@@ -31,7 +31,7 @@
 #define INJECT_L2_PHYS (TEST_PHYS + STAGE_SIZE)
 #define INJECT_PHYS (INJECT_L2_PHYS + 0x1000u)
 #define INJECT_PAGES 64u
-#define INJECT_VA 0x0a000000u
+#define INJECT_VA 0x30000000u
 #define STAGE0_VA (INJECT_VA + 0x1000u)
 #define SYNTH_STACK_TOP (INJECT_VA + 0x3f000u - 16u)
 #define SENTINEL_VA (INJECT_VA + 0x3f000u)
@@ -39,7 +39,7 @@
 #define L1_DATA_VA 0x07f00044u
 #define L1_CODE_VA 0x07f00048u
 #define L1_STAGE_VA 0x07f00240u
-#define L1_INJECT_VA 0x07f00280u
+#define L1_INJECT_VA 0x07f00c00u
 #define SWI_VECTOR_VA 0x08000008u
 
 #define COARSE_FLAGS 0x11u
@@ -289,6 +289,13 @@ static int build_launcher_ram(struct e2e *s)
     return 1;
 }
 
+static uint32_t lcd_framebuffer_phys(struct e2e *s)
+{
+    uint32_t v = s->hdw->s3c2410_lcd->lcdsaddr1;
+    return ((v << 1) & 0x7fc00000u) |
+           ((v << 1) & 0x003ffffeu);
+}
+
 static int snapshot_stock(struct e2e *s)
 {
     if (!guest_read32(s->hdw, L1_DATA_VA, &s->old_data) ||
@@ -297,6 +304,31 @@ static int snapshot_stock(struct e2e *s)
         !guest_read32(s->hdw, L1_INJECT_VA, &s->old_inject) ||
         !guest_read32(s->hdw, SWI_VECTOR_VA, &s->old_swi))
         return 0;
+
+    /*
+     * HP's stock 49/50 layout stores the LCD framebuffer in the same 4 KiB
+     * S3C2410 SRAM that backs the low part of the L1 table. Never choose a
+     * synthetic descriptor whose four bytes overlap the live framebuffer.
+     */
+    uint32_t l1_phys = s->hdw->cpu->cp15.c2_base0 & 0xffffc000u;
+    uint32_t inject_desc_phys = l1_phys + 0x0c00u;
+    uint32_t fb_phys = lcd_framebuffer_phys(s);
+    uint32_t fb_bytes = 160u * 80u / 8u;
+
+    if (s->old_inject != 0u) {
+        fprintf(stderr, "synthetic L1 slot 0x300 is not empty: %08x\n",
+                s->old_inject);
+        return 0;
+    }
+
+    if (inject_desc_phys + 4u > fb_phys &&
+        inject_desc_phys < fb_phys + fb_bytes) {
+        fprintf(stderr,
+                "synthetic L1 descriptor overlaps LCD framebuffer: "
+                "desc=%08x fb=%08x..%08x\n",
+                inject_desc_phys, fb_phys, fb_phys + fb_bytes);
+        return 0;
+    }
 
     snapshot_cpu(&s->stock, s->hdw->cpu);
     return 1;
@@ -322,6 +354,10 @@ static void json(struct e2e *s, const char *status)
     uint32_t l1_phys_base = ttbr0 & 0xffffc000u;
     uint32_t inject_phys_desc = ldl_phys(l1_phys_base + 0x280u);
     uint32_t trace = ldl_phys(INJECT_PHYS + 0x930u);
+    uint32_t lcdsaddr1 = s->hdw->s3c2410_lcd->lcdsaddr1;
+    uint32_t fb_phys = lcd_framebuffer_phys(s);
+    uint32_t inject_desc_addr =
+        (s->hdw->cpu->cp15.c2_base0 & 0xffffc000u) + 0x0c00u;
 
     fprintf(
         f,
@@ -345,7 +381,10 @@ static void json(struct e2e *s, const char *status)
         "  \"sp\":\"0x%08x\",\n"
         "  \"lr\":\"0x%08x\",\n"
         "  \"ifsr\":\"0x%08x\",\n"
-        "  \"ifar\":\"0x%08x\"\n"
+        "  \"ifar\":\"0x%08x\",\n"
+        "  \"lcdsaddr1\":\"0x%08x\",\n"
+        "  \"framebuffer_phys\":\"0x%08x\",\n"
+        "  \"inject_desc_phys\":\"0x%08x\"\n"
         "}\n",
         status,
         s->result,
@@ -361,7 +400,10 @@ static void json(struct e2e *s, const char *status)
         s->hdw->cpu->regs[13],
         s->hdw->cpu->regs[14],
         s->hdw->cpu->cp15.c5_insn,
-        s->hdw->cpu->cp15.c6_insn);
+        s->hdw->cpu->cp15.c6_insn,
+        lcdsaddr1,
+        fb_phys,
+        inject_desc_addr);
     fclose(f);
 }
 
