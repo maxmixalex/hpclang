@@ -1,0 +1,78 @@
+name: x50ng headless ARM boot
+
+on:
+  push:
+    paths:
+      - "tests/x50ng/**"
+      - "tools/pgm-to-png.py"
+      - ".github/workflows/x50ng-headless.yml"
+  pull_request:
+    paths:
+      - "tests/x50ng/**"
+      - "tools/pgm-to-png.py"
+      - ".github/workflows/x50ng-headless.yml"
+  workflow_dispatch:
+
+jobs:
+  arm-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install x50ng build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git pkg-config wget unzip \
+            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+
+      - name: Fetch pinned x50ng ARM emulator
+        run: |
+          git clone --no-checkout \
+            https://github.com/gwenhael-le-moine/x50ng.git \
+            build/x50ng
+          git -C build/x50ng checkout \
+            ac1e1e24827aa9c66e020baa47bb253746c037b5
+          git -C build/x50ng rev-parse HEAD | tee build/x50ng-source.txt
+
+      - name: Install hpclang headless frontend
+        run: |
+          cp tests/x50ng/headless-main.c build/x50ng/src/main.c
+
+      - name: Build x50ng without a runtime GUI
+        working-directory: build/x50ng
+        run: |
+          make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Fetch official 49g+/50g firmware fixtures
+        working-directory: build/x50ng
+        run: |
+          make -C dist/firmware bootloaders official
+
+      - name: Boot ARM firmware and capture LCD
+        run: |
+          export HPCLANG_X50NG_PGM="$GITHUB_WORKSPACE/build/x50ng-lcd.pgm"
+          export HPCLANG_X50NG_JSON="$GITHUB_WORKSPACE/build/x50ng-state.json"
+          mkdir -p build/x50ng-state
+          timeout 30s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/x50ng-state" \
+            --overwrite-config \
+            --flash \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
+          python tools/pgm-to-png.py \
+            build/x50ng-lcd.pgm build/x50ng-lcd.png
+          cat build/x50ng-state.json
+
+      - name: Upload ARM boot screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: x50ng-headless-arm-boot
+          path: |
+            build/x50ng-lcd.pgm
+            build/x50ng-lcd.png
+            build/x50ng-state.json
+            build/x50ng-source.txt
+          if-no-files-found: error
