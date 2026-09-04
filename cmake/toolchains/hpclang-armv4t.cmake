@@ -17,7 +17,7 @@ set(HPCLANG_ARCH_FLAGS
 )
 
 set(HPCLANG_RUNTIME_FLAGS
-    "-fno-exceptions -fno-rtti -ffreestanding -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-pic -fno-pie"
+    "-fno-exceptions -fno-rtti -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-pic -fno-pie"
     CACHE STRING "hpclang runtime flags"
 )
 
