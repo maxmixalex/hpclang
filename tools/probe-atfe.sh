@@ -126,8 +126,9 @@ echo
 echo "== HP39 hardware runtime validation =="
 
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
+"$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-runtime-diag.c" -o "$OUT/hp39-runtime-diag.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/hp39-runtime-diag.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 

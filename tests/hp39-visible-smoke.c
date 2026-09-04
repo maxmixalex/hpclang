@@ -12,6 +12,8 @@
 #define HEIGHT 64
 #define STRIDE 20
 
+void hpclang_diag_step(uint32_t step);
+
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
 volatile uint32_t hpclang_bss_probe;
@@ -31,6 +33,7 @@ static volatile double hpclang_double_b = 3.5;
 __attribute__((constructor))
 static void hpclang_runtime_ctor(void)
 {
+    hpclang_diag_step(0x31);
     hpclang_ctor_probe = 0xc0def00du;
 }
 
@@ -151,16 +154,21 @@ static int finish(uint32_t failure)
 
 int main(void)
 {
+    hpclang_diag_step(0x10);
     const struct hpclang_boot_info *boot = hpclang_boot_info();
 
     if (boot->model != 2u || boot->rw_bytes < 0x4000u)
         return finish(0x01);
+
+    hpclang_diag_step(0x11);
 
     if (hpclang_initialized_probe != 0x13579bdfu)
         return finish(0x02);
 
     if (hpclang_bss_probe != 0u)
         return finish(0x03);
+
+    hpclang_diag_step(0x12);
 
     if (hpclang_tls_initialized != 0x2468ace0u || hpclang_tls_zero != 0u)
         return finish(0x04);
@@ -170,21 +178,27 @@ int main(void)
         hpclang_tls_zero != 0x11223344u)
         return finish(0x05);
 
+    hpclang_diag_step(0x13);
+
     if (hpclang_ctor_probe != 0xc0def00du)
         return finish(0x06);
 
+    hpclang_diag_step(0x14);
     uint32_t q32 = hpclang_u32_a / hpclang_u32_b;
     if (q32 != 10309u)
         return finish(0x07);
 
+    hpclang_diag_step(0x15);
     uint64_t q64 = hpclang_u64_a / hpclang_u64_b;
     if (q64 != UINT64_C(1311764532170))
         return finish(0x08);
 
+    hpclang_diag_step(0x16);
     double fp = hpclang_double_a * hpclang_double_b + 0.5;
     if (!(fp > 4.87 && fp < 4.88))
         return finish(0x09);
 
+    hpclang_diag_step(0x17);
     char src[] = "hpclang";
     char copy[16];
     memset(copy, 0, sizeof(copy));
@@ -192,6 +206,7 @@ int main(void)
     if (strlen(copy) != 7u || strcmp(copy, "hpclang") != 0)
         return finish(0x0a);
 
+    hpclang_diag_step(0x18);
     char *heap = malloc(24);
     if (heap == NULL)
         return finish(0x0b);
@@ -200,6 +215,7 @@ int main(void)
     if (strcmp(heap, "hpclang") != 0)
         return finish(0x0c);
 
+    hpclang_diag_step(0x19);
     char formatted[64];
     int n = snprintf(
         formatted,
@@ -212,6 +228,8 @@ int main(void)
         strcmp(formatted, "hpclang:10309:1311764532170") != 0)
         return finish(0x0d);
 
+    hpclang_diag_step(0x1a);
     free(heap);
+    hpclang_diag_step(0x1b);
     return finish(0);
 }
