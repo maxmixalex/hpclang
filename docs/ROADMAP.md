@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: real-hardware canonical runtime validated; emulator gate pending**
+**Status: real-hardware canonical runtime validated; Saturn-side Emu48 automation optional**
 
 Targets:
 
@@ -98,9 +98,15 @@ Steps:
 4. [x] restore stock HPGCC39 transfer filenames for maximum Conn3x compatibility;
 5. [x] enter HPC1 on a real HP39gs over USB: model 2 and RW 0x00014000 observed;
 6. [x] validate return/state restoration on the same real HP39gs;
-7. [ ] execute the same smoke in Emu48 through a driverless serial peer;
+7. [ ] automate HP39 stock UI/package-transfer coverage in Emu48 where useful;
 8. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
 9. [ ] verify sibling 39g+/40gs differences.
+
+Emu48 does not emulate the ARM native execution engine used by HPGCC/HPC1 on
+the Apple-family calculators: its NATIVE/ARMSYS/ARMSAT paths are not
+implemented. It therefore cannot be an execution oracle for the HP39 HPC1
+runtime. Real HP39gs hardware is the authoritative execution gate; Emu48 may
+still cover the Saturn-side stock UI and transfer protocol.
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
@@ -114,8 +120,9 @@ delay: `main()` records the boot fields and returns immediately.
 
 Completion criterion:
 
-> The canonical HPC1 runtime test suite passes in Emu48 and on the real 39gs
-> without a legacy Launcher V3 application ABI.
+> The canonical HPC1 runtime test suite passes on real HP39gs hardware without
+> a legacy Launcher V3 application ABI, with any Emu48 coverage limited to the
+> Saturn-side stock UI/package-transfer path.
 
 ## M4 — HP48gII family
 
@@ -140,7 +147,7 @@ Completion criterion:
 Steps:
 
 - replace the historical VC launcher dependency with the common bootstrap;
-- validate on Emu48;
+- validate ARM execution on x50ng/x49gp-class hardware emulation;
 - validate on real hardware when useful;
 - preserve only platform-specific packaging and OS integration.
 
@@ -150,34 +157,38 @@ Completion criterion:
 
 ## M6 — Automated emulator E2E
 
-**Status: design validated; driverless HP39 transport in progress**
+**Status: headless infrastructure active; true ARM execution backend moving to x50ng**
 
 Validated design:
 
-- Emu48 exposes direct core APIs for engine state, document/state loading,
-  object loading, keyboard injection and memory inspection;
-- use those APIs from a thin headless harness instead of GUI-coordinate
-  automation;
-- HP39/40 Aplets cannot use Emu48's object-stack loader and must enter through
-  the calculator communication path;
-- Emu48's calculator UART behavior is separable from its Win32 host-COM
-  transport, so HP39 automation can replace only the host endpoint with an
-  in-memory byte peer rather than requiring a virtual COM kernel driver;
-- boot a known calculator ROM/state, transfer the generated package, execute it
-  and inspect a machine-readable result in emulated memory;
-- HP published a dedicated 2.15 emulator ROM for 48gII/49g+/50g, making that
-  family the simplest public-CI ROM source;
-- HP also published the 39gs 2.22 flash image; its reproducible conversion into
-  the Emu48 ROM format still needs to be pinned down.
+- Emu48+ can be driven from a headless x86 controller for stock UI, state,
+  keyboard, memory/debugger API and screenshot infrastructure;
+- Emu48 does not implement the Apple-family ARM-native NATIVE/ARMSYS/ARMSAT
+  execution path and therefore cannot execute HPC1;
+- x50ng/x49gp emulates the actual S3C2410/ARM hardware and is the execution
+  backend for automated HPC1 tests;
+- x50ng exposes calculator keys and the LCD controller through host-side APIs,
+  allowing a no-GUI test frontend to inject input and capture a deterministic
+  131x80 LCD image directly;
+- keep both emulators as external test dependencies. No emulator implementation
+  becomes part of the hpclang runtime.
 
-HPComm38 and Emu48 source are protocol/emulator evidence only. Keep them as
-external test/research dependencies and independently implement the narrow
-hpclang-side transfer peer.
+Execution plan:
+
+1. [x] build the Emu48+ controller and deterministic screenshot pipeline;
+2. [ ] boot official 49g+/50g ARM firmware in x50ng without a runtime GUI and
+   capture its LCD as a CI artifact;
+3. [ ] run common bootstrap + the canonical HPC1 runtime image under x50ng and
+   stop on machine-readable PASS;
+4. [ ] capture the PASS LCD frame in CI;
+5. [ ] upgrade the ARM execution gate to the real stock 49g+/50g
+   package/launcher path.
 
 Completion criterion:
 
-> At least one calculator-family E2E test runs automatically from source build
-> through calculator execution and returns machine-readable success.
+> At least one real ARM calculator-family path runs automatically from source
+> build through HPC1 execution, produces machine-readable success and uploads a
+> deterministic LCD screenshot.
 
 ## M7 — Common platform services
 
