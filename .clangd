@@ -1,0 +1,10 @@
+CompileFlags:
+  Add:
+    - --target=arm-none-eabi
+    - -march=armv4t
+    - -marm
+    - -ffreestanding
+    - -fno-builtin
+    - -fno-stack-protector
+    - -fno-unwind-tables
+    - -fno-asynchronous-unwind-tables
