@@ -30,8 +30,8 @@ static const struct key_action lshift_down = { HP4950_KEY_LEFTSHIFT, 1 };
 static const struct key_action lshift_up = { HP4950_KEY_LEFTSHIFT, 0 };
 static const struct key_action g_down = { HP4950_KEY_G, 1 };
 static const struct key_action g_up = { HP4950_KEY_G, 0 };
-static const struct key_action down_down = { HP4950_KEY_DOWN, 1 };
-static const struct key_action down_up = { HP4950_KEY_DOWN, 0 };
+static const struct key_action up_down = { HP4950_KEY_UP, 1 };
+static const struct key_action up_up = { HP4950_KEY_UP, 0 };
 static const struct key_action a_down = { HP4950_KEY_A, 1 };
 static const struct key_action a_up = { HP4950_KEY_A, 0 };
 
@@ -107,13 +107,18 @@ static void open_files(void *arg)
         fprintf(stderr, "stock launcher explorer: cannot schedule FILES chord\n");
 }
 
+static void capture_files(void *arg)
+{
+    struct state *s = arg;
+    if (!capture(s->hdw, s->files))
+        fprintf(stderr, "stock launcher explorer: blank FILES capture\n");
+}
+
 static void enter_sd(void *arg)
 {
     (void)arg;
-    if (!tap(&down_down, &down_up, 0) ||
-        !tap(&down_down, &down_up, 250000) ||
-        !tap(&down_down, &down_up, 500000) ||
-        !tap(&a_down, &a_up, 850000))
+    if (!tap(&up_down, &up_up, 0) ||
+        !tap(&a_down, &a_up, 300000))
         fprintf(stderr, "stock launcher explorer: cannot enter SD\n");
 }
 
@@ -163,8 +168,9 @@ int main(int argc, char **argv)
         !tap(&f_down, &f_up, 4000000LL) ||
         !later(capture_home, &s, 7000000LL) ||
         !later(open_files, &s, 8000000LL) ||
+        !later(capture_files, &s, 10200000LL) ||
         !later(enter_sd, &s, 10500000LL) ||
-        !later(finish, &s, 13500000LL)) {
+        !later(finish, &s, 13000000LL)) {
         fprintf(stderr, "stock launcher explorer: cannot schedule actions\n");
         return EXIT_FAILURE;
     }
