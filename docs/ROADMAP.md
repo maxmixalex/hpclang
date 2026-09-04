@@ -261,3 +261,22 @@ independently of whether the stock launcher entered hpclang from a privileged
 or unprivileged ARM mode.
 
 Hardware re-validation is pending.
+
+
+### HP39gs runtime checkpoint: ARMv4T 64-bit divmod interworking
+
+After SWI-supervisor interrupt isolation, real HP39gs hardware progressed
+reliably through TLS, constructors and 32-bit division and stopped at
+`STEP 15`, immediately before/inside the 64-bit unsigned division check.
+
+ATfE 22.1.0 resolves the operation through LLVM compiler-rt's ARM
+`__aeabi_uldivmod` wrapper. Upstream's generic ARM wrapper restores its saved
+return address with `pop {..., pc}`. That epilogue cannot interwork from ARM
+state back to a Thumb caller on ARMv4T.
+
+hpclang now supplies narrow ARMv4T-safe `__aeabi_uldivmod` and
+`__aeabi_ldivmod` wrappers. They retain compiler-rt's canonical
+`__udivmoddi4`/`__divmoddi4` algorithms and only replace the epilogue with
+explicit LR restore plus `bx lr`.
+
+Hardware validation is pending.

@@ -40,11 +40,12 @@ echo
 "$CC" --target=arm-none-eabi -print-multi-lib | grep armv4t || true
 
 "$CC" "${COMMON[@]}" -marm     -c "$ROOT/runtime/core/start.S" -o "$OUT/start.o"
+"$CC" "${COMMON[@]}" -marm     -c "$ROOT/runtime/core/armv4t-eabi-div.S" -o "$OUT/armv4t-eabi-div.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/runtime.c" -o "$OUT/runtime.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/libc/sbrk.c" -o "$OUT/sbrk.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-runtime-smoke.c" -o "$OUT/smoke.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/smoke.o"     -o "$OUT/hpclang-atfe.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/smoke.o"     -o "$OUT/hpclang-atfe.elf"
 
 echo
 echo "== undefined global symbols =="
@@ -53,6 +54,13 @@ if "$READELF" -Ws "$OUT/hpclang-atfe.elf" | grep -E ' GLOBAL .* UND '; then
     exit 1
 fi
 echo "none"
+
+echo
+echo "== ARMv4T EABI divmod wrapper check =="
+"$ATFE/bin/llvm-objdump" -d "$OUT/hpclang-atfe.elf" |
+    sed -n '/<__aeabi_uldivmod>:/,/^$/p'
+"$ATFE/bin/llvm-objdump" -d "$OUT/hpclang-atfe.elf" |
+    sed -n '/<__aeabi_ldivmod>:/,/^$/p' || true
 
 echo
 echo "== resolved runtime helpers =="
@@ -72,7 +80,7 @@ echo "== libc++ Armv4T smoke =="
 "$CXX" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-platform-stubs.c" -o "$OUT/platform-stubs.o"
 
-"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
+"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
 
 if "$READELF" -Ws "$OUT/hpclang-atfe-cxx.elf" | grep -E ' GLOBAL .* UND '; then
     echo "unexpected undefined global C++ symbols" >&2
@@ -128,7 +136,7 @@ echo "== HP39 hardware runtime validation =="
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-runtime-diag.c" -o "$OUT/hp39-runtime-diag.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/hp39-runtime-diag.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/hp39-runtime-diag.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 
