@@ -318,6 +318,11 @@ static void json(struct e2e *s, const char *status)
     (void)guest_read32(s->hdw, L1_INJECT_VA, &inject);
     (void)guest_read32(s->hdw, SWI_VECTOR_VA, &swi);
 
+    uint32_t ttbr0 = s->hdw->cpu->cp15.c2_base0;
+    uint32_t l1_phys_base = ttbr0 & 0xffffc000u;
+    uint32_t inject_phys_desc = ldl_phys(l1_phys_base + 0x280u);
+    uint32_t trace = ldl_phys(INJECT_PHYS + 0x930u);
+
     fprintf(
         f,
         "{\n"
@@ -332,7 +337,15 @@ static void json(struct e2e *s, const char *status)
         "  \"l1_stage\":\"0x%08x\",\n"
         "  \"l1_inject\":\"0x%08x\",\n"
         "  \"swi\":\"0x%08x\",\n"
-        "  \"saved_swi\":\"0x%08x\"\n"
+        "  \"saved_swi\":\"0x%08x\",\n"
+        "  \"ttbr0\":\"0x%08x\",\n"
+        "  \"inject_phys_desc\":\"0x%08x\",\n"
+        "  \"stage0_trace\":\"0x%08x\",\n"
+        "  \"cpsr\":\"0x%08x\",\n"
+        "  \"sp\":\"0x%08x\",\n"
+        "  \"lr\":\"0x%08x\",\n"
+        "  \"ifsr\":\"0x%08x\",\n"
+        "  \"ifar\":\"0x%08x\"\n"
         "}\n",
         status,
         s->result,
@@ -340,7 +353,15 @@ static void json(struct e2e *s, const char *status)
         s->returned ? "true" : "false",
         s->hdw->cpu->regs[15],
         s->stock.regs[15],
-        data, code, stage, inject, swi, s->old_swi);
+        data, code, stage, inject, swi, s->old_swi,
+        ttbr0,
+        inject_phys_desc,
+        trace,
+        cpsr_read(s->hdw->cpu),
+        s->hdw->cpu->regs[13],
+        s->hdw->cpu->regs[14],
+        s->hdw->cpu->cp15.c5_insn,
+        s->hdw->cpu->cp15.c6_insn);
     fclose(f);
 }
 
