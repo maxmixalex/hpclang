@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: real-hardware HPC1 entry/return validated; runtime and emulator gates pending**
+**Status: real-hardware canonical runtime validated; emulator gate pending**
 
 Targets:
 
@@ -99,7 +99,7 @@ Steps:
 5. [x] enter HPC1 on a real HP39gs over USB: model 2 and RW 0x00014000 observed;
 6. [x] validate return/state restoration on the same real HP39gs;
 7. [ ] execute the same smoke in Emu48 through a driverless serial peer;
-8. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc;
+8. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
 9. [ ] verify sibling 39g+/40gs differences.
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
@@ -322,3 +322,30 @@ stock UI.
 The hardware test now preserves the final PASS/FAIL page for a short finite
 test-only hold and no longer overwrites it during fini-array teardown.
 Production runtime behavior is unchanged.
+
+
+### HP39gs hardware checkpoint: canonical runtime PASS
+
+Real HP39gs hardware now reports:
+
+```text
+RUNTIME PASS
+```
+
+The validated path includes:
+
+- initialized globals and BSS;
+- static TLS (.tdata/.tbss) and TLS read/write;
+- init-array constructors;
+- compiler/runtime 32-bit and 64-bit division;
+- ARMv4T-target-built double soft-float multiply/add/compare;
+- picolibc memory/string routines;
+- malloc/free;
+- snprintf;
+- clean return to the responsive stock OS.
+
+The ARMv4T EABI divmod veneers, target-built soft-float core and common
+bootstrap interrupt isolation are architecture/common-runtime code, not
+HP39-specific platform code. HP39-specific code remains limited to packaging,
+stage0/platform integration and hardware-facing validation helpers. The common
+pieces still require execution validation on HP48gII and HP49g+/50g.
