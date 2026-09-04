@@ -33,6 +33,7 @@ SECTIONS
         . = ALIGN(8);
 
         __preinit_array_start = .;
+        __bothinit_array_start = .;
         KEEP(*(.preinit_array))
         __preinit_array_end = .;
 
@@ -40,6 +41,7 @@ SECTIONS
         KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
         KEEP(*(.init_array .ctors))
         __init_array_end = .;
+        __bothinit_array_end = .;
 
         __fini_array_start = .;
         KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
