@@ -132,6 +132,21 @@ echo "== visible HP39 HPC1 smoke =="
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 
+python3 - "$OUT/hp39-visible.hpc" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+magic, image_size, entry_offset, rw_static = struct.unpack(
+    "<4sIII", Path(sys.argv[1]).read_bytes()[:16]
+)
+assert magic == b"HPC1"
+assert image_size > 0
+assert entry_offset == 0
+assert rw_static >= 4, "pure-BSS RW footprint was lost by the packer"
+print(f"PASS: visible HPC1 RW footprint is {rw_static} bytes")
+PY
+
 result_addr="$("$ATFE/bin/llvm-nm" -n "$OUT/hp39-visible.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
 test -n "$result_addr"
