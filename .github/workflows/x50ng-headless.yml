@@ -63,7 +63,7 @@ jobs:
 
           /tmp/atfe/bin/clang \
             --target=arm-none-eabi -march=armv4t -marm \
-            -DHPCLANG_STAGE0_MODEL=6 \
+            -DHPCLANG_STAGE0_MODEL=6 -DHPCLANG_STAGE0_TRACE=1 \
             -c platform/armtoolbox/stage0.S \
             -o build/x50ng-e2e/stage0-hp50g.o
 
