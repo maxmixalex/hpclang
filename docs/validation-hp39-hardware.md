@@ -1,19 +1,19 @@
 # HP39gs real-hardware validation
 
-This is the preferred first manual execution gate for the HP39-family backend.
-It validates the same generated HPC1 image that will later run under automated
-Emu48 E2E.
+This is the authoritative execution gate for the HP39/40-family backend. It
+validates the same HPC1 ABI/runtime that is also exercised by automated ARM
+execution CI on other S3C2410-family targets.
 
 ## Requirements
 
 - an HP39gs;
 - its normal 5-pin mini-USB PC cable;
 - HP 39/40 Connectivity Kit / Conn3x 2.x;
-- the `hpclang-hp39-emulator-smoke` artifact from the `HP39 package`
+- the `hpclang-hp39-hardware-validation` artifact from the `HP39 package`
   workflow.
 
-The HP39gs supports PC transfer over USB. The calculator's separate serial port
-and an Emu48 virtual COM setup are not required for this test.
+The HP39gs supports PC transfer over USB. Its separate serial port is not
+required for this test.
 
 ## Bundle layout
 
@@ -45,33 +45,26 @@ the extracted directory and let the calculator browse the generated
 
 ## Expected result
 
-The current return-only smoke intentionally shows no diagnostic page. Real
-hardware has already proven HPC1 entry and framebuffer output.
+The current package runs the canonical runtime validation. It briefly leaves a
+machine-readable and visible result in the framebuffer, then returns to the
+stock OS.
 
-Launch `HPCLANG HPC1 TEST`. A pass is an immediate clean return to the stock
-APLET library with the calculator still responsive. The smoke does not touch
-GPIO, framebuffer, interrupt-controller state or CPSR and contains no delay.
+Success:
 
-If it hangs, the failure is after normal HPC1 `main()` return and the next
-debugging target is the common return/MMU-restore/stage0-cleanup chain.
+```text
+RUNTIME PASS
+```
 
-## Report
+Failure:
 
-For a pass, record the visible four lines and whether it returned automatically.
+```text
+RUNTIME FAIL
+CODE xx
+```
 
-For a failure, record the earliest boundary:
-
-- Conn3x/USB connection failure;
-- LIB275L transfer failure;
-- Aplet transfer failure;
-- Aplet is present but launch returns immediately;
-- reset or ADDRESS ERROR before HPC1 output;
-- partial/corrupt output;
-- PASS reached but automatic return fails;
-- exit succeeds but the stock OS is corrupted.
-
-A screenshot is useful but the exact failure boundary is more important.
-
+After the result, APLET/ENTER/ON must still respond. A stale result page until
+the stock UI redraws is acceptable; a frozen keyboard, reset, ADDRESS ERROR or
+persistent OS-state damage is not.
 
 ## First real-hardware observation
 
@@ -175,3 +168,23 @@ steps `F0` and `FF` immediately before returning.
 The current test no longer writes teardown checkpoints. It leaves
 `RUNTIME PASS` or `RUNTIME FAIL / CODE xx` visible for a short finite hold,
 then returns automatically. No key press is required during the result page.
+
+
+## HP40gs sibling validation
+
+HP40gs uses the same S3C2410A/ARM920T generation, 256 KiB RAM and 131x64 LCD as
+HP39gs, but has a different stock ROM/CAS image, 2 MiB flash, no infrared, and a
+distinct hpclang model ID.
+
+The HP39gs hardware run is sufficient evidence for the common HP39/40 ARM
+runtime implementation. HP40gs support still requires one target-specific
+closure test:
+
+1. build/package the same HPC1 runtime for model 3;
+2. transfer it through the stock HP40gs Connectivity Kit/Aplet path;
+3. observe model 3 and `RUNTIME PASS`;
+4. verify clean return to the HP40gs stock OS.
+
+That check may be done on real HP40gs hardware or a future emulator that truly
+executes the underlying ARM920T code. A Saturn-only simulator is not an
+execution substitute.
