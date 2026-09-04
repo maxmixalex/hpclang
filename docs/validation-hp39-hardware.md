@@ -160,3 +160,18 @@ Failure codes:
 After either result appears, press APLET. Opening the normal APLET library
 confirms that the result was left by a program that has already returned rather
 than by a hung HPC1 process.
+
+
+## Final-result visibility correction
+
+With the target-built ARMv4T double soft-float build, the real HP39gs no longer
+stopped at a checkpoint: ENTER caused only a short busy interval and the stock
+OS remained responsive afterwards, including a working APLET menu.
+
+That run is strong execution evidence but not yet a visually explicit PASS:
+the diagnostic startup wrapper overwrote `RUNTIME PASS/FAIL` with teardown
+steps `F0` and `FF` immediately before returning.
+
+The current test no longer writes teardown checkpoints. It leaves
+`RUNTIME PASS` or `RUNTIME FAIL / CODE xx` visible for a short finite hold,
+then returns automatically. No key press is required during the result page.
