@@ -121,3 +121,60 @@ fi
     grep -E 'LOAD|Entry point'
 
 echo "PASS: stock ARMToolbox stage1 is fixed-address, non-PIC and self-contained."
+
+echo
+echo "== stock ARMToolbox stage0 bundle =="
+
+cat > "$OUT/stage0-bundle.S" <<EOF
+.section .rodata.hpclang.bundle,"a",%progbits
+.align 2
+
+.global __stage1_blob_start
+.global __stage1_blob_end
+.global __stage1_blob_size
+.global __hpc1_blob_start
+.global __hpc1_blob_end
+
+__stage1_blob_start:
+.incbin "$OUT/armtoolbox-stage1.bin"
+__stage1_blob_end:
+.set __stage1_blob_size, __stage1_blob_end - __stage1_blob_start
+
+.align 2
+__hpc1_blob_start:
+.incbin "$OUT/hpclang-atfe.hpc"
+__hpc1_blob_end:
+EOF
+
+"$CC" "${COMMON[@]}" -marm -DHPCLANG_STAGE0_MODEL=2     -c "$ROOT/platform/armtoolbox/stage0.S" -o "$OUT/stage0.o"
+"$CC" "${COMMON[@]}" -marm     -c "$OUT/stage0-bundle.S" -o "$OUT/stage0-bundle.o"
+
+"$ATFE/bin/ld.lld" -m armelf     -T "$ROOT/platform/armtoolbox/stage0.ld"     "$OUT/stage0.o" "$OUT/stage0-bundle.o"     -o "$OUT/armtoolbox-stage0.elf"
+
+entry="$("$READELF" -h "$OUT/armtoolbox-stage0.elf" |
+    awk '/Entry point address:/ {print $4}')"
+test "$entry" = "0x0"
+
+if "$ATFE/bin/llvm-nm" -u "$OUT/armtoolbox-stage0.elf" | grep .; then
+    echo "unexpected undefined stage0 symbols" >&2
+    exit 1
+fi
+
+"$ATFE/bin/llvm-objcopy" -O binary     "$OUT/armtoolbox-stage0.elf"     "$OUT/armtoolbox-stage0.bin"
+
+python3 "$ROOT/tools/armtoolbox-wrap.py"     "$OUT/armtoolbox-stage0.bin"     "$OUT/hp39gs-hpc1.hp"
+
+python3 - "$OUT/hp39gs-hpc1.hp" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+p = Path(sys.argv[1]).read_bytes()
+assert p[:8] == b"HPHP49-C"
+assert p[13:20] == b"\x4c\xb3\x80A>CP"
+assert p[-4:] == struct.pack("<I", 0x3176B34C)
+assert p[-16:-12] == struct.pack("<I", 0)
+print(f"PASS: single-form stock ARMToolbox envelope, {len(p)} bytes")
+PY
+
+echo "PASS: PIC stage0 + fixed stage1 + HPC1 bundle builds without legacy runtime objects."
