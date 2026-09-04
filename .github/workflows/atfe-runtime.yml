@@ -1,4 +1,4 @@
-name: ATfE runtime
+name: Core runtime
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - "runtime/libc/**"
       - "include/hpclang/**"
       - "tests/atfe-runtime-smoke.c"
+      - "tests/atfe-cxx-smoke.cpp"
       - "tools/probe-atfe.sh"
       - "tools/hpclang-pack.py"
       - ".github/workflows/atfe-runtime.yml"
