@@ -2,120 +2,144 @@
 
 ## Decision
 
-The project should not choose one historical HPGCC release as a wholesale
-baseline.
+hpclang does **not** select HPGCC 1.1, 2.0 or 3.0 wholesale as its baseline, and it is not a 39gs-specific SDK.
 
-The clean baseline is instead a **39gs-first machine contract** assembled from
-the parts of the lineage that are actually useful:
+The project baseline is assembled from four independently useful layers:
 
-1. **HPGCC 1.1-p1 39G support** is the authoritative reference for the HP39
-   calculator-side launch/aplet contract.
-2. **HPGCC 2.0 VC** is the architectural reference for removing the old
-   r10/GOT code model and for ARM/Thumb interworking.
-3. **Current LLVM ROPI+RWPI** is the code model for newly built hpclang
-   programs.
-4. **HPGCC3 R004.revA** is a source/API reference and an optional 50g ROMLIB
-   backend, not the universal runtime baseline.
+1. **Launcher V3 simple/MMU ABI** as the common historical native-ARM launch contract.
+2. **Current LLVM ROPI+RWPI** as the normal code/data relocation model for newly built applications.
+3. **Per-family calculator adapters** for HP39/40, 48gII and 49g+/50g packaging, Saturn address conversion, memory discovery and OS entry points.
+4. **Optional later-generation profiles** for HPGCC 2.0 virtual-code addressing and HPGCC3 ROMLIB compatibility.
 
-The intended first-class clean profile is therefore `hp39gs-clean`, not
-`hpgcc11-with-clang`, `hpgcc20-with-clang`, or `hpgcc3-with-clang`.
+The first clean implementation happens to be on a 39gs because that is the first available hardware-validation path. It must not dictate the common ABI.
 
-## Why 1.1 cannot be the final compiler/runtime baseline
+## Historical target families
 
-1.1 is indispensable because it contains the 39G-specific launcher and aplet
-work, but its ARM object model is legacy GCC-specific:
+### HP39/40 ARM family
 
-- APCS32;
-- r10/sl as a single PIC/GOT base;
+Reference material:
+
+- HPGCC 1.1-p1 39G support;
+- `HP39-Aplet/`;
+- ARMToolbox39 / library 275;
+- HP39 aplet and directory packaging.
+
+The 39G launcher intentionally removed secondary HPGCC function-entry dispatch and retains the Launcher V3 M/R memory-packer path.
+
+### HP48gII
+
+Reference material:
+
+- the ordinary HPGCC 1.1 source explicitly contains HP48gII compatibility work;
+- ARMToolbox includes a separate `masd_source48/` implementation and `L275_48.LIB`.
+
+The 48 launcher uses a different Saturn-to-ARM mapping and a different usable-memory model from 49g+/50g. It therefore deserves its own backend even when most C runtime code is shared.
+
+### HP49g+ / HP50g
+
+Reference material:
+
+- ordinary ARMToolbox;
+- HPGCC 2.0 / SP2;
+- HPGCC3.
+
+HPGCC 2.0 SP2 is catalogued for the 49/50 platform. ARMToolbox 3.1 adds virtual code addressing, removes the old stack bias and improves cache flushing.
+
+HPGCC3 documentation describes the 49g+/50g family and its source explicitly states that both machines share the same 512 KiB physical RAM layout.
+
+## Common executable contract
+
+Launcher V3 v1.1 simple format is implemented by:
+
+- ordinary ARMToolbox;
+- ARMToolbox48;
+- ARMToolbox39.
+
+HPGCC 2.0 Launcher V3 v1.2 keeps that simple format for assembler/MMU programs and adds a second virtual-code format.
+
+Therefore the common hpclang payload should initially target the simple/MMU contract:
+
+- marker `0B34C`;
+- primary entry point;
+- Launcher V3 memory-requirement word;
+- M memory-packer flag;
+- optional R OS-RAM flag where supported;
+- target-side family adapter supplies the machine-specific launch implementation.
+
+This is a better compatibility baseline than either the 1.1 r10/GOT object ABI or the 2.0 fixed virtual-code ABI.
+
+## Common LLVM code model
+
+New code uses stock LLVM:
+
+```
+--target=arm-none-eabi
+-march=armv4t
+-mabi=apcs-gnu
+-mfloat-abi=soft
+-fropi
+-frwpi
+```
+
+ROPI removes the need to know the physical placement of code. RWPI gives writable data a standard ARM static base through r9.
+
+A family runtime may choose an appropriate virtual writable-data window while preserving the source-level ABI.
+
+No new application should depend on:
+
+- GCC `-mpic-register=r10`;
+- GCC `-msingle-pic-base`;
 - runtime GOT patching;
-- a special non-PIC loader requiring `-ffixed-r10`.
+- a historical HPGCC object.
 
-Those details are compatibility baggage, not desirable hpclang ABI.
+## HPGCC 2.0 features to preserve
 
-## Why 2.0 is a major architectural reference
+HPGCC 2.0 is an important compatibility and optimization target, not a universal baseline.
 
-The official SourceForge `frozen_2.0_VC_release` source tree no longer builds
-the 1.1 MMU loader. Its crt0 Makefile builds:
+Confirmed improvements include:
 
-- `crt0.o`;
-- `MMUglobals.o`;
-- `VCloader.o`.
+- removal of the old application r10/single-PIC-base model from the VC source build;
+- ARM/Thumb interworking;
+- Launcher V3 format v1.2;
+- virtual code addressing;
+- virtual code/data page-table construction in the calculator-side launcher;
+- E/A flags controlling use of ERAM and main RAM;
+- B flag controlling historical stack-bias compatibility;
+- improved cache flushing.
 
-It uses ordinary ARM920T soft-float/interworking flags and defaults to Thumb;
-the r10/single-PIC-base flags are gone.
+For HP49/50, hpclang should aim to reproduce the full Launcher V3 v1.2/VC behavior.
 
-`VCld.script` fixes:
+For HP39/40 and 48gII, compatible pieces can be backported independently. The common simple/MMU ABI remains available even where the historical launcher lacks V support.
 
-- code/rodata at virtual address `0x01220000`;
-- writable data at `0x01101000`.
+## HPGCC3 features to preserve
 
-`VCloader.c` only copies initialized data, clears BSS, initializes runtime
-globals, and enters `_start`. The distributed SP2 archive kept the older
-MMUloader/MMUld artifacts for compatibility, but they are not the frozen 2.0 VC
-source build.
+HPGCC3 provides useful higher-level evolution:
 
-This confirms the right direction: eliminate the old GOT model rather than
-teach current LLVM to reproduce it.
+- CC3/EXT3 program format with minimum ROMLIB revision;
+- versioned shared runtime ABI;
+- richer startup policy;
+- expanded Saturn object API (`sat3`);
+- extended-real support;
+- expanded filesystem/SD functions;
+- larger GUI/runtime library surface;
+- conventional `arm-none-eabi` ARM/Thumb organization.
 
-However, the 2.0 VC virtual-address contract depends on calculator-side launcher
-mapping that has not yet been proven on 39gs. Therefore hpclang should adopt the
-**design lesson**, not blindly replace the proven 39gs entry contract with VC.
+These should influence hpclang's source API and optional shared-service ABI.
 
-## Clean 39gs code model
+However, ROM modification is explicitly outside the hpclang project goal. An HPGCC3-compatible ROMLIB backend may be supported only when such an environment already exists; hpclang itself will not require users to install a replacement ROM.
 
-The current clean experiment uses stock LLVM:
+## Final baseline
 
-    --target=arm-none-eabi
-    -march=armv4t
-    -marm
-    -mabi=apcs-gnu
-    -mfloat-abi=soft
-    -fropi
-    -frwpi
+The long-term baseline is therefore:
 
-ROPI makes code and read-only data PC-relative. RWPI makes writable data
-static-base-relative through r9/sb.
+```
+LLVM-native common runtime/API
+          +
+Launcher V3 simple/MMU executable ABI
+          +
+family-specific platform adapter
+          +
+optional VC / ROMLIB compatibility profiles
+```
 
-The clean loader:
-
-- keeps the 39gs launcher/MMU entry contract needed to obtain physical RAM;
-- establishes the historical 0x09000000 virtual RAM window;
-- copies initialized data to 0x09000400;
-- clears BSS;
-- sets r9 to 0x09000400;
-- calls C;
-- restores stack/MMU state and returns.
-
-There is no GOT, r10 static base, `MMUglobals.o`, or historical HPGCC object in
-this design.
-
-## HPGCC3's role
-
-HPGCC3 already uses a comparatively conventional `arm-none-eabi` ARM/Thumb
-toolchain. Its distinctive ABI is instead above the compiler:
-
-- custom ROM and ROMLIB;
-- ROM entry table;
-- RLloader;
-- two-stage/prelink flow;
-- CC3/EX3 metadata generated by elf2armc.
-
-That makes HPGCC3 useful as a modernized library/API source and as an optional
-50g target backend. It cannot be the common baseline for 39gs because the
-required ROMLIB environment does not exist there.
-
-## Migration policy for libraries
-
-Every historical source module should be classified before import:
-
-| Class | Examples | Migration policy |
-| --- | --- | --- |
-| Pure portable C | decNumber, algorithms, containers | Prefer newest usable source, rebuild with Clang |
-| Compiler support | libgcc helpers | Replace with compiler-rt builtins |
-| S3C2410 hardware | LCD, keyboard, clock, USB/SD primitives | Consolidate behind hpclang hardware APIs and test per calculator |
-| Saturn/OS entry-point dependent | filesystem/RPL bridge functions | Keep per-family adapters; do not call these portable |
-| HPGCC3 ROMLIB dependent | `__launch_*`, ROM entry calls | 50g ROMLIB backend only |
-| HP39 packaging/launcher | HP39BinB, HP39DIR, LIB275/aplet code | hp39gs backend only |
-
-The final hpclang core should therefore be a new source tree, with compatibility
-profiles around it rather than a fork of any one HPGCC release.
+No one historical release owns the architecture.
