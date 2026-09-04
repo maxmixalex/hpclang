@@ -13,6 +13,15 @@ hpclang stage0/stage1/common bootstrap as guest ARM code, runs the same
 canonical HPC1 runtime image used on real HP39gs hardware, observes
 machine-readable `0x50415353`, and captures the live `RUNTIME PASS` LCD.
 
-The remaining work is the synthetic outer-launcher return boundary and then
-replacing the synthetic ARMSYS preparation with the real stock 49g+/50g package
-and launcher.
+The normalized ARM gate is complete through PASS and stock-OS resume.
+
+A second stock-launcher gate is intentionally separate. It mounts a calculator
+SD directory containing ARMToolbox SETUP.BIN and a normal Launcher-V3 .hp
+object, then drives only the calculator key matrix. It must eventually prove
+the stock System-RPL/ARMToolbox memory packer creates the ARMSYS state consumed
+by the same hpclang stage0.
+
+The Little-Apple bring-up uses the same hardware-level emulator core only as a
+starting point. It boots official HP39gs/HP40gs update images and records the
+first hardware/firmware boundary that differs; no Saturn-only emulator is part
+of this path.
