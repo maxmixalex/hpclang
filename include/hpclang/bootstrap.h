@@ -51,6 +51,20 @@ struct hpclang_mmu_saved {
     uint32_t code_l1;
 };
 
+/*
+ * Family shims fill this after allocating/staging physical pages. No legacy
+ * launcher memory flags or calculator-specific allocator state crosses this
+ * boundary.
+ */
+struct hpclang_launch_context {
+    struct hpclang_mmu_layout mmu;
+
+    uint32_t model;
+    uint32_t entry_offset;
+    uintptr_t saturn_state;
+    uintptr_t platform_cookie;
+};
+
 void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout);
 void hpclang_mmu_install(
     const struct hpclang_mmu_layout *layout,
@@ -58,6 +72,8 @@ void hpclang_mmu_install(
 void hpclang_mmu_restore(
     const struct hpclang_mmu_layout *layout,
     const struct hpclang_mmu_saved *saved);
+
+int hpclang_bootstrap_run(const struct hpclang_launch_context *launch);
 
 #ifdef __cplusplus
 }
