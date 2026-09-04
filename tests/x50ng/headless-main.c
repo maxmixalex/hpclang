@@ -13,7 +13,8 @@
 #define HPCLANG_LCD_WIDTH 131
 #define HPCLANG_LCD_HEIGHT 80
 #define RECOVERY_NO_PRESS_DELAY_US 2000000LL
-#define RECOVERY_NO_HOLD_US 100000LL
+#define MEMORY_CLEAR_OK_PRESS_DELAY_US 4000000LL
+#define BOOT_KEY_HOLD_US 100000LL
 #define FIRST_CAPTURE_DELAY_US 8000000LL
 #define RETRY_DELAY_US 1000000LL
 #define MAX_CAPTURE_ATTEMPTS 8
@@ -60,6 +61,24 @@ static void set_key_from_timer(void *opaque)
         press_key(action->hpkey);
     else
         release_key(action->hpkey);
+}
+
+static int schedule_key_tap(
+    const struct key_action *down,
+    const struct key_action *up,
+    int64_t delay_us)
+{
+    hdw_timer_t *key_down = timer_new(
+        HDW_TIMER_REALTIME, set_key_from_timer, (void *)down);
+    hdw_timer_t *key_up = timer_new(
+        HDW_TIMER_REALTIME, set_key_from_timer, (void *)up);
+
+    if (key_down == NULL || key_up == NULL)
+        return 0;
+
+    timer_mod(key_down, timer_get_clock() + delay_us);
+    timer_mod(key_up, timer_get_clock() + delay_us + BOOT_KEY_HOLD_US);
+    return 1;
 }
 
 static void capture_and_stop(void *opaque)
@@ -169,21 +188,17 @@ int main(int argc, char **argv)
      * The right-most softkey is NO, i.e. physical F. Drive the calculator key
      * matrix directly; no host-window coordinates are involved.
      */
-    hdw_timer_t *key_down = timer_new(
-        HDW_TIMER_REALTIME, set_key_from_timer, (void *)&recovery_no_down);
-    hdw_timer_t *key_up = timer_new(
-        HDW_TIMER_REALTIME, set_key_from_timer, (void *)&recovery_no_up);
-    if (key_down == NULL || key_up == NULL) {
+    if (!schedule_key_tap(
+            &recovery_no_down,
+            &recovery_no_up,
+            RECOVERY_NO_PRESS_DELAY_US) ||
+        !schedule_key_tap(
+            &recovery_no_down,
+            &recovery_no_up,
+            MEMORY_CLEAR_OK_PRESS_DELAY_US)) {
         fprintf(stderr, "cannot allocate boot key timers\n");
         return EXIT_FAILURE;
     }
-    timer_mod(
-        key_down,
-        timer_get_clock() + RECOVERY_NO_PRESS_DELAY_US);
-    timer_mod(
-        key_up,
-        timer_get_clock() +
-            RECOVERY_NO_PRESS_DELAY_US + RECOVERY_NO_HOLD_US);
 
     hdw_timer_t *timer = timer_new(
         HDW_TIMER_REALTIME, capture_and_stop, &capture);
