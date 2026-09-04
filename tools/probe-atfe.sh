@@ -70,8 +70,9 @@ echo
 echo "== libc++ Armv4T smoke =="
 
 "$CXX" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
+"$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-platform-stubs.c" -o "$OUT/platform-stubs.o"
 
-"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
+"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
 
 if "$READELF" -Ws "$OUT/hpclang-atfe-cxx.elf" | grep -E ' GLOBAL .* UND '; then
     echo "unexpected undefined global C++ symbols" >&2
