@@ -109,3 +109,21 @@ HPC1 is not itself an HP39 aplet, HP48/49 RPL object or HP transfer file.
 Each platform packager wraps the same logical image in the calculator's native
 container and supplies whatever alignment/storage metadata that platform
 requires. Those outer formats are not visible to compiled application code.
+
+
+## Stable model IDs
+
+`hpclang_boot_info.model` is an ABI value, not an enum ordinal that may be
+renumbered. The v1 assignments are fixed:
+
+| ID | Model |
+| ---: | --- |
+| 0 | unknown |
+| 1 | HP 39g+ |
+| 2 | HP 39gs |
+| 3 | HP 40gs |
+| 4 | HP 48gII |
+| 5 | HP 49g+ |
+| 6 | HP 50g |
+
+New models must receive new IDs; existing values must not be renumbered.
