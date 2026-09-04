@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: historical-hpgcc-archaeology
+  cancel-in-progress: true
+
 jobs:
   archaeology:
     runs-on: ubuntu-24.04
@@ -76,5 +80,6 @@ jobs:
             echo "No generated changes."
           else
             git commit -m "research: analyze official HPGCC 1.1 and 2.0 tags"
+            git pull --rebase origin main
             git push
           fi
