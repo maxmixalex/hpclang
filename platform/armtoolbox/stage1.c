@@ -85,7 +85,7 @@ int hpclang_armtoolbox_stage1(
     uint32_t left = hpc1->image_size;
 
     for (uint32_t i = 0; i < code_count; ++i) {
-        uint8_t *dst = (uint8_t *)(uintptr_t)(
+        volatile uint8_t *dst = (volatile uint8_t *)(uintptr_t)(
             STAGE_WINDOW_BASE + (code_first + i) * HPCLANG_PAGE_SIZE);
         uint32_t n = left < HPCLANG_PAGE_SIZE ? left : HPCLANG_PAGE_SIZE;
 
