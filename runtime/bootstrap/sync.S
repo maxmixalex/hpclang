@@ -113,22 +113,63 @@ hpclang_cache_clean:
 
 
 /*
- * Keep stock calculator IRQ/FIQ handlers out of the temporary HPC1 virtual
- * address space. These helpers are part of the common ARMv4T bootstrap, not a
- * calculator-family backend.
+ * Save the caller CPSR and return with IRQ/FIQ masked.
+ *
+ * Do this through the same temporary SWI-0 supervisor trampoline used by the
+ * MMU/cache helpers. hpclang_bootstrap_run may be entered from an unprivileged
+ * stock-launcher context, where a direct MSR CPSR_c cannot be relied upon.
+ *
+ * Return value (r0): caller CPSR before masking.
  */
 .global hpclang_irq_save_disable
 .type hpclang_irq_save_disable,%function
 hpclang_irq_save_disable:
-    mrs     r0, cpsr
+    stmfd   sp!, {r1-r5, lr}
+
+    ldr     r2, =0x08000008
+    adr     r3, .Lirq_disable_supervisor
+    swp     r4, r3, [r2]
+    swi     0
+    str     r4, [r2]
+
+    ldmfd   sp!, {r1-r5, pc}
+
+.align 2
+.Lirq_disable_supervisor:
+    /*
+     * SPSR_svc is the exact caller CPSR captured by SWI entry. Return it in
+     * r0, but modify the exception-return SPSR so the caller resumes with both
+     * IRQ and FIQ masked.
+     */
+    mrs     r0, spsr
     orr     r1, r0, #0xc0
-    msr     cpsr_c, r1
-    bx      lr
+    msr     spsr_c, r1
+    movs    pc, lr
 .size hpclang_irq_save_disable, .-hpclang_irq_save_disable
 
+
+/*
+ * Restore the caller CPSR saved by hpclang_irq_save_disable().
+ *
+ * r0 = original caller CPSR
+ */
 .global hpclang_irq_restore
 .type hpclang_irq_restore,%function
 hpclang_irq_restore:
-    msr     cpsr_c, r0
-    bx      lr
+    stmfd   sp!, {r1-r5, lr}
+    mov     r5, r0
+
+    ldr     r2, =0x08000008
+    adr     r3, .Lirq_restore_supervisor
+    swp     r4, r3, [r2]
+    mov     r0, r5
+    swi     0
+    str     r4, [r2]
+
+    ldmfd   sp!, {r1-r5, pc}
+
+.align 2
+.Lirq_restore_supervisor:
+    msr     spsr_cxsf, r0
+    movs    pc, lr
 .size hpclang_irq_restore, .-hpclang_irq_restore

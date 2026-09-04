@@ -245,3 +245,19 @@ entries and only afterwards restores the original CPSR. Stock OS interrupt
 handlers must never execute against the HPC1 virtual layout.
 
 Hardware validation of this change is pending.
+
+
+### HP39gs interrupt-isolation correction
+
+The first common-bootstrap IRQ/FIQ isolation attempt used direct CPSR writes
+from the normal bootstrap call chain. Real HP39gs hardware regressed to a white
+screen before HPC1 diagnostics, so that implementation was rejected.
+
+The bootstrap now uses the already-established SWI-0 supervisor trampoline.
+The disable helper captures the caller CPSR from `SPSR_svc`, returns to the
+same caller with IRQ/FIQ masked via exception return, and later restores the
+saved CPSR through a second SWI after the stock MMU mapping is back. This works
+independently of whether the stock launcher entered hpclang from a privileged
+or unprivileged ARM mode.
+
+Hardware re-validation is pending.
