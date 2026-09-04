@@ -1,115 +1,75 @@
 # Removing GCC and HPGCC from the build
 
-The target state is:
+The end state is simple:
 
-> A fresh checkout can build calculator-ready programs from source for every
-> supported hpclang target without an HPGCC SDK, historical HPGCC target
-> object, GCC target compiler or libgcc.
+> A fresh checkout builds hpclang applications for every supported ARM
+> calculator using LLVM tools and hpclang source only.
 
-This requirement applies independently to the HP39/40, 48gII and 49g+/50g
-backends.
+## Toolchain
 
-## Dependency elimination matrix
+| Need | hpclang |
+| --- | --- |
+| C/C++ compiler | Clang |
+| assembler | Clang integrated assembler |
+| linker | LLD |
+| archiver | llvm-ar |
+| compiler helpers | LLVM compiler-rt builtins |
+| executable packer | hpclang HPC1 packer |
+| calculator package | hpclang family backend |
 
-| Historical dependency | Clean replacement | Status |
-| --- | --- | --- |
-| `arm-elf-gcc` / `arm-none-eabi-gcc` | Clang | proven for ARMv4T source objects |
-| GNU `as` | Clang integrated assembler | proven for clean loader |
-| GNU `ld` | LLD | proven for clean ELF |
-| GNU `ar` | `llvm-ar` | library migration pending |
-| `libgcc.a` | LLVM compiler-rt builtins | integration pending |
-| HPGCC 1.x MMU startup objects | new source runtime | HP39 bootstrap host-proven; other families pending |
-| old r10/GOT runtime patching | LLVM ROPI+RWPI | eliminated in clean bootstrap |
-| `elf2hp` | direct ELF-to-Launcher-V3 packer | clean implementation exists |
-| historical calculator package builders | family-specific source packers | HP39 reconstruction in progress |
-| prebuilt ARMToolbox/LIB275 artifacts | rebuild/installable family support libraries from source | pending |
-| HP Tools host binaries | rebuild source with a modern host compiler or replace the narrow required encoders | pending |
+There is no normal-build role for GCC, libgcc, historical HPGCC object files or
+HPGCC runtime libraries.
 
-## Compiler support runtime
+## Already proven
 
-Removing GCC does not mean arithmetic helper routines disappear.
+The unified core CI currently proves:
 
-Clang ARMv4T soft-float code can reference helpers such as:
+- ARMv4T AAPCS32 code generation;
+- Thumb-1 C and ARM startup interworking;
+- fixed virtual RX/RW segments;
+- initialized data and BSS layout;
+- model-independent HPC1 output;
+- no unresolved symbols in the current core image.
 
-- `__udivsi3`;
-- `__divsi3`;
-- `__muldf3`;
-- `__divdf3`;
-- `__adddf3`.
+## Next dependency: compiler-rt
 
-hpclang should build the required LLVM compiler-rt builtins for the selected
-ARMv4T ABI rather than copy an HPGCC `libgcc.a`.
+Real applications require compiler helper routines for operations that ARMv4T
+cannot express directly, including integer division, 64-bit arithmetic and
+software floating point.
 
-## Family bootstrap requirements
+These will come from LLVM compiler-rt, not from HPGCC's copied `libgcc.a`.
 
-### HP39/40
+hpclang should build a normal ARMv4T compiler-rt builtins archive matching the
+same AAPCS32/soft-float ABI as application code.
 
-Replace:
+## libc/runtime
 
-- historical MMUloader/MMUglobals;
-- hp2aplet;
-- prebuilt aplet fragments;
-- prebuilt ARMToolbox39/library 275.
+After compiler-rt, the common runtime should provide a small normal libc layer:
 
-The current Clang+LLD+Launcher-V3 payload is the first clean implementation.
+- memory/string primitives;
+- allocator;
+- basic formatting;
+- integer conversion;
+- selected math support.
 
-### HP48gII
+Calculator I/O is implemented underneath through hpclang platform services,
+not by preserving old HPGCC syscall wrappers.
 
-Rebuild the dedicated ARMToolbox48 launcher/package path from source.
+## Platform completion
 
-Do not reuse 49/50 Saturn address conversion or memory limits merely because
-the ARM CPU family is similar.
+Each family is complete when its backend can take the same HPC1 image,
+construct the common virtual environment, run it, restore the calculator
+cleanly and pass the same runtime test suite.
 
-### HP49g+ / HP50g
+The test suite should include:
 
-Rebuild the ordinary ARMToolbox launcher and RPL packaging path from source.
-
-The initial common profile should accept Launcher V3 simple/MMU payloads. A
-second profile should reproduce HPGCC 2.0 Launcher V3 v1.2 virtual-code
-addressing.
-
-### HPGCC3 compatibility
-
-This is optional.
-
-If the calculator already has a compatible HPGCC3 ROMLIB environment, hpclang
-may emit CC3/EXT3 programs that use it. The core SDK must never require ROM
-replacement.
-
-## Why clean ROPI+RWPI is preferred
-
-When every target object is rebuilt with Clang:
-
-- ROPI handles code/read-only relocation;
-- RWPI handles writable data through r9;
-- no historical GOT is necessary;
-- no GOT runtime patching is necessary;
-- no r10 reservation is necessary;
-- no LLVM fork is currently necessary.
-
-Legacy GCC-built objects remain a compatibility/testing concern, not the normal
-application ABI.
-
-## Milestones
-
-1. **Common clean ARM toolchain** — Clang/integrated assembler/LLD/compiler-rt.
-2. **Common Launcher V3 simple/MMU packer** — one payload format usable by all
-   historical launcher families that implement the common contract.
-3. **HP39/40 source bootstrap** — aplet + launcher/support library built without
-   historical binaries; hardware validation on 39gs first, then sibling models.
-4. **HP48gII source bootstrap** — dedicated launcher/package path and hardware
-   validation.
-5. **HP49g+/50g source bootstrap** — ordinary ARMToolbox path and hardware
-   validation on both models.
-6. **HPGCC 2.0 VC profile** — Launcher V3 v1.2 virtual-code compatibility for
-   supported 49/50 environments, followed by feasibility tests on other
-   families.
-7. **Library migration** — compiler-rt, libc subset, hpg/ggl, Saturn object APIs,
-   filesystem and hardware services with explicit capabilities.
-8. **Optional HPGCC3 compatibility** — CC3/EXT3 + versioned ROMLIB when already
-   installed, never as a prerequisite.
-
-A target is not considered complete merely because a smoke program links. It
-must eventually pass a non-trivial runtime suite covering global/static data,
-heap, integer/soft-float helpers, LCD, keyboard, timer, ARM/Thumb interworking
-and calculator-OS interaction.
+- globals/data/BSS;
+- heap;
+- integer division and 64-bit helpers;
+- soft-float arithmetic;
+- ARM/Thumb calls;
+- LCD;
+- keyboard;
+- timer;
+- filesystem where present;
+- calculator object/stack interaction where present.
