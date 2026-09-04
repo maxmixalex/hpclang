@@ -1,0 +1,94 @@
+name: HP39 40 true ARM boot
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tests/x50ng/little-apple-boot-main.c"
+      - ".github/workflows/x50ng-little-apple.yml"
+
+jobs:
+  boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: hp39gs
+            archive: hp39gs222.zip
+            member: HP39GS_2.22/hp39gs_v2.22.bin
+          - target: hp40gs
+            archive: hp40gs222.zip
+            member: HP40GS_2.22/hp40gs_v2.22.bin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential git pkg-config unzip curl \
+            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+
+      - name: Fetch pinned x50ng
+        run: |
+          git clone --no-checkout https://github.com/gwenhael-le-moine/x50ng.git build/x50ng
+          git -C build/x50ng checkout ac1e1e24827aa9c66e020baa47bb253746c037b5
+          git -C build/x50ng rev-parse HEAD > build/x50ng-little-apple-source.txt
+          cp tests/x50ng/little-apple-boot-main.c build/x50ng/src/main.c
+
+      - name: Build x50ng
+        working-directory: build/x50ng
+        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Fetch bootloader and official Little-Apple ROM
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+          MEMBER: ${{ matrix.member }}
+        run: |
+          make -C build/x50ng/dist/firmware bootloaders
+          curl -L "https://www.hpcalc.org/hp39/pc/$ARCHIVE" -o "/tmp/$ARCHIVE"
+          unzip -p "/tmp/$ARCHIVE" "$MEMBER" > build/little-apple.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          data = Path("build/little-apple.bin").read_bytes()
+          print("size", len(data))
+          print("header", data[:32])
+          if data[:16] != b"KINPOUPDATEIMAGE":
+              raise SystemExit("Little-Apple update image does not use the Kinpo update header")
+          PY
+          sha256sum build/little-apple.bin
+
+      - name: Boot official ${{ matrix.target }} ROM on ARM hardware model
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "build/$TARGET-state"
+          export HPCLANG_LA_PREFIX="$GITHUB_WORKSPACE/build/$TARGET"
+          export HPCLANG_LA_JSON="$GITHUB_WORKSPACE/build/$TARGET.json"
+          timeout 25s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
+            --overwrite-config \
+            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
+            --flash-full \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --firmware="$GITHUB_WORKSPACE/build/little-apple.bin"
+          for pgm in build/$TARGET-*.pgm; do
+            [ -f "$pgm" ] || continue
+            python tools/pgm-to-png.py "$pgm" "$pgm.png"
+          done
+          cat "build/$TARGET.json"
+
+      - name: Upload ${{ matrix.target }} ARM boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x50ng-${{ matrix.target }}-arm-boot
+          path: |
+            build/${{ matrix.target }}-*.pgm
+            build/${{ matrix.target }}-*.pgm.png
+            build/${{ matrix.target }}.json
+            build/x50ng-little-apple-source.txt
+            build/little-apple.bin
+          if-no-files-found: warn

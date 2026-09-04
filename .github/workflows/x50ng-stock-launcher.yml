@@ -1,0 +1,113 @@
+name: x50ng stock launcher E2E
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tests/hp39-runtime-diag.c"
+      - "tests/x50ng/stock-launcher-main.c"
+      - "tools/probe-atfe.sh"
+      - "tools/armtoolbox-wrap.py"
+      - ".github/workflows/x50ng-stock-launcher.yml"
+
+jobs:
+  stock-launcher:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential git pkg-config unzip curl xz-utils \
+            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+
+      - name: Install Arm Toolchain for Embedded 22.1.0
+        run: |
+          curl -L https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz -o /tmp/atfe.tar.xz
+          mkdir -p /tmp/atfe
+          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+
+      - name: Build canonical HP50g stock payload
+        run: |
+          export ATFE=/tmp/atfe
+          export OUT="$GITHUB_WORKSPACE/build/stock-payload"
+          chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
+          tools/probe-atfe.sh
+          /tmp/atfe/bin/clang --target=arm-none-eabi -march=armv4t -marm \
+            -DHPCLANG_STAGE0_MODEL=6 -c platform/armtoolbox/stage0.S \
+            -o build/stock-payload/stage0-hp50g.o
+          /tmp/atfe/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
+            build/stock-payload/stage0-hp50g.o \
+            build/stock-payload/stage0-bundle.o \
+            -o build/stock-payload/stage0-hp50g.elf
+          /tmp/atfe/bin/llvm-objcopy -O binary \
+            build/stock-payload/stage0-hp50g.elf \
+            build/stock-payload/stage0-hp50g.bin
+          python3 tools/armtoolbox-wrap.py \
+            build/stock-payload/stage0-hp50g.bin \
+            build/stock-payload/HPCLANG.HP
+
+      - name: Prepare stock SD card contents
+        run: |
+          mkdir -p build/stock-sd
+          curl -L https://www.hpcalc.org/hp49/math/statistic/mlreg.zip -o /tmp/mlreg.zip
+          unzip -j /tmp/mlreg.zip SETUP.BIN -d build/stock-sd
+          cp build/stock-payload/HPCLANG.HP build/stock-sd/
+          test "$(stat -c %s build/stock-sd/SETUP.BIN)" = 7673
+          sha256sum build/stock-sd/SETUP.BIN build/stock-sd/HPCLANG.HP
+
+      - name: Fetch pinned x50ng
+        run: |
+          git clone --no-checkout https://github.com/gwenhael-le-moine/x50ng.git build/x50ng
+          git -C build/x50ng checkout ac1e1e24827aa9c66e020baa47bb253746c037b5
+          git -C build/x50ng rev-parse HEAD > build/x50ng-stock-source.txt
+          cp tests/x50ng/stock-launcher-main.c build/x50ng/src/main.c
+
+      - name: Build x50ng
+        working-directory: build/x50ng
+        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Fetch official 49g+/50g firmware
+        working-directory: build/x50ng
+        run: make -C dist/firmware bootloaders official
+
+      - name: Explore stock FILES path
+        run: |
+          export HPCLANG_STOCK_HOME_PGM="$GITHUB_WORKSPACE/build/stock-home.pgm"
+          export HPCLANG_STOCK_FILES_PGM="$GITHUB_WORKSPACE/build/stock-files.pgm"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-explorer.json"
+          mkdir -p build/stock-state
+          timeout 25s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/stock-state" \
+            --overwrite-config \
+            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
+            --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
+            --flash \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
+          for image in stock-home stock-files; do
+            python tools/pgm-to-png.py "build/$image.pgm" "build/$image.png"
+          done
+          cat build/stock-explorer.json
+
+      - name: Upload stock launcher evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x50ng-stock-launcher-explorer
+          path: |
+            build/stock-home.*
+            build/stock-files.*
+            build/stock-explorer.json
+            build/x50ng-stock-source.txt
+            build/stock-sd/SETUP.BIN
+            build/stock-payload/HPCLANG.HP
+          if-no-files-found: warn
