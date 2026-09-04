@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$ROOT/build/atfe-probe}"
 ATFE="${ATFE:?set ATFE to the extracted Arm Toolchain for Embedded root}"
 CC="$ATFE/bin/clang"
+CXX="$ATFE/bin/clang++"
 READELF="$ATFE/bin/llvm-readelf"
 
 rm -rf "$OUT"
@@ -64,3 +65,20 @@ python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hpclang-atfe.elf"     "$OUT/hpcl
 
 echo
 echo "PASS: ATfE Armv4T compiler-rt + picolibc link into HPC1."
+
+
+echo
+echo "== libc++ Armv4T smoke =="
+
+"$CXX" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
+
+"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
+
+if "$READELF" -Ws "$OUT/hpclang-atfe-cxx.elf" | grep -E ' GLOBAL .* UND '; then
+    echo "unexpected undefined global C++ symbols" >&2
+    exit 1
+fi
+
+python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hpclang-atfe-cxx.elf"     "$OUT/hpclang-atfe-cxx.hpc"
+
+echo "PASS: ATfE Armv4T libc++ links into HPC1."
