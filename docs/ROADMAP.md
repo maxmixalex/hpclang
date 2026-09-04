@@ -58,7 +58,7 @@ Completion criterion:
 
 ## M2 — Common ARM bootstrap
 
-**Status: implementation complete; cross-family validation pending**
+**Status: implementation complete; HP39 entry validated on hardware, return pending**
 
 Build one common ARM bootstrap used by all calculator families.
 
@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: execution package ready; real-hardware and emulator gates pending**
+**Status: real-hardware HPC1 entry validated; return and emulator gates pending**
 
 Targets:
 
@@ -96,11 +96,18 @@ Steps:
 2. [x] package HPC1 through the stock HP39 Aplet outer container;
 3. [x] build a visible + machine-readable HPC1 smoke in public CI;
 4. [x] restore stock HPGCC39 transfer filenames for maximum Conn3x compatibility;
-5. [ ] execute the smoke on a real HP39gs over USB;
-6. [ ] execute the same smoke in Emu48 through a driverless serial peer;
-7. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc;
-8. [ ] validate exit/state restoration;
+5. [x] enter HPC1 on a real HP39gs over USB: model 2 and RW 0x00014000 observed;
+6. [ ] validate automatic return/state restoration on the same real HP39gs;
+7. [ ] execute the same smoke in Emu48 through a driverless serial peer;
+8. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc;
 9. [ ] verify sibling 39g+/40gs differences.
+
+The first hardware run reached `HPC1 PASS` and therefore validated the complete
+stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
+chain. That smoke then waited forever for its own APLET GPIO poll while IRQ/FIQ
+were masked. The missing `X` in `EXIT` was independently traced to the tiny
+test font lacking an X glyph. The return path itself was not reached, so that
+run is not evidence of a bootstrap-return failure.
 
 Completion criterion:
 

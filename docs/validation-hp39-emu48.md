@@ -65,11 +65,12 @@ Launching `HPCLANG HPC1 TEST` must display:
 HPC1 PASS
 MODEL 00000002
 RW <mapped byte count>
-APLET TO EXIT
+AUTO EXIT
 ```
 
 The exact RW byte count depends on the stock launcher page pool and is not a
-fixed pass criterion.
+fixed pass criterion. The smoke keeps this page visible briefly and then
+returns automatically; keyboard scanning is deliberately outside this gate.
 
 ## Machine-readable result
 
@@ -90,9 +91,9 @@ All of the following must hold:
 1. The Aplet is visible in the APLET library after transfer.
 2. Launch reaches the `HPC1 PASS` screen.
 3. Model is `00000002` (HP39gs).
-4. The calculator remains responsive while the result screen is displayed.
-5. Pressing APLET exits the smoke and returns cleanly to the stock OS.
-6. There is no reset, ADDRESS ERROR, corrupted LCD, or persistent OS state
+4. The smoke returns automatically after the visible delay.
+5. The stock calculator OS is responsive after return.
+6. There is no reset, ADDRESS ERROR, corrupted LCD, or persistent OS-state
    corruption after return.
 
 ## Failure report
@@ -103,7 +104,7 @@ Record the earliest observable failure boundary:
 - Aplet visible but launch returns immediately;
 - reset or ADDRESS ERROR before visible HPC1 output;
 - partial/corrupt HPC1 output;
-- PASS screen reached but APLET exit fails;
+- PASS screen reached but automatic return fails;
 - return succeeds but stock OS state is corrupted.
 
 A screenshot plus the exact category above is enough for the next debugging

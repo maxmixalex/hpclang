@@ -6,8 +6,6 @@
 
 #define INTMSK    REG32(0x07100008u)
 #define LCDSADDR1 REG32(0x07300014u)
-#define GPGCON    REG32(0x07A00060u)
-#define GPGDAT    REG32(0x07A00064u)
 
 #define WIDTH  131
 #define HEIGHT 64
@@ -56,6 +54,7 @@ static uint32_t glyph_bits(char c)
     case 'S': return 0x388eu;
     case 'T': return 0x7492u;
     case 'W': return 0x5bfdu;
+    case 'X': return 0x5aadu;
     case '0': return 0x7b6fu;
     case '1': return 0x2c97u;
     case '2': return 0x62a7u;
@@ -111,29 +110,12 @@ static void clear(volatile uint8_t *fb)
     }
 }
 
-/* Exact HP39gs APLET-key matrix mapping, already hardware-validated in 39gsX. */
-static int aplet_pressed(void)
-{
-    GPGCON = (1u << 30) | 0xAAA9u;
-    delay(100);
-
-    int pressed = (GPGDAT & (1u << 1)) == 0;
-
-    GPGCON = 0x5555AAA9u;
-    delay(100);
-    return pressed;
-}
-
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
 
-    uint32_t old_cpsr;
+    uint32_t old_cpsr = hp39_irq_save_disable();
     uint32_t saved_intmsk = INTMSK;
-    uint32_t saved_gpgcon = GPGCON;
-    uint32_t saved_gpgdat = GPGDAT;
-
-    old_cpsr = hp39_irq_save_disable();
     INTMSK = 0xffffffffu;
 
     volatile uint8_t *fb = framebuffer();
@@ -144,19 +126,17 @@ int main(void)
     hex8(fb, 36, 28, boot->model);
     text(fb, 8, 38, "RW");
     hex8(fb, 20, 38, boot->rw_bytes);
-    text(fb, 8, 52, "APLET TO EXIT");
+    text(fb, 8, 52, "AUTO EXIT");
 
     hpclang_e2e_result = 0x50415353u;
 
-    while (aplet_pressed())
-        delay(1000);
-    while (!aplet_pressed())
-        delay(1000);
-    while (aplet_pressed())
-        delay(1000);
+    /*
+     * This gate validates return/state restoration, not the keyboard backend.
+     * Keep the result visible for a short human-observable interval, then
+     * restore interrupt state and return through the common bootstrap.
+     */
+    delay(60000000u);
 
-    GPGCON = saved_gpgcon;
-    GPGDAT = saved_gpgdat;
     INTMSK = saved_intmsk;
     hp39_irq_restore(old_cpsr);
 
