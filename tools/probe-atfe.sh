@@ -123,6 +123,21 @@ fi
 echo "PASS: stock ARMToolbox stage1 is fixed-address, non-PIC and self-contained."
 
 echo
+echo "== visible HP39 HPC1 smoke =="
+
+"$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
+
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+
+python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
+
+result_addr="$("$ATFE/bin/llvm-nm" -n "$OUT/hp39-visible.elf" |
+    awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
+test -n "$result_addr"
+echo "E2E result address: $result_addr"
+echo "$result_addr" > "$OUT/hp39-visible.result-address"
+
+echo
 echo "== stock ARMToolbox stage0 bundle =="
 
 cat > "$OUT/stage0-bundle.S" <<EOF
@@ -142,7 +157,7 @@ __stage1_blob_end:
 
 .align 2
 __hpc1_blob_start:
-.incbin "$OUT/hpclang-atfe.hpc"
+.incbin "$OUT/hp39-visible.hpc"
 __hpc1_blob_end:
 EOF
 
