@@ -103,23 +103,22 @@ int hpclang_armtoolbox_stage1(
             STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
         code_count * HPCLANG_PAGE_SIZE);
 
-    struct hpclang_launch_context launch = {
-        .mmu = {
-            .l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u,
-            .l2_workspace = (volatile uint32_t *)(uintptr_t)(
-                STAGE_WINDOW_BASE + workspace_page * HPCLANG_PAGE_SIZE),
-            .l2_workspace_phys =
-                old_l2[workspace_page] & 0xfffff000u,
-            .rw_pages = rw_pages,
-            .rw_page_count = rw_count,
-            .code_pages = code_pages,
-            .code_page_count = code_count,
-        },
-        .model = model,
-        .entry_offset = hpc1->entry_offset,
-        .saturn_state = (uintptr_t)saturn_state,
-        .platform_cookie = old_l2_phys,
-    };
+    struct hpclang_launch_context launch;
+
+    launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
+    launch.mmu.l2_workspace = (volatile uint32_t *)(uintptr_t)(
+        STAGE_WINDOW_BASE + workspace_page * HPCLANG_PAGE_SIZE);
+    launch.mmu.l2_workspace_phys =
+        old_l2[workspace_page] & 0xfffff000u;
+    launch.mmu.rw_pages = rw_pages;
+    launch.mmu.rw_page_count = rw_count;
+    launch.mmu.code_pages = code_pages;
+    launch.mmu.code_page_count = code_count;
+
+    launch.model = model;
+    launch.entry_offset = hpc1->entry_offset;
+    launch.saturn_state = (uintptr_t)saturn_state;
+    launch.platform_cookie = old_l2_phys;
 
     return hpclang_bootstrap_run(&launch);
 }
