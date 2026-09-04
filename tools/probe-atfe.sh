@@ -24,7 +24,6 @@ TARGET=(
 
 COMMON=(
     "${TARGET[@]}"
-    -ffreestanding
     -fno-stack-protector
     -fno-unwind-tables
     -fno-asynchronous-unwind-tables
