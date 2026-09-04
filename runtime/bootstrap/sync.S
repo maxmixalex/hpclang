@@ -66,3 +66,47 @@ hpclang_mmu_sync:
     ldmfd   sp!, {r0-r3, lr}
     movs    pc, lr
 .size hpclang_mmu_sync, .-hpclang_mmu_sync
+
+
+/*
+ * void hpclang_cache_clean(const void *start, uint32_t size)
+ *
+ * Clean staged payload bytes through their current virtual alias before those
+ * physical pages are exposed at HPCLANG_CODE_BASE.
+ */
+.global hpclang_cache_clean
+.type hpclang_cache_clean,%function
+hpclang_cache_clean:
+    stmfd   sp!, {r2-r5, lr}
+
+    add     r3, r0, r1
+    bic     r0, r0, #31
+    add     r3, r3, #31
+    bic     r3, r3, #31
+
+    ldr     r2, =0x08000008
+    adr     r1, .Lclean_supervisor
+    swp     r4, r1, [r2]
+    swi     0
+    str     r4, [r2]
+
+    ldmfd   sp!, {r2-r5, pc}
+
+.align 2
+.Lclean_supervisor:
+    stmfd   sp!, {r0-r2, lr}
+1:
+    cmp     r0, r3
+    bhs     2f
+    mcr     p15, 0, r0, c7, c10, 1
+    add     r0, r0, #32
+    b       1b
+2:
+    mov     r0, #0
+    mcr     p15, 0, r0, c7, c10, 4
+    mcr     p15, 0, r0, c7, c5, 0
+    nop
+    nop
+    ldmfd   sp!, {r0-r2, lr}
+    movs    pc, lr
+.size hpclang_cache_clean, .-hpclang_cache_clean
