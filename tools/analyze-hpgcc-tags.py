@@ -21,6 +21,8 @@ FOCUS_PREFIXES = (
     "sources/ggl/",
     "sources/win/",
     "sources/fsystem/",
+    "sources/ARMToolbox/",
+    "sources/HP39-Aplet/",
     "elf2hp/",
     "examples/",
 )
