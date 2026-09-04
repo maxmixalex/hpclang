@@ -99,3 +99,25 @@ if "$ATFE/bin/llvm-nm" -u "$OUT/bootstrap.o" | grep .; then
 fi
 
 echo "PASS: common ARMv4T bootstrap links without platform/runtime dependencies."
+
+echo
+echo "== stock ARMToolbox fixed stage1 =="
+
+"$CC" "${COMMON[@]}" -marm -Os     -c "$ROOT/platform/armtoolbox/stage1.c" -o "$OUT/stage1.o"
+"$CC" "${COMMON[@]}" -marm     -c "$ROOT/platform/armtoolbox/stage1-entry.S" -o "$OUT/stage1-entry.o"
+
+"$ATFE/bin/ld.lld" -m armelf     -T "$ROOT/platform/armtoolbox/stage1.ld"     "$OUT/stage1-entry.o"     "$OUT/stage1.o"     "$OUT/bootstrap-mmu.o"     "$OUT/bootstrap-run.o"     "$OUT/bootstrap-sync.o"     "$OUT/bootstrap-enter.o"     -o "$OUT/armtoolbox-stage1.elf"
+
+if "$ATFE/bin/llvm-nm" -u "$OUT/armtoolbox-stage1.elf" | grep .; then
+    echo "unexpected undefined stage1 symbols" >&2
+    exit 1
+fi
+
+"$ATFE/bin/llvm-objcopy" -O binary     "$OUT/armtoolbox-stage1.elf"     "$OUT/armtoolbox-stage1.bin"
+
+"$READELF" -h "$OUT/armtoolbox-stage1.elf" |
+    grep -E 'Entry point address|Machine'
+"$READELF" -l "$OUT/armtoolbox-stage1.elf" |
+    grep -E 'LOAD|Entry point'
+
+echo "PASS: stock ARMToolbox stage1 is fixed-address, non-PIC and self-contained."
