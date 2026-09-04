@@ -7,10 +7,13 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
+#include "ui4x/src/api.h"
 #include "s3c2410/s3c2410_lcd.h"
 
 #define HPCLANG_LCD_WIDTH 131
 #define HPCLANG_LCD_HEIGHT 80
+#define RECOVERY_NO_PRESS_DELAY_US 2000000LL
+#define RECOVERY_NO_HOLD_US 100000LL
 #define FIRST_CAPTURE_DELAY_US 8000000LL
 #define RETRY_DELAY_US 1000000LL
 #define MAX_CAPTURE_ATTEMPTS 8
@@ -20,6 +23,11 @@ struct capture_state {
     const char *pgm_path;
     const char *json_path;
     int attempts;
+};
+
+struct key_action {
+    int hpkey;
+    int pressed;
 };
 
 static int write_pgm(
@@ -42,6 +50,16 @@ static int write_pgm(
 
     fclose(f);
     return 1;
+}
+
+static void set_key_from_timer(void *opaque)
+{
+    const struct key_action *action = opaque;
+
+    if (action->pressed)
+        press_key(action->hpkey);
+    else
+        release_key(action->hpkey);
 }
 
 static void capture_and_stop(void *opaque)
@@ -137,6 +155,35 @@ int main(int argc, char **argv)
         .json_path = json_path,
         .attempts = 0,
     };
+    static const struct key_action recovery_no_down = {
+        .hpkey = HP4950_KEY_F,
+        .pressed = 1,
+    };
+    static const struct key_action recovery_no_up = {
+        .hpkey = HP4950_KEY_F,
+        .pressed = 0,
+    };
+
+    /*
+     * A brand-new x50ng state boots the stock ROM at "Try To Recover Memory?".
+     * The right-most softkey is NO, i.e. physical F. Drive the calculator key
+     * matrix directly; no host-window coordinates are involved.
+     */
+    hdw_timer_t *key_down = timer_new(
+        HDW_TIMER_REALTIME, set_key_from_timer, (void *)&recovery_no_down);
+    hdw_timer_t *key_up = timer_new(
+        HDW_TIMER_REALTIME, set_key_from_timer, (void *)&recovery_no_up);
+    if (key_down == NULL || key_up == NULL) {
+        fprintf(stderr, "cannot allocate boot key timers\n");
+        return EXIT_FAILURE;
+    }
+    timer_mod(
+        key_down,
+        timer_get_clock() + RECOVERY_NO_PRESS_DELAY_US);
+    timer_mod(
+        key_up,
+        timer_get_clock() +
+            RECOVERY_NO_PRESS_DELAY_US + RECOVERY_NO_HOLD_US);
 
     hdw_timer_t *timer = timer_new(
         HDW_TIMER_REALTIME, capture_and_stop, &capture);
