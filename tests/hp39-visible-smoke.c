@@ -194,9 +194,21 @@ int main(void)
         return finish(0x08);
 
     hpclang_diag_step(0x16);
-    double fp = hpclang_double_a * hpclang_double_b + 0.5;
-    if (!(fp > 4.87 && fp < 4.88))
+    volatile double mul = hpclang_double_a * hpclang_double_b;
+    hpclang_diag_step(0x61);
+    if (!(mul > 4.37 && mul < 4.38))
         return finish(0x09);
+
+    volatile double fp = mul + 0.5;
+    hpclang_diag_step(0x62);
+    if (!(fp > 4.87))
+        return finish(0x09);
+
+    hpclang_diag_step(0x63);
+    if (!(fp < 4.88))
+        return finish(0x09);
+
+    hpclang_diag_step(0x64);
 
     hpclang_diag_step(0x17);
     char src[] = "hpclang";
