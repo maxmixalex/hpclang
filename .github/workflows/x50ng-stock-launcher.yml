@@ -55,14 +55,13 @@ jobs:
             build/stock-payload/stage0-hp50g.bin \
             build/stock-payload/HPCLANG.HP
 
-      - name: Prepare stock SD card contents
+      - name: Prepare ARMToolbox installer
         run: |
           mkdir -p build/stock-sd
           curl -L https://www.hpcalc.org/hp49/math/statistic/mlreg.zip -o /tmp/mlreg.zip
           unzip -j /tmp/mlreg.zip SETUP.BIN -d build/stock-sd
-          cp build/stock-payload/HPCLANG.HP build/stock-sd/
           test "$(stat -c %s build/stock-sd/SETUP.BIN)" = 7673
-          sha256sum build/stock-sd/SETUP.BIN build/stock-sd/HPCLANG.HP
+          sha256sum build/stock-sd/SETUP.BIN
 
       - name: Fetch pinned x50ng
         run: |
@@ -79,14 +78,13 @@ jobs:
         working-directory: build/x50ng
         run: make -C dist/firmware bootloaders official
 
-      - name: Explore stock FILES path
+      - name: Install ARMToolbox through stock File Manager
         run: |
-          export HPCLANG_STOCK_HOME_PGM="$GITHUB_WORKSPACE/build/stock-home.pgm"
-          export HPCLANG_STOCK_FILES_PGM="$GITHUB_WORKSPACE/build/stock-files.pgm"
-          export HPCLANG_STOCK_SD_PGM="$GITHUB_WORKSPACE/build/stock-sd.pgm"
-          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-explorer.json"
+          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/stock-install"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-install.json"
           mkdir -p build/stock-state
-          timeout 25s build/x50ng/dist/x50ng \
+          timeout 30s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/stock-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
@@ -94,23 +92,44 @@ jobs:
             --flash \
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
-          for image in stock-home stock-files stock-sd; do
-            python tools/pgm-to-png.py "build/$image.pgm" "build/$image.png"
+          for pgm in build/stock-install-*.pgm; do
+            [ -f "$pgm" ] || continue
+            python tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
-          cat build/stock-explorer.json
+          cat build/stock-install.json
+
+      - name: Execute HPCLANG.HP through stock ARMToolbox PrRUN
+        run: |
+          rm -f build/stock-sd/SETUP.BIN
+          cp build/stock-payload/HPCLANG.HP build/stock-sd/
+
+          export HPCLANG_STOCK_MODE=run
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/stock-payload/hp39-visible.result-address")"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/stock-run"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-run.json"
+
+          timeout 30s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/stock-state" \
+            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
+            --sd-dir="$GITHUB_WORKSPACE/build/stock-sd"
+
+          for pgm in build/stock-run-*.pgm; do
+            [ -f "$pgm" ] || continue
+            python tools/pgm-to-png.py "$pgm" "$pgm.png"
+          done
+          cat build/stock-run.json
 
       - name: Upload stock launcher evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: x50ng-stock-launcher-explorer
+          name: x50ng-stock-armtoolbox-e2e
           path: |
-            build/stock-home.*
-            build/stock-files.*
-            build/stock-sd.pgm
-            build/stock-sd.png
-            build/stock-explorer.json
+            build/stock-install-*
+            build/stock-install.json
+            build/stock-run-*
+            build/stock-run.json
             build/x50ng-stock-source.txt
-            build/stock-sd/SETUP.BIN
             build/stock-payload/HPCLANG.HP
+            build/stock-payload/hp39-visible.result-address
           if-no-files-found: warn

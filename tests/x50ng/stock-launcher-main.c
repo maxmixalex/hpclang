@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "emulator_api.h"
 #include "hdw.h"
@@ -13,27 +14,45 @@
 #define LCD_W 131
 #define LCD_H 80
 #define KEY_HOLD_US 100000LL
+#define PASS_WORD 0x50415353u
+#define FAIL_PREFIX 0x46410000u
+#define POLL_US 20000LL
+#define RUN_DEADLINE_US 10000000LL
+
+enum stock_mode {
+    MODE_INSTALL,
+    MODE_RUN,
+};
 
 struct state {
     hdw_t *hdw;
-    const char *home;
-    const char *files;
-    const char *sd;
+    enum stock_mode mode;
+    const char *prefix;
     const char *json;
+    uint32_t result_addr;
+    int saw_pass;
+    int failed;
+    int64_t deadline;
 };
 
 struct key_action { int key; int down; };
 
-static const struct key_action f_down = { HP4950_KEY_F, 1 };
-static const struct key_action f_up = { HP4950_KEY_F, 0 };
-static const struct key_action lshift_down = { HP4950_KEY_LEFTSHIFT, 1 };
-static const struct key_action lshift_up = { HP4950_KEY_LEFTSHIFT, 0 };
-static const struct key_action g_down = { HP4950_KEY_G, 1 };
-static const struct key_action g_up = { HP4950_KEY_G, 0 };
-static const struct key_action up_down = { HP4950_KEY_UP, 1 };
-static const struct key_action up_up = { HP4950_KEY_UP, 0 };
-static const struct key_action f_down = { HP4950_KEY_F, 1 };
-static const struct key_action f_up = { HP4950_KEY_F, 0 };
+#define KEY_PAIR(name, code) \
+    static const struct key_action name##_down = { code, 1 }; \
+    static const struct key_action name##_up = { code, 0 }
+
+KEY_PAIR(f1, HP4950_KEY_A);
+KEY_PAIR(f3, HP4950_KEY_C);
+KEY_PAIR(f4, HP4950_KEY_D);
+KEY_PAIR(f5, HP4950_KEY_E);
+KEY_PAIR(f6, HP4950_KEY_F);
+KEY_PAIR(files, HP4950_KEY_G);
+KEY_PAIR(up, HP4950_KEY_UP);
+KEY_PAIR(two, HP4950_KEY_2);
+KEY_PAIR(enter, HP4950_KEY_ENTER);
+KEY_PAIR(on, HP4950_KEY_ON);
+KEY_PAIR(lshift, HP4950_KEY_LEFTSHIFT);
+KEY_PAIR(rshift, HP4950_KEY_RIGHTSHIFT);
 
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
@@ -50,10 +69,13 @@ static void key_cb(void *arg)
     else release_key(a->key);
 }
 
-static int tap(const struct key_action *down, const struct key_action *up, int64_t us)
+static int tap(
+    const struct key_action *down,
+    const struct key_action *up_action,
+    int64_t us)
 {
     return later(key_cb, (void *)down, us) &&
-           later(key_cb, (void *)up, us + KEY_HOLD_US);
+           later(key_cb, (void *)up_action, us + KEY_HOLD_US);
 }
 
 static int chord(
@@ -91,91 +113,279 @@ static unsigned capture(hdw_t *h, const char *path)
     return nonzero;
 }
 
-static void capture_home(void *arg)
+static void capture_named(struct state *s, const char *name)
 {
-    struct state *s = arg;
-    if (!capture(s->hdw, s->home)) {
-        fprintf(stderr, "stock launcher explorer: blank HOME capture\n");
-        hdw_stop(s->hdw);
-    }
+    char path[512];
+    snprintf(path, sizeof(path), "%s-%s.pgm", s->prefix, name);
+    if (!capture(s->hdw, path))
+        fprintf(stderr, "stock launcher: blank capture %s\n", name);
+}
+
+static int guest_read32(hdw_t *h, uint32_t address, uint32_t *value)
+{
+    uint8_t b[4];
+    if (cpu_memory_rw_debug(h->cpu, address, b, sizeof(b), 0) != 0)
+        return 0;
+    *value = (uint32_t)b[0] |
+             ((uint32_t)b[1] << 8) |
+             ((uint32_t)b[2] << 16) |
+             ((uint32_t)b[3] << 24);
+    return 1;
+}
+
+static void write_json(struct state *s, const char *status)
+{
+    FILE *f = fopen(s->json, "w");
+    if (!f) return;
+    fprintf(
+        f,
+        "{\n"
+        "  \"mode\":\"%s\",\n"
+        "  \"status\":\"%s\",\n"
+        "  \"saw_pass\":%s,\n"
+        "  \"pc\":\"0x%08x\",\n"
+        "  \"display_on\":%s,\n"
+        "  \"sd_mounted\":%s\n"
+        "}\n",
+        s->mode == MODE_INSTALL ? "install" : "run",
+        status,
+        s->saw_pass ? "true" : "false",
+        s->hdw->cpu->regs[15],
+        is_display_on() ? "true" : "false",
+        emulator_is_sd_mounted() ? "true" : "false");
+    fclose(f);
+}
+
+static void fail(struct state *s, const char *why)
+{
+    s->failed = 1;
+    fprintf(stderr, "stock launcher FAIL: %s\n", why);
+    capture_named(s, "failure");
+    write_json(s, why);
+    hdw_stop(s->hdw);
 }
 
 static void open_files(void *arg)
 {
-    (void)arg;
-    if (!chord(&lshift_down, &g_down, &g_up, &lshift_up, 0))
-        fprintf(stderr, "stock launcher explorer: cannot schedule FILES chord\n");
-}
-
-static void capture_files(void *arg)
-{
     struct state *s = arg;
-    if (!capture(s->hdw, s->files))
-        fprintf(stderr, "stock launcher explorer: blank FILES capture\n");
+    if (!chord(&lshift_down, &files_down, &files_up, &lshift_up, 0))
+        fail(s, "files-key");
 }
 
 static void enter_sd(void *arg)
 {
-    (void)arg;
+    struct state *s = arg;
     if (!tap(&up_down, &up_up, 0) ||
-        !tap(&f_down, &f_up, 300000))
-        fprintf(stderr, "stock launcher explorer: cannot enter SD\n");
+        !tap(&f6_down, &f6_up, 300000))
+        fail(s, "sd-key");
 }
 
-static void finish(void *arg)
+static void capture_files(void *arg)
+{
+    capture_named(arg, "files");
+}
+
+static void capture_sd(void *arg)
+{
+    capture_named(arg, "sd");
+}
+
+static void eval_setup(void *arg)
 {
     struct state *s = arg;
-    unsigned files_pixels = capture(s->hdw, s->sd);
-    FILE *f = fopen(s->json, "w");
-    if (f) {
-        fprintf(
-            f,
-            "{\n"
-            "  \"pc\":\"0x%08x\",\n"
-            "  \"display_on\":%s,\n"
-            "  \"sd_mounted\":%s,\n"
-            "  \"files_nonzero_pixels\":%u\n"
-            "}\n",
-            s->hdw->cpu->regs[15],
-            is_display_on() ? "true" : "false",
-            emulator_is_sd_mounted() ? "true" : "false",
-            files_pixels);
-        fclose(f);
+    if (!tap(&f5_down, &f5_up, 0))
+        fail(s, "setup-eval-key");
+}
+
+static void warmstart(void *arg)
+{
+    struct state *s = arg;
+    if (!chord(&on_down, &f3_down, &f3_up, &on_up, 0))
+        fail(s, "warmstart-key");
+}
+
+static void finish_install(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "installed");
+    if (!is_display_on()) {
+        fail(s, "install-display");
+        return;
     }
-    if (!is_display_on() || !files_pixels || !emulator_is_sd_mounted()) {
-        fprintf(stderr, "stock launcher explorer did not reach a usable FILES state\n");
-        exit(EXIT_FAILURE);
-    }
+    write_json(s, "installed");
     hdw_stop(s->hdw);
+}
+
+static void rcl_payload(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&f4_down, &f4_up, 0))
+        fail(s, "payload-rcl-key");
+}
+
+static void cancel_filer(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&on_down, &on_up, 0))
+        fail(s, "filer-cancel-key");
+}
+
+static void open_lib(void *arg)
+{
+    struct state *s = arg;
+    if (!chord(&rshift_down, &two_down, &two_up, &rshift_up, 0))
+        fail(s, "lib-key");
+}
+
+static void choose_armtoolbox(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "lib");
+    if (!tap(&f1_down, &f1_up, 0))
+        fail(s, "armtoolbox-key");
+}
+
+static void run_prrun(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "armtoolbox");
+    if (!tap(&f1_down, &f1_up, 0))
+        fail(s, "prrun-key");
+    else
+        s->deadline = timer_get_clock() + RUN_DEADLINE_US;
+}
+
+static void finish_run(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "returned");
+    if (!is_display_on()) {
+        fail(s, "return-display");
+        return;
+    }
+    write_json(s, "pass");
+    hdw_stop(s->hdw);
+}
+
+static void monitor(void *arg)
+{
+    struct state *s = arg;
+    uint32_t value = 0;
+
+    if (s->deadline == 0) {
+        if (!later(monitor, s, POLL_US))
+            fail(s, "monitor-timer");
+        return;
+    }
+
+    if (timer_get_clock() >= s->deadline) {
+        fail(s, "timeout");
+        return;
+    }
+
+    if (guest_read32(s->hdw, s->result_addr, &value)) {
+        if (value == PASS_WORD) {
+            s->saw_pass = 1;
+            capture_named(s, "pass");
+            fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
+            if (!tap(&on_down, &on_up, 700000) ||
+                !later(finish_run, s, 1800000))
+                fail(s, "return-timer");
+            return;
+        }
+        if ((value & 0xffff0000u) == FAIL_PREFIX) {
+            fprintf(stderr, "stock runtime failure 0x%08x\n", value);
+            fail(s, "runtime-fail");
+            return;
+        }
+    }
+
+    if (!later(monitor, s, POLL_US))
+        fail(s, "monitor-timer");
+}
+
+static int schedule_install(struct state *s)
+{
+    /*
+     * Fresh stock 2.15 ROM: dismiss recovery/memory-clear, put install port 2
+     * on the stack, then evaluate the sole SETUP.BIN object on SD.
+     */
+    return tap(&f6_down, &f6_up, 2000000LL) &&
+           tap(&f6_down, &f6_up, 4000000LL) &&
+           tap(&two_down, &two_up, 7000000LL) &&
+           tap(&enter_down, &enter_up, 7300000LL) &&
+           later(open_files, s, 8000000LL) &&
+           later(capture_files, s, 10200000LL) &&
+           later(enter_sd, s, 10500000LL) &&
+           later(capture_sd, s, 12500000LL) &&
+           later(eval_setup, s, 13000000LL) &&
+           later(warmstart, s, 16500000LL) &&
+           later(finish_install, s, 20000000LL);
+}
+
+static int schedule_run(struct state *s)
+{
+    /*
+     * The preserved calculator already has ARMToolbox installed. SD contains
+     * only HPCLANG.HP, so the File Manager selection is deterministic.
+     * RCL it, then use the stock LIB -> ARMToolbox -> PrRUN path.
+     */
+    return later(open_files, s, 2000000LL) &&
+           later(capture_files, s, 4200000LL) &&
+           later(enter_sd, s, 4500000LL) &&
+           later(capture_sd, s, 6500000LL) &&
+           later(rcl_payload, s, 7000000LL) &&
+           later(cancel_filer, s, 8200000LL) &&
+           later(open_lib, s, 9000000LL) &&
+           later(choose_armtoolbox, s, 10500000LL) &&
+           later(run_prrun, s, 12000000LL) &&
+           later(monitor, s, 12200000LL);
 }
 
 int main(int argc, char **argv)
 {
-    struct state s = {0};
-    s.home = getenv("HPCLANG_STOCK_HOME_PGM");
-    s.files = getenv("HPCLANG_STOCK_FILES_PGM");
-    s.sd = getenv("HPCLANG_STOCK_SD_PGM");
+    struct state s;
+    const char *mode = getenv("HPCLANG_STOCK_MODE");
+    const char *result_text = getenv("HPCLANG_STOCK_RESULT_ADDR");
+    char *end = NULL;
+
+    memset(&s, 0, sizeof(s));
+    s.mode = mode && strcmp(mode, "run") == 0 ? MODE_RUN : MODE_INSTALL;
+    s.prefix = getenv("HPCLANG_STOCK_PREFIX");
     s.json = getenv("HPCLANG_STOCK_JSON");
-    if (!s.home) s.home = "stock-home.pgm";
-    if (!s.files) s.files = "stock-files.pgm";
-    if (!s.sd) s.sd = "stock-sd.pgm";
-    if (!s.json) s.json = "stock-explorer.json";
+    if (!s.prefix) s.prefix = "stock";
+    if (!s.json) s.json = "stock.json";
+
+    if (s.mode == MODE_RUN) {
+        unsigned long value;
+        if (!result_text) {
+            fprintf(stderr, "stock run mode needs result address\n");
+            return EXIT_FAILURE;
+        }
+        value = strtoul(result_text, &end, 0);
+        if (end == result_text || *end != '\0' || value > 0xfffffffful) {
+            fprintf(stderr, "invalid stock result address\n");
+            return EXIT_FAILURE;
+        }
+        s.result_addr = (uint32_t)value;
+    }
 
     config_t config = *config_init(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!tap(&f_down, &f_up, 2000000LL) ||
-        !tap(&f_down, &f_up, 4000000LL) ||
-        !later(capture_home, &s, 7000000LL) ||
-        !later(open_files, &s, 8000000LL) ||
-        !later(capture_files, &s, 10200000LL) ||
-        !later(enter_sd, &s, 10500000LL) ||
-        !later(finish, &s, 13000000LL)) {
-        fprintf(stderr, "stock launcher explorer: cannot schedule actions\n");
+    int ok = s.mode == MODE_INSTALL
+        ? schedule_install(&s)
+        : schedule_run(&s);
+    if (!ok) {
+        fprintf(stderr, "cannot schedule stock launcher actions\n");
         return EXIT_FAILURE;
     }
 
     main_loop(s.hdw);
+    save_modules(s.hdw);
     exit_modules(s.hdw);
-    return EXIT_SUCCESS;
+
+    return s.failed || (s.mode == MODE_RUN && !s.saw_pass)
+        ? EXIT_FAILURE
+        : EXIT_SUCCESS;
 }
