@@ -45,26 +45,27 @@ the extracted directory and let the calculator browse the generated
 
 ## Expected result
 
-The screen must show:
+The current return-only smoke must show:
 
 ```text
 HPC1 PASS
 MODEL 00000002
 RW <mapped byte count>
-APLET TO EXIT
+AUTO EXIT
 ```
 
 The RW count is informational and may vary with the page pool.
 
-While this screen is visible, verify that the calculator has not reset or
-frozen. Then press APLET once.
+Do not press a key on this screen. The smoke deliberately avoids keyboard/GPIO
+testing, keeps the result visible briefly, restores interrupt state and returns
+through the common bootstrap automatically.
 
-A pass requires a clean return to the stock APLET library with no ADDRESS
-ERROR, corrupted LCD, reset, or persistent OS-state corruption.
+A pass requires an automatic clean return to the stock calculator OS with no
+ADDRESS ERROR, corrupted LCD, reset, or persistent OS-state corruption.
 
 ## Report
 
-For a pass, record the visible four lines and whether APLET returned cleanly.
+For a pass, record the visible four lines and whether it returned automatically.
 
 For a failure, record the earliest boundary:
 
@@ -74,7 +75,28 @@ For a failure, record the earliest boundary:
 - Aplet is present but launch returns immediately;
 - reset or ADDRESS ERROR before HPC1 output;
 - partial/corrupt output;
-- PASS reached but APLET exit fails;
+- PASS reached but automatic return fails;
 - exit succeeds but the stock OS is corrupted.
 
 A screenshot is useful but the exact failure boundary is more important.
+
+
+## First real-hardware observation
+
+The first HP39gs run of commit `4c4db3d` reached:
+
+```text
+HPC1 PASS
+MODEL 00000002
+RW 00014000
+APLET TO E IT
+```
+
+This proves real-hardware entry through the stock Aplet, stage0, stage1, common
+MMU/bootstrap and HPC1 runtime. The blank character in `EXIT` was a test-font
+bug: the tiny smoke font did not define `X`.
+
+That version then remained in its APLET polling loop with IRQ/FIQ masked. Since
+the loop never returned, it did not exercise the common bootstrap's return/MMU
+restore path. The next gate therefore removes keyboard polling entirely and
+uses timed automatic return.
