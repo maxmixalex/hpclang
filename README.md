@@ -1,63 +1,73 @@
 # hpclang
 
-Modern Clang/clangd tooling for classic HP ARM graphing calculators, derived from the calculator-specific parts of HPGCC 1.1 through HPGCC 3.0.
+Modern Clang/clangd tooling and runtime for the ARM-based HP graphing calculator family, informed by HPGCC 1.x, 2.x and 3.x.
 
-The project deliberately separates four things that old HPGCC distributions bundled together:
+hpclang is not intended to become a patched copy of one historical HPGCC release. The end state is a self-contained LLVM-native SDK that can build calculator-ready programs from source without an HPGCC SDK, historical HPGCC target binaries, GCC or libgcc.
 
-1. the C/C++ compiler and language tooling;
-2. the ARM ABI/startup/runtime contract;
-3. ELF layout and calculator loader requirements;
-4. calculator-specific packaging and runtime installation.
+## Intended calculator families
 
-The goal is to keep only the minimum HP-specific compatibility layer and use current Clang/LLVM tooling everywhere else.
-
-## Target profiles
-
-| Profile | Historical baseline | Calculator family | Status |
+| Family | Models | Historical launcher lineage | hpclang direction |
 | --- | --- | --- | --- |
-| `hp39gs-hpgcc11` | HPGCC 1.1-p1 with 39G support | 39g+/39gs/40gs | **hardware-proven source-modern baseline exists in 39gsX** |
-| `hp39gs-hpgcc11-rwpi` | HPGCC 1.1-p1 runtime + Clang RWPI | 39g+/39gs/40gs | host-proven legacy-interop experiment; hardware validation pending |
-| `hp49g50g-hpgcc2` | HPGCC 2.0 / SP2 | 49g+/50g | official-tag archaeology in progress |
-| `hp50g-hpgcc3` | HPGCC3 R004.revA | 50g + HPGCC3 ROMLIB | historical diff in progress |
+| HP39/40 ARM | 39g+, 39gs, 40gs | HP39 aplet + ARMToolbox39 / library 275 | native backend; 39gs is the first hardware-validation machine |
+| HP48 ARM | 48gII | dedicated ARMToolbox48 launcher | native backend |
+| HP49/50 ARM | 49g+, 50g | ARMToolbox Launcher V3; HPGCC 2.0 VC | native backend with optional VC profile |
+| HP49/50 ROMLIB | 49g+, 50g where a compatible HPGCC3 environment exists | HPGCC3 CC3/EXT3 + ROMLIB | optional compatibility backend; never required |
 
-39gs support is a first-class target. It must not be dropped merely because later HPGCC releases concentrated on the 49/50 family.
+Older Saturn-only machines such as the 39G/40G, 48G family and 49G are outside the native-ARM scope of hpclang.
 
-## Current design rule
+## Common executable baseline
 
-Do **not** fork Clang unless a calculator requirement cannot be expressed through stock target flags, runtime objects, linker scripts, post-link tools, or small ABI shims.
+The historical sources reveal a useful common denominator: Launcher V3 **simple/MMU format** (marker `0B34C`) with the M/R memory-packer contract exists in the normal ARMToolbox, the dedicated 48gII launcher and ARMToolbox39. HPGCC 2.0 retains this format while adding virtual-code addressing as an extension.
 
-Two distinct 39gs paths are intentionally retained:
-
-### Hardware-proven source-modern baseline
-
-The existing 39gsX path builds new ARMv4T code with stock Clang and links it with the historical HPGCC 1.1-p1 39G MMU startup objects using LLD. This remains the golden 39gs baseline.
-
-### Experimental legacy-object interop
-
-Stock LLVM already has ARM RWPI, a static-base-relative model for writable data. A host-verified experiment keeps historical HPGCC objects on their original `r10`/GOT model while new Clang code uses `r9`/RWPI:
+That gives hpclang a portable native-ARM baseline:
 
 ```
-old MMUloader establishes r10 = 0x09000400
-                  |
-                  v
-_start bridge: mov r9, r10
-                  |
-                  v
-new Clang code: -frwpi -mabi=apcs-gnu -mfloat-abi=soft
+C / C++ / assembly
+        |
+        v
+stock Clang + LLVM tools
+        |
+        v
+ROPI/RWPI ARMv4T image
+        |
+        v
+Launcher V3 simple/MMU payload
+        |
+        +----------------------+----------------------+
+        |                      |                      |
+   HP39/40 adapter         HP48gII adapter       HP49/50 adapter
+   aplet + lib275          RPL + Toolbox48       RPL + Toolbox
 ```
 
-With one RW PT_LOAD rooted at `0x09000400`, LLD successfully resolves both the historical `R_ARM_GOT_BREL` relocations and new `R_ARM_SBREL32` relocations in one image.
+Family-specific launchers and package formats remain separate. The common C runtime and source API should not depend on one calculator's Saturn memory map.
 
-This suggests normal hpclang development may require **no LLVM fork at all**. Hardware validation is still required before the RWPI experiment can replace any proven 39gs build path.
+## Optional compatibility profiles
+
+Later HPGCC features remain valuable and should be preserved where the platform supports them:
+
+- **HPGCC 2.0 VC:** fixed virtual code/data addresses, Launcher V3 v1.2 flags, ARM/Thumb interworking, no historical r10 single-PIC-base requirement.
+- **HPGCC3:** CC3/EXT3 executable format, versioned ROMLIB ABI and a much richer runtime/library surface.
+
+These are additive backends, not the definition of hpclang itself. No hpclang target will require a ROM replacement.
+
+## Current status
+
+The first clean bootstrap is the HP39/40 backend because real 39gs hardware and a hardware-proven historical launch path are already available. It currently proves:
+
+- Clang integrated assembler;
+- Clang ARMv4T ROPI/RWPI C code;
+- LLD;
+- no HPGCC target object;
+- no GCC/libgcc;
+- direct ELF-to-Launcher-V3 packing.
+
+This is a validation foothold, not a model-specific architecture decision.
 
 See:
 
+- [Target families](docs/targets.md)
+- [Runtime architecture](docs/runtime-architecture.md)
+- [Baseline decision](docs/baseline.md)
+- [Library lineage](docs/library-lineage.md)
 - [HPGCC lineage](docs/lineage.md)
-- [Porting model](docs/porting-model.md)
 - [ABI migration findings](docs/abi.md)
-- [39gs compatibility contract](docs/39gs.md)
-- [Hybrid RWPI experiment](experiments/hybrid-rwpi/README.md)
-
-## Repository status
-
-This repository is currently in the archaeology/minimal-port phase. Historical calculator/runtime binaries and packaging assets are intentionally not vendored until provenance and redistribution terms have been audited.
