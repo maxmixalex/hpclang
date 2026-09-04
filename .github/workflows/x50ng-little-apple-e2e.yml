@@ -13,6 +13,7 @@ on:
       - "tests/hp39-runtime-diag.c"
       - "tests/x50ng/e2e-main.c"
       - "tools/probe-atfe.sh"
+      - "tools/pgm-to-summary.py"
       - ".github/workflows/x50ng-little-apple-e2e.yml"
 
 jobs:
@@ -139,6 +140,19 @@ jobs:
             python tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat "build/$TARGET-e2e.json"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          python tools/pgm-to-summary.py \
+            --heading "$TARGET canonical ARM E2E" \
+            --json "build/$TARGET-e2e.json" \
+            "build/$TARGET-before.pgm" \
+            "build/$TARGET-pass.pgm" \
+            "build/$TARGET-return.pgm" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload ${{ matrix.target }} canonical E2E evidence
         if: always()
