@@ -126,8 +126,9 @@ echo
 echo "== visible HP39 HPC1 smoke =="
 
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
+"$CC" "${COMMON[@]}" -marm     -c "$ROOT/tests/hp39-visible-smoke-irq.S" -o "$OUT/hp39-visible-smoke-irq.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o" "$OUT/hp39-visible-smoke-irq.o"     -o "$OUT/hp39-visible.elf"
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 
