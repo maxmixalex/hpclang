@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "emulator_api.h"
 #include "hdw.h"
@@ -30,6 +31,21 @@ struct key_action {
     int hpkey;
     int pressed;
 };
+
+static int read_guest_u32(hdw_t *hdw, uint32_t address, uint32_t *value)
+{
+    uint8_t bytes[4];
+
+    if (cpu_memory_rw_debug(hdw->cpu, address, bytes, sizeof(bytes), 0) != 0)
+        return 0;
+
+    *value =
+        (uint32_t)bytes[0] |
+        ((uint32_t)bytes[1] << 8) |
+        ((uint32_t)bytes[2] << 16) |
+        ((uint32_t)bytes[3] << 24);
+    return 1;
+}
 
 static int write_pgm(
     const char *path,
@@ -124,6 +140,20 @@ static void capture_and_stop(void *opaque)
         exit(EXIT_FAILURE);
     }
 
+    uint32_t l1_data = 0;
+    uint32_t l1_code = 0;
+    uint32_t l1_stage = 0;
+    int l1_data_ok = read_guest_u32(state->hdw, 0x07f00044u, &l1_data);
+    int l1_code_ok = read_guest_u32(state->hdw, 0x07f00048u, &l1_code);
+    int l1_stage_ok = read_guest_u32(state->hdw, 0x07f00240u, &l1_stage);
+
+    target_phys_addr_t l1_phys =
+        cpu_get_phys_page_debug(state->hdw->cpu, 0x07f00000u);
+    target_phys_addr_t sram_probe_phys =
+        cpu_get_phys_page_debug(state->hdw->cpu, 0x08040000u);
+    target_phys_addr_t stage_window_phys =
+        cpu_get_phys_page_debug(state->hdw->cpu, 0x09000000u);
+
     fprintf(
         json,
         "{\n"
@@ -132,14 +162,31 @@ static void capture_and_stop(void *opaque)
         "  \"nonzero_pixels\": %u,\n"
         "  \"capture_attempts\": %d,\n"
         "  \"width\": %d,\n"
-        "  \"height\": %d\n"
+        "  \"height\": %d,\n"
+        "  \"sctlr\": \"0x%08x\",\n"
+        "  \"ttbr0\": \"0x%08x\",\n"
+        "  \"l1_page_phys\": \"0x%08llx\",\n"
+        "  \"l1_data_entry\": \"0x%08x\",\n"
+        "  \"l1_code_entry\": \"0x%08x\",\n"
+        "  \"l1_stage_entry\": \"0x%08x\",\n"
+        "  \"sram_08040000_phys\": \"0x%08llx\",\n"
+        "  \"stage_09000000_phys\": \"0x%08llx\"\n"
         "}\n",
         state->hdw->cpu->regs[15],
         is_display_on() ? "true" : "false",
         nonzero,
         state->attempts,
         HPCLANG_LCD_WIDTH,
-        HPCLANG_LCD_HEIGHT);
+        HPCLANG_LCD_HEIGHT,
+        state->hdw->cpu->cp15.c1_sys,
+        state->hdw->cpu->cp15.c2_base0,
+        (unsigned long long)l1_phys,
+        l1_data_ok ? l1_data : 0xffffffffu,
+        l1_code_ok ? l1_code : 0xffffffffu,
+        l1_stage_ok ? l1_stage : 0xffffffffu,
+        (unsigned long long)sram_probe_phys,
+        (unsigned long long)stage_window_phys);
+
     fclose(json);
 
     if (!is_display_on() || nonzero == 0) {
