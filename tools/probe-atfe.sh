@@ -189,7 +189,7 @@ p = Path(sys.argv[1]).read_bytes()
 assert p[:8] == b"HPHP49-C"
 assert p[13:20] == b"\x4c\xb3\x80A>CP"
 assert p[-4:] == struct.pack("<I", 0x3176B34C)
-assert p[-16:-12] == struct.pack("<I", 0)
+assert p[-20:-16] == struct.pack("<I", 0)
 print(f"PASS: single-form stock ARMToolbox envelope, {len(p)} bytes")
 PY
 
