@@ -6,7 +6,7 @@ The purpose of the HPGCC archaeology is to identify the smallest compatibility s
 
 Prefer stock, current Clang and clangd.
 
-For the ARMv4T-era targets the common front-end baseline is approximately:
+For the ARMv4T-era targets the common source-modern front-end baseline is approximately:
 
 ```
 --target=arm-none-eabi
@@ -21,38 +21,62 @@ For the ARMv4T-era targets the common front-end baseline is approximately:
 
 Exact optimization and section flags belong to the build profile rather than clangd semantics.
 
+When binary interoperability with historical HPGCC objects is required, add the old ABI-compatible dimensions explicitly:
+
+```
+-mabi=apcs-gnu
+-mfloat-abi=soft
+```
+
 ## Layer 1 — ABI and startup
 
-Historical HPGCC mixes several assumptions:
+Historical HPGCC 1.x/2.x combines:
 
 - ARMv4T / ARM state;
-- old APCS-era compiler options;
-- a dedicated PIC base register (`r10/sl`) in 1.x/2.x code;
+- APCS-era function ABI;
+- a dedicated `r10/sl` PIC/GOT base;
 - special non-PIC MMU loader code;
-- calculator-specific startup and state save/restore;
-- in HPGCC3, a ROMLIB call ABI.
+- calculator-specific startup and state save/restore.
 
-These are the highest-risk pieces for full source compatibility.
+HPGCC3 is different again and uses a ROMLIB/launcher ABI.
 
-A key distinction:
+### The important new result
 
-- modern Clang has already produced **hardware-working 39gs application objects** in 39gsX;
-- that does **not yet prove binary-compatible replacement of every old HPGCC library object or every `r10`-based global-access convention**.
+Current LLVM already implements ARM RWPI: writable data is addressed relative to a static-base register using `R_ARM_SBREL32`. ARM RWPI standardizes that base as `r9/sb`.
 
-Full legacy-library compatibility therefore needs ABI tests, not assumptions.
+The original HPGCC 1.1 object `MMUglobals.o` was inspected directly and uses `R_ARM_GOT_BREL` with `r10/sl`.
+
+These two code models can coexist:
+
+```
+legacy GCC objects        modern Clang objects
+r10 + GOT_BREL            r9 + SBREL32
+       \                    /
+        \                  /
+         same HPGCC RAM image
+              0x09000400
+```
+
+The historical loader establishes r10 before calling `_start`. A tiny assembly bridge can execute `mov r9, r10` and tail-branch into Clang RWPI code.
+
+This means reproducing GCC's old `-mpic-register=r10 -msingle-pic-base` backend is currently unnecessary.
 
 ## Layer 2 — ELF layout
 
 Keep calculator-required layout in linker scripts rather than compiler patches.
 
-For the hardware-proven 39gs path, modern LLD needs only small normalization of the old HPGCC script:
+For the hardware-proven 39gs source-modern path, modern LLD needs only small normalization of the old HPGCC script:
 
 - pass MMU startup objects explicitly instead of legacy `STARTUP()/INPUT()`;
 - express `__data_start` using `LOADADDR(.got) + SIZEOF(.got)`;
 - keep the end of copied data word-aligned;
 - discard Clang-generated `.ARM.exidx*` / `.ARM.extab*` sections when using the historical `elf2hp` copying model.
 
-These are linker/runtime compatibility changes, not reasons to fork Clang.
+For the experimental RWPI interoperability path there is one additional invariant:
+
+- `.got + initialized data + .bss` must belong to a **single RW PT_LOAD rooted at 0x09000400**.
+
+LLD defines ARM SBREL relative to the writable load segment's static base. If it splits HPGCC's RAM image into several PT_LOAD segments, merely copying r10 to r9 is not sufficient.
 
 ## Layer 3 — post-link conversion
 
@@ -72,6 +96,20 @@ Examples:
 - 49g+/50g HPGCC 1/2: RPL/ARM launcher conventions.
 - 50g HPGCC3: custom ROM + ROMLIB + CC3 launcher.
 
+## Compatibility levels
+
+### source-modern
+
+New application sources compiled with stock modern Clang while retaining only the historical calculator runtime/package pieces that are still needed.
+
+The existing 39gsX route is already hardware-proven for this level.
+
+### legacy-interop
+
+New Clang objects and historical GCC-built HPGCC objects coexist in one image.
+
+The RWPI/r9 + legacy-GOT/r10 experiment is host-proven at link/codegen level, but still requires real calculator testing and a broader ABI fixture matrix.
+
 ## When a Clang patch is justified
 
 A Clang/LLVM fork is a last resort.
@@ -83,4 +121,4 @@ Create a compiler patch only when a required historical behavior:
 3. cannot be isolated in startup code, a thunk, a runtime helper, or linker transformation;
 4. has a regression test demonstrating the missing behavior.
 
-The most likely area requiring investigation is the old HPGCC 1.x/2.x `r10` single-PIC-base convention. Until tested, hpclang must distinguish “modern source compilation works” from “drop-in ABI compatibility with all old HPGCC libraries.”
+At present there is only one concrete small compiler gap: current ARM Clang supports `-ffixed-r9` but not `-ffixed-r10`. That matters for source-identical recompilation of historical `MMUloader.c`, but it is **not required for normal hpclang application code** if the dual-base RWPI route survives hardware validation.
