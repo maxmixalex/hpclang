@@ -40,11 +40,11 @@ KEYS = [
     "elf2hp/elf2hp.c",
 ]
 
-FLAG_RE = re.compile(r"(?<![A-Za-z0-9_])-(?:m|f)[A-Za-z0-9_.=+\\-]+")
-ASMREG_RE = re.compile(r"asm\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*\\)")
+FLAG_RE = re.compile(r"(?<![A-Za-z0-9_])-(?:m|f)[A-Za-z0-9_.=+\-]+")
+ASMREG_RE = re.compile(r'asm\s*\(\s*"([^"]+)"')
 HEX_RE = re.compile(r"0x[0-9A-Fa-f]{5,8}")
-LINK_RE = re.compile(r"\\b(?:ENTRY|STARTUP|INPUT|OUTPUT_ARCH|OUTPUT_FORMAT)\\s*\\([^\\n]+")
-GLOBAL_RE = re.compile(r"\\b__[A-Za-z0-9_]+\\b")
+LINK_RE = re.compile(r"\b(?:ENTRY|STARTUP|INPUT|OUTPUT_ARCH|OUTPUT_FORMAT)\s*\([^\n]+")
+GLOBAL_RE = re.compile(r"\b__[A-Za-z0-9_]+\b")
 
 def files(root: Path):
     d = {}
