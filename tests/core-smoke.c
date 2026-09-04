@@ -6,6 +6,7 @@ volatile uint32_t hpclang_smoke_bss;
 
 static const char banner[] = "hpclang-v1";
 
+/* Same binary ABI is used by every calculator family. */
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
