@@ -10,7 +10,7 @@
 #include "s3c2410/s3c2410_lcd.h"
 
 #define LCD_W 131
-#define LCD_H 80
+#define LCD_H 64
 
 struct state {
     hdw_t *hdw;
@@ -19,6 +19,17 @@ struct state {
     unsigned captures;
     unsigned last_nonzero;
 };
+
+struct key_action { int key; int down; };
+static const struct key_action f_down = { HP4950_KEY_F, 1 };
+static const struct key_action f_up = { HP4950_KEY_F, 0 };
+
+static void key_cb(void *arg)
+{
+    const struct key_action *a = arg;
+    if (a->down) press_key(a->key);
+    else release_key(a->key);
+}
 
 static unsigned capture(hdw_t *h, const char *path)
 {
@@ -106,6 +117,8 @@ int main(int argc, char **argv)
     s.hdw = emulator_init(&config);
 
     if (!later(snapshot, &s, 3000000LL) ||
+        !later(key_cb, (void *)&f_down, 4000000LL) ||
+        !later(key_cb, (void *)&f_up, 4100000LL) ||
         !later(snapshot, &s, 6000000LL) ||
         !later(snapshot, &s, 10000000LL) ||
         !later(snapshot, &s, 15000000LL) ||
