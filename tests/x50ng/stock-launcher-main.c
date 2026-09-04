@@ -34,6 +34,8 @@ static const struct key_action up_down = { HP4950_KEY_UP, 1 };
 static const struct key_action up_up = { HP4950_KEY_UP, 0 };
 static const struct key_action a_down = { HP4950_KEY_A, 1 };
 static const struct key_action a_up = { HP4950_KEY_A, 0 };
+static const struct key_action f_down = { HP4950_KEY_F, 1 };
+static const struct key_action f_up = { HP4950_KEY_F, 0 };
 
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
@@ -118,7 +120,7 @@ static void enter_sd(void *arg)
 {
     (void)arg;
     if (!tap(&up_down, &up_up, 0) ||
-        !tap(&a_down, &a_up, 300000))
+        !tap(&f_down, &f_up, 300000))
         fprintf(stderr, "stock launcher explorer: cannot enter SD\n");
 }
 

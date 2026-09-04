@@ -166,14 +166,18 @@ static int finish(uint32_t failure)
     return (int)failure;
 }
 
+static int supported_model(uint32_t model)
+{
+    return model >= HPCLANG_MODEL_HP39GPLUS &&
+           model <= HPCLANG_MODEL_HP50G;
+}
+
 int main(void)
 {
     hpclang_diag_step(0x10);
     const struct hpclang_boot_info *boot = hpclang_boot_info();
 
-    if ((boot->model != HPCLANG_MODEL_HP39GS &&
-         boot->model != HPCLANG_MODEL_HP50G) ||
-        boot->rw_bytes < 0x4000u)
+    if (!supported_model(boot->model) || boot->rw_bytes < 0x4000u)
         return finish(0x01);
 
     hpclang_diag_step(0x11);
