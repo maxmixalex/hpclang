@@ -47,6 +47,7 @@ jobs:
       - name: Probe Emu48+ automation API
         shell: pwsh
         run: |
+          dumpbin /exports "$env:EMU48_DLL" | Out-File build\emu48-exports.txt
           & build\emu48-headless.exe probe "$env:EMU48_DLL" | Tee-Object -FilePath build\emu48-probe.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -64,6 +65,7 @@ jobs:
           path: |
             build/emu48-headless.exe
             build/emu48-probe.json
+            build/emu48-exports.txt
             build/emu48plus67.sha256.txt
             build/lcd-selftest.bmp
             build/lcd-selftest.png

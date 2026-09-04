@@ -31,14 +31,28 @@ struct emu48_api {
     EmuStopFn stop;
 };
 
-static FARPROC required(HMODULE module, const char *name)
+static FARPROC required_stdcall(
+    HMODULE module, const char *name, unsigned argument_bytes)
 {
+    char decorated[128];
     FARPROC proc = GetProcAddress(module, name);
-    if (proc == NULL) {
-        fprintf(stderr, "missing required Emu48 export: %s\n", name);
-        ExitProcess(3);
-    }
-    return proc;
+
+    if (proc != NULL)
+        return proc;
+
+    snprintf(decorated, sizeof(decorated), "_%s@%u", name, argument_bytes);
+    proc = GetProcAddress(module, decorated);
+    if (proc != NULL)
+        return proc;
+
+    snprintf(decorated, sizeof(decorated), "%s@%u", name, argument_bytes);
+    proc = GetProcAddress(module, decorated);
+    if (proc != NULL)
+        return proc;
+
+    fprintf(stderr, "missing required Emu48 export: %s (stdcall @%u)\n",
+            name, argument_bytes);
+    ExitProcess(3);
 }
 
 static struct emu48_api load_api(const char *dll_path)
@@ -51,17 +65,18 @@ static struct emu48_api load_api(const char *dll_path)
                 dll_path, GetLastError());
         ExitProcess(2);
     }
-#define LOAD(name, field, type) api.field = (type)required(api.module, name)
-    LOAD("EmuCreate", create, EmuCreateFn);
-    LOAD("EmuDestroy", destroy, EmuDestroyFn);
-    LOAD("EmuAcceleratorTable", accelerator_table, EmuAcceleratorTableFn);
-    LOAD("EmuCalculatorType", calculator_type, EmuCalculatorTypeFn);
-    LOAD("EmuSimulateKey", simulate_key, EmuSimulateKeyFn);
-    LOAD("EmuPressOn", press_on, EmuPressOnFn);
-    LOAD("EmuGetRegister", get_register, EmuGetRegisterFn);
-    LOAD("EmuGetMem", get_mem, EmuGetMemFn);
-    LOAD("EmuRun", run, EmuRunFn);
-    LOAD("EmuStop", stop, EmuStopFn);
+#define LOAD(name, bytes, field, type) \
+    api.field = (type)required_stdcall(api.module, name, bytes)
+    LOAD("EmuCreate", 4, create, EmuCreateFn);
+    LOAD("EmuDestroy", 0, destroy, EmuDestroyFn);
+    LOAD("EmuAcceleratorTable", 4, accelerator_table, EmuAcceleratorTableFn);
+    LOAD("EmuCalculatorType", 0, calculator_type, EmuCalculatorTypeFn);
+    LOAD("EmuSimulateKey", 12, simulate_key, EmuSimulateKeyFn);
+    LOAD("EmuPressOn", 4, press_on, EmuPressOnFn);
+    LOAD("EmuGetRegister", 4, get_register, EmuGetRegisterFn);
+    LOAD("EmuGetMem", 8, get_mem, EmuGetMemFn);
+    LOAD("EmuRun", 0, run, EmuRunFn);
+    LOAD("EmuStop", 0, stop, EmuStopFn);
 #undef LOAD
     return api;
 }
