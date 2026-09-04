@@ -15,6 +15,9 @@
 
 volatile uint32_t hpclang_e2e_result;
 
+uint32_t hp39_irq_save_disable(void);
+void hp39_irq_restore(uint32_t cpsr);
+
 static void delay(uint32_t n)
 {
     while (n--)
@@ -130,9 +133,7 @@ int main(void)
     uint32_t saved_gpgcon = GPGCON;
     uint32_t saved_gpgdat = GPGDAT;
 
-    __asm__ volatile("mrs %0, cpsr" : "=r"(old_cpsr));
-    uint32_t masked = old_cpsr | 0xc0u;
-    __asm__ volatile("msr cpsr_c, %0" : : "r"(masked) : "memory");
+    old_cpsr = hp39_irq_save_disable();
     INTMSK = 0xffffffffu;
 
     volatile uint8_t *fb = framebuffer();
@@ -157,7 +158,7 @@ int main(void)
     GPGCON = saved_gpgcon;
     GPGDAT = saved_gpgdat;
     INTMSK = saved_intmsk;
-    __asm__ volatile("msr cpsr_c, %0" : : "r"(old_cpsr) : "memory");
+    hp39_irq_restore(old_cpsr);
 
     return 0;
 }
