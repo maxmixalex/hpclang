@@ -1,0 +1,81 @@
+name: Historical HPGCC archaeology
+
+on:
+  push:
+    paths:
+      - research/trigger.txt
+      - .github/workflows/historical-archaeology.yml
+      - tools/analyze-hpgcc-tags.py
+
+permissions:
+  contents: write
+
+jobs:
+  archaeology:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install SVN
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y subversion
+
+      - name: Export official SourceForge tags
+        run: |
+          rm -rf /tmp/hpgcc11 /tmp/hpgcc20
+          svn export --force https://svn.code.sf.net/p/hpgcc/code/tags/frozen_1.1_MMU_trunk /tmp/hpgcc11
+          svn export --force https://svn.code.sf.net/p/hpgcc/code/tags/frozen_2.0_VC_release /tmp/hpgcc20
+
+      - name: Analyze historical trees
+        run: |
+          rm -rf research/generated
+          mkdir -p research/generated
+          python3 tools/analyze-hpgcc-tags.py /tmp/hpgcc11 /tmp/hpgcc20 research/generated
+
+      - name: Run modern Clang probes
+        run: |
+          {
+            echo '# Modern Clang probe'
+            echo
+            echo '## Version'
+            echo '~~~'
+            clang --version
+            echo '~~~'
+            echo
+            echo '## Old required flag: -ffixed-r10'
+            echo '~~~'
+            printf 'int f(int x){return x+1;}\n' >/tmp/fixed.c
+            clang --target=arm-none-eabi -march=armv4t -marm -ffixed-r10 -c /tmp/fixed.c -o /tmp/fixed.o 2>&1 || true
+            echo '~~~'
+            echo
+            echo '## APCS GNU ABI support'
+            echo '~~~'
+            clang --target=arm-none-eabi -march=armv4t -marm -mabi=apcs-gnu -c /tmp/fixed.c -o /tmp/apcs.o 2>&1
+            file /tmp/apcs.o
+            echo '~~~'
+            echo
+            echo '## PIC codegen'
+            cat >/tmp/pic.c <<'EOF'
+extern int ext;
+int glob=3;
+int f(int x){ return ext + glob + x; }
+EOF
+            echo '~~~asm'
+            clang --target=arm-none-eabi -march=armv4t -marm -O2 -fPIC -S /tmp/pic.c -o -
+            echo '~~~'
+          } > research/generated/clang-probe.md
+
+      - name: Commit generated research
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/generated
+          if git diff --cached --quiet; then
+            echo "No generated changes."
+          else
+            git commit -m "research: analyze official HPGCC 1.1 and 2.0 tags"
+            git push
+          fi
