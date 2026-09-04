@@ -229,3 +229,19 @@ key event, but ENTER/ON responded and APLET opened the normal APLET library.
 Therefore control flow, interrupts and calculator state had returned to the
 stock OS. Immediate LCD repaint is a separate HP39 platform-integration concern,
 not a bootstrap-return failure.
+
+
+### HP39gs runtime checkpoint: interrupt isolation
+
+The first extended runtime validation could hang before producing its final
+result, and the progressive diagnostic could be interrupted while drawing the
+first glyph. The earlier visible smoke was stable only after it masked IRQ/FIQ,
+while the very short immediate-return smoke could complete without waiting long
+enough to observe the race.
+
+The common bootstrap now owns this requirement: it saves CPSR and masks IRQ/FIQ
+before installing the temporary HPC1 MMU entries, then restores the stock MMU
+entries and only afterwards restores the original CPSR. Stock OS interrupt
+handlers must never execute against the HPC1 virtual layout.
+
+Hardware validation of this change is pending.

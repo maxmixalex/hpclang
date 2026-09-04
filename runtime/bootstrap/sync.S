@@ -110,3 +110,25 @@ hpclang_cache_clean:
     ldmfd   sp!, {r0-r2, lr}
     movs    pc, lr
 .size hpclang_cache_clean, .-hpclang_cache_clean
+
+
+/*
+ * Keep stock calculator IRQ/FIQ handlers out of the temporary HPC1 virtual
+ * address space. These helpers are part of the common ARMv4T bootstrap, not a
+ * calculator-family backend.
+ */
+.global hpclang_irq_save_disable
+.type hpclang_irq_save_disable,%function
+hpclang_irq_save_disable:
+    mrs     r0, cpsr
+    orr     r1, r0, #0xc0
+    msr     cpsr_c, r1
+    bx      lr
+.size hpclang_irq_save_disable, .-hpclang_irq_save_disable
+
+.global hpclang_irq_restore
+.type hpclang_irq_restore,%function
+hpclang_irq_restore:
+    msr     cpsr_c, r0
+    bx      lr
+.size hpclang_irq_restore, .-hpclang_irq_restore

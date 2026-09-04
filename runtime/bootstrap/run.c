@@ -5,6 +5,8 @@
 void hpclang_mmu_sync(
     volatile uint32_t *l2_workspace,
     volatile uint32_t *l1);
+uint32_t hpclang_irq_save_disable(void);
+void hpclang_irq_restore(uint32_t cpsr);
 int hpclang_enter(uintptr_t entry, uintptr_t stack_top);
 
 int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
@@ -12,6 +14,15 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     struct hpclang_mmu_saved saved;
 
     hpclang_mmu_prepare(&launch->mmu);
+
+    /*
+     * The stock OS interrupt handlers run in the stock virtual address space.
+     * They must not preempt while HPC1's temporary L1 entries are installed.
+     * Save the complete CPSR so the caller's original IRQ/FIQ state and mode
+     * are restored only after the stock mappings are back.
+     */
+    uint32_t saved_cpsr = hpclang_irq_save_disable();
+
     hpclang_mmu_install(&launch->mmu, &saved);
     hpclang_mmu_sync(launch->mmu.l2_workspace, launch->mmu.l1);
 
@@ -33,5 +44,6 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     hpclang_mmu_restore(&launch->mmu, &saved);
     hpclang_mmu_sync(launch->mmu.l2_workspace, launch->mmu.l1);
 
+    hpclang_irq_restore(saved_cpsr);
     return result;
 }
