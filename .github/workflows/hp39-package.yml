@@ -64,14 +64,14 @@ jobs:
         run: |
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
-          tools/package-hp39-aplet.sh             build/atfe-probe/hp39gs-hpc1.hp             dist/hp39-emulator-smoke
-          cp build/atfe-probe/hp39-visible.result-address             dist/hp39-emulator-smoke/E2E_RESULT_ADDRESS.txt
-          printf 'commit=%s\nworkflow_run=%s\n'             "$GITHUB_SHA" "$GITHUB_RUN_ID"             > dist/hp39-emulator-smoke/BUILD_INFO.txt
+          tools/package-hp39-aplet.sh             build/atfe-probe/hp39gs-hpc1.hp             dist/hp39-hardware-validation
+          cp build/atfe-probe/hp39-visible.result-address             dist/hp39-hardware-validation/E2E_RESULT_ADDRESS.txt
+          printf 'commit=%s\nworkflow_run=%s\n'             "$GITHUB_SHA" "$GITHUB_RUN_ID"             > dist/hp39-hardware-validation/BUILD_INFO.txt
           python3 - <<'PY'
           from hashlib import sha256
           from pathlib import Path
 
-          root = Path("dist/hp39-emulator-smoke")
+          root = Path("dist/hp39-hardware-validation")
           names = sorted(
               p.name for p in root.iterdir()
               if p.is_file() and p.name != "SHA256SUMS.txt"
@@ -82,9 +82,9 @@ jobs:
                   out.write(f"{digest}  {name}\n")
           PY
 
-      - name: Upload Emu48 smoke bundle
+      - name: Upload HP39 hardware validation bundle
         uses: actions/upload-artifact@v4
         with:
-          name: hpclang-hp39-emulator-smoke
-          path: dist/hp39-emulator-smoke/
+          name: hpclang-hp39-hardware-validation
+          path: dist/hp39-hardware-validation/
           if-no-files-found: error

@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: real-hardware canonical runtime validated; Saturn-side Emu48 automation optional**
+**Status: HP39gs canonical runtime validated on real hardware; 39g+/40gs sibling launch validation pending**
 
 Targets:
 
@@ -98,31 +98,35 @@ Steps:
 4. [x] restore stock HPGCC39 transfer filenames for maximum Conn3x compatibility;
 5. [x] enter HPC1 on a real HP39gs over USB: model 2 and RW 0x00014000 observed;
 6. [x] validate return/state restoration on the same real HP39gs;
-7. [ ] automate HP39 stock UI/package-transfer coverage in Emu48 where useful;
-8. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
-9. [ ] verify sibling 39g+/40gs differences.
+7. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
+8. [ ] verify HP39g+ outer-launcher/model differences;
+9. [ ] verify HP40gs outer-launcher/model/ROM differences.
 
-Emu48 does not emulate the ARM native execution engine used by HPGCC/HPC1 on
-the Apple-family calculators: its NATIVE/ARMSYS/ARMSAT paths are not
-implemented. It therefore cannot be an execution oracle for the HP39 HPC1
-runtime. Real HP39gs hardware is the authoritative execution gate; Emu48 may
-still cover the Saturn-side stock UI and transfer protocol.
+The real HP39gs is the authoritative execution gate for the HP39/40 family.
+HP39gs and HP40gs use the same 75 MHz S3C2410A/ARM920T platform, 256 KiB RAM
+and 131x64 LCD. The important HP40gs differences are the 2 MiB flash/CAS image,
+the absence of infrared, its calculator-side ROM, and model identity. Therefore
+the common ARM runtime does not need a separate HP40gs-specific implementation;
+support is complete only after the stock HP40gs Aplet/ARMToolbox outer path is
+executed at least once and returns cleanly with model 3.
+
+Until a true Little-Apple ARM emulator exists, sibling validation is split:
+
+- CI proves the common HPC1/runtime/bootstrap on Armv4T and on x50ng's real
+  ARM920T/S3C2410 execution engine;
+- the HP39gs real machine proves the HP39/40 family stage0 + stock Aplet path;
+- HP40gs requires one real-machine (or future true-ARM emulator) launch/return
+  check, not a second re-validation of compiler-rt/TLS/libc internals.
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
-chain. The first two diagnostic builds are not return-path evidence: one waited
-on its own APLET GPIO poll with IRQ/FIQ masked; the next used an uncalibrated
-60,000,000-iteration busy-wait while IRQ/FIQ remained masked. Missing letters
-in those pages were independently traced to omissions in the tiny test font.
-
-The active return gate now contains no display, GPIO, interrupt masking or
-delay: `main()` records the boot fields and returns immediately.
+chain. Later real-hardware work closed the return path and the canonical runtime
+suite.
 
 Completion criterion:
 
-> The canonical HPC1 runtime test suite passes on real HP39gs hardware without
-> a legacy Launcher V3 application ABI, with any Emu48 coverage limited to the
-> Saturn-side stock UI/package-transfer path.
+> The canonical HPC1 runtime passes on real HP39gs hardware, and each sibling
+> target has its stock outer launcher/model integration executed at least once.
 
 ## M4 — HP48gII family
 
@@ -142,53 +146,55 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Status: planned**
+**Status: canonical HPC1 runtime PASS reached on x50ng; stage0 return and stock package path pending**
 
 Steps:
 
-- replace the historical VC launcher dependency with the common bootstrap;
-- validate ARM execution on x50ng/x49gp-class hardware emulation;
-- validate on real hardware when useful;
-- preserve only platform-specific packaging and OS integration.
+- [x] boot official 49g+/50g firmware headlessly in x50ng;
+- [x] execute the same canonical HPC1 runtime image used by HP39gs through
+  stage0 -> stage1 -> common bootstrap;
+- [x] observe machine-readable `0x50415353` and capture the live
+  `RUNTIME PASS` LCD;
+- [ ] close the synthetic outer-launcher return boundary;
+- [ ] replace the synthetic ARMSYS allocation with the real stock 49g+/50g
+  package/launcher path;
+- [ ] validate on real hardware when useful.
 
 Completion criterion:
 
-> HP49g+ and HP50g execute the same HPC1 ABI through the same common bootstrap.
+> HP49g+ and HP50g execute the same HPC1 ABI through the same common bootstrap
+> and the supported stock package/launcher path.
 
-## M6 — Automated emulator E2E
+## M6 — Automated ARM emulator E2E
 
-**Status: headless infrastructure active; true ARM execution backend moving to x50ng**
+**Status: x50ng executes canonical HPC1; full return gate in progress**
 
 Validated design:
 
-- Emu48+ can be driven from a headless x86 controller for stock UI, state,
-  keyboard, memory/debugger API and screenshot infrastructure;
-- Emu48 does not implement the Apple-family ARM-native NATIVE/ARMSYS/ARMSAT
-  execution path and therefore cannot execute HPC1;
-- x50ng/x49gp emulates the actual S3C2410/ARM hardware and is the execution
-  backend for automated HPC1 tests;
+- x50ng emulates the actual S3C2410/ARM920T hardware used by the 49g+/50g
+  family and is the automated HPC1 execution backend;
 - x50ng exposes calculator keys and the LCD controller through host-side APIs,
-  allowing a no-GUI test frontend to inject input and capture a deterministic
-  131x80 LCD image directly;
-- keep both emulators as external test dependencies. No emulator implementation
-  becomes part of the hpclang runtime.
+  so CI needs no GUI, mouse coordinates or image recognition;
+- official 49g+/50g firmware boots to normal HOME in headless CI;
+- the same canonical HPC1 image used on the real HP39gs reaches machine-readable
+  PASS under x50ng and produces a deterministic 131x80 PASS screenshot;
+- the remaining failure is after PASS, at the synthetic outer-launcher return
+  boundary; HPC1 code/data mappings and the SWI vector are already restored.
 
 Execution plan:
 
-1. [x] build the Emu48+ controller and deterministic screenshot pipeline;
-2. [ ] boot official 49g+/50g ARM firmware in x50ng without a runtime GUI and
-   capture its LCD as a CI artifact;
-3. [ ] run common bootstrap + the canonical HPC1 runtime image under x50ng and
-   stop on machine-readable PASS;
-4. [ ] capture the PASS LCD frame in CI;
-5. [ ] upgrade the ARM execution gate to the real stock 49g+/50g
-   package/launcher path.
+1. [x] boot official 49g+/50g ARM firmware and capture the LCD;
+2. [x] run common bootstrap + canonical HPC1 and observe machine-readable PASS;
+3. [x] capture the live PASS LCD frame in CI;
+4. [ ] complete synthetic stage0 return and resume the saved stock HOME state;
+5. [ ] upgrade the execution gate to the real stock 49g+/50g package/launcher.
 
 Completion criterion:
 
 > At least one real ARM calculator-family path runs automatically from source
-> build through HPC1 execution, produces machine-readable success and uploads a
-> deterministic LCD screenshot.
+> build through HPC1 execution, produces machine-readable success, returns to a
+> responsive stock OS state and uploads deterministic before/PASS/after LCD
+> evidence.
 
 ## M7 — Common platform services
 

@@ -33,6 +33,7 @@
 #define INJECT_PAGES 64u
 #define INJECT_VA 0x0a000000u
 #define STAGE0_VA (INJECT_VA + 0x1000u)
+#define SYNTH_STACK_TOP (INJECT_VA + 0x3f000u - 16u)
 #define SENTINEL_VA (INJECT_VA + 0x3f000u)
 
 #define L1_DATA_VA 0x07f00044u
@@ -256,7 +257,9 @@ static int build_launcher_ram(struct e2e *s)
     const uint32_t stage0_phys = INJECT_PHYS + 0x1000u;
     const uint32_t sentinel_phys =
         INJECT_PHYS + (INJECT_PAGES - 1u) * 0x1000u;
-    const size_t max_stage0 = (INJECT_PAGES - 2u) * 0x1000u;
+    /* Reserve page 62 for the synthetic outer-launcher stack and page 63
+     * for the return sentinel. */
+    const size_t max_stage0 = (INJECT_PAGES - 3u) * 0x1000u;
 
     if (s->stage0_size > max_stage0)
         return 0;
@@ -468,10 +471,22 @@ static void inject(void *arg)
         return;
     }
 
+    /*
+     * Do not jump into stage0 from an arbitrary instant of the stock ARM
+     * emulator loop. The real Saturn/RPL launcher enters ARM code at a safe
+     * call boundary. Model that boundary explicitly with a private System-mode
+     * stack and IRQ/FIQ masked until stage0 returns to our sentinel.
+     *
+     * The host restores the exact stock CPU snapshot afterwards.
+     */
+    uint32_t launch_cpsr =
+        (s->stock.cpsr & (CPSR_NZCV | CPSR_Q | CPSR_GE)) |
+        ARM_CPU_MODE_SYS | CPSR_I | CPSR_F;
+    cpsr_write(cpu, launch_cpsr, 0xffffffffu);
+    cpu->regs[13] = SYNTH_STACK_TOP;
     cpu->regs[1] = INJECT_VA;
     cpu->regs[14] = SENTINEL_VA;
     cpu->regs[15] = STAGE0_VA;
-    cpsr_write(cpu, s->stock.cpsr & ~CPSR_T, CPSR_T);
 
     s->deadline = timer_get_clock() + DEADLINE_US;
     tb_flush(cpu);
