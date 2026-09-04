@@ -22,8 +22,8 @@ without the normal PIC model and with r10 unavailable to the allocator:
     -ffixed-r10
     -fno-inline
 
-This distinction matters: preserving r10 for the loader and reproducing the
-single-PIC-base model for normal legacy objects are two separate compatibility
+This distinction matters: preserving r10 for the loader and replacing the
+single-PIC-base model for newly compiled code are separate compatibility
 problems.
 
 ## What stock current Clang already covers
@@ -35,9 +35,8 @@ Clang accepts:
 
     -mabi=apcs-gnu
 
-This should be used for binary-interop probes against historical HPGCC objects.
-It is deliberately not forced on the existing 39gsX-derived source-modern
-profile until that change is hardware/regression tested.
+This is the correct starting point for binary-interop probes against historical
+HPGCC objects.
 
 ### Soft float
 
@@ -56,69 +55,156 @@ Stock Clang already expresses these directly:
     -marm
     -mlittle-endian
 
-## What stock current Clang does not reproduce
+### A standard single-static-base model: RWPI
 
-### Historical r10 single-PIC-base codegen
+Current LLVM already implements ARM RWPI:
 
-Current Clang's ARM `-fPIC` codegen is PC-relative/GOT-based. It does not
-implement GCC's old pair:
+    -frwpi
 
-    -mpic-register=r10
-    -msingle-pic-base
+Writable globals use `R_ARM_SBREL32` relocations and are addressed relative
+to r9/sb. On ARMv4T the generated access pattern is the same broad class of
+operation HPGCC needs: load an offset and access data relative to a persistent
+static-base register.
 
-Therefore `-fPIC` is not a source-compatible spelling replacement for the
-historical HPGCC global-data model.
+This gives hpclang a much smaller migration route than reproducing GCC's old
+PIC backend.
 
-This is the largest remaining question for arbitrary old HPGCC library binary
-interoperability. It does not block the current 39gs source-modern path because
-that path has already run on hardware while retaining the historical startup
-objects.
+## What the historical objects actually do
+
+The original GCC 3.4.1 `MMUglobals.o` from the HPGCC 1.1 39G SDK was
+inspected directly.
+
+It uses:
+
+- `R_ARM_GOT_BREL` relocations for globals;
+- r10/sl as the GOT base;
+- an extra GOT indirection before accessing each global.
+
+A newly compiled Clang RWPI object uses:
+
+- `R_ARM_SBREL32`;
+- r9/sb as the static base;
+- direct static-base-relative access to the writable symbol.
+
+These are not binary-identical models, but LLD can resolve both relocation
+families in one ELF.
+
+## Dual static-base bridge
+
+The preferred experiment is now:
+
+    legacy HPGCC object:  r10 -> historical GOT/static area
+    modern Clang object:  r9  -> same RAM image base
+
+The original HPGCC MMU loader has already established r10 as 0x09000400 before
+calling `_start`. A tiny assembly entry bridge can mirror it before any
+Clang-generated C code executes:
+
+    _start:
+        mov r9, r10
+        b hpclang_start
+
+The real C entry is then compiled with:
+
+    -frwpi -mabi=apcs-gnu -mfloat-abi=soft
+
+This is compatible with the APCS register model: r9/sb/v6 and r10/sl/v7 are
+persistent/callee-preserved in the relevant variants.
+
+### Linker requirement
+
+This only works if LLD sees the complete HPGCC RAM image as one RW PT_LOAD
+starting at 0x09000400.
+
+The RAM segment must contain, in historical runtime order:
+
+    .got + .rodata + .data + .bss
+
+If LLD splits .got and .data into different PT_LOAD segments, an SBREL
+relocation for a modern data symbol is based on the later data segment rather
+than 0x09000400. In that layout `mov r9, r10` would be wrong.
+
+Adding explicit PHDRS to keep the HPGCC RAM image in one RW load segment fixes
+this. In the host experiment a modern global at 0x09000420 correctly resolves
+to SBREL offset 0x20 while the old GCC object continues to use r10 and its GOT.
+
+## Full old-loader host experiment
+
+The experiment has progressed beyond linking two ordinary objects.
+
+The following link succeeds with no unresolved runtime symbols:
+
+- original HPGCC 1.1 `MMUloader.o`;
+- original HPGCC 1.1 `MMUglobals.o`;
+- the r10-to-r9 entry bridge;
+- a Clang ARMv4T/APCS/RWPI C entry.
+
+The linked call path is:
+
+    old _loader
+      -> old c_loader / _init_globals
+      -> bridge _start
+      -> modern hpclang_start
+
+The ELF has:
+
+- one RX code PT_LOAD;
+- one RW RAM PT_LOAD rooted at 0x09000400;
+- old r10/GOT accesses and new r9/SBREL accesses in the same image.
+
+See `experiments/hybrid-rwpi/`.
+
+This is strong host-side evidence, but it is not yet a replacement for the
+existing real-hardware 39gsX golden path.
+
+## Remaining stock-Clang gap
 
 ### -ffixed-r10 on ARM
 
-Current Clang/LLVM has target support for reserving r9 on ARM, exposed as
+Current Clang/LLVM supports reserving r9 on ARM, exposed as
 `-ffixed-r9` / `+reserve-r9`, but not r10.
 
-This is the smallest concrete compiler gap found so far. HPGCC's historical
-`MMUloader.c` explicitly requires `-ffixed-r10`.
+Historical `MMUloader.c` explicitly asks for `-ffixed-r10`.
 
-An optional hpclang LLVM patch can therefore add only ARM r10 reservation,
-without inventing a full custom HP target.
+This gap matters only if hpclang wants source-identical recompilation of that
+historical loader. It is no longer a prerequisite for ordinary new application
+code if the dual-base RWPI model validates on hardware.
 
 ## Two compatibility levels
-
-hpclang should expose these separately.
 
 ### source-modern
 
 For new applications:
 
 - current Clang ARMv4T codegen;
-- modern ordinary PC-relative code/data accesses;
-- calculator-specific historical startup objects and linker/package layers
-  where still required;
-- the 39gsX hardware-proven hybrid path is the baseline.
+- `-frwpi` for writable static data when legacy-runtime interop is needed;
+- tiny r10-to-r9 entry bridge;
+- original calculator startup/packaging objects where still required;
+- the existing 39gsX build remains the production/golden baseline until RWPI
+  is hardware-tested.
 
 ### legacy-abi
 
-For interoperation with old GCC-built HPGCC libraries/objects:
+For interoperation with GCC-built HPGCC libraries/objects:
 
 - `-mabi=apcs-gnu`;
 - `-mfloat-abi=soft`;
-- ABI fixture tests across the old/new object boundary;
-- investigate whether the old r10 single-PIC-base model needs a shim,
-  recompilation of libraries, or additional LLVM support.
+- keep r10 valid for old objects;
+- keep r9 valid for new RWPI objects;
+- ABI fixture tests across old/new calls and callbacks;
+- preserve the one-RAM-segment linker invariant.
 
 Do not claim full legacy ABI compatibility until those tests pass.
 
 ## Compiler patch policy
 
-The experimental ARM r10 reservation patch is acceptable because it is:
+The priority has changed after the RWPI experiment.
 
-1. required verbatim by historical HPGCC runtime source;
-2. orthogonal to calculator packaging;
-3. tiny and independently testable;
-4. unnecessary for users who keep the known-good historical MMUloader object.
+A tiny ARM `-ffixed-r10` patch remains technically reasonable for rebuilding
+the historical MMU loader from unmodified source, but **hpclang should not
+require an LLVM fork for normal application development** unless hardware tests
+disprove the dual-base approach.
 
-The much larger old GCC single-PIC-base model is **not** yet approved as an
-LLVM patch. First try source recompilation, thunks and runtime/linker changes.
+Reimplementing GCC's old `-mpic-register=r10 -msingle-pic-base` backend is
+currently rejected as unnecessary complexity. Stock LLVM RWPI plus a startup
+bridge and linker-layout normalization is the preferred path.
