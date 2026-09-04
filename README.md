@@ -94,5 +94,4 @@ The next implementation layers are:
 4. hardware validation on each model family;
 5. graphics, keyboard, timers, filesystem and calculator-object APIs.
 
-See [hpclang v1 ABI](docs/abi-v1.md) and
-[target families](docs/targets.md).
+See [hpclang v1 ABI](docs/abi-v1.md), [target families](docs/targets.md), and the maintained [roadmap](docs/ROADMAP.md).
