@@ -58,12 +58,11 @@ jobs:
             echo '~~~'
             echo
             echo '## PIC codegen'
-            cat >/tmp/pic.c <<'EOF'
-extern int ext;
-int glob=3;
-int f(int x){ return ext + glob + x; }
-EOF
             echo '~~~asm'
+            printf '%s\n' \
+              'extern int ext;' \
+              'int glob=3;' \
+              'int f(int x){ return ext + glob + x; }' >/tmp/pic.c
             clang --target=arm-none-eabi -march=armv4t -marm -O2 -fPIC -S /tmp/pic.c -o -
             echo '~~~'
           } > research/generated/clang-probe.md
