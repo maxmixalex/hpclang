@@ -29,8 +29,11 @@ EOF
     HPGCC="$SDK/data" ./hp2aplet "$INPUT"
 )
 
-mv "$BUILD/HPGCC000.000" "$OUT/hpclang-hpc1.apt"
-cp "$SDK/data/LIB275L.L39" "$OUT/lib275.sys"
+# Preserve the stock HPGCC39 transfer names.  Conn3x/HPGComm and real HP39gs
+# hardware have decades of evidence for these names; semantic renaming adds no
+# value at the calculator boundary.
+mv "$BUILD/HPGCC000.000" "$OUT/HPGCC000.000"
+cp "$SDK/data/LIB275L.L39" "$OUT/LIB275L.000"
 
 python3 - "$OUT" <<'PY'
 from pathlib import Path
@@ -43,9 +46,9 @@ def entry(kind: str, name: str, title: str) -> str:
 
 directory = (
     "HP39AscA "
-    + entry("B", "hpclang-hpc1.apt", "HPCLANG HPC1 TEST")
+    + entry("B", "HPGCC000.000", "HPCLANG HPC1 TEST")
     + " "
-    + entry("H", "lib275.sys", "LIB275L")
+    + entry("H", "LIB275L.000", "LIB275L")
     + " "
 )
 
@@ -55,18 +58,21 @@ directory = (
 (root / "TESTING.txt").write_text(
     "hpclang HP39 visible HPC1 smoke\n"
     "\n"
-    "IMPORTANT: Emu48 HP39/40 cannot directly load an Aplet/object file.\n"
-    "Use the emulated serial port, just like a real HP39-series calculator.\n"
-    "\n"
-    "Recommended Windows setup:\n"
+    "PREFERRED FIRST EXECUTION: real HP39gs over USB\n"
     "  1. Extract this entire bundle into its own directory.\n"
-    "  2. Create a virtual null-modem pair with com0com, for example COM11 <-> COM12.\n"
-    "  3. In Emu48 configure the calculator wire/serial port as COM11.\n"
-    "  4. Start HPGComm 2.0 (HP 38/39/40 connectivity kit), select COM12,\n"
-    "     and browse to this extracted directory.\n"
-    "  5. In the emulated HP39gs APLET library choose RECV, then the serial\n"
-    "     disk-drive/HP39-40 serial receive path, and receive HPCLANG HPC1 TEST.\n"
+    "  2. Start the HP 39/40 Connectivity Kit (Conn3x) and connect the HP39gs\n"
+    "     through its normal 5-pin mini-USB PC connection.\n"
+    "  3. On the calculator open APLET, press RECV, and choose HP39/40 (USB).\n"
+    "  4. Transfer LIB275L.000 once if library 275 is not already installed.\n"
+    "  5. Repeat RECV -> HP39/40 (USB) and transfer HPGCC000.000.\n"
+    "     The USB DISK DRIVE path may also be used with this whole directory.\n"
     "  6. Launch HPCLANG HPC1 TEST.\n"
+    "\n"
+    "EMU48 MANUAL EXECUTION:\n"
+    "  Emu48 HP39/40 cannot directly load an Aplet/object file. It requires an\n"
+    "  emulated serial endpoint. If the serial selectors are all disabled, skip\n"
+    "  this manual gate; do not weaken Windows driver/security policy for it.\n"
+    "  A driverless host transport is the intended automated E2E path.\n"
     "\n"
     "Expected screen:\n"
     "  HPC1 PASS\n"
@@ -77,6 +83,7 @@ directory = (
     "Press APLET once to return to the calculator OS.\n"
     "\n"
     "Please record:\n"
+    "  - whether LIB275L and the Aplet transfer successfully;\n"
     "  - whether the Aplet appears and launches;\n"
     "  - the exact screen contents (or a screenshot);\n"
     "  - whether APLET returns cleanly to the OS;\n"

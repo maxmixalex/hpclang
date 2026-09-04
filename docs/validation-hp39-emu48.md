@@ -1,6 +1,6 @@
 # HP39gs Emu48 validation
 
-This is the first execution gate for the clean hpclang v1 HP39 backend.
+This is the emulator execution gate for the clean hpclang v1 HP39 backend.
 
 ## Artifact
 
@@ -18,16 +18,44 @@ address, build metadata and checksums.
 
 Emu48's HP39/40 emulation intentionally does not expose the normal object-stack
 loading path. Aplets must be transferred through the emulated calculator
-communication port, matching the real HP39-series workflow.
+communication port.
 
-Reference:
+References:
 
 - https://hp.giesselink.com/emu48faq.htm
 - https://www.hpcalc.org/details/5421
 - https://www.hpcalc.org/hp39/pc/
 
-A convenient Windows setup is a virtual null-modem pair (for example com0com)
-between Emu48 and HPGComm 2.0.
+The historical manual setup used a host COM port or a virtual null-modem pair
+between Emu48 and HPGComm/HPComm38. That remains usable when a working serial
+endpoint already exists, but it is not a prerequisite for hpclang development.
+In particular, do not require unsigned/test-signed Windows kernel drivers merely
+to satisfy this gate.
+
+If Emu48 exposes only `disabled` serial choices, use the real-hardware gate in
+`validation-hp39-hardware.md` while the driverless emulator transport is being
+completed.
+
+## Driverless E2E boundary
+
+Emu48 models the calculator UART separately from its host serial transport. The
+calculator-side transmit/receive state lives in the emulated UART registers;
+the Win32 COM handle is only the host byte transport.
+
+The automated HP39 harness should therefore keep the calculator UART behavior
+unchanged and replace only the host endpoint with an in-memory peer:
+
+```text
+HP39 ROM
+  -> emulated UART
+  -> in-memory byte transport
+  -> minimal HP39 transfer peer
+  -> generated HP39DIR/HPGCC000/LIB275 bundle
+```
+
+This is preferable to GUI-coordinate automation and to requiring a host virtual
+COM driver. Emu48 and HPComm38 remain external GPL research/test dependencies;
+hpclang's production runtime does not absorb their implementations.
 
 ## Expected visible result
 
@@ -53,8 +81,7 @@ value:   0x50415353
 meaning: "PASS"
 ```
 
-This address/value pair is the contract for the future headless Emu48 E2E
-harness.
+This address/value pair is the contract for the headless Emu48 E2E harness.
 
 ## Pass criteria
 

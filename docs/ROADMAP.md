@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: Emu48 user-validation gate ready**
+**Status: execution package ready; real-hardware and emulator gates pending**
 
 Targets:
 
@@ -95,11 +95,12 @@ Steps:
 1. [x] define the clean HP39 stock-launcher stage0/stage1 boundary;
 2. [x] package HPC1 through the stock HP39 Aplet outer container;
 3. [x] build a visible + machine-readable HPC1 smoke in public CI;
-4. [ ] execute that smoke image in Emu48;
-5. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc in the emulator;
-6. [ ] validate exit/state restoration;
-7. [ ] repeat on real HP39gs hardware;
-8. [ ] verify sibling 39g+/40gs differences.
+4. [x] restore stock HPGCC39 transfer filenames for maximum Conn3x compatibility;
+5. [ ] execute the smoke on a real HP39gs over USB;
+6. [ ] execute the same smoke in Emu48 through a driverless serial peer;
+7. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc;
+8. [ ] validate exit/state restoration;
+9. [ ] verify sibling 39g+/40gs differences.
 
 Completion criterion:
 
@@ -139,7 +140,7 @@ Completion criterion:
 
 ## M6 — Automated emulator E2E
 
-**Status: design validated; HP39 manual gate ready**
+**Status: design validated; driverless HP39 transport in progress**
 
 Validated design:
 
@@ -147,15 +148,21 @@ Validated design:
   object loading, keyboard injection and memory inspection;
 - use those APIs from a thin headless harness instead of GUI-coordinate
   automation;
-- boot a known calculator ROM/state, inject or load the generated package,
-  execute it and inspect a machine-readable result in emulated memory;
+- HP39/40 Aplets cannot use Emu48's object-stack loader and must enter through
+  the calculator communication path;
+- Emu48's calculator UART behavior is separable from its Win32 host-COM
+  transport, so HP39 automation can replace only the host endpoint with an
+  in-memory byte peer rather than requiring a virtual COM kernel driver;
+- boot a known calculator ROM/state, transfer the generated package, execute it
+  and inspect a machine-readable result in emulated memory;
 - HP published a dedicated 2.15 emulator ROM for 48gII/49g+/50g, making that
-  family the simplest first public-CI E2E target;
+  family the simplest public-CI ROM source;
 - HP also published the 39gs 2.22 flash image; its reproducible conversion into
   the Emu48 ROM format still needs to be pinned down.
 
-The first automated target should therefore be 49g+/50g (and likely 48gII)
-while the HP39-family injection/ROM conversion path is completed.
+HPComm38 and Emu48 source are protocol/emulator evidence only. Keep them as
+external test/research dependencies and independently implement the narrow
+hpclang-side transfer peer.
 
 Completion criterion:
 
