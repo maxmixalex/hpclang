@@ -21,6 +21,11 @@ SECTIONS
         *(.text.unlikely .text.unlikely.*)
         *(.text.startup .text.startup.*)
         *(.text .text.*)
+
+        __start___lcxx_override = .;
+        *(__lcxx_override)
+        __stop___lcxx_override = .;
+
         *(.gnu.linkonce.t.*)
 
         *(.rdata)
