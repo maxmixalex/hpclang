@@ -58,7 +58,7 @@ Completion criterion:
 
 ## M2 — Common ARM bootstrap
 
-**Status: implementation complete; HP39 entry validated on hardware, return pending**
+**Status: implementation complete; HP39 entry and return validated on hardware**
 
 Build one common ARM bootstrap used by all calculator families.
 
@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: real-hardware HPC1 entry validated; return and emulator gates pending**
+**Status: real-hardware HPC1 entry/return validated; runtime and emulator gates pending**
 
 Targets:
 
@@ -97,7 +97,7 @@ Steps:
 3. [x] build a visible + machine-readable HPC1 smoke in public CI;
 4. [x] restore stock HPGCC39 transfer filenames for maximum Conn3x compatibility;
 5. [x] enter HPC1 on a real HP39gs over USB: model 2 and RW 0x00014000 observed;
-6. [ ] validate automatic return/state restoration on the same real HP39gs;
+6. [x] validate return/state restoration on the same real HP39gs;
 7. [ ] execute the same smoke in Emu48 through a driverless serial peer;
 8. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc;
 9. [ ] verify sibling 39g+/40gs differences.
@@ -207,3 +207,25 @@ Completion criteria:
 - public headers and package/build UX are coherent;
 - legacy research code is clearly separated from supported code;
 - a fresh checkout can build applications without GCC or HPGCC.
+
+
+### HP39gs hardware checkpoint: entry and return
+
+Real hardware now validates both directions of the common execution chain.
+
+Observed entry:
+
+```text
+HPC1 PASS
+MODEL 00000002
+RW 00014000
+```
+
+A later side-effect-free smoke performed no framebuffer, GPIO, interrupt or
+delay operations and returned immediately from `main()`. The LCD still showed
+the prior diagnostic contents until the stock OS received a redraw-triggering
+key event, but ENTER/ON responded and APLET opened the normal APLET library.
+
+Therefore control flow, interrupts and calculator state had returned to the
+stock OS. Immediate LCD repaint is a separate HP39 platform-integration concern,
+not a bootstrap-return failure.

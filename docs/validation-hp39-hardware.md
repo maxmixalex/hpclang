@@ -105,3 +105,16 @@ expected, and the actual delay duration was not calibrated on real hardware.
 That build is not used as return-path evidence. The next gate removes the
 display, interrupt masking, GPIO access and delay entirely and immediately
 returns from `main()`.
+
+
+## Third observation: return gate passed
+
+The side-effect-free immediate-return build returned successfully on real
+HP39gs hardware. The LCD continued to show the previous diagnostic contents,
+which initially looked like a hang, but the calculator responded to ENTER/ON
+and APLET opened the normal APLET menu.
+
+This is a PASS for the return gate: CPU control, interrupt handling and the
+stock calculator UI were live again. The stale LCD contents only show that the
+stock UI does not force an immediate full repaint when the ARM Aplet returns.
+Treat repaint/dirty-screen integration as a later HP39 platform-service issue.
