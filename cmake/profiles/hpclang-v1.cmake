@@ -15,6 +15,8 @@ set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c")
+set(HPCLANG_RUNTIME_EABI_SHIMS
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-eabi-div.S")
 set(HPCLANG_LINKER_SCRIPT
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/link.ld")
 set(HPCLANG_PACKER
