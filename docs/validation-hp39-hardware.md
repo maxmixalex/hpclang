@@ -45,23 +45,15 @@ the extracted directory and let the calculator browse the generated
 
 ## Expected result
 
-The current return-only smoke must show:
+The current return-only smoke intentionally shows no diagnostic page. Real
+hardware has already proven HPC1 entry and framebuffer output.
 
-```text
-HPC1 PASS
-MODEL 00000002
-RW <mapped byte count>
-AUTO EXIT
-```
+Launch `HPCLANG HPC1 TEST`. A pass is an immediate clean return to the stock
+APLET library with the calculator still responsive. The smoke does not touch
+GPIO, framebuffer, interrupt-controller state or CPSR and contains no delay.
 
-The RW count is informational and may vary with the page pool.
-
-Do not press a key on this screen. The smoke deliberately avoids keyboard/GPIO
-testing, keeps the result visible briefly, restores interrupt state and returns
-through the common bootstrap automatically.
-
-A pass requires an automatic clean return to the stock calculator OS with no
-ADDRESS ERROR, corrupted LCD, reset, or persistent OS-state corruption.
+If it hangs, the failure is after normal HPC1 `main()` return and the next
+debugging target is the common return/MMU-restore/stage0-cleanup chain.
 
 ## Report
 
@@ -100,3 +92,16 @@ That version then remained in its APLET polling loop with IRQ/FIQ masked. Since
 the loop never returned, it did not exercise the common bootstrap's return/MMU
 restore path. The next gate therefore removes keyboard polling entirely and
 uses timed automatic return.
+
+
+## Second observation and correction
+
+The second hardware build displayed `A TO EXIT` and appeared unresponsive.
+The missing `U` was another omission in the tiny diagnostic font. More
+importantly, that build still masked IRQ/FIQ and executed a raw
+`delay(60000000)`; therefore APLET/ON being unresponsive during the page was
+expected, and the actual delay duration was not calibrated on real hardware.
+
+That build is not used as return-path evidence. The next gate removes the
+display, interrupt masking, GPIO access and delay entirely and immediately
+returns from `main()`.
