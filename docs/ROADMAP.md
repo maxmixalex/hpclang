@@ -34,7 +34,7 @@ Completion criteria:
 
 ## M1 — Modern language/runtime stack
 
-**Status: in progress**
+**Status: complete**
 
 Completed:
 
@@ -45,11 +45,11 @@ Completed:
 - init/fini arrays;
 - hosted C/C++ language semantics.
 
-Remaining:
+Also validated:
 
-- close libc++ smoke with constructors and std::string;
-- define the minimal platform hooks required by libc/libc++;
-- keep exceptions and RTTI disabled unless an application demonstrates a need.
+- libc++ links for Armv4T with std::string and global constructors;
+- the only extra platform hooks needed by the smoke are normal termination/stdio hooks;
+- exceptions and RTTI remain intentionally disabled until a real application needs them.
 
 Completion criterion:
 
@@ -138,20 +138,23 @@ Completion criterion:
 
 ## M6 — Automated emulator E2E
 
-**Status: investigation**
+**Status: design validated**
 
-Preferred design:
+Validated design:
 
-1. use Emu48/Emu48+ source or emulator core directly;
-2. avoid GUI-coordinate automation;
-3. boot a known calculator state/ROM;
-4. inject/load the generated calculator package;
-5. run the test;
-6. expose an unambiguous machine-readable PASS/FAIL result.
+- Emu48 exposes direct core APIs for engine state, document/state loading,
+  object loading, keyboard injection and memory inspection;
+- use those APIs from a thin headless harness instead of GUI-coordinate
+  automation;
+- boot a known calculator ROM/state, inject or load the generated package,
+  execute it and inspect a machine-readable result in emulated memory;
+- HP published a dedicated 2.15 emulator ROM for 48gII/49g+/50g, making that
+  family the simplest first public-CI E2E target;
+- HP also published the 39gs 2.22 flash image; its reproducible conversion into
+  the Emu48 ROM format still needs to be pinned down.
 
-CI must not commit or redistribute calculator ROM images without a clear legal
-basis. If a suitable ROM cannot be obtained reproducibly in public CI, keep the
-same harness usable from a local/self-hosted runner with a user-provided ROM.
+The first automated target should therefore be 49g+/50g (and likely 48gII)
+while the HP39-family injection/ROM conversion path is completed.
 
 Completion criterion:
 
