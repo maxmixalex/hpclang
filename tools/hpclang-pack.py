@@ -53,7 +53,7 @@ def parse_elf32(path: Path) -> tuple[bytes, int, list[Segment]]:
         p_type, p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags, _ = (
             struct.unpack_from("<IIIIIIII", blob, off)
         )
-        if p_type == PT_LOAD and p_filesz:
+        if p_type == PT_LOAD:
             segments.append(
                 Segment(p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags)
             )
@@ -64,12 +64,14 @@ def parse_elf32(path: Path) -> tuple[bytes, int, list[Segment]]:
 def pack(src: Path, dst: Path) -> None:
     blob, entry, segments = parse_elf32(src)
 
-    image_end = max(s.paddr + s.filesz for s in segments)
+    initialized = [s for s in segments if s.filesz]
+    if not initialized:
+        raise ValueError("ELF has no initialized PT_LOAD payload")
+
+    image_end = max(s.paddr + s.filesz for s in initialized)
     image = bytearray(image_end - CODE_BASE)
 
-    for s in segments:
-        if s.filesz == 0:
-            continue
+    for s in initialized:
         start = s.paddr - CODE_BASE
         if start < 0:
             raise ValueError("initialized segment lies below hpclang code base")
