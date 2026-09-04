@@ -58,7 +58,7 @@ Completion criterion:
 
 ## M2 — Common ARM bootstrap
 
-**Status: next**
+**Status: implementation complete; cross-family validation pending**
 
 Build one common ARM bootstrap used by all calculator families.
 
@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: next**
+**Status: Emu48 user-validation gate ready**
 
 Targets:
 
@@ -92,13 +92,14 @@ Targets:
 
 Steps:
 
-1. verify the proposed HPC1 virtual slots in the stock Emu48 memory map;
-2. package HPC1 through a clean HP39-family outer container;
-3. execute a smoke image in Emu48;
-4. validate globals/BSS/TLS/heap/compiler-rt/libc;
-5. validate exit/state restoration;
-6. repeat on real HP39gs hardware;
-7. verify sibling 39g+/40gs differences.
+1. [x] define the clean HP39 stock-launcher stage0/stage1 boundary;
+2. [x] package HPC1 through the stock HP39 Aplet outer container;
+3. [x] build a visible + machine-readable HPC1 smoke in public CI;
+4. [ ] execute that smoke image in Emu48;
+5. [ ] validate globals/BSS/TLS/heap/compiler-rt/libc in the emulator;
+6. [ ] validate exit/state restoration;
+7. [ ] repeat on real HP39gs hardware;
+8. [ ] verify sibling 39g+/40gs differences.
 
 Completion criterion:
 
@@ -138,7 +139,7 @@ Completion criterion:
 
 ## M6 — Automated emulator E2E
 
-**Status: design validated**
+**Status: design validated; HP39 manual gate ready**
 
 Validated design:
 
