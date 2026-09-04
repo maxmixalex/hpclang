@@ -47,9 +47,9 @@ echo
 "$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/smoke.o"     -o "$OUT/hpclang-atfe.elf"
 
 echo
-echo "== undefined symbols =="
-if "$READELF" -Ws "$OUT/hpclang-atfe.elf" | grep ' UND '; then
-    echo "unexpected undefined symbols" >&2
+echo "== undefined global symbols =="
+if "$READELF" -Ws "$OUT/hpclang-atfe.elf" | grep -E ' GLOBAL .* UND '; then
+    echo "unexpected undefined global symbols" >&2
     exit 1
 fi
 echo "none"
