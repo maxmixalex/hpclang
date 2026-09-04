@@ -108,13 +108,11 @@ int hpclang_start(const struct hpclang_boot_info *boot)
 
     int result = main();
 
-    if (result == 0)
-        hpclang_diag_step(0xf0);
-
+    /*
+     * main() leaves the authoritative RUNTIME PASS/FAIL result in the
+     * framebuffer. Do not overwrite it with teardown checkpoints.
+     */
     __libc_fini_array();
-
-    if (result == 0)
-        hpclang_diag_step(0xff);
 
     return result;
 }

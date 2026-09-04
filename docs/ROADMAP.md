@@ -304,3 +304,21 @@ A host IEEE-754 self-test runs before every ATfE probe, and the HP39 hardware
 test now has sub-checkpoints 61-64 inside the floating-point section.
 
 Hardware validation is pending.
+
+
+### HP39gs runtime checkpoint: visible final result
+
+The first real-hardware run with the target-built ARMv4T double soft-float no
+longer stopped at any progressive checkpoint. Launching the Aplet produced a
+brief busy interval, then returned to a responsive stock OS; APLET opened the
+normal menu. This strongly indicates that the full runtime validation completed
+and returned.
+
+The test result was not visually conclusive because `finish()` wrote
+`RUNTIME PASS/FAIL`, then the diagnostic `hpclang_start()` immediately
+overwrote it with teardown checkpoints `F0` and `FF` before returning to the
+stock UI.
+
+The hardware test now preserves the final PASS/FAIL page for a short finite
+test-only hold and no longer overwrites it during fini-array teardown.
+Production runtime behavior is unchanged.

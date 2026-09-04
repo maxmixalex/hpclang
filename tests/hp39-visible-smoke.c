@@ -134,6 +134,17 @@ static void clear(volatile uint8_t *fb)
     }
 }
 
+static void hold_result(void)
+{
+    /*
+     * Finite test-only hold so the LCD has time to scan the final pixels.
+     * Bootstrap owns IRQ/FIQ isolation now, so this does not change runtime
+     * state and always terminates.
+     */
+    for (volatile uint32_t n = 12000000u; n != 0; --n)
+        __asm__ volatile("nop");
+}
+
 static int finish(uint32_t failure)
 {
     volatile uint8_t *fb = framebuffer();
@@ -142,6 +153,7 @@ static int finish(uint32_t failure)
     if (failure == 0) {
         text(fb, 38, 28, "RUNTIME PASS");
         hpclang_e2e_result = 0x50415353u;
+        hold_result();
         return 0;
     }
 
@@ -149,6 +161,7 @@ static int finish(uint32_t failure)
     text(fb, 55, 36, "CODE");
     hex2(fb, 75, 36, failure);
     hpclang_e2e_result = 0x46410000u | failure;
+    hold_result();
     return (int)failure;
 }
 
