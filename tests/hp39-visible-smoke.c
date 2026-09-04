@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/target.h>
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define LCDSADDR1 REG32(0x07300014u)
@@ -170,7 +171,9 @@ int main(void)
     hpclang_diag_step(0x10);
     const struct hpclang_boot_info *boot = hpclang_boot_info();
 
-    if (boot->model != 2u || boot->rw_bytes < 0x4000u)
+    if ((boot->model != HPCLANG_MODEL_HP39GS &&
+         boot->model != HPCLANG_MODEL_HP50G) ||
+        boot->rw_bytes < 0x4000u)
         return finish(0x01);
 
     hpclang_diag_step(0x11);
