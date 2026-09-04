@@ -9,7 +9,7 @@ execution CI on other S3C2410-family targets.
 - an HP39gs;
 - its normal 5-pin mini-USB PC cable;
 - HP 39/40 Connectivity Kit / Conn3x 2.x;
-- the `hpclang-hp39-hardware-validation` artifact from the `HP39 package`
+- the `hpclang-hp39gs-hardware-validation` artifact from the `HP39 package`
   workflow.
 
 The HP39gs supports PC transfer over USB. Its separate serial port is not
@@ -180,7 +180,8 @@ The HP39gs hardware run is sufficient evidence for the common HP39/40 ARM
 runtime implementation. HP40gs support still requires one target-specific
 closure test:
 
-1. build/package the same HPC1 runtime for model 3;
+1. download the CI-built `hpclang-hp40gs-hardware-validation` artifact, which
+   packages the same HPC1 runtime with stage0 model 3;
 2. transfer it through the stock HP40gs Connectivity Kit/Aplet path;
 3. observe model 3 and `RUNTIME PASS`;
 4. verify clean return to the HP40gs stock OS.

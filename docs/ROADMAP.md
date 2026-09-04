@@ -100,7 +100,8 @@ Steps:
 6. [x] validate return/state restoration on the same real HP39gs;
 7. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
 8. [ ] verify HP39g+ outer-launcher/model differences;
-9. [ ] verify HP40gs outer-launcher/model/ROM differences.
+9. [x] build a dedicated HP40gs model-3 hardware-validation artifact in CI;
+10. [ ] execute that artifact on HP40gs and verify outer-launcher/model/ROM differences.
 
 The real HP39gs is the authoritative execution gate for the HP39/40 family.
 HP39gs and HP40gs use the same 75 MHz S3C2410A/ARM920T platform, 256 KiB RAM

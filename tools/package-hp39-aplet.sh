@@ -1,14 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 ]]; then
-    echo "usage: $0 <stage0.hp> <output-dir>" >&2
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+    echo "usage: $0 <stage0.hp> <output-dir> [hp39gs|hp40gs]" >&2
     exit 2
 fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INPUT="$(realpath "$1")"
 OUT="$(realpath -m "$2")"
+TARGET="${3:-hp39gs}"
+
+case "$TARGET" in
+    hp39gs)
+        TARGET_LABEL="HP39gs"
+        MODEL_ID=2
+        ;;
+    hp40gs)
+        TARGET_LABEL="HP40gs"
+        MODEL_ID=3
+        ;;
+    *)
+        echo "unsupported HP39/40 hardware-validation target: $TARGET" >&2
+        exit 2
+        ;;
+esac
+
 SDK="${HP39_APLET_HOME:-$ROOT/.cache/hp39-aplet/sdk}"
 BUILD="$ROOT/build/hp39-aplet"
 
@@ -35,11 +52,13 @@ EOF
 mv "$BUILD/HPGCC000.000" "$OUT/HPGCC000.000"
 cp "$SDK/data/LIB275L.L39" "$OUT/LIB275L.000"
 
-python3 - "$OUT" <<'PY'
+python3 - "$OUT" "$TARGET_LABEL" "$MODEL_ID" <<'PY'
 from pathlib import Path
 import sys
 
 root = Path(sys.argv[1])
+target = sys.argv[2]
+model = sys.argv[3]
 
 def entry(kind: str, name: str, title: str) -> str:
     return f"{kind} {len(name)} {name}{len(title)} {title}"
@@ -56,9 +75,10 @@ directory = (
 (root / "HP39DIR.CUR").write_bytes(b"HP39AscA A 11 HP39DIR.0004 Root")
 
 (root / "TESTING.txt").write_text(
-    "hpclang HP39 canonical runtime validation\n"
+    f"hpclang {target} canonical runtime validation\n"
     "\n"
-    "Transfer HPGCC000.000 to the real HP39gs over Conn3x USB.\n"
+    f"Expected hpclang model id: {model}.\n"
+    f"Transfer HPGCC000.000 to the real {target} over Conn3x USB.\n"
     "LIB275L.000 only needs to be installed once.\n"
     "\n"
     "Launch HPCLANG HPC1 TEST. The program immediately returns to the stock OS\n"

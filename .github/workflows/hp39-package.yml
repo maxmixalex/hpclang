@@ -60,31 +60,85 @@ jobs:
           chmod +x             tools/probe-atfe.sh             tools/hpclang-pack.py             tools/armtoolbox-wrap.py
           tools/probe-atfe.sh
 
-      - name: Prepare stock HP39 Aplet packaging
+      - name: Build HP40gs model-3 launcher bundle
+        run: |
+          /tmp/atfe/bin/clang \
+            --target=arm-none-eabi -march=armv4t -marm \
+            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
+            -fno-stack-protector -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
+            -DHPCLANG_STAGE0_MODEL=3 \
+            -c platform/armtoolbox/stage0.S \
+            -o build/atfe-probe/stage0-hp40gs.o
+
+          /tmp/atfe/bin/ld.lld -m armelf \
+            -T platform/armtoolbox/stage0.ld \
+            build/atfe-probe/stage0-hp40gs.o \
+            build/atfe-probe/stage0-bundle.o \
+            -o build/atfe-probe/stage0-hp40gs.elf
+
+          /tmp/atfe/bin/llvm-objcopy -O binary \
+            build/atfe-probe/stage0-hp40gs.elf \
+            build/atfe-probe/stage0-hp40gs.bin
+
+          python3 tools/armtoolbox-wrap.py \
+            build/atfe-probe/stage0-hp40gs.bin \
+            build/atfe-probe/hp40gs-hpc1.hp
+
+      - name: Prepare HP39gs and HP40gs hardware-validation packages
         run: |
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
-          tools/package-hp39-aplet.sh             build/atfe-probe/hp39gs-hpc1.hp             dist/hp39-hardware-validation
-          cp build/atfe-probe/hp39-visible.result-address             dist/hp39-hardware-validation/E2E_RESULT_ADDRESS.txt
-          printf 'commit=%s\nworkflow_run=%s\n'             "$GITHUB_SHA" "$GITHUB_RUN_ID"             > dist/hp39-hardware-validation/BUILD_INFO.txt
+
+          tools/package-hp39-aplet.sh \
+            build/atfe-probe/hp39gs-hpc1.hp \
+            dist/hp39gs-hardware-validation \
+            hp39gs
+
+          tools/package-hp39-aplet.sh \
+            build/atfe-probe/hp40gs-hpc1.hp \
+            dist/hp40gs-hardware-validation \
+            hp40gs
+
+          for root in \
+            dist/hp39gs-hardware-validation \
+            dist/hp40gs-hardware-validation
+          do
+            cp build/atfe-probe/hp39-visible.result-address \
+              "$root/E2E_RESULT_ADDRESS.txt"
+            printf 'commit=%s\nworkflow_run=%s\n' \
+              "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+              > "$root/BUILD_INFO.txt"
+          done
+
           python3 - <<'PY'
           from hashlib import sha256
           from pathlib import Path
 
-          root = Path("dist/hp39-hardware-validation")
-          names = sorted(
-              p.name for p in root.iterdir()
-              if p.is_file() and p.name != "SHA256SUMS.txt"
-          )
-          with (root / "SHA256SUMS.txt").open("w", encoding="ascii") as out:
-              for name in names:
-                  digest = sha256((root / name).read_bytes()).hexdigest()
-                  out.write(f"{digest}  {name}\n")
+          for root in (
+              Path("dist/hp39gs-hardware-validation"),
+              Path("dist/hp40gs-hardware-validation"),
+          ):
+              names = sorted(
+                  p.name for p in root.iterdir()
+                  if p.is_file() and p.name != "SHA256SUMS.txt"
+              )
+              with (root / "SHA256SUMS.txt").open("w", encoding="ascii") as out:
+                  for name in names:
+                      digest = sha256((root / name).read_bytes()).hexdigest()
+                      out.write(f"{digest}  {name}\n")
           PY
 
-      - name: Upload HP39 hardware validation bundle
+      - name: Upload HP39gs hardware validation bundle
         uses: actions/upload-artifact@v4
         with:
-          name: hpclang-hp39-hardware-validation
-          path: dist/hp39-hardware-validation/
+          name: hpclang-hp39gs-hardware-validation
+          path: dist/hp39gs-hardware-validation/
+          if-no-files-found: error
+
+      - name: Upload HP40gs hardware validation bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hpclang-hp40gs-hardware-validation
+          path: dist/hp40gs-hardware-validation/
           if-no-files-found: error
