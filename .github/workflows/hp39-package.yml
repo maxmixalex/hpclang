@@ -9,6 +9,7 @@ on:
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
       - "tests/hp39-visible-smoke.c"
+      - "tests/hp39-visible-smoke-irq.S"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/probe-atfe.sh"
