@@ -237,10 +237,18 @@ static void open_lib(void *arg)
         fail(s, "lib-key");
 }
 
-static void choose_armtoolbox(void *arg)
+static void choose_port2(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "lib");
+    if (!tap(&f3_down, &f3_up, 0))
+        fail(s, "lib-port2-key");
+}
+
+static void choose_armtoolbox(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "port2");
     if (!tap(&f1_down, &f1_up, 0))
         fail(s, "armtoolbox-key");
 }
@@ -337,9 +345,10 @@ static int schedule_run(struct state *s)
            later(rcl_payload, s, 7000000LL) &&
            later(cancel_filer, s, 8200000LL) &&
            later(open_lib, s, 9000000LL) &&
-           later(choose_armtoolbox, s, 10500000LL) &&
-           later(run_prrun, s, 12000000LL) &&
-           later(monitor, s, 12200000LL);
+           later(choose_port2, s, 10300000LL) &&
+           later(choose_armtoolbox, s, 11600000LL) &&
+           later(run_prrun, s, 13000000LL) &&
+           later(monitor, s, 13200000LL);
 }
 
 int main(int argc, char **argv)
