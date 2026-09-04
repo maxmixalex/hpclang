@@ -18,6 +18,7 @@ struct state {
     hdw_t *hdw;
     const char *home;
     const char *files;
+    const char *sd;
     const char *json;
 };
 
@@ -29,6 +30,10 @@ static const struct key_action lshift_down = { HP4950_KEY_LEFTSHIFT, 1 };
 static const struct key_action lshift_up = { HP4950_KEY_LEFTSHIFT, 0 };
 static const struct key_action g_down = { HP4950_KEY_G, 1 };
 static const struct key_action g_up = { HP4950_KEY_G, 0 };
+static const struct key_action down_down = { HP4950_KEY_DOWN, 1 };
+static const struct key_action down_up = { HP4950_KEY_DOWN, 0 };
+static const struct key_action a_down = { HP4950_KEY_A, 1 };
+static const struct key_action a_up = { HP4950_KEY_A, 0 };
 
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
@@ -102,10 +107,20 @@ static void open_files(void *arg)
         fprintf(stderr, "stock launcher explorer: cannot schedule FILES chord\n");
 }
 
+static void enter_sd(void *arg)
+{
+    (void)arg;
+    if (!tap(&down_down, &down_up, 0) ||
+        !tap(&down_down, &down_up, 250000) ||
+        !tap(&down_down, &down_up, 500000) ||
+        !tap(&a_down, &a_up, 850000))
+        fprintf(stderr, "stock launcher explorer: cannot enter SD\n");
+}
+
 static void finish(void *arg)
 {
     struct state *s = arg;
-    unsigned files_pixels = capture(s->hdw, s->files);
+    unsigned files_pixels = capture(s->hdw, s->sd);
     FILE *f = fopen(s->json, "w");
     if (f) {
         fprintf(
@@ -134,9 +149,11 @@ int main(int argc, char **argv)
     struct state s = {0};
     s.home = getenv("HPCLANG_STOCK_HOME_PGM");
     s.files = getenv("HPCLANG_STOCK_FILES_PGM");
+    s.sd = getenv("HPCLANG_STOCK_SD_PGM");
     s.json = getenv("HPCLANG_STOCK_JSON");
     if (!s.home) s.home = "stock-home.pgm";
     if (!s.files) s.files = "stock-files.pgm";
+    if (!s.sd) s.sd = "stock-sd.pgm";
     if (!s.json) s.json = "stock-explorer.json";
 
     config_t config = *config_init(argc, argv);
@@ -146,7 +163,8 @@ int main(int argc, char **argv)
         !tap(&f_down, &f_up, 4000000LL) ||
         !later(capture_home, &s, 7000000LL) ||
         !later(open_files, &s, 8000000LL) ||
-        !later(finish, &s, 10500000LL)) {
+        !later(enter_sd, &s, 10500000LL) ||
+        !later(finish, &s, 13500000LL)) {
         fprintf(stderr, "stock launcher explorer: cannot schedule actions\n");
         return EXIT_FAILURE;
     }

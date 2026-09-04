@@ -38,6 +38,21 @@ jobs:
           git -C build/x50ng rev-parse HEAD > build/x50ng-little-apple-source.txt
           cp tests/x50ng/little-apple-boot-main.c build/x50ng/src/main.c
 
+      - name: Accept Little-Apple Kinpo firmware headers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("build/x50ng/src/flash.c")
+          s = p.read_text()
+          old = 'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0'
+          new = '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0'''
+          if old not in s:
+              raise SystemExit("x50ng firmware-header check changed")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Build x50ng
         working-directory: build/x50ng
         run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
@@ -55,8 +70,8 @@ jobs:
           data = Path("build/little-apple.bin").read_bytes()
           print("size", len(data))
           print("header", data[:32])
-          if data[:16] != b"KINPOUPDATEIMAGE":
-              raise SystemExit("Little-Apple update image does not use the Kinpo update header")
+          if data[:16] not in (b"KINPOHP39G+IMAGE", b"KINPOHP40G+IMAGE"):
+              raise SystemExit("unexpected Little-Apple Kinpo update header")
           PY
           sha256sum build/little-apple.bin
 

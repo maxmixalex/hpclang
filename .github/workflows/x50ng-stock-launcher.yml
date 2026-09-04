@@ -83,6 +83,7 @@ jobs:
         run: |
           export HPCLANG_STOCK_HOME_PGM="$GITHUB_WORKSPACE/build/stock-home.pgm"
           export HPCLANG_STOCK_FILES_PGM="$GITHUB_WORKSPACE/build/stock-files.pgm"
+          export HPCLANG_STOCK_SD_PGM="$GITHUB_WORKSPACE/build/stock-sd.pgm"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-explorer.json"
           mkdir -p build/stock-state
           timeout 25s build/x50ng/dist/x50ng \
@@ -93,7 +94,7 @@ jobs:
             --flash \
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
-          for image in stock-home stock-files; do
+          for image in stock-home stock-files stock-sd; do
             python tools/pgm-to-png.py "build/$image.pgm" "build/$image.png"
           done
           cat build/stock-explorer.json
@@ -106,6 +107,8 @@ jobs:
           path: |
             build/stock-home.*
             build/stock-files.*
+            build/stock-sd.pgm
+            build/stock-sd.png
             build/stock-explorer.json
             build/x50ng-stock-source.txt
             build/stock-sd/SETUP.BIN
