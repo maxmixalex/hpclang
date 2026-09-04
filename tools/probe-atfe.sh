@@ -82,3 +82,20 @@ fi
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hpclang-atfe-cxx.elf"     "$OUT/hpclang-atfe-cxx.hpc"
 
 echo "PASS: ATfE Armv4T libc++ links into HPC1."
+
+echo
+echo "== common bootstrap ARMv4T link =="
+
+"$CC" "${COMMON[@]}" -marm -Os     -c "$ROOT/runtime/bootstrap/mmu.c" -o "$OUT/bootstrap-mmu.o"
+"$CC" "${COMMON[@]}" -marm -Os     -c "$ROOT/runtime/bootstrap/run.c" -o "$OUT/bootstrap-run.o"
+"$CC" "${COMMON[@]}" -marm     -c "$ROOT/runtime/bootstrap/sync.S" -o "$OUT/bootstrap-sync.o"
+"$CC" "${COMMON[@]}" -marm     -c "$ROOT/runtime/bootstrap/enter.S" -o "$OUT/bootstrap-enter.o"
+
+"$ATFE/bin/ld.lld" -m armelf -r     "$OUT/bootstrap-mmu.o"     "$OUT/bootstrap-run.o"     "$OUT/bootstrap-sync.o"     "$OUT/bootstrap-enter.o"     -o "$OUT/bootstrap.o"
+
+if "$ATFE/bin/llvm-nm" -u "$OUT/bootstrap.o" | grep .; then
+    echo "unexpected undefined bootstrap symbols" >&2
+    exit 1
+fi
+
+echo "PASS: common ARMv4T bootstrap links without platform/runtime dependencies."
