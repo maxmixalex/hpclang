@@ -104,10 +104,13 @@ Steps:
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
-chain. That smoke then waited forever for its own APLET GPIO poll while IRQ/FIQ
-were masked. The missing `X` in `EXIT` was independently traced to the tiny
-test font lacking an X glyph. The return path itself was not reached, so that
-run is not evidence of a bootstrap-return failure.
+chain. The first two diagnostic builds are not return-path evidence: one waited
+on its own APLET GPIO poll with IRQ/FIQ masked; the next used an uncalibrated
+60,000,000-iteration busy-wait while IRQ/FIQ remained masked. Missing letters
+in those pages were independently traced to omissions in the tiny test font.
+
+The active return gate now contains no display, GPIO, interrupt masking or
+delay: `main()` records the boot fields and returns immediately.
 
 Completion criterion:
 
