@@ -280,3 +280,27 @@ hpclang now supplies narrow ARMv4T-safe `__aeabi_uldivmod` and
 explicit LR restore plus `bx lr`.
 
 Hardware validation is pending.
+
+
+### HP39gs runtime checkpoint: target-built generic soft-float
+
+The ARMv4T-safe 64-bit divmod veneer was validated on real HP39gs hardware:
+the progressive runtime test advanced from `STEP 15` to `STEP 16`.
+
+`STEP 16` then stopped in the double soft-float section. ATfE's Armv4T
+multilib still resolves double arithmetic to compiler-rt's optimized ARM
+assembly implementations. Those sources contain instructions and return
+patterns intended for newer ARM revisions (including paths with `movw`,
+`clz`, and `pop {..., pc}`), so merely fixing one entry epilogue would leave
+the runtime structurally fragile.
+
+hpclang now keeps compiler-rt as the canonical runtime but supplies a narrow
+target-built double core following compiler-rt's generic C algorithms. It is
+compiled explicitly with `-march=armv4t -marm`; thin EABI veneers provide the
+Thumb-1 application boundary and return with `bx lr`. The first covered
+operations are double multiply/add/subtract and ordered/unordered comparisons.
+
+A host IEEE-754 self-test runs before every ATfE probe, and the HP39 hardware
+test now has sub-checkpoints 61-64 inside the floating-point section.
+
+Hardware validation is pending.

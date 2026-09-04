@@ -16,7 +16,17 @@ set(HPCLANG_RUNTIME_START
 set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c")
 set(HPCLANG_RUNTIME_EABI_SHIMS
-    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-eabi-div.S")
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-eabi-div.S"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-softfloat-entry.S")
+set(HPCLANG_RUNTIME_SOFTFLOAT
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-softfloat.c")
+
+# These implementation objects deliberately stay in ARM state. Application C/C++
+# remains Thumb-1; the EABI veneers provide the one explicit interworking edge.
+set_source_files_properties(
+    ${HPCLANG_RUNTIME_EABI_SHIMS}
+    ${HPCLANG_RUNTIME_SOFTFLOAT}
+    PROPERTIES COMPILE_OPTIONS "-marm")
 set(HPCLANG_LINKER_SCRIPT
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/link.ld")
 set(HPCLANG_PACKER
