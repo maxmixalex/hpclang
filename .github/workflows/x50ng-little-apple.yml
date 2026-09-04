@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "tests/x50ng/little-apple-boot-main.c"
+      - "tools/pgm-to-summary.py"
       - ".github/workflows/x50ng-little-apple.yml"
 
 jobs:
@@ -94,6 +95,20 @@ jobs:
             python tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat "build/$TARGET.json"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          python tools/pgm-to-summary.py \
+            --heading "$TARGET official-ROM boot" \
+            --json "build/$TARGET.json" \
+            "build/$TARGET-1.pgm" \
+            "build/$TARGET-2.pgm" \
+            "build/$TARGET-3.pgm" \
+            "build/$TARGET-4.pgm" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload ${{ matrix.target }} ARM boot evidence
         if: always()

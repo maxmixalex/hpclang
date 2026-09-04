@@ -14,6 +14,7 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/hpclang-pack.py"
       - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
       - ".github/workflows/x50ng-headless.yml"
   pull_request:
     paths:
@@ -144,6 +145,17 @@ jobs:
 
           test ! -f build/x50ng-e2e.json || cat build/x50ng-e2e.json
           exit "$status"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        run: |
+          python tools/pgm-to-summary.py \
+            --heading "HP50g normalized ARM E2E" \
+            --json build/x50ng-e2e.json \
+            build/x50ng-before.pgm \
+            build/x50ng-hpc1-pass.pgm \
+            build/x50ng-returned-home.pgm \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload E2E evidence
         if: always()
