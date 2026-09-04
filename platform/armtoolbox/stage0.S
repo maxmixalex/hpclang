@@ -10,16 +10,6 @@
 .equ STAGE_L1_SLOT,     0x07f00240
 .equ SWI_VECTOR,        0x08000008
 
-#ifdef HPCLANG_STAGE0_TRACE
-.macro HPCLANG_TRACE value
-    mov     r12, #\value
-    str     r12, [r10, #0x930]
-.endm
-#else
-.macro HPCLANG_TRACE value
-.endm
-#endif
-
 .section .text.stage0.entry,"ax",%progbits
 .global hpclang_armtoolbox_stage0
 .type hpclang_armtoolbox_stage0,%function
@@ -35,7 +25,6 @@ hpclang_armtoolbox_stage0:
     ldr     r2, =STAGE_L1_SLOT
     str     r0, [r2]
     bl      .Lpublish_stage_map
-    HPCLANG_TRACE 1
 
     /* Move to the top of the temporary page pool. */
     ldr     r2, [r10, #0x914]
@@ -81,22 +70,17 @@ hpclang_armtoolbox_stage0:
     mov     r2, r6
     ldr     r3, =HPCLANG_STAGE0_MODEL
     ldr     r4, =STAGE1_BASE
-    HPCLANG_TRACE 2
     mov     lr, pc
     bx      r4
 
-    HPCLANG_TRACE 3
-
     /* Restore the original stock-launcher stack. */
     ldr     sp, [sp]
-    HPCLANG_TRACE 4
 
     /* Remove only our temporary 0x09000000 alias. */
     mov     r0, #0
     ldr     r2, =STAGE_L1_SLOT
     str     r0, [r2]
     bl      .Lpublish_stage_map
-    HPCLANG_TRACE 5
 
     /* Release the optional KOS block allocated by the stock launcher. */
     ldr     r1, [r10, #0x918]
@@ -107,7 +91,6 @@ hpclang_armtoolbox_stage0:
     swi     0
 
 3:
-    HPCLANG_TRACE 6
     ldmfd   sp!, {r0-r12, pc}
 .size hpclang_armtoolbox_stage0, .-hpclang_armtoolbox_stage0
 
