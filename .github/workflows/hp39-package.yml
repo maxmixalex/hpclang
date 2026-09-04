@@ -1,0 +1,71 @@
+name: HP39 package
+
+on:
+  push:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/probe-atfe.sh"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
+      - ".github/workflows/hp39-package.yml"
+  pull_request:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/probe-atfe.sh"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
+      - ".github/workflows/hp39-package.yml"
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y innoextract
+
+      - name: Install Arm Toolchain for Embedded 22.1.0
+        run: |
+          curl -L             https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz             -o /tmp/atfe.tar.xz
+          mkdir -p /tmp/atfe
+          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+
+      - name: Build visible HPC1 and stock launcher bundle
+        env:
+          ATFE: /tmp/atfe
+        run: |
+          chmod +x             tools/probe-atfe.sh             tools/hpclang-pack.py             tools/armtoolbox-wrap.py
+          tools/probe-atfe.sh
+
+      - name: Prepare stock HP39 Aplet packaging
+        run: |
+          chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
+          tools/bootstrap-hp39-aplet.sh
+          tools/package-hp39-aplet.sh             build/atfe-probe/hp39gs-hpc1.hp             dist/hp39-emulator-smoke
+          cp build/atfe-probe/hp39-visible.result-address             dist/hp39-emulator-smoke/E2E_RESULT_ADDRESS.txt
+
+      - name: Upload Emu48 smoke bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hpclang-hp39-emulator-smoke
+          path: dist/hp39-emulator-smoke/
+          if-no-files-found: error
