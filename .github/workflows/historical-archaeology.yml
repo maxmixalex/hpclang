@@ -39,6 +39,26 @@ jobs:
           mkdir -p research/generated
           python3 tools/analyze-hpgcc-tags.py /tmp/hpgcc11 /tmp/hpgcc20 research/generated
 
+      - name: Inspect 2.0 VC packer constants
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("/tmp/hpgcc20/elf2hp/elf2hp.c")
+          lines = p.read_text(errors="replace").splitlines()
+          needles = (
+              "0A94C", "0a94c", "01220000", "01101000",
+              "1024", "2048", "virtual", "VIRTUAL",
+              "3176B34C", "0x40000000", "0x4a800400",
+          )
+          for i, line in enumerate(lines, 1):
+              if any(n in line for n in needles):
+                  lo = max(1, i - 4)
+                  hi = min(len(lines), i + 5)
+                  print(f"--- {lo}:{hi} around line {i} ---")
+                  for n in range(lo, hi + 1):
+                      print(f"{n:5}: {lines[n-1]}")
+          PY
+
       - name: Run modern Clang probes
         run: |
           {
