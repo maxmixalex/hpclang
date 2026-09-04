@@ -147,19 +147,31 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Status: canonical HPC1 runtime PASS reached on x50ng; stage0 return and stock package path pending**
+**Status: canonical HPC1 execution and return validated in x50ng; real stock package/launcher path pending**
 
-Steps:
+Completed on x50ng:
 
-- [x] boot official 49g+/50g firmware headlessly in x50ng;
+- [x] boot official 49g+/50g 2.15 firmware headlessly to stock HOME;
 - [x] execute the same canonical HPC1 runtime image used by HP39gs through
-  stage0 -> stage1 -> common bootstrap;
-- [x] observe machine-readable `0x50415353` and capture the live
-  `RUNTIME PASS` LCD;
-- [ ] close the synthetic outer-launcher return boundary;
-- [ ] replace the synthetic ARMSYS allocation with the real stock 49g+/50g
-  package/launcher path;
+  stage0 -> fixed stage1 -> common bootstrap;
+- [x] observe machine-readable `0x50415353` and capture live
+  `RUNTIME PASS`;
+- [x] return through stage1 and stage0, remove temporary mappings, restore the
+  SWI vector and resume the saved responsive stock HOME state.
+
+Remaining:
+
+- [ ] replace the synthetic normalized ARMSYS/page-pool preparation with the
+  real stock 49g+/50g package/launcher path;
 - [ ] validate on real hardware when useful.
+
+The first synthetic return failure was test-harness-induced rather than an
+hpclang bootstrap defect. HP's stock layout keeps the LCD framebuffer in the
+same 4 KiB S3C2410 SRAM used by the active low L1 table. The initial synthetic
+descriptor at physical `0x40000280` overlapped the live framebuffer beginning
+at `0x4000026c`, so drawing the PASS page zeroed the descriptor. The harness
+now uses an empty descriptor at `0x40000c00` and asserts that its four bytes
+do not overlap the live 160x80 framebuffer range.
 
 Completion criterion:
 
@@ -168,34 +180,45 @@ Completion criterion:
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: x50ng executes canonical HPC1; full return gate in progress**
+**Status: complete for the common ARM execution path**
 
-Validated design:
+The x50ng CI gate now proves, unattended:
 
-- x50ng emulates the actual S3C2410/ARM920T hardware used by the 49g+/50g
-  family and is the automated HPC1 execution backend;
-- x50ng exposes calculator keys and the LCD controller through host-side APIs,
-  so CI needs no GUI, mouse coordinates or image recognition;
-- official 49g+/50g firmware boots to normal HOME in headless CI;
-- the same canonical HPC1 image used on the real HP39gs reaches machine-readable
-  PASS under x50ng and produces a deterministic 131x80 PASS screenshot;
-- the remaining failure is after PASS, at the synthetic outer-launcher return
-  boundary; HPC1 code/data mappings and the SWI vector are already restored.
+1. official HP 49g+/50g firmware boots to normal HOME;
+2. calculator keys are driven through the emulated key matrix, not host GUI
+   coordinates;
+3. hpclang stage0, fixed stage1 and common bootstrap execute as guest ARM code;
+4. the same canonical HPC1 runtime image used on the real HP39gs reaches
+   machine-readable PASS;
+5. the live LCD controller produces a deterministic `RUNTIME PASS` frame;
+6. HPC1 data/code mappings, the stage window and SWI vector are restored;
+7. stage0 returns;
+8. the saved stock CPU context resumes at its original PC;
+9. the stock calculator accepts a real ON/cancel key after return;
+10. before/PASS/after 131x80 LCD evidence is uploaded.
 
-Execution plan:
+The successful checkpoint recorded:
 
-1. [x] boot official 49g+/50g ARM firmware and capture the LCD;
-2. [x] run common bootstrap + canonical HPC1 and observe machine-readable PASS;
-3. [x] capture the live PASS LCD frame in CI;
-4. [ ] complete synthetic stage0 return and resume the saved stock HOME state;
-5. [ ] upgrade the execution gate to the real stock 49g+/50g package/launcher.
+```text
+result             0x50415353
+saved PC           0x00008428
+resumed PC         0x00008428
+L1 data/code       0 / 0
+L1 stage           0
+L1 host injection  0
+SWI vector         0x0003f568 (restored)
+IFSR / IFAR        0 / 0
+```
+
+This milestone intentionally stops at the normalized ARM launch boundary.
+Driving the real stock 49g+/50g Saturn/System-RPL package is platform integration
+work under M5, not a requirement for the common runtime emulator gate.
 
 Completion criterion:
 
-> At least one real ARM calculator-family path runs automatically from source
-> build through HPC1 execution, produces machine-readable success, returns to a
-> responsive stock OS state and uploads deterministic before/PASS/after LCD
-> evidence.
+> A real ARM calculator-family emulator runs automatically from source build
+> through canonical HPC1 execution and return, produces machine-readable
+> success, resumes a responsive stock OS and uploads deterministic LCD evidence.
 
 ## M7 — Common platform services
 

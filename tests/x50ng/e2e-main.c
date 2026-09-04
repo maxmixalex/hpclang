@@ -353,7 +353,6 @@ static void json(struct e2e *s, const char *status)
     uint32_t ttbr0 = s->hdw->cpu->cp15.c2_base0;
     uint32_t l1_phys_base = ttbr0 & 0xffffc000u;
     uint32_t inject_phys_desc = ldl_phys(l1_phys_base + 0x0c00u);
-    uint32_t trace = ldl_phys(INJECT_PHYS + 0x930u);
     uint32_t lcdsaddr1 = ((s3c2410_lcd_t *)s->hdw->s3c2410_lcd)->lcdsaddr1;
     uint32_t fb_phys = lcd_framebuffer_phys(s);
     uint32_t inject_desc_addr =
@@ -376,7 +375,6 @@ static void json(struct e2e *s, const char *status)
         "  \"saved_swi\":\"0x%08x\",\n"
         "  \"ttbr0\":\"0x%08x\",\n"
         "  \"inject_phys_desc\":\"0x%08x\",\n"
-        "  \"stage0_trace\":\"0x%08x\",\n"
         "  \"cpsr\":\"0x%08x\",\n"
         "  \"sp\":\"0x%08x\",\n"
         "  \"lr\":\"0x%08x\",\n"
@@ -395,7 +393,6 @@ static void json(struct e2e *s, const char *status)
         data, code, stage, inject, swi, s->old_swi,
         ttbr0,
         inject_phys_desc,
-        trace,
         cpsr_read(s->hdw->cpu),
         s->hdw->cpu->regs[13],
         s->hdw->cpu->regs[14],
