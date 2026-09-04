@@ -1,0 +1,628 @@
+# Official SourceForge tag comparison
+
+- HPGCC 1.1 tag files: 761
+- HPGCC 2.0 VC tag files: 736
+- identical paths/content: 279
+- changed common paths: 399
+- only in 1.1: 83
+- only in 2.0: 58
+
+Tags compared:
+- frozen_1.1_MMU_trunk
+- frozen_2.0_VC_release
+
+## Calculator/runtime-focused file changes
+
+- changed: 379
+- removed from 2.0: 81
+- added in 2.0: 57
+
+### Added in 2.0
+
+- elf2hp/prerequisites/libelf-0.8.5.tar.gz
+- examples/hump/Makefile
+- examples/hump/hump.c
+- examples/hump/humpgraph/Testmap.c
+- examples/hump/humpgraph/backgnd.c
+- examples/hump/humpgraph/enemies.c
+- examples/hump/humpgraph/humphrey.c
+- examples/lotto.c
+- sources/ARMToolbox/Attic/Version 2 binaries/L275_48.LIB
+- sources/ARMToolbox/Attic/Version 2 binaries/LIB275.LIB
+- sources/ARMToolbox/Attic/Version 2 binaries/LibFmt.txt
+- sources/ARMToolbox/Attic/Version 2 binaries/README.TXT
+- sources/ARMToolbox/SETUP.BIN
+- sources/ARMToolbox/masd_source/ARMTBX_3_SOURCES.DIR
+- sources/ARMToolbox/masd_source/Old version 2.0/ALIGN
+- sources/ARMToolbox/masd_source/Old version 2.0/ARMJMP
+- sources/ARMToolbox/masd_source/Old version 2.0/DEALIGN
+- sources/ARMToolbox/masd_source/Old version 2.0/FIXSTO
+- sources/ARMToolbox/masd_source/Old version 2.0/FNRUN
+- sources/ARMToolbox/masd_source/Old version 2.0/MESSAGES
+- sources/ARMToolbox/masd_source/Old version 2.0/PRFIX
+- sources/ARMToolbox/masd_source/Old version 2.0/PRLNK
+- sources/ARMToolbox/masd_source/Old version 2.0/PRRUN
+- sources/ARMToolbox/masd_source/Old version 2.0/SEXE
+- sources/ARMToolbox/masd_source/Old version 2.0/SPRG
+- sources/ARMToolbox/masd_source/Old version 2.0/STRL3
+- sources/ARMToolbox/masd_source/Old version 2.0/SYSMEM.ARM
+- sources/ARMToolbox/masd_source/Old version 2.0/TBXLIB
+- sources/crt0/VCld.script
+- sources/crt0/VCloader.c
+- sources/crt0/libgcc_interwork.a
+- sources/hplib/arm/Makefile
+- sources/hplib/arm/exit_arm.c
+- sources/hplib/arm/kos_GetFuncEntry.c
+- sources/hplib/arm/kos_fclose.c
+- sources/hplib/arm/kos_fopen.c
+- sources/hplib/arm/kos_fread.c
+- sources/hplib/arm/kos_fseek.c
+- sources/hplib/arm/kos_fwrite.c
+- sources/hplib/arm/sys_flush_cache.c
+- sources/hplib/arm/syscall.c
+- sources/hplib/arm/syscallArg0.c
+- sources/hplib/arm/syscallArg1.c
+- sources/hplib/arm/syscallArg2.c
+- sources/hplib/arm/syscallArg3.c
+- sources/hplib/arm/syscallArg4.c
+- sources/hplib/arm/syscallArg5.c
+- sources/hplib/arm/syscallArg6.c
+- sources/hplib/arm/syscallArg7.c
+- sources/hplib/hp49.h
+- sources/hplib/hpgcc_config.h
+- sources/hplib/math/hook_random_functions.c
+- sources/hplib/saturn/sat_memmove.c
+- sources/hplib/saturn/sat_shrinklastob.c
+- sources/hplib/saturn/sat_stack_pop_stdargs.c
+- sources/hplib/stdio/beep.c
+- sources/hplib/sys/sys_is_slowOn.c
+
+### Removed from 2.0
+
+- elf2hp/elf2hp
+- sources/ARMToolbox/L275_48.LIB
+- sources/ARMToolbox/LIB275.LIB
+- sources/ARMToolbox/masd_source/ALIGN
+- sources/ARMToolbox/masd_source/ARMJMP
+- sources/ARMToolbox/masd_source/DEALIGN
+- sources/ARMToolbox/masd_source/FIXSTO
+- sources/ARMToolbox/masd_source/FNRUN
+- sources/ARMToolbox/masd_source/MESSAGES
+- sources/ARMToolbox/masd_source/PRFIX
+- sources/ARMToolbox/masd_source/PRLNK
+- sources/ARMToolbox/masd_source/PRRUN
+- sources/ARMToolbox/masd_source/SEXE
+- sources/ARMToolbox/masd_source/SPRG
+- sources/ARMToolbox/masd_source/STRL3
+- sources/ARMToolbox/masd_source/SYSMEM.ARM
+- sources/ARMToolbox/masd_source/TBXLIB
+- sources/ARMToolbox/masd_source48/ARMJMP
+- sources/ARMToolbox/masd_source48/PRFIX
+- sources/ARMToolbox/masd_source48/PRLNK
+- sources/ARMToolbox/masd_source48/SYSMEM.ARM
+- sources/ARMToolbox/masd_source48/TBXLIB
+- sources/HP39-Aplet/Binaries/LIB275L.L39
+- sources/HP39-Aplet/Binaries/apletcode.bin
+- sources/HP39-Aplet/Binaries/apletepilog.bin
+- sources/HP39-Aplet/Binaries/blank.gro
+- sources/HP39-Aplet/LIB275/HEADER.H
+- sources/HP39-Aplet/LIB275/SEXE.s
+- sources/HP39-Aplet/LIB275/SUPROM39.A
+- sources/HP39-Aplet/LIB275/lib275.s
+- sources/HP39-Aplet/LIB275/makefile.bat
+- sources/HP39-Aplet/Skeleton/=Common.h
+- sources/HP39-Aplet/Skeleton/=Entry39.h
+- sources/HP39-Aplet/Skeleton/=Funcdir.h
+- sources/HP39-Aplet/Skeleton/=Head39.h
+- sources/HP39-Aplet/Skeleton/=Sharedvar.h
+- sources/HP39-Aplet/Skeleton/Makefile
+- sources/HP39-Aplet/Skeleton/howtopatch.txt
+- sources/HP39-Aplet/Skeleton/hpgccaplet.m
+- sources/HP39-Aplet/Skeleton/hpgccaplet.s
+- sources/HP39-Aplet/hp2aplet/hp2aplet.c
+- sources/HP39-Aplet/hp2aplet/hp39wiz.c
+- sources/crt0/MMUld.script
+- sources/crt0/MMUloader.c
+- sources/ggl/ggl/Dependencies
+- sources/hpg/common/Dependencies
+- sources/hpg/examples/test.c
+- sources/hplib/fileio/Dependencies
+- sources/hplib/fileio/kos_GetFuncEntry.c
+- sources/hplib/fileio/kos_fclose.c
+- sources/hplib/fileio/kos_fopen.c
+- sources/hplib/fileio/kos_fread.c
+- sources/hplib/fileio/kos_fseek.c
+- sources/hplib/fileio/kos_fwrite.c
+- sources/hplib/keyboard/Dependencies
+- sources/hplib/kos/Dependencies
+- sources/hplib/kos/syscall.c
+- sources/hplib/kos/syscallArg0.c
+- sources/hplib/kos/syscallArg1.c
+- sources/hplib/kos/syscallArg2.c
+- sources/hplib/kos/syscallArg3.c
+- sources/hplib/kos/syscallArg4.c
+- sources/hplib/kos/syscallArg5.c
+- sources/hplib/kos/syscallArg6.c
+- sources/hplib/kos/syscallArg7.c
+- sources/hplib/math/Dependencies
+- sources/hplib/saturn/Dependencies
+- sources/hplib/saturn/sat_moveup.c
+- sources/hplib/screen/Dependencies
+- sources/hplib/stdio/Dependencies
+- sources/hplib/strings/Dependencies
+- sources/hplib/sys/Dependencies
+- sources/hplib/sys/sys_flush_cache.c
+- sources/win/box/Dependencies
+- sources/win/checkbox/Dependencies
+- sources/win/choose/Dependencies
+- sources/win/common/Dependencies
+- sources/win/img/Dependencies
+- sources/win/progress/Dependencies
+- sources/win/softmenu/Dependencies
+- sources/win/text/Dependencies
+
+### Changed common files
+
+- elf2hp/Makefile
+- elf2hp/elf2hp.c
+- elf2hp/elf2hp.exe
+- elf2hp/elf2hp_old.c
+- examples/Makefile
+- examples/balls.c
+- examples/benchmarks/Makefile
+- examples/benchmarks/flops.c
+- examples/benchmarks/hpdry.c
+- examples/benchmarks/knightr.c
+- examples/benchmarks/mcpf.c
+- examples/benchmarks/mcpi.c
+- examples/benchmarks/sieve1.c
+- examples/block.c
+- examples/deprecated/keyboard.c
+- examples/function.c
+- examples/games/Makefile
+- examples/games/daleks.c
+- examples/games/lchess.c
+- examples/games/tetris.c
+- examples/hiworld.c
+- examples/malloc.c
+- examples/rplstk.c
+- examples/sieve.c
+- examples/stack.c
+- sources/ARMToolbox/LibFmt.txt
+- sources/ARMToolbox/README.TXT
+- sources/crt0/MMUglobals.c
+- sources/crt0/Makefile
+- sources/crt0/crt0.c
+- sources/crt0/libgcc.a
+- sources/ggl/Makefile
+- sources/ggl/examples/humpgame/hump.c
+- sources/ggl/examples/humpgame/humpgraph/Testmap.c
+- sources/ggl/examples/tggl.c
+- sources/ggl/ggl.h
+- sources/ggl/ggl/Makefile
+- sources/ggl/ggl/ggl_aline.c
+- sources/ggl/ggl/ggl_bitblt.c
+- sources/ggl/ggl/ggl_bitbltoper.c
+- sources/ggl/ggl/ggl_filter.c
+- sources/ggl/ggl/ggl_fltdarken.c
+- sources/ggl/ggl/ggl_fltlighten.c
+- sources/ggl/ggl/ggl_hblt.c
+- sources/ggl/ggl/ggl_hbltfilter.c
+- sources/ggl/ggl/ggl_hbltoper.c
+- sources/ggl/ggl/ggl_hline.c
+- sources/ggl/ggl/ggl_initscr.c
+- sources/ggl/ggl/ggl_mkcolor.c
+- sources/ggl/ggl/ggl_mkcolor32.c
+- sources/ggl/ggl/ggl_opmask.c
+- sources/ggl/ggl/ggl_optransp.c
+- sources/ggl/ggl/ggl_ovlblt.c
+- sources/ggl/ggl/ggl_rect.c
+- sources/ggl/ggl/ggl_rectp.c
+- sources/ggl/ggl/ggl_revblt.c
+- sources/ggl/ggl/ggl_vline.c
+- sources/ggl/ggl/gglpr.h
+- sources/hpg/Makefile
+- sources/hpg/common/Makefile
+- sources/hpg/common/_hpg_mono_draw.c
+- sources/hpg/common/_hpg_poly.c
+- sources/hpg/common/_hpg_set_mode.c
+- sources/hpg/common/hpg_init.c
+- sources/hpg/common/hpg_set_mode_gray16.c
+- sources/hpg/common/hpg_set_mode_gray4.c
+- sources/hpg/common/hpg_set_mode_mono.c
+- sources/hpg/common/hpgpriv.h
+- sources/hpg/examples/examplesetpattern.c
+- sources/hpg/examples/testbigtext.c
+- sources/hpg/examples/testcolorsgray16.c
+- sources/hpg/examples/testcolorsgray4.c
+- sources/hpg/examples/testdoublebuf.c
+- sources/hpg/examples/testimage.c
+- sources/hpg/examples/testpoly.c
+- sources/hpg/examples/testshapes.c
+- sources/hpg/examples/testtext.c
+- sources/hpg/hpgraphics.h
+- sources/hplib/Doxyfile
+- sources/hplib/Makefile
+- sources/hplib/fileio/Makefile
+- sources/hplib/fileio/fclose.c
+- sources/hplib/fileio/fdelete.c
+- sources/hplib/fileio/fgetc.c
+- sources/hplib/fileio/fgets.c
+- sources/hplib/fileio/fopen.c
+- sources/hplib/fileio/fputc.c
+- sources/hplib/fileio/fputs.c
+- sources/hplib/fileio/fread.c
+- sources/hplib/fileio/fwrite.c
+- sources/hplib/hpconio.h
+- sources/hplib/hpctype.h
+- sources/hplib/hpgcc49.h
+- sources/hplib/hpkeyb49.h
+- sources/hplib/hpmath.h
+- sources/hplib/hpscreen.h
+- sources/hplib/hpstdio.h
+- sources/hplib/hpstdlib.h
+- sources/hplib/hpstring.h
+- sources/hplib/hpsys.h
+- sources/hplib/hptime.h
+- sources/hplib/keyboard/Makefile
+- sources/hplib/keyboard/keyb_getkey.c
+- sources/hplib/keyboard/keyb_getkeyM.c
+- sources/hplib/keyboard/keyb_getmatrix.c
+- sources/hplib/keyboard/keyb_getnextkey.c
+- sources/hplib/keyboard/keyb_isAlpha.c
+- sources/hplib/keyboard/keyb_isAnyKeyPressed.c
+- sources/hplib/keyboard/keyb_isDown.c
+- sources/hplib/keyboard/keyb_isKeyPrM.c
+- sources/hplib/keyboard/keyb_isKeyPressed.c
+- sources/hplib/keyboard/keyb_isLS.c
+- sources/hplib/keyboard/keyb_isLeft.c
+- sources/hplib/keyboard/keyb_isON.c
+- sources/hplib/keyboard/keyb_isRS.c
+- sources/hplib/keyboard/keyb_isRight.c
+- sources/hplib/keyboard/keyb_isShiftKeyPrM.c
+- sources/hplib/keyboard/keyb_isUp.c
+- sources/hplib/keyboard/keyb_read_keymap.c
+- sources/hplib/keyboard/keyb_waitKeyPressed.c
+- sources/hplib/kos.h
+- sources/hplib/kos/Beep.c
+- sources/hplib/kos/ClearLcd.c
+- sources/hplib/kos/LCDGetContrast.c
+- sources/hplib/kos/LCDSetContrast.c
+- sources/hplib/kos/Makefile
+- sources/hplib/kos/PutDecNumber.c
+- sources/hplib/kos/PutHexNumber.c
+- sources/hplib/kos/PutString.c
+- sources/hplib/kos/Reset.c
+- sources/hplib/kos/getSerialNumber.c
+- sources/hplib/kos/kos_CheckDiskInsert.c
+- sources/hplib/kos/kos_CheckDiskProtect.c
+- sources/hplib/kos/kos_GetDiskFreeSize.c
+- sources/hplib/kos/kos_GetFirstDirInfo.c
+- sources/hplib/kos/kos_GetFirstFileInfo.c
+- sources/hplib/kos/kos_GetLastError.c
+- sources/hplib/kos/kos_GetNextDirInfo.c
+- sources/hplib/kos/kos_GetNextFileInfo.c
+- sources/hplib/kos/kos_GetPrevDirInfo.c
+- sources/hplib/kos/kos_GetPrevFileInfo.c
+- sources/hplib/kos/kos_GetRTCTime.c
+- sources/hplib/kos/kos_GetSpecialFileInfo.c
+- sources/hplib/kos/kos_GetSysTickTime.c
+- sources/hplib/kos/kos_SetLastError.c
+- sources/hplib/kos/kos_SetRTCTime.c
+- sources/hplib/kos/kos_chdir.c
+- sources/hplib/kos/kos_fattr.c
+- sources/hplib/kos/kos_frename.c
+- sources/hplib/kos/kos_mem.c
+- sources/hplib/math/Makefile
+- sources/hplib/math/dround.c
+- sources/hplib/math/e_acos.c
+- sources/hplib/math/e_asin.c
+- sources/hplib/math/e_atan2.c
+- sources/hplib/math/e_exp.c
+- sources/hplib/math/e_log.c
+- sources/hplib/math/e_log10.c
+- sources/hplib/math/e_pow.c
+- sources/hplib/math/e_rem_pio2.c
+- sources/hplib/math/e_sqrt.c
+- sources/hplib/math/fabs.c
+- sources/hplib/math/fpdefs.h
+- sources/hplib/math/gauss.c
+- sources/hplib/math/ipow.c
+- sources/hplib/math/k_cos.c
+- sources/hplib/math/k_rem_pio2.c
+- sources/hplib/math/k_sin.c
+- sources/hplib/math/k_tan.c
+- sources/hplib/math/mwc.c
+- sources/hplib/math/newton.c
+- sources/hplib/math/num_derivative.c
+- sources/hplib/math/qlog10.c
+- sources/hplib/math/rand.c
+- sources/hplib/math/random.c
+- sources/hplib/math/s_atan.c
+- sources/hplib/math/s_ceil.c
+- sources/hplib/math/s_copysign.c
+- sources/hplib/math/s_cos.c
+- sources/hplib/math/s_floor.c
+- sources/hplib/math/s_frexp.c
+- sources/hplib/math/s_modf.c
+- sources/hplib/math/s_round.c
+- sources/hplib/math/s_scalbn.c
+- sources/hplib/math/s_sin.c
+- sources/hplib/math/s_tan.c
+- sources/hplib/math/square.c
+- sources/hplib/math/srand.c
+- sources/hplib/satdir.h
+- sources/hplib/saturn.h
+- sources/hplib/saturn/Makefile
+- sources/hplib/saturn/sat_BCD2LONGLONG.c
+- sources/hplib/saturn/sat_check_type.c
+- sources/hplib/saturn/sat_concatnib.c
+- sources/hplib/saturn/sat_convert_double_real.c
+- sources/hplib/saturn/sat_createtemp.c
+- sources/hplib/saturn/sat_decode_data.c
+- sources/hplib/saturn/sat_decode_real.c
+- sources/hplib/saturn/sat_dir_chdir.c
+- sources/hplib/saturn/sat_dir_close.c
+- sources/hplib/saturn/sat_dir_curdir.c
+- sources/hplib/saturn/sat_dir_destroy_slist.c
+- sources/hplib/saturn/sat_dir_fetchreal.c
+- sources/hplib/saturn/sat_dir_getcwd.c
+- sources/hplib/saturn/sat_dir_getobject.c
+- sources/hplib/saturn/sat_dir_getprolog.c
+- sources/hplib/saturn/sat_dir_getroot.c
+- sources/hplib/saturn/sat_dir_open.c
+- sources/hplib/saturn/sat_dir_path.c
+- sources/hplib/saturn/sat_dir_rclobject.c
+- sources/hplib/saturn/sat_dir_searchobject.c
+- sources/hplib/saturn/sat_dir_split_path.c
+- sources/hplib/saturn/sat_dircurrent.c
+- sources/hplib/saturn/sat_dirfindfirst.c
+- sources/hplib/saturn/sat_dirfindnext.c
+- sources/hplib/saturn/sat_dirhome.c
+- sources/hplib/saturn/sat_find_path.c
+- sources/hplib/saturn/sat_itemgetdir.c
+- sources/hplib/saturn/sat_itemgetname.c
+- sources/hplib/saturn/sat_list_add_real.c
+- sources/hplib/saturn/sat_list_add_zint.c
+- sources/hplib/saturn/sat_list_add_zint_array.c
+- sources/hplib/saturn/sat_map_s2a.c
+- sources/hplib/saturn/sat_obj_is_real.c
+- sources/hplib/saturn/sat_objcurdir.c
+- sources/hplib/saturn/sat_objgetdir.c
+- sources/hplib/saturn/sat_objgetitem.c
+- sources/hplib/saturn/sat_objhome.c
+- sources/hplib/saturn/sat_peek.c
+- sources/hplib/saturn/sat_peek_sat_bytes.c
+- sources/hplib/saturn/sat_pick_str.c
+- sources/hplib/saturn/sat_pick_str_alloc.c
+- sources/hplib/saturn/sat_poke.c
+- sources/hplib/saturn/sat_poke_nibbles.c
+- sources/hplib/saturn/sat_pop_real.c
+- sources/hplib/saturn/sat_pop_str.c
+- sources/hplib/saturn/sat_pop_str_alloc.c
+- sources/hplib/saturn/sat_pop_zint_llong.c
+- sources/hplib/saturn/sat_push_bint.c
+- sources/hplib/saturn/sat_push_char.c
+- sources/hplib/saturn/sat_push_comp.c
+- sources/hplib/saturn/sat_push_real.c
+- sources/hplib/saturn/sat_push_realarray.c
+- sources/hplib/saturn/sat_push_realvector.c
+- sources/hplib/saturn/sat_push_string.c
+- sources/hplib/saturn/sat_push_zint_array.c
+- sources/hplib/saturn/sat_push_zint_llong.c
+- sources/hplib/saturn/sat_pushptr.c
+- sources/hplib/saturn/sat_real2double.c
+- sources/hplib/saturn/sat_skipob.c
+- sources/hplib/saturn/sat_sknamedn.c
+- sources/hplib/saturn/sat_sknameup.c
+- sources/hplib/saturn/sat_stack.c
+- sources/hplib/saturn/sat_stack_drop.c
+- sources/hplib/saturn/sat_stack_list.c
+- sources/hplib/saturn/sat_stack_nip.c
+- sources/hplib/saturn/sat_stack_push_double.c
+- sources/hplib/saturn/sat_stack_push_int.c
+- sources/hplib/saturn/sat_stack_push_string.c
+- sources/hplib/saturn/sat_stack_swap.c
+- sources/hplib/saturn/sat_stack_zint.c
+- sources/hplib/screen/LCDOff.c
+- sources/hplib/screen/LCDOn.c
+- sources/hplib/screen/Makefile
+- sources/hplib/screen/clearScreen.c
+- sources/hplib/screen/drawBlockOR4bit.c
+- sources/hplib/screen/drawBlockXOR.c
+- sources/hplib/screen/drawBlockXOR4bitC.c
+- sources/hplib/screen/getBlock4bit.c
+- sources/hplib/screen/getMF.c
+- sources/hplib/screen/print.c
+- sources/hplib/screen/testBlock4bitC.c
+- sources/hplib/signal.h
+- sources/hplib/stdint.h
+- sources/hplib/stdio/Makefile
+- sources/hplib/stdio/clreol.c
+- sources/hplib/stdio/fprintf.c
+- sources/hplib/stdio/get_bigfont.c
+- sources/hplib/stdio/get_bigfontheight.c
+- sources/hplib/stdio/get_minifont.c
+- sources/hplib/stdio/getchar.c
+- sources/hplib/stdio/gets.c
+- sources/hplib/stdio/getx.c
+- sources/hplib/stdio/gety.c
+- sources/hplib/stdio/gotoxy.c
+- sources/hplib/stdio/home.c
+- sources/hplib/stdio/ifprintf.c
+- sources/hplib/stdio/iprintf.c
+- sources/hplib/stdio/isatty.c
+- sources/hplib/stdio/isprintf.c
+- sources/hplib/stdio/ivsprintf.c
+- sources/hplib/stdio/printf.c
+- sources/hplib/stdio/putcon.c
+- sources/hplib/stdio/puts.c
+- sources/hplib/stdio/readdouble.c
+- sources/hplib/stdio/readint.c
+- sources/hplib/stdio/readlonglong.c
+- sources/hplib/stdio/readuint.c
+- sources/hplib/stdio/readulonglong.c
+- sources/hplib/stdio/screen_height.c
+- sources/hplib/stdio/screen_width.c
+- sources/hplib/stdio/sprintf.c
+- sources/hplib/stdio/vsprintf.c
+- sources/hplib/stdio/write.c
+- sources/hplib/strings/Makefile
+- sources/hplib/strings/atof.c
+- sources/hplib/strings/atoi.c
+- sources/hplib/strings/atoll.c
+- sources/hplib/strings/atoui.c
+- sources/hplib/strings/atoull.c
+- sources/hplib/strings/dtoa.c
+- sources/hplib/strings/ints.c
+- sources/hplib/strings/itoa.c
+- sources/hplib/strings/lltoa.c
+- sources/hplib/strings/lower.c
+- sources/hplib/strings/str_unquote.c
+- sources/hplib/strings/strcmp.c
+- sources/hplib/strings/strcpy.c
+- sources/hplib/strings/strdup.c
+- sources/hplib/strings/strlen.c
+- sources/hplib/strings/strncpy.c
+- sources/hplib/strings/strrev.c
+- sources/hplib/strings/strset.c
+- sources/hplib/strings/tens.c
+- sources/hplib/strings/uints.c
+- sources/hplib/strings/upper.c
+- sources/hplib/strings/utoa.c
+- sources/hplib/strings/xpad.c
+- sources/hplib/sys/Makefile
+- sources/hplib/sys/asctime.c
+- sources/hplib/sys/atexit.c
+- sources/hplib/sys/bsearch.c
+- sources/hplib/sys/calloc.c
+- sources/hplib/sys/divlu2.c
+- sources/hplib/sys/exit.c
+- sources/hplib/sys/malloc.c
+- sources/hplib/sys/memcpy.c
+- sources/hplib/sys/memcpyw.c
+- sources/hplib/sys/memmove.c
+- sources/hplib/sys/memset.c
+- sources/hplib/sys/memsetw.c
+- sources/hplib/sys/qsort.c
+- sources/hplib/sys/raise.c
+- sources/hplib/sys/realloc.c
+- sources/hplib/sys/sbrk.c
+- sources/hplib/sys/signal.c
+- sources/hplib/sys/sys_LCDSynch.c
+- sources/hplib/sys/sys_RTC_seconds.c
+- sources/hplib/sys/sys_bcd2bin.c
+- sources/hplib/sys/sys_bcd2str.c
+- sources/hplib/sys/sys_chkptr.c
+- sources/hplib/sys/sys_delta_seconds.c
+- sources/hplib/sys/sys_error.c
+- sources/hplib/sys/sys_getPWMCounter0.c
+- sources/hplib/sys/sys_intOff.c
+- sources/hplib/sys/sys_intOn.c
+- sources/hplib/sys/sys_isRTCTick.c
+- sources/hplib/sys/sys_map.c
+- sources/hplib/sys/sys_phys_malloc.c
+- sources/hplib/sys/sys_playTone.c
+- sources/hplib/sys/sys_playTone2.c
+- sources/hplib/sys/sys_restoreTimers.c
+- sources/hplib/sys/sys_setRTCTickPeriod.c
+- sources/hplib/sys/sys_setupTimers.c
+- sources/hplib/sys/sys_slowOff.c
+- sources/hplib/sys/sys_slowOn.c
+- sources/hplib/sys/sys_tm_RTC.c
+- sources/hplib/sys/sys_waitRTCTicks.c
+- sources/hplib/sys/sys_waitTicks.c
+- sources/hplib/syscall.h
+- sources/win/Makefile
+- sources/win/box/Makefile
+- sources/win/checkbox/Makefile
+- sources/win/choose/Makefile
+- sources/win/common/Makefile
+- sources/win/img/Makefile
+- sources/win/progress/Makefile
+- sources/win/softmenu/Makefile
+- sources/win/text/Makefile
+
+## Key file fingerprints
+
+### sources/crt0/Makefile
+- 1.1: 1768 bytes, 425f3d493d54067ee1e0a722416766a3b2ac9412fa0e468f50142ad29906f3c5
+- 2.0: 1541 bytes, 2950138972b767a9f9e792f07158e1a64b16291ebf11c493437699aa66909367
+
+### sources/crt0/MMUloader.c
+- 1.1: 6189 bytes, e758d8fbc89779b441471fbea8df74b2320d188ce178b2c4175e530139d948a6
+- 2.0: absent
+
+### sources/crt0/MMUglobals.c
+- 1.1: 539 bytes, aec75f3a226bbd0c213ed725ef1409490b1512735b422737aec2715fb359298d
+- 2.0: 735 bytes, 205fbac0b214d3af98d695002fe3aa7fce57e5ff4e4c228cf00e7b36ff71aa65
+
+### sources/crt0/MMUld.script
+- 1.1: 6718 bytes, 8ba1395e11a0b9239803aae71691a00534c39e307745bc2062f631ef1c0793c8
+- 2.0: absent
+
+### sources/crt0/VCloader.c
+- 1.1: absent
+- 2.0: 2194 bytes, c22fd3c260f70653f858c46d4ab0eba20e382fc6adc985ac2a651ce5d20e30f9
+
+### sources/crt0/VCld.script
+- 1.1: absent
+- 2.0: 6855 bytes, 273ad143538d0e4161723173c61cbf825c891b6c495404f6e274f06564159d4b
+
+### sources/crt0/crt0.c
+- 1.1: 2106 bytes, 92d8d58204af38adc189bb9cd99315723256a58e861dd366f1ca6c857f75920e
+- 2.0: 2242 bytes, 9abcef833d509c56189f3d2b222c94c8f1ea4ee0ecfa271e1bbe8fe91a2a8751
+
+### sources/Makefile
+- 1.1: 1536 bytes, dca9a6df3bee2e4836828e155b49c12892b9c25fa9ea77eec959f7ddc0aa3c11
+- 2.0: 1591 bytes, c94dca43bb5adb8ac4f71fb8618c9364c986d6217a1682b9e47218d64cdbe4e3
+
+### sources/README.TXT
+- 1.1: 8945 bytes, b0abb78b9b717ad309d9c408faa9e29da0d0f45c2c3c5299d828983d85a6ae39
+- 2.0: 8945 bytes, b0abb78b9b717ad309d9c408faa9e29da0d0f45c2c3c5299d828983d85a6ae39
+
+### elf2hp/elf2hp.c
+- 1.1: 47417 bytes, 2b907886c8e84845badea413edbbc91bb7e084812a1877a037553c14b10e6a48
+- 2.0: 57176 bytes, 21bbba60ebe8d6eb4542b847cd7c94a0380027efb661191642debb7dfb4909ab
+
+## Compiler/codegen flags found in build files and READMEs
+
+### 1.1
+
+-fPIC -ffixed-r10 -fno-inline -fomit-frame-pointer -fpic -mapcs-32 -mcpu=arm920t -mlittle-endian -mno-fpu -mpic-register=r10 -msingle-pic-base -msoft-float -mtune=arm920t
+
+### 2.0
+
+-fPIC -fomit-frame-pointer -mapcs-32 -marm -mcpu=arm920t -mlittle-endian -mno-fpu -mpic-register=r10 -msingle-pic-base -msoft-float -mthumb -mthumb-interwork -mtune=arm920t
+
+## Runtime-specific tokens from crt0
+
+### 1.1
+
+- sources/crt0/MMUloader.c
+  - explicit asm registers: add lr, pc,#0, ldmfd sp!,{r0-r12,pc}, ldr r1,[r1,#0x918], ldr r1,[sp,#4], mov pc,lr, mov r0,#101, r0, r1, r2, sl, sp, stmfd sp!,{r0-r12,lr}, swine 0, tst r1,r1
+  - fixed addresses: 0x07f00240, 0x08FFFFFC, 0x09000000, 0x09000100, 0x09000400, 0x8000000
+  - double-underscore symbols: __attribute__, __bss_size, __data_size, __data_start, __got_size, __got_start
+- sources/crt0/MMUglobals.c
+  - explicit asm registers: sl
+  - fixed addresses: 0x09000000
+  - double-underscore symbols: __attribute__
+- sources/crt0/MMUld.script
+  - fixed addresses: 0x00000000, 0x09000400, 0x80000
+  - linker directives: ENTRY(_loader); INPUT("MMUglobals.o"); OUTPUT_ARCH(arm); OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm",; STARTUP("MMUloader.o")
+  - double-underscore symbols: __bss_size, __bss_start, __code_start, __data_size, __data_start, __fini_array_end, __fini_array_start, __got_size, __got_start, __init_array_end, __init_array_start, __preinit_array_end, __tmp_datastart
+
+### 2.0
+
+- sources/crt0/VCloader.c
+  - explicit asm registers: add r7,r7, #0x8, ldmfd sp!,{r0-r12,pc}, ldr r6, =0xbdff9346, mov r6, #0xFFFFFFFF, mov r7, #0x7100000, r1, stmfd sp!,{r0-r12,lr}, str r6, [r7]
+  - fixed addresses: 0x01101000, 0x01220000, 0x7100000, 0xFFFFFFFF, 0xbdff9346
+  - double-underscore symbols: __attribute__, __bss_size, __c_loader, __data_size, __data_start
+- sources/crt0/MMUglobals.c
+  - fixed addresses: 0x01100000, 0x01101000
+  - double-underscore symbols: __attribute__, __elf2hp_version_info
+- sources/crt0/VCld.script
+  - fixed addresses: 0x01101000, 0x01220000, 0x80000
+  - linker directives: ENTRY(_loader); INPUT("MMUglobals.o"); OUTPUT_ARCH(arm); OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm",; STARTUP("VCloader.o")
+  - double-underscore symbols: __bss_size, __bss_start, __code_start, __data_size, __data_start, __fini_array_end, __fini_array_start, __init_array_end, __init_array_start, __preinit_array_end, __tmp_datastart
+
