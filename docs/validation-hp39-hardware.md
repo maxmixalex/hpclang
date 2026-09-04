@@ -118,3 +118,45 @@ This is a PASS for the return gate: CPU control, interrupt handling and the
 stock calculator UI were live again. The stale LCD contents only show that the
 stock UI does not force an immediate full repaint when the ARM Aplet returns.
 Treat repaint/dirty-screen integration as a later HP39 platform-service issue.
+
+
+## Canonical runtime validation
+
+After the entry/return gate passed, the hardware package was upgraded to the
+canonical runtime validation. It leaves its result in the framebuffer and then
+returns immediately to the stock OS.
+
+Success:
+
+```text
+RUNTIME PASS
+```
+
+Failure:
+
+```text
+RUNTIME FAIL
+CODE xx
+```
+
+Failure codes:
+
+| Code | Check |
+| --- | --- |
+| 01 | boot info / model / writable arena |
+| 02 | initialized global data |
+| 03 | BSS zeroing |
+| 04 | initial static TLS (.tdata/.tbss) |
+| 05 | static TLS read/write |
+| 06 | init-array constructor |
+| 07 | compiler-rt 32-bit division |
+| 08 | compiler-rt 64-bit division |
+| 09 | compiler-rt software floating point |
+| 0A | picolibc memcpy/memset/strlen/strcmp |
+| 0B | malloc allocation |
+| 0C | heap memory read/write |
+| 0D | snprintf formatting |
+
+After either result appears, press APLET. Opening the normal APLET library
+confirms that the result was left by a program that has already returned rather
+than by a hung HPC1 process.
