@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: HP39gs canonical runtime validated on real hardware; 39g+/40gs sibling launch validation pending**
+**Status: HP39gs hardware PASS; HP39gs/HP40gs canonical true-ARM E2E PASS; stock sibling outer-launch validation pending**
 
 Targets:
 
@@ -101,7 +101,8 @@ Steps:
 7. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
 8. [ ] verify HP39g+ outer-launcher/model differences;
 9. [x] build a dedicated HP40gs model-3 hardware-validation artifact in CI;
-10. [ ] execute that artifact on HP40gs and verify outer-launcher/model/ROM differences.
+10. [x] execute model 3 on official HP40gs 2.22 ROM in the true-ARM x50ng backend and validate canonical HPC1 entry/runtime/return;
+11. [ ] execute the stock HP40gs Aplet/ARMToolbox outer path (or the same package on real hardware) to close sibling shell integration.
 
 The real HP39gs is the authoritative execution gate for the HP39/40 family.
 HP39gs and HP40gs use the same 75 MHz S3C2410A/ARM920T platform, 256 KiB RAM
@@ -111,13 +112,17 @@ the common ARM runtime does not need a separate HP40gs-specific implementation;
 support is complete only after the stock HP40gs Aplet/ARMToolbox outer path is
 executed at least once and returns cleanly with model 3.
 
-Until a true Little-Apple ARM emulator exists, sibling validation is split:
+Little-Apple true-ARM CI now boots the official HP39gs and HP40gs 2.22 ROM
+images to their stock HOME states and runs the canonical HPC1 image through
+stage0 -> stage1 -> common bootstrap -> runtime -> return.
 
-- CI proves the common HPC1/runtime/bootstrap on Armv4T and on x50ng's real
-  ARM920T/S3C2410 execution engine;
-- the HP39gs real machine proves the HP39/40 family stage0 + stock Aplet path;
-- HP40gs requires one real-machine (or future true-ARM emulator) launch/return
-  check, not a second re-validation of compiler-rt/TLS/libc internals.
+The split is now:
+
+- real HP39gs hardware proves the stock HP39 Aplet/ARMToolbox outer path;
+- official HP39gs and HP40gs ROMs in x50ng prove the common ARM execution path
+  independently for model 2 and model 3;
+- the remaining HP40gs family-specific gate is the stock Aplet/ARMToolbox outer
+  launcher itself, not the canonical runtime.
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
@@ -180,7 +185,7 @@ Completion criterion:
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: complete for the common ARM execution path**
+**Status: complete for the common ARM execution path on HP39gs, HP40gs and HP50g-class ROMs**
 
 The x50ng CI gate now proves, unattended:
 

@@ -32,8 +32,6 @@ static const struct key_action g_down = { HP4950_KEY_G, 1 };
 static const struct key_action g_up = { HP4950_KEY_G, 0 };
 static const struct key_action up_down = { HP4950_KEY_UP, 1 };
 static const struct key_action up_up = { HP4950_KEY_UP, 0 };
-static const struct key_action a_down = { HP4950_KEY_A, 1 };
-static const struct key_action a_up = { HP4950_KEY_A, 0 };
 static const struct key_action f_down = { HP4950_KEY_F, 1 };
 static const struct key_action f_up = { HP4950_KEY_F, 0 };
 
