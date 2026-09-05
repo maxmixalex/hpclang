@@ -37,6 +37,10 @@ on:
       - "tools/hpclang-pack.py"
       - ".github/workflows/atfe-runtime.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   runtime:
     runs-on: home-docker
@@ -46,7 +50,6 @@ jobs:
       - name: Setup host build dependencies
         uses: ./.github/actions/setup-apt
         with:
-          group: core
           packages: build-essential curl xz-utils
 
       - name: Validate common MMU layout

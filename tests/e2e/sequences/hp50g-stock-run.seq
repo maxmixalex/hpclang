@@ -1,7 +1,8 @@
 # HP50g stock ARMToolbox launch.
-# SD contains only HPCLANG.HP. Enter the VVFAT volume so the file itself is
-# highlighted, recall it through the stock File Manager, then open ARMToolbox
-# directly from RS+LIB and execute PrRUN.
+# SD contains only HPCLANG.HP. Copy the selected transfer file into HOME so
+# the stock firmware materializes the HPHP49-C transfer envelope as a native
+# calculator object. Recall that HOME variable, then run it through ARMToolbox
+# PrRUN.
 2000 chord lshift files
 4200 capture files
 4500 tap up
@@ -9,11 +10,20 @@
 6500 capture sd
 6900 tap enter
 7600 capture sd-payload
-8000 tap f4
-9200 tap on
-10000 chord rshift two
-11250 capture lib
-11600 tap f1
-12900 capture armtoolbox
-13300 tap f1
-13600 monitor
+8000 tap f2
+9200 capture copy-destination
+9500 tap down
+9800 tap f6
+11600 capture copy-result
+12100 tap on
+13000 capture home
+13400 tap var
+14500 capture vars
+14900 tap f1
+16000 capture payload-recalled
+16500 chord rshift two
+17750 capture lib
+18100 tap f1
+19400 capture armtoolbox
+19800 tap f1
+20100 monitor
