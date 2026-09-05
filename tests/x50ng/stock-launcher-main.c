@@ -54,6 +54,7 @@ KEY_PAIR(eval, HP4950_KEY_N);
 KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(neg, HP4950_KEY_W);
 KEY_PAIR(up, HP4950_KEY_UP);
+KEY_PAIR(down, HP4950_KEY_DOWN);
 KEY_PAIR(two, HP4950_KEY_2);
 KEY_PAIR(period, HP4950_KEY_PERIOD);
 KEY_PAIR(enter, HP4950_KEY_ENTER);
@@ -200,11 +201,12 @@ static void open_vars(void *arg)
         fail(s, "setup-var-key");
 }
 
-static void probe_setup_var(void *arg)
+static void run_setup_var(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "vars");
-    fail(s, "setup-var-probe");
+    if (!tap(&f1_down, &f1_up, 0))
+        fail(s, "setup-var-f1");
 }
 
 static void open_files(void *arg)
@@ -374,7 +376,7 @@ static int schedule_install(struct state *s)
 {
     /*
      * Fresh stock 2.15 ROM: dismiss recovery/memory-clear, put install port 2
-     * on the stack, then evaluate the sole SETUP.BIN object on SD.
+     * on the stack, copy SETUP.BIN from SD to HOME, then run it from VAR.
      */
     return tap(&f6_down, &f6_up, 2000000LL) &&
            tap(&f6_down, &f6_up, 4000000LL) &&
@@ -393,7 +395,10 @@ static int schedule_install(struct state *s)
            later(cancel_filer, s, 16500000LL) &&
            later(capture_home_after_copy, s, 17500000LL) &&
            later(open_vars, s, 18000000LL) &&
-           later(probe_setup_var, s, 19500000LL);
+           later(run_setup_var, s, 19500000LL) &&
+           later(capture_setup_eval, s, 22000000LL) &&
+           later(warmstart, s, 24500000LL) &&
+           later(finish_install, s, 28000000LL);
 }
 
 static int schedule_run(struct state *s)
