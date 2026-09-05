@@ -1,0 +1,55 @@
+name: Setup ATfE
+description: Restore or install the pinned Arm Toolchain for Embedded.
+
+inputs:
+  version:
+    description: Arm Toolchain for Embedded version
+    required: false
+    default: "22.1.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Restore ATfE cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.cache/atfe-${{ inputs.version }}
+        key: hpclang-atfe-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}-v1
+
+    - name: Download ATfE
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        DEST: ${{ github.workspace }}/.cache/atfe-${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "${RUNNER_ARCH:-}" in
+          X64|x64|"") ;;
+          *)
+            echo "ATfE cache helper supports x86_64 runners; got ${RUNNER_ARCH:-unknown}" >&2
+            exit 2
+            ;;
+        esac
+
+        tmp="$(mktemp --suffix=.tar.xz)"
+        trap 'rm -f "$tmp"' EXIT
+
+        curl -fL --retry 3 --retry-delay 2 \
+          "https://github.com/arm/arm-toolchain/releases/download/release-${VERSION}-ATfE/ATfE-${VERSION}-Linux-x86_64.tar.xz" \
+          -o "$tmp"
+        rm -rf "$DEST"
+        mkdir -p "$DEST"
+        tar -xJf "$tmp" -C "$DEST" --strip-components=1
+
+    - name: Export ATfE path
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        DEST: ${{ github.workspace }}/.cache/atfe-${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        test -x "$DEST/bin/clang"
+        test -x "$DEST/bin/ld.lld"
+        printf 'ATFE=%s\n' "$DEST" >> "$GITHUB_ENV"

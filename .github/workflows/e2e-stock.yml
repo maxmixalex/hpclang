@@ -15,6 +15,9 @@ on:
       - "tests/e2e/sequences/**"
       - "tests/x50ng/headless-ui-init.h"
       - "tools/probe-atfe.sh"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - ".github/actions/setup-atfe/**"
       - "tools/armtoolbox-wrap.py"
       - "tools/pgm-to-summary.py"
       - ".github/workflows/e2e-stock.yml"
@@ -22,7 +25,7 @@ on:
 jobs:
   stock-launcher:
     name: hp50g
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -33,53 +36,64 @@ jobs:
           sudo apt-get install -y build-essential git pkg-config unzip curl xz-utils \
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
-      - name: Install Arm Toolchain for Embedded 22.1.0
-        run: |
-          curl -L https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz -o /tmp/atfe.tar.xz
-          mkdir -p /tmp/atfe
-          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
 
       - name: Build canonical HP50g stock payload
         run: |
-          export ATFE=/tmp/atfe
           export OUT="$GITHUB_WORKSPACE/build/stock-payload"
           chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
           tools/probe-atfe.sh
-          /tmp/atfe/bin/clang --target=arm-none-eabi -march=armv4t -marm \
+          $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL=6 -c platform/armtoolbox/stage0.S \
             -o build/stock-payload/stage0-hp50g.o
-          /tmp/atfe/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
+          $ATFE/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
             build/stock-payload/stage0-hp50g.o \
             build/stock-payload/stage0-bundle.o \
             -o build/stock-payload/stage0-hp50g.elf
-          /tmp/atfe/bin/llvm-objcopy -O binary \
+          $ATFE/bin/llvm-objcopy -O binary \
             build/stock-payload/stage0-hp50g.elf \
             build/stock-payload/stage0-hp50g.bin
           python3 tools/armtoolbox-wrap.py \
             build/stock-payload/stage0-hp50g.bin \
             build/stock-payload/HPCLANG.HP
 
+      - name: Restore hpcalc download cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/hpcalc
+          key: hpclang-hpcalc-static-v1
+
       - name: Prepare ARMToolbox installer
         run: |
-          mkdir -p build/stock-sd
-          curl -L https://www.hpcalc.org/hp49/math/statistic/mlreg.zip -o /tmp/mlreg.zip
-          unzip -j /tmp/mlreg.zip SETUP.BIN -d build/stock-sd
+          mkdir -p .cache/hpcalc build/stock-sd
+          if [ ! -f .cache/hpcalc/mlreg.zip ]; then
+            curl -fL --retry 3 --retry-delay 2 \
+              https://www.hpcalc.org/hp49/math/statistic/mlreg.zip \
+              -o .cache/hpcalc/mlreg.zip
+          fi
+          unzip -jo .cache/hpcalc/mlreg.zip SETUP.BIN -d build/stock-sd
           test "$(stat -c %s build/stock-sd/SETUP.BIN)" = 7673
           sha256sum build/stock-sd/SETUP.BIN
 
-      - name: Fetch pinned x50ng
-        run: |
-          git clone --no-checkout https://codeberg.org/gwh/x50ng.git build/x50ng
-          git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
-          git -C build/x50ng submodule update --init --recursive
-          git -C build/x50ng rev-parse HEAD > build/x50ng-stock-source.txt
-          cp tests/x50ng/stock-launcher-main.c build/x50ng/src/main.c
-          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
+      - name: Restore x50ng build cache
+        id: x50ng-cache
+        uses: actions/cache@v4
+        with:
+          path: build/x50ng
+          key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+
+      - name: Fetch and adapt pinned x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp4950
 
       - name: Build x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
         working-directory: build/x50ng
-        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+        run: make -j"$(nproc)" WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
+      - name: Record x50ng source
+        run: git -C build/x50ng rev-parse HEAD > build/x50ng-stock-source.txt
       - name: Fetch official 49g+/50g firmware
         working-directory: build/x50ng
         run: make -C dist/firmware bootloaders official
