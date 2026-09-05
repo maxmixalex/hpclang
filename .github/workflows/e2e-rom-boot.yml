@@ -45,8 +45,8 @@ jobs:
         id: x50ng-cache
         uses: actions/cache@v4
         with:
-          path: build/x50ng
-          key: hpclang-x50ng-rom-boot-little-apple-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/little-apple-boot-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          path: build/x50ng/dist
+          key: hpclang-x50ng-rom-boot-little-apple-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/little-apple-boot-main.c', 'tests/x50ng/headless-ui-init.h') }}
           save-always: true
 
       - name: Fetch and adapt pinned x50ng
@@ -59,7 +59,7 @@ jobs:
         run: make -j"$(nproc)" WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
       - name: Record x50ng source
-        run: git -C build/x50ng rev-parse HEAD > build/x50ng-little-apple-source.txt
+        run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-little-apple-source.txt
       - name: Fetch bootloader and official Little-Apple ROM
         run: |
           make -C build/x50ng/dist/firmware bootloaders
