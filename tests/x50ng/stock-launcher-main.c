@@ -49,6 +49,7 @@ KEY_PAIR(f5, HP4950_KEY_E);
 KEY_PAIR(f6, HP4950_KEY_F);
 KEY_PAIR(files, HP4950_KEY_G);
 KEY_PAIR(mode, HP4950_KEY_H);
+KEY_PAIR(var, HP4950_KEY_J);
 KEY_PAIR(eval, HP4950_KEY_N);
 KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(neg, HP4950_KEY_W);
@@ -178,11 +179,32 @@ static void copy_setup(void *arg)
         fail(s, "setup-copy-key");
 }
 
-static void probe_copy_destination(void *arg)
+static void select_copy_home(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "copy");
-    fail(s, "setup-copy-destination-probe");
+    if (!tap(&down_down, &down_up, 0) ||
+        !tap(&f6_down, &f6_up, 300000))
+        fail(s, "setup-copy-home-key");
+}
+
+static void capture_home_after_copy(void *arg)
+{
+    capture_named(arg, "home-after-copy");
+}
+
+static void open_vars(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&var_down, &var_up, 0))
+        fail(s, "setup-var-key");
+}
+
+static void probe_setup_var(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "vars");
+    fail(s, "setup-var-probe");
 }
 
 static void open_files(void *arg)
@@ -367,7 +389,11 @@ static int schedule_install(struct state *s)
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
            later(copy_setup, s, 13300000LL) &&
-           later(probe_copy_destination, s, 15000000LL);
+           later(select_copy_home, s, 14300000LL) &&
+           later(cancel_filer, s, 16500000LL) &&
+           later(capture_home_after_copy, s, 17500000LL) &&
+           later(open_vars, s, 18000000LL) &&
+           later(probe_setup_var, s, 19500000LL);
 }
 
 static int schedule_run(struct state *s)
