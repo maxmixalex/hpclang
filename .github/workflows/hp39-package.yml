@@ -51,7 +51,7 @@ jobs:
       - name: Setup host packaging dependencies
         uses: ./.github/actions/setup-apt
         with:
-          packages: build-essential curl xz-utils innoextract
+          packages: build-essential curl xz-utils python3 innoextract
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe

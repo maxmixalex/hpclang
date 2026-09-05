@@ -64,7 +64,7 @@ jobs:
         uses: ./.github/actions/setup-apt
         with:
           packages: >-
-            build-essential git pkg-config unzip curl xz-utils
+            build-essential git pkg-config unzip curl wget xz-utils python3
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Load target profile
@@ -95,6 +95,7 @@ jobs:
         with:
           path: build/x50ng
           key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h', 'tests/e2e/targets/*.json') }}
+          save-always: true
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -150,7 +151,7 @@ jobs:
 
           for pgm in build/$TARGET-*.pgm; do
             [ -f "$pgm" ] || continue
-            python tools/pgm-to-png.py "$pgm" "$pgm.png"
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat "build/$TARGET-e2e.json"
 
@@ -159,7 +160,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          python tools/pgm-to-summary.py \
+          python3 tools/pgm-to-summary.py \
             --heading "$TARGET canonical ARM E2E" \
             --json "build/$TARGET-e2e.json" \
             "build/$TARGET-before.pgm" \

@@ -50,7 +50,7 @@ jobs:
       - name: Setup host build dependencies
         uses: ./.github/actions/setup-apt
         with:
-          packages: build-essential curl xz-utils
+          packages: build-essential curl xz-utils python3
 
       - name: Validate common MMU layout
         run: |

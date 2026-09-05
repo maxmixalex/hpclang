@@ -39,7 +39,7 @@ jobs:
         uses: ./.github/actions/setup-apt
         with:
           packages: >-
-            build-essential git pkg-config unzip curl xz-utils
+            build-essential git pkg-config unzip curl wget xz-utils python3
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Setup Arm Toolchain for Embedded
@@ -88,6 +88,7 @@ jobs:
         with:
           path: build/x50ng
           key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          save-always: true
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -121,7 +122,7 @@ jobs:
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
           for pgm in build/stock-install-*.pgm; do
             [ -f "$pgm" ] || continue
-            python tools/pgm-to-png.py "$pgm" "$pgm.png"
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat build/stock-install.json
 
@@ -143,14 +144,14 @@ jobs:
 
           for pgm in build/stock-run-*.pgm; do
             [ -f "$pgm" ] || continue
-            python tools/pgm-to-png.py "$pgm" "$pgm.png"
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat build/stock-run.json
 
       - name: Add LCD evidence to job summary
         if: always()
         run: |
-          python tools/pgm-to-summary.py \
+          python3 tools/pgm-to-summary.py \
             --heading "HP50g stock ARMToolbox E2E" \
             --json build/stock-install.json \
             --json build/stock-run.json \
