@@ -5,14 +5,16 @@ emulator happens to execute them.
 
 ## Test tiers
 
-- **ROM boot** — boot an official calculator ROM to a responsive stock UI.
-  This is a hardware/firmware-model sanity check and does not execute hpclang.
-- **Canonical** — enter the common ARM launch boundary, execute the canonical
-  HPC1 runtime image and return to the stock OS. This is the primary runtime
-  regression gate.
-- **Stock** — enter hpclang through the calculator's supported stock shell:
-  Aplet/ARMToolbox on HP39/40, or ARMToolbox/PrRUN on HP49/50. This validates
-  the family-specific outer launcher in addition to the canonical runtime.
+- **Official ROM boot** — boot an unmodified HP calculator ROM to a responsive
+  normal calculator screen. This checks the emulator/firmware model only and
+  does not execute hpclang.
+- **Direct runtime** — bypass the calculator's menus and installers, enter the
+  common hpclang ARM boundary directly, run the HPC1 runtime test, then return
+  to the HP operating system. This tells us whether hpclang itself works.
+- **Full calculator launch** — use the calculator exactly as a user would:
+  install/select the required launcher, copy the hpclang program through the
+  calculator UI, launch it, run HPC1, and return. This additionally tests the
+  HP-side packaging, menus, libraries and launcher.
 
 GitHub Actions orchestration lives only in `.github/workflows/e2e-*.yml`.
 Emulator adapters live in `tests/x50ng/`. Human-like input is test data under
@@ -49,10 +51,10 @@ host transfer is Conn3x/USB/serial, while x50ng currently models the S3C2410
 device registers but does not expose a host transport endpoint suitable for
 Conn3x.
 
-Therefore the first automated HP39/40 **Stock** gate starts from a deterministic
+Therefore the first automated HP39/40 **full calculator launch** gate starts from a deterministic
 post-transfer calculator-state fixture containing the normal packaged Aplet.
 The test still drives the stock APLET UI, enters the historical outer launcher,
-executes hpclang, checks the canonical result word and verifies return to a
+executes hpclang, checks the direct-runtime result word and verifies return to a
 responsive stock OS.
 
 PC-to-calculator transfer protocol is a separate integration concern. It should
