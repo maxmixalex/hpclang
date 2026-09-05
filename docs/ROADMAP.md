@@ -82,7 +82,7 @@ Completion criterion:
 
 ## M3 — HP39/40 family
 
-**Status: HP39gs hardware PASS; HP39gs/HP40gs canonical true-ARM E2E PASS; stock sibling outer-launch validation pending**
+**Status: HP39gs hardware PASS; HP39gs/HP40gs direct-runtime true-ARM E2E PASS; stock sibling outer-launch validation pending**
 
 Targets:
 
@@ -101,7 +101,7 @@ Steps:
 7. [x] validate globals/BSS/TLS/heap/compiler-rt/libc on real HP39gs;
 8. [ ] verify HP39g+ outer-launcher/model differences;
 9. [x] build a dedicated HP40gs model-3 hardware-validation artifact in CI;
-10. [x] execute model 3 on official HP40gs 2.22 ROM in the true-ARM x50ng backend and validate canonical HPC1 entry/runtime/return;
+10. [x] execute model 3 on official HP40gs 2.22 ROM in the true-ARM x50ng backend and validate direct HPC1 entry/runtime/return;
 11. [ ] automate the stock HP39gs and HP40gs Aplet/ARMToolbox outer path from deterministic post-transfer fixtures and validate return;
 
 The real HP39gs is the authoritative execution gate for the HP39/40 family.
@@ -113,7 +113,7 @@ support is complete only after the stock HP40gs Aplet/ARMToolbox outer path is
 executed at least once and returns cleanly with model 3.
 
 Little-Apple true-ARM CI now boots the official HP39gs and HP40gs 2.22 ROM
-images to their stock HOME states and runs the canonical HPC1 image through
+images to their stock HOME states and runs the direct HPC1 image through
 stage0 -> stage1 -> common bootstrap -> runtime -> return.
 
 The split is now:
@@ -129,12 +129,12 @@ The split is now:
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
-chain. Later real-hardware work closed the return path and the canonical runtime
+chain. Later real-hardware work closed the return path and the direct runtime
 suite.
 
 Completion criterion:
 
-> The canonical HPC1 runtime passes on real HP39gs hardware, and each sibling
+> The direct HPC1 runtime passes on real HP39gs hardware, and each sibling
 > target has its stock outer launcher/model integration executed at least once.
 
 ## M4 — HP48gII family
@@ -155,12 +155,12 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Status: canonical HPC1 execution and return validated in x50ng; stock ARMToolbox package/launcher E2E is the active blocker**
+**Status: direct HPC1 execution and return validated in x50ng; full HP50g ARMToolbox launch E2E is the active blocker**
 
 Completed on x50ng:
 
 - [x] boot official 49g+/50g 2.15 firmware headlessly to stock HOME;
-- [x] execute the same canonical HPC1 runtime image used by HP39gs through
+- [x] execute the same direct HPC1 runtime image used by HP39gs through
   stage0 -> fixed stage1 -> common bootstrap;
 - [x] observe machine-readable `0x50415353` and capture live
   `RUNTIME PASS`;
@@ -172,9 +172,9 @@ Remaining:
 - [ ] close the stock HP50g ARMToolbox installation and PrRUN path against the
   official 2.15 ROM in x50ng;
 - [ ] prove that the stock-installed ARMToolbox library launches the same
-  HPCLANG.HP transfer object and reaches canonical HPC1 PASS/return;
+  HPCLANG.HP transfer object and reaches direct HPC1 PASS/return;
 - [ ] replace the synthetic normalized ARMSYS/page-pool preparation as the
-  supported launcher gate once the stock path is green;
+  supported launcher gate once the full calculator launch path is green;
 - [ ] validate on real hardware when useful.
 
 Current stock-E2E evidence already proves the HP transfer envelope, SD file
@@ -199,7 +199,7 @@ Completion criterion:
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: canonical matrix and official-ROM boot gates complete; HP50g stock-shell gate in progress**
+**Status: direct-runtime matrix and official-ROM boot gates complete; HP50g stock-shell gate in progress**
 
 The x50ng CI gate now proves, unattended:
 
@@ -207,7 +207,7 @@ The x50ng CI gate now proves, unattended:
 2. calculator keys are driven through the emulated key matrix, not host GUI
    coordinates;
 3. hpclang stage0, fixed stage1 and common bootstrap execute as guest ARM code;
-4. the same canonical HPC1 runtime image used on the real HP39gs reaches
+4. the same direct HPC1 runtime image used on the real HP39gs reaches
    machine-readable PASS;
 5. the live LCD controller produces a deterministic `RUNTIME PASS` frame;
 6. HPC1 data/code mappings, the stage window and SWI vector are restored;
@@ -229,13 +229,13 @@ SWI vector         0x0003f568 (restored)
 IFSR / IFAR        0 / 0
 ```
 
-The canonical runtime gate intentionally stops at the normalized ARM launch
+The direct runtime gate intentionally stops at the normalized ARM launch
 boundary. Stock shell/launcher automation is a separate E2E tier so a broken
 calculator menu path cannot be confused with a common-runtime regression.
 
 Current CI status:
 
-- HP39gs / HP40gs / HP50g canonical HPC1 matrix: PASS;
+- HP39gs / HP40gs / HP50g direct HPC1 matrix: PASS;
 - official HP39gs / HP40gs ROM boot matrix: PASS;
 - HP50g stock-ROM ARMToolbox path: transfer/materialization proven, launcher
   installation/PrRUN still open;
@@ -248,7 +248,7 @@ Current CI status:
 Completion criterion:
 
 > A real ARM calculator-family emulator runs automatically from source build
-> through canonical HPC1 execution and return, produces machine-readable
+> through direct HPC1 execution and return, produces machine-readable
 > success, resumes a responsive stock OS and uploads deterministic LCD evidence.
 
 ## M7 — Common platform services
@@ -366,7 +366,7 @@ patterns intended for newer ARM revisions (including paths with `movw`,
 `clz`, and `pop {..., pc}`), so merely fixing one entry epilogue would leave
 the runtime structurally fragile.
 
-hpclang now keeps compiler-rt as the canonical runtime but supplies a narrow
+hpclang now keeps compiler-rt as the direct runtime but supplies a narrow
 target-built double core following compiler-rt's generic C algorithms. It is
 compiled explicitly with `-march=armv4t -marm`; thin EABI veneers provide the
 Thumb-1 application boundary and return with `bx lr`. The first covered
@@ -396,7 +396,7 @@ test-only hold and no longer overwrites it during fini-array teardown.
 Production runtime behavior is unchanged.
 
 
-### HP39gs hardware checkpoint: canonical runtime PASS
+### HP39gs hardware checkpoint: direct runtime PASS
 
 Real HP39gs hardware now reports:
 
