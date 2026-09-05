@@ -27,7 +27,7 @@ jobs:
         uses: ./.github/actions/setup-apt
         with:
           group: archaeology
-          packages: build-essential git subversion clang file
+          packages: build-essential git subversion clang file python3
 
       - name: Export official SourceForge tags
         run: |
