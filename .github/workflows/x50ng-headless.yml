@@ -89,7 +89,8 @@ jobs:
 
       - name: Install E2E frontend and reserve RAM before QEMU bookkeeping
         run: |
-          cp tests/x50ng/e2e-main.c build/x50ng/src/main.c\n          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
+          cp tests/x50ng/e2e-main.c build/x50ng/src/main.c
+          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
           python3 - <<'PY'
           from pathlib import Path
 
