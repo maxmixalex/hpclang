@@ -38,6 +38,10 @@ on:
       - "tools/package-hp39-aplet.sh"
       - ".github/workflows/hp39-package.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   package:
     runs-on: home-docker
@@ -47,7 +51,6 @@ jobs:
       - name: Setup host packaging dependencies
         uses: ./.github/actions/setup-apt
         with:
-          group: hp39-package
           packages: build-essential curl xz-utils innoextract
 
       - name: Setup Arm Toolchain for Embedded

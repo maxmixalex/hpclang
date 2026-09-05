@@ -41,6 +41,10 @@ on:
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   canonical:
     name: ${{ matrix.target }}
@@ -59,7 +63,6 @@ jobs:
       - name: Setup host build dependencies
         uses: ./.github/actions/setup-apt
         with:
-          group: x50ng
           packages: >-
             build-essential git pkg-config unzip curl xz-utils
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
