@@ -254,7 +254,7 @@ jobs:
         run: |
           IMAGE_URL=""
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            IMAGE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-evidence/full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png"
+            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png?raw=1"
           fi
           python3 tools/pgm-to-summary.py \
             --heading "HP50g full original-system launch" \
