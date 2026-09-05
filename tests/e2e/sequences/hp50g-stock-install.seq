@@ -1,7 +1,7 @@
 # HP50g stock ARMToolbox install probe.
 # Format: <absolute-ms> <tap|chord|capture|fail|monitor|finish-install> [args...]
-# The destination picker defaults to HOME. 3:SD is the source volume, so the
-# sequence confirms immediately instead of moving DOWN first.
+# In PICK DESTINATION, 3:SD is initially highlighted. Move DOWN once to HOME,
+# confirm with F6, then inspect HOME's VAR menu to verify the converted object.
 2000 tap f6
 4000 tap f6
 5000 tap mode
@@ -16,6 +16,11 @@
 12800 capture sd-setup
 13200 tap f2
 14200 capture copy
-14500 tap f6
+14300 tap down
+14600 tap f6
 16500 capture copy-result
-16600 fail copy-result-probe
+17000 tap on
+18000 capture home-after-copy
+18500 tap var
+19800 capture vars
+20000 fail vars-after-copy-probe
