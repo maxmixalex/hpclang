@@ -231,7 +231,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.target }}-canonical-arm-e2e
+          name: ${{ matrix.target }}-direct-runtime-e2e
           path: |
             build/${{ matrix.target }}-*.pgm
             build/${{ matrix.target }}-*.pgm.png
