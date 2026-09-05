@@ -45,7 +45,7 @@ jobs:
   package:
     runs-on: home-docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install HP39 packaging dependency
         run: |
@@ -86,7 +86,7 @@ jobs:
             build/atfe-probe/hp40gs-hpc1.hp
 
       - name: Restore HPGCC39 packaging cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-v1
@@ -136,14 +136,14 @@ jobs:
           PY
 
       - name: Upload HP39gs hardware validation bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hpclang-hp39gs-hardware-validation
           path: dist/hp39gs-hardware-validation/
           if-no-files-found: error
 
       - name: Upload HP40gs hardware validation bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hpclang-hp40gs-hardware-validation
           path: dist/hp40gs-hardware-validation/
