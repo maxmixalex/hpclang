@@ -1,4 +1,7 @@
-name: E2E / ROM boot
+name: E2E / Official ROM boot
+
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:
@@ -7,6 +10,7 @@ on:
       - "tests/x50ng/little-apple-boot-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -135,14 +139,28 @@ jobs:
             "build/$TARGET-4.pgm"
 
 
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            "build/$TARGET-summary.png" \
+            "official-rom-boot/$GITHUB_RUN_ID/$TARGET.png"
+
       - name: Add LCD evidence to job summary
         if: always()
         env:
           TARGET: ${{ matrix.target }}
         run: |
+          IMAGE_URL=""
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            IMAGE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-evidence/official-rom-boot/$GITHUB_RUN_ID/$TARGET.png"
+          fi
           python3 tools/pgm-to-summary.py \
-            --heading "$TARGET official-ROM boot" \
-            --image-file "build/$TARGET-summary.png" \
+            --heading "$TARGET official HP ROM boot" \
+            --image-url "$IMAGE_URL" \
             --json "build/$TARGET.json" \
             "build/$TARGET-1.pgm" \
             "build/$TARGET-2.pgm" \
