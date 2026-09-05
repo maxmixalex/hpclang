@@ -3,7 +3,7 @@ set -euo pipefail
 
 image="$1"
 destination="$2"
-branch="\${3:-ci-evidence}"
+branch="${3:-ci-evidence}"
 
 test -f "$image"
 
