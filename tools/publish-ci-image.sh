@@ -26,7 +26,12 @@ fi
 
 git -C "$worktree" commit -m "ci: publish $destination" >/dev/null
 
-while ! git -C "$worktree" push origin "HEAD:$branch"; do
+for _ in 1 2 3; do
+  if git -C "$worktree" push origin "HEAD:$branch"; then
+    exit 0
+  fi
   git -C "$worktree" fetch origin "$branch"
   git -C "$worktree" rebase "origin/$branch"
 done
+
+exit 1
