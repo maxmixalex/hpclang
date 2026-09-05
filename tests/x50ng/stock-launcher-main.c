@@ -305,7 +305,7 @@ static int schedule_sequence(struct state *s, const char *path)
     unsigned line_no = 0;
 
     if (!f) {
-        fprintf(stderr, "cannot open E2E sequence %s\\n", path);
+        fprintf(stderr, "cannot open E2E sequence %s\n", path);
         return 0;
     }
 
@@ -319,14 +319,14 @@ static int schedule_sequence(struct state *s, const char *path)
         int64_t us;
 
         ++line_no;
-        while (*p == ' ' || *p == '\\t') ++p;
-        if (*p == '\\0' || *p == '\\n' || *p == '#')
+        while (*p == ' ' || *p == '\t') ++p;
+        if (*p == '\0' || *p == '\n' || *p == '#')
             continue;
 
         fields = sscanf(p, "%llu %31s %95s %95s",
                         &ms, op, first, second);
         if (fields < 2 || ms > 600000ULL) {
-            fprintf(stderr, "%s:%u: invalid sequence line\\n", path, line_no);
+            fprintf(stderr, "%s:%u: invalid sequence line\n", path, line_no);
             fclose(f);
             return 0;
         }
