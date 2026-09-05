@@ -290,11 +290,11 @@ jobs:
             build/stock-run-failure.pgm \
             >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload stock launcher evidence
+      - name: Upload full HP50g launch evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: x50ng-stock-armtoolbox-e2e
+          name: hp50g-full-launch-evidence
           path: |
             build/stock-install-*
             build/stock-install.json
