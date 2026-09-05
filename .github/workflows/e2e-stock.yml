@@ -1,4 +1,7 @@
-name: E2E / Stock
+name: E2E / Full HP50g launch
+
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:
@@ -21,6 +24,7 @@ on:
       - "tools/armtoolbox-wrap.py"
       - "tools/inspect-armtoolbox-envelope.py"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
       - ".github/workflows/e2e-stock.yml"
 
 concurrency:
@@ -237,12 +241,24 @@ jobs:
             build/stock-run-failure.pgm
 
 
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            build/stock-summary.png \
+            "full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png"
+
       - name: Add LCD evidence to job summary
         if: always()
         run: |
+          IMAGE_URL=""
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            IMAGE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-evidence/full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png"
+          fi
           python3 tools/pgm-to-summary.py \
-            --heading "HP50g stock ARMToolbox E2E" \
-            --image-file build/stock-summary.png \
+            --heading "HP50g full original-system launch" \
+            --image-url "$IMAGE_URL" \
             --json build/stock-install.json \
             --json build/stock-run.json \
             build/stock-install-files.pgm \
