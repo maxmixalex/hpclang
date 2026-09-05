@@ -66,8 +66,9 @@ jobs:
 
       - name: Fetch pinned x50ng
         run: |
-          git clone --no-checkout https://github.com/gwenhael-le-moine/x50ng.git build/x50ng
-          git -C build/x50ng checkout ac1e1e24827aa9c66e020baa47bb253746c037b5
+          git clone --no-checkout https://codeberg.org/gwh/x50ng.git build/x50ng
+          git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
+          git -C build/x50ng submodule update --init --recursive
           git -C build/x50ng rev-parse HEAD > build/x50ng-stock-source.txt
           cp tests/x50ng/stock-launcher-main.c build/x50ng/src/main.c
 
