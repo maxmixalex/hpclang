@@ -6,6 +6,7 @@ on:
       - research/trigger.txt
       - .github/workflows/historical-archaeology.yml
       - tools/analyze-hpgcc-tags.py
+      - .github/actions/setup-apt/**
 
 permissions:
   contents: write
@@ -22,10 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install SVN
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y subversion
+      - name: Setup archaeology dependencies
+        uses: ./.github/actions/setup-apt
+        with:
+          group: archaeology
+          packages: build-essential git subversion clang file
 
       - name: Export official SourceForge tags
         run: |
