@@ -51,6 +51,7 @@ KEY_PAIR(files, HP4950_KEY_G);
 KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(up, HP4950_KEY_UP);
 KEY_PAIR(two, HP4950_KEY_2);
+KEY_PAIR(period, HP4950_KEY_PERIOD);
 KEY_PAIR(enter, HP4950_KEY_ENTER);
 KEY_PAIR(on, HP4950_KEY_ON);
 KEY_PAIR(lshift, HP4950_KEY_LEFTSHIFT);
@@ -251,8 +252,7 @@ static void choose_armtoolbox(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "port2");
-    if (!tap(&f3_down, &f3_up, 0))
-        fail(s, "armtoolbox-229-key");
+    fail(s, "port2-after-real-install-probe");
 }
 
 static void run_prrun(void *arg)
@@ -323,14 +323,15 @@ static int schedule_install(struct state *s)
     return tap(&f6_down, &f6_up, 2000000LL) &&
            tap(&f6_down, &f6_up, 4000000LL) &&
            tap(&two_down, &two_up, 7000000LL) &&
-           tap(&enter_down, &enter_up, 7300000LL) &&
-           later(open_files, s, 8000000LL) &&
-           later(capture_files, s, 10200000LL) &&
-           later(enter_sd, s, 10500000LL) &&
-           later(capture_sd, s, 12500000LL) &&
-           later(eval_setup, s, 13000000LL) &&
-           later(warmstart, s, 16500000LL) &&
-           later(finish_install, s, 20000000LL);
+           tap(&period_down, &period_up, 7300000LL) &&
+           tap(&enter_down, &enter_up, 7600000LL) &&
+           later(open_files, s, 8300000LL) &&
+           later(capture_files, s, 10500000LL) &&
+           later(enter_sd, s, 10800000LL) &&
+           later(capture_sd, s, 12800000LL) &&
+           later(eval_setup, s, 13300000LL) &&
+           later(warmstart, s, 16800000LL) &&
+           later(finish_install, s, 20300000LL);
 }
 
 static int schedule_run(struct state *s)
