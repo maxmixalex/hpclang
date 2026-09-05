@@ -102,7 +102,7 @@ Steps:
 8. [ ] verify HP39g+ outer-launcher/model differences;
 9. [x] build a dedicated HP40gs model-3 hardware-validation artifact in CI;
 10. [x] execute model 3 on official HP40gs 2.22 ROM in the true-ARM x50ng backend and validate canonical HPC1 entry/runtime/return;
-11. [ ] execute the stock HP40gs Aplet/ARMToolbox outer path (or the same package on real hardware) to close sibling shell integration.
+11. [ ] automate the stock HP39gs and HP40gs Aplet/ARMToolbox outer path from deterministic post-transfer fixtures and validate return;
 
 The real HP39gs is the authoritative execution gate for the HP39/40 family.
 HP39gs and HP40gs use the same 75 MHz S3C2410A/ARM920T platform, 256 KiB RAM
@@ -121,8 +121,11 @@ The split is now:
 - real HP39gs hardware proves the stock HP39 Aplet/ARMToolbox outer path;
 - official HP39gs and HP40gs ROMs in x50ng prove the common ARM execution path
   independently for model 2 and model 3;
-- the remaining HP40gs family-specific gate is the stock Aplet/ARMToolbox outer
-  launcher itself, not the canonical runtime.
+- the emulator Stock tier will start from deterministic post-transfer Aplet
+  fixtures, then drive the stock APLET UI and outer launcher entirely through
+  the calculator key matrix;
+- Conn3x/USB/serial host transport is kept separate from the runtime gate unless
+  x50ng gains a maintained host transport suitable for reliable automation.
 
 The first hardware run reached `HPC1 PASS` and therefore validated the complete
 stock-Aplet -> ARMToolbox stage0 -> stage1 -> common bootstrap -> HPC1 entry
@@ -185,7 +188,7 @@ Completion criterion:
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: complete for the common ARM execution path on HP39gs, HP40gs and HP50g-class ROMs**
+**Status: canonical matrix complete on HP39gs, HP40gs and HP50g; stock-shell matrix expansion in progress**
 
 The x50ng CI gate now proves, unattended:
 
@@ -215,9 +218,9 @@ SWI vector         0x0003f568 (restored)
 IFSR / IFAR        0 / 0
 ```
 
-This milestone intentionally stops at the normalized ARM launch boundary.
-Driving the real stock 49g+/50g Saturn/System-RPL package is platform integration
-work under M5, not a requirement for the common runtime emulator gate.
+The canonical runtime gate intentionally stops at the normalized ARM launch
+boundary. Stock shell/launcher automation is a separate E2E tier so a broken
+calculator menu path cannot be confused with a common-runtime regression.
 
 Completion criterion:
 

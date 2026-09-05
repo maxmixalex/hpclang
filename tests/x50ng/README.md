@@ -1,27 +1,31 @@
 # x50ng headless ARM execution backend
 
-CI checks out a pinned external x50ng revision, replaces only its UI entry point
-with the test frontend in this directory, boots official 49g+/50g ARM firmware,
-reads the emulated LCD controller directly and writes a 131x80 screenshot.
+CI checks out a pinned external x50ng revision and replaces only its UI entry
+point with a headless test frontend from this directory. The tests read the
+emulated LCD controller directly and drive the calculator key matrix directly.
 
-No GTK, SDL, Xvfb, mouse automation or screen-coordinate automation is used at
-runtime. x50ng remains an external emulator/test dependency; none of its GPL
-implementation is copied into hpclang's production runtime.
+No GTK/SDL window automation, Xvfb, mouse coordinates or host-screen scraping is
+used at runtime. x50ng remains an external emulator/test dependency; none of
+its GPL implementation is copied into hpclang's production runtime.
 
-The automated gate now boots the official stock firmware to HOME, enters the
-hpclang stage0/stage1/common bootstrap as guest ARM code, runs the same
-canonical HPC1 runtime image used on real HP39gs hardware, observes
-machine-readable `0x50415353`, and captures the live `RUNTIME PASS` LCD.
+The public E2E workflows are organized by semantics:
 
-The normalized ARM gate is complete through PASS and stock-OS resume.
+- `E2E / ROM boot`: official-ROM boot sanity checks;
+- `E2E / Canonical`: the common HPC1 execution/return gate;
+- `E2E / Stock`: the real calculator shell/launcher path.
 
-A second stock-launcher gate is intentionally separate. It mounts a calculator
-SD directory containing ARMToolbox SETUP.BIN and a normal Launcher-V3 .hp
-object, then drives only the calculator key matrix. It must eventually prove
-the stock System-RPL/ARMToolbox memory packer creates the ARMSYS state consumed
-by the same hpclang stage0.
+`E2E / Canonical` currently runs one matrix over HP39gs, HP40gs and HP50g.
+All three execute the same canonical HPC1 runtime suite, with only the target
+model/firmware adapter differing.
 
-The Little-Apple bring-up uses the same hardware-level emulator core only as a
-starting point. It boots official HP39gs/HP40gs update images and records the
-first hardware/firmware boundary that differs; no Saturn-only emulator is part
-of this path.
+The HP50g stock gate mounts a host directory as calculator SD storage, installs
+ARMToolbox through the stock File Manager, and drives the stock
+LIB -> ARMToolbox -> PrRUN path. Its input sequence is stored separately under
+`tests/e2e/sequences/`.
+
+For HP39gs/HP40gs, the same stock-shell tier will use deterministic post-transfer
+fixtures because x50ng does not currently expose a host Conn3x transport. The
+stock Aplet UI and launcher remain part of the E2E; the file-transfer protocol
+does not need to be a runtime regression gate.
+
+See `tests/e2e/README.md` for the test-layer contract and sequence format.
