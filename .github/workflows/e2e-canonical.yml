@@ -88,7 +88,21 @@ jobs:
         with:
           path: build/x50ng/dist
           key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
-      - name: Ensure x50ng dependencies
+      - name: Ensure x50ng runtime dependencies
+        run: |
+          packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
+              || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+
+      - name: Install x50ng build dependencies
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
         run: |
           packages=(libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev)
           missing=()
