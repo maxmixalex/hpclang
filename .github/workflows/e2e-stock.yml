@@ -208,14 +208,18 @@ jobs:
           python3 tools/pgm-to-summary.py \
             --image-only \
             --image-out build/stock-summary.png \
-            build/stock-install-port-number.pgm \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled.pgm \
-            build/stock-install-recalled-home.pgm \
-            build/stock-install-evaluated.pgm \
+            build/stock-install-copy-destination.pgm \
+            build/stock-install-copy-result.pgm \
+            build/stock-install-home-after-copy.pgm \
+            build/stock-install-port-number.pgm \
+            build/stock-install-vars.pgm \
+            build/stock-install-setup-executed.pgm \
             build/stock-install-warmstart.pgm \
+            build/stock-install-lib.pgm \
+            build/stock-install-port2.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
@@ -241,14 +245,18 @@ jobs:
             --image-file build/stock-summary.png \
             --json build/stock-install.json \
             --json build/stock-run.json \
-            build/stock-install-port-number.pgm \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled.pgm \
-            build/stock-install-recalled-home.pgm \
-            build/stock-install-evaluated.pgm \
+            build/stock-install-copy-destination.pgm \
+            build/stock-install-copy-result.pgm \
+            build/stock-install-home-after-copy.pgm \
+            build/stock-install-port-number.pgm \
+            build/stock-install-vars.pgm \
+            build/stock-install-setup-executed.pgm \
             build/stock-install-warmstart.pgm \
+            build/stock-install-lib.pgm \
+            build/stock-install-port2.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
