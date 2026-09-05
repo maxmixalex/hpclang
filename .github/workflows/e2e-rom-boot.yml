@@ -63,6 +63,7 @@ jobs:
         run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-little-apple-source.txt
       - name: Fetch bootloader and official Little-Apple ROM
         run: |
+          find build/x50ng/dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
           make -C build/x50ng/dist/firmware bootloaders
           curl -L "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
           unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" "$HPCLANG_E2E_MEMBER" > build/little-apple.bin
