@@ -42,8 +42,8 @@ def main() -> None:
         replace_once(
             root / "src" / "module.c",
             "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
-            "    /* hpclang E2E reserved RAM. */\\n"
-            "    phys_ram_size += 0x00100000;\\n\\n"
+            "    /* hpclang E2E reserved RAM. */\n"
+            "    phys_ram_size += 0x00100000;\n\n"
             "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
             "reserved RAM",
         )
