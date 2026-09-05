@@ -10,13 +10,14 @@ its GPL implementation is copied into hpclang's production runtime.
 
 The public E2E workflows are organized by semantics:
 
-- `E2E / ROM boot`: official-ROM boot sanity checks;
-- `E2E / Canonical`: the common HPC1 execution/return gate;
-- `E2E / Stock`: the real calculator shell/launcher path.
+- `E2E / Official ROM boot`: boot the unmodified HP ROM;
+- `E2E / Direct runtime`: run hpclang directly, bypassing calculator menus;
+- `E2E / Full HP50g launch`: install and launch hpclang through the normal
+  HP50g UI and ARMToolbox.
 
-`E2E / Canonical` currently runs one matrix over HP39gs, HP40gs and HP50g.
-All three execute the same canonical HPC1 runtime suite, with only the target
-model/firmware adapter differing.
+`E2E / Direct runtime` currently runs one matrix over HP39gs, HP40gs and
+HP50g. All three execute the same HPC1 runtime suite, with only the
+target/model firmware adapter differing.
 
 The HP50g stock gate mounts a host directory as calculator SD storage, installs
 ARMToolbox through the stock File Manager, and drives the stock
