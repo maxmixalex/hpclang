@@ -184,6 +184,7 @@ jobs:
         id: lcd-summary-image
         uses: actions/upload-artifact@v7
         with:
+          name: lcd-summary-${{ matrix.target }}
           path: build/${{ matrix.target }}-summary.png
           archive: false
           if-no-files-found: ignore
