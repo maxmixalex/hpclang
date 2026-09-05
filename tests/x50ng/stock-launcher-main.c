@@ -48,7 +48,9 @@ KEY_PAIR(f4, HP4950_KEY_D);
 KEY_PAIR(f5, HP4950_KEY_E);
 KEY_PAIR(f6, HP4950_KEY_F);
 KEY_PAIR(files, HP4950_KEY_G);
+KEY_PAIR(mode, HP4950_KEY_H);
 KEY_PAIR(nxt, HP4950_KEY_L);
+KEY_PAIR(neg, HP4950_KEY_W);
 KEY_PAIR(up, HP4950_KEY_UP);
 KEY_PAIR(two, HP4950_KEY_2);
 KEY_PAIR(period, HP4950_KEY_PERIOD);
@@ -322,6 +324,9 @@ static int schedule_install(struct state *s)
      */
     return tap(&f6_down, &f6_up, 2000000LL) &&
            tap(&f6_down, &f6_up, 4000000LL) &&
+           tap(&mode_down, &mode_up, 5000000LL) &&
+           tap(&neg_down, &neg_up, 5500000LL) &&
+           tap(&f6_down, &f6_up, 6000000LL) &&
            tap(&two_down, &two_up, 7000000LL) &&
            tap(&period_down, &period_up, 7300000LL) &&
            tap(&enter_down, &enter_up, 7600000LL) &&
