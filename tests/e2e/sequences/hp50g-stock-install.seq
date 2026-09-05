@@ -1,27 +1,33 @@
 # HP50g stock ARMToolbox install.
-# Keep port number 2 on the stack as an integer, enter SETUP.BIN through
-# the stock SD File Manager, and use its EVAL action. After warmstart, inspect
-# port 2 so the run proves library 275 (ARMToolbox) was actually installed.
+# Follow the hardware-proven HPGCC path: copy SETUP.BIN from SD to HOME,
+# put real 2. on level 1, execute SETUP.BIN from VAR, then warmstart ON+C.
 2000 tap f6
 4000 tap f6
 5000 tap mode
 5500 tap neg
 6000 tap f6
-6300 tap two
-6600 tap enter
-7500 capture install-home
-8000 chord lshift files
-10200 capture files
-10500 tap up
-10800 tap f6
-12800 capture sd
-13300 tap enter
-14100 capture sd-setup
-14600 tap f5
-16500 capture setup-eval
-17500 chord on f3
-19500 chord rshift two
-20750 capture install-lib
-21100 tap f3
-22400 capture install-port2
-22800 finish-install
+7000 chord lshift files
+9200 capture files
+9500 tap up
+9800 tap f6
+11500 capture sd
+12000 tap enter
+12800 capture sd-setup
+13200 tap f2
+14200 capture copy-destination
+14500 tap down
+14800 tap f6
+16600 capture copy-result
+17100 tap on
+18000 capture home-after-copy
+18500 tap two
+18800 tap period
+19100 tap enter
+19900 capture port-number
+20400 tap var
+21500 capture vars
+21900 tap f1
+23500 capture setup-executed
+24500 chord on f3
+26500 capture warmstart
+27500 finish-install
