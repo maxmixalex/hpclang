@@ -173,6 +173,18 @@ static void fail(struct state *s, const char *why)
     hdw_stop(s->hdw);
 }
 
+static void mark_setup(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&enter_down, &enter_up, 0))
+        fail(s, "setup-mark-key");
+}
+
+static void capture_marked_setup(void *arg)
+{
+    capture_named(arg, "sd-marked");
+}
+
 static void copy_setup(void *arg)
 {
     struct state *s = arg;
@@ -390,15 +402,17 @@ static int schedule_install(struct state *s)
            later(capture_files, s, 10500000LL) &&
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
-           later(copy_setup, s, 13300000LL) &&
-           later(select_copy_home, s, 14300000LL) &&
-           later(cancel_filer, s, 16500000LL) &&
-           later(capture_home_after_copy, s, 17500000LL) &&
-           later(open_vars, s, 18000000LL) &&
-           later(run_setup_var, s, 19500000LL) &&
-           later(capture_setup_eval, s, 22000000LL) &&
-           later(warmstart, s, 24500000LL) &&
-           later(finish_install, s, 28000000LL);
+           later(mark_setup, s, 13300000LL) &&
+           later(capture_marked_setup, s, 14100000LL) &&
+           later(copy_setup, s, 14500000LL) &&
+           later(select_copy_home, s, 15500000LL) &&
+           later(cancel_filer, s, 17700000LL) &&
+           later(capture_home_after_copy, s, 18700000LL) &&
+           later(open_vars, s, 19200000LL) &&
+           later(run_setup_var, s, 20700000LL) &&
+           later(capture_setup_eval, s, 23200000LL) &&
+           later(warmstart, s, 25700000LL) &&
+           later(finish_install, s, 29200000LL);
 }
 
 static int schedule_run(struct state *s)
