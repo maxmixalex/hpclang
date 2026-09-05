@@ -18,7 +18,6 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
-      - ".github/actions/setup-apt/**"
       - "tools/armtoolbox-wrap.py"
       - "tools/inspect-armtoolbox-envelope.py"
       - "tools/pgm-to-summary.py"
@@ -35,13 +34,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup host build dependencies
-        uses: ./.github/actions/setup-apt
-        with:
-          packages: >-
-            build-essential git pkg-config unzip curl wget xz-utils python3
-            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
