@@ -84,18 +84,22 @@ jobs:
 
       - name: Restore x50ng build cache
         id: x50ng-cache
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
           key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
-          save-always: true
-
-      - name: Install x50ng build dependencies
-        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      - name: Ensure x50ng dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+          packages=(libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
+              || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -106,6 +110,13 @@ jobs:
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
         working-directory: build/x50ng
         run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Save x50ng build cache
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/x50ng/dist
+          key: ${{ steps.x50ng-cache.outputs.cache-primary-key }}
 
       - name: Record x50ng source
         run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-canonical-source.txt
