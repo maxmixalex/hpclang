@@ -54,6 +54,7 @@ jobs:
       X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp50g' && 'hp4950' || 'little-apple' }}
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         target: [hp39gs, hp40gs, hp50g]
 
@@ -105,7 +106,7 @@ jobs:
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
         working-directory: build/x50ng
-        run: make -j"$(nproc)" WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
       - name: Record x50ng source
         run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-canonical-source.txt
