@@ -1,0 +1,15 @@
+# HP50g stock ARMToolbox launch probe.
+# The preserved state should contain ARMToolbox and SD contains only HPCLANG.HP.
+# This still stops at port 2 until the install sequence proves ARMToolbox exists.
+2000 chord lshift files
+4200 capture files
+4500 tap up
+4800 tap f6
+6500 capture sd
+7000 tap f4
+8200 tap on
+9000 chord rshift two
+10250 capture lib
+10300 tap f3
+11600 capture port2
+11700 fail port2-after-real-install-probe

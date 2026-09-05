@@ -1,0 +1,21 @@
+# HP50g stock ARMToolbox install probe.
+# Format: <absolute-ms> <tap|chord|capture|fail|monitor|finish-install> [args...]
+# The destination picker defaults to HOME. 3:SD is the source volume, so the
+# sequence confirms immediately instead of moving DOWN first.
+2000 tap f6
+4000 tap f6
+5000 tap mode
+5500 tap neg
+6000 tap f6
+7000 chord lshift files
+9200 capture files
+9500 tap up
+9800 tap f6
+11500 capture sd
+12000 tap enter
+12800 capture sd-setup
+13200 tap f2
+14200 capture copy
+14500 tap f6
+16500 capture copy-result
+16600 fail copy-result-probe

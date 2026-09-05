@@ -62,6 +62,31 @@ KEY_PAIR(on, HP4950_KEY_ON);
 KEY_PAIR(lshift, HP4950_KEY_LEFTSHIFT);
 KEY_PAIR(rshift, HP4950_KEY_RIGHTSHIFT);
 
+struct key_pair_ref {
+    const char *name;
+    const struct key_action *down;
+    const struct key_action *up;
+};
+
+#define KEY_REF(name) { #name, &name##_down, &name##_up }
+static const struct key_pair_ref key_pairs[] = {
+    KEY_REF(f1), KEY_REF(f2), KEY_REF(f3), KEY_REF(f4), KEY_REF(f5), KEY_REF(f6),
+    KEY_REF(files), KEY_REF(mode), KEY_REF(var), KEY_REF(eval), KEY_REF(nxt),
+    KEY_REF(neg), KEY_REF(up), KEY_REF(down), KEY_REF(two), KEY_REF(period),
+    KEY_REF(enter), KEY_REF(on), KEY_REF(lshift), KEY_REF(rshift),
+};
+#undef KEY_REF
+
+static const struct key_pair_ref *find_key_pair(const char *name)
+{
+    size_t n = sizeof(key_pairs) / sizeof(key_pairs[0]);
+    for (size_t i = 0; i < n; ++i) {
+        if (strcmp(key_pairs[i].name, name) == 0)
+            return &key_pairs[i];
+    }
+    return NULL;
+}
+
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
     hdw_timer_t *t = timer_new(HDW_TIMER_REALTIME, fn, arg);
@@ -173,124 +198,6 @@ static void fail(struct state *s, const char *why)
     hdw_stop(s->hdw);
 }
 
-static void enter_fat_storage(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&enter_down, &enter_up, 0))
-        fail(s, "fat-storage-enter-key");
-}
-
-static void capture_setup_file(void *arg)
-{
-    capture_named(arg, "sd-setup");
-}
-
-static void capture_copy_result(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "copy-result");
-    fail(s, "copy-result-probe");
-}
-
-static void rcl_setup(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&f4_down, &f4_up, 0))
-        fail(s, "setup-rcl-key");
-}
-
-static void copy_setup(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&f2_down, &f2_up, 0))
-        fail(s, "setup-copy-key");
-}
-
-static void select_copy_home(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "copy");
-    if (!tap(&down_down, &down_up, 0) ||
-        !tap(&f6_down, &f6_up, 300000))
-        fail(s, "setup-copy-home-key");
-}
-
-static void capture_home_after_copy(void *arg)
-{
-    capture_named(arg, "home-after-copy");
-}
-
-static void open_vars(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&var_down, &var_up, 0))
-        fail(s, "setup-var-key");
-}
-
-static void run_setup_var(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "vars");
-    if (!tap(&f1_down, &f1_up, 0))
-        fail(s, "setup-var-f1");
-}
-
-static void open_files(void *arg)
-{
-    struct state *s = arg;
-    if (!chord(&lshift_down, &files_down, &files_up, &lshift_up, 0))
-        fail(s, "files-key");
-}
-
-static void enter_sd(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&up_down, &up_up, 0) ||
-        !tap(&f6_down, &f6_up, 300000))
-        fail(s, "sd-key");
-}
-
-static void capture_files(void *arg)
-{
-    capture_named(arg, "files");
-}
-
-static void capture_sd(void *arg)
-{
-    capture_named(arg, "sd");
-}
-
-static void eval_setup(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&f5_down, &f5_up, 0))
-        fail(s, "setup-eval-key");
-}
-
-static void capture_setup_stack(void *arg)
-{
-    capture_named(arg, "setup-stack");
-}
-
-static void capture_setup_eval(void *arg)
-{
-    capture_named(arg, "setup-eval");
-}
-
-static void eval_home(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&eval_down, &eval_up, 0))
-        fail(s, "home-eval-key");
-}
-
-static void warmstart(void *arg)
-{
-    struct state *s = arg;
-    if (!chord(&on_down, &f3_down, &f3_up, &on_up, 0))
-        fail(s, "warmstart-key");
-}
-
 static void finish_install(void *arg)
 {
     struct state *s = arg;
@@ -301,52 +208,6 @@ static void finish_install(void *arg)
     }
     write_json(s, "installed");
     hdw_stop(s->hdw);
-}
-
-static void rcl_payload(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&f4_down, &f4_up, 0))
-        fail(s, "payload-rcl-key");
-}
-
-static void cancel_filer(void *arg)
-{
-    struct state *s = arg;
-    if (!tap(&on_down, &on_up, 0))
-        fail(s, "filer-cancel-key");
-}
-
-static void open_lib(void *arg)
-{
-    struct state *s = arg;
-    if (!chord(&rshift_down, &two_down, &two_up, &rshift_up, 0))
-        fail(s, "lib-key");
-}
-
-static void choose_port2(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "lib");
-    if (!tap(&f3_down, &f3_up, 0))
-        fail(s, "lib-port2-key");
-}
-
-static void choose_armtoolbox(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "port2");
-    fail(s, "port2-after-real-install-probe");
-}
-
-static void run_prrun(void *arg)
-{
-    struct state *s = arg;
-    capture_named(s, "armtoolbox");
-    if (!tap(&f1_down, &f1_up, 0))
-        fail(s, "prrun-key");
-    else
-        s->deadline = timer_get_clock() + RUN_DEADLINE_US;
 }
 
 static void finish_run(void *arg)
@@ -398,52 +259,125 @@ static void monitor(void *arg)
         fail(s, "monitor-timer");
 }
 
-static int schedule_install(struct state *s)
+struct seq_named_event {
+    struct state *state;
+    char text[96];
+};
+
+static struct seq_named_event *seq_named_event_new(
+    struct state *s, const char *text)
 {
-    /*
-     * Probe the stock FAT -> HOME copy conversion. SETUP.BIN must become a
-     * native HOME object before ARMToolbox's installer can execute.
-     */
-    return tap(&f6_down, &f6_up, 2000000LL) &&
-           tap(&f6_down, &f6_up, 4000000LL) &&
-           tap(&mode_down, &mode_up, 5000000LL) &&
-           tap(&neg_down, &neg_up, 5500000LL) &&
-           tap(&f6_down, &f6_up, 6000000LL) &&
-           later(open_files, s, 7000000LL) &&
-           later(capture_files, s, 9200000LL) &&
-           later(enter_sd, s, 9500000LL) &&
-           later(capture_sd, s, 11500000LL) &&
-           later(enter_fat_storage, s, 12000000LL) &&
-           later(capture_setup_file, s, 12800000LL) &&
-           later(copy_setup, s, 13200000LL) &&
-           later(select_copy_home, s, 14200000LL) &&
-           later(capture_copy_result, s, 16500000LL);
+    struct seq_named_event *event = calloc(1, sizeof(*event));
+    if (!event) return NULL;
+    snprintf(event->text, sizeof(event->text), "%s", text);
+    event->state = s;
+    return event;
 }
 
-static int schedule_run(struct state *s)
+static void seq_capture(void *arg)
 {
-    /*
-     * The preserved calculator already has ARMToolbox installed. SD contains
-     * only HPCLANG.HP, so the File Manager selection is deterministic.
-     * RCL it, then use the stock LIB -> ARMToolbox -> PrRUN path.
-     */
-    return later(open_files, s, 2000000LL) &&
-           later(capture_files, s, 4200000LL) &&
-           later(enter_sd, s, 4500000LL) &&
-           later(capture_sd, s, 6500000LL) &&
-           later(rcl_payload, s, 7000000LL) &&
-           later(cancel_filer, s, 8200000LL) &&
-           later(open_lib, s, 9000000LL) &&
-           later(choose_port2, s, 10300000LL) &&
-           later(choose_armtoolbox, s, 11600000LL) &&
-           later(run_prrun, s, 13000000LL) &&
-           later(monitor, s, 13200000LL);
+    struct seq_named_event *event = arg;
+    capture_named(event->state, event->text);
+    free(event);
+}
+
+static void seq_fail(void *arg)
+{
+    struct seq_named_event *event = arg;
+    struct state *s = event->state;
+    char why[sizeof(event->text)];
+    snprintf(why, sizeof(why), "%s", event->text);
+    free(event);
+    fail(s, why);
+}
+
+static void seq_monitor(void *arg)
+{
+    struct state *s = arg;
+    s->deadline = timer_get_clock() + RUN_DEADLINE_US;
+    monitor(s);
+}
+
+static int schedule_sequence(struct state *s, const char *path)
+{
+    FILE *f = fopen(path, "r");
+    char line[256];
+    unsigned line_no = 0;
+
+    if (!f) {
+        fprintf(stderr, "cannot open E2E sequence %s\\n", path);
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long long ms = 0;
+        char op[32] = {0};
+        char first[96] = {0};
+        char second[96] = {0};
+        char *p = line;
+        int fields;
+        int64_t us;
+
+        ++line_no;
+        while (*p == ' ' || *p == '\\t') ++p;
+        if (*p == '\\0' || *p == '\\n' || *p == '#')
+            continue;
+
+        fields = sscanf(p, "%llu %31s %95s %95s",
+                        &ms, op, first, second);
+        if (fields < 2 || ms > 600000ULL) {
+            fprintf(stderr, "%s:%u: invalid sequence line\\n", path, line_no);
+            fclose(f);
+            return 0;
+        }
+        us = (int64_t)ms * 1000LL;
+
+        if (strcmp(op, "tap") == 0 && fields == 3) {
+            const struct key_pair_ref *key = find_key_pair(first);
+            if (!key || !tap(key->down, key->up, us))
+                goto invalid_action;
+        } else if (strcmp(op, "chord") == 0 && fields == 4) {
+            const struct key_pair_ref *mod = find_key_pair(first);
+            const struct key_pair_ref *key = find_key_pair(second);
+            if (!mod || !key || !chord(
+                    mod->down, key->down, key->up, mod->up, us))
+                goto invalid_action;
+        } else if (strcmp(op, "capture") == 0 && fields == 3) {
+            struct seq_named_event *event = seq_named_event_new(s, first);
+            if (!event || !later(seq_capture, event, us)) {
+                free(event);
+                goto invalid_action;
+            }
+        } else if (strcmp(op, "fail") == 0 && fields == 3) {
+            struct seq_named_event *event = seq_named_event_new(s, first);
+            if (!event || !later(seq_fail, event, us)) {
+                free(event);
+                goto invalid_action;
+            }
+        } else if (strcmp(op, "monitor") == 0 && fields == 2) {
+            if (!later(seq_monitor, s, us))
+                goto invalid_action;
+        } else if (strcmp(op, "finish-install") == 0 && fields == 2) {
+            if (!later(finish_install, s, us))
+                goto invalid_action;
+        } else {
+invalid_action:
+            fprintf(stderr, "%s:%u: invalid E2E action: %s",
+                    path, line_no, line);
+            fclose(f);
+            return 0;
+        }
+    }
+
+    fclose(f);
+    return 1;
 }
 
 int main(int argc, char **argv)
 {
     struct state s;
     const char *mode = getenv("HPCLANG_STOCK_MODE");
+    const char *sequence = getenv("HPCLANG_E2E_SEQUENCE");
     const char *result_text = getenv("HPCLANG_STOCK_RESULT_ADDR");
     char *end = NULL;
 
@@ -471,11 +405,12 @@ int main(int argc, char **argv)
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    int ok = s.mode == MODE_INSTALL
-        ? schedule_install(&s)
-        : schedule_run(&s);
-    if (!ok) {
-        fprintf(stderr, "cannot schedule stock launcher actions\n");
+    if (!sequence) {
+        fprintf(stderr, "missing HPCLANG_E2E_SEQUENCE\\n");
+        return EXIT_FAILURE;
+    }
+    if (!schedule_sequence(&s, sequence)) {
+        fprintf(stderr, "cannot schedule stock launcher sequence\\n");
         return EXIT_FAILURE;
     }
 
