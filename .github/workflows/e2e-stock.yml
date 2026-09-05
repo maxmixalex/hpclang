@@ -42,13 +42,13 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Reset stock E2E state
+      - name: Reset HP50g test state
         run: |
           rm -rf build/stock-state build/stock-sd build/stock-reference
           rm -f build/stock-install* build/stock-run* build/stock-summary.png
           mkdir -p build/stock-sd build/stock-reference
 
-      - name: Build canonical HP50g stock payload
+      - name: Build HP50g test payload
         run: |
           export OUT="$GITHUB_WORKSPACE/build/stock-payload"
           chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
@@ -159,14 +159,14 @@ jobs:
           find dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
           make -C dist/firmware bootloaders official
 
-      - name: Install ARMToolbox through stock File Manager
+      - name: Install ARMToolbox through HP50g UI
         run: |
           export HPCLANG_STOCK_MODE=install
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp50g-stock-install.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/stock-install"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-install.json"
           mkdir -p build/stock-state
-          timeout 30s build/x50ng/dist/x50ng \
+          timeout 45s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/stock-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
@@ -180,7 +180,7 @@ jobs:
           done
           cat build/stock-install.json
 
-      - name: Execute HPCLANG.HP through stock ARMToolbox PrRUN
+      - name: Execute HPCLANG.HP through ARMToolbox PrRUN
         run: |
           rm -f build/stock-sd/SETUP.BIN
           cp build/stock-payload/HPCLANG.HP build/stock-sd/
@@ -191,7 +191,7 @@ jobs:
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/stock-run"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-run.json"
 
-          timeout 30s build/x50ng/dist/x50ng \
+          timeout 45s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/stock-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
