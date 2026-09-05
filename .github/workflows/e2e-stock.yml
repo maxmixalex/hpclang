@@ -33,7 +33,7 @@ jobs:
     runs-on: home-docker
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
@@ -58,7 +58,7 @@ jobs:
             build/stock-payload/HPCLANG.HP
 
       - name: Restore hpcalc download cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/hpcalc
           key: hpclang-hpcalc-static-v1
@@ -86,7 +86,7 @@ jobs:
 
       - name: Restore x50ng build cache
         id: x50ng-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/x50ng/dist
           key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
@@ -188,7 +188,7 @@ jobs:
 
       - name: Upload stock launcher evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: x50ng-stock-armtoolbox-e2e
           path: |
