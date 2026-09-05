@@ -228,23 +228,13 @@ jobs:
             build/stock-run-returned.pgm \
             build/stock-run-failure.pgm
 
-      - name: Upload LCD summary image
-        if: always()
-        id: lcd-summary-image
-        uses: actions/upload-artifact@v7
-        with:
-          path: build/stock-summary.png
-          archive: false
-          if-no-files-found: ignore
 
       - name: Add LCD evidence to job summary
         if: always()
-        env:
-          IMAGE_URL: ${{ steps.lcd-summary-image.outputs.artifact-url }}
         run: |
           python3 tools/pgm-to-summary.py \
             --heading "HP50g stock ARMToolbox E2E" \
-            --image-url "$IMAGE_URL" \
+            --image-file build/stock-summary.png \
             --json build/stock-install.json \
             --json build/stock-run.json \
             build/stock-install-files.pgm \
