@@ -156,7 +156,7 @@ jobs:
         run: |
           IMAGE_URL=""
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            IMAGE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-evidence/official-rom-boot/$GITHUB_RUN_ID/$TARGET.png"
+            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/official-rom-boot/$GITHUB_RUN_ID/$TARGET.png?raw=1"
           fi
           python3 tools/pgm-to-summary.py \
             --heading "$TARGET official HP ROM boot" \
