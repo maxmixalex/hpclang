@@ -155,7 +155,7 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Status: canonical HPC1 execution and return validated in x50ng; real stock package/launcher path pending**
+**Status: canonical HPC1 execution and return validated in x50ng; stock ARMToolbox package/launcher E2E is the active blocker**
 
 Completed on x50ng:
 
@@ -169,9 +169,20 @@ Completed on x50ng:
 
 Remaining:
 
-- [ ] replace the synthetic normalized ARMSYS/page-pool preparation with the
-  real stock 49g+/50g package/launcher path;
+- [ ] close the stock HP50g ARMToolbox installation and PrRUN path against the
+  official 2.15 ROM in x50ng;
+- [ ] prove that the stock-installed ARMToolbox library launches the same
+  HPCLANG.HP transfer object and reaches canonical HPC1 PASS/return;
+- [ ] replace the synthetic normalized ARMSYS/page-pool preparation as the
+  supported launcher gate once the stock path is green;
 - [ ] validate on real hardware when useful.
+
+Current stock-E2E evidence already proves the HP transfer envelope, SD file
+visibility, SD -> HOME materialization and deterministic stock-ROM key driving.
+The remaining uncertainty is calculator-side ARMToolbox installation/selection
+and PrRUN invocation, not the common HPC1 runtime or bootstrap. CI now clears
+self-hosted x50ng state between runs so only the install -> execute phases inside
+one job may share calculator state.
 
 The first synthetic return failure was test-harness-induced rather than an
 hpclang bootstrap defect. HP's stock layout keeps the LCD framebuffer in the
@@ -188,7 +199,7 @@ Completion criterion:
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: canonical matrix complete on HP39gs, HP40gs and HP50g; stock-shell matrix expansion in progress**
+**Status: canonical matrix and official-ROM boot gates complete; HP50g stock-shell gate in progress**
 
 The x50ng CI gate now proves, unattended:
 
@@ -221,6 +232,18 @@ IFSR / IFAR        0 / 0
 The canonical runtime gate intentionally stops at the normalized ARM launch
 boundary. Stock shell/launcher automation is a separate E2E tier so a broken
 calculator menu path cannot be confused with a common-runtime regression.
+
+Current CI status:
+
+- HP39gs / HP40gs / HP50g canonical HPC1 matrix: PASS;
+- official HP39gs / HP40gs ROM boot matrix: PASS;
+- HP50g stock-ROM ARMToolbox path: transfer/materialization proven, launcher
+  installation/PrRUN still open;
+- GitHub Actions are on the current major generations used by this repository
+  (`checkout@v7`, `cache@v6`, `upload-artifact@v7`);
+- self-hosted `home-docker` is kept runner-compatible with GitHub-hosted
+  Ubuntu for baseline tools, while project-specific packages remain installed
+  by workflows.
 
 Completion criterion:
 
