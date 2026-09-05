@@ -132,6 +132,7 @@ jobs:
             --json build/stock-run.json \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
+            build/stock-install-copy.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
