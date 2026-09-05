@@ -25,7 +25,7 @@
 17750 capture lib
 18100 tap f3
 19400 capture port2
-19800 tap f1
+19800 tap f4
 21100 capture armtoolbox
 21500 tap f1
 21800 monitor
