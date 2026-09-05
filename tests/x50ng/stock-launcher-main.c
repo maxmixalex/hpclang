@@ -185,6 +185,13 @@ static void capture_setup_file(void *arg)
     capture_named(arg, "sd-setup");
 }
 
+static void capture_copy_result(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "copy-result");
+    fail(s, "copy-result-probe");
+}
+
 static void rcl_setup(void *arg)
 {
     struct state *s = arg;
@@ -394,31 +401,23 @@ static void monitor(void *arg)
 static int schedule_install(struct state *s)
 {
     /*
-     * Fresh stock 2.15 ROM: dismiss recovery/memory-clear, put real port 2.
-     * on the stack, enter the SD FAT storage object, RCL SETUP.BIN, then EVAL.
-     * ARMToolbox's SETUP consumes the port number already below it.
+     * Probe the stock FAT -> HOME copy conversion. SETUP.BIN must become a
+     * native HOME object before ARMToolbox's installer can execute.
      */
     return tap(&f6_down, &f6_up, 2000000LL) &&
            tap(&f6_down, &f6_up, 4000000LL) &&
            tap(&mode_down, &mode_up, 5000000LL) &&
            tap(&neg_down, &neg_up, 5500000LL) &&
            tap(&f6_down, &f6_up, 6000000LL) &&
-           tap(&two_down, &two_up, 7000000LL) &&
-           tap(&period_down, &period_up, 7300000LL) &&
-           tap(&enter_down, &enter_up, 7600000LL) &&
-           later(open_files, s, 8300000LL) &&
-           later(capture_files, s, 10500000LL) &&
-           later(enter_sd, s, 10800000LL) &&
-           later(capture_sd, s, 12800000LL) &&
-           later(enter_fat_storage, s, 13300000LL) &&
-           later(capture_setup_file, s, 14100000LL) &&
-           later(rcl_setup, s, 14500000LL) &&
-           later(cancel_filer, s, 15700000LL) &&
-           later(capture_setup_stack, s, 16500000LL) &&
-           later(eval_home, s, 17000000LL) &&
-           later(capture_setup_eval, s, 19500000LL) &&
-           later(warmstart, s, 22000000LL) &&
-           later(finish_install, s, 25500000LL);
+           later(open_files, s, 7000000LL) &&
+           later(capture_files, s, 9200000LL) &&
+           later(enter_sd, s, 9500000LL) &&
+           later(capture_sd, s, 11500000LL) &&
+           later(enter_fat_storage, s, 12000000LL) &&
+           later(capture_setup_file, s, 12800000LL) &&
+           later(copy_setup, s, 13200000LL) &&
+           later(select_copy_home, s, 14200000LL) &&
+           later(capture_copy_result, s, 16500000LL);
 }
 
 static int schedule_run(struct state *s)
