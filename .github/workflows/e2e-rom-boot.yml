@@ -148,17 +148,8 @@ jobs:
         if: always()
         env:
           TARGET: ${{ matrix.target }}
-          ARTIFACT_ID: ${{ steps.lcd-summary-image.outputs.artifact-id }}
-          GH_TOKEN: ${{ github.token }}
-          API_URL: ${{ github.api_url }}
-          REPOSITORY: ${{ github.repository }}
+          IMAGE_URL: ${{ steps.lcd-summary-image.outputs.artifact-url }}
         run: |
-          IMAGE_URL=""
-          if [ -n "$ARTIFACT_ID" ]; then
-            IMAGE_URL="$(curl -fLsS -o /dev/null -w '%{url_effective}' \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              "$API_URL/repos/$REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" || true)"
-          fi
           python3 tools/pgm-to-summary.py \
             --heading "$TARGET official-ROM boot" \
             --image-url "$IMAGE_URL" \
