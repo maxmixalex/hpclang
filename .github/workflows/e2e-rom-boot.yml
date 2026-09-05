@@ -7,6 +7,8 @@ on:
       - "tests/x50ng/little-apple-boot-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tools/pgm-to-summary.py"
+      - "tools/e2e-target-env.py"
+      - "tests/e2e/targets/**"
       - ".github/workflows/e2e-rom-boot.yml"
 
 jobs:
@@ -17,16 +19,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: hp39gs
-            archive: hp39gs222.zip
-            member: HP39GS_2.22/hp39gs_v2.22.bin
-          - target: hp40gs
-            archive: hp40gs222.zip
-            member: HP40GS_2.22/hp40gs_v2.22.bin
+        target: [hp39gs, hp40gs]
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load target profile
+        run: python3 tools/e2e-target-env.py "tests/e2e/targets/${{ matrix.target }}.json" >> "$GITHUB_ENV"
 
       - name: Install build dependencies
         run: |
@@ -64,8 +63,8 @@ jobs:
 
       - name: Fetch bootloader and official Little-Apple ROM
         env:
-          ARCHIVE: ${{ matrix.archive }}
-          MEMBER: ${{ matrix.member }}
+          ARCHIVE: ${{ env.HPCLANG_E2E_ARCHIVE }}
+          MEMBER: ${{ env.HPCLANG_E2E_MEMBER }}
         run: |
           make -C build/x50ng/dist/firmware bootloaders
           curl -L "https://www.hpcalc.org/hp39/pc/$ARCHIVE" -o "/tmp/$ARCHIVE"
