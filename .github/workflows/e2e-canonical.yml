@@ -20,7 +20,6 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
-      - ".github/actions/setup-apt/**"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
   pull_request:
@@ -60,13 +59,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup host build dependencies
-        uses: ./.github/actions/setup-apt
-        with:
-          packages: >-
-            build-essential git pkg-config unzip curl wget xz-utils python3
-            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Load target profile
         run: python3 tools/e2e-target-env.py "tests/e2e/targets/${{ matrix.target }}.json" >> "$GITHUB_ENV"
