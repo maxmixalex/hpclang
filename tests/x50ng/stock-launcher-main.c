@@ -352,13 +352,10 @@ static int schedule_install(struct state *s)
            later(capture_files, s, 10500000LL) &&
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
-           later(rcl_payload, s, 13300000LL) &&
-           later(cancel_filer, s, 14500000LL) &&
-           later(capture_setup_stack, s, 14900000LL) &&
-           later(eval_home, s, 15300000LL) &&
-           later(capture_setup_eval, s, 17000000LL) &&
-           later(warmstart, s, 20500000LL) &&
-           later(finish_install, s, 24000000LL);
+           later(eval_setup, s, 13300000LL) &&
+           later(capture_setup_eval, s, 16500000LL) &&
+           later(warmstart, s, 20000000LL) &&
+           later(finish_install, s, 23500000LL);
 }
 
 static int schedule_run(struct state *s)
