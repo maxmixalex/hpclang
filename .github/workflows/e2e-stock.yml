@@ -38,6 +38,12 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
+      - name: Reset stock E2E state
+        run: |
+          rm -rf build/stock-state build/stock-sd build/stock-reference
+          rm -f build/stock-install* build/stock-run* build/stock-summary.png
+          mkdir -p build/stock-sd build/stock-reference
+
       - name: Build canonical HP50g stock payload
         run: |
           export OUT="$GITHUB_WORKSPACE/build/stock-payload"
