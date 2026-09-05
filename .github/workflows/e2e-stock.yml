@@ -163,21 +163,75 @@ jobs:
           done
           cat build/stock-run.json
 
-      - name: Add LCD evidence to job summary
+      - name: Generate LCD summary image
         if: always()
         run: |
           python3 tools/pgm-to-summary.py \
-            --heading "HP50g stock ARMToolbox E2E" \
-            --json build/stock-install.json \
-            --json build/stock-run.json \
+            --image-only \
+            --image-out build/stock-summary.png \
+            build/stock-install-install-home.pgm \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
-            build/stock-install-copy.pgm \
-            build/stock-install-home-after-copy.pgm \
-            build/stock-install-vars.pgm \
+            build/stock-install-sd-setup.pgm \
+            build/stock-install-setup-eval.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
+            build/stock-run-sd-payload.pgm \
+            build/stock-run-copy-destination.pgm \
+            build/stock-run-copy-result.pgm \
+            build/stock-run-home.pgm \
+            build/stock-run-vars.pgm \
+            build/stock-run-payload-recalled.pgm \
+            build/stock-run-lib.pgm \
+            build/stock-run-port2.pgm \
+            build/stock-run-armtoolbox.pgm \
+            build/stock-run-pass.pgm \
+            build/stock-run-returned.pgm \
+            build/stock-run-failure.pgm
+
+      - name: Upload LCD summary image
+        if: always()
+        id: lcd-summary-image
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/stock-summary.png
+          archive: false
+          if-no-files-found: ignore
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        env:
+          ARTIFACT_ID: ${{ steps.lcd-summary-image.outputs.artifact-id }}
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          IMAGE_URL=""
+          if [ -n "$ARTIFACT_ID" ]; then
+            IMAGE_URL="$(curl -fLsS -o /dev/null -w '%{url_effective}' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "$API_URL/repos/$REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" || true)"
+          fi
+          python3 tools/pgm-to-summary.py \
+            --heading "HP50g stock ARMToolbox E2E" \
+            --image-url "$IMAGE_URL" \
+            --json build/stock-install.json \
+            --json build/stock-run.json \
+            build/stock-install-install-home.pgm \
+            build/stock-install-files.pgm \
+            build/stock-install-sd.pgm \
+            build/stock-install-sd-setup.pgm \
+            build/stock-install-setup-eval.pgm \
+            build/stock-install-installed.pgm \
+            build/stock-run-files.pgm \
+            build/stock-run-sd.pgm \
+            build/stock-run-sd-payload.pgm \
+            build/stock-run-copy-destination.pgm \
+            build/stock-run-copy-result.pgm \
+            build/stock-run-home.pgm \
+            build/stock-run-vars.pgm \
+            build/stock-run-payload-recalled.pgm \
             build/stock-run-lib.pgm \
             build/stock-run-port2.pgm \
             build/stock-run-armtoolbox.pgm \
