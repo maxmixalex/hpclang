@@ -14,6 +14,7 @@
 9800 tap f6
 11500 capture sd
 12000 tap enter
+12400 tap down
 12800 capture sd-setup
 13200 tap f2
 14200 capture copy-destination
@@ -28,7 +29,7 @@
 19900 capture port-number
 20400 tap var
 21500 capture vars
-21900 tap f1
+21900 tap f3
 23500 capture setup-executed
 24500 chord on f3
 26500 capture warmstart
