@@ -1,15 +1,14 @@
 # HP50g stock ARMToolbox install.
-# Keep the required real port number 2. on the stack, enter SETUP.BIN through
-# the stock SD File Manager, and use its EVAL action so the firmware performs
-# the port-3 file recall/conversion before executing the installer.
+# Keep port number 2 on the stack as an integer, enter SETUP.BIN through
+# the stock SD File Manager, and use its EVAL action. After warmstart, inspect
+# port 2 so the run proves library 275 (ARMToolbox) was actually installed.
 2000 tap f6
 4000 tap f6
 5000 tap mode
 5500 tap neg
 6000 tap f6
 6300 tap two
-6600 tap period
-6900 tap enter
+6600 tap enter
 7500 capture install-home
 8000 chord lshift files
 10200 capture files
@@ -21,4 +20,8 @@
 14600 tap f5
 16500 capture setup-eval
 17500 chord on f3
-19500 finish-install
+19500 chord rshift two
+20750 capture install-lib
+21100 tap f3
+22400 capture install-port2
+22800 finish-install
