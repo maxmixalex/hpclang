@@ -19,7 +19,7 @@
 13000 capture home
 13400 tap var
 14500 capture vars
-14900 tap f1
+14900 chord rshift f1
 16000 capture payload-recalled
 16500 chord rshift two
 17750 capture lib
