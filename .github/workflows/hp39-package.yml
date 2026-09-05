@@ -47,6 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install HP39 packaging dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends innoextract
+
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
