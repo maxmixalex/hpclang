@@ -173,16 +173,23 @@ static void fail(struct state *s, const char *why)
     hdw_stop(s->hdw);
 }
 
-static void mark_setup(void *arg)
+static void enter_fat_storage(void *arg)
 {
     struct state *s = arg;
     if (!tap(&enter_down, &enter_up, 0))
-        fail(s, "setup-mark-key");
+        fail(s, "fat-storage-enter-key");
 }
 
-static void capture_marked_setup(void *arg)
+static void capture_setup_file(void *arg)
 {
-    capture_named(arg, "sd-marked");
+    capture_named(arg, "sd-setup");
+}
+
+static void rcl_setup(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&f4_down, &f4_up, 0))
+        fail(s, "setup-rcl-key");
 }
 
 static void copy_setup(void *arg)
@@ -387,8 +394,9 @@ static void monitor(void *arg)
 static int schedule_install(struct state *s)
 {
     /*
-     * Fresh stock 2.15 ROM: dismiss recovery/memory-clear, put install port 2
-     * on the stack, copy SETUP.BIN from SD to HOME, then run it from VAR.
+     * Fresh stock 2.15 ROM: dismiss recovery/memory-clear, put real port 2.
+     * on the stack, enter the SD FAT storage object, RCL SETUP.BIN, then EVAL.
+     * ARMToolbox's SETUP consumes the port number already below it.
      */
     return tap(&f6_down, &f6_up, 2000000LL) &&
            tap(&f6_down, &f6_up, 4000000LL) &&
@@ -402,17 +410,15 @@ static int schedule_install(struct state *s)
            later(capture_files, s, 10500000LL) &&
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
-           later(mark_setup, s, 13300000LL) &&
-           later(capture_marked_setup, s, 14100000LL) &&
-           later(copy_setup, s, 14500000LL) &&
-           later(select_copy_home, s, 15500000LL) &&
-           later(cancel_filer, s, 17700000LL) &&
-           later(capture_home_after_copy, s, 18700000LL) &&
-           later(open_vars, s, 19200000LL) &&
-           later(run_setup_var, s, 20700000LL) &&
-           later(capture_setup_eval, s, 23200000LL) &&
-           later(warmstart, s, 25700000LL) &&
-           later(finish_install, s, 29200000LL);
+           later(enter_fat_storage, s, 13300000LL) &&
+           later(capture_setup_file, s, 14100000LL) &&
+           later(rcl_setup, s, 14500000LL) &&
+           later(cancel_filer, s, 15700000LL) &&
+           later(capture_setup_stack, s, 16500000LL) &&
+           later(eval_home, s, 17000000LL) &&
+           later(capture_setup_eval, s, 19500000LL) &&
+           later(warmstart, s, 22000000LL) &&
+           later(finish_install, s, 25500000LL);
 }
 
 static int schedule_run(struct state *s)
