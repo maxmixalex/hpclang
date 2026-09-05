@@ -112,6 +112,7 @@ jobs:
         run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-canonical-source.txt
       - name: Fetch official firmware
         run: |
+          find build/x50ng/dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
           if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
             make -C build/x50ng/dist/firmware bootloaders
             curl -L "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
