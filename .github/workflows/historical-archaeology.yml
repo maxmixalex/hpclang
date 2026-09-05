@@ -23,6 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Subversion
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends subversion
+
       - name: Export official SourceForge tags
         run: |
           rm -rf /tmp/hpgcc11 /tmp/hpgcc20
