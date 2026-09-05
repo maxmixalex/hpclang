@@ -249,18 +249,15 @@ static void choose_armtoolbox(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "port2");
-    if (!tap(&f1_down, &f1_up, 0))
-        fail(s, "armtoolbox-key");
+    if (!tap(&nxt_down, &nxt_up, 0))
+        fail(s, "port2-next-key");
 }
 
 static void run_prrun(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "armtoolbox");
-    if (!tap(&f1_down, &f1_up, 0))
-        fail(s, "prrun-key");
-    else
-        s->deadline = timer_get_clock() + RUN_DEADLINE_US;
+    fail(s, "port2-page-probe");
 }
 
 static void finish_run(void *arg)
