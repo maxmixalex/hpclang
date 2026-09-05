@@ -17,6 +17,9 @@ on:
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
       - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - ".github/actions/setup-atfe/**"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
   pull_request:
@@ -40,7 +43,7 @@ on:
 jobs:
   canonical:
     name: ${{ matrix.target }}
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -59,69 +62,48 @@ jobs:
       - name: Load target profile
         run: python3 tools/e2e-target-env.py "tests/e2e/targets/${{ matrix.target }}.json" >> "$GITHUB_ENV"
 
-      - name: Install Arm Toolchain for Embedded 22.1.0
-        run: |
-          curl -L https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz -o /tmp/atfe.tar.xz
-          mkdir -p /tmp/atfe
-          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
 
       - name: Build canonical HPC1 and ${{ matrix.target }} stage0
         run: |
-          export ATFE=/tmp/atfe
           export OUT="$GITHUB_WORKSPACE/build/canonical"
           chmod +x tools/probe-atfe.sh
           tools/probe-atfe.sh
 
-          /tmp/atfe/bin/clang --target=arm-none-eabi -march=armv4t -marm \
+          $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" \
             -c platform/armtoolbox/stage0.S \
             -o build/canonical/stage0.o
-          /tmp/atfe/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
+          $ATFE/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
             build/canonical/stage0.o build/canonical/stage0-bundle.o \
             -o build/canonical/stage0.elf
-          /tmp/atfe/bin/llvm-objcopy -O binary \
+          $ATFE/bin/llvm-objcopy -O binary \
             build/canonical/stage0.elf build/canonical/stage0.bin
 
+      - name: Restore x50ng build cache
+        id: x50ng-cache
+        uses: actions/cache@v4
+        with:
+          path: build/x50ng
+          key: hpclang-x50ng-canonical-${{ matrix.target }}-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h', 'tests/e2e/targets/*.json') }}
+
       - name: Fetch and adapt pinned x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
         run: |
-          git clone --no-checkout https://codeberg.org/gwh/x50ng.git build/x50ng
-          git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
-          git -C build/x50ng submodule update --init --recursive
-          git -C build/x50ng rev-parse HEAD > build/x50ng-canonical-source.txt
-          cp tests/x50ng/e2e-main.c build/x50ng/src/main.c
-          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-
-          if os.environ["HPCLANG_E2E_FAMILY"] == "little-apple":
-              flash = Path("build/x50ng/src/flash.c")
-              s = flash.read_text()
-              old = 'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0'
-              new = '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
-                             memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
-                             memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0'''
-              if old not in s:
-                  raise SystemExit("x50ng firmware-header check changed")
-              flash.write_text(s.replace(old, new, 1))
-
-          module = Path("build/x50ng/src/module.c")
-          s = module.read_text()
-          needle = "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,"
-          if needle not in s:
-              raise SystemExit("x50ng init_modules layout changed")
-          module.write_text(s.replace(
-              needle,
-              "    /* hpclang canonical E2E reserved RAM. */\n"
-              "    phys_ram_size += 0x00100000;\n\n" + needle,
-              1))
-          PY
+          mode=hp4950
+          if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
+            mode=little-apple
+          fi
+          tools/fetch-x50ng.sh build/x50ng tests/x50ng/e2e-main.c "$mode" reserve-ram
 
       - name: Build x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
         working-directory: build/x50ng
-        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+        run: make -j"$(nproc)" WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
+      - name: Record x50ng source
+        run: git -C build/x50ng rev-parse HEAD > build/x50ng-canonical-source.txt
       - name: Fetch official firmware
         run: |
           if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then

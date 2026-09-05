@@ -8,13 +8,15 @@ on:
       - "tests/x50ng/headless-ui-init.h"
       - "tools/pgm-to-summary.py"
       - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-rom-boot.yml"
 
 jobs:
   boot:
     name: ${{ matrix.target }}
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -33,34 +35,24 @@ jobs:
           sudo apt-get install -y build-essential git pkg-config unzip curl \
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
-      - name: Fetch pinned x50ng
-        run: |
-          git clone --no-checkout https://codeberg.org/gwh/x50ng.git build/x50ng
-          git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
-          git -C build/x50ng submodule update --init --recursive
-          git -C build/x50ng rev-parse HEAD > build/x50ng-little-apple-source.txt
-          cp tests/x50ng/little-apple-boot-main.c build/x50ng/src/main.c
-          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
+      - name: Restore x50ng build cache
+        id: x50ng-cache
+        uses: actions/cache@v4
+        with:
+          path: build/x50ng
+          key: hpclang-x50ng-rom-boot-${{ matrix.target }}-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/little-apple-boot-main.c', 'tests/x50ng/headless-ui-init.h') }}
 
-      - name: Accept Little-Apple Kinpo firmware headers
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("build/x50ng/src/flash.c")
-          s = p.read_text()
-          old = 'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0'
-          new = '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0'''
-          if old not in s:
-              raise SystemExit("x50ng firmware-header check changed")
-          p.write_text(s.replace(old, new, 1))
-          PY
+      - name: Fetch and adapt pinned x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/little-apple-boot-main.c little-apple
 
       - name: Build x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
         working-directory: build/x50ng
-        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+        run: make -j"$(nproc)" WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
+      - name: Record x50ng source
+        run: git -C build/x50ng rev-parse HEAD > build/x50ng-little-apple-source.txt
       - name: Fetch bootloader and official Little-Apple ROM
         run: |
           make -C build/x50ng/dist/firmware bootloaders

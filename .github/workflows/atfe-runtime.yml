@@ -17,6 +17,7 @@ on:
       - "tests/hp39-visible-smoke-irq.S"
       - "tools/probe-atfe.sh"
       - "tools/hpclang-pack.py"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
     paths:
@@ -37,7 +38,7 @@ on:
 
 jobs:
   runtime:
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     steps:
       - uses: actions/checkout@v4
 
@@ -46,15 +47,10 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror -Iinclude             runtime/bootstrap/mmu.c tests/bootstrap-mmu.c             -o /tmp/bootstrap-mmu
           /tmp/bootstrap-mmu
 
-      - name: Install Arm Toolchain for Embedded 22.1.0
-        run: |
-          curl -L             https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz             -o /tmp/atfe.tar.xz
-          mkdir -p /tmp/atfe
-          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
 
       - name: Link compiler-rt and picolibc into HPC1
-        env:
-          ATFE: /tmp/atfe
         run: |
           chmod +x tools/probe-atfe.sh tools/hpclang-pack.py
           tools/probe-atfe.sh

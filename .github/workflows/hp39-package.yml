@@ -17,6 +17,7 @@ on:
       - "tools/prepare-hp39-aplet.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/hp39-package.yml"
   pull_request:
     paths:
@@ -38,7 +39,7 @@ on:
 
 jobs:
   package:
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     steps:
       - uses: actions/checkout@v4
 
@@ -47,22 +48,17 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y innoextract
 
-      - name: Install Arm Toolchain for Embedded 22.1.0
-        run: |
-          curl -L             https://github.com/arm/arm-toolchain/releases/download/release-22.1.0-ATfE/ATfE-22.1.0-Linux-x86_64.tar.xz             -o /tmp/atfe.tar.xz
-          mkdir -p /tmp/atfe
-          tar -xJf /tmp/atfe.tar.xz -C /tmp/atfe --strip-components=1
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
 
       - name: Build visible HPC1 and stock launcher bundle
-        env:
-          ATFE: /tmp/atfe
         run: |
           chmod +x             tools/probe-atfe.sh             tools/hpclang-pack.py             tools/armtoolbox-wrap.py
           tools/probe-atfe.sh
 
       - name: Build HP40gs model-3 launcher bundle
         run: |
-          /tmp/atfe/bin/clang \
+          $ATFE/bin/clang \
             --target=arm-none-eabi -march=armv4t -marm \
             -mfpu=none -mfloat-abi=soft -mabi=aapcs \
             -fno-stack-protector -fno-unwind-tables \
@@ -71,19 +67,25 @@ jobs:
             -c platform/armtoolbox/stage0.S \
             -o build/atfe-probe/stage0-hp40gs.o
 
-          /tmp/atfe/bin/ld.lld -m armelf \
+          $ATFE/bin/ld.lld -m armelf \
             -T platform/armtoolbox/stage0.ld \
             build/atfe-probe/stage0-hp40gs.o \
             build/atfe-probe/stage0-bundle.o \
             -o build/atfe-probe/stage0-hp40gs.elf
 
-          /tmp/atfe/bin/llvm-objcopy -O binary \
+          $ATFE/bin/llvm-objcopy -O binary \
             build/atfe-probe/stage0-hp40gs.elf \
             build/atfe-probe/stage0-hp40gs.bin
 
           python3 tools/armtoolbox-wrap.py \
             build/atfe-probe/stage0-hp40gs.bin \
             build/atfe-probe/hp40gs-hpc1.hp
+
+      - name: Restore HPGCC39 packaging cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-v1
 
       - name: Prepare HP39gs and HP40gs hardware-validation packages
         run: |
