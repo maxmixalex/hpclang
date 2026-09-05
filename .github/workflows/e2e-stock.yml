@@ -92,6 +92,13 @@ jobs:
           key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
           save-always: true
 
+      - name: Install x50ng build dependencies
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
         run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp4950
