@@ -23,11 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup archaeology dependencies
-        uses: ./.github/actions/setup-apt
-        with:
-          packages: build-essential git subversion clang file python3
-
       - name: Export official SourceForge tags
         run: |
           rm -rf /tmp/hpgcc11 /tmp/hpgcc20
