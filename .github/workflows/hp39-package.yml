@@ -18,7 +18,6 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
-      - ".github/actions/setup-apt/**"
       - ".github/workflows/hp39-package.yml"
   pull_request:
     paths:
@@ -47,11 +46,6 @@ jobs:
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup host packaging dependencies
-        uses: ./.github/actions/setup-apt
-        with:
-          packages: build-essential curl xz-utils python3 innoextract
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
