@@ -20,6 +20,7 @@ on:
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-apt/**"
       - "tools/armtoolbox-wrap.py"
+      - "tools/inspect-armtoolbox-envelope.py"
       - "tools/pgm-to-summary.py"
       - ".github/workflows/e2e-stock.yml"
 
@@ -72,22 +73,31 @@ jobs:
 
       - name: Prepare ARMToolbox installer
         run: |
-          mkdir -p .cache/hpcalc build/stock-sd
+          mkdir -p .cache/hpcalc build/stock-sd build/stock-reference
           if [ ! -f .cache/hpcalc/mlreg.zip ]; then
             curl -fL --retry 3 --retry-delay 2 \
               https://www.hpcalc.org/hp49/math/statistic/mlreg.zip \
               -o .cache/hpcalc/mlreg.zip
           fi
           unzip -jo .cache/hpcalc/mlreg.zip SETUP.BIN -d build/stock-sd
+          unzip -jo .cache/hpcalc/mlreg.zip mlreg.hp -d build/stock-reference
           test "$(stat -c %s build/stock-sd/SETUP.BIN)" = 7673
           sha256sum build/stock-sd/SETUP.BIN
+          test "$(stat -c %s build/stock-reference/mlreg.hp)" = 21914
+
+      - name: Validate ARMToolbox transfer envelopes
+        run: |
+          python3 tools/inspect-armtoolbox-envelope.py \
+            build/stock-reference/mlreg.hp \
+            build/stock-payload/HPCLANG.HP \
+            | tee build/armtoolbox-envelope-reference.jsonl
 
       - name: Restore x50ng build cache
         id: x50ng-cache
         uses: actions/cache@v4
         with:
-          path: build/x50ng
-          key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          path: build/x50ng/dist
+          key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
           save-always: true
 
       - name: Fetch and adapt pinned x50ng
@@ -100,7 +110,7 @@ jobs:
         run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
       - name: Record x50ng source
-        run: git -C build/x50ng rev-parse HEAD > build/x50ng-stock-source.txt
+        run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-stock-source.txt
       - name: Fetch official 49g+/50g firmware
         working-directory: build/x50ng
         run: make -C dist/firmware bootloaders official
@@ -184,4 +194,5 @@ jobs:
             build/x50ng-stock-source.txt
             build/stock-payload/HPCLANG.HP
             build/stock-payload/hp39-visible.result-address
+            build/armtoolbox-envelope-reference.jsonl
           if-no-files-found: warn
