@@ -46,6 +46,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify GitHub-hosted runner baseline
+        run: |
+          missing=()
+          for tool in git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout; do
+            command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing GitHub-hosted baseline tools: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
       - name: Validate common MMU layout
         run: |
           cc -std=c11 -Wall -Wextra -Werror -Iinclude             runtime/bootstrap/mmu.c tests/bootstrap-mmu.c             -o /tmp/bootstrap-mmu
