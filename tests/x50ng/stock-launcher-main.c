@@ -171,6 +171,20 @@ static void fail(struct state *s, const char *why)
     hdw_stop(s->hdw);
 }
 
+static void copy_setup(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&f2_down, &f2_up, 0))
+        fail(s, "setup-copy-key");
+}
+
+static void probe_copy_destination(void *arg)
+{
+    struct state *s = arg;
+    capture_named(s, "copy");
+    fail(s, "setup-copy-destination-probe");
+}
+
 static void open_files(void *arg)
 {
     struct state *s = arg;
@@ -352,10 +366,8 @@ static int schedule_install(struct state *s)
            later(capture_files, s, 10500000LL) &&
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
-           later(eval_setup, s, 13300000LL) &&
-           later(capture_setup_eval, s, 16500000LL) &&
-           later(warmstart, s, 20000000LL) &&
-           later(finish_install, s, 23500000LL);
+           later(copy_setup, s, 13300000LL) &&
+           later(probe_copy_destination, s, 15000000LL);
 }
 
 static int schedule_run(struct state *s)
