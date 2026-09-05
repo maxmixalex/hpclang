@@ -62,13 +62,10 @@ jobs:
         run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
       - name: Fetch bootloader and official Little-Apple ROM
-        env:
-          ARCHIVE: ${{ env.HPCLANG_E2E_ARCHIVE }}
-          MEMBER: ${{ env.HPCLANG_E2E_MEMBER }}
         run: |
           make -C build/x50ng/dist/firmware bootloaders
-          curl -L "https://www.hpcalc.org/hp39/pc/$ARCHIVE" -o "/tmp/$ARCHIVE"
-          unzip -p "/tmp/$ARCHIVE" "$MEMBER" > build/little-apple.bin
+          curl -L "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
+          unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" "$HPCLANG_E2E_MEMBER" > build/little-apple.bin
           python3 - <<'PY'
           from pathlib import Path
           data = Path("build/little-apple.bin").read_bytes()
