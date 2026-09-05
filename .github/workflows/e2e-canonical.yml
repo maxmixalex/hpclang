@@ -1,4 +1,7 @@
-name: E2E / Canonical
+name: E2E / Direct runtime
+
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:
@@ -16,6 +19,7 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
@@ -36,6 +40,7 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
       - "tools/e2e-target-env.py"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
@@ -194,21 +199,35 @@ jobs:
             "build/$TARGET-return.pgm"
 
 
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            "build/$TARGET-summary.png" \
+            "direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
+
       - name: Add LCD evidence to job summary
         if: always()
         env:
           TARGET: ${{ matrix.target }}
         run: |
+          IMAGE_URL=""
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            IMAGE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
+          fi
           python3 tools/pgm-to-summary.py \
-            --heading "$TARGET canonical ARM E2E" \
-            --image-file "build/$TARGET-summary.png" \
+            --heading "$TARGET direct hpclang runtime" \
+            --image-url "$IMAGE_URL" \
             --json "build/$TARGET-e2e.json" \
             "build/$TARGET-before.pgm" \
             "build/$TARGET-pass.pgm" \
             "build/$TARGET-return.pgm" \
             >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload ${{ matrix.target }} canonical E2E evidence
+      - name: Upload ${{ matrix.target }} direct-runtime E2E evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
