@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import binascii
 import json
 import struct
@@ -167,15 +168,20 @@ def emit_summary(
     heading: str,
     files: list[Path],
     image_url: str | None,
+    image_file: Path | None,
     json_files: list[str],
 ) -> None:
     found = False
     existing = [path for path in files if path.exists()]
 
     print(f"## {heading}")
+    if image_file and image_file.exists():
+        image_url = "data:image/png;base64," + base64.b64encode(
+            image_file.read_bytes()
+        ).decode("ascii")
     if existing and image_url:
         found = True
-        print(f"\n![{heading}]({image_url})")
+        print(f'\n<img alt="{heading}" src="{image_url}">')
         print("\n**Frames:**")
         for index, path in enumerate(existing, 1):
             width, height, _ = read_pgm(path)
@@ -208,6 +214,7 @@ def main() -> None:
     parser.add_argument("--heading", default="Calculator LCD evidence")
     parser.add_argument("--image-out", type=Path)
     parser.add_argument("--image-url")
+    parser.add_argument("--image-file", type=Path)
     parser.add_argument("--scale", type=int, default=2)
     parser.add_argument("--columns", type=int, default=4)
     parser.add_argument("--image-only", action="store_true")
@@ -220,7 +227,13 @@ def main() -> None:
         build_sheet(args.files, args.image_out, args.scale, args.columns)
 
     if not args.image_only:
-        emit_summary(args.heading, args.files, args.image_url, args.json_files)
+        emit_summary(
+            args.heading,
+            args.files,
+            args.image_url,
+            args.image_file,
+            args.json_files,
+        )
 
 
 if __name__ == "__main__":
