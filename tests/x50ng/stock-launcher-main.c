@@ -8,7 +8,7 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
-#include "ui4x/src/api.h"
+#include "headless-ui-init.h"
 #include "s3c2410/s3c2410_lcd.h"
 
 #define LCD_W 131
@@ -406,7 +406,7 @@ int main(int argc, char **argv)
         s.result_addr = (uint32_t)value;
     }
 
-    config_t config = *config_init(argc, argv);
+    config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
     int ok = s.mode == MODE_INSTALL

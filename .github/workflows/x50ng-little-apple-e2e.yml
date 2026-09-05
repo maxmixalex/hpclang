@@ -11,7 +11,7 @@ on:
       - "include/hpclang/**"
       - "tests/hp39-visible-smoke.c"
       - "tests/hp39-runtime-diag.c"
-      - "tests/x50ng/e2e-main.c"
+      - "tests/x50ng/e2e-main.c"\n      - "tests/x50ng/headless-ui-init.h"
       - "tools/probe-atfe.sh"
       - "tools/pgm-to-summary.py"
       - ".github/workflows/x50ng-little-apple-e2e.yml"
@@ -75,7 +75,7 @@ jobs:
           git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
           git -C build/x50ng submodule update --init --recursive
           git -C build/x50ng rev-parse HEAD > build/x50ng-little-e2e-source.txt
-          cp tests/x50ng/e2e-main.c build/x50ng/src/main.c
+          cp tests/x50ng/e2e-main.c build/x50ng/src/main.c\n          cp tests/x50ng/headless-ui-init.h build/x50ng/src/
 
           python3 - <<'PY'
           from pathlib import Path

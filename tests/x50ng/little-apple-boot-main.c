@@ -5,7 +5,7 @@
 #include "emulator_api.h"
 #include "hdw.h"
 #include "module.h"
-#include "options.h"
+#include "options.h"\n#include "headless-ui-init.h"
 #include "timer.h"
 #include "s3c2410/s3c2410_lcd.h"
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     if (!s.prefix) s.prefix = "little-apple";
     if (!s.json) s.json = "little-apple.json";
 
-    config_t config = *config_init(argc, argv);
+    config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
     if (!later(snapshot, &s, 3000000LL) ||

@@ -10,7 +10,7 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
-#include "ui4x/src/api.h"
+#include "headless-ui-init.h"
 #include "s3c2410/s3c2410_lcd.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
@@ -593,7 +593,7 @@ int main(int argc, char **argv)
     if (!s.return_pgm) s.return_pgm = "return.pgm";
     if (!s.json) s.json = "e2e.json";
 
-    config_t config = *config_init(argc, argv);
+    config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
     if (!tap(&f_down, &f_up, BOOT_NO_US) ||
