@@ -58,7 +58,7 @@ jobs:
         target: [hp39gs, hp40gs, hp50g]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Load target profile
         run: python3 tools/e2e-target-env.py "tests/e2e/targets/${{ matrix.target }}.json" >> "$GITHUB_ENV"
@@ -84,7 +84,7 @@ jobs:
 
       - name: Restore x50ng build cache
         id: x50ng-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/x50ng/dist
           key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
@@ -171,7 +171,7 @@ jobs:
 
       - name: Upload ${{ matrix.target }} canonical E2E evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}-canonical-arm-e2e
           path: |
