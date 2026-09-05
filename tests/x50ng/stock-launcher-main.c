@@ -49,6 +49,7 @@ KEY_PAIR(f5, HP4950_KEY_E);
 KEY_PAIR(f6, HP4950_KEY_F);
 KEY_PAIR(files, HP4950_KEY_G);
 KEY_PAIR(mode, HP4950_KEY_H);
+KEY_PAIR(eval, HP4950_KEY_N);
 KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(neg, HP4950_KEY_W);
 KEY_PAIR(up, HP4950_KEY_UP);
@@ -202,6 +203,13 @@ static void eval_setup(void *arg)
         fail(s, "setup-eval-key");
 }
 
+static void eval_home(void *arg)
+{
+    struct state *s = arg;
+    if (!tap(&eval_down, &eval_up, 0))
+        fail(s, "home-eval-key");
+}
+
 static void warmstart(void *arg)
 {
     struct state *s = arg;
@@ -334,9 +342,11 @@ static int schedule_install(struct state *s)
            later(capture_files, s, 10500000LL) &&
            later(enter_sd, s, 10800000LL) &&
            later(capture_sd, s, 12800000LL) &&
-           later(eval_setup, s, 13300000LL) &&
-           later(warmstart, s, 16800000LL) &&
-           later(finish_install, s, 20300000LL);
+           later(rcl_payload, s, 13300000LL) &&
+           later(cancel_filer, s, 14500000LL) &&
+           later(eval_home, s, 15000000LL) &&
+           later(warmstart, s, 18000000LL) &&
+           later(finish_install, s, 21500000LL);
 }
 
 static int schedule_run(struct state *s)
