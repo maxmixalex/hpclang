@@ -5,7 +5,8 @@
 #include "emulator_api.h"
 #include "hdw.h"
 #include "module.h"
-#include "options.h"\n#include "headless-ui-init.h"
+#include "options.h"
+#include "headless-ui-init.h"
 #include "timer.h"
 #include "s3c2410/s3c2410_lcd.h"
 
