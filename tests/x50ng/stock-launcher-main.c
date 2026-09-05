@@ -42,6 +42,7 @@ struct key_action { int key; int down; };
     static const struct key_action name##_up = { code, 0 }
 
 KEY_PAIR(f1, HP4950_KEY_A);
+KEY_PAIR(f2, HP4950_KEY_B);
 KEY_PAIR(f3, HP4950_KEY_C);
 KEY_PAIR(f4, HP4950_KEY_D);
 KEY_PAIR(f5, HP4950_KEY_E);
@@ -250,15 +251,15 @@ static void choose_armtoolbox(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "port2");
-    if (!tap(&nxt_down, &nxt_up, 0))
-        fail(s, "port2-next-key");
+    if (!tap(&f2_down, &f2_up, 0))
+        fail(s, "armtoolbox-227-key");
 }
 
 static void run_prrun(void *arg)
 {
     struct state *s = arg;
     capture_named(s, "armtoolbox");
-    fail(s, "port2-page-probe");
+    fail(s, "library-227-probe");
 }
 
 static void finish_run(void *arg)
