@@ -1,33 +1,29 @@
 # HP50g stock ARMToolbox install.
-# Follow the hardware-proven HPGCC path: copy SETUP.BIN from SD to HOME,
-# put real 2. on level 1, execute SETUP.BIN from VAR, then warmstart ON+C.
+# x49gp's HPGCC2 quick-start sequence is:
+#   2, SETUP.BIN, 3, ->TAG, RCL, EVAL, ON+C.
+# Selecting SETUP.BIN in the stock SD File Manager already supplies the :3:
+# tagged file reference, so F4/RCL is the UI-equivalent recall step.
 2000 tap f6
 4000 tap f6
 5000 tap mode
 5500 tap neg
 6000 tap f6
-7000 chord lshift files
-9200 capture files
-9500 tap up
-9800 tap f6
-11500 capture sd
-12000 tap enter
-12800 capture sd-setup
-13200 tap f2
-14200 capture copy-destination
-14500 tap down
-14800 tap f6
-16600 capture copy-result
-17100 tap on
-18000 capture home-after-copy
-18500 tap two
-18800 tap period
-19100 tap enter
-19900 capture port-number
-20400 tap var
-21500 capture vars
-21900 tap f1
-23500 capture setup-executed
-24500 chord on f3
-26500 capture warmstart
-27500 finish-install
+6500 tap two
+6800 tap enter
+7600 capture port-number
+8200 chord lshift files
+10400 capture files
+10700 tap up
+11000 tap f6
+12700 capture sd
+13200 tap enter
+14000 capture sd-setup
+14500 tap f4
+16000 capture recalled
+16500 tap on
+17500 capture recalled-home
+18000 tap eval
+19600 capture evaluated
+20600 chord on f3
+22600 capture warmstart
+23600 finish-install
