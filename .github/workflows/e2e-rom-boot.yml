@@ -1,4 +1,4 @@
-name: HP39 40 true ARM boot
+name: E2E / ROM boot
 
 on:
   workflow_dispatch:
@@ -7,10 +7,11 @@ on:
       - "tests/x50ng/little-apple-boot-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tools/pgm-to-summary.py"
-      - ".github/workflows/x50ng-little-apple.yml"
+      - ".github/workflows/e2e-rom-boot.yml"
 
 jobs:
   boot:
+    name: ${{ matrix.target }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:

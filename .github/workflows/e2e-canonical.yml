@@ -1,4 +1,4 @@
-name: HP39 40 canonical ARM E2E
+name: E2E / Canonical
 
 on:
   workflow_dispatch:
@@ -14,11 +14,28 @@ on:
       - "tests/x50ng/e2e-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tools/probe-atfe.sh"
+      - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
-      - ".github/workflows/x50ng-little-apple-e2e.yml"
+      - ".github/workflows/e2e-canonical.yml"
+  pull_request:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tests/hp39-runtime-diag.c"
+      - "tests/x50ng/e2e-main.c"
+      - "tests/x50ng/headless-ui-init.h"
+      - "tools/probe-atfe.sh"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - ".github/workflows/e2e-canonical.yml"
 
 jobs:
-  e2e:
+  canonical:
+    name: ${{ matrix.target }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
@@ -26,13 +43,20 @@ jobs:
       matrix:
         include:
           - target: hp39gs
+            family: little-apple
             model: 2
             archive: hp39gs222.zip
             member: HP39GS_2.22/hp39gs_v2.22.bin
           - target: hp40gs
+            family: little-apple
             model: 3
             archive: hp40gs222.zip
             member: HP40GS_2.22/hp40gs_v2.22.bin
+          - target: hp50g
+            family: hp4950
+            model: 6
+            archive: ""
+            member: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -54,43 +78,45 @@ jobs:
           MODEL: ${{ matrix.model }}
         run: |
           export ATFE=/tmp/atfe
-          export OUT="$GITHUB_WORKSPACE/build/little-e2e"
+          export OUT="$GITHUB_WORKSPACE/build/canonical"
           chmod +x tools/probe-atfe.sh
           tools/probe-atfe.sh
 
           /tmp/atfe/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL="$MODEL" \
             -c platform/armtoolbox/stage0.S \
-            -o build/little-e2e/stage0.o
+            -o build/canonical/stage0.o
           /tmp/atfe/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
-            build/little-e2e/stage0.o build/little-e2e/stage0-bundle.o \
-            -o build/little-e2e/stage0.elf
+            build/canonical/stage0.o build/canonical/stage0-bundle.o \
+            -o build/canonical/stage0.elf
           /tmp/atfe/bin/llvm-objcopy -O binary \
-            build/little-e2e/stage0.elf build/little-e2e/stage0.bin
+            build/canonical/stage0.elf build/canonical/stage0.bin
 
       - name: Fetch and adapt pinned x50ng
         env:
-          TARGET: ${{ matrix.target }}
+          FAMILY: ${{ matrix.family }}
         run: |
           git clone --no-checkout https://codeberg.org/gwh/x50ng.git build/x50ng
           git -C build/x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
           git -C build/x50ng submodule update --init --recursive
-          git -C build/x50ng rev-parse HEAD > build/x50ng-little-e2e-source.txt
+          git -C build/x50ng rev-parse HEAD > build/x50ng-canonical-source.txt
           cp tests/x50ng/e2e-main.c build/x50ng/src/main.c
           cp tests/x50ng/headless-ui-init.h build/x50ng/src/
 
           python3 - <<'PY'
           from pathlib import Path
+          import os
 
-          flash = Path("build/x50ng/src/flash.c")
-          s = flash.read_text()
-          old = 'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0'
-          new = '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0'''
-          if old not in s:
-              raise SystemExit("x50ng firmware-header check changed")
-          flash.write_text(s.replace(old, new, 1))
+          if os.environ["FAMILY"] == "little-apple":
+              flash = Path("build/x50ng/src/flash.c")
+              s = flash.read_text()
+              old = 'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0'
+              new = '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
+                             memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
+                             memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0'''
+              if old not in s:
+                  raise SystemExit("x50ng firmware-header check changed")
+              flash.write_text(s.replace(old, new, 1))
 
           module = Path("build/x50ng/src/module.c")
           s = module.read_text()
@@ -99,7 +125,7 @@ jobs:
               raise SystemExit("x50ng init_modules layout changed")
           module.write_text(s.replace(
               needle,
-              "    /* hpclang Little-Apple E2E reserved RAM. */\n"
+              "    /* hpclang canonical E2E reserved RAM. */\n"
               "    phys_ram_size += 0x00100000;\n\n" + needle,
               1))
           PY
@@ -108,35 +134,50 @@ jobs:
         working-directory: build/x50ng
         run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
-      - name: Fetch bootloader and official ${{ matrix.target }} ROM
+      - name: Fetch official firmware
         env:
+          FAMILY: ${{ matrix.family }}
           ARCHIVE: ${{ matrix.archive }}
           MEMBER: ${{ matrix.member }}
         run: |
-          make -C build/x50ng/dist/firmware bootloaders
-          curl -L "https://www.hpcalc.org/hp39/pc/$ARCHIVE" -o "/tmp/$ARCHIVE"
-          unzip -p "/tmp/$ARCHIVE" "$MEMBER" > build/little-apple.bin
-          sha256sum build/little-apple.bin
+          if [ "$FAMILY" = little-apple ]; then
+            make -C build/x50ng/dist/firmware bootloaders
+            curl -L "https://www.hpcalc.org/hp39/pc/$ARCHIVE" -o "/tmp/$ARCHIVE"
+            unzip -p "/tmp/$ARCHIVE" "$MEMBER" > build/target-firmware.bin
+          else
+            make -C build/x50ng/dist/firmware bootloaders official
+          fi
 
-      - name: Execute canonical HPC1 on ${{ matrix.target }}
+      - name: Execute canonical HPC1
         env:
           TARGET: ${{ matrix.target }}
+          FAMILY: ${{ matrix.family }}
         run: |
-          export HPCLANG_X50NG_STAGE0="$GITHUB_WORKSPACE/build/little-e2e/stage0.bin"
-          export HPCLANG_X50NG_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/little-e2e/hp39-visible.result-address")"
+          export HPCLANG_X50NG_STAGE0="$GITHUB_WORKSPACE/build/canonical/stage0.bin"
+          export HPCLANG_X50NG_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/canonical/hp39-visible.result-address")"
           export HPCLANG_X50NG_BEFORE_PGM="$GITHUB_WORKSPACE/build/$TARGET-before.pgm"
           export HPCLANG_X50NG_PASS_PGM="$GITHUB_WORKSPACE/build/$TARGET-pass.pgm"
           export HPCLANG_X50NG_RETURN_PGM="$GITHUB_WORKSPACE/build/$TARGET-return.pgm"
           export HPCLANG_X50NG_E2E_JSON="$GITHUB_WORKSPACE/build/$TARGET-e2e.json"
 
+          if [ "$FAMILY" = little-apple ]; then
+            STYLE="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
+            FLASH_ARG=--flash-full
+            FIRMWARE="$GITHUB_WORKSPACE/build/target-firmware.bin"
+          else
+            STYLE="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css"
+            FLASH_ARG=--flash
+            FIRMWARE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
+          fi
+
           mkdir -p "build/$TARGET-state"
           timeout 35s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
             --overwrite-config \
-            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
-            --flash-full \
+            --style="$STYLE" \
+            "$FLASH_ARG" \
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
-            --firmware="$GITHUB_WORKSPACE/build/little-apple.bin"
+            --firmware="$FIRMWARE"
 
           for pgm in build/$TARGET-*.pgm; do
             [ -f "$pgm" ] || continue
@@ -166,7 +207,7 @@ jobs:
             build/${{ matrix.target }}-*.pgm
             build/${{ matrix.target }}-*.pgm.png
             build/${{ matrix.target }}-e2e.json
-            build/x50ng-little-e2e-source.txt
-            build/little-e2e/stage0.bin
-            build/little-e2e/hp39-visible.hpc
+            build/x50ng-canonical-source.txt
+            build/canonical/stage0.bin
+            build/canonical/hp39-visible.hpc
           if-no-files-found: warn

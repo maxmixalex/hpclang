@@ -1,4 +1,4 @@
-name: x50ng stock launcher E2E
+name: E2E / Stock
 
 on:
   workflow_dispatch:
@@ -17,10 +17,11 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/armtoolbox-wrap.py"
       - "tools/pgm-to-summary.py"
-      - ".github/workflows/x50ng-stock-launcher.yml"
+      - ".github/workflows/e2e-stock.yml"
 
 jobs:
   stock-launcher:
+    name: hp50g
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
