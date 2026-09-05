@@ -18,6 +18,7 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-apt/**"
       - ".github/workflows/hp39-package.yml"
   pull_request:
     paths:
@@ -43,10 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install host packaging tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y innoextract
+      - name: Setup host packaging dependencies
+        uses: ./.github/actions/setup-apt
+        with:
+          group: hp39-package
+          packages: build-essential curl xz-utils innoextract
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe

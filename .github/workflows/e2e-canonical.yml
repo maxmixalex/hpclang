@@ -20,6 +20,7 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-apt/**"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
   pull_request:
@@ -45,6 +46,8 @@ jobs:
     name: ${{ matrix.target }}
     runs-on: home-docker
     timeout-minutes: 25
+    env:
+      X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp50g' && 'hp4950' || 'little-apple' }}
     strategy:
       fail-fast: false
       matrix:
@@ -53,10 +56,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y build-essential git pkg-config unzip curl xz-utils \
+      - name: Setup host build dependencies
+        uses: ./.github/actions/setup-apt
+        with:
+          group: x50ng
+          packages: >-
+            build-essential git pkg-config unzip curl xz-utils
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Load target profile
@@ -86,16 +91,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/x50ng
-          key: hpclang-x50ng-canonical-${{ matrix.target }}-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h', 'tests/e2e/targets/*.json') }}
+          key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-v2-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h', 'tests/e2e/targets/*.json') }}
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
         run: |
-          mode=hp4950
-          if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
-            mode=little-apple
-          fi
-          tools/fetch-x50ng.sh build/x50ng tests/x50ng/e2e-main.c "$mode" reserve-ram
+          tools/fetch-x50ng.sh build/x50ng tests/x50ng/e2e-main.c "$X50NG_BUILD_VARIANT" reserve-ram
 
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'

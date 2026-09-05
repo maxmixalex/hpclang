@@ -18,6 +18,7 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-apt/**"
       - "tools/armtoolbox-wrap.py"
       - "tools/pgm-to-summary.py"
       - ".github/workflows/e2e-stock.yml"
@@ -30,10 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y build-essential git pkg-config unzip curl xz-utils \
+      - name: Setup host build dependencies
+        uses: ./.github/actions/setup-apt
+        with:
+          group: x50ng
+          packages: >-
+            build-essential git pkg-config unzip curl xz-utils
             libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
 
       - name: Setup Arm Toolchain for Embedded

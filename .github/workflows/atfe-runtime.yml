@@ -18,6 +18,7 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/hpclang-pack.py"
       - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-apt/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
     paths:
@@ -41,6 +42,12 @@ jobs:
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup host build dependencies
+        uses: ./.github/actions/setup-apt
+        with:
+          group: core
+          packages: build-essential curl xz-utils
 
       - name: Validate common MMU layout
         run: |

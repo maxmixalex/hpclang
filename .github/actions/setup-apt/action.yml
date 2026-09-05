@@ -1,0 +1,44 @@
+name: Setup apt dependencies
+description: Install missing apt packages while reusing downloaded .deb files across ephemeral runners.
+
+inputs:
+  group:
+    description: Stable cache namespace for this package set
+    required: true
+  packages:
+    description: Space-separated Debian package names
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore apt package cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.cache/apt/${{ inputs.group }}
+        key: hpclang-apt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.group }}-v1
+
+    - name: Install missing packages
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        CACHE: ${{ github.workspace }}/.cache/apt/${{ inputs.group }}
+      run: |
+        set -euo pipefail
+        read -r -a packages <<< "$PACKAGES"
+        missing=()
+        for package in "${packages[@]}"; do
+          if ! dpkg -s "$package" >/dev/null 2>&1; then
+            missing+=("$package")
+          fi
+        done
+
+        if (( ${#missing[@]} == 0 )); then
+          echo "All apt dependencies are already installed."
+          exit 0
+        fi
+
+        mkdir -p "$CACHE/archives/partial"
+        sudo apt-get update -qq
+        sudo apt-get -o Dir::Cache::archives="$CACHE/archives" install -y "${missing[@]}"
+        sudo chown -R "$(id -u):$(id -g)" "$CACHE"
