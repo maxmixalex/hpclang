@@ -120,21 +120,51 @@ jobs:
           if "hpclang_host_aligned_alloc" not in text:
               shim = """#ifdef _WIN32
           #include <stddef.h>
-          #include <stdlib.h>
-          static void *hpclang_host_aligned_alloc(size_t alignment, size_t size)
+          #pragma push_macro("DATADIR")
+          #pragma push_macro("VERSION_MAJOR")
+          #pragma push_macro("VERSION_MINOR")
+          #pragma push_macro("PATCHLEVEL")
+          #undef DATADIR
+          #undef VERSION_MAJOR
+          #undef VERSION_MINOR
+          #undef PATCHLEVEL
+          #include <windows.h>
+          #pragma pop_macro("PATCHLEVEL")
+          #pragma pop_macro("VERSION_MINOR")
+          #pragma pop_macro("VERSION_MAJOR")
+          #pragma pop_macro("DATADIR")
+          static void *hpclang_host_memalign(size_t alignment, size_t size)
           {
-              size_t rounded = (size + alignment - 1) / alignment * alignment;
-              return aligned_alloc(alignment, rounded);
+              (void)alignment;
+              return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
           }
-          #define memalign hpclang_host_aligned_alloc
+          #define memalign hpclang_host_memalign
           static void *hpclang_host_valloc(size_t size)
           {
-              return hpclang_host_aligned_alloc(4096, size);
+              return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
           }
           #define valloc hpclang_host_valloc
           #endif
           """
               text = shim + text
+
+          import re
+          text, free_count = re.subn(
+              r"void\s+qemu_vfree\s*\(\s*void\s*\*\s*ptr\s*\)\s*\{\s*free\s*\(\s*ptr\s*\)\s*;\s*\}",
+              """void qemu_vfree(void *ptr)
+          {
+          #ifdef _WIN32
+              VirtualFree(ptr, 0, MEM_RELEASE);
+          #else
+              free(ptr);
+          #endif
+          }""",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if free_count != 1:
+              raise SystemExit(f"x50ng qemu_vfree anchor changed: {free_count}")
           fq.write_text(text)
 
           api = Path("x50ng/src/emulator_api.c")
