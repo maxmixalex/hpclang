@@ -1,4 +1,4 @@
-name: E2E / Full HP50g launch
+name: E2E / HP50g stock launch
 
 permissions:
   contents: write
@@ -110,7 +110,7 @@ jobs:
           key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
       - name: Ensure x50ng runtime dependencies
         run: |
-          packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+          packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
           missing=()
           for package in "${packages[@]}"; do
             dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
@@ -290,6 +290,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: hp50g-full-launch-evidence
+          retention-days: 14
           path: |
             build/stock-install-*
             build/stock-install.json
