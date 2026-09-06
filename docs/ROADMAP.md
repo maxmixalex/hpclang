@@ -10,7 +10,9 @@ durable milestones and completion criteria.
 - one common ARMv4T runtime;
 - thin calculator-family platform backends;
 - no required GCC, HPGCC runtime or ROM replacement;
-- historical code is research evidence, not a compatibility mode.
+- historical code is research evidence, not a compatibility mode;
+- emulator fixtures are generated from current build products rather than
+  committed as opaque calculator-state snapshots.
 
 ## M0 — Unified application ABI
 
@@ -37,25 +39,33 @@ the current emulator gates validate the design.
 
 ## M3 — HP39/40 family
 
-**Runtime validated; sibling stock-launch closure remains.**
+**Runtime validated; automated stock-launch closure active.**
 
 - [x] HP39gs real-hardware canonical runtime PASS and clean return.
 - [x] HP39gs official-ROM direct E2E.
 - [x] HP40gs official-ROM direct E2E.
 - [x] HP39gs/HP40gs hardware-validation packages.
-- [ ] HP39g+ model/outer-launch validation.
-- [ ] HP40gs stock aplet/ARMToolbox outer-launch validation.
+- [ ] generate an installed x50ng fixture from the current
+  `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000` and `LIB275L.000`;
+- [ ] drive stock APLET -> HPCLANG -> ARMToolbox39 -> HPC1 PASS -> stock return
+  on HP39gs and HP40gs;
+- [ ] close HP39g+ sibling model/outer-launch validation.
+
+The preferred fixture path uses the stock ROM's own transfer/install logic.
+Direct SRAM/flash patching is a fallback only. The obsolete Conn3x GUI itself
+is not part of the runtime regression contract.
 
 ## M4 — HP48gII
 
-**Active next milestone.**
+**Active.**
 
-- [ ] add an HP48gII E2E target profile;
-- [ ] validate the real HP48gII hardware/memory model used by the emulator;
-- [ ] implement only the thin HP48 launch adapter required by the common
-  bootstrap;
-- [ ] run the canonical HPC1 runtime and validate clean return;
-- [ ] exercise the supported calculator-side package/launcher path.
+- [x] add a model-4 / 131x64 E2E target profile;
+- [x] record the true medium-apple hardware differences: 256 KiB physical RAM,
+  64-line LCD and HP48gII firmware identity;
+- [x] add a thin x50ng HP48gII preparation mode;
+- [ ] boot the shared 48gII/49g+/50g System RPL ROM on that hardware model;
+- [ ] execute the same HPC1 runtime and validate clean return;
+- [ ] exercise the supported ARMToolbox48 calculator-side launch path.
 
 Completion criterion:
 
@@ -64,13 +74,17 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**HP50g complete; HP49g+ active next milestone.**
+**HP50g complete; HP49g+ direct E2E active.**
 
 - [x] HP50g direct runtime E2E PASS + clean stock return.
 - [x] HP50g original-system ARMToolbox install -> HPCLANG.HP -> PrRUN -> PASS.
-- [ ] add HP49g+ to the direct-runtime E2E matrix;
-- [ ] validate HP49g+ model-specific boot/launcher differences;
-- [ ] close the supported HP49g+ stock package/launcher path.
+- [x] add HP49g+ model 5 to the shared hp4950 Direct runtime matrix.
+- [ ] obtain the first green HP49g+ direct-runtime run;
+- [ ] close the supported HP49g+ stock package/ARMToolbox path.
+
+49g+ and 50g intentionally share the same hp4950 hardware backend. Model
+identity belongs in the hpclang launch context unless a genuine hardware
+difference requires otherwise.
 
 Completion criterion:
 
@@ -79,26 +93,30 @@ Completion criterion:
 
 ## M6 — Automated emulator E2E
 
-**Current representative gates complete; target expansion in progress.**
+**Representative gates complete; family expansion active.**
 
-Current passing gates:
+Passing:
 
 - HP39gs direct runtime;
 - HP40gs direct runtime;
 - HP50g direct runtime;
 - HP50g full stock ARMToolbox/PrRUN launch.
 
-Next expansion:
+Active expansion:
 
-- [ ] HP48gII;
-- [ ] HP49g+.
+- [ ] HP49g+ direct runtime;
+- [ ] HP48gII direct runtime;
+- [ ] HP39gs/HP40gs generated-fixture stock launch;
+- [ ] HP48gII/HP49g+ stock launch.
 
-The Direct runtime gate owns common-bootstrap execution and return correctness.
-Stock-launch gates own the user-visible calculator package/menu path.
+Direct runtime owns common-bootstrap execution and return correctness.
+Stock-launch gates own calculator-side package/menu/launcher integration.
+Host transfer tools are included only when they can be exercised by a
+maintained deterministic transport.
 
 ## M7 — Common platform services
 
-**Planned after M4/M5 sibling closure.**
+**Planned after M3/M4/M5 closure.**
 
 Add display, keyboard, timers, storage and calculator-object/stack services
 behind common APIs. Add only capabilities required by real applications.
