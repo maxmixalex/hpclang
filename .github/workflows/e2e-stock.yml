@@ -167,7 +167,6 @@ jobs:
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-install.json"
           mkdir -p build/stock-state
           timeout 45s build/x50ng/dist/x50ng \
-            --50g \
             --datadir="$GITHUB_WORKSPACE/build/stock-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
@@ -195,7 +194,6 @@ jobs:
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-run.json"
 
           timeout 45s build/x50ng/dist/x50ng \
-            --50g \
             --datadir="$GITHUB_WORKSPACE/build/stock-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
