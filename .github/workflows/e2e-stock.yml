@@ -179,6 +179,12 @@ jobs:
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat build/stock-install.json
+          test -f build/stock-install-port2.pgm
+          test -f build/stock-install-armtoolbox.pgm
+          if cmp -s build/stock-install-port2.pgm build/stock-install-armtoolbox.pgm; then
+            echo "::error::ARMToolbox library 275 did not appear in port 2"
+            exit 1
+          fi
 
       - name: Execute HPCLANG.HP through ARMToolbox PrRUN
         run: |
@@ -212,25 +218,27 @@ jobs:
           python3 tools/pgm-to-summary.py \
             --image-only \
             --image-out build/stock-summary.png \
-            build/stock-install-port-number.pgm \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled-in-filer.pgm \
-            build/stock-install-filer-halt-menu.pgm \
-            build/stock-install-recalled-stack.pgm \
-            build/stock-install-setup-evaluated.pgm \
+            build/stock-install-copy-destination.pgm \
+            build/stock-install-copy-result.pgm \
+            build/stock-install-home-after-copy.pgm \
+            build/stock-install-port-number.pgm \
+            build/stock-install-vars.pgm \
+            build/stock-install-setup-executed.pgm \
             build/stock-install-warmstart.pgm \
             build/stock-install-lib.pgm \
             build/stock-install-port2.pgm \
+            build/stock-install-armtoolbox.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
             build/stock-run-sd-payload.pgm \
             build/stock-run-copy-destination.pgm \
             build/stock-run-copy-result.pgm \
-            build/stock-run-home.pgm \
-            build/stock-run-vars.pgm \
+            build/stock-run-recalled-in-filer.pgm \
+            build/stock-run-filer-halt-menu.pgm \
             build/stock-run-payload-recalled.pgm \
             build/stock-run-lib.pgm \
             build/stock-run-port2.pgm \
@@ -260,25 +268,27 @@ jobs:
             --image-url "$IMAGE_URL" \
             --json build/stock-install.json \
             --json build/stock-run.json \
-            build/stock-install-port-number.pgm \
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled-in-filer.pgm \
-            build/stock-install-filer-halt-menu.pgm \
-            build/stock-install-recalled-stack.pgm \
-            build/stock-install-setup-evaluated.pgm \
+            build/stock-install-copy-destination.pgm \
+            build/stock-install-copy-result.pgm \
+            build/stock-install-home-after-copy.pgm \
+            build/stock-install-port-number.pgm \
+            build/stock-install-vars.pgm \
+            build/stock-install-setup-executed.pgm \
             build/stock-install-warmstart.pgm \
             build/stock-install-lib.pgm \
             build/stock-install-port2.pgm \
+            build/stock-install-armtoolbox.pgm \
             build/stock-install-installed.pgm \
             build/stock-run-files.pgm \
             build/stock-run-sd.pgm \
             build/stock-run-sd-payload.pgm \
             build/stock-run-copy-destination.pgm \
             build/stock-run-copy-result.pgm \
-            build/stock-run-home.pgm \
-            build/stock-run-vars.pgm \
+            build/stock-run-recalled-in-filer.pgm \
+            build/stock-run-filer-halt-menu.pgm \
             build/stock-run-payload-recalled.pgm \
             build/stock-run-lib.pgm \
             build/stock-run-port2.pgm \
