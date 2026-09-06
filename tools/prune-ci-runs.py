@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 api = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
 repo = os.environ["GITHUB_REPOSITORY"]
@@ -44,18 +46,33 @@ for run in runs:
     if run["status"] == "completed" and run["id"] != current_run:
         by_workflow[run["workflow_id"]].append(run)
 
-deleted = 0
+victims: list[dict] = []
 for workflow_id, items in sorted(by_workflow.items()):
     items.sort(
         key=lambda run: (run["created_at"], run["run_number"], run["id"]),
         reverse=True,
     )
-    for run in items[keep:]:
-        print(
-            f"delete workflow={workflow_id} run={run['id']} "
-            f"number={run['run_number']} conclusion={run['conclusion']}"
-        )
+    victims.extend(items[keep:])
+
+
+def delete_run(run: dict) -> int:
+    try:
         request(f"{api}/repos/{repo}/actions/runs/{run['id']}", method="DELETE")
-        deleted += 1
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return 0
+        raise
+    print(
+        f"deleted run={run['id']} workflow={run['workflow_id']} "
+        f"number={run['run_number']} conclusion={run['conclusion']}"
+    )
+    return 1
+
+
+deleted = 0
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures = [pool.submit(delete_run, run) for run in victims]
+    for future in as_completed(futures):
+        deleted += future.result()
 
 print(f"kept up to {keep} completed runs per workflow; deleted {deleted}")
