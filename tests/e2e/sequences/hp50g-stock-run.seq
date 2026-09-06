@@ -1,8 +1,6 @@
-# HP50g stock ARMToolbox launch.
-# SD contains only HPCLANG.HP. Copy the selected transfer file into HOME so
-# the stock firmware materializes the HPHP49-C transfer envelope as a native
-# calculator object. Recall that HOME variable, then run it through ARMToolbox
-# PrRUN.
+# HP50g launch through the original UI and ARMToolbox.
+# Copy HPCLANG.HP from SD to HOME, recall the native object from File Manager,
+# return to the stack with HALT, then enter library 275 and run PrRUN.
 2000 chord lshift files
 4200 capture files
 4500 tap up
@@ -16,17 +14,18 @@
 9500 tap down
 9800 tap f6
 11600 capture copy-result
-12100 tap on
-13000 capture home
-13400 tap var
-14500 capture vars
-14900 chord rshift f3
-16000 capture payload-recalled
-16500 chord rshift two
-17750 capture lib
-18100 tap f3
-19400 capture port2
-19800 tap f4
-21100 capture armtoolbox
-21500 tap f1
-21800 monitor
+12100 tap f4
+13400 capture recalled-in-filer
+13800 tap nxt
+14200 tap nxt
+15000 capture filer-halt-menu
+15400 tap f1
+16700 capture payload-recalled
+17200 chord rshift two
+18450 capture lib
+18800 tap f3
+20100 capture port2
+20500 tap f4
+21800 capture armtoolbox
+22200 tap f1
+22500 monitor
