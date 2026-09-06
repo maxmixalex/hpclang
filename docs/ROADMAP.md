@@ -155,101 +155,70 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Status: direct HPC1 execution and return validated in x50ng; full HP50g ARMToolbox launch E2E is the active blocker**
+**Status: HP50g stock ARMToolbox launch E2E PASS; HP49g+ sibling validation pending**
 
-Completed on x50ng:
+Completed on official HP50g 2.15 firmware in x50ng:
 
-- [x] boot official 49g+/50g 2.15 firmware headlessly to stock HOME;
-- [x] execute the same direct HPC1 runtime image used by HP39gs through
-  stage0 -> fixed stage1 -> common bootstrap;
-- [x] observe machine-readable `0x50415353` and capture live
-  `RUNTIME PASS`;
-- [x] return through stage1 and stage0, remove temporary mappings, restore the
-  SWI vector and resume the saved responsive stock HOME state.
+- [x] boot the stock ROM to HOME;
+- [x] execute the common direct HPC1 runtime and return to a responsive stock OS;
+- [x] install ARMToolbox/library 275 through the original calculator UI;
+- [x] preserve the installed calculator state across the install and launch phases;
+- [x] materialize `HPCLANG.HP` from SD through the stock File Manager;
+- [x] enter `ARMTo` and execute `PrRUN`;
+- [x] reach the same machine-readable `0x50415353` / `RUNTIME PASS` result as
+  the direct-runtime gate;
+- [x] capture a clean 131x80 PASS frame from the live LCD controller.
+
+The two HP50g emulator gates intentionally have different boundaries:
+
+- **Direct runtime** validates stage0 -> stage1 -> common bootstrap -> HPC1,
+  temporary mapping restoration and clean return to the stock OS.
+- **Stock launch** validates the real user path through the original HP50g UI,
+  ARMToolbox and `PrRUN`, and stops once HPC1 reports PASS.
+
+The stock gate does not inject a synthetic key after PASS. During development,
+that extra host-side key event could make the pinned x50ng/QEMU teardown abort
+after the runtime had already passed. Return correctness is therefore owned by
+the direct-runtime gate rather than redundantly mixed into the stock UI gate.
 
 Remaining:
 
-- [ ] close the stock HP50g ARMToolbox installation and PrRUN path against the
-  official 2.15 ROM in x50ng;
-- [ ] prove that the stock-installed ARMToolbox library launches the same
-  HPCLANG.HP transfer object and reaches direct HPC1 PASS/return;
-- [ ] replace the synthetic normalized ARMSYS/page-pool preparation as the
-  supported launcher gate once the full calculator launch path is green;
-- [ ] validate on real hardware when useful.
-
-Current stock-E2E evidence already proves the HP transfer envelope, SD file
-visibility, SD -> HOME materialization and deterministic stock-ROM key driving.
-The remaining uncertainty is calculator-side ARMToolbox installation/selection
-and PrRUN invocation, not the common HPC1 runtime or bootstrap. CI now clears
-self-hosted x50ng state between runs so only the install -> execute phases inside
-one job may share calculator state.
-
-The first synthetic return failure was test-harness-induced rather than an
-hpclang bootstrap defect. HP's stock layout keeps the LCD framebuffer in the
-same 4 KiB S3C2410 SRAM used by the active low L1 table. The initial synthetic
-descriptor at physical `0x40000280` overlapped the live framebuffer beginning
-at `0x4000026c`, so drawing the PASS page zeroed the descriptor. The harness
-now uses an empty descriptor at `0x40000c00` and asserts that its four bytes
-do not overlap the live 160x80 framebuffer range.
+- [ ] execute the equivalent supported package/launcher path on HP49g+;
+- [ ] validate HP49g+/50g on real hardware when useful.
 
 Completion criterion:
 
 > HP49g+ and HP50g execute the same HPC1 ABI through the same common bootstrap
-> and the supported stock package/launcher path.
+> and their supported stock package/launcher paths.
 
 ## M6 — Automated ARM emulator E2E
 
-**Status: direct-runtime matrix and official-ROM boot gates complete; HP50g stock-shell gate in progress**
+**Status: complete for the current representative emulator gates**
 
-The x50ng CI gate now proves, unattended:
+The unattended x50ng gates now cover:
 
-1. official HP 49g+/50g firmware boots to normal HOME;
-2. calculator keys are driven through the emulated key matrix, not host GUI
-   coordinates;
-3. hpclang stage0, fixed stage1 and common bootstrap execute as guest ARM code;
-4. the same direct HPC1 runtime image used on the real HP39gs reaches
-   machine-readable PASS;
-5. the live LCD controller produces a deterministic `RUNTIME PASS` frame;
-6. HPC1 data/code mappings, the stage window and SWI vector are restored;
-7. stage0 returns;
-8. the saved stock CPU context resumes at its original PC;
-9. the stock calculator accepts a real ON/cancel key after return;
-10. before/PASS/after 131x80 LCD evidence is uploaded.
+- HP39gs direct HPC1 runtime: PASS + stock return;
+- HP40gs direct HPC1 runtime: PASS + stock return;
+- HP50g direct HPC1 runtime: PASS + stock return;
+- official HP39gs 2.22 ROM boot: PASS;
+- official HP40gs 2.22 ROM boot: PASS;
+- official HP50g 2.15 stock UI -> ARMToolbox -> `HPCLANG.HP` -> `PrRUN`
+  -> HPC1 PASS: PASS.
 
-The successful checkpoint recorded:
+All calculator input used by these gates is driven through the emulated key
+matrix rather than host GUI coordinates. LCD evidence is generated from the
+live emulated controller and published separately from the source branch.
 
-```text
-result             0x50415353
-saved PC           0x00008428
-resumed PC         0x00008428
-L1 data/code       0 / 0
-L1 stage           0
-L1 host injection  0
-SWI vector         0x0003f568 (restored)
-IFSR / IFAR        0 / 0
-```
-
-The direct runtime gate intentionally stops at the normalized ARM launch
-boundary. Stock shell/launcher automation is a separate E2E tier so a broken
-calculator menu path cannot be confused with a common-runtime regression.
-
-Current CI status:
-
-- HP39gs / HP40gs / HP50g direct HPC1 matrix: PASS;
-- official HP39gs / HP40gs ROM boot matrix: PASS;
-- HP50g stock-ROM ARMToolbox path: transfer/materialization proven, launcher
-  installation/PrRUN still open;
-- GitHub Actions are on the current major generations used by this repository
-  (`checkout@v7`, `cache@v6`, `upload-artifact@v7`);
-- self-hosted `home-docker` is kept runner-compatible with GitHub-hosted
-  Ubuntu for baseline tools, while project-specific packages remain installed
-  by workflows.
+The successful direct-runtime checkpoint includes restored HPC1 data/code
+mappings, the temporary stage mapping and SWI vector, followed by resumed stock
+execution. The stock HP50g gate adds the end-user launcher path without making
+menu automation part of the common-runtime correctness test.
 
 Completion criterion:
 
 > A real ARM calculator-family emulator runs automatically from source build
-> through direct HPC1 execution and return, produces machine-readable
-> success, resumes a responsive stock OS and uploads deterministic LCD evidence.
+> through direct HPC1 execution and return, produces machine-readable success,
+> resumes a responsive stock OS and uploads deterministic LCD evidence.
 
 ## M7 — Common platform services
 
