@@ -15,6 +15,7 @@ repo = os.environ["GITHUB_REPOSITORY"]
 token = os.environ["GITHUB_TOKEN"]
 current_run = int(os.environ.get("GITHUB_RUN_ID", "0"))
 keep = int(os.environ.get("KEEP_RUNS_PER_WORKFLOW", "20"))
+inactive_keep = int(os.environ.get("KEEP_INACTIVE_RUNS", "2"))
 
 
 def request(url: str, method: str = "GET") -> dict | None:
@@ -41,6 +42,15 @@ for page in range(1, 101):
     if len(batch) < 100:
         break
 
+workflow_entries = request(
+    f"{api}/repos/{repo}/contents/.github/workflows?ref=main"
+)
+current_paths = {
+    item["path"]
+    for item in workflow_entries
+    if item.get("type") == "file"
+}
+
 by_workflow: dict[int, list[dict]] = defaultdict(list)
 for run in runs:
     if run["status"] == "completed" and run["id"] != current_run:
@@ -52,7 +62,9 @@ for workflow_id, items in sorted(by_workflow.items()):
         key=lambda run: (run["created_at"], run["run_number"], run["id"]),
         reverse=True,
     )
-    victims.extend(items[keep:])
+    is_current = any(run["path"] in current_paths for run in items)
+    limit = keep if is_current else inactive_keep
+    victims.extend(items[limit:])
 
 
 def delete_run(run: dict) -> int:
@@ -75,4 +87,7 @@ with ThreadPoolExecutor(max_workers=8) as pool:
     for future in as_completed(futures):
         deleted += future.result()
 
-print(f"kept up to {keep} completed runs per workflow; deleted {deleted}")
+print(
+    f"kept up to {keep} runs for current workflows and "
+    f"{inactive_keep} for removed workflows; deleted {deleted}"
+)
