@@ -198,7 +198,6 @@ jobs:
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
             --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
-            --flash \
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
 
