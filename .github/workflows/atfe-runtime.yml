@@ -1,4 +1,4 @@
-name: Core runtime
+name: CI / Core runtime
 
 on:
   push:
