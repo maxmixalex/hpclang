@@ -214,6 +214,13 @@ mappings, the temporary stage mapping and SWI vector, followed by resumed stock
 execution. The stock HP50g gate adds the end-user launcher path without making
 menu automation part of the common-runtime correctness test.
 
+CI screenshots live on the dedicated orphan `ci-evidence` branch and are
+tracked through Git LFS. Weekly maintenance keeps the newest 20 evidence run
+directories per family, rewrites that branch as a single root history, keeps up
+to 20 completed runs for current workflows and only 2 for removed workflows.
+Transient E2E artifacts use short retention windows rather than accumulating
+indefinitely.
+
 Completion criterion:
 
 > A real ARM calculator-family emulator runs automatically from source build
