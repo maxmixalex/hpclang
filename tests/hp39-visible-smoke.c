@@ -14,9 +14,9 @@
 #define GPGDAT REG32(0x07A00064u)
 #endif
 
-#define WIDTH  131
-#define HEIGHT 64
-#define STRIDE 20
+#define WIDTH      131
+#define MAX_HEIGHT 80
+#define STRIDE     20
 
 void hpclang_diag_step(uint32_t step);
 
@@ -51,7 +51,7 @@ static volatile uint8_t *framebuffer(void)
 
 static void pixel(volatile uint8_t *fb, int x, int y)
 {
-    if ((unsigned)x >= WIDTH || (unsigned)y >= HEIGHT)
+    if ((unsigned)x >= WIDTH || (unsigned)y >= MAX_HEIGHT)
         return;
 
     volatile uint8_t *p = fb + y * STRIDE + (x >> 3);
@@ -131,9 +131,17 @@ static void hex2(volatile uint8_t *fb, int x, int y, uint32_t value)
     glyph(fb, x + 4, y, digits[value & 15u]);
 }
 
-static void clear(volatile uint8_t *fb)
+static int display_height(uint32_t model)
 {
-    for (int y = 0; y < HEIGHT; ++y) {
+    return model == HPCLANG_MODEL_HP49GPLUS ||
+           model == HPCLANG_MODEL_HP50G
+        ? 80
+        : 64;
+}
+
+static void clear(volatile uint8_t *fb, uint32_t model)
+{
+    for (int y = 0; y < display_height(model); ++y) {
         for (int x = 0; x < 16; ++x)
             fb[y * STRIDE + x] = 0;
         fb[y * STRIDE + 16] &= 0xf8u;
@@ -168,9 +176,9 @@ static void hold_result(void)
 {
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
     /*
-     * Stock HP50g E2E uses an explicit acknowledgement so PASS cannot vanish
-     * before the host observes it. Ignore a pre-held ENTER, then require one
-     * complete press/release cycle.
+     * Keep the interactive HP50g result visible until ENTER. Automated stock
+     * E2E stops the emulator as soon as it observes PASS, so it does not inject
+     * a keyboard interrupt into the launcher return path.
      */
     while (enter_pressed())
         ;
@@ -188,11 +196,11 @@ static void hold_result(void)
 #endif
 }
 
-static int finish(uint32_t failure)
+static int finish(uint32_t failure, uint32_t model)
 {
     volatile uint8_t *fb = framebuffer();
 
-    clear(fb);
+    clear(fb, model);
     if (failure == 0) {
         text(fb, 38, 28, "RUNTIME PASS");
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
@@ -226,55 +234,55 @@ int main(void)
     const struct hpclang_boot_info *boot = hpclang_boot_info();
 
     if (!supported_model(boot->model) || boot->rw_bytes < 0x4000u)
-        return finish(0x01);
+        return finish(0x01, boot->model);
 
     hpclang_diag_step(0x11);
 
     if (hpclang_initialized_probe != 0x13579bdfu)
-        return finish(0x02);
+        return finish(0x02, boot->model);
 
     if (hpclang_bss_probe != 0u)
-        return finish(0x03);
+        return finish(0x03, boot->model);
 
     hpclang_diag_step(0x12);
 
     if (hpclang_tls_initialized != 0x2468ace0u || hpclang_tls_zero != 0u)
-        return finish(0x04);
+        return finish(0x04, boot->model);
     hpclang_tls_initialized ^= 0xffffffffu;
     hpclang_tls_zero = 0x11223344u;
     if (hpclang_tls_initialized != 0xdb97531fu ||
         hpclang_tls_zero != 0x11223344u)
-        return finish(0x05);
+        return finish(0x05, boot->model);
 
     hpclang_diag_step(0x13);
 
     if (hpclang_ctor_probe != 0xc0def00du)
-        return finish(0x06);
+        return finish(0x06, boot->model);
 
     hpclang_diag_step(0x14);
     uint32_t q32 = hpclang_u32_a / hpclang_u32_b;
     if (q32 != 10309u)
-        return finish(0x07);
+        return finish(0x07, boot->model);
 
     hpclang_diag_step(0x15);
     uint64_t q64 = hpclang_u64_a / hpclang_u64_b;
     if (q64 != UINT64_C(1311764532170))
-        return finish(0x08);
+        return finish(0x08, boot->model);
 
     hpclang_diag_step(0x16);
     volatile double mul = hpclang_double_a * hpclang_double_b;
     hpclang_diag_step(0x61);
     if (!(mul > 4.37 && mul < 4.38))
-        return finish(0x09);
+        return finish(0x09, boot->model);
 
     volatile double fp = mul + 0.5;
     hpclang_diag_step(0x62);
     if (!(fp > 4.87))
-        return finish(0x09);
+        return finish(0x09, boot->model);
 
     hpclang_diag_step(0x63);
     if (!(fp < 4.88))
-        return finish(0x09);
+        return finish(0x09, boot->model);
 
     hpclang_diag_step(0x64);
 
@@ -284,16 +292,16 @@ int main(void)
     memset(copy, 0, sizeof(copy));
     memcpy(copy, src, sizeof(src));
     if (strlen(copy) != 7u || strcmp(copy, "hpclang") != 0)
-        return finish(0x0a);
+        return finish(0x0a, boot->model);
 
     hpclang_diag_step(0x18);
     char *heap = malloc(24);
     if (heap == NULL)
-        return finish(0x0b);
+        return finish(0x0b, boot->model);
     memset(heap, 0, 24);
     memcpy(heap, copy, sizeof(src));
     if (strcmp(heap, "hpclang") != 0)
-        return finish(0x0c);
+        return finish(0x0c, boot->model);
 
     hpclang_diag_step(0x19);
     char formatted[64];
@@ -306,10 +314,10 @@ int main(void)
         (unsigned long long)q64);
     if (n <= 0 ||
         strcmp(formatted, "hpclang:10309:1311764532170") != 0)
-        return finish(0x0d);
+        return finish(0x0d, boot->model);
 
     hpclang_diag_step(0x1a);
     free(heap);
     hpclang_diag_step(0x1b);
-    return finish(0);
+    return finish(0, boot->model);
 }
