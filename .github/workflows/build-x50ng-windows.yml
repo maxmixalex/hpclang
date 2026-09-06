@@ -119,6 +119,8 @@ jobs:
           text = fq.read_text()
           if "hpclang_host_aligned_alloc" not in text:
               shim = """#ifdef _WIN32
+          #include <stddef.h>
+          #include <stdlib.h>
           static void *hpclang_host_aligned_alloc(size_t alignment, size_t size)
           {
               size_t rounded = (size + alignment - 1) / alignment * alignment;
