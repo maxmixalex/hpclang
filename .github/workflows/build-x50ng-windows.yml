@@ -95,32 +95,32 @@ jobs:
           done
 
           cat > "$out/README.txt" <<'EOF'
-x50ng Windows GUI build for hpclang HP50g launch testing
+          x50ng Windows GUI build for hpclang HP50g launch testing
 
-Source:
-  https://codeberg.org/gwh/x50ng
-Pinned commit:
-  003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
+          Source:
+            https://codeberg.org/gwh/x50ng
+          Pinned commit:
+            003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
 
-This package contains x50ng and its MSYS2/UCRT64 runtime DLLs.
-HP firmware/ROM files are not redistributed in this package.
+          This package contains x50ng and its MSYS2/UCRT64 runtime DLLs.
+          HP firmware/ROM files are not redistributed in this package.
 
-Current ARMToolbox installation check:
-  1. Put the HP50g in RPN mode.
-  2. Put SETUP.BIN on the emulated SD card.
-  3. The historical x49gp HPGCC2 instructions say:
-       2
-       SETUP.BIN
-       3
-       ->TAG
-       RCL
-       EVAL
-       ON+C (warmstart)
-  4. Open RS+LIB and inspect port 2.
-  5. Success means ARMToolbox/library 275 appears.
+          Current ARMToolbox installation check:
+            1. Put the HP50g in RPN mode.
+            2. Put SETUP.BIN on the emulated SD card.
+            3. The historical x49gp HPGCC2 instructions say:
+                 2
+                 SETUP.BIN
+                 3
+                 ->TAG
+                 RCL
+                 EVAL
+                 ON+C (warmstart)
+            4. Open RS+LIB and inspect port 2.
+            5. Success means ARMToolbox/library 275 appears.
 
-Please report exactly what appears after each step if the sequence differs.
-EOF
+          Please report exactly what appears after each step if the sequence differs.
+          EOF
 
           (cd "$GITHUB_WORKSPACE" && zip -9r x50ng-windows-x64.zip x50ng-windows-x64)
 
