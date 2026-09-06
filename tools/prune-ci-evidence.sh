@@ -6,7 +6,7 @@ keep="${KEEP_EVIDENCE_RUNS:-20}"
 git lfs install --local >/dev/null
 
 # Keep only CI images and the attributes file.
-find . -path ./.git -prune -o -type f \
+find . -type f ! -path './.git/*' \
   ! -name .gitattributes \
   ! -iname '*.png' ! -iname '*.jpg' ! -iname '*.jpeg' \
   ! -iname '*.webp' ! -iname '*.gif' -delete
@@ -35,7 +35,7 @@ while IFS= read -r -d '' image; do
     mkdir -p "$tmp/$(dirname "$rel")"
     cp "$image" "$tmp/$rel"
 done < <(
-    find . -path ./.git -prune -o -type f \
+    find . -type f ! -path './.git/*' \
       \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
          -o -iname '*.webp' -o -iname '*.gif' \) -print0
 )
