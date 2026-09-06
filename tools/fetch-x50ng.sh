@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-    echo "usage: $0 <dest> <frontend> <mode> [reserve-ram]" >&2
+    echo "usage: $0 <dest> <frontend> <mode> [reserve-ram] [host-uart0]" >&2
     exit 2
 fi
 
@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$1"
 FRONTEND="$2"
 MODE="$3"
-RESERVE="${4:-}"
+shift 3
 
 PIN="003533d9eca3f6ded36c6ab80b8dbc0563e31d9a"
 
@@ -34,8 +34,16 @@ elif [[ "$MODE" != "hp4950" ]]; then
     echo "unknown x50ng mode: $MODE" >&2
     exit 2
 fi
-if [[ "$RESERVE" == "reserve-ram" ]]; then
-    args+=(--reserve-ram)
-fi
+
+for option in "$@"; do
+    case "$option" in
+        reserve-ram) args+=(--reserve-ram) ;;
+        host-uart0) args+=(--host-uart0) ;;
+        *)
+            echo "unknown x50ng preparation option: $option" >&2
+            exit 2
+            ;;
+    esac
+done
 
 python3 "${args[@]}"
