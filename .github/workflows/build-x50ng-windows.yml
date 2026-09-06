@@ -1,10 +1,7 @@
-name: Build / x50ng Windows GUI
+name: Tools / x50ng Windows GUI
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/build-x50ng-windows.yml"
 
 permissions:
   contents: read
