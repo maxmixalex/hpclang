@@ -104,6 +104,16 @@ jobs:
           if old not in text:
               raise SystemExit("x50ng hdw.h times.h anchor changed")
           hdw.write_text(text.replace(old, new, 1))
+
+          rtc = Path("x50ng/src/s3c2410/s3c2410_rtc.c")
+          text = rtc.read_text()
+          old_call = "tm = localtime( &tv.tv_sec );"
+          new_call = """time_t hpclang_host_time = (time_t)tv.tv_sec;
+              tm = localtime( &hpclang_host_time );"""
+          count = text.count(old_call)
+          if count != 2:
+              raise SystemExit(f"x50ng rtc localtime anchors changed: {count}")
+          rtc.write_text(text.replace(old_call, new_call))
           PY
 
           grep -R -nE 'times\\(|struct tms|GetTempPath|GetTempFileName' x50ng/src | head -n 80 || true
