@@ -1,4 +1,4 @@
-name: HP39 package
+name: CI / HP39 package
 
 on:
   push:
@@ -139,6 +139,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: hpclang-hp39gs-hardware-validation
+          retention-days: 30
           path: dist/hp39gs-hardware-validation/
           if-no-files-found: error
 
@@ -146,5 +147,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: hpclang-hp40gs-hardware-validation
+          retention-days: 30
           path: dist/hp40gs-hardware-validation/
           if-no-files-found: error
