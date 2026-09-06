@@ -180,6 +180,25 @@ jobs:
           if "#include <time.h>" not in text:
               text = "#include <time.h>\n" + text
           api.write_text(text)
+
+          gdb = Path("x50ng/src/gdbstub.c")
+          text = gdb.read_text()
+          poll_include = "#include <sys/poll.h>"
+          if poll_include not in text:
+              raise SystemExit("x50ng gdbstub poll header anchor changed")
+          text = text.replace(
+              poll_include,
+              """#ifdef _WIN32
+          #include <winsock2.h>
+          typedef unsigned long nfds_t;
+          #define poll(fds, nfds, timeout) \\
+              WSAPoll((LPWSAPOLLFD)(fds), (ULONG)(nfds), (INT)(timeout))
+          #else
+          #include <sys/poll.h>
+          #endif""",
+              1,
+          )
+          gdb.write_text(text)
           PY
 
           grep -R -nE 'times\\(|struct tms|GetTempPath|GetTempFileName|qemu_vfree|qemu_memalign|qemu_vmalloc' x50ng/src | head -n 120 || true
@@ -187,7 +206,7 @@ jobs:
       - name: Build x50ng GUI
         run: |
           grep -nE 'LDFLAGS|LDLIBS|LIBS|^LD' x50ng/Makefile || true
-          make -C x50ng -j2 LDFLAGS="-lmman" LIBS="-lmman" LDLIBS="-lmman"
+          make -C x50ng -j2 LDFLAGS="-lmman -lws2_32" LIBS="-lmman -lws2_32" LDLIBS="-lmman -lws2_32"
 
       - name: Inspect executable
         run: |
