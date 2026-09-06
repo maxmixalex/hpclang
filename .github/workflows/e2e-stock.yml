@@ -222,9 +222,6 @@ jobs:
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled-in-filer.pgm \
-            build/stock-install-filer-halt-menu.pgm \
-            build/stock-install-recalled-stack.pgm \
             build/stock-install-setup-evaluated.pgm \
             build/stock-install-warmstart.pgm \
             build/stock-install-lib.pgm \
@@ -271,9 +268,6 @@ jobs:
             build/stock-install-files.pgm \
             build/stock-install-sd.pgm \
             build/stock-install-sd-setup.pgm \
-            build/stock-install-recalled-in-filer.pgm \
-            build/stock-install-filer-halt-menu.pgm \
-            build/stock-install-recalled-stack.pgm \
             build/stock-install-setup-evaluated.pgm \
             build/stock-install-warmstart.pgm \
             build/stock-install-lib.pgm \
