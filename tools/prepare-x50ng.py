@@ -21,6 +21,7 @@ def main() -> None:
     parser.add_argument("--frontend", type=Path, required=True)
     parser.add_argument("--headless-header", type=Path, required=True)
     parser.add_argument("--little-apple", action="store_true")
+    parser.add_argument("--hp48gii", action="store_true")
     parser.add_argument("--reserve-ram", action="store_true")
     args = parser.parse_args()
 
@@ -36,6 +37,27 @@ def main() -> None:
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0''',
             "Little-Apple firmware header",
+        )
+
+    if args.hp48gii:
+        replace_once(
+            root / "src" / "sram.c",
+            "#define S3C2410_SRAM_SIZE 0x00080000",
+            "#define S3C2410_SRAM_SIZE 0x00040000",
+            "HP48gII SRAM mapping size",
+        )
+        replace_once(
+            root / "src" / "sram.c",
+            "    sram->size = 0x00080000;",
+            "    sram->size = S3C2410_SRAM_SIZE;",
+            "HP48gII SRAM backing size",
+        )
+        replace_once(
+            root / "src" / "flash.c",
+            'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
+            '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP48GIIMAGE", 16 ) != 0''',
+            "HP48gII firmware header",
         )
 
     if args.reserve_ram:

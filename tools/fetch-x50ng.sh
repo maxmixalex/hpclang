@@ -28,6 +28,11 @@ args=(
 
 if [[ "$MODE" == "little-apple" ]]; then
     args+=(--little-apple)
+elif [[ "$MODE" == "hp48gii" ]]; then
+    args+=(--hp48gii)
+elif [[ "$MODE" != "hp4950" ]]; then
+    echo "unknown x50ng mode: $MODE" >&2
+    exit 2
 fi
 if [[ "$RESERVE" == "reserve-ram" ]]; then
     args+=(--reserve-ram)
