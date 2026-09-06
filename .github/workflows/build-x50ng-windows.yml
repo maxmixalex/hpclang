@@ -47,6 +47,50 @@ jobs:
           git -C x50ng submodule update --init --recursive
           printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > x50ng-source.txt
 
+      - name: Apply Windows host portability patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          block = Path("x50ng/src/s3c2410/block.c")
+          text = block.read_text()
+          if "#include <windows.h>" not in text:
+              text = "#ifdef _WIN32\n#include <windows.h>\n#endif\n" + text
+          block.write_text(text)
+
+          hdw = Path("x50ng/src/hdw.h")
+          text = hdw.read_text()
+          old = "#include <sys/times.h>"
+          new = """#ifdef _WIN32
+          #include <time.h>
+          struct tms {
+              clock_t tms_utime;
+              clock_t tms_stime;
+              clock_t tms_cutime;
+              clock_t tms_cstime;
+          };
+          static inline clock_t hpclang_host_times(struct tms *buffer)
+          {
+              clock_t now = clock();
+              if (buffer) {
+                  buffer->tms_utime = now;
+                  buffer->tms_stime = 0;
+                  buffer->tms_cutime = 0;
+                  buffer->tms_cstime = 0;
+              }
+              return now;
+          }
+          #define times hpclang_host_times
+          #else
+          #include <sys/times.h>
+          #endif"""
+          if old not in text:
+              raise SystemExit("x50ng hdw.h times.h anchor changed")
+          hdw.write_text(text.replace(old, new, 1))
+          PY
+
+          grep -R -nE 'times\\(|struct tms|GetTempPath|GetTempFileName' x50ng/src | head -n 80 || true
+
       - name: Build x50ng GUI
         run: |
           make -C x50ng -j2
