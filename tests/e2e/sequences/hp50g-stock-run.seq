@@ -1,6 +1,7 @@
 # HP50g launch through the original UI and ARMToolbox.
 # Copy HPCLANG.HP from SD to HOME, recall the native object from File Manager,
-# return to the stack with HALT, then enter library 275 and run PrRUN.
+# return to the stack with HALT, then follow the hardware-verified library menu:
+# RS+LIB exposes ARMTo on F1, and ARMTo exposes PrRUN on F1.
 2000 chord lshift files
 4200 capture files
 4500 tap up
@@ -23,9 +24,7 @@
 16700 capture payload-recalled
 17200 chord rshift two
 18450 capture lib
-18800 tap f3
-20100 capture port2
-20500 tap f4
-21800 capture armtoolbox
-22200 tap f1
-22500 monitor
+18800 tap f1
+20100 capture armtoolbox
+20500 tap f1
+20800 monitor
