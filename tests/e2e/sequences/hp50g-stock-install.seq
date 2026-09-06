@@ -1,38 +1,31 @@
-# HP50g ARMToolbox install using x49gp's HPGCC2 semantics.
-# Keep integer port 2 on the stack, recall SETUP.BIN from SD, HALT the
-# File Manager back to the stack, EVAL the recalled installer, warmstart,
-# then verify library 275 in port 2.
+# HP50g ARMToolbox install through the original File Manager.
+# Put real destination port 2. on the stack, select the actual SETUP.BIN
+# on SD, execute the selected installer, warmstart, then verify library 275.
 2000 tap f6
 4000 tap f6
 5000 tap mode
 5500 tap neg
 6000 tap f6
 6500 tap two
-6800 tap enter
-7600 capture port-number
-8200 chord lshift files
-10400 capture files
-10700 tap up
-11000 tap f6
-12700 capture sd
-13200 tap enter
+6800 tap period
+7100 tap enter
+7900 capture port-number
+8500 chord lshift files
+10700 capture files
+11000 tap up
+11300 tap f6
+13000 capture sd
+13300 tap enter
 13600 tap down
 14300 capture sd-setup
-14700 tap f4
-16000 capture recalled-in-filer
-16400 tap nxt
-16800 tap nxt
-17600 capture filer-halt-menu
-18000 tap f1
-19300 capture recalled-stack
-19800 tap eval
-21500 capture setup-evaluated
-22500 chord on f3
-24500 capture warmstart
-25000 chord rshift two
-26200 capture lib
-26600 tap f3
-27900 capture port2
-28300 tap f4
-29600 capture armtoolbox
-30000 finish-install
+14700 tap f5
+16500 capture setup-evaluated
+17500 chord on f3
+19500 capture warmstart
+20000 chord rshift two
+21200 capture lib
+21600 tap f3
+22900 capture port2
+23300 tap f4
+24600 capture armtoolbox
+25000 finish-install
