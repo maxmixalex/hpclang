@@ -1,0 +1,55 @@
+name: Maintenance / CI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 0"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ci-maintenance.yml"
+      - "tools/prune-ci-runs.py"
+      - "tools/prune-ci-evidence.sh"
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: ci-maintenance
+  cancel-in-progress: true
+
+jobs:
+  maintenance:
+    runs-on: home-docker
+    timeout-minutes: 15
+    steps:
+      - name: Ensure Git LFS
+        run: |
+          if ! git lfs version >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends git-lfs
+          fi
+
+      - name: Checkout maintenance scripts
+        uses: actions/checkout@v7
+
+      - name: Prune old Actions runs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KEEP_RUNS_PER_WORKFLOW: "20"
+        run: python3 tools/prune-ci-runs.py
+
+      - name: Checkout CI evidence
+        uses: actions/checkout@v7
+        with:
+          ref: ci-evidence
+          path: evidence
+          fetch-depth: 0
+          lfs: true
+
+      - name: Prune CI evidence branch
+        working-directory: evidence
+        env:
+          KEEP_EVIDENCE_RUNS: "20"
+        run: bash ../tools/prune-ci-evidence.sh
