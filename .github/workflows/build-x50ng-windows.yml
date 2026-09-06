@@ -137,15 +137,16 @@ jobs:
 
           api = Path("x50ng/src/emulator_api.c")
           text = api.read_text()
-          old_clock = "sysconf(_SC_CLK_TCK)"
-          if old_clock not in text:
-              raise SystemExit("x50ng emulator_api clock anchor changed")
-          text = text.replace(
-              old_clock,
-              "(long)CLOCKS_PER_SEC" if "#ifdef _WIN32" not in text else old_clock,
-              1,
+          import re
+          text, count = re.subn(
+              r"sysconf\s*\(\s*_SC_CLK_TCK\s*\)",
+              "(long)CLOCKS_PER_SEC",
+              text,
+              count=1,
           )
-          if "(long)CLOCKS_PER_SEC" in text and "#include <time.h>" not in text:
+          if count != 1:
+              raise SystemExit(f"x50ng emulator_api clock anchor changed: {count}")
+          if "#include <time.h>" not in text:
               text = "#include <time.h>\n" + text
           api.write_text(text)
           PY
