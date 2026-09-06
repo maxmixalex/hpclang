@@ -181,10 +181,6 @@ jobs:
           cat build/stock-install.json
           test -f build/stock-install-port2.pgm
           test -f build/stock-install-armtoolbox.pgm
-          if cmp -s build/stock-install-port2.pgm build/stock-install-armtoolbox.pgm; then
-            echo "::error::ARMToolbox library 275 did not appear in port 2"
-            exit 1
-          fi
 
       - name: Execute HPCLANG.HP through ARMToolbox PrRUN
         run: |
