@@ -34,6 +34,11 @@ COMMON=(
     -I"$ROOT/include"
 )
 
+VISIBLE_TEST_DEFINES=()
+if [[ "${HPCLANG_E2E_WAIT_FOR_ENTER:-0}" == "1" ]]; then
+    VISIBLE_TEST_DEFINES+=(-DHPCLANG_E2E_WAIT_FOR_ENTER=1)
+fi
+
 echo "== host generic soft-float self-test =="
 cc -std=c11 -O2 -Wall -Wextra -Werror \
     "$ROOT/runtime/core/armv4t-softfloat.c" \
@@ -151,7 +156,7 @@ echo "PASS: stock ARMToolbox stage1 is fixed-address, non-PIC and self-contained
 echo
 echo "== HP39 hardware runtime validation =="
 
-"$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
+"$CC" "${COMMON[@]}" "${VISIBLE_TEST_DEFINES[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-runtime-diag.c" -o "$OUT/hp39-runtime-diag.o"
 
 "$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/hp39-runtime-diag.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
