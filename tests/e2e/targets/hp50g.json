@@ -3,5 +3,7 @@
   "family": "hp4950",
   "model": 6,
   "archive": "",
-  "member": ""
+  "member": "",
+  "x50ng_model": "50g",
+  "lcd_height": 80
 }

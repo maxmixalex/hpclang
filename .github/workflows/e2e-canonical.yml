@@ -55,12 +55,12 @@ jobs:
     runs-on: home-docker
     timeout-minutes: 25
     env:
-      X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp50g' && 'hp4950' || 'little-apple' }}
+      X50NG_BUILD_VARIANT: ${{ (matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'little-apple' }}
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        target: [hp39gs, hp40gs, hp50g]
+        target: [hp39gs, hp40gs, hp49gplus, hp50g]
 
     steps:
       - uses: actions/checkout@v7
@@ -160,6 +160,7 @@ jobs:
           export HPCLANG_X50NG_PASS_PGM="$GITHUB_WORKSPACE/build/$TARGET-pass.pgm"
           export HPCLANG_X50NG_RETURN_PGM="$GITHUB_WORKSPACE/build/$TARGET-return.pgm"
           export HPCLANG_X50NG_E2E_JSON="$GITHUB_WORKSPACE/build/$TARGET-e2e.json"
+          export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
           if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
             STYLE="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
@@ -171,8 +172,14 @@ jobs:
             FIRMWARE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
           fi
 
+          MODEL_ARG=()
+          if [ -n "$HPCLANG_E2E_X50NG_MODEL" ]; then
+            MODEL_ARG=("--$HPCLANG_E2E_X50NG_MODEL")
+          fi
+
           mkdir -p "build/$TARGET-state"
           timeout 35s build/x50ng/dist/x50ng \
+            "${MODEL_ARG[@]}" \
             --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
             --overwrite-config \
             --style="$STYLE" \

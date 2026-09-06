@@ -13,7 +13,10 @@ def main() -> int:
 
     path = Path(sys.argv[1])
     data = json.loads(path.read_text(encoding="utf-8"))
-    required = {"target", "family", "model", "archive", "member"}
+    required = {
+        "target", "family", "model", "archive", "member",
+        "x50ng_model", "lcd_height",
+    }
     missing = sorted(required - data.keys())
     if missing:
         print(f"{path}: missing keys: {', '.join(missing)}", file=sys.stderr)
@@ -26,7 +29,10 @@ def main() -> int:
         )
         return 2
 
-    for key in ("target", "family", "model", "archive", "member"):
+    for key in (
+        "target", "family", "model", "archive", "member",
+        "x50ng_model", "lcd_height",
+    ):
         value = str(data[key])
         if "\n" in value or "\r" in value:
             print(f"{path}: newline in {key}", file=sys.stderr)

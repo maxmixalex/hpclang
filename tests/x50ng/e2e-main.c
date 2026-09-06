@@ -16,7 +16,6 @@
 #include "qemu/exec-all.h"
 
 #define LCD_W 131
-#define LCD_H 80
 
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
@@ -92,6 +91,7 @@ struct e2e {
     int saw_pass;
     int returned;
     int failed;
+    int lcd_height;
     int64_t deadline;
 };
 
@@ -123,7 +123,7 @@ static int guest_write32(hdw_t *h, uint32_t va, uint32_t v)
     return cpu_memory_rw_debug(h->cpu, va, b, 4, 1) == 0;
 }
 
-static unsigned capture_lcd(hdw_t *h, const char *path)
+static unsigned capture_lcd(hdw_t *h, const char *path, int height)
 {
     FILE *f = fopen(path, "wb");
     unsigned nonzero = 0;
@@ -131,8 +131,8 @@ static unsigned capture_lcd(hdw_t *h, const char *path)
     if (f == NULL)
         return 0;
 
-    fprintf(f, "P5\n%d %d\n255\n", LCD_W, LCD_H);
-    for (int y = 0; y < LCD_H; ++y) {
+    fprintf(f, "P5\n%d %d\n255\n", LCD_W, height);
+    for (int y = 0; y < height; ++y) {
         for (int x = 0; x < LCD_W; ++x) {
             int level = s3c2410_get_pixel_color(h->s3c2410_lcd, x, y);
             uint8_t pixel;
@@ -313,7 +313,7 @@ static int snapshot_stock(struct e2e *s)
     uint32_t l1_phys = s->hdw->cpu->cp15.c2_base0 & 0xffffc000u;
     uint32_t inject_desc_phys = l1_phys + 0x0c00u;
     uint32_t fb_phys = lcd_framebuffer_phys(s);
-    uint32_t fb_bytes = 160u * 80u / 8u;
+    uint32_t fb_bytes = 160u * (uint32_t)s->lcd_height / 8u;
 
     if (s->old_inject != 0u) {
         fprintf(stderr, "synthetic L1 slot 0x300 is not empty: %08x\n",
@@ -444,7 +444,7 @@ static int restore_stock(struct e2e *s)
 static void finish_return(void *arg)
 {
     struct e2e *s = arg;
-    unsigned pixels = capture_lcd(s->hdw, s->return_pgm);
+    unsigned pixels = capture_lcd(s->hdw, s->return_pgm, s->lcd_height);
 
     if (!is_display_on() || pixels == 0 ||
         s->hdw->cpu->regs[15] == SENTINEL_VA) {
@@ -470,14 +470,14 @@ static void monitor(void *arg)
         if (v == PASS_WORD) {
             s->result = v;
             s->saw_pass = 1;
-            if (!capture_lcd(s->hdw, s->pass_pgm)) {
+            if (!capture_lcd(s->hdw, s->pass_pgm, s->lcd_height)) {
                 fail(s, "pass-capture");
                 return;
             }
             fprintf(stderr, "HPC1 machine-readable PASS observed\n");
         } else if ((v & 0xffff0000u) == FAIL_PREFIX) {
             s->result = v;
-            (void)capture_lcd(s->hdw, s->pass_pgm);
+            (void)capture_lcd(s->hdw, s->pass_pgm, s->lcd_height);
             fail(s, "runtime-fail");
             return;
         }
@@ -510,7 +510,7 @@ static void inject(void *arg)
         return;
     }
 
-    if (!capture_lcd(s->hdw, s->before_pgm)) {
+    if (!capture_lcd(s->hdw, s->before_pgm, s->lcd_height)) {
         fail(s, "before-capture");
         return;
     }
@@ -561,6 +561,7 @@ int main(int argc, char **argv)
 {
     const char *stage0_path = getenv("HPCLANG_X50NG_STAGE0");
     const char *result_text = getenv("HPCLANG_X50NG_RESULT_ADDR");
+    const char *lcd_height_text = getenv("HPCLANG_X50NG_LCD_HEIGHT");
     char *end = NULL;
     unsigned long result;
     struct e2e s;
@@ -577,6 +578,12 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     s.result_addr = (uint32_t)result;
+
+    s.lcd_height = lcd_height_text ? atoi(lcd_height_text) : 80;
+    if (s.lcd_height != 64 && s.lcd_height != 80) {
+        fprintf(stderr, "invalid LCD height\n");
+        return EXIT_FAILURE;
+    }
 
     s.stage0 = load_file(stage0_path, &s.stage0_size);
     if (s.stage0 == NULL) {

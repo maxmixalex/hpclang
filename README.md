@@ -2,96 +2,48 @@
 
 A clean LLVM-native SDK for the ARM-based HP graphing calculators.
 
-hpclang is not an HPGCC compatibility layer. Historical HPGCC source is used
-to understand the hardware, calculator OS and launch path, but new
-applications use one hpclang ABI regardless of which historical SDK once
-supported a calculator.
+hpclang uses one application ABI across HP 39g+/39gs/40gs, HP 48gII and
+HP 49g+/50g. Historical HPGCC source is research evidence for calculator
+hardware, package formats and launch behavior; it is not a selectable runtime.
 
-## Targets
+## Application model
 
-The native ARM targets are:
+New applications use:
 
-- HP 39g+, 39gs and 40gs;
-- HP 48gII;
-- HP 49g+ and 50g.
-
-Saturn-only calculators are outside the native runtime scope.
-
-## One application ABI
-
-Every supported target uses the same application-side contract:
-
-- ARMv4T;
-- AAPCS32;
-- soft float;
-- Thumb-1 C/C++ by default;
-- ARM startup where useful;
+- Clang / LLVM / LLD;
+- ARMv4T, AAPCS32 and soft float;
+- Thumb-1 C/C++ with ARM startup where useful;
 - fixed virtual code and writable-memory addresses;
-- no PIC/GOT static-base convention;
-- no reserved r9/r10;
-- no HPGCC object files;
-- no GCC or libgcc.
+- the model-independent HPC1 executable format.
 
-The current v1 virtual layout is:
-
-```
-0x01220000  executable image
-0x01100000  launcher boot page
-0x01101000  .data / .bss / heap
-             ...
-             stack at top of mapped writable arena
-```
-
-The model-independent post-link image is an `HPC1` file. Calculator-specific
-packaging is a separate layer.
+There is no normal-build dependency on GCC, libgcc, historical HPGCC objects
+or a replacement calculator ROM.
 
 ## Architecture
 
-```
-              application source
-                     |
-             Clang / LLVM / LLD
-                     |
-                hpclang v1
-        AAPCS32 + fixed virtual layout
-                     |
-                   HPC1
-                     |
-       +-------------+-------------+
-       |             |             |
-    HP39/40        48gII        49g+/50g
-    platform       platform      platform
-    backend        backend       backend
-       |             |             |
-       +------ calculator OS / ARMSYS ------+
+```text
+application -> hpclang v1 / HPC1 -> common ARM runtime
+                                  -> HP39/40 platform
+                                  -> HP48gII platform
+                                  -> HP49g+/50g platform
 ```
 
-The platform backend is responsible for finding physical memory, building the
-MMU mappings, filling the boot page, entering ARM code and wrapping the HPC1
-image in the calculator's native storage/package format. None of those details
+Calculator-specific launchers own native packaging, physical-memory discovery,
+MMU setup, Saturn-to-ARM transition and state restoration. Those details do not
 change the application ABI.
 
-## Current status
+## Validation status
 
-The unified core is already host-validated in CI:
+- HP39gs: canonical runtime PASS on real hardware and in the ARM emulator.
+- HP40gs: canonical runtime PASS on official firmware in the ARM emulator.
+- HP50g: canonical runtime PASS/return plus full original-system
+  ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
+- HP49g+: being added to the same direct-runtime matrix.
+- HP48gII: active next family bring-up; it requires a genuine 48gII hardware
+  model rather than relabeling the 49/50 emulator.
 
-- stock Clang integrated assembler;
-- AAPCS32 Thumb-1 C code;
-- ARM/Thumb interworking;
-- fixed virtual RX/RW ELF layout through LLD;
-- model-independent HPC1 packing;
-- no unresolved target symbols for the core smoke image;
-- no GCC, libgcc or HPGCC target binary.
+CI screenshots are published to the image-only Git-LFS `ci-evidence` branch.
 
-A separate HP39 Launcher-V3 path remains in the repository only because it is
-the current real-hardware bootstrap route. It is not the long-term hpclang ABI.
-
-The next implementation layers are:
-
-1. LLVM compiler-rt builtins;
-2. common libc/runtime primitives;
-3. the three calculator platform backends;
-4. hardware validation on each model family;
-5. graphics, keyboard, timers, filesystem and calculator-object APIs.
-
-See [hpclang v1 ABI](docs/abi-v1.md), [target families](docs/targets.md), and the maintained [roadmap](docs/ROADMAP.md).
+See the [documentation index](docs/README.md), [ABI](docs/abi.md),
+[target status](docs/targets.md), [validation](docs/validation.md), and
+[roadmap](docs/ROADMAP.md).
