@@ -9,6 +9,11 @@
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define LCDSADDR1 REG32(0x07300014u)
 
+#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
+#define GPGCON REG32(0x07A00060u)
+#define GPGDAT REG32(0x07A00064u)
+#endif
+
 #define WIDTH  131
 #define HEIGHT 64
 #define STRIDE 20
@@ -135,15 +140,52 @@ static void clear(volatile uint8_t *fb)
     }
 }
 
-static void hold_result(void)
+#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
+static void key_settle(void)
+{
+    for (volatile uint32_t n = 100u; n != 0; --n)
+        __asm__ volatile("nop");
+}
+
+static int enter_pressed(void)
 {
     /*
-     * Finite test-only hold so the LCD has time to scan the final pixels.
-     * Bootstrap owns IRQ/FIQ isolation now, so this does not change runtime
-     * state and always terminates.
+     * HP49g+/50g keyboard matrix: ENTER is logical col 0 / row 6.
+     * Select column 0 on GPG[8], sample row 6 on GPGDAT bit 7, then restore
+     * the exact caller GPIO configuration instead of assuming HPGCC defaults.
+     */
+    uint32_t saved_gpgcon = GPGCON;
+    GPGCON = (1u << 16) | 0xaaa9u;
+    key_settle();
+    int pressed = (GPGDAT & (1u << 7)) == 0;
+    GPGCON = saved_gpgcon;
+    key_settle();
+    return pressed;
+}
+#endif
+
+static void hold_result(void)
+{
+#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
+    /*
+     * Stock HP50g E2E uses an explicit acknowledgement so PASS cannot vanish
+     * before the host observes it. Ignore a pre-held ENTER, then require one
+     * complete press/release cycle.
+     */
+    while (enter_pressed())
+        ;
+    while (!enter_pressed())
+        ;
+    while (enter_pressed())
+        ;
+#else
+    /*
+     * Existing HP39/40 and canonical gates intentionally remain automatic:
+     * they validate return/state restoration independently of keyboard GPIO.
      */
     for (volatile uint32_t n = 12000000u; n != 0; --n)
         __asm__ volatile("nop");
+#endif
 }
 
 static int finish(uint32_t failure)
@@ -153,6 +195,9 @@ static int finish(uint32_t failure)
     clear(fb);
     if (failure == 0) {
         text(fb, 38, 28, "RUNTIME PASS");
+#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
+        text(fb, 39, 40, "ENTER TO EXIT");
+#endif
         hpclang_e2e_result = 0x50415353u;
         hold_result();
         return 0;
@@ -161,6 +206,9 @@ static int finish(uint32_t failure)
     text(fb, 30, 24, "RUNTIME FAIL");
     text(fb, 55, 36, "CODE");
     hex2(fb, 75, 36, failure);
+#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
+    text(fb, 39, 48, "ENTER TO EXIT");
+#endif
     hpclang_e2e_result = 0x46410000u | failure;
     hold_result();
     return (int)failure;

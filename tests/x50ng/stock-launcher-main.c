@@ -243,7 +243,8 @@ static void monitor(void *arg)
             s->saw_pass = 1;
             capture_named(s, "pass");
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
-            if (!tap(&on_down, &on_up, 700000) ||
+            if (!tap(&enter_down, &enter_up, 100000) ||
+                !tap(&on_down, &on_up, 800000) ||
                 !later(finish_run, s, 1800000))
                 fail(s, "return-timer");
             return;
