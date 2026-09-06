@@ -12,7 +12,6 @@
 #include "s3c2410/s3c2410_lcd.h"
 
 #define LCD_W 131
-#define LCD_H 80
 #define KEY_HOLD_US 100000LL
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
@@ -32,6 +31,7 @@ struct state {
     uint32_t result_addr;
     int saw_pass;
     int failed;
+    int lcd_height;
     int64_t deadline;
 };
 
@@ -48,6 +48,7 @@ KEY_PAIR(f4, HP4950_KEY_D);
 KEY_PAIR(f5, HP4950_KEY_E);
 KEY_PAIR(f6, HP4950_KEY_F);
 KEY_PAIR(files, HP4950_KEY_G);
+KEY_PAIR(aplet, HP4950_KEY_G);
 KEY_PAIR(mode, HP4950_KEY_H);
 KEY_PAIR(var, HP4950_KEY_J);
 KEY_PAIR(eval, HP4950_KEY_N);
@@ -55,6 +56,8 @@ KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(neg, HP4950_KEY_W);
 KEY_PAIR(up, HP4950_KEY_UP);
 KEY_PAIR(down, HP4950_KEY_DOWN);
+KEY_PAIR(left, HP4950_KEY_LEFT);
+KEY_PAIR(right, HP4950_KEY_RIGHT);
 KEY_PAIR(two, HP4950_KEY_2);
 KEY_PAIR(period, HP4950_KEY_PERIOD);
 KEY_PAIR(enter, HP4950_KEY_ENTER);
@@ -71,8 +74,9 @@ struct key_pair_ref {
 #define KEY_REF(name) { #name, &name##_down, &name##_up }
 static const struct key_pair_ref key_pairs[] = {
     KEY_REF(f1), KEY_REF(f2), KEY_REF(f3), KEY_REF(f4), KEY_REF(f5), KEY_REF(f6),
-    KEY_REF(files), KEY_REF(mode), KEY_REF(var), KEY_REF(eval), KEY_REF(nxt),
-    KEY_REF(neg), KEY_REF(up), KEY_REF(down), KEY_REF(two), KEY_REF(period),
+    KEY_REF(files), KEY_REF(aplet), KEY_REF(mode), KEY_REF(var), KEY_REF(eval),
+    KEY_REF(nxt), KEY_REF(neg), KEY_REF(up), KEY_REF(down), KEY_REF(left),
+    KEY_REF(right), KEY_REF(two), KEY_REF(period),
     KEY_REF(enter), KEY_REF(on), KEY_REF(lshift), KEY_REF(rshift),
 };
 #undef KEY_REF
@@ -124,14 +128,14 @@ static int chord(
            later(key_cb, (void *)mod_up, us + 160000);
 }
 
-static unsigned capture(hdw_t *h, const char *path)
+static unsigned capture(hdw_t *h, const char *path, int height)
 {
     FILE *f = fopen(path, "wb");
     unsigned nonzero = 0;
     if (!f) return 0;
 
-    fprintf(f, "P5\n%d %d\n255\n", LCD_W, LCD_H);
-    for (int y = 0; y < LCD_H; ++y) {
+    fprintf(f, "P5\n%d %d\n255\n", LCD_W, height);
+    for (int y = 0; y < height; ++y) {
         for (int x = 0; x < LCD_W; ++x) {
             int level = s3c2410_get_pixel_color(
                 (s3c2410_lcd_t *)h->s3c2410_lcd, x, y);
@@ -150,7 +154,7 @@ static void capture_named(struct state *s, const char *name)
 {
     char path[512];
     snprintf(path, sizeof(path), "%s-%s.pgm", s->prefix, name);
-    if (!capture(s->hdw, path))
+    if (!capture(s->hdw, path, s->lcd_height))
         fprintf(stderr, "stock launcher: blank capture %s\n", name);
 }
 
@@ -372,6 +376,7 @@ int main(int argc, char **argv)
     const char *mode = getenv("HPCLANG_STOCK_MODE");
     const char *sequence = getenv("HPCLANG_E2E_SEQUENCE");
     const char *result_text = getenv("HPCLANG_STOCK_RESULT_ADDR");
+    const char *lcd_height_text = getenv("HPCLANG_X50NG_LCD_HEIGHT");
     char *end = NULL;
 
     memset(&s, 0, sizeof(s));
@@ -380,6 +385,11 @@ int main(int argc, char **argv)
     s.json = getenv("HPCLANG_STOCK_JSON");
     if (!s.prefix) s.prefix = "stock";
     if (!s.json) s.json = "stock.json";
+    s.lcd_height = lcd_height_text ? atoi(lcd_height_text) : 80;
+    if (s.lcd_height != 64 && s.lcd_height != 80) {
+        fprintf(stderr, "invalid stock LCD height\n");
+        return EXIT_FAILURE;
+    }
 
     if (s.mode == MODE_RUN) {
         unsigned long value;
