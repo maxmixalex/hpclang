@@ -7,11 +7,18 @@ branch="${3:-ci-evidence}"
 
 test -f "$image"
 
+if ! git lfs version >/dev/null 2>&1; then
+    echo "git-lfs is required to publish CI evidence" >&2
+    exit 1
+fi
+git lfs install --local >/dev/null
+
 worktree="$(mktemp -d)"
 trap 'git worktree remove --force "$worktree" >/dev/null 2>&1 || true; rm -rf "$worktree"' EXIT
 
 git fetch origin "$branch"
 git worktree add --detach "$worktree" "origin/$branch" >/dev/null
+git -C "$worktree" lfs pull >/dev/null
 
 mkdir -p "$worktree/$(dirname "$destination")"
 cp "$image" "$worktree/$destination"
