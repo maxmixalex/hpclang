@@ -172,14 +172,8 @@ jobs:
             FIRMWARE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
           fi
 
-          MODEL_ARG=()
-          if [ -n "$HPCLANG_E2E_X50NG_MODEL" ]; then
-            MODEL_ARG=("--$HPCLANG_E2E_X50NG_MODEL")
-          fi
-
           mkdir -p "build/$TARGET-state"
           timeout 35s build/x50ng/dist/x50ng \
-            "${MODEL_ARG[@]}" \
             --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
             --overwrite-config \
             --style="$STYLE" \
