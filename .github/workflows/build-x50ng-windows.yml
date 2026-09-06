@@ -1,0 +1,132 @@
+name: Build / x50ng Windows GUI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-x50ng-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-gui:
+    name: Windows x64 GUI
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Configure Git line endings
+        shell: pwsh
+        run: git config --global core.autocrlf input
+
+      - uses: actions/checkout@v7
+
+      - name: Setup MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            make
+            zip
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-ncurses
+            mingw-w64-ucrt-x86_64-lua
+
+      - name: Fetch pinned x50ng
+        run: |
+          git clone --no-checkout https://codeberg.org/gwh/x50ng.git x50ng
+          git -C x50ng checkout 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
+          git -C x50ng submodule update --init --recursive
+          printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > x50ng-source.txt
+
+      - name: Build x50ng GUI
+        run: |
+          make -C x50ng -j2
+
+      - name: Inspect executable
+        run: |
+          find x50ng -maxdepth 2 -type f \( -name 'x50ng.exe' -o -name 'x50ng' \) -print
+          exe="$(find x50ng -maxdepth 2 -type f -name 'x50ng.exe' | head -n1)"
+          test -n "$exe"
+          ldd "$exe"
+
+      - name: Assemble portable package
+        run: |
+          set -euo pipefail
+          exe="$(find x50ng -maxdepth 2 -type f -name 'x50ng.exe' | head -n1)"
+          test -n "$exe"
+
+          out="$GITHUB_WORKSPACE/x50ng-windows-x64"
+          mkdir -p "$out"
+          cp "$exe" "$out/x50ng.exe"
+          cp x50ng-source.txt "$out/"
+
+          for pattern in '*.css' '*.png' '*.lua'; do
+            find x50ng -maxdepth 3 -type f -name "$pattern" -exec cp -n {} "$out/" \; || true
+          done
+
+          # Recursively copy UCRT64 DLL dependencies reported by ldd.
+          copied=1
+          while [ "$copied" -ne 0 ]; do
+            copied=0
+            for binary in "$out"/*.exe "$out"/*.dll; do
+              [ -e "$binary" ] || continue
+              while IFS= read -r dll; do
+                [ -f "$dll" ] || continue
+                base="$(basename "$dll")"
+                case "$dll" in
+                  /ucrt64/bin/*)
+                    if [ ! -e "$out/$base" ]; then
+                      cp "$dll" "$out/$base"
+                      copied=1
+                    fi
+                    ;;
+                esac
+              done < <(ldd "$binary" | awk '{for (i=1;i<=NF;i++) if ($i ~ /^\/ucrt64\/bin\/.*\.dll$/) print $i}')
+            done
+          done
+
+          cat > "$out/README.txt" <<'EOF'
+x50ng Windows GUI build for hpclang HP50g launch testing
+
+Source:
+  https://codeberg.org/gwh/x50ng
+Pinned commit:
+  003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
+
+This package contains x50ng and its MSYS2/UCRT64 runtime DLLs.
+HP firmware/ROM files are not redistributed in this package.
+
+Current ARMToolbox installation check:
+  1. Put the HP50g in RPN mode.
+  2. Put SETUP.BIN on the emulated SD card.
+  3. The historical x49gp HPGCC2 instructions say:
+       2
+       SETUP.BIN
+       3
+       ->TAG
+       RCL
+       EVAL
+       ON+C (warmstart)
+  4. Open RS+LIB and inspect port 2.
+  5. Success means ARMToolbox/library 275 appears.
+
+Please report exactly what appears after each step if the sequence differs.
+EOF
+
+          (cd "$GITHUB_WORKSPACE" && zip -9r x50ng-windows-x64.zip x50ng-windows-x64)
+
+      - name: Upload Windows GUI package
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-windows-x64
+          path: x50ng-windows-x64.zip
+          if-no-files-found: error
