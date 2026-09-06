@@ -39,6 +39,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-ncurses
             mingw-w64-ucrt-x86_64-lua
+            mingw-w64-ucrt-x86_64-mman-win32
 
       - name: Fetch pinned x50ng
         run: |
@@ -109,7 +110,8 @@ jobs:
 
       - name: Build x50ng GUI
         run: |
-          make -C x50ng -j2
+          grep -nE 'LDFLAGS|LDLIBS|LIBS|^LD' x50ng/Makefile || true
+          make -C x50ng -j2 LDFLAGS="-lmman" LIBS="-lmman" LDLIBS="-lmman"
 
       - name: Inspect executable
         run: |
