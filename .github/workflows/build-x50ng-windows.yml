@@ -114,6 +114,40 @@ jobs:
           if count != 2:
               raise SystemExit(f"x50ng rtc localtime anchors changed: {count}")
           rtc.write_text(text.replace(old_call, new_call))
+
+          fq = Path("x50ng/src/for_qemu.c")
+          text = fq.read_text()
+          if "hpclang_host_aligned_alloc" not in text:
+              shim = """#ifdef _WIN32
+          static void *hpclang_host_aligned_alloc(size_t alignment, size_t size)
+          {
+              size_t rounded = (size + alignment - 1) / alignment * alignment;
+              return aligned_alloc(alignment, rounded);
+          }
+          #define memalign hpclang_host_aligned_alloc
+          static void *hpclang_host_valloc(size_t size)
+          {
+              return hpclang_host_aligned_alloc(4096, size);
+          }
+          #define valloc hpclang_host_valloc
+          #endif
+          """
+              text = shim + text
+          fq.write_text(text)
+
+          api = Path("x50ng/src/emulator_api.c")
+          text = api.read_text()
+          old_clock = "sysconf(_SC_CLK_TCK)"
+          if old_clock not in text:
+              raise SystemExit("x50ng emulator_api clock anchor changed")
+          text = text.replace(
+              old_clock,
+              "(long)CLOCKS_PER_SEC" if "#ifdef _WIN32" not in text else old_clock,
+              1,
+          )
+          if "(long)CLOCKS_PER_SEC" in text and "#include <time.h>" not in text:
+              text = "#include <time.h>\n" + text
+          api.write_text(text)
           PY
 
           grep -R -nE 'times\\(|struct tms|GetTempPath|GetTempFileName' x50ng/src | head -n 80 || true
