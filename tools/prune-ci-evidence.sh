@@ -4,6 +4,8 @@ set -euo pipefail
 keep="${KEEP_EVIDENCE_RUNS:-20}"
 
 git lfs install --local >/dev/null
+git fetch origin ci-evidence
+start_remote="$(git rev-parse origin/ci-evidence)"
 
 # Keep only CI images and the attributes file.
 find . -type f ! -path './.git/*' \
@@ -51,4 +53,12 @@ cp -a "$tmp"/. .
 git add .
 git commit --allow-empty -m "ci: prune evidence history"
 git lfs ls-files
-git push --force origin HEAD:ci-evidence
+
+git fetch origin ci-evidence
+current_remote="$(git rev-parse origin/ci-evidence)"
+if [ "$current_remote" != "$start_remote" ]; then
+    echo "ci-evidence changed during maintenance; skip history rewrite"
+    exit 0
+fi
+
+git push --force-with-lease="ci-evidence:$start_remote" origin HEAD:ci-evidence
