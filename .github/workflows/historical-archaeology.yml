@@ -1,12 +1,7 @@
-name: Historical HPGCC archaeology
+name: Research / HPGCC archaeology
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - research/trigger.txt
-      - .github/workflows/historical-archaeology.yml
-      - tools/analyze-hpgcc-tags.py
 
 permissions:
   contents: write
