@@ -55,7 +55,23 @@ jobs:
           block = Path("x50ng/src/s3c2410/block.c")
           text = block.read_text()
           if "#include <windows.h>" not in text:
-              text = "#ifdef _WIN32\n#include <windows.h>\n#endif\n" + text
+              prefix = """#ifdef _WIN32
+          #pragma push_macro("DATADIR")
+          #pragma push_macro("VERSION_MAJOR")
+          #pragma push_macro("VERSION_MINOR")
+          #pragma push_macro("PATCHLEVEL")
+          #undef DATADIR
+          #undef VERSION_MAJOR
+          #undef VERSION_MINOR
+          #undef PATCHLEVEL
+          #include <windows.h>
+          #pragma pop_macro("PATCHLEVEL")
+          #pragma pop_macro("VERSION_MINOR")
+          #pragma pop_macro("VERSION_MAJOR")
+          #pragma pop_macro("DATADIR")
+          #endif
+          """
+              text = prefix + text
           block.write_text(text)
 
           hdw = Path("x50ng/src/hdw.h")
