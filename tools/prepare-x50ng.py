@@ -88,7 +88,11 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
         """    cpu_register_physical_memory( S3C2410_UART0_BASE, S3C2410_MAP_SIZE, iotype );
 
     return 0;""",
-        """    cpu_register_physical_memory( S3C2410_UART0_BASE, S3C2410_MAP_SIZE, iotype );
+        """    uint32_t uart_base =
+        uart_regs->int_rxd == SUB_INT_RXD0 ? S3C2410_UART0_BASE :
+        uart_regs->int_rxd == SUB_INT_RXD1 ? S3C2410_UART1_BASE :
+                                             S3C2410_UART2_BASE;
+    cpu_register_physical_memory( uart_base, 0x4000, iotype );
 
     if ( uart_regs->int_rxd == SUB_INT_RXD0 ) {
         const char* host_path = getenv( "HPCLANG_X50NG_UART0" );
