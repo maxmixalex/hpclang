@@ -162,7 +162,7 @@ jobs:
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39gs-stock.json"
 
           mkdir -p build/hp39gs-state
-          timeout 225s build/x50ng/dist/x50ng \
+          timeout 255s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp39gs-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \

@@ -26,4 +26,9 @@
 31000 capture remote-aplet
 32500 tap enter
 34000 capture lazy-fetch
-34500 monitor 180000
+# The first ENTER above installs the remote aplet and its library, then the
+# stock ROM returns to APLET LIBRARY. ENTER does not cancel an in-progress
+# transfer (ON does), so retry launch after the measured full transfer window.
+215000 tap enter
+230000 tap enter
+34500 monitor 210000
