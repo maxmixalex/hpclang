@@ -16,7 +16,7 @@
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define POLL_US 20000LL
-#define RUN_DEADLINE_US 10000000LL
+#define DEFAULT_RUN_DEADLINE_US 10000000LL
 
 enum stock_mode {
     MODE_INSTALL,
@@ -294,10 +294,17 @@ static void seq_fail(void *arg)
     fail(s, why);
 }
 
+struct seq_monitor_event {
+    struct state *state;
+    int64_t timeout_us;
+};
+
 static void seq_monitor(void *arg)
 {
-    struct state *s = arg;
-    s->deadline = timer_get_clock() + RUN_DEADLINE_US;
+    struct seq_monitor_event *event = arg;
+    struct state *s = event->state;
+    s->deadline = timer_get_clock() + event->timeout_us;
+    free(event);
     monitor(s);
 }
 
@@ -357,9 +364,28 @@ static int schedule_sequence(struct state *s, const char *path)
                 free(event);
                 goto invalid_action;
             }
-        } else if (strcmp(op, "monitor") == 0 && fields == 2) {
-            if (!later(seq_monitor, s, us))
+        } else if (strcmp(op, "monitor") == 0 &&
+                   (fields == 2 || fields == 3)) {
+            unsigned long long timeout_ms = 0;
+            struct seq_monitor_event *event = calloc(1, sizeof(*event));
+            if (!event)
                 goto invalid_action;
+            event->state = s;
+            event->timeout_us = DEFAULT_RUN_DEADLINE_US;
+            if (fields == 3) {
+                char *timeout_end = NULL;
+                timeout_ms = strtoull(first, &timeout_end, 10);
+                if (timeout_end == first || *timeout_end != '\0' ||
+                    timeout_ms == 0 || timeout_ms > 600000ULL) {
+                    free(event);
+                    goto invalid_action;
+                }
+                event->timeout_us = (int64_t)timeout_ms * 1000LL;
+            }
+            if (!later(seq_monitor, event, us)) {
+                free(event);
+                goto invalid_action;
+            }
         } else if (strcmp(op, "finish-install") == 0 && fields == 2) {
             if (!later(finish_install, s, us))
                 goto invalid_action;
