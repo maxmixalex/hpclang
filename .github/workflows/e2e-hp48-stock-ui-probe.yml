@@ -14,6 +14,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build HP48gII HPC1 payload
+        run: |
+          export OUT="$GITHUB_WORKSPACE/build/hp48-payload"
+          chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
+          HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/probe-atfe.sh
+          $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
+            -DHPCLANG_STAGE0_MODEL=4 -c platform/armtoolbox/stage0.S \
+            -o build/hp48-payload/stage0-hp48gii.o
+          $ATFE/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
+            build/hp48-payload/stage0-hp48gii.o \
+            build/hp48-payload/stage0-bundle.o \
+            -o build/hp48-payload/stage0-hp48gii.elf
+          $ATFE/bin/llvm-objcopy -O binary \
+            build/hp48-payload/stage0-hp48gii.elf \
+            build/hp48-payload/stage0-hp48gii.bin
+          python3 tools/armtoolbox-wrap.py \
+            build/hp48-payload/stage0-hp48gii.bin \
+            build/hp48-payload/HPCLANG.HP
+
       - name: Ensure runtime dependencies
         run: |
           packages=(ckermit socat innoextract libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
@@ -61,16 +83,18 @@ jobs:
           printf '%s  %s\n' 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 build/hp48gii-nor.bin | sha256sum -c -
           python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin build/hp48-ui-state
 
-      - name: Prepare ARMToolbox48 transfer object
+      - name: Prepare stock transfer objects
         run: |
           chmod +x tools/bootstrap-hp39-aplet.sh tools/run-hp48-kermit-send.sh
           tools/bootstrap-hp39-aplet.sh >/dev/null
           mkdir -p build/hp48-send
           cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/hp48-send/L275_48
+          cp build/hp48-payload/HPCLANG.HP build/hp48-send/HPCLANG.HP
           test "$(stat -c %s build/hp48-send/L275_48)" = 2404
           sha256sum build/hp48-send/L275_48
+          sha256sum build/hp48-send/HPCLANG.HP
 
-      - name: Probe stock serial Kermit receive
+      - name: Execute full HP48gII stock launch
         run: |
           set -euo pipefail
           X50_TTY="$RUNNER_TEMP/hp48-x50ng-uart"
@@ -97,20 +121,21 @@ jobs:
 
           export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT=64
-          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_STOCK_MODE=run
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48-stock-ui-probe.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48-ui"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48-ui.json"
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/hp48-payload/hp39-visible.result-address")"
 
-          timeout 70s build/x50ng/dist/x50ng \
+          timeout 200s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" &
           X50_PID=$!
 
           sleep 31
-          timeout 15s tools/run-hp48-kermit-send.sh \
-            "$KERMIT_TTY" build/hp48-send build/hp48-kermit-debug.log L275_48=L275 \
+          timeout 70s tools/run-hp48-kermit-send.sh \
+            "$KERMIT_TTY" build/hp48-send build/hp48-kermit-debug.log L275_48=L275 HPCLANG.HP=HPCLANG \
             > build/hp48-kermit.out 2>&1
 
           wait "$X50_PID"
@@ -133,4 +158,6 @@ jobs:
             build/hp48-ui.json
             build/hp48-kermit*
             build/hp48-socat.log
+            build/hp48-payload/HPCLANG.HP
+            build/hp48-payload/hp39-visible.result-address
           if-no-files-found: warn
