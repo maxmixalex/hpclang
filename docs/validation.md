@@ -14,9 +14,9 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | `E2E / HP50g stock launch` | original HP50g UI -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
-Direct runtime currently passes on HP39gs, HP40gs, HP49g+ and HP50g. Full stock
-launch also passes on HP39gs, HP40gs and HP50g. HP48gII is the remaining family
-target to add to Direct runtime.
+Direct runtime currently passes on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g.
+HP48gII uses a verified 2 MiB full-NOR fixture and a 256 KiB medium-apple x50ng
+personality. Full stock launch also passes on HP39gs, HP40gs and HP50g.
 
 ## Evidence
 
@@ -76,3 +76,11 @@ the calculator's original serial-disk path to request `HP39DIR.CUR`,
 HPCLANG aplet through ARMToolbox39 and requires the same machine-readable HPC1
 PASS result. HP40gs uses its own stock UI sequence because it must leave the CAS
 front end before APLET and its RECEIVE FROM menu has no IrDA entry.
+
+## HP48gII direct emulator gate
+
+The HP48gII Direct gate boots a verified 2 MiB full-NOR image, including its
+native 48gII ARM bootloader, on a 256 KiB / 131x64 medium-apple x50ng
+personality. The fixture is pinned by SHA-256 before being installed as the
+persistent x50ng flash state. The same model-independent HPC1 image then
+produces machine-readable PASS and returns to a responsive stock environment.

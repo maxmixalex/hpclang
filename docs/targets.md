@@ -7,9 +7,9 @@ hpclang supports six ARM calculator targets through three family backends.
 | Target | Model ID | Backend | Runtime validation | Stock launcher validation |
 | --- | ---: | --- | --- | --- |
 | HP 39g+ | 1 | HP39/40 | pending sibling gate | pending |
-| HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS |
-| HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | pending sibling gate |
-| HP 48gII | 4 | HP48 | next E2E target | next E2E target |
+| HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS; full stock emulator PASS |
+| HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | full stock emulator PASS |
+| HP 48gII | 4 | HP48 | full-NOR medium-apple emulator PASS | pending ARMToolbox48 gate |
 | HP 49g+ | 5 | HP49/50 | official-ROM emulator PASS | pending stock launcher gate |
 | HP 50g | 6 | HP49/50 | official-ROM emulator PASS | full ARMToolbox/PrRUN E2E PASS |
 
@@ -32,9 +32,10 @@ Important differences from 49/50 include its 131x64 display, smaller RAM
 configurations and a dedicated launcher memory model without the normal 49/50
 Port1/ERAM scan.
 
-The hpclang goal is a thin HP48 family adapter feeding the same common
-bootstrap and HPC1 image. It must not be hidden behind a generic HP49 model
-flag.
+The HP48 family adapter now feeds the same common bootstrap and HPC1 image on
+a genuine 48gII full-NOR fixture with 256 KiB SRAM and a 131x64 display. The
+Direct gate passes and returns cleanly. Remaining work is calculator-side
+ARMToolbox48 launch integration, not a distinct runtime or ABI.
 
 ## HP49g+/50g family
 

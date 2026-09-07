@@ -57,14 +57,14 @@ is not part of the runtime regression contract.
 
 ## M4 — HP48gII
 
-**Active.**
+**Direct runtime complete; calculator-side stock launch active.**
 
 - [x] add a model-4 / 131x64 E2E target profile;
 - [x] record the true medium-apple hardware differences: 256 KiB physical RAM,
   64-line LCD and HP48gII firmware identity;
 - [x] add a thin x50ng HP48gII preparation mode;
-- [ ] boot the shared 48gII/49g+/50g System RPL ROM on that hardware model;
-- [ ] execute the same HPC1 runtime and validate clean return;
+- [x] boot a genuine HP48gII full-NOR image on the 256 KiB medium-apple model;
+- [x] execute the same HPC1 runtime and validate clean return;
 - [ ] exercise the supported ARMToolbox48 calculator-side launch path.
 
 Completion criterion:
@@ -99,6 +99,7 @@ Passing:
 
 - HP39gs direct runtime;
 - HP40gs direct runtime;
+- HP48gII direct runtime on a genuine full-NOR/medium-apple model;
 - HP49g+ direct runtime;
 - HP50g direct runtime;
 - HP50g full stock ARMToolbox/PrRUN launch;
@@ -107,7 +108,7 @@ Passing:
 
 Active expansion:
 
-- [ ] HP48gII direct runtime;
+- [x] HP48gII direct runtime;
 - [x] HP39gs/HP40gs stock serial-disk/APLET launch;
 - [ ] HP48gII/HP49g+ stock launch.
 

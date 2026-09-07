@@ -41,8 +41,9 @@ change the application ABI.
 - HP50g: canonical runtime PASS/return plus full original-system
   ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
 - HP49g+: canonical runtime PASS/return on official 2.15 firmware in the shared HP49/50 emulator backend.
-- HP48gII: active next family bring-up; it requires a genuine 48gII hardware
-  model rather than relabeling the 49/50 emulator.
+- HP48gII: canonical runtime PASS/return on a genuine 2 MiB full-NOR image
+  with a 256 KiB / 131x64 medium-apple emulator personality; stock
+  ARMToolbox48 launch integration remains.
 
 CI screenshots are published to the image-only Git-LFS `ci-evidence` branch.
 
