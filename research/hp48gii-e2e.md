@@ -30,17 +30,36 @@ This supports a thin HP48 platform adapter rather than a second application ABI.
 
 ## Firmware fixture
 
-A public cnCalc post documents
-`48gII_208_92_NOR_CNA0000000.raw`: a 2 MiB JTAG dump of factory 2.08 build 92
-with the bootloader included. That is the preferred fixture for a true-ARM
-x50ng boot.
+The primary historical source is wjchen's 2020 cnCalc dump:
+https://www.cncalc.org/thread-24739-1-1.html
 
-The old forum attachment currently resolves to an expired attachment URL, so CI
-must not depend on it until a stable mirror is available. A Zhihu mirror also
-documents the same raw file, but its linked Baidu object has not yet been
-recovered into a stable direct URL.
+It documents `48gII_208_92_NOR_CNA0000000.raw` as a complete 2 MiB JTAG
+dump of a factory 2.08 build-92 HP48gII, including the bootloader, with the
+serial cleared to `CNA0000000`. The original cnCalc attachment has expired.
 
-`tools/prepare-hp48gii-nor.py` validates a 2 MiB full dump and installs it as
-x50ng's persistent `flash` state. Once a stable fixture is available, add
-`hp48gii` to the Direct runtime matrix using the `hp48gii` x50ng preparation
-mode and model ID 4.
+A still-live mirror is published with lyc8503's 2021 hardware-modification
+write-up:
+https://blog.lyc8503.net/en/post/hp39gs-modify/
+
+The mirrored `48gii.bin` was independently inspected in CI:
+
+- exact size: `0x200000` bytes;
+- SHA-256: `4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937`;
+- ARM vector table at offset zero;
+- `KINPOHP48GIIMAGE` in the boot area;
+- `Kinposhcopyright` at the firmware boundary `0x4000`.
+
+For an independent vendor-origin cross-check, hpcalc.org archives
+Hewlett-Packard's 2.15 emulator ROM as a 2 MiB `rom.49g` and explicitly
+describes it as a ROM image from the HP48gII/49g+/50g family:
+https://www.hpcalc.org/details/6744
+
+hpcalc.org also preserves the Hewlett-Packard 49g+/50g ARM bootloaders, but
+does not currently provide a standalone 48gII ARM bootloader archive. Thus the
+full-NOR mirror remains the current source for the 48gII boot area; CI pins its
+SHA-256 rather than trusting mutable web content.
+
+`tools/prepare-hp48gii-nor.py` installs the verified raw image directly as
+x50ng's persistent `flash` state. Pinned x50ng defaults to
+`HDW_REINIT_NONE`; passing `--flash` or `--flash-full` would overwrite the
+already prepared HP48gII NOR.
