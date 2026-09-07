@@ -11,12 +11,13 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | `CI / HP39 package` | build HP39gs/HP40gs hardware-validation packages |
 | `E2E / Direct runtime` | boot official firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS and validate stock return |
 | `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI -> serial-disk transfer -> ARMToolbox39 -> HPC1 PASS |
+| `E2E / HP48gII stock launch` | original HP48gII UI -> Kermit transfer -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `E2E / HP50g stock launch` | original HP50g UI -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
 Direct runtime currently passes on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g.
 HP48gII uses a verified 2 MiB full-NOR fixture and a 256 KiB medium-apple x50ng
-personality. Full stock launch also passes on HP39gs, HP40gs and HP50g.
+personality. Full stock launch also passes on HP39gs, HP40gs, HP48gII and HP50g.
 
 ## Evidence
 
@@ -84,3 +85,13 @@ native 48gII ARM bootloader, on a 256 KiB / 131x64 medium-apple x50ng
 personality. The fixture is pinned by SHA-256 before being installed as the
 persistent x50ng flash state. The same model-independent HPC1 image then
 produces machine-readable PASS and returns to a responsive stock environment.
+
+## HP48gII stock emulator gate
+
+The `E2E / HP48gII stock launch` gate boots the verified 2 MiB full-NOR
+fixture, switches the factory-default Algebraic mode to RPN, selects Serial
+wire I/O and starts the calculator's Kermit server. The host transfers the
+historical ARMToolbox48 library as `L275` plus the generated `HPCLANG.HP`
+object as `HPCLANG`. The calculator installs library 275 into Port 0,
+warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN` and must produce
+the same machine-readable HPC1 PASS word.

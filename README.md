@@ -42,8 +42,8 @@ change the application ABI.
   ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
 - HP49g+: canonical runtime PASS/return on official 2.15 firmware in the shared HP49/50 emulator backend.
 - HP48gII: canonical runtime PASS/return on a genuine 2 MiB full-NOR image
-  with a 256 KiB / 131x64 medium-apple emulator personality; stock
-  ARMToolbox48 launch integration remains.
+  with a 256 KiB / 131x64 medium-apple emulator personality, plus full stock
+  Kermit -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> PASS E2E.
 
 CI screenshots are published to the image-only Git-LFS `ci-evidence` branch.
 
