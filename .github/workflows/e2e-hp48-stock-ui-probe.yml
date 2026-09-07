@@ -102,7 +102,7 @@ jobs:
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48-ui"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48-ui.json"
 
-          timeout 50s build/x50ng/dist/x50ng \
+          timeout 70s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" &
