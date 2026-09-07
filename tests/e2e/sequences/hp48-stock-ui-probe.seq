@@ -1,16 +1,19 @@
 # Temporary HP48gII stock I/O UI probe.
-8000 capture home
-9000 tap files
-10000 capture apps
-10500 tap down
-11000 tap enter
-12000 capture io-functions
+# A fresh full-NOR + empty SRAM starts at Try To Recover Memory?; choose NO
+# to create the deterministic factory-default state.
+2000 tap f6
+7000 capture home
+8000 tap files
+9000 capture apps
+9500 tap down
+10000 tap enter
+11000 capture io-functions
+11500 tap down
+12000 tap down
 12500 tap down
 13000 tap down
 13500 tap down
-14000 tap down
-14500 tap down
-15000 capture start-server-selected
-15500 tap enter
-17000 capture server
-20000 finish-install
+14000 capture start-server-selected
+14500 tap enter
+16500 capture server
+19000 finish-install
