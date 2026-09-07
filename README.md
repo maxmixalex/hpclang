@@ -38,7 +38,7 @@ change the application ABI.
 - HP40gs: canonical runtime PASS on official firmware in the ARM emulator.
 - HP50g: canonical runtime PASS/return plus full original-system
   ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
-- HP49g+: being added to the same direct-runtime matrix.
+- HP49g+: canonical runtime PASS/return on official 2.15 firmware in the shared HP49/50 emulator backend.
 - HP48gII: active next family bring-up; it requires a genuine 48gII hardware
   model rather than relabeling the 49/50 emulator.
 
