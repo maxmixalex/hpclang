@@ -21,7 +21,6 @@ jobs:
           tools/bootstrap-hp39-aplet.sh >/dev/null
           ROOT=.cache/hp39-aplet/raw
           mkdir -p build
-          mkdir -p build
           echo '=== paths containing ARMToolbox / source48 / 48g ==='
           find "$ROOT" -type f | grep -Ei 'ARMToolbox|source48|48g' | sort | tee build/hp48-armtoolbox-paths.txt
           echo '=== candidate fingerprints ==='
@@ -40,6 +39,16 @@ jobs:
           find "$ROOT" -type f \( -path '*masd_source48*' -o -iname '*48*' \) -size -128k -print0 | while IFS= read -r -d '' f; do
             rel=${f#"$ROOT"/}; safe=$(printf '%s' "$rel" | tr '/ ' '__'); cp "$f" "build/hp48-armtoolbox-source/$safe";
           done
+          mkdir -p build/hp48-armtoolbox-diff
+          BASE="$ROOT/app/ARMToolbox"
+          for name in ARMJMP PRFIX PRLNK SYSMEM.ARM TBXLIB; do
+            cp "$BASE/masd_source/$name" "build/hp48-armtoolbox-diff/generic-$name"
+            cp "$BASE/masd_source48/$name" "build/hp48-armtoolbox-diff/hp48-$name"
+            diff -u "$BASE/masd_source/$name" "$BASE/masd_source48/$name" > "build/hp48-armtoolbox-diff/$name.diff" || true
+          done
+          cp "$BASE/LIB275.LIB" build/hp48-armtoolbox-diff/LIB275.LIB
+          cp "$BASE/L275_48.LIB" build/hp48-armtoolbox-diff/L275_48.LIB
+          cmp -l "$BASE/LIB275.LIB" "$BASE/L275_48.LIB" | head -n 200 > build/hp48-armtoolbox-diff/library-byte-diff.txt || true
       - name: Upload probe
         uses: actions/upload-artifact@v7
         with:
@@ -49,4 +58,5 @@ jobs:
             build/hp48-armtoolbox-paths.txt
             build/hp48-armtoolbox-fingerprints.txt
             build/hp48-armtoolbox-source/
+            build/hp48-armtoolbox-diff/
           if-no-files-found: error
