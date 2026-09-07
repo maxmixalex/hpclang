@@ -13,8 +13,8 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | `E2E / HP50g stock launch` | original HP50g UI -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
-Direct runtime currently passes on HP39gs, HP40gs and HP50g. HP48gII and
-HP49g+ are the next targets to add.
+Direct runtime currently passes on HP39gs, HP40gs, HP49g+ and HP50g. HP48gII
+is the remaining family target to add.
 
 ## Evidence
 
