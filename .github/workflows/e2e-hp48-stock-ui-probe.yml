@@ -16,7 +16,7 @@ jobs:
 
       - name: Ensure runtime dependencies
         run: |
-          packages=(ckermit socat innoextract libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+          packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
           missing=()
           for package in "${packages[@]}"; do
             dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' || missing+=("$package")
@@ -61,67 +61,19 @@ jobs:
           printf '%s  %s\n' 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 build/hp48gii-nor.bin | sha256sum -c -
           python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin build/hp48-ui-state
 
-      - name: Prepare ARMToolbox48 transfer object
+      - name: Probe stock transfer port UI
         run: |
-          chmod +x tools/bootstrap-hp39-aplet.sh tools/run-hp48-kermit-send.sh
-          tools/bootstrap-hp39-aplet.sh >/dev/null
-          mkdir -p build/hp48-send
-          cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/hp48-send/L275_48
-          test "$(stat -c %s build/hp48-send/L275_48)" = 2404
-          sha256sum build/hp48-send/L275_48
-
-      - name: Probe stock Kermit receive
-        run: |
-          set -euo pipefail
-          X50_TTY="$RUNNER_TEMP/hp48-x50ng-uart"
-          KERMIT_TTY="$RUNNER_TEMP/hp48-kermit-uart"
-
-          socat -d -d -x -v \
-            PTY,raw,echo=0,link="$X50_TTY" \
-            PTY,raw,echo=0,link="$KERMIT_TTY" \
-            2> build/hp48-socat.log &
-          SOCAT_PID=$!
-
-          cleanup() {
-            kill "${X50_PID:-}" "$SOCAT_PID" 2>/dev/null || true
-            wait "${X50_PID:-}" 2>/dev/null || true
-            wait "$SOCAT_PID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
-          for _ in $(seq 1 50); do
-            [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]] && break
-            sleep 0.1
-          done
-          [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
-
-          export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT=64
           export HPCLANG_STOCK_MODE=install
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48-stock-ui-probe.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48-ui"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48-ui.json"
-
-          timeout 40s build/x50ng/dist/x50ng \
-            --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" \
-            --overwrite-config \
-            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" &
-          X50_PID=$!
-
-          sleep 17
-          timeout 15s tools/run-hp48-kermit-send.sh \
-            "$KERMIT_TTY" build/hp48-send build/hp48-kermit-debug.log L275_48 \
-            > build/hp48-kermit.out 2>&1
-
-          wait "$X50_PID"
-          X50_PID=
-
+          timeout 30s build/x50ng/dist/x50ng --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" --overwrite-config --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
           for pgm in build/hp48-ui-*.pgm; do
             [ -f "$pgm" ] || continue
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
           cat build/hp48-ui.json
-
       - name: Upload probe evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -132,6 +84,4 @@ jobs:
             build/hp48-ui-*.pgm
             build/hp48-ui-*.pgm.png
             build/hp48-ui.json
-            build/hp48-kermit*
-            build/hp48-socat.log
           if-no-files-found: warn
