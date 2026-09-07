@@ -5,42 +5,45 @@ emulator happens to execute them.
 
 ## Test tiers
 
-- **Direct runtime** — boot stock firmware, bypass calculator menus/installers,
-  enter the common hpclang ARM boundary, run the canonical HPC1 runtime, then
-  restore the exact stock execution state.
-- **Stock launch** — begin from a normal calculator-side installed state, drive
-  the stock UI and supported launcher, execute HPC1, and return to the stock
-  calculator environment.
+- **Direct runtime** — boot a target-appropriate stock firmware/full-NOR
+  fixture, bypass calculator menus/installers, enter the common hpclang ARM
+  boundary, run the canonical HPC1 runtime, then restore the stock execution
+  state.
+- **Stock launch** — drive the calculator's original UI and supported launcher
+  path, then require the same machine-readable HPC1 PASS result.
 
-The HP50g gate can also create its installed state through the emulated SD card.
-HP39gs/HP40gs have no equivalent SD injection path, so their stock-launch gate
-uses a generated post-transfer fixture.
+Current stock-launch transports intentionally match each calculator family:
+
+- HP39gs/HP40gs use the original serial-disk path. A headless Kermit server
+  supplies `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000` and
+  `LIB275L.000`; the stock ROM performs the transfer/install itself.
+- HP50g uses an emulated SD card to install ARMToolbox and copy the generated
+  `HPCLANG.HP` payload.
+- HP48gII currently has Direct runtime coverage; ARMToolbox48 stock-launch
+  integration is the remaining family gate.
 
 GitHub Actions orchestration lives in `.github/workflows/e2e-*.yml`.
 Emulator frontends live in `tests/x50ng/`. Human-like key input belongs under
 `tests/e2e/sequences/`.
 
-## Generated HP39/40 fixtures
+## Target profiles
 
-The fixture generator consumes the same transfer set produced for real
-hardware:
+`tests/e2e/targets/*.json` contains only emulator target metadata shared by
+workflows:
 
-- `HP39DIR.CUR`;
-- `HP39DIR.000`;
-- `HPGCC000.000`;
-- `LIB275L.000`.
+- `target`: workflow/filename identity;
+- `family`: firmware/emulator family selector;
+- `model`: hpclang stage0 model ID;
+- `lcd_height`: 64- or 80-line capture height.
 
-The preferred builder boots the official ROM and feeds those files through a
-headless host transport so the calculator's own transfer/install code creates
-its persistent state. The result is an x50ng datadir containing the normal
-`flash`, `sram` and `state` files.
+Only targets distributed as per-model firmware archives add a `firmware`
+object. Today that is HP39gs/HP40gs, whose object supplies the hpcalc archive
+name and member path. HP48gII uses a pinned full-NOR fixture, while HP49g+/50g
+use the shared x50ng 49/50 firmware fixture, so they do not carry empty archive
+fields.
 
-The cache key includes the firmware identity, all four input-file digests and
-the builder version. A payload/package change therefore rebuilds the fixture
-automatically.
-
-Direct patching of calculator SRAM/flash is a fallback only. Conn3x's Windows
-GUI is not part of the regression gate.
+`tools/e2e-target-env.py` exposes a selected profile as `HPCLANG_E2E_*`
+variables for the workflow.
 
 ## Sequence files
 

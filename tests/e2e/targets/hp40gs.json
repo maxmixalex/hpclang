@@ -2,7 +2,9 @@
   "target": "hp40gs",
   "family": "little-apple",
   "model": 3,
-  "archive": "hp40gs222.zip",
-  "member": "HP40GS_2.22/hp40gs_v2.22.bin",
-  "lcd_height": 64
+  "lcd_height": 64,
+  "firmware": {
+    "archive": "hp40gs222.zip",
+    "member": "HP40GS_2.22/hp40gs_v2.22.bin"
+  }
 }
