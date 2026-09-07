@@ -109,7 +109,7 @@ jobs:
           X50_PID=$!
 
           sleep 17
-          tools/run-hp48-kermit-send.sh \
+          timeout 15s tools/run-hp48-kermit-send.sh \
             "$KERMIT_TTY" build/hp48-send build/hp48-kermit-debug.log L275_48 \
             > build/hp48-kermit.out 2>&1
 
