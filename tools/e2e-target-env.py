@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 
 
+COMMON_KEYS = ("target", "family", "model", "lcd_height")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(f"usage: {sys.argv[0]} TARGET.json", file=sys.stderr)
@@ -13,12 +16,11 @@ def main() -> int:
 
     path = Path(sys.argv[1])
     data = json.loads(path.read_text(encoding="utf-8"))
-    required = {
-        "target", "family", "model", "archive", "member", "lcd_height",
-    }
-    missing = sorted(required - data.keys())
+
+    missing = [key for key in COMMON_KEYS if key not in data]
     if missing:
-        print(f"{path}: missing keys: {', '.join(missing)}", file=sys.stderr)
+        missing_text = ", ".join(missing)
+        print(f"{path}: missing keys: {missing_text}", file=sys.stderr)
         return 2
 
     if data["target"] != path.stem:
@@ -28,14 +30,28 @@ def main() -> int:
         )
         return 2
 
-    for key in (
-        "target", "family", "model", "archive", "member", "lcd_height",
-    ):
+    for key in COMMON_KEYS:
         value = str(data[key])
         if "\n" in value or "\r" in value:
             print(f"{path}: newline in {key}", file=sys.stderr)
             return 2
         print(f"HPCLANG_E2E_{key.upper()}={value}")
+
+    firmware = data.get("firmware")
+    if firmware is not None:
+        if not isinstance(firmware, dict):
+            print(f"{path}: firmware must be an object", file=sys.stderr)
+            return 2
+        for key in ("archive", "member"):
+            value = str(firmware.get(key, ""))
+            if not value:
+                print(f"{path}: firmware.{key} is required", file=sys.stderr)
+                return 2
+            if "\n" in value or "\r" in value:
+                print(f"{path}: newline in firmware.{key}", file=sys.stderr)
+                return 2
+            print(f"HPCLANG_E2E_{key.upper()}={value}")
+
     return 0
 
 

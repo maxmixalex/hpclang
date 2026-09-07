@@ -10,14 +10,16 @@ its GPL implementation is copied into hpclang's production runtime.
 
 Current roles:
 
-- `E2E / Direct runtime`: common HPC1 execution and stock-state restoration;
-- `E2E / HP50g stock launch`: stock HP50g File Manager/ARMToolbox/PrRUN path;
-- HP39gs/HP40gs stock launch: generated installed fixture followed by stock
-  APLET/ARMToolbox39 UI;
-- HP48gII: true medium-apple hardware preparation for the shared 2.15 ROM.
+- `E2E / Direct runtime`: common HPC1 execution and stock-state restoration
+  on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g;
+- `E2E / HP39/40 stock launch`: real stock serial-disk transfer followed by
+  APLET/ARMToolbox39 launch;
+- `E2E / HP50g stock launch`: stock File Manager/ARMToolbox/PrRUN path;
+- HP48gII: verified 2 MiB full-NOR boot on a 256 KiB / 131x64 medium-apple
+  personality; ARMToolbox48 stock launch remains.
 
 HP39gs/HP40gs use the little-apple x50ng hardware path. HP49g+/HP50g share the
-hp4950 path. HP48gII uses the same S3C2410 base with its real 256 KiB RAM and
-64-line LCD differences.
+hp4950 path. HP48gII uses the same S3C2410 base with its genuine 256 KiB RAM,
+64-line LCD and native 48gII bootloader/full-NOR state.
 
 See `tests/e2e/README.md` for the test-layer contract.
