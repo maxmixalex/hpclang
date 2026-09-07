@@ -1,0 +1,193 @@
+name: E2E / HP39 stock launch
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/hp39-fixture-key.py"
+      - "tools/package-hp39-aplet.sh"
+      - "tests/x50ng/stock-launcher-main.c"
+      - "tests/x50ng/headless-ui-init.h"
+      - "tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+      - ".github/workflows/e2e-hp39-stock.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  serial-fixture-probe:
+    name: hp39gs serial fixture probe
+    runs-on: home-docker
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install fixture and x50ng runtime dependencies
+        run: |
+          packages=(
+            ckermit socat innoextract
+            libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0
+          )
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
+              || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build current HP39gs transfer set
+        run: |
+          chmod +x \
+            tools/probe-atfe.sh \
+            tools/bootstrap-hp39-aplet.sh \
+            tools/package-hp39-aplet.sh \
+            tools/run-hp39-kermit-server.sh
+          tools/probe-atfe.sh
+          tools/bootstrap-hp39-aplet.sh
+          tools/package-hp39-aplet.sh \
+            build/atfe-probe/hp39gs-hpc1.hp \
+            dist/hp39gs-stock-transfer \
+            hp39gs
+
+      - name: Restore x50ng serial build cache
+        id: x50ng-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: build/x50ng/dist
+          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+
+      - name: Install x50ng build dependencies
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: |
+          packages=(libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
+              || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+
+      - name: Fetch and adapt pinned x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: |
+          tools/fetch-x50ng.sh \
+            build/x50ng \
+            tests/x50ng/stock-launcher-main.c \
+            little-apple \
+            host-uart0
+
+      - name: Build x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        working-directory: build/x50ng
+        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Save x50ng serial build cache
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/x50ng/dist
+          key: ${{ steps.x50ng-cache.outputs.cache-primary-key }}
+
+      - name: Fetch official HP39gs 2.22 firmware
+        run: |
+          make -C build/x50ng/dist/firmware bootloaders
+          curl -fL --retry 3 \
+            https://www.hpcalc.org/hp39/pc/hp39gs222.zip \
+            -o /tmp/hp39gs222.zip
+          unzip -p /tmp/hp39gs222.zip \
+            HP39GS_2.22/hp39gs_v2.22.bin \
+            > build/hp39gs-2.22.bin
+
+      - name: Compute fixture content key
+        run: |
+          python3 tools/hp39-fixture-key.py \
+            hp39gs \
+            build/hp39gs-2.22.bin \
+            dist/hp39gs-stock-transfer \
+            | tee build/hp39-fixture-key.txt
+
+      - name: Probe stock serial disk transport
+        run: |
+          set -euo pipefail
+          X50_TTY="$RUNNER_TEMP/hp39-x50ng-uart"
+          KERMIT_TTY="$RUNNER_TEMP/hp39-kermit-uart"
+
+          socat -d -d -x -v \
+            PTY,raw,echo=0,link="$X50_TTY" \
+            PTY,raw,echo=0,link="$KERMIT_TTY" \
+            2> build/hp39-socat.log &
+          SOCAT_PID=$!
+
+          cleanup() {
+            kill "${KERMIT_PID:-}" "$SOCAT_PID" 2>/dev/null || true
+            wait "${KERMIT_PID:-}" 2>/dev/null || true
+            wait "$SOCAT_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 50); do
+            [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]] && break
+            sleep 0.1
+          done
+          [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
+
+          tools/run-hp39-kermit-server.sh \
+            "$KERMIT_TTY" \
+            dist/hp39gs-stock-transfer \
+            "$GITHUB_WORKSPACE/build/hp39-kermit-debug.log" \
+            > build/hp39-kermit.out 2>&1 &
+          KERMIT_PID=$!
+
+          export HPCLANG_X50NG_UART0="$X50_TTY"
+          export HPCLANG_X50NG_LCD_HEIGHT=64
+          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp39gs-stock"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39gs-stock.json"
+
+          mkdir -p build/hp39gs-state
+          timeout 50s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/hp39gs-state" \
+            --overwrite-config \
+            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
+            --flash-full \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --firmware="$GITHUB_WORKSPACE/build/hp39gs-2.22.bin"
+
+          grep -Eq 'length=[1-9][0-9]*' build/hp39-socat.log
+
+      - name: Render probe captures
+        if: always()
+        run: |
+          for pgm in build/hp39gs-stock-*.pgm; do
+            [[ -f "$pgm" ]] || continue
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
+          done
+
+      - name: Upload HP39 serial fixture probe
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp39gs-serial-fixture-probe
+          retention-days: 14
+          path: |
+            build/hp39gs-stock*
+            build/hp39-socat.log
+            build/hp39-kermit*
+            build/hp39-fixture-key.txt
+            build/hp39gs-state/
+          if-no-files-found: warn
