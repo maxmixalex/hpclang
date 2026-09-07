@@ -27,4 +27,4 @@ exec "$KERMIT" \
     -l "$TTY" \
     -b 9600 \
     -8 -P -i \
-    -C "set carrier-watch off,set modem type none,set flow none,set parity none,set control prefix all,set send packet-length 80,set file type binary,set handshake none,log debug $LOG,server"
+    -C "set carrier-watch off,set modem type none,set flow none,set parity none,set control prefix all,set send packet-length 80,set send timeout 1 fixed,set file type binary,set handshake none,log debug $LOG,server"
