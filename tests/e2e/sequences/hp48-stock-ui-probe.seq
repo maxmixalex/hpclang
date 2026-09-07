@@ -35,10 +35,14 @@
 42000 tap f1
 43000 capture l275-stack
 44000 tap zero
-45000 capture port-zero-stack
-46000 tap sto
-48000 capture stored
+45000 capture port-zero-entry
+46000 tap enter
+47000 capture port-zero-stack
+48000 tap sto
+50000 capture stored
 # Warmstart attaches the installed library.
-50000 chord on f3
-55000 capture after-warmstart
-59000 finish-install
+52000 chord on f3
+58000 capture after-warmstart
+62000 chord rshift two
+63500 capture lib-menu
+66000 finish-install
