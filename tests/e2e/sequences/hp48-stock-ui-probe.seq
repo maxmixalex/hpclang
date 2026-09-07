@@ -2,6 +2,7 @@
 # A fresh full-NOR + empty SRAM starts at Try To Recover Memory?; choose NO
 # to create the deterministic factory-default state.
 2000 tap f6
+4000 tap f6
 7000 capture home
 8000 tap files
 9000 capture apps
