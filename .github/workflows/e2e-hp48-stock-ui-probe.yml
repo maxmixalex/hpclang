@@ -1,0 +1,88 @@
+name: Probe / HP48 stock UI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tests/e2e/sequences/hp48-stock-ui-probe.seq"
+      - ".github/workflows/e2e-hp48-stock-ui-probe.yml"
+
+jobs:
+  probe:
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure runtime dependencies
+        run: |
+          packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+
+      - name: Restore HP48 stock x50ng cache
+        id: x50ng-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: build/x50ng/dist
+          key: hpclang-x50ng-hp48-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+
+      - name: Install x50ng build dependencies
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+
+      - name: Fetch and adapt pinned x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp48gii host-uart0
+
+      - name: Build x50ng
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        working-directory: build/x50ng
+        run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Save HP48 stock x50ng cache
+        if: steps.x50ng-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/x50ng/dist
+          key: ${{ steps.x50ng-cache.outputs.cache-primary-key }}
+
+      - name: Prepare verified HP48gII full NOR
+        run: |
+          curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o build/hp48gii-nor.bin
+          printf '%s  %s\n' 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 build/hp48gii-nor.bin | sha256sum -c -
+          python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin build/hp48-ui-state
+
+      - name: Probe stock I/O UI
+        run: |
+          export HPCLANG_X50NG_LCD_HEIGHT=64
+          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48-stock-ui-probe.seq"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48-ui"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48-ui.json"
+          timeout 30s build/x50ng/dist/x50ng --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" --overwrite-config --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
+          for pgm in build/hp48-ui-*.pgm; do
+            [ -f "$pgm" ] || continue
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
+          done
+          cat build/hp48-ui.json
+
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp48-stock-ui-probe
+          retention-days: 1
+          path: |
+            build/hp48-ui-*.pgm
+            build/hp48-ui-*.pgm.png
+            build/hp48-ui.json
+          if-no-files-found: warn
