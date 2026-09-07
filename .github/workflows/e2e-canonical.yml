@@ -22,6 +22,7 @@ on:
       - "tools/publish-ci-image.sh"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
       - "tests/e2e/targets/**"
@@ -58,12 +59,12 @@ jobs:
     runs-on: home-docker
     timeout-minutes: 25
     env:
-      X50NG_BUILD_VARIANT: ${{ (matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'little-apple' }}
+      X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp48gii' && 'hp48gii' || ((matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'little-apple') }}
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        target: [hp39gs, hp40gs, hp49gplus, hp50g]
+        target: [hp39gs, hp40gs, hp48gii, hp49gplus, hp50g]
 
     steps:
       - uses: actions/checkout@v7
@@ -142,13 +143,19 @@ jobs:
 
       - name: Record x50ng source
         run: printf '%s\n' 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a > build/x50ng-canonical-source.txt
-      - name: Fetch official firmware
+      - name: Prepare target firmware
+        env:
+          HP48GII_NOR_SHA256: 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937
         run: |
           find build/x50ng/dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
           if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
             make -C build/x50ng/dist/firmware bootloaders
-            curl -L "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
+            curl -fL --retry 3 "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
             unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" "$HPCLANG_E2E_MEMBER" > build/target-firmware.bin
+          elif [ "$HPCLANG_E2E_FAMILY" = hp48 ]; then
+            curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o build/hp48gii-nor.bin
+            printf "%s  %s\n" "$HP48GII_NOR_SHA256" build/hp48gii-nor.bin | sha256sum -c -
+            python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin "build/$HPCLANG_E2E_TARGET-state"
           else
             make -C build/x50ng/dist/firmware bootloaders official
           fi
@@ -165,24 +172,32 @@ jobs:
           export HPCLANG_X50NG_E2E_JSON="$GITHUB_WORKSPACE/build/$TARGET-e2e.json"
           export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
+          X50_ARGS=(
+            --datadir="$GITHUB_WORKSPACE/build/$TARGET-state"
+            --overwrite-config
+          )
           if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
-            STYLE="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
-            FLASH_ARG=--flash-full
-            FIRMWARE="$GITHUB_WORKSPACE/build/target-firmware.bin"
+            X50_ARGS+=(
+              --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
+              --flash-full
+              --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin"
+              --firmware="$GITHUB_WORKSPACE/build/target-firmware.bin"
+            )
+          elif [ "$HPCLANG_E2E_FAMILY" = hp48 ]; then
+            X50_ARGS+=(
+              --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
+            )
           else
-            STYLE="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css"
-            FLASH_ARG=--flash
-            FIRMWARE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
+            X50_ARGS+=(
+              --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css"
+              --flash
+              --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin"
+              --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
+            )
           fi
 
           mkdir -p "build/$TARGET-state"
-          timeout 35s build/x50ng/dist/x50ng \
-            --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
-            --overwrite-config \
-            --style="$STYLE" \
-            "$FLASH_ARG" \
-            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
-            --firmware="$FIRMWARE"
+          timeout 35s build/x50ng/dist/x50ng "${X50_ARGS[@]}"
 
           for pgm in build/$TARGET-*.pgm; do
             [ -f "$pgm" ] || continue
