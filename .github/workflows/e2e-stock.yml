@@ -44,14 +44,9 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        include:
-          - target: hp49gplus
-            bootloader: boot-49g+.bin
-          - target: hp50g
-            bootloader: boot-50g.bin
+        target: [hp49gplus, hp50g]
     env:
       TARGET: ${{ matrix.target }}
-      BOOTLOADER: ${{ matrix.bootloader }}
     steps:
       - uses: actions/checkout@v7
 
@@ -191,7 +186,7 @@ jobs:
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
             --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
             --flash \
-            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$BOOTLOADER" \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$HPCLANG_E2E_BOOTLOADER" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
           for pgm in build/stock-install-*.pgm; do
             [ -f "$pgm" ] || continue
@@ -217,7 +212,7 @@ jobs:
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
             --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
-            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$BOOTLOADER" \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$HPCLANG_E2E_BOOTLOADER" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
 
           for pgm in build/stock-run-*.pgm; do

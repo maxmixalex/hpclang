@@ -2,5 +2,6 @@
   "target": "hp50g",
   "family": "hp4950",
   "model": 6,
-  "lcd_height": 80
+  "lcd_height": 80,
+  "bootloader": "boot-50g.bin"
 }

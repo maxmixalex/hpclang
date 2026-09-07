@@ -37,6 +37,17 @@ def main() -> int:
             return 2
         print(f"HPCLANG_E2E_{key.upper()}={value}")
 
+    bootloader = data.get("bootloader")
+    if bootloader is not None:
+        value = str(bootloader)
+        if not value:
+            print(f"{path}: bootloader must not be empty", file=sys.stderr)
+            return 2
+        if "\n" in value or "\r" in value:
+            print(f"{path}: newline in bootloader", file=sys.stderr)
+            return 2
+        print(f"HPCLANG_E2E_BOOTLOADER={value}")
+
     firmware = data.get("firmware")
     if firmware is not None:
         if not isinstance(firmware, dict):
