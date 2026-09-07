@@ -38,8 +38,9 @@ The provenance chain has three distinct layers:
    https://www.cncalc.org/thread-11475-1-1.html
 2. wjchen's 2020 cnCalc post publishes a specifically identified factory
    2.08 build-92 HP48gII JTAG dump and records its full-NOR properties.
-3. lyc8503's 2021 write-up is the currently live downloadable mirror used by
-   CI, not the primary technical source.
+3. lyc8503's 2021 write-up provides the currently live downloadable full-NOR
+   fixture used by CI. It is an independent dump lineage, not a byte-for-byte
+   mirror of wjchen's 2020 `CNA0000000` image.
 The primary historical source is wjchen's 2020 cnCalc dump:
 https://www.cncalc.org/thread-24739-1-1.html
 
@@ -57,7 +58,9 @@ The mirrored `48gii.bin` was independently inspected in CI:
 - SHA-256: `4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937`;
 - ARM vector table at offset zero;
 - `KINPOHP48GIIMAGE` in the boot area;
-- `Kinposhcopyright` at the firmware boundary `0x4000`.
+- `Kinposhcopyright` at the firmware boundary `0x4000`;
+- bootloader serial `CNA6070206`, proving it is not wjchen's serial-cleared
+  `CNA0000000` dump.
 
 For an independent vendor-origin cross-check, hpcalc.org archives
 Hewlett-Packard's 2.15 emulator ROM as a 2 MiB `rom.49g` and explicitly
@@ -73,3 +76,16 @@ SHA-256 rather than trusting mutable web content.
 x50ng's persistent `flash` state. Pinned x50ng defaults to
 `HDW_REINIT_NONE`; passing `--flash` or `--flash-full` would overwrite the
 already prepared HP48gII NOR.
+
+## Direct runtime result
+
+GitHub Actions run `34132800652` booted the verified full NOR on the hp48gii
+x50ng personality and completed the canonical runtime contract:
+
+- machine-readable result `0x50415353`;
+- `saw_pass=true`;
+- `returned=true`;
+- 131x64 PASS and post-return LCD captures.
+
+This closes the raw-NOR and Direct-runtime bring-up blockers. Remaining HP48gII
+work is the supported calculator-side ARMToolbox48 launch path.
