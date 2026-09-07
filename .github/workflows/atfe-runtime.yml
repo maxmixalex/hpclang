@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   runtime:
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
 

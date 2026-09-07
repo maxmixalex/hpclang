@@ -22,7 +22,7 @@ concurrency:
 jobs:
   stock-launch:
     name: hp39gs
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     timeout-minutes: 25
 
     steps:
@@ -66,7 +66,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-gh24-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
 
       - name: Install x50ng build dependencies
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -162,7 +162,7 @@ jobs:
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39gs-stock.json"
 
           mkdir -p build/hp39gs-state
-          timeout 135s build/x50ng/dist/x50ng \
+          timeout 225s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp39gs-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \

@@ -26,4 +26,4 @@
 31000 capture remote-aplet
 32500 tap enter
 34000 capture lazy-fetch
-34500 monitor 90000
+34500 monitor 180000
