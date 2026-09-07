@@ -1,4 +1,4 @@
-name: E2E / HP50g stock launch
+name: E2E / HP49/50 stock launch
 
 permissions:
   contents: write
@@ -22,6 +22,9 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
+      - "tests/e2e/targets/hp49gplus.json"
+      - "tests/e2e/targets/hp50g.json"
+      - "tools/e2e-target-env.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/inspect-armtoolbox-envelope.py"
       - "tools/pgm-to-summary.py"
@@ -34,38 +37,53 @@ concurrency:
 
 jobs:
   stock-launcher:
-    name: hp50g
+    name: ${{ matrix.target }}
     runs-on: home-docker
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - target: hp49gplus
+            bootloader: boot-49g+.bin
+          - target: hp50g
+            bootloader: boot-50g.bin
+    env:
+      TARGET: ${{ matrix.target }}
+      BOOTLOADER: ${{ matrix.bootloader }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Load target profile
+        run: python3 tools/e2e-target-env.py "tests/e2e/targets/$TARGET.json" >> "$GITHUB_ENV"
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Reset HP50g test state
+      - name: Reset target test state
         run: |
           rm -rf build/stock-state build/stock-sd build/stock-reference
           rm -f build/stock-install* build/stock-run* build/stock-summary.png
           mkdir -p build/stock-sd build/stock-reference
 
-      - name: Build HP50g test payload
+      - name: Build ${{ matrix.target }} test payload
         run: |
           export OUT="$GITHUB_WORKSPACE/build/stock-payload"
           chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
           HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/probe-atfe.sh
           $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
-            -DHPCLANG_STAGE0_MODEL=6 -c platform/armtoolbox/stage0.S \
-            -o build/stock-payload/stage0-hp50g.o
+            -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" -c platform/armtoolbox/stage0.S \
+            -o build/stock-payload/stage0.o
           $ATFE/bin/ld.lld -m armelf -T platform/armtoolbox/stage0.ld \
-            build/stock-payload/stage0-hp50g.o \
+            build/stock-payload/stage0.o \
             build/stock-payload/stage0-bundle.o \
-            -o build/stock-payload/stage0-hp50g.elf
+            -o build/stock-payload/stage0.elf
           $ATFE/bin/llvm-objcopy -O binary \
-            build/stock-payload/stage0-hp50g.elf \
-            build/stock-payload/stage0-hp50g.bin
+            build/stock-payload/stage0.elf \
+            build/stock-payload/stage0.bin
           python3 tools/armtoolbox-wrap.py \
-            build/stock-payload/stage0-hp50g.bin \
+            build/stock-payload/stage0.bin \
             build/stock-payload/HPCLANG.HP
 
       - name: Restore hpcalc download cache
@@ -108,7 +126,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-stock-hp50g-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-stock-hp4950-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
       - name: Ensure x50ng runtime dependencies
         run: |
           packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
@@ -160,7 +178,7 @@ jobs:
           find dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
           make -C dist/firmware bootloaders official
 
-      - name: Install ARMToolbox through HP50g UI
+      - name: Install ARMToolbox through stock UI
         run: |
           export HPCLANG_STOCK_MODE=install
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp50g-stock-install.seq"
@@ -173,7 +191,7 @@ jobs:
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
             --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
             --flash \
-            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$BOOTLOADER" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
           for pgm in build/stock-install-*.pgm; do
             [ -f "$pgm" ] || continue
@@ -199,7 +217,7 @@ jobs:
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css" \
             --sd-dir="$GITHUB_WORKSPACE/build/stock-sd" \
-            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$BOOTLOADER" \
             --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
 
           for pgm in build/stock-run-*.pgm; do
@@ -246,17 +264,17 @@ jobs:
           chmod +x tools/publish-ci-image.sh
           tools/publish-ci-image.sh \
             build/stock-summary.png \
-            "full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png"
+            "full-hp4950-launch/$GITHUB_RUN_ID/$TARGET.png"
 
       - name: Add LCD evidence to job summary
         if: always()
         run: |
           IMAGE_URL=""
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/full-hp50g-launch/$GITHUB_RUN_ID/hp50g.png?raw=1"
+            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/full-hp4950-launch/$GITHUB_RUN_ID/$TARGET.png?raw=1"
           fi
           python3 tools/pgm-to-summary.py \
-            --heading "HP50g full original-system launch" \
+            --heading "$TARGET full original-system launch" \
             --image-url "$IMAGE_URL" \
             --json build/stock-install.json \
             --json build/stock-run.json \
@@ -286,11 +304,11 @@ jobs:
             build/stock-run-failure.pgm \
             >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload full HP50g launch evidence
+      - name: Upload ${{ matrix.target }} full-launch evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp50g-full-launch-evidence
+          name: ${{ matrix.target }}-full-launch-evidence
           retention-days: 14
           path: |
             build/stock-install-*
