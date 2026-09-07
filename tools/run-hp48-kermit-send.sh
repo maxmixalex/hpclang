@@ -35,7 +35,13 @@ commands=(
     "log debug $LOG"
 )
 
-for file in "$@"; do
+for spec in "$@"; do
+    file="${spec%%=*}"
+    as_name=""
+    if [[ "$spec" == *=* ]]; then
+        as_name="${spec#*=}"
+    fi
+
     [[ "$file" != */* ]] || {
         echo "send file must be relative to send-directory: $file" >&2
         exit 2
@@ -44,7 +50,12 @@ for file in "$@"; do
         echo "missing send file: $SEND_DIR/$file" >&2
         exit 1
     }
-    commands+=("send $file")
+
+    if [[ -n "$as_name" ]]; then
+        commands+=("send /as-name:$as_name $file")
+    else
+        commands+=("send $file")
+    fi
 done
 
 commands+=("finish" "exit")
