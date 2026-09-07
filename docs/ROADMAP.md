@@ -57,7 +57,7 @@ is not part of the runtime regression contract.
 
 ## M4 — HP48gII
 
-**Direct runtime complete; calculator-side stock launch active.**
+**Complete.**
 
 - [x] add a model-4 / 131x64 E2E target profile;
 - [x] record the true medium-apple hardware differences: 256 KiB physical RAM,
@@ -65,7 +65,7 @@ is not part of the runtime regression contract.
 - [x] add a thin x50ng HP48gII preparation mode;
 - [x] boot a genuine HP48gII full-NOR image on the 256 KiB medium-apple model;
 - [x] execute the same HPC1 runtime and validate clean return;
-- [ ] exercise the supported ARMToolbox48 calculator-side launch path.
+- [x] exercise the supported ARMToolbox48 calculator-side launch path.
 
 Completion criterion:
 
@@ -103,6 +103,7 @@ Passing:
 - HP49g+ direct runtime;
 - HP50g direct runtime;
 - HP50g full stock ARMToolbox/PrRUN launch;
+- HP48gII full stock Kermit/ARMToolbox48/PrRUN launch;
 - HP39gs full stock serial-disk/APLET launch;
 - HP40gs full stock serial-disk/APLET launch.
 
@@ -110,7 +111,8 @@ Active expansion:
 
 - [x] HP48gII direct runtime;
 - [x] HP39gs/HP40gs stock serial-disk/APLET launch;
-- [ ] HP48gII/HP49g+ stock launch.
+- [x] HP48gII stock launch;
+- [ ] HP49g+ stock launch.
 
 Direct runtime owns common-bootstrap execution and return correctness.
 Stock-launch gates own calculator-side package/menu/launcher integration.

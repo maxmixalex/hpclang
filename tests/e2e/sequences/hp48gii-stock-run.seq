@@ -1,4 +1,4 @@
-# HP48gII full stock-launch probe: ARMToolbox48 -> hpclang HPC1.
+# HP48gII full stock launch: stock Kermit -> ARMToolbox48 -> hpclang HPC1.
 2000 tap f6
 4000 tap f6
 # Factory default is ALG; use RPN for the stack-based library install.

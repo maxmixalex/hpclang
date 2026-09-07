@@ -1,16 +1,43 @@
-name: Probe / HP48 stock UI
+name: E2E / HP48gII stock launch
+
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "tests/e2e/sequences/hp48-stock-ui-probe.seq"
-      - ".github/workflows/e2e-hp48-stock-ui-probe.yml"
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tests/hp39-runtime-diag.c"
+      - "tests/x50ng/stock-launcher-main.c"
+      - "tests/x50ng/headless-ui-init.h"
+      - "tests/e2e/sequences/hp48gii-stock-run.seq"
+      - "tools/probe-atfe.sh"
+      - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/run-hp48-kermit-send.sh"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
+      - ".github/actions/setup-atfe/**"
+      - ".github/workflows/e2e-hp48-stock.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  probe:
+  stock-launcher:
+    name: hp48gii
     runs-on: home-docker
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -38,7 +65,7 @@ jobs:
 
       - name: Ensure runtime dependencies
         run: |
-          packages=(ckermit socat innoextract libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+          packages=(ckermit socat innoextract libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
           missing=()
           for package in "${packages[@]}"; do
             dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' || missing+=("$package")
@@ -81,7 +108,7 @@ jobs:
         run: |
           curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o build/hp48gii-nor.bin
           printf '%s  %s\n' 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 build/hp48gii-nor.bin | sha256sum -c -
-          python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin build/hp48-ui-state
+          python3 tools/prepare-hp48gii-nor.py build/hp48gii-nor.bin build/hp48-state
 
       - name: Prepare stock transfer objects
         run: |
@@ -122,13 +149,13 @@ jobs:
           export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT=64
           export HPCLANG_STOCK_MODE=run
-          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48-stock-ui-probe.seq"
-          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48-ui"
-          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48-ui.json"
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48gii-stock-run.seq"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48.json"
           export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/hp48-payload/hp39-visible.result-address")"
 
           timeout 200s build/x50ng/dist/x50ng \
-            --datadir="$GITHUB_WORKSPACE/build/hp48-ui-state" \
+            --datadir="$GITHUB_WORKSPACE/build/hp48-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" &
           X50_PID=$!
@@ -141,21 +168,74 @@ jobs:
           wait "$X50_PID"
           X50_PID=
 
-          for pgm in build/hp48-ui-*.pgm; do
+          for pgm in build/hp48-*.pgm; do
             [ -f "$pgm" ] || continue
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
-          cat build/hp48-ui.json
-      - name: Upload probe evidence
+          cat build/hp48.json
+
+      - name: Generate LCD summary image
+        if: always()
+        run: |
+          python3 tools/pgm-to-summary.py \
+            --image-only \
+            --image-out build/hp48-summary.png \
+            build/hp48-home-rpn.pgm \
+            build/hp48-server-serial.pgm \
+            build/hp48-after-transfer.pgm \
+            build/hp48-vars-before-install.pgm \
+            build/hp48-l275-stack.pgm \
+            build/hp48-stored.pgm \
+            build/hp48-after-warmstart.pgm \
+            build/hp48-hpclang-stack.pgm \
+            build/hp48-lib-menu.pgm \
+            build/hp48-armtoolbox.pgm \
+            build/hp48-pass.pgm \
+            build/hp48-failure.pgm
+
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            build/hp48-summary.png \
+            "full-hp48gii-launch/$GITHUB_RUN_ID/hp48gii.png"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        run: |
+          IMAGE_URL=""
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/full-hp48gii-launch/$GITHUB_RUN_ID/hp48gii.png?raw=1"
+          fi
+          python3 tools/pgm-to-summary.py \
+            --heading "HP48gII full original-system launch" \
+            --image-url "$IMAGE_URL" \
+            --json build/hp48.json \
+            build/hp48-home-rpn.pgm \
+            build/hp48-server-serial.pgm \
+            build/hp48-after-transfer.pgm \
+            build/hp48-vars-before-install.pgm \
+            build/hp48-l275-stack.pgm \
+            build/hp48-stored.pgm \
+            build/hp48-after-warmstart.pgm \
+            build/hp48-hpclang-stack.pgm \
+            build/hp48-lib-menu.pgm \
+            build/hp48-armtoolbox.pgm \
+            build/hp48-pass.pgm \
+            build/hp48-failure.pgm \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload HP48gII full-launch evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp48-stock-ui-probe
-          retention-days: 1
+          name: hp48gii-full-launch-evidence
+          retention-days: 14
           path: |
-            build/hp48-ui-*.pgm
-            build/hp48-ui-*.pgm.png
-            build/hp48-ui.json
+            build/hp48-*.pgm
+            build/hp48-*.pgm.png
+            build/hp48.json
             build/hp48-kermit*
             build/hp48-socat.log
             build/hp48-payload/HPCLANG.HP

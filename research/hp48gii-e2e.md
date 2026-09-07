@@ -87,5 +87,10 @@ x50ng personality and completed the canonical runtime contract:
 - `returned=true`;
 - 131x64 PASS and post-return LCD captures.
 
-This closes the raw-NOR and Direct-runtime bring-up blockers. Remaining HP48gII
-work is the supported calculator-side ARMToolbox48 launch path.
+This closed the raw-NOR and Direct-runtime bring-up blockers.
+
+The calculator-side path was subsequently closed by GitHub Actions run
+`34147202219`: stock HP48gII UI -> Serial Kermit -> `L275_48.LIB` + generated
+`HPCLANG.HP` -> Port 0 install -> warmstart -> `ARMTo` -> `PrRUN` ->
+machine-readable HPC1 PASS. The supported result now lives in `docs/`; this
+research note remains only as bring-up provenance.

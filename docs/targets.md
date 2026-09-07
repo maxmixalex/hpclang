@@ -9,7 +9,7 @@ hpclang supports six ARM calculator targets through three family backends.
 | HP 39g+ | 1 | HP39/40 | pending sibling gate | pending |
 | HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS; full stock emulator PASS |
 | HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | full stock emulator PASS |
-| HP 48gII | 4 | HP48 | full-NOR medium-apple emulator PASS | pending ARMToolbox48 gate |
+| HP 48gII | 4 | HP48 | full-NOR medium-apple emulator PASS | full ARMToolbox48/PrRUN E2E PASS |
 | HP 49g+ | 5 | HP49/50 | official-ROM emulator PASS | pending stock launcher gate |
 | HP 50g | 6 | HP49/50 | official-ROM emulator PASS | full ARMToolbox/PrRUN E2E PASS |
 
@@ -34,8 +34,10 @@ Port1/ERAM scan.
 
 The HP48 family adapter now feeds the same common bootstrap and HPC1 image on
 a genuine 48gII full-NOR fixture with 256 KiB SRAM and a 131x64 display. The
-Direct gate passes and returns cleanly. Remaining work is calculator-side
-ARMToolbox48 launch integration, not a distinct runtime or ABI.
+Direct gate passes and returns cleanly. The full stock gate also transfers
+ARMToolbox48 and HPCLANG through the calculator's original serial Kermit path,
+installs library 275 into Port 0, launches PrRUN and reaches the same HPC1 PASS
+result.
 
 ## HP49g+/50g family
 

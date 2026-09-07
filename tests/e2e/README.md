@@ -17,10 +17,11 @@ Current stock-launch transports intentionally match each calculator family:
 - HP39gs/HP40gs use the original serial-disk path. A headless Kermit server
   supplies `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000` and
   `LIB275L.000`; the stock ROM performs the transfer/install itself.
+- HP48gII uses the stock serial Kermit server to receive `L275_48.LIB` and
+  the generated `HPCLANG.HP`, then installs library 275 into Port 0 and
+  launches the payload through ARMToolbox48 / PrRUN.
 - HP50g uses an emulated SD card to install ARMToolbox and copy the generated
   `HPCLANG.HP` payload.
-- HP48gII currently has Direct runtime coverage; ARMToolbox48 stock-launch
-  integration is the remaining family gate.
 
 GitHub Actions orchestration lives in `.github/workflows/e2e-*.yml`.
 Emulator frontends live in `tests/x50ng/`. Human-like key input belongs under

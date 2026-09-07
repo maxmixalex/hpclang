@@ -15,8 +15,8 @@ Current roles:
 - `E2E / HP39/40 stock launch`: real stock serial-disk transfer followed by
   APLET/ARMToolbox39 launch;
 - `E2E / HP50g stock launch`: stock File Manager/ARMToolbox/PrRUN path;
-- HP48gII: verified 2 MiB full-NOR boot on a 256 KiB / 131x64 medium-apple
-  personality; ARMToolbox48 stock launch remains.
+- `E2E / HP48gII stock launch`: verified full-NOR boot, stock serial Kermit
+  transfer, Port-0 ARMToolbox48 install and PrRUN -> HPC1 PASS.
 
 HP39gs/HP40gs use the little-apple x50ng hardware path. HP49g+/HP50g share the
 hp4950 path. HP48gII uses the same S3C2410 base with its genuine 256 KiB RAM,
