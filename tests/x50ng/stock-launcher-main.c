@@ -63,7 +63,9 @@ KEY_PAIR(up, HP4950_KEY_UP);
 KEY_PAIR(down, HP4950_KEY_DOWN);
 KEY_PAIR(left, HP4950_KEY_LEFT);
 KEY_PAIR(right, HP4950_KEY_RIGHT);
+KEY_PAIR(zero, HP4950_KEY_0);
 KEY_PAIR(two, HP4950_KEY_2);
+KEY_PAIR(sto, HP4950_KEY_K);
 KEY_PAIR(period, HP4950_KEY_PERIOD);
 KEY_PAIR(enter, HP4950_KEY_ENTER);
 KEY_PAIR(on, HP4950_KEY_ON);
@@ -82,7 +84,7 @@ static const struct key_pair_ref key_pairs[] = {
     KEY_REF(files), KEY_REF(symb), KEY_REF(plot), KEY_REF(num), KEY_REF(home),
     KEY_REF(aplet), KEY_REF(views), KEY_REF(mode), KEY_REF(var), KEY_REF(eval),
     KEY_REF(nxt), KEY_REF(neg), KEY_REF(up), KEY_REF(down), KEY_REF(left),
-    KEY_REF(right), KEY_REF(two), KEY_REF(period),
+    KEY_REF(right), KEY_REF(zero), KEY_REF(two), KEY_REF(sto), KEY_REF(period),
     KEY_REF(enter), KEY_REF(on), KEY_REF(lshift), KEY_REF(rshift),
 };
 #undef KEY_REF
