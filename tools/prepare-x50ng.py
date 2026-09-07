@@ -20,8 +20,8 @@ def patch_host_uart0(root: Path) -> None:
 
     replace_once(
         path,
-        "#include <fcntl.h>\n#include <sys/mman.h>",
-        "#include <fcntl.h>\n#include <errno.h>\n#include <sys/mman.h>",
+        "#include <fcntl.h>\n",
+        "#include <fcntl.h>\n#include <errno.h>\n",
         "UART errno include",
     )
     replace_once(
