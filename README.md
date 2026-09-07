@@ -34,8 +34,10 @@ change the application ABI.
 
 ## Validation status
 
-- HP39gs: canonical runtime PASS on real hardware and in the ARM emulator.
-- HP40gs: canonical runtime PASS on official firmware in the ARM emulator.
+- HP39gs: canonical runtime PASS on real hardware and in the ARM emulator,
+  plus full stock APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
+- HP40gs: canonical runtime PASS on official firmware plus full stock
+  APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
 - HP50g: canonical runtime PASS/return plus full original-system
   ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
 - HP49g+: canonical runtime PASS/return on official 2.15 firmware in the shared HP49/50 emulator backend.
