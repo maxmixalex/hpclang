@@ -20,6 +20,7 @@ jobs:
           chmod +x tools/bootstrap-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh >/dev/null
           ROOT=.cache/hp39-aplet/raw
+          mkdir -p build
           echo '=== paths containing ARMToolbox / source48 / 48g ==='
           find "$ROOT" -type f | grep -Ei 'ARMToolbox|source48|48g' | sort | tee build/hp48-armtoolbox-paths.txt
           echo '=== candidate fingerprints ==='
