@@ -1,0 +1,14 @@
+# Temporary HP40gs stock UI probe. Remove after confirming serial disk selection.
+2000 tap f6
+4000 tap f6
+13000 tap home
+14000 capture home
+15000 tap aplet
+16000 capture aplet-library
+17000 tap f5
+18000 capture receive-menu
+18500 tap down
+19200 tap down
+19900 tap down
+20200 capture receive-serial-disk
+21500 finish-install
