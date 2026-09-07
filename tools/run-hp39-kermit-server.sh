@@ -22,4 +22,9 @@ fi
 mkdir -p "$(dirname "$LOG")"
 cd "$SERVE"
 
-exec "$KERMIT"     -Y -H     -l "$TTY"     -b 9600     -P -i     -C "set carrier-watch off,set flow none,set handshake none,log debug $LOG,server"
+exec "$KERMIT" \
+    -Y -H \
+    -l "$TTY" \
+    -b 9600 \
+    -8 -P -i \
+    -C "set carrier-watch off,set modem type none,set flow none,set parity none,set control prefix all,set file type binary,set handshake none,log debug $LOG,server"
