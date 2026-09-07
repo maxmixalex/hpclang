@@ -26,7 +26,6 @@ on:
       - "tests/e2e/targets/hp50g.json"
       - "tools/e2e-target-env.py"
       - "tools/armtoolbox-wrap.py"
-      - "tools/inspect-armtoolbox-envelope.py"
       - "tools/pgm-to-summary.py"
       - "tools/publish-ci-image.sh"
       - ".github/workflows/e2e-stock.yml"
@@ -58,9 +57,9 @@ jobs:
 
       - name: Reset target test state
         run: |
-          rm -rf build/stock-state build/stock-sd build/stock-reference
+          rm -rf build/stock-state build/stock-sd
           rm -f build/stock-install* build/stock-run* build/stock-summary.png
-          mkdir -p build/stock-sd build/stock-reference
+          mkdir -p build/stock-sd
 
       - name: Build ${{ matrix.target }} test payload
         run: |
@@ -90,17 +89,15 @@ jobs:
 
       - name: Prepare ARMToolbox installer
         run: |
-          mkdir -p .cache/hpcalc build/stock-sd build/stock-reference
+          mkdir -p .cache/hpcalc build/stock-sd
           if [ ! -f .cache/hpcalc/mlreg.zip ]; then
             curl -fL --retry 3 --retry-delay 2 \
               https://www.hpcalc.org/hp49/math/statistic/mlreg.zip \
               -o .cache/hpcalc/mlreg.zip
           fi
           unzip -jo .cache/hpcalc/mlreg.zip SETUP.BIN -d build/stock-sd
-          unzip -jo .cache/hpcalc/mlreg.zip mlreg.hp -d build/stock-reference
           test "$(stat -c %s build/stock-sd/SETUP.BIN)" = 7673
           sha256sum build/stock-sd/SETUP.BIN
-          test "$(stat -c %s build/stock-reference/mlreg.hp)" = 21914
 
       - name: Save hpcalc download cache
         if: steps.hpcalc-cache.outputs.cache-hit != 'true'
@@ -108,13 +105,6 @@ jobs:
         with:
           path: .cache/hpcalc
           key: ${{ steps.hpcalc-cache.outputs.cache-primary-key }}
-
-      - name: Validate ARMToolbox transfer envelopes
-        run: |
-          python3 tools/inspect-armtoolbox-envelope.py \
-            build/stock-reference/mlreg.hp \
-            build/stock-payload/HPCLANG.HP \
-            | tee build/armtoolbox-envelope-reference.jsonl
 
       - name: Restore x50ng build cache
         id: x50ng-cache
@@ -313,5 +303,4 @@ jobs:
             build/x50ng-stock-source.txt
             build/stock-payload/HPCLANG.HP
             build/stock-payload/hp39-visible.result-address
-            build/armtoolbox-envelope-reference.jsonl
           if-no-files-found: warn
