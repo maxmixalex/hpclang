@@ -39,9 +39,9 @@ workflows:
 
 Only targets distributed as per-model firmware archives add a `firmware`
 object. Today that is HP39gs/HP40gs, whose object supplies the hpcalc archive
-name and member path. HP48gII uses a pinned full-NOR fixture, while HP49g+/50g
-use the shared x50ng 49/50 firmware fixture, so they do not carry empty archive
-fields.
+name and member path. HP49g+/HP50g share the 2.15 OS image but carry their
+distinct `bootloader` filenames because that is genuine per-model metadata.
+HP48gII uses a pinned full-NOR fixture. Profiles do not carry empty fields.
 
 `tools/e2e-target-env.py` exposes a selected profile as `HPCLANG_E2E_*`
 variables for the workflow.
