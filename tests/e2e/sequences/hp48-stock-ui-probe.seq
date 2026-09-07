@@ -1,6 +1,4 @@
-# Temporary HP48gII stock I/O UI probe.
-# A fresh full-NOR + empty SRAM starts at Try To Recover Memory?; choose NO
-# to create the deterministic factory-default state.
+# Temporary HP48gII stock transfer probe.
 2000 tap f6
 4000 tap f6
 7000 capture home
@@ -17,4 +15,8 @@
 14000 capture start-server-selected
 14500 tap enter
 16500 capture server
-19000 finish-install
+# Host C-Kermit sends L275_48 and FINISHes the server after this point.
+26000 capture after-transfer
+27000 tap var
+28000 capture vars
+32000 finish-install
