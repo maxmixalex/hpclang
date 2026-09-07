@@ -9,6 +9,7 @@ on:
       - "tools/run-hp39-kermit-server.sh"
       - "tools/hp39-fixture-key.py"
       - "tools/package-hp39-aplet.sh"
+      - ".github/actions/setup-atfe/**"
       - "tests/x50ng/stock-launcher-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tests/e2e/sequences/hp39-serial-fixture-probe.seq"
@@ -19,9 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  serial-fixture-probe:
-    name: hp39gs serial fixture probe
-    runs-on: home-docker
+  stock-launch:
+    name: hp39gs
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -65,7 +66,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-gh24-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
 
       - name: Install x50ng build dependencies
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -120,7 +121,7 @@ jobs:
             dist/hp39gs-stock-transfer \
             | tee build/hp39-fixture-key.txt
 
-      - name: Probe stock serial disk transport
+      - name: Execute HP39gs through stock serial disk
         run: |
           set -euo pipefail
           X50_TTY="$RUNNER_TEMP/hp39-x50ng-uart"
@@ -154,13 +155,14 @@ jobs:
 
           export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT=64
-          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_STOCK_MODE=run
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/atfe-probe/hp39-visible.result-address")"
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp39gs-stock"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39gs-stock.json"
 
           mkdir -p build/hp39gs-state
-          timeout 50s build/x50ng/dist/x50ng \
+          timeout 135s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp39gs-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
@@ -168,9 +170,17 @@ jobs:
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
             --firmware="$GITHUB_WORKSPACE/build/hp39gs-2.22.bin"
 
-          grep -Eq 'length=[1-9][0-9]*' build/hp39-socat.log
+          kill "$KERMIT_PID" 2>/dev/null || true
+          wait "$KERMIT_PID" 2>/dev/null || true
+          KERMIT_PID=
 
-      - name: Render probe captures
+          cat build/hp39gs-stock.json
+          grep -F 'sgetinit[HP39DIR.CUR]=0' build/hp39-kermit-debug.log
+          grep -F 'sgetinit[HP39DIR.000]=0' build/hp39-kermit-debug.log
+          grep -F 'sgetinit[HPGCC000.000]=0' build/hp39-kermit-debug.log
+          grep -F 'sgetinit[LIB275L.000]=0' build/hp39-kermit-debug.log
+
+      - name: Render stock-launch captures
         if: always()
         run: |
           for pgm in build/hp39gs-stock-*.pgm; do
@@ -178,11 +188,11 @@ jobs:
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
 
-      - name: Upload HP39 serial fixture probe
+      - name: Upload HP39 stock-launch evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp39gs-serial-fixture-probe
+          name: hp39gs-stock-launch-evidence
           retention-days: 14
           path: |
             build/hp39gs-stock*

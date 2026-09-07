@@ -42,6 +42,9 @@ on:
       - "tools/pgm-to-summary.py"
       - "tools/publish-ci-image.sh"
       - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - ".github/actions/setup-atfe/**"
       - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
 
@@ -52,7 +55,7 @@ concurrency:
 jobs:
   canonical:
     name: ${{ matrix.target }}
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       X50NG_BUILD_VARIANT: ${{ (matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'little-apple' }}
@@ -92,7 +95,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-gh24-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
       - name: Ensure x50ng runtime dependencies
         run: |
           packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
