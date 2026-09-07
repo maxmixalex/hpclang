@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   maintenance:
-    runs-on: ubuntu-24.04
+    runs-on: home-docker
     timeout-minutes: 15
     steps:
       - name: Ensure Git LFS
