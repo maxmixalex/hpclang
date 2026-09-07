@@ -1,4 +1,4 @@
-name: E2E / HP39 stock launch
+name: E2E / HP39/40 stock launch
 
 on:
   workflow_dispatch:
@@ -9,6 +9,12 @@ on:
       - "tools/run-hp39-kermit-server.sh"
       - "tools/hp39-fixture-key.py"
       - "tools/package-hp39-aplet.sh"
+      - "tools/probe-atfe.sh"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "platform/armtoolbox/**"
+      - "tests/e2e/targets/hp39gs.json"
+      - "tests/e2e/targets/hp40gs.json"
       - ".github/actions/setup-atfe/**"
       - "tests/x50ng/stock-launcher-main.c"
       - "tests/x50ng/headless-ui-init.h"
@@ -21,12 +27,22 @@ concurrency:
 
 jobs:
   stock-launch:
-    name: hp39gs
+    name: ${{ matrix.target }}
     runs-on: home-docker
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: [hp39gs, hp40gs]
+    env:
+      TARGET: ${{ matrix.target }}
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Load target profile
+        run: python3 tools/e2e-target-env.py "tests/e2e/targets/$TARGET.json" >> "$GITHUB_ENV"
 
       - name: Install fixture and x50ng runtime dependencies
         run: |
@@ -47,7 +63,7 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build current HP39gs transfer set
+      - name: Build current ${{ matrix.target }} transfer set
         run: |
           chmod +x \
             tools/probe-atfe.sh \
@@ -55,11 +71,35 @@ jobs:
             tools/package-hp39-aplet.sh \
             tools/run-hp39-kermit-server.sh
           tools/probe-atfe.sh
+
+          $ATFE/bin/clang \
+            --target=arm-none-eabi -march=armv4t -marm \
+            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
+            -fno-stack-protector -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
+            -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" \
+            -c platform/armtoolbox/stage0.S \
+            -o "build/atfe-probe/stage0-$TARGET.o"
+
+          $ATFE/bin/ld.lld -m armelf \
+            -T platform/armtoolbox/stage0.ld \
+            "build/atfe-probe/stage0-$TARGET.o" \
+            build/atfe-probe/stage0-bundle.o \
+            -o "build/atfe-probe/stage0-$TARGET.elf"
+
+          $ATFE/bin/llvm-objcopy -O binary \
+            "build/atfe-probe/stage0-$TARGET.elf" \
+            "build/atfe-probe/stage0-$TARGET.bin"
+
+          python3 tools/armtoolbox-wrap.py \
+            "build/atfe-probe/stage0-$TARGET.bin" \
+            "build/atfe-probe/$TARGET-hpc1.hp"
+
           tools/bootstrap-hp39-aplet.sh
           tools/package-hp39-aplet.sh \
-            build/atfe-probe/hp39gs-hpc1.hp \
-            dist/hp39gs-stock-transfer \
-            hp39gs
+            "build/atfe-probe/$TARGET-hpc1.hp" \
+            "dist/$TARGET-stock-transfer" \
+            "$TARGET"
 
       - name: Restore x50ng serial build cache
         id: x50ng-cache
@@ -103,34 +143,34 @@ jobs:
           path: build/x50ng/dist
           key: ${{ steps.x50ng-cache.outputs.cache-primary-key }}
 
-      - name: Fetch official HP39gs 2.22 firmware
+      - name: Fetch official ${{ matrix.target }} firmware
         run: |
           make -C build/x50ng/dist/firmware bootloaders
           curl -fL --retry 3 \
-            https://www.hpcalc.org/hp39/pc/hp39gs222.zip \
-            -o /tmp/hp39gs222.zip
-          unzip -p /tmp/hp39gs222.zip \
-            HP39GS_2.22/hp39gs_v2.22.bin \
-            > build/hp39gs-2.22.bin
+            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+            -o "/tmp/$HPCLANG_E2E_ARCHIVE"
+          unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" \
+            "$HPCLANG_E2E_MEMBER" \
+            > "build/$TARGET-2.22.bin"
 
       - name: Compute fixture content key
         run: |
           python3 tools/hp39-fixture-key.py \
-            hp39gs \
-            build/hp39gs-2.22.bin \
-            dist/hp39gs-stock-transfer \
-            | tee build/hp39-fixture-key.txt
+            "$TARGET" \
+            "build/$TARGET-2.22.bin" \
+            "dist/$TARGET-stock-transfer" \
+            | tee "build/$TARGET-fixture-key.txt"
 
-      - name: Execute HP39gs through stock serial disk
+      - name: Execute ${{ matrix.target }} through stock serial disk
         run: |
           set -euo pipefail
-          X50_TTY="$RUNNER_TEMP/hp39-x50ng-uart"
-          KERMIT_TTY="$RUNNER_TEMP/hp39-kermit-uart"
+          X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
+          KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
 
           socat -d -d -x -v \
             PTY,raw,echo=0,link="$X50_TTY" \
             PTY,raw,echo=0,link="$KERMIT_TTY" \
-            2> build/hp39-socat.log &
+            2> "build/$TARGET-socat.log" &
           SOCAT_PID=$!
 
           cleanup() {
@@ -148,56 +188,56 @@ jobs:
 
           tools/run-hp39-kermit-server.sh \
             "$KERMIT_TTY" \
-            dist/hp39gs-stock-transfer \
-            "$GITHUB_WORKSPACE/build/hp39-kermit-debug.log" \
-            > build/hp39-kermit.out 2>&1 &
+            "dist/$TARGET-stock-transfer" \
+            "$GITHUB_WORKSPACE/build/$TARGET-kermit-debug.log" \
+            > "build/$TARGET-kermit.out" 2>&1 &
           KERMIT_PID=$!
 
           export HPCLANG_X50NG_UART0="$X50_TTY"
-          export HPCLANG_X50NG_LCD_HEIGHT=64
+          export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
           export HPCLANG_STOCK_MODE=run
           export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/atfe-probe/hp39-visible.result-address")"
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
-          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp39gs-stock"
-          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39gs-stock.json"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/$TARGET-stock"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/$TARGET-stock.json"
 
-          mkdir -p build/hp39gs-state
+          mkdir -p "build/$TARGET-state"
           timeout 255s build/x50ng/dist/x50ng \
-            --datadir="$GITHUB_WORKSPACE/build/hp39gs-state" \
+            --datadir="$GITHUB_WORKSPACE/build/$TARGET-state" \
             --overwrite-config \
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
             --flash-full \
             --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
-            --firmware="$GITHUB_WORKSPACE/build/hp39gs-2.22.bin"
+            --firmware="$GITHUB_WORKSPACE/build/$TARGET-2.22.bin"
 
           kill "$KERMIT_PID" 2>/dev/null || true
           wait "$KERMIT_PID" 2>/dev/null || true
           KERMIT_PID=
 
-          cat build/hp39gs-stock.json
-          grep -F 'sgetinit[HP39DIR.CUR]=0' build/hp39-kermit-debug.log
-          grep -F 'sgetinit[HP39DIR.000]=0' build/hp39-kermit-debug.log
-          grep -F 'sgetinit[HPGCC000.000]=0' build/hp39-kermit-debug.log
-          grep -F 'sgetinit[LIB275L.000]=0' build/hp39-kermit-debug.log
+          cat "build/$TARGET-stock.json"
+          grep -F 'sgetinit[HP39DIR.CUR]=0' "build/$TARGET-kermit-debug.log"
+          grep -F 'sgetinit[HP39DIR.000]=0' "build/$TARGET-kermit-debug.log"
+          grep -F 'sgetinit[HPGCC000.000]=0' "build/$TARGET-kermit-debug.log"
+          grep -F 'sgetinit[LIB275L.000]=0' "build/$TARGET-kermit-debug.log"
 
       - name: Render stock-launch captures
         if: always()
         run: |
-          for pgm in build/hp39gs-stock-*.pgm; do
+          for pgm in build/$TARGET-stock-*.pgm; do
             [[ -f "$pgm" ]] || continue
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
 
-      - name: Upload HP39 stock-launch evidence
+      - name: Upload ${{ matrix.target }} stock-launch evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp39gs-stock-launch-evidence
+          name: ${{ matrix.target }}-stock-launch-evidence
           retention-days: 14
           path: |
-            build/hp39gs-stock*
-            build/hp39-socat.log
-            build/hp39-kermit*
-            build/hp39-fixture-key.txt
-            build/hp39gs-state/
+            build/${{ matrix.target }}-stock*
+            build/${{ matrix.target }}-socat.log
+            build/${{ matrix.target }}-kermit*
+            build/${{ matrix.target }}-fixture-key.txt
+            build/${{ matrix.target }}-state/
           if-no-files-found: warn
