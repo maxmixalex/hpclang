@@ -18,8 +18,6 @@ jobs:
           curl -fL --retry 3 https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin -o /tmp/48gii.bin
           stat -c 'size=%s' /tmp/48gii.bin
           sha256sum /tmp/48gii.bin
-          printf 'head64=' && head -c 64 /tmp/48gii.bin | xxd -p -c 64
-          printf 'tail64=' && tail -c 64 /tmp/48gii.bin | xxd -p -c 64
           python3 - <<'PY'
           from pathlib import Path
           p=Path('/tmp/48gii.bin').read_bytes()
