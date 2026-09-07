@@ -10,11 +10,13 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | `CI / Core runtime` | host/link/runtime invariants for the LLVM-native core |
 | `CI / HP39 package` | build HP39gs/HP40gs hardware-validation packages |
 | `E2E / Direct runtime` | boot official firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS and validate stock return |
+| `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI -> serial-disk transfer -> ARMToolbox39 -> HPC1 PASS |
 | `E2E / HP50g stock launch` | original HP50g UI -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
-Direct runtime currently passes on HP39gs, HP40gs, HP49g+ and HP50g. HP48gII
-is the remaining family target to add.
+Direct runtime currently passes on HP39gs, HP40gs, HP49g+ and HP50g. Full stock
+launch also passes on HP39gs, HP40gs and HP50g. HP48gII is the remaining family
+target to add to Direct runtime.
 
 ## Evidence
 
@@ -65,3 +67,12 @@ persistent calculator-state damage is not.
 
 The real HP39gs run has passed the complete canonical runtime and returned
 cleanly to the stock OS.
+
+## HP39gs/HP40gs stock emulator gate
+
+The `E2E / HP39/40 stock launch` matrix boots each official 2.22 ROM and uses
+the calculator's original serial-disk path to request `HP39DIR.CUR`,
+`HP39DIR.000`, `HPGCC000.000` and `LIB275L.000`. It then launches the installed
+HPCLANG aplet through ARMToolbox39 and requires the same machine-readable HPC1
+PASS result. HP40gs uses its own stock UI sequence because it must leave the CAS
+front end before APLET and its RECEIVE FROM menu has no IrDA entry.

@@ -39,15 +39,15 @@ the current emulator gates validate the design.
 
 ## M3 — HP39/40 family
 
-**Runtime validated; automated stock-launch closure active.**
+**Runtime and automated stock-launch validation complete for HP39gs/HP40gs.**
 
 - [x] HP39gs real-hardware canonical runtime PASS and clean return.
 - [x] HP39gs official-ROM direct E2E.
 - [x] HP40gs official-ROM direct E2E.
 - [x] HP39gs/HP40gs hardware-validation packages.
-- [ ] generate an installed x50ng fixture from the current
-  `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000` and `LIB275L.000`;
-- [ ] drive stock APLET -> HPCLANG -> ARMToolbox39 -> HPC1 PASS -> stock return
+- [x] exercise the stock serial-disk transfer of `HP39DIR.CUR`, `HP39DIR.000`,
+  `HPGCC000.000` and `LIB275L.000` through the original ROM;
+- [x] drive stock APLET -> HPCLANG -> ARMToolbox39 -> HPC1 PASS -> stock return
   on HP39gs and HP40gs;
 - [ ] close HP39g+ sibling model/outer-launch validation.
 
@@ -101,12 +101,14 @@ Passing:
 - HP40gs direct runtime;
 - HP49g+ direct runtime;
 - HP50g direct runtime;
-- HP50g full stock ARMToolbox/PrRUN launch.
+- HP50g full stock ARMToolbox/PrRUN launch;
+- HP39gs full stock serial-disk/APLET launch;
+- HP40gs full stock serial-disk/APLET launch.
 
 Active expansion:
 
 - [ ] HP48gII direct runtime;
-- [ ] HP39gs/HP40gs generated-fixture stock launch;
+- [x] HP39gs/HP40gs stock serial-disk/APLET launch;
 - [ ] HP48gII/HP49g+ stock launch.
 
 Direct runtime owns common-bootstrap execution and return correctness.
