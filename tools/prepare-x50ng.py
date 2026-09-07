@@ -57,7 +57,7 @@ def patch_host_uart0(root: Path) -> None:
     }
 
     if ( uart_regs->host_timer )
-        timer_mod( uart_regs->host_timer, timer_get_clock() + 1000 );
+        timer_mod( uart_regs->host_timer, timer_get_clock() + 100 );
 }
 
 static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
@@ -105,7 +105,7 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
                 timer_new( HDW_TIMER_REALTIME, s3c2410_uart_host_poll, uart_regs );
             if ( uart_regs->host_timer == NULL )
                 return -ENOMEM;
-            timer_mod( uart_regs->host_timer, timer_get_clock() + 1000 );
+            timer_mod( uart_regs->host_timer, timer_get_clock() + 100 );
         }
     }
 
