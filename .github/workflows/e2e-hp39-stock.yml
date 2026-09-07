@@ -19,6 +19,7 @@ on:
       - "tests/x50ng/stock-launcher-main.c"
       - "tests/x50ng/headless-ui-init.h"
       - "tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+      - "tests/e2e/sequences/hp40-serial-fixture-probe.seq"
       - ".github/workflows/e2e-hp39-stock.yml"
 
 concurrency:
@@ -197,7 +198,12 @@ jobs:
           export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
           export HPCLANG_STOCK_MODE=run
           export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/atfe-probe/hp39-visible.result-address")"
-          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+          if [ "$TARGET" = hp40gs ]; then
+            SEQUENCE=tests/e2e/sequences/hp40-serial-fixture-probe.seq
+          else
+            SEQUENCE=tests/e2e/sequences/hp39-serial-fixture-probe.seq
+          fi
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/$SEQUENCE"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/$TARGET-stock"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/$TARGET-stock.json"
 
