@@ -1,4 +1,4 @@
-# Temporary HP48gII transfer-port UI probe.
+# Temporary HP48gII transfer-port choice probe.
 2000 tap f6
 4000 tap f6
 7000 capture home
@@ -7,7 +7,6 @@
 9500 tap down
 10000 tap enter
 11000 capture io-functions
-# Select 5.Transfer (four rows below item 1).
 11500 tap down
 12000 tap down
 12500 tap down
@@ -15,4 +14,9 @@
 13500 capture transfer-selected
 14000 tap enter
 15500 capture transfer-dialog
-19000 finish-install
+# Initial focus is Name; move to Port and invoke CHOOS.
+16000 tap up
+17000 capture port-focused
+17500 tap f2
+18500 capture port-choose
+21000 finish-install
