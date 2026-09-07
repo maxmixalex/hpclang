@@ -188,10 +188,14 @@ jobs:
               --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
             )
           else
+            BOOTLOADER=boot-50g.bin
+            if [ "$HPCLANG_E2E_TARGET" = hp49gplus ]; then
+              BOOTLOADER=boot-49g+.bin
+            fi
             X50_ARGS+=(
               --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-50g.css"
               --flash
-              --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin"
+              --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/$BOOTLOADER"
               --firmware="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
             )
           fi
