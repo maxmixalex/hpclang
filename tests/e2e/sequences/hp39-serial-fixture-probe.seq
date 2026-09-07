@@ -1,24 +1,30 @@
 # HP39gs/HP40gs stock serial-disk fixture probe.
-# F6 dismisses the two stock boot prompts used by the direct-runtime gate.
+# F6 dismisses the stock boot prompt used by the direct-runtime gate.
 2000 tap f6
 4000 tap f6
 
-# Open Aplet Library, where F5 is RECV.
+# HP39 matrix aliases:
+#   G/H/I -> SYMB/PLOT/NUM
+#   J/K/L -> HOME/APLET/VIEWS
 7000 tap aplet
 8000 capture aplet-library
 9000 tap f5
 10000 capture receive-menu
 
-# gs/40gs receive menu:
-#   HP39/40 (USB)
-#   HP39/40 (SER)
-#   USB DISK DRIVE
-#   SER. DISK DRIVE
+# Walk the RECEIVE FROM chooser so the evidence shows the exact stock-ROM
+# ordering before we commit the generator to one transport choice.
 10500 tap down
-10900 tap down
-11300 tap down
-11800 capture serial-disk-selected
-12300 tap enter
+10800 capture receive-1
+11200 tap down
+11500 capture receive-2
+11900 tap down
+12200 capture receive-3
+12600 tap down
+12900 capture receive-4
+13300 tap down
+13600 capture receive-5
 
-17000 capture serial-disk-active
+# The final selection is expected to be SER. DISK DRIVE on HP39gs.
+14000 tap enter
+18000 capture serial-disk-active
 35000 finish-install
