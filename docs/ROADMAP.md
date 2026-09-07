@@ -74,12 +74,12 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**HP50g complete; HP49g+ direct E2E active.**
+**Direct runtime complete for HP49g+/50g; HP49g+ stock launch remains.**
 
 - [x] HP50g direct runtime E2E PASS + clean stock return.
 - [x] HP50g original-system ARMToolbox install -> HPCLANG.HP -> PrRUN -> PASS.
 - [x] add HP49g+ model 5 to the shared hp4950 Direct runtime matrix.
-- [ ] obtain the first green HP49g+ direct-runtime run;
+- [x] HP49g+ direct runtime E2E PASS + clean stock return;
 - [ ] close the supported HP49g+ stock package/ARMToolbox path.
 
 49g+ and 50g intentionally share the same hp4950 hardware backend. Model
@@ -99,12 +99,12 @@ Passing:
 
 - HP39gs direct runtime;
 - HP40gs direct runtime;
+- HP49g+ direct runtime;
 - HP50g direct runtime;
 - HP50g full stock ARMToolbox/PrRUN launch.
 
 Active expansion:
 
-- [ ] HP49g+ direct runtime;
 - [ ] HP48gII direct runtime;
 - [ ] HP39gs/HP40gs generated-fixture stock launch;
 - [ ] HP48gII/HP49g+ stock launch.
