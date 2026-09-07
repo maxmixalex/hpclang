@@ -30,6 +30,16 @@ This supports a thin HP48 platform adapter rather than a second application ABI.
 
 ## Firmware fixture
 
+The provenance chain has three distinct layers:
+
+1. ZephRay's 2015 cnCalc hardware-modification write-up demonstrates the
+   original method: replace the HP39gs NOR with SST39VF160, JTAG a ROM
+   extracted from a real HP48gII at flash address zero, then boot as 48gII:
+   https://www.cncalc.org/thread-11475-1-1.html
+2. wjchen's 2020 cnCalc post publishes a specifically identified factory
+   2.08 build-92 HP48gII JTAG dump and records its full-NOR properties.
+3. lyc8503's 2021 write-up is the currently live downloadable mirror used by
+   CI, not the primary technical source.
 The primary historical source is wjchen's 2020 cnCalc dump:
 https://www.cncalc.org/thread-24739-1-1.html
 
