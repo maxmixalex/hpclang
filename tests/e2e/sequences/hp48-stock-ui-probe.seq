@@ -1,22 +1,39 @@
-# Temporary HP48gII transfer-port choice probe.
+# Temporary HP48gII serial Kermit receive probe.
 2000 tap f6
 4000 tap f6
 7000 capture home
+# APPS -> I/O functions -> Transfer.
 8000 tap files
-9000 capture apps
 9500 tap down
 10000 tap enter
-11000 capture io-functions
 11500 tap down
 12000 tap down
 12500 tap down
 13000 tap down
-13500 capture transfer-selected
 14000 tap enter
-15500 capture transfer-dialog
-# Initial focus is Name; move to Port and invoke CHOOS.
+# Transfer opens with Name focused. Select Port -> Serial.
 16000 tap up
-17000 capture port-focused
-17500 tap f2
-18500 capture port-choose
-21000 finish-install
+17000 tap f2
+18000 tap down
+18500 tap enter
+19500 capture port-serial
+# Accept Transfer settings and return to HOME.
+20000 tap enter
+21500 capture serial-settings-accepted
+# APPS -> I/O functions -> Start Server.
+22000 tap files
+23500 tap down
+24000 tap enter
+25000 tap down
+25500 tap down
+26000 tap down
+26500 tap down
+27000 tap down
+27500 capture start-server-serial
+28000 tap enter
+30000 capture server-serial
+# Host sends L275_48 and FINISHes after this point.
+39000 capture after-transfer
+40000 tap var
+41000 capture vars
+45000 finish-install
