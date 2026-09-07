@@ -1,0 +1,56 @@
+name: Probe / HP40 key matrix
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tests/e2e/sequences/hp40-key-probe.seq"
+      - ".github/workflows/e2e-hp40-key-probe.yml"
+
+jobs:
+  probe:
+    name: hp40gs-key-probe
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure x50ng runtime dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0
+
+      - name: Restore x50ng stock harness
+        uses: actions/cache/restore@v6
+        with:
+          path: build/x50ng/dist
+          key: hpclang-x50ng-hp39-stock-uart-Linux-X64-003533d9-01f0bafb2d7f86421f23e3784e1ac7f24d1cd3578d712905a589a295c289e840
+          fail-on-cache-miss: true
+
+      - name: Fetch official HP40gs firmware
+        run: |
+          make -C build/x50ng/dist/firmware bootloaders
+          curl -fL --retry 3 https://www.hpcalc.org/hp39/pc/hp40gs222.zip -o /tmp/hp40gs222.zip
+          unzip -p /tmp/hp40gs222.zip HP40GS_2.22/hp40gs_v2.22.bin > build/hp40gs-2.22.bin
+
+      - name: Probe HP40gs key positions
+        run: |
+          export HPCLANG_X50NG_LCD_HEIGHT=64
+          export HPCLANG_STOCK_MODE=install
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp40-key-probe.seq"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp40-key"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp40-key.json"
+          mkdir -p build/hp40-key-state
+          timeout 30s build/x50ng/dist/x50ng --datadir="$GITHUB_WORKSPACE/build/hp40-key-state" --overwrite-config --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" --flash-full --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" --firmware="$GITHUB_WORKSPACE/build/hp40gs-2.22.bin"
+          for pgm in build/hp40-key-*.pgm; do [ -f "$pgm" ] || continue; python3 tools/pgm-to-png.py "$pgm" "$pgm.png"; done
+          cat build/hp40-key.json
+
+      - name: Upload key probe
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp40gs-key-probe
+          retention-days: 1
+          path: |
+            build/hp40-key-*.pgm
+            build/hp40-key-*.pgm.png
+            build/hp40-key.json
+          if-no-files-found: warn
