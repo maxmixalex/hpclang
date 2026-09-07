@@ -1,0 +1,30 @@
+# HP40gs stock launch through the original APLET UI and serial disk.
+# HP40gs boots into the CAS front end more slowly than HP39gs, so wait for
+# initialization before entering APLET LIBRARY.
+2000 tap f6
+4000 tap f6
+15000 tap aplet
+16000 capture aplet-library
+17000 tap f5
+18000 capture receive-menu
+
+# HP40gs 2.22 RECEIVE FROM order has no HP39 (IrDA) entry:
+#   HP39/40 (USB), HP39/40 (Ser), USB Disk drive, Ser. Disk drive.
+18500 tap down
+19200 tap down
+19900 tap down
+20200 capture receive-serial-disk
+20600 tap enter
+
+# Directory metadata loads first; ENTER then lazily installs the selected aplet
+# and library. The exact transfer duration varies because stock Kermit retries.
+40000 capture remote-aplet
+41500 tap enter
+43000 capture lazy-fetch
+190000 tap enter
+200000 tap enter
+210000 tap enter
+220000 tap enter
+230000 tap enter
+240000 tap enter
+43500 monitor 205000
