@@ -1,8 +1,8 @@
-# Temporary HP48gII serial Kermit receive probe.
+# Temporary HP48gII ARMToolbox48 Port-0 install probe.
 2000 tap f6
 4000 tap f6
 7000 capture home
-# APPS -> I/O functions -> Transfer.
+# Configure wire I/O to Serial.
 8000 tap files
 9500 tap down
 10000 tap enter
@@ -11,16 +11,12 @@
 12500 tap down
 13000 tap down
 14000 tap enter
-# Transfer opens with Name focused. Select Port -> Serial.
 16000 tap up
 17000 tap f2
 18000 tap down
 18500 tap enter
-19500 capture port-serial
-# Accept Transfer settings and return to HOME.
 20000 tap enter
-21500 capture serial-settings-accepted
-# APPS -> I/O functions -> Start Server.
+# Start Kermit server.
 22000 tap files
 23500 tap down
 24000 tap enter
@@ -29,11 +25,20 @@
 26000 tap down
 26500 tap down
 27000 tap down
-27500 capture start-server-serial
 28000 tap enter
 30000 capture server-serial
-# Host sends L275_48 and FINISHes after this point.
+# Host sends L275 and FINISHes at ~31s.
 39000 capture after-transfer
+# Recall L275 from VAR and install library 275 into Port 0.
 40000 tap var
 41000 capture vars
-45000 finish-install
+42000 tap f1
+43000 capture l275-stack
+44000 tap zero
+45000 capture port-zero-stack
+46000 tap sto
+48000 capture stored
+# Warmstart attaches the installed library.
+50000 chord on f3
+55000 capture after-warmstart
+59000 finish-install
