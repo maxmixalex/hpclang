@@ -32,3 +32,9 @@ jobs:
           for off in (0,0x4000,0x40100,0x60000,0x1ffff0):
               if off < len(p): print('off_%x='%off + p[off:off+32].hex())
           PY
+      - name: Inspect pinned x50ng flash startup
+        run: |
+          git clone --quiet --no-checkout https://codeberg.org/gwh/x50ng.git /tmp/x50ng
+          git -C /tmp/x50ng checkout --quiet 003533d9eca3f6ded36c6ab80b8dbc0563e31d9a
+          grep -n -E 'HDW_REINIT_FLASH|reinit|flash-full|flash_full|bootloader|firmware' /tmp/x50ng/src/flash.c | head -n 120
+          grep -n -E 'flash-full|flash_full|reinit|bootloader|firmware|flash' /tmp/x50ng/src/options.c | head -n 160
