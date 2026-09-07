@@ -10,7 +10,7 @@ hpclang supports six ARM calculator targets through three family backends.
 | HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS |
 | HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | pending sibling gate |
 | HP 48gII | 4 | HP48 | next E2E target | next E2E target |
-| HP 49g+ | 5 | HP49/50 | next E2E target | next E2E target |
+| HP 49g+ | 5 | HP49/50 | official-ROM emulator PASS | pending stock launcher gate |
 | HP 50g | 6 | HP49/50 | official-ROM emulator PASS | full ARMToolbox/PrRUN E2E PASS |
 
 The 39gs is the primary real-hardware validation machine. It is not the
@@ -50,8 +50,9 @@ official 2.15 ROM
  -> HPC1 RUNTIME PASS
 ```
 
-HP49g+ is the next sibling closure target. The implementation should reuse the
-same backend and introduce only genuine model differences.
+HP49g+ now passes the same Direct runtime gate on the shared hp4950 hardware
+backend. Its remaining sibling work is the stock ARMToolbox/package path; no
+model-specific runtime fork is required.
 
 ## Hardware baseline
 
