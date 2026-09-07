@@ -11,20 +11,21 @@
 9000 tap f5
 10000 capture receive-menu
 
-# Walk the RECEIVE FROM chooser so the evidence shows the exact stock-ROM
-# ordering before we commit the generator to one transport choice.
+# HP39gs RECEIVE FROM order, verified against stock ROM 2.22:
+#   HP39 (IrDA)
+#   HP39/40 (USB)
+#   HP39/40 (Ser)
+#   USB Disk drive
+#   Ser. Disk drive
 10500 tap down
-10800 capture receive-1
+10800 capture receive-usb
 11200 tap down
-11500 capture receive-2
+11500 capture receive-serial
 11900 tap down
-12200 capture receive-3
+12200 capture receive-usb-disk
 12600 tap down
-12900 capture receive-4
-13300 tap down
-13600 capture receive-5
+12900 capture receive-serial-disk
 
-# The final selection is expected to be SER. DISK DRIVE on HP39gs.
-14000 tap enter
+13300 tap enter
 18000 capture serial-disk-active
 35000 finish-install
