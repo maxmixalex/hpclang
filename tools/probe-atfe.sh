@@ -100,7 +100,7 @@ echo "PASS: ATfE Armv4T compiler-rt + picolibc link into HPC1."
 echo
 echo "== libc++ Armv4T smoke =="
 
-"$CXX" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
+"$CXX" "${COMMON[@]}" -std=c++23 -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-platform-stubs.c" -o "$OUT/platform-stubs.o"
 
 "$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/runtime.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
@@ -112,7 +112,7 @@ fi
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hpclang-atfe-cxx.elf"     "$OUT/hpclang-atfe-cxx.hpc"
 
-echo "PASS: ATfE Armv4T libc++ links into HPC1."
+echo "PASS: ATfE Armv4T C++23 + libc++ links into HPC1."
 
 echo
 echo "== common bootstrap ARMv4T link =="
