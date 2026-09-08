@@ -1,8 +1,4 @@
-# Central hpclang target registry.
-#
-# A target name identifies a concrete calculator model.  A family identifies
-# the calculator-side launcher/package backend.  Later compatibility profiles
-# (VC, ROMLIB, legacy HPGCC ABI) are orthogonal to the physical model.
+# Central hpclang model registry.
 
 set(HPCLANG_SUPPORTED_TARGETS
     hp39gplus
@@ -22,7 +18,7 @@ function(hpclang_target_family target out_var)
         set(_family "hp48")
     elseif(target STREQUAL "hp49gplus" OR
            target STREQUAL "hp50g")
-        set(_family "hp49")
+        set(_family "hp4950")
     else()
         message(FATAL_ERROR
             "Unknown HPCLANG_TARGET='${target}'. "

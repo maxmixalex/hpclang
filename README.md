@@ -1,54 +1,27 @@
 # hpclang
 
-A clean LLVM-native SDK for the ARM-based HP graphing calculators.
+hpclang is an LLVM-native SDK for the ARM-based HP graphing calculators. It uses one ARMv4T/AAPCS32 application ABI and one common runtime across six calculator profiles.
 
-hpclang uses one application ABI across HP 39g+/39gs/40gs, HP 48gII and
-HP 49g+/50g. Historical HPGCC source is research evidence for calculator
-hardware, package formats and launch behavior; it is not a selectable runtime.
+The implementation is organized into three platform families:
 
-## Application model
+- `hp39`: HP 39g+, HP 39gs, HP 40gs;
+- `hp48`: HP 48gII;
+- `hp4950`: HP 49g+, HP 50g.
 
-New applications use:
+Applications are packaged as model-independent HPC1 images. Calculator-specific code handles the native package format, memory setup, stock-system launcher, and return path.
 
-- Clang / LLVM / LLD;
-- ARMv4T, AAPCS32 and soft float;
-- Thumb-1 C/C++ with ARM startup where useful;
-- fixed virtual code and writable-memory addresses;
-- the model-independent HPC1 executable format.
+## Validation
 
-There is no normal-build dependency on GCC, libgcc, historical HPGCC objects
-or a replacement calculator ROM.
+HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g pass Direct runtime and original-system E2E. HP 39gs also passes the canonical runtime on real hardware.
 
-## Architecture
+HP 39g+ support builds, but its E2E is blocked until a real machine is available to provide a trustworthy stock flash dump.
 
-```text
-application -> hpclang v1 / HPC1 -> common ARM runtime
-                                  -> HP39/40 platform
-                                  -> HP48gII platform
-                                  -> HP49g+/50g platform
-```
+## Development documentation
 
-Calculator-specific launchers own native packaging, physical-memory discovery,
-MMU setup, Saturn-to-ARM transition and state restoration. Those details do not
-change the application ABI.
+The current documentation is an internal Development site built with Zensical:
 
-## Validation status
+- source: [`docs/`](docs/);
+- configuration: [`zensical.toml`](zensical.toml);
+- published site: <https://zyf722.github.io/hpclang/>.
 
-- HP39g+: model-1 HPGCC39/APLET hardware-validation package builds; a
-  trustworthy stock ARM firmware fixture is still required for automated E2E.
-- HP39gs: canonical runtime PASS on real hardware and in the ARM emulator,
-  plus full stock APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
-- HP40gs: canonical runtime PASS on official firmware plus full stock
-  APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
-- HP49g+/HP50g: canonical runtime PASS/return on their model-specific ARM
-  bootloaders plus the shared official 2.15 OS, and full original-system
-  ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E on both models.
-- HP48gII: canonical runtime PASS/return on a genuine 2 MiB full-NOR image
-  with a 256 KiB / 131x64 medium-apple emulator personality, plus full stock
-  Kermit -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> PASS E2E.
-
-CI screenshots are published to the image-only Git-LFS `ci-evidence` branch.
-
-See the [documentation index](docs/README.md), [ABI](docs/abi.md),
-[target status](docs/targets.md), [validation](docs/validation.md), and
-[roadmap](docs/ROADMAP.md).
+Historical HPGCC source is used as implementation evidence only. A normal hpclang build does not depend on GCC, historical HPGCC runtime objects, or a replacement calculator ROM.
