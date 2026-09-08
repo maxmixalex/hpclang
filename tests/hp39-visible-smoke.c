@@ -6,6 +6,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/target.h>
+#include <hpclang/time.h>
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define LCDSADDR1 REG32(0x07300014u)
@@ -257,6 +258,14 @@ int main(void)
         device->display_width != 131u ||
         device->display_height != (uint32_t)display_height(boot->model))
         return finish(0x0e, boot->model);
+
+    uint64_t time_before = hpclang_time_monotonic_us();
+    hpclang_delay_us(3000u);
+    uint64_t time_after = hpclang_time_monotonic_us();
+    if (time_after < time_before ||
+        time_after - time_before < 3000u ||
+        time_after - time_before > 200000u)
+        return finish(0x0f, boot->model);
 
     hpclang_diag_step(0x11);
 
