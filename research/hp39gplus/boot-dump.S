@@ -51,6 +51,9 @@ hp39_boot_dump:
        the descriptor only makes physical 0 visible at 0x0a000000. */
     ldr     r7, =L1_SLOT
     ldr     r8, [r7]
+    /* Never borrow a section already owned by the stock environment. */
+    cmp     r8, #0
+    bne     .Lreturn
     ldr     r0, =FLASH_SECTION_DESC
     str     r0, [r7]
     bl      .Lpublish_map
