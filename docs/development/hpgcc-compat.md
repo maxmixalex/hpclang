@@ -32,6 +32,60 @@ Primary references:
 - HPGCC3 Saturn documentation:
   <https://hpgcc3.org/documentation/html/group__grconst.html>
 
+## HPGCC 1.0 baseline
+
+SourceForge still publishes the official `hpgcc-1.0.3-beta-Linux.tar.bz2`
+release dated 2004-10-26. Direct archive retrieval is not currently reliable
+from the automated environment, so the function-level cross-check below uses a
+mirror that preserves HPGCCLibrary Doxygen generated on 2004-10-20, six days
+before that release. The mirror is supporting evidence, not a replacement for
+the official release provenance.
+
+The 2004 public HPGCCLibrary file index contains only 13 headers:
+
+- `hpconio.h`
+- `hpctype.h`
+- `hpgcc49.h`
+- `hpkeyb49.h`
+- `hpmath.h`
+- `hpscreen.h`
+- `hpstdio.h`
+- `hpstdlib.h`
+- `hpstring.h`
+- `hpsys.h`
+- `hptime.h`
+- `kos.h`
+- `syscall.h`
+
+Notably, that public file index does not yet contain the later mature
+`hpgraphics.h`, Saturn/RPL `saturn.h` / `satdir.h`, filesystem, or
+`win*.h` surfaces.
+
+The 1.0 keyboard header exposes 12 operations: `keyb_isKeyPressed`,
+`keyb_isAnyKeyPressed`, `keyb_waitKeyPressed`, the four directions,
+Alpha/left-shift/right-shift/ON tests, and `keyb_getkey`. The 1.1/2.0 common
+keyboard layer later grows to 18 implementation functions.
+
+The 1.0 `hpscreen.h` is also a smaller pre-HPG graphics interface with
+`clearScreen`, `print`, raw LCD-pointer access, block drawing, and minifont
+helpers.
+
+`hptime.h` is empty in the 2004 generated public documentation. Timing is
+instead exposed through `hpsys.h`, including RTC/tick waits, PWM-counter
+access, timer setup/restore, and slow/normal clock helpers.
+
+### Compatibility consequence
+
+HPGCC 1.0 is treated as an **early source subset**, not as the maximum API
+surface hpclang should imitate. Compatibility design should preserve common
+1.0 source patterns where practical, while the mature common 1.1/2.0 surface
+is the principal historical baseline for M7.
+
+Before claiming exact 1.0 parity, the official 1.0.3 archive itself should be
+retrieved and mechanically compared. The current mirror cross-check is enough
+to guide API design but is deliberately not recorded as byte-identical release
+evidence.
+
 ## Stability between HPGCC 1.1 and 2.0
 
 A filename-level API implementation comparison gives the following picture.
