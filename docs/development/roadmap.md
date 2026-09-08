@@ -132,7 +132,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**In design. This is the next major implementation phase.**
+**In progress.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a
 validated native execution environment.
@@ -141,17 +141,22 @@ validated native execution environment.
 
 Before freezing the public service API:
 
-- [ ] inventory the public HPGCC 1.0/1.1 and 2.0 headers by functional area;
-- [ ] inventory the relevant HPGCC3 public interfaces separately;
-- [ ] classify each commonly used historical API as direct source-compatible,
+- [x] inventory the public HPGCC 1.0.3/1.1 and 2.0 headers by functional area
+  from complete distribution archives;
+- [x] inventory the relevant HPGCC3 public interfaces separately;
+- [x] classify the major historical API families as direct source-compatible,
   compatibility-adapter, migration-only, or intentionally unsupported;
-- [ ] define ownership, error, coordinate, time-unit, string/buffer, and
-  capability-query conventions for the new core API;
-- [ ] define the C ABI boundary and C++ wrapper policy;
-- [ ] choose the first service slice only after the compatibility matrix is
-  reviewed.
+- [ ] finish ownership, error, coordinate, string/buffer, and capability-query
+  conventions for the remaining services;
+- [x] define the C ABI boundary and C++ wrapper policy;
+- [x] choose the first service slice: device/capability facts + monotonic time +
+  keyboard + display/surface.
 
 See [SDK API design](sdk-design.md).
+
+M7.1 implementation has started: the stable device-information API and the
+stock-preserving monotonic microsecond clock/delay service are in the common
+runtime. Keyboard and display/surface are next.
 
 The minimum cross-platform service set should cover:
 

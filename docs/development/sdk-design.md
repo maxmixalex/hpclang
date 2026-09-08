@@ -104,9 +104,10 @@ HPGCC3 must be inventoried separately. It uses a revisioned library environment
 and includes more structured subsystems such as its filesystem. Its API may
 provide useful design ideas, but its ROMLIB ABI is not the hpclang ABI.
 
-Before implementing compatibility headers, M7.0 will mechanically inventory
-the public headers from the official historical sources and build a
-function-by-function compatibility matrix.
+M7.0 now mechanically inventories the public headers from complete HPGCC
+1.0.3, 1.1, 2.0 SP2, and HPGCC3 distribution archives. The resulting
+function-level compatibility matrix is recorded in
+[HPGCC compatibility inventory](hpgcc-compat.md).
 
 ## Core API design rules
 
@@ -217,19 +218,27 @@ until their runtime requirements are implemented and tested.
 
 ## First implementation slice
 
-Do not freeze a graphics or keyboard API before M7.0 produces the historical
-compatibility matrix.
-
-Once that matrix exists, the preferred first vertical slice is likely:
+The historical compatibility matrix now exists, so M7.1 uses this vertical
+slice:
 
 ```text
-capability query
+device/capability facts
 + monotonic time
 + keyboard
-+ display
++ display/surface
 ```
 
-because together they are sufficient for a small interactive program and can
+The stable device-information API and stock-preserving monotonic microsecond
+clock are already implemented. The time service does not reconfigure the stock
+PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
+than deadlock if the stock clock service becomes unavailable.
+
+Keyboard is next and must keep raw physical state separate from translated
+events. Display/surface follows and must be capable of implementing the stable
+HPG drawing surface without making its historical framebuffer representation
+the core ABI.
+
+Together these services are sufficient for a small interactive program and can
 be validated without first solving persistent storage or RPL object lifetime.
 
 The first slice should end with one non-trivial C example and one C++ example
