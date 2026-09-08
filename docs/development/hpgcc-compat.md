@@ -6,18 +6,22 @@ compatibility layer, not automatically names for the new core API.
 
 ## Sources and method
 
-The HPGCC 1.1 and 2.0 comparison is based on the official historical source
-trees previously inventoried from the SourceForge tags
-`frozen_1.1_MMU_trunk` and `frozen_2.0_VC_release`, cross-checked against
-the complete HPGCC 2.0 SP2 archive listing preserved by hpcalc.org.
+The comparison now uses three complete historical distribution archives as
+the primary function-level evidence:
 
-The 2.0 SP2 archive includes source and installed public headers such as
-`hpgraphics.h`, `hpscreen.h`, `hpkeyb49.h`, `hptime.h`, `hpsys.h`,
-`kos.h`, `saturn.h`, `satdir.h`, `fsystem.h`, `ggl.h`, and the
-`win*.h` widget headers.
+- HPGCC 1.1 with 39g support for Windows;
+- HPGCC 2.0 SP2 for Linux;
+- HPGCC3 R004.revA.
 
-HPGCC3 is inventoried separately from its published Doxygen documentation. It
-is a design reference, not an ABI compatibility target.
+Their installed/public headers were parsed directly, and their source trees and
+examples were used to distinguish public declarations from internal helpers and
+to estimate which interfaces real historical applications actually used.
+
+The older SourceForge tags `frozen_1.1_MMU_trunk` and
+`frozen_2.0_VC_release` remain useful provenance/cross-version evidence.
+
+HPGCC3 is treated separately as both a compatibility data point and a design
+reference. Its ROMLIB/custom-ROM ABI is not an hpclang ABI target.
 
 Primary references:
 
@@ -85,6 +89,63 @@ Before claiming exact 1.0 parity, the official 1.0.3 archive itself should be
 retrieved and mechanically compared. The current mirror cross-check is enough
 to guide API design but is deliberately not recorded as byte-identical release
 evidence.
+
+## Exact public-signature stability
+
+The release archives show substantially stronger API continuity than a
+filename/source inventory alone suggests. After normalizing whitespace, the
+following common public function declarations are **signature-identical**:
+
+| Public surface | Comparison | Exact common signatures |
+| --- | --- | ---: |
+| `hpgraphics.h` | 1.1 → 2.0 | 59 / 59 |
+| `hpgraphics.h` | 2.0 → HPGCC3 | 59 / 59 |
+| `hpkeyb49.h` | 1.1 → 2.0 | 17 / 17 |
+| `hpscreen.h` | 1.1 → 2.0 | 9 / 9 |
+| `ggl.h` | 1.1 → 2.0 | 28 / 28 |
+| `hpsys.h` | 1.1 → 2.0 | 40 / 40 |
+| `saturn.h` | 1.1 → 2.0 | 49 / 49 |
+| `satdir.h` | 1.1 → 2.0 | 29 / 29 |
+| `hpstdio.h` | 1.1 → 2.0 | 37 / 37 |
+| stdio surface | 2.0 → HPGCC3 | 40 / 40 |
+| `fsystem.h` | 2.0 → HPGCC3 | 41 / 41 |
+| `kos.h` | 2.0 → HPGCC3 | 33 / 33 |
+
+HPGCC3 adds only two public filesystem handle helpers beyond the HPGCC 2.0
+`fsystem.h` surface: `FSGetFileFromHandle` and `FSGetHandle`.
+
+This changes the compatibility priority:
+
+- HPG is a strong candidate for broad source compatibility, not merely a loose
+  migration shim.
+- Standard I/O and the HPGCC2/3 filesystem surface are also unusually stable.
+- KOS retains its HPGCC2 public function surface into HPGCC3, although hpclang
+  should still avoid exposing raw OS-entry conventions as its canonical core.
+- Saturn/RPL is stable from 1.1 to 2.0, but HPGCC3 deliberately replaces that
+  interface with the much larger `sat3_*` API, so hpclang needs its own typed
+  object model plus adapters.
+- Keyboard is stable from 1.1 to 2.0 but is redesigned in HPGCC3 around raw
+  matrix state plus an asynchronous message queue. Several old convenience
+  calls become macros, and some signatures change.
+
+### Historical example usage
+
+The bundled examples reinforce the same priorities. Mechanical call-site
+analysis found public hpclang-relevant API use in 38 HPGCC 1.1 example source
+files and 39 HPGCC 2.0 example source files.
+
+Frequently used calculator-specific calls include:
+
+- HPG drawing: `hpg_fill_rect`, `hpg_set_color`, `hpg_draw_text`,
+  `hpg_clear`, `hpg_draw_line`, `hpg_flip`;
+- keyboard polling: `keyb_isAnyKeyPressed`, `keyb_waitKeyPressed`,
+  `keyb_isKeyPressed`, `keyb_isON`;
+- timing/power: `sys_waitRTCTicks`, `sys_RTC_seconds`,
+  `sys_slowOn`, `sys_slowOff`;
+- low-level graphics in performance-sensitive code: `ggl_bitblt`.
+
+This supports implementing display, keyboard, and time before higher-level
+widget compatibility.
 
 ## Stability between HPGCC 1.1 and 2.0
 
@@ -180,7 +241,13 @@ common 1.1/2.0 implementation set includes operations such as:
 
 ### Compatibility decision
 
-**Adapter** for HPG. **Migration/adapter-later** for raw GGL.
+**Broad source-compatible adapter** for HPG. **Migration/adapter-later** for
+raw GGL.
+
+The 59 public HPG function signatures are identical in HPGCC 1.1, 2.0, and
+HPGCC3. hpclang should therefore aim to provide the complete common
+`hpgraphics.h` source surface once the core display/surface implementation is
+mature, rather than selecting only a handful of legacy drawing calls.
 
 The new core should use an explicit surface/display model with queryable
 geometry and pixel capabilities. HPG compatibility wrappers can map common
@@ -282,9 +349,13 @@ storage hooks required by picolibc.
 The core storage service should expose calculator-specific volume/object-store
 facts needed to implement standard I/O rather than replace standard I/O.
 
-HPGCC3's `fsystem.h` is useful design evidence for volumes, directories,
-file attributes, path handling, and explicit errors. Its `FS_FILE` ABI and
-`FS*` names are not hpclang compatibility targets.
+The HPGCC 2.0 and HPGCC3 `fsystem.h` surfaces are also much more stable than
+previously assumed: all 41 HPGCC 2.0 public function signatures are unchanged
+in HPGCC3, which adds only two handle helpers.
+
+The `FS_FILE` ABI still should not become hpclang's canonical storage ABI, but
+a source-compatible `FS*` adapter becomes a reasonable M7.2 goal after the
+core storage layer and standard C I/O backend exist.
 
 ## Saturn / RPL object bridge
 
