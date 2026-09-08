@@ -198,8 +198,9 @@ echo "== HP39 hardware runtime validation =="
 
 "$CC" "${COMMON[@]}" "${VISIBLE_TEST_DEFINES[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-runtime-diag.c" -o "$OUT/hp39-runtime-diag.o"
+"$CXX" "${COMMON[@]}" -std=c++23 -Os     -c "$ROOT/tests/m7-cxx-probe.cpp" -o "$OUT/m7-cxx-probe.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/hp39-runtime-diag.o" "$OUT/device.o" "$OUT/display.o" "$OUT/display-surface.o" "$OUT/keyboard.o" "$OUT/keyboard-event-engine.o" "$OUT/keyboard-events.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/hp39-runtime-diag.o" "$OUT/device.o" "$OUT/display.o" "$OUT/display-surface.o" "$OUT/keyboard.o" "$OUT/keyboard-event-engine.o" "$OUT/keyboard-events.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o"     "$OUT/m7-cxx-probe.o" "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 
