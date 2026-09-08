@@ -10,6 +10,7 @@ nav = [
     "development/abi.md",
     "development/platforms.md",
     "development/validation.md",
+    "development/sdk-design.md",
     "development/e2e.md",
     "development/fixtures.md",
     "development/roadmap.md",
