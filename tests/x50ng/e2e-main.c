@@ -41,6 +41,14 @@
 #define L1_INJECT_VA 0x07f00c00u
 #define SWI_VECTOR_VA 0x08000008u
 
+#define POWER_MPLLCON_VA 0x07200004u
+#define POWER_CLKSLOW_VA 0x07200010u
+#define POWER_CLKDIVN_VA 0x07200014u
+#define TIMER_TCFG0_VA   0x07600000u
+#define TIMER_TCFG1_VA   0x07600004u
+#define TIMER_TCON_VA    0x07600008u
+#define TIMER_TCNTB0_VA  0x0760000cu
+
 #define COARSE_FLAGS 0x11u
 #define SMALL_FLAGS 0x0ffeu
 
@@ -86,6 +94,14 @@ struct e2e {
     uint32_t old_stage;
     uint32_t old_inject;
     uint32_t old_swi;
+
+    uint32_t stock_mpllcon;
+    uint32_t stock_clkslow;
+    uint32_t stock_clkdivn;
+    uint32_t stock_tcfg0;
+    uint32_t stock_tcfg1;
+    uint32_t stock_tcon;
+    uint32_t stock_tcntb0;
 
     uint32_t result;
     int saw_pass;
@@ -306,6 +322,18 @@ static int snapshot_stock(struct e2e *s)
         return 0;
 
     /*
+     * Read-only clock/timer evidence for M7 time-service design. These values
+     * do not affect PASS and are never written by the host frontend.
+     */
+    (void)guest_read32(s->hdw, POWER_MPLLCON_VA, &s->stock_mpllcon);
+    (void)guest_read32(s->hdw, POWER_CLKSLOW_VA, &s->stock_clkslow);
+    (void)guest_read32(s->hdw, POWER_CLKDIVN_VA, &s->stock_clkdivn);
+    (void)guest_read32(s->hdw, TIMER_TCFG0_VA, &s->stock_tcfg0);
+    (void)guest_read32(s->hdw, TIMER_TCFG1_VA, &s->stock_tcfg1);
+    (void)guest_read32(s->hdw, TIMER_TCON_VA, &s->stock_tcon);
+    (void)guest_read32(s->hdw, TIMER_TCNTB0_VA, &s->stock_tcntb0);
+
+    /*
      * HP's stock 49/50 layout stores the LCD framebuffer in the same 4 KiB
      * S3C2410 SRAM that backs the low part of the L1 table. Never choose a
      * synthetic descriptor whose four bytes overlap the live framebuffer.
@@ -382,7 +410,14 @@ static void json(struct e2e *s, const char *status)
         "  \"ifar\":\"0x%08x\",\n"
         "  \"lcdsaddr1\":\"0x%08x\",\n"
         "  \"framebuffer_phys\":\"0x%08x\",\n"
-        "  \"inject_desc_phys\":\"0x%08x\"\n"
+        "  \"inject_desc_phys\":\"0x%08x\",\n"
+        "  \"stock_mpllcon\":\"0x%08x\",\n"
+        "  \"stock_clkslow\":\"0x%08x\",\n"
+        "  \"stock_clkdivn\":\"0x%08x\",\n"
+        "  \"stock_tcfg0\":\"0x%08x\",\n"
+        "  \"stock_tcfg1\":\"0x%08x\",\n"
+        "  \"stock_tcon\":\"0x%08x\",\n"
+        "  \"stock_tcntb0\":\"0x%08x\"\n"
         "}\n",
         status,
         s->result,
@@ -400,7 +435,14 @@ static void json(struct e2e *s, const char *status)
         s->hdw->cpu->cp15.c6_insn,
         lcdsaddr1,
         fb_phys,
-        inject_desc_addr);
+        inject_desc_addr,
+        s->stock_mpllcon,
+        s->stock_clkslow,
+        s->stock_clkdivn,
+        s->stock_tcfg0,
+        s->stock_tcfg1,
+        s->stock_tcon,
+        s->stock_tcntb0);
     fclose(f);
 }
 
