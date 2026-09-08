@@ -25,6 +25,15 @@ non-cacheable/non-buffered and is removed before return.
 `extract-boot-dump.py` scans a returned aplet/object for the completed marker
 and extracts the 16 KiB block.
 
-The temporary emulator probe exists only to prove the mechanism against a known
-loaded boot block. A successful probe is **not** HP39g+ firmware validation and
-must not be recorded as a native HP39g+ fixture.
+The emulator mechanism probe passed byte-for-byte against the loaded physical
+NOR and has been removed from CI now that the result is established. This
+directory is retained for the next real-hardware step.
+
+HP39g+ E2E is blocked until a real calculator is available. When that happens,
+use the validated read-only mapping approach to obtain and verify the stock
+flash image, then add that fixture to the normal Direct and stock-launch E2E
+gates. The current payload extracts the first 16 KiB boot block; a complete
+1 MiB dump should be transferred in bounded chunks rather than buffered in RAM.
+
+Emulator probe success is not HP39g+ firmware validation and must never be
+recorded as a native HP39g+ fixture.
