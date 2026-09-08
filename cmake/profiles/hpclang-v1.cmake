@@ -14,7 +14,8 @@ add_compile_options(
 set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
-    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c")
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c")
 set(HPCLANG_RUNTIME_EABI_SHIMS
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-eabi-div.S"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-softfloat-entry.S")
