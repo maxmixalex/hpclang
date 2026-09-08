@@ -79,30 +79,46 @@ int main(void)
     if ((chord_down.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) == 0u)
         return EXIT_FAILURE;
 
-    /* Dedicated modifier keys never autorepeat. */
-    expect_none(&engine, chord, 1400000u);
+    /* The most recently pressed matrix key becomes the repeat source. */
+    expect_none(&engine, chord, 1319999u);
+    struct hpclang_keyboard_event repeated =
+        expect_event(&engine, chord, 1320000u,
+                     HPCLANG_KEYBOARD_EVENT_REPEAT, 8u);
+    if ((repeated.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) == 0u)
+        return EXIT_FAILURE;
 
-    /* Releases are also debounced and report the post-event modifier state. */
-    uint64_t without_shift = BIT(7) | BIT(8);
-    expect_none(&engine, without_shift, 1500000u);
+    /* Leave only the dedicated Shift key held; it must never autorepeat. */
+    uint64_t shift_only = BIT(HPCLANG_KEYBOARD_LEFT_SHIFT);
+    expect_none(&engine, shift_only, 1400000u);
+    expect_event(&engine, shift_only, 1420000u,
+                 HPCLANG_KEYBOARD_EVENT_UP, 7u);
+    expect_event(&engine, shift_only, 1420000u,
+                 HPCLANG_KEYBOARD_EVENT_UP, 8u);
+    expect_none(&engine, shift_only, 2000000u);
+
+    /* Modifier releases report the post-event modifier state. */
+    expect_none(&engine, 0u, 2100000u);
     struct hpclang_keyboard_event shift_up =
-        expect_event(&engine, without_shift, 1520000u,
+        expect_event(&engine, 0u, 2120000u,
                      HPCLANG_KEYBOARD_EVENT_UP,
                      HPCLANG_KEYBOARD_LEFT_SHIFT);
     if ((shift_up.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) != 0u)
         return EXIT_FAILURE;
 
-    /* Simultaneous releases are drained deterministically, lowest scan first. */
-    expect_none(&engine, 0u, 1600000u);
-    expect_event(&engine, 0u, 1620000u, HPCLANG_KEYBOARD_EVENT_UP, 7u);
-    expect_event(&engine, 0u, 1620000u, HPCLANG_KEYBOARD_EVENT_UP, 8u);
-    expect_none(&engine, 0u, 1620000u);
-
     /* Timing is configurable and repeat can be disabled without reset. */
     hpclang_keyboard_event_engine_set_timing(&engine, 0u, 100u, 0u);
-    expect_none(&engine, BIT(3), 1700000u);
-    expect_event(&engine, BIT(3), 1700000u, HPCLANG_KEYBOARD_EVENT_DOWN, 3u);
-    expect_none(&engine, BIT(3), 2000000u);
+    expect_none(&engine, BIT(7) | BIT(8), 2200000u);
+    expect_event(&engine, BIT(7) | BIT(8), 2200000u,
+                 HPCLANG_KEYBOARD_EVENT_DOWN, 7u);
+    expect_event(&engine, BIT(7) | BIT(8), 2200000u,
+                 HPCLANG_KEYBOARD_EVENT_DOWN, 8u);
+    expect_none(&engine, BIT(7) | BIT(8), 2500000u);
+
+    /* Simultaneous releases are drained deterministically, lowest scan first. */
+    expect_none(&engine, 0u, 2600000u);
+    expect_event(&engine, 0u, 2600000u, HPCLANG_KEYBOARD_EVENT_UP, 7u);
+    expect_event(&engine, 0u, 2600000u, HPCLANG_KEYBOARD_EVENT_UP, 8u);
+    expect_none(&engine, 0u, 2600000u);
 
     puts("PASS: polled keyboard event debounce/repeat engine.");
     return EXIT_SUCCESS;
