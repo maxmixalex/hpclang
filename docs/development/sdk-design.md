@@ -136,13 +136,51 @@ Do not hard-code 131×64 or 131×80 assumptions into common API contracts.
 Display size and pixel/plane capabilities should be queryable. Coordinates
 should have one documented origin and clipping rule across platforms.
 
+The display model should separate two concepts:
+
+1. a **surface** owns or borrows a pixel target and exposes geometry/format;
+2. a **drawing context** carries mutable drawing state such as clip, color,
+   composite mode, font, and fill pattern.
+
+The physical display is a borrowed surface. Off-screen images are explicitly
+owned surfaces. Stable application APIs must not expose the calculator's
+framebuffer packing, physical address, or stride as the representation of
+either kind of surface.
+
+This split is intentional compatibility groundwork. Historical HPG stores the
+pixel target, clip, color, PAINT/XOR mode, font, and fill pattern together in
+`hpg_t`. A compatibility `hpg_t` can map onto one hpclang surface plus one
+draw context without making that historical state bundle the canonical core
+object.
+
 ### Keyboard
 
 Separate raw physical-key state from higher-level key events.
 
-Historical APIs often mix scanning, debounce, repeat, and translated key
-semantics. hpclang should make those layers explicit so games can request raw
-state while ordinary applications can consume events.
+The first stable layer is now `<hpclang/keyboard.h>`. A snapshot is exactly
+eight bytes and uses an hpclang-specific raw encoding:
+
+- bits 0–55 are the 8×7 S3C2410 matrix, packed as
+  `column * 7 + row`;
+- bits 56–59 are the dedicated ON, Alpha, left-Shift, and right-Shift inputs.
+
+Those matrix coordinates are physical scan positions, **not** portable key
+meanings. HPGCC 1.1 itself documents its logical row/column table as HP49g+
+specific, with HP39g+ different and HP48gII not verified. hpclang therefore
+does not make the historical HPGCC `keymatrix` bit numbering its core ABI.
+
+The raw reader is synchronous and does not install an IRQ, alter the clock
+tree, or retain GPIO changes after it returns. It is suitable for games and
+other callers that need instantaneous state.
+
+The next keyboard layer will turn snapshots into debounced key events and
+repeat policy. That event layer may normalize model-specific key identities,
+but it must be implemented on top of the raw scanner rather than changing the
+raw encoding.
+
+Historical APIs often mix scanning, debounce, repeat, blocking waits, modifier
+planes, and translated key semantics. HPGCC compatibility adapters may
+reproduce those combinations without forcing them into the core service.
 
 ### Time
 
