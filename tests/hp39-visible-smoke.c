@@ -11,6 +11,7 @@
 #include <hpclang/time.h>
 
 void hpclang_diag_step(uint32_t step);
+int hpclang_m7_cxx_probe(void);
 
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
@@ -269,6 +270,9 @@ int main(void)
         time_after - time_before < 3000u ||
         time_after - time_before > 200000u)
         return finish(0x0f, boot->model);
+
+    if (hpclang_m7_cxx_probe() != 0)
+        return finish(0x12, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
     if (!keyboard_transition())
