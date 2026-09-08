@@ -136,22 +136,27 @@ Do not hard-code 131×64 or 131×80 assumptions into common API contracts.
 Display size and pixel/plane capabilities should be queryable. Coordinates
 should have one documented origin and clipping rule across platforms.
 
-The display model should separate two concepts:
+The first display abstraction is an opaque **surface**. The physical display is
+a borrowed surface whose framebuffer address, stride, and bit packing remain
+runtime-private. Applications can query geometry and color-level capability,
+then use clipped clear/pixel/line/fill-rectangle primitives.
 
-1. a **surface** owns or borrows a pixel target and exposes geometry/format;
-2. a **drawing context** carries mutable drawing state such as clip, color,
-   composite mode, font, and fill pattern.
+Drawing primitives currently take their intensity explicitly instead of
+introducing a mutable core drawing-context object. Intensity uses 0 for white
+and 255 for black; the current two-level physical surface thresholds
+intermediate values internally. This also lines up cleanly with HPG's historic
+256-value virtual color convention in monochrome mode without exposing HPG's
+object layout.
 
-The physical display is a borrowed surface. Off-screen images are explicitly
-owned surfaces. Stable application APIs must not expose the calculator's
-framebuffer packing, physical address, or stride as the representation of
-either kind of surface.
+Historical HPG stores the pixel target, clip, color, PAINT/XOR mode, font, and
+fill pattern together in `hpg_t`. The compatibility adapter can retain that
+legacy state and forward primitive operations to an hpclang surface. A
+canonical draw-context type should be added only if non-HPG applications
+actually need shared mutable drawing state.
 
-This split is intentional compatibility groundwork. Historical HPG stores the
-pixel target, clip, color, PAINT/XOR mode, font, and fill pattern together in
-`hpg_t`. A compatibility `hpg_t` can map onto one hpclang surface plus one
-draw context without making that historical state bundle the canonical core
-object.
+Off-screen owned surfaces, blitting, fonts, clipping state, grayscale/double
+buffering, and composite modes remain later display work. None of them should
+require exposing the physical framebuffer representation.
 
 ### Keyboard
 
@@ -173,14 +178,25 @@ The raw reader is synchronous and does not install an IRQ, alter the clock
 tree, or retain GPIO changes after it returns. It is suitable for games and
 other callers that need instantaneous state.
 
-The next keyboard layer will turn snapshots into debounced key events and
-repeat policy. That event layer may normalize model-specific key identities,
-but it must be implemented on top of the raw scanner rather than changing the
-raw encoding.
+The second layer is a synchronous, polled event service. It debounces the raw
+snapshot and emits `DOWN`, `UP`, and `REPEAT` events. Repeat timing is
+configurable, and each event carries the physically held ON/Alpha/left-Shift/
+right-Shift modifiers.
 
-Historical APIs often mix scanning, debounce, repeat, blocking waits, modifier
-planes, and translated key semantics. HPGCC compatibility adapters may
-reproduce those combinations without forcing them into the core service.
+The event service deliberately does **not** install an IRQ or background timer.
+Calling code drives progress by polling, so hpclang keeps ownership of the stock
+interrupt/timer configuration unchanged.
+
+It also does not implement sticky shift planes, Alpha lock, text translation,
+or model-neutral key labels yet. HPGCC3 combined those policies with an
+asynchronous message queue; hpclang keeps them above the physical/debounce
+layer. A future compatibility adapter can synthesize HPGCC-style
+`KEYDN/PRESS/KEYUP`, repeat, and shift-plane behavior from hpclang events
+without making those historical policies the core API.
+
+Model-neutral key identities will be added only after scan mappings have been
+measured across `hp39`, `hp48`, and `hp4950`, rather than inferred from
+the documented HP49g+ layout.
 
 ### Time
 
@@ -271,10 +287,15 @@ clock are already implemented. The time service does not reconfigure the stock
 PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
 than deadlock if the stock clock service becomes unavailable.
 
-Keyboard is next and must keep raw physical state separate from translated
-events. Display/surface follows and must be capable of implementing the stable
-HPG drawing surface without making its historical framebuffer representation
-the core ABI.
+Raw keyboard state and the polled debounce/repeat event service are now
+implemented. Model-neutral key translation remains deliberately pending until
+cross-family scan mappings are measured.
+
+The first opaque display surface and clipped clear/pixel/line/fill-rectangle
+primitives are also implemented. The visible runtime validation page now draws
+through this API instead of accessing the LCD framebuffer directly. Broader
+HPG compatibility still requires owned images, blitting, fonts, clip state and
+additional drawing primitives.
 
 Together these services are sufficient for a small interactive program and can
 be validated without first solving persistent storage or RPL object lifetime.

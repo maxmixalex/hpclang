@@ -154,9 +154,11 @@ Before freezing the public service API:
 
 See [SDK API design](sdk-design.md).
 
-M7.1 implementation has started: the stable device-information API and the
-stock-preserving monotonic microsecond clock/delay service are in the common
-runtime. Keyboard and display/surface are next.
+M7.1 implementation is active. Device information and stock-preserving
+monotonic time are stable; raw keyboard snapshots pass five-model Direct E2E.
+A synchronous debounced/repeating keyboard-event service and the first opaque
+display surface primitives are implemented and are being closed against the
+same five-model Direct path.
 
 The minimum cross-platform service set should cover:
 
