@@ -131,6 +131,10 @@ jobs:
           cp ".cache/hp39-aplet/raw/app/sources/crt0/MMUglobals.c" build/hpgcc39-mmu-source/
           cp ".cache/hp39-aplet/raw/app/sources/crt0/crt0.c" build/hpgcc39-mmu-source/
           cp ".cache/hp39-aplet/raw/app/sources/crt0/MMUld.script" build/hpgcc39-mmu-source/
+          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_push_string.c" build/hpgcc39-mmu-source/
+          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_stack_push_string.c" build/hpgcc39-mmu-source/
+          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_stack.c" build/hpgcc39-mmu-source/
+          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn.h" build/hpgcc39-mmu-source/
 
           tools/package-hp39-aplet.sh \
             build/atfe-probe/hp39gplus-hpc1.hp \
