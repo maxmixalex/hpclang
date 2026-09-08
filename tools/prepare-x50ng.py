@@ -151,8 +151,8 @@ def main() -> None:
     parser.add_argument("x50ng", type=Path)
     parser.add_argument("--frontend", type=Path, required=True)
     parser.add_argument("--headless-header", type=Path, required=True)
-    parser.add_argument("--little-apple", action="store_true")
-    parser.add_argument("--hp48gii", action="store_true")
+    parser.add_argument("--hp39", action="store_true")
+    parser.add_argument("--hp48", action="store_true")
     parser.add_argument("--host-uart0", action="store_true")
     parser.add_argument("--reserve-ram", action="store_true")
     args = parser.parse_args()
@@ -161,17 +161,17 @@ def main() -> None:
     shutil.copy2(args.frontend, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
 
-    if args.little_apple:
+    if args.hp39:
         replace_once(
             root / "src" / "flash.c",
             'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
             '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0''',
-            "Little-Apple firmware header",
+            "HP39 firmware header",
         )
 
-    if args.hp48gii:
+    if args.hp48:
         replace_once(
             root / "src" / "sram.c",
             "#define S3C2410_SRAM_SIZE 0x00080000",

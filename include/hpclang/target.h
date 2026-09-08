@@ -5,12 +5,7 @@
 extern "C" {
 #endif
 
-/*
- * Physical calculator identity.
- *
- * Execution features are not represented as historical launcher capabilities:
- * every supported target implements the same hpclang v1 application ABI.
- */
+/* Physical calculator identity. */
 enum hpclang_model {
     HPCLANG_MODEL_UNKNOWN = 0,
     HPCLANG_MODEL_HP39GPLUS = 1,
@@ -21,11 +16,12 @@ enum hpclang_model {
     HPCLANG_MODEL_HP50G = 6
 };
 
+/* Platform families share launch, packaging and low-level integration. */
 enum hpclang_family {
     HPCLANG_FAMILY_UNKNOWN = 0,
     HPCLANG_FAMILY_HP39 = 1,
     HPCLANG_FAMILY_HP48 = 2,
-    HPCLANG_FAMILY_HP49 = 3
+    HPCLANG_FAMILY_HP4950 = 3
 };
 
 #ifdef __cplusplus

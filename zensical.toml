@@ -1,0 +1,24 @@
+[project]
+site_name = "hpclang Development"
+site_url = "https://zyf722.github.io/hpclang/"
+repo_url = "https://github.com/zyf722/hpclang"
+repo_name = "zyf722/hpclang"
+nav = [
+  { "Development" = [
+    "index.md",
+    "development/architecture.md",
+    "development/abi.md",
+    "development/platforms.md",
+    "development/validation.md",
+    "development/roadmap.md",
+    "development/history.md",
+  ] },
+]
+
+[project.theme]
+features = [
+  "navigation.sections",
+  "navigation.indexes",
+  "navigation.path",
+  "navigation.tracking",
+]

@@ -129,7 +129,7 @@ jobs:
           tools/fetch-x50ng.sh \
             build/x50ng \
             tests/x50ng/stock-launcher-main.c \
-            little-apple \
+            hp39 \
             host-uart0
 
       - name: Build x50ng

@@ -90,7 +90,7 @@ jobs:
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
-        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp48gii host-uart0
+        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp48 host-uart0
 
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'

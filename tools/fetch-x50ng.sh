@@ -2,14 +2,14 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-    echo "usage: $0 <dest> <frontend> <mode> [reserve-ram] [host-uart0]" >&2
+    echo "usage: $0 <dest> <frontend> <family> [reserve-ram] [host-uart0]" >&2
     exit 2
 fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$1"
 FRONTEND="$2"
-MODE="$3"
+FAMILY="$3"
 shift 3
 
 PIN="003533d9eca3f6ded36c6ab80b8dbc0563e31d9a"
@@ -26,12 +26,12 @@ args=(
     --headless-header "$ROOT/tests/x50ng/headless-ui-init.h"
 )
 
-if [[ "$MODE" == "little-apple" ]]; then
-    args+=(--little-apple)
-elif [[ "$MODE" == "hp48gii" ]]; then
-    args+=(--hp48gii)
-elif [[ "$MODE" != "hp4950" ]]; then
-    echo "unknown x50ng mode: $MODE" >&2
+if [[ "$FAMILY" == "hp39" ]]; then
+    args+=(--hp39)
+elif [[ "$FAMILY" == "hp48" ]]; then
+    args+=(--hp48)
+elif [[ "$FAMILY" != "hp4950" ]]; then
+    echo "unknown x50ng family: $FAMILY" >&2
     exit 2
 fi
 

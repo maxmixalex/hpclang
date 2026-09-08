@@ -59,7 +59,7 @@ jobs:
     runs-on: home-docker
     timeout-minutes: 25
     env:
-      X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp48gii' && 'hp48gii' || ((matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'little-apple') }}
+      X50NG_BUILD_VARIANT: ${{ matrix.target == 'hp48gii' && 'hp48' || ((matrix.target == 'hp49gplus' || matrix.target == 'hp50g') && 'hp4950' || 'hp39') }}
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -148,7 +148,7 @@ jobs:
           HP48GII_NOR_SHA256: 4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937
         run: |
           find build/x50ng/dist/firmware -mindepth 1 -maxdepth 1 ! -name Makefile -exec rm -rf {} +
-          if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
+          if [ "$HPCLANG_E2E_FAMILY" = hp39 ]; then
             make -C build/x50ng/dist/firmware bootloaders
             curl -fL --retry 3 "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" -o "/tmp/$HPCLANG_E2E_ARCHIVE"
             unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" "$HPCLANG_E2E_MEMBER" > build/target-firmware.bin
@@ -176,7 +176,7 @@ jobs:
             --datadir="$GITHUB_WORKSPACE/build/$TARGET-state"
             --overwrite-config
           )
-          if [ "$HPCLANG_E2E_FAMILY" = little-apple ]; then
+          if [ "$HPCLANG_E2E_FAMILY" = hp39 ]; then
             X50_ARGS+=(
               --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css"
               --flash-full
