@@ -230,27 +230,38 @@ static uint32_t expected_family(uint32_t model)
 #ifdef HPCLANG_E2E_KEYBOARD
 static int keyboard_transition(void)
 {
-    struct hpclang_keyboard_state state;
-    hpclang_keyboard_read(&state);
-    if (hpclang_keyboard_any_is_down(&state))
+    struct hpclang_keyboard_state raw;
+    hpclang_keyboard_read(&raw);
+    if (hpclang_keyboard_any_is_down(&raw))
         return 0;
 
-    uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
-    do {
-        hpclang_keyboard_read(&state);
-        if (hpclang_keyboard_any_is_down(&state))
-            break;
-    } while (hpclang_time_monotonic_us() < deadline);
+    hpclang_keyboard_events_reset();
 
-    if (!hpclang_keyboard_any_is_down(&state))
+    struct hpclang_keyboard_event event;
+    int down_scan = -1;
+    uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
+
+    while (hpclang_time_monotonic_us() < deadline) {
+        if (!hpclang_keyboard_event_poll(&event))
+            continue;
+        if (event.type == HPCLANG_KEYBOARD_EVENT_DOWN &&
+            event.scan_code < 60u) {
+            down_scan = (int)event.scan_code;
+            break;
+        }
+    }
+
+    if (down_scan < 0)
         return 0;
 
     deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
-    do {
-        hpclang_keyboard_read(&state);
-        if (!hpclang_keyboard_any_is_down(&state))
+    while (hpclang_time_monotonic_us() < deadline) {
+        if (!hpclang_keyboard_event_poll(&event))
+            continue;
+        if (event.type == HPCLANG_KEYBOARD_EVENT_UP &&
+            event.scan_code == (uint8_t)down_scan)
             return 1;
-    } while (hpclang_time_monotonic_us() < deadline);
+    }
 
     return 0;
 }
