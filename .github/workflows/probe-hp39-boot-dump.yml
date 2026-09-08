@@ -126,7 +126,6 @@ jobs:
           export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT=64
           export HPCLANG_STOCK_MODE=dump
-          export HPCLANG_BOOT_DUMP_REFERENCE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin"
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp39-bootdump"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39-bootdump.json"
