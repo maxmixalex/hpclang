@@ -10,8 +10,8 @@ hpclang supports six ARM calculator targets through three family backends.
 | HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS; full stock emulator PASS |
 | HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | full stock emulator PASS |
 | HP 48gII | 4 | HP48 | full-NOR medium-apple emulator PASS | full ARMToolbox48/PrRUN E2E PASS |
-| HP 49g+ | 5 | HP49/50 | official-ROM emulator PASS | pending stock launcher gate |
-| HP 50g | 6 | HP49/50 | official-ROM emulator PASS | full ARMToolbox/PrRUN E2E PASS |
+| HP 49g+ | 5 | HP49/50 | native-bootloader emulator PASS | full ARMToolbox/PrRUN E2E PASS |
+| HP 50g | 6 | HP49/50 | native-bootloader emulator PASS | full ARMToolbox/PrRUN E2E PASS |
 
 The 39gs is the primary real-hardware validation machine. It is not the
 architectural center of the SDK.
@@ -42,20 +42,21 @@ result.
 ## HP49g+/50g family
 
 49g+ and 50g share the standard ARMToolbox lineage and the same hpclang family
-backend. The HP50g original-system path is now fully automated:
+backend. Both original-system paths are automated:
 
 ```text
-official 2.15 ROM
- -> install ARMToolbox/library 275
+model-specific ARM bootloader + shared official 2.15 OS
+ -> install ARMToolbox/library 275 from SD
  -> materialize HPCLANG.HP
  -> ARMTo
  -> PrRUN
  -> HPC1 RUNTIME PASS
 ```
 
-HP49g+ now passes the same Direct runtime gate on the shared hp4950 hardware
-backend. Its remaining sibling work is the stock ARMToolbox/package path; no
-model-specific runtime fork is required.
+The same stock UI sequences pass unchanged on both models. The only validated
+model-specific boot difference is the native ARM bootloader
+(`boot-49g+.bin` versus `boot-50g.bin`); it is carried by the target profile,
+not by a separate runtime or application ABI.
 
 ## Hardware baseline
 

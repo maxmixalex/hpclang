@@ -14,7 +14,8 @@ Current roles:
   on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g;
 - `E2E / HP39/40 stock launch`: real stock serial-disk transfer followed by
   APLET/ARMToolbox39 launch;
-- `E2E / HP50g stock launch`: stock File Manager/ARMToolbox/PrRUN path;
+- `E2E / HP49/50 stock launch`: shared stock File Manager/ARMToolbox/PrRUN
+  path with model-specific ARM bootloaders;
 - `E2E / HP48gII stock launch`: verified full-NOR boot, stock serial Kermit
   transfer, Port-0 ARMToolbox48 install and PrRUN -> HPC1 PASS.
 

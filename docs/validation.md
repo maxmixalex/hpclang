@@ -12,12 +12,12 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | `E2E / Direct runtime` | boot official firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS and validate stock return |
 | `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI -> serial-disk transfer -> ARMToolbox39 -> HPC1 PASS |
 | `E2E / HP48gII stock launch` | original HP48gII UI -> Kermit transfer -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
-| `E2E / HP50g stock launch` | original HP50g UI -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
+| `E2E / HP49/50 stock launch` | original HP49g+/HP50g UI -> SD -> ARMToolbox -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
 Direct runtime currently passes on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g.
 HP48gII uses a verified 2 MiB full-NOR fixture and a 256 KiB medium-apple x50ng
-personality. Full stock launch also passes on HP39gs, HP40gs, HP48gII and HP50g.
+personality. Full stock launch also passes on HP39gs, HP40gs, HP48gII, HP49g+ and HP50g.
 
 ## Evidence
 
@@ -95,3 +95,15 @@ historical ARMToolbox48 library as `L275` plus the generated `HPCLANG.HP`
 object as `HPCLANG`. The calculator installs library 275 into Port 0,
 warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN` and must produce
 the same machine-readable HPC1 PASS word.
+
+## HP49g+/HP50g stock emulator gate
+
+The `E2E / HP49/50 stock launch` matrix uses each model's native ARM
+bootloader with the shared official 2.15 OS image. It installs the same
+ARMToolbox/library 275 package from the emulated SD card, copies the generated
+`HPCLANG.HP` object through the stock File Manager, enters `ARMTo` /
+`PrRUN` and requires the machine-readable HPC1 PASS result.
+
+HP49g+ and HP50g intentionally share the same install and launch sequences.
+Their separate `boot-49g+.bin` and `boot-50g.bin` files are target metadata;
+no model-specific hpclang runtime path is involved.

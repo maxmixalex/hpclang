@@ -38,9 +38,9 @@ change the application ABI.
   plus full stock APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
 - HP40gs: canonical runtime PASS on official firmware plus full stock
   APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
-- HP50g: canonical runtime PASS/return plus full original-system
-  ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E.
-- HP49g+: canonical runtime PASS/return on official 2.15 firmware in the shared HP49/50 emulator backend.
+- HP49g+/HP50g: canonical runtime PASS/return on their model-specific ARM
+  bootloaders plus the shared official 2.15 OS, and full original-system
+  ARMToolbox -> HPCLANG.HP -> PrRUN -> PASS E2E on both models.
 - HP48gII: canonical runtime PASS/return on a genuine 2 MiB full-NOR image
   with a 256 KiB / 131x64 medium-apple emulator personality, plus full stock
   Kermit -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> PASS E2E.
