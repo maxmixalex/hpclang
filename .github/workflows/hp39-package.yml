@@ -121,39 +121,6 @@ jobs:
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
 
-          # Temporary provenance probe: inventory the 2006 HPGCC 39G kit without
-          # publishing any vendor binaries.
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-
-          root = Path(".cache/hp39-aplet/raw")
-          files = sorted(p for p in root.rglob("*") if p.is_file())
-          with Path("build/hpgcc39-files.txt").open("w", encoding="utf-8") as out:
-              for path in files:
-                  out.write(f"{path.relative_to(root)}\t{path.stat().st_size}\n")
-
-          terms = re.compile(
-              r"39g|armtool|boot|flash|kinpo|jtag|dump|rom|s3c2410",
-              re.IGNORECASE,
-          )
-          printable = re.compile(rb"[ -~]{6,}")
-          with Path("build/hpgcc39-strings.txt").open("w", encoding="utf-8") as out:
-              for path in files:
-                  data = path.read_bytes()
-                  hits = []
-                  for match in printable.finditer(data):
-                      text = match.group().decode("ascii", errors="ignore")
-                      if terms.search(text):
-                          hits.append(text)
-                          if len(hits) >= 200:
-                              break
-                  if hits:
-                      out.write(f"===== {path.relative_to(root)} =====\n")
-                      for text in hits:
-                          out.write(text + "\n")
-          PY
-
           tools/package-hp39-aplet.sh \
             build/atfe-probe/hp39gplus-hpc1.hp \
             dist/hp39gplus-hardware-validation \
@@ -198,35 +165,6 @@ jobs:
                       digest = sha256((root / name).read_bytes()).hexdigest()
                       out.write(f"{digest}  {name}\n")
           PY
-
-      - name: Upload temporary HPGCC39 provenance inventory
-        uses: actions/upload-artifact@v7
-        with:
-          name: hpgcc39-provenance-inventory
-          retention-days: 1
-          path: |
-            build/hpgcc39-files.txt
-            build/hpgcc39-strings.txt
-          if-no-files-found: error
-
-      - name: Collect temporary HPGCC39 provenance sources
-        run: |
-          rm -rf build/hpgcc39-source
-          mkdir -p build/hpgcc39-source
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/SUPROM39.A" build/hpgcc39-source/
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/SEXE.s" build/hpgcc39-source/
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/lib275.s" build/hpgcc39-source/
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/Skeleton/hpgccaplet.s" build/hpgcc39-source/
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/Skeleton/howtopatch.txt" build/hpgcc39-source/
-          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/hp2aplet/hp39wiz.c" build/hpgcc39-source/
-
-      - name: Upload temporary HPGCC39 provenance sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: hpgcc39-provenance-sources
-          retention-days: 1
-          path: build/hpgcc39-source/
-          if-no-files-found: error
 
       - name: Upload HP39g+ hardware validation bundle
         uses: actions/upload-artifact@v7
