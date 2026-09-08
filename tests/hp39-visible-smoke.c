@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/device.h>
 #include <hpclang/target.h>
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
@@ -228,6 +229,17 @@ static int supported_model(uint32_t model)
            model <= HPCLANG_MODEL_HP50G;
 }
 
+static uint32_t expected_family(uint32_t model)
+{
+    if (model >= HPCLANG_MODEL_HP39GPLUS && model <= HPCLANG_MODEL_HP40GS)
+        return HPCLANG_FAMILY_HP39;
+    if (model == HPCLANG_MODEL_HP48GII)
+        return HPCLANG_FAMILY_HP48;
+    if (model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G)
+        return HPCLANG_FAMILY_HP4950;
+    return HPCLANG_FAMILY_UNKNOWN;
+}
+
 int main(void)
 {
     hpclang_diag_step(0x10);
@@ -235,6 +247,16 @@ int main(void)
 
     if (!supported_model(boot->model) || boot->rw_bytes < 0x4000u)
         return finish(0x01, boot->model);
+
+    const struct hpclang_device_info *device = hpclang_device_info();
+    if (device == NULL ||
+        device->version != HPCLANG_DEVICE_INFO_VERSION ||
+        device->size < sizeof(*device) ||
+        device->model != boot->model ||
+        device->family != expected_family(boot->model) ||
+        device->display_width != 131u ||
+        device->display_height != (uint32_t)display_height(boot->model))
+        return finish(0x0e, boot->model);
 
     hpclang_diag_step(0x11);
 
