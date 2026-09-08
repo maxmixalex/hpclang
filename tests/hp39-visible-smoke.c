@@ -5,16 +5,10 @@
 
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
+#include <hpclang/display.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
-
-#define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
-#define LCDSADDR1 REG32(0x07300014u)
-
-#define WIDTH      131
-#define MAX_HEIGHT 80
-#define STRIDE     20
 
 void hpclang_diag_step(uint32_t step);
 
@@ -39,21 +33,6 @@ static void hpclang_runtime_ctor(void)
 {
     hpclang_diag_step(0x31);
     hpclang_ctor_probe = 0xc0def00du;
-}
-
-static volatile uint8_t *framebuffer(void)
-{
-    return (volatile uint8_t *)(uintptr_t)(
-        ((LCDSADDR1 & 0xffffu) * 2u) + 0x07f00000u);
-}
-
-static void pixel(volatile uint8_t *fb, int x, int y)
-{
-    if ((unsigned)x >= WIDTH || (unsigned)y >= MAX_HEIGHT)
-        return;
-
-    volatile uint8_t *p = fb + y * STRIDE + (x >> 3);
-    *p |= (uint8_t)(1u << (x & 7));
 }
 
 static uint32_t glyph_bits(char c)
@@ -99,7 +78,7 @@ static uint32_t glyph_bits(char c)
     }
 }
 
-static void glyph(volatile uint8_t *fb, int x, int y, char c)
+static void glyph(struct hpclang_surface *surface, int x, int y, char c)
 {
     uint32_t rows = glyph_bits(c);
 
@@ -107,26 +86,26 @@ static void glyph(volatile uint8_t *fb, int x, int y, char c)
         uint32_t row = (rows >> ((4 - yy) * 3)) & 7u;
         for (int xx = 0; xx < 3; ++xx)
             if (row & (1u << (2 - xx)))
-                pixel(fb, x + xx, y + yy);
+                hpclang_surface_set_pixel(surface, x + xx, y + yy, 255u);
     }
 }
 
-static void text(volatile uint8_t *fb, int x, int y, const char *s)
+static void text(struct hpclang_surface *surface, int x, int y, const char *s)
 {
     while (*s) {
         if (*s != ' ')
-            glyph(fb, x, y, *s);
+            glyph(surface, x, y, *s);
         x += 4;
         ++s;
     }
 }
 
-static void hex2(volatile uint8_t *fb, int x, int y, uint32_t value)
+static void hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
 {
     static const char digits[] = "0123456789ABCDEF";
 
-    glyph(fb, x, y, digits[(value >> 4) & 15u]);
-    glyph(fb, x + 4, y, digits[value & 15u]);
+    glyph(surface, x, y, digits[(value >> 4) & 15u]);
+    glyph(surface, x + 4, y, digits[value & 15u]);
 }
 
 static int display_height(uint32_t model)
@@ -135,15 +114,6 @@ static int display_height(uint32_t model)
            model == HPCLANG_MODEL_HP50G
         ? 80
         : 64;
-}
-
-static void clear(volatile uint8_t *fb, uint32_t model)
-{
-    for (int y = 0; y < display_height(model); ++y) {
-        for (int x = 0; x < 16; ++x)
-            fb[y * STRIDE + x] = 0;
-        fb[y * STRIDE + 16] &= 0xf8u;
-    }
 }
 
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
@@ -186,24 +156,25 @@ static void hold_result(void)
 
 static int finish(uint32_t failure, uint32_t model)
 {
-    volatile uint8_t *fb = framebuffer();
+    (void)model;
+    struct hpclang_surface *surface = hpclang_display_surface();
 
-    clear(fb, model);
+    hpclang_surface_clear(surface, 0u);
     if (failure == 0) {
-        text(fb, 38, 28, "RUNTIME PASS");
+        text(surface, 38, 28, "RUNTIME PASS");
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
-        text(fb, 39, 40, "ENTER TO EXIT");
+        text(surface, 39, 40, "ENTER TO EXIT");
 #endif
         hpclang_e2e_result = 0x50415353u;
         hold_result();
         return 0;
     }
 
-    text(fb, 30, 24, "RUNTIME FAIL");
-    text(fb, 55, 36, "CODE");
-    hex2(fb, 75, 36, failure);
+    text(surface, 30, 24, "RUNTIME FAIL");
+    text(surface, 55, 36, "CODE");
+    hex2(surface, 75, 36, failure);
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
-    text(fb, 39, 48, "ENTER TO EXIT");
+    text(surface, 39, 48, "ENTER TO EXIT");
 #endif
     hpclang_e2e_result = 0x46410000u | failure;
     hold_result();
@@ -284,6 +255,12 @@ int main(void)
         device->display_width != 131u ||
         device->display_height != (uint32_t)display_height(boot->model))
         return finish(0x0e, boot->model);
+
+    struct hpclang_surface *surface = hpclang_display_surface();
+    if (hpclang_surface_width(surface) != device->display_width ||
+        hpclang_surface_height(surface) != device->display_height ||
+        hpclang_surface_levels(surface) != 2u)
+        return finish(0x11, boot->model);
 
     uint64_t time_before = hpclang_time_monotonic_us();
     hpclang_delay_us(3000u);
