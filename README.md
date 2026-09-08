@@ -34,6 +34,8 @@ change the application ABI.
 
 ## Validation status
 
+- HP39g+: model-1 HPGCC39/APLET hardware-validation package builds; a
+  trustworthy stock ARM firmware fixture is still required for automated E2E.
 - HP39gs: canonical runtime PASS on real hardware and in the ARM emulator,
   plus full stock APLET/serial-disk -> ARMToolbox39 -> HPC1 PASS E2E.
 - HP40gs: canonical runtime PASS on official firmware plus full stock

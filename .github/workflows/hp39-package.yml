@@ -60,6 +60,31 @@ jobs:
           chmod +x             tools/probe-atfe.sh             tools/hpclang-pack.py             tools/armtoolbox-wrap.py
           tools/probe-atfe.sh
 
+      - name: Build HP39g+ model-1 launcher bundle
+        run: |
+          $ATFE/bin/clang \
+            --target=arm-none-eabi -march=armv4t -marm \
+            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
+            -fno-stack-protector -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
+            -DHPCLANG_STAGE0_MODEL=1 \
+            -c platform/armtoolbox/stage0.S \
+            -o build/atfe-probe/stage0-hp39gplus.o
+
+          $ATFE/bin/ld.lld -m armelf \
+            -T platform/armtoolbox/stage0.ld \
+            build/atfe-probe/stage0-hp39gplus.o \
+            build/atfe-probe/stage0-bundle.o \
+            -o build/atfe-probe/stage0-hp39gplus.elf
+
+          $ATFE/bin/llvm-objcopy -O binary \
+            build/atfe-probe/stage0-hp39gplus.elf \
+            build/atfe-probe/stage0-hp39gplus.bin
+
+          python3 tools/armtoolbox-wrap.py \
+            build/atfe-probe/stage0-hp39gplus.bin \
+            build/atfe-probe/hp39gplus-hpc1.hp
+
       - name: Build HP40gs model-3 launcher bundle
         run: |
           $ATFE/bin/clang \
@@ -91,10 +116,15 @@ jobs:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-v1
 
-      - name: Prepare HP39gs and HP40gs hardware-validation packages
+      - name: Prepare HP39g+, HP39gs and HP40gs hardware-validation packages
         run: |
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
+
+          tools/package-hp39-aplet.sh \
+            build/atfe-probe/hp39gplus-hpc1.hp \
+            dist/hp39gplus-hardware-validation \
+            hp39gplus
 
           tools/package-hp39-aplet.sh \
             build/atfe-probe/hp39gs-hpc1.hp \
@@ -107,6 +137,7 @@ jobs:
             hp40gs
 
           for root in \
+            dist/hp39gplus-hardware-validation \
             dist/hp39gs-hardware-validation \
             dist/hp40gs-hardware-validation
           do
@@ -134,6 +165,14 @@ jobs:
                       digest = sha256((root / name).read_bytes()).hexdigest()
                       out.write(f"{digest}  {name}\n")
           PY
+
+      - name: Upload HP39g+ hardware validation bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hpclang-hp39gplus-hardware-validation
+          retention-days: 30
+          path: dist/hp39gplus-hardware-validation/
+          if-no-files-found: error
 
       - name: Upload HP39gs hardware validation bundle
         uses: actions/upload-artifact@v7

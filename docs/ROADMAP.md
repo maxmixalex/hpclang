@@ -45,6 +45,8 @@ the current emulator gates validate the design.
 - [x] HP39gs official-ROM direct E2E.
 - [x] HP40gs official-ROM direct E2E.
 - [x] HP39gs/HP40gs hardware-validation packages.
+- [x] HP39g+ model-1 hardware-validation package using the shared HPGCC39
+  APLET/ARMToolbox39 boundary.
 - [x] exercise the stock serial-disk transfer of `HP39DIR.CUR`, `HP39DIR.000`,
   `HPGCC000.000` and `LIB275L.000` through the original ROM;
 - [x] drive stock APLET -> HPCLANG -> ARMToolbox39 -> HPC1 PASS -> stock return
