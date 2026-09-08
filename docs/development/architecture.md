@@ -1,15 +1,33 @@
 # Architecture
 
-hpclang uses one application ABI across all supported calculators. A normal application is compiled with Clang/LLVM for ARMv4T, uses AAPCS32 and soft float, and is packaged as an HPC1 image. The normal build does not depend on GCC, libgcc, historical HPGCC objects, or a replacement calculator ROM.
+hpclang is a clean LLVM-native SDK for the ARM-based HP graphing calculators. It is not a selectable collection of historical HPGCC runtimes.
+
+## Supported build model
+
+A normal application uses:
+
+```text
+Clang / LLVM / LLD
+ARMv4T
+AAPCS32
+Thumb-1 C/C++
+soft float
+fixed virtual code and writable-memory addresses
+HPC1 logical executable
+```
+
+The normal build has no dependency on GCC, libgcc, historical HPGCC object files, or a replacement calculator ROM.
+
+## Layers
 
 ```text
 application
     |
-hpclang public API
+hpclang public C/C++ API
     |
 common runtime + libc + compiler builtins
     |
-HPC1
+hpclang v1 boot/service boundary
     |
 +-----------+-----------+-----------+
 |           |           |           |
@@ -18,30 +36,42 @@ hp39        hp48        hp4950
 39g+        48gII       49g+
 39gs                    50g
 40gs
+    |
+calculator OS / ARMSYS / hardware
 ```
 
-The three platform families describe implementation differences that affect launch, packaging, memory setup, and stock-system integration. They are not separate application ABIs.
+The common runtime owns language/runtime concerns: startup, initialized data and BSS, static TLS, constructors, compiler helpers, heap management, libc primitives, entry into `main()`, and cleanup on return.
 
-## Common runtime
+A platform implementation owns calculator-specific work: native packaging, physical-memory discovery, Saturn-to-ARM transition, MMU setup, boot-info construction, state restoration, stock-system integration, and low-level services.
 
-The common runtime owns startup, initialized data, BSS, static TLS, constructors, compiler helpers, heap setup, libc integration, entry into `main()`, and cleanup on return.
+## Common bootstrap
 
-The common bootstrap receives calculator-specific launch information, establishes the fixed HPC1 virtual address layout, enters the application, restores temporary mappings, and returns to the calculator OS.
+The common ARM bootstrap receives a small family-specific launch context, installs the HPC1 virtual layout, enters the application, restores the original mappings and privileged state, and returns to the calculator OS.
 
-## Platform families
+Calculator-model policy must not leak into application code unless an actual user-visible hardware difference requires it. Platform differences remain below the HPC1 boundary; model identity is passed separately in the boot record.
 
-`hp39` covers HP 39g+, HP 39gs, and HP 40gs. These models use the HP39 aplet/container path and ARMToolbox39/library 275.
+## Platform families and model profiles
 
-`hp48` currently contains HP 48gII. It uses the dedicated historical ARMToolbox48 path and has a 131×64 display and 256 KiB physical RAM in the validated full-NOR fixture.
+The platform family is the implementation unit for launch and low-level integration:
 
-`hp4950` covers HP 49g+ and HP 50g. The two models share the same hpclang platform implementation and the same official 2.15 OS image in E2E, but retain their distinct native ARM bootloaders.
+- `hp39` — HP 39g+, HP 39gs, HP 40gs;
+- `hp48` — HP 48gII;
+- `hp4950` — HP 49g+, HP 50g.
 
-Model identity remains available through `hpclang_boot_info.model`. Code should use it only when a real hardware or stock-system difference requires model-specific behavior.
+A model profile is narrower. It records real per-model facts such as model ID, firmware source, bootloader identity, LCD height, or stock transfer sequence. It must not create a runtime fork merely because a calculator has a different product name.
 
-## Platform services
+## Common platform services
 
-Display, keyboard, timers, storage, and calculator-object integration will be added behind common APIs. The project does not reproduce the historical HPGCC API wholesale; services are added when current applications require them.
+Display, keyboard, timers, storage, and calculator-object/stack integration are planned behind common APIs. They should be added only after a real application needs them and after the affected families have a stable execution path.
 
-## ROM policy
+The project does not copy the historical HPGCC API surface wholesale. Historical names or services are kept only when they describe an external calculator interface that hpclang must actually interoperate with.
 
-The supported SDK must run through ordinary calculator software mechanisms. Replacement ROMs and ROM patching may be useful for research, but they are not part of the normal hpclang execution model.
+## Non-ROM policy
+
+The supported SDK must work through ordinary calculator software mechanisms. ROM replacement or ROM patching may be studied as an optional research or compatibility environment, but it is not part of the normal hpclang architecture.
+
+## Historical execution models
+
+Historical HPGCC launchers are specifications and test evidence. APCS-GNU, r9/r10 static-base conventions, ROPI/RWPI experiments, and Launcher V3 application ABIs are not supported hpclang application modes.
+
+Those paths were useful during bring-up because they established that stock Clang/LLD can coexist with the calculator launch environment and because they exposed the underlying ARMSYS/MMU behavior. The production architecture deliberately moves those details behind the fixed-address HPC1 ABI instead of making applications reproduce historical compiler conventions.

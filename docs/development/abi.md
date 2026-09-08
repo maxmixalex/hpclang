@@ -1,6 +1,6 @@
 # hpclang v1 application ABI
 
-The hpclang v1 ABI defines the environment visible to an application after the calculator-specific launcher has prepared execution.
+The v1 ABI describes what an application sees after the calculator-specific launcher has completed its work.
 
 ## CPU ABI
 
@@ -14,16 +14,18 @@ Application code uses:
 -mthumb
 ```
 
-ARM startup code may be used where required. ARM/Thumb interworking is part of the normal ARMv4T build. Applications use fixed virtual addresses and ordinary non-PIC code; there is no application-visible HPGCC r9/r10 static-base convention.
+ARM startup code may be used where useful. ARM/Thumb interworking is part of the normal ARMv4T build.
 
-## Virtual address layout
+Applications use fixed virtual addresses and ordinary non-PIC code. There is no application-visible historical r9/r10 static-base contract.
+
+## Virtual layout
 
 ```text
 0x01100000  boot page, 4 KiB
 0x01101000  initialized writable data
             BSS
             heap
-            remaining writable pages
+            free writable pages
             stack grows down from the top
 
 0x01220000  executable image
@@ -31,7 +33,7 @@ ARM startup code may be used where required. ARM/Thumb interworking is part of t
             load image for initialized writable data
 ```
 
-These virtual addresses are common to all three platform families. The platform launcher chooses the physical memory backing them.
+The virtual addresses are common across calculator families. The platform launcher chooses the physical pages that back them.
 
 ## Boot record
 
@@ -48,7 +50,7 @@ struct hpclang_boot_info {
 
 ## HPC1 image
 
-The post-link image begins with:
+The model-independent post-link container begins with:
 
 ```c
 struct hpclang_image_header {
@@ -59,11 +61,15 @@ struct hpclang_image_header {
 };
 ```
 
-The header is followed by the initialized code/load image. HPC1 contains no calculator model ID, historical launcher flags, or secondary entry table. The same logical image can therefore be launched by different calculator profiles.
+The header is followed by the initialized code/load image. HPC1 contains no calculator target ID, historical launcher flags, or secondary entry table.
+
+This is intentional: the same logical application image can be wrapped and launched by different calculator profiles without recompiling application code for a historical launcher ABI.
 
 ## Entry and return
 
-The platform launcher maps code and writable memory, writes the boot record, supplies an 8-byte-aligned stack, and enters the HPC1 entry point. The common runtime initializes language state, calls `main()`, performs cleanup, and returns through the platform launcher.
+The platform launcher maps the code and writable arena, writes the boot record, provides an 8-byte-aligned stack, and enters the HPC1 entry point.
+
+The common runtime initializes language state, calls `main()`, tears down the runtime, restores temporary mappings and privileged state, and returns through the platform launcher.
 
 ## Stable model IDs
 
@@ -79,6 +85,10 @@ The platform launcher maps code and writable memory, writes the boot record, sup
 
 Existing IDs are ABI values and must not be renumbered.
 
+## Platform family IDs
+
+The current implementation groups models into `hp39`, `hp48`, and `hp4950`. Family identity describes the launcher/platform implementation, not the public HPC1 image format.
+
 ## Packaging
 
-HPC1 is not itself an HP39 aplet, RPL object, or calculator transfer file. Each platform wraps the image in the format required by the target calculator without changing the application ABI.
+HPC1 is not itself an HP39 aplet, RPL object, or HP transfer file. Each platform wraps the same logical image in the calculator-native package required by that model. Those outer formats are not visible to application code.
