@@ -40,7 +40,10 @@ workflows:
 
 Only targets distributed as per-model firmware archives add a `firmware`
 object. Today that is HP39gs/HP40gs, whose object supplies the hpcalc archive
-name and member path. HP49g+/HP50g share the 2.15 OS image but carry their
+name and member path. HP39g+ intentionally has no `firmware` object: its
+model/family profile is useful for packaging, but no trustworthy public stock
+ARM firmware fixture has been established yet. HP49g+/HP50g share the 2.15 OS
+image but carry their
 distinct `bootloader` filenames because that is genuine per-model metadata.
 HP48gII uses a pinned full-NOR fixture. Profiles do not carry empty fields.
 

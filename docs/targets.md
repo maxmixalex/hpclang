@@ -6,7 +6,7 @@ hpclang supports six ARM calculator targets through three family backends.
 
 | Target | Model ID | Backend | Runtime validation | Stock launcher validation |
 | --- | ---: | --- | --- | --- |
-| HP 39g+ | 1 | HP39/40 | pending sibling gate | pending |
+| HP 39g+ | 1 | HP39/40 | model-1 hardware package builds; firmware gate pending | pending stock fixture |
 | HP 39gs | 2 | HP39/40 | real hardware PASS; emulator PASS | real hardware PASS; full stock emulator PASS |
 | HP 40gs | 3 | HP39/40 | official-ROM emulator PASS | full stock emulator PASS |
 | HP 48gII | 4 | HP48 | full-NOR medium-apple emulator PASS | full ARMToolbox48/PrRUN E2E PASS |
@@ -23,7 +23,10 @@ Its launcher has a distinct Saturn-to-ARM mapping and no need to expose later
 49/50 launcher features to applications.
 
 The common runtime is already validated on HP39gs hardware and on official
-HP39gs/HP40gs ROMs in the ARM emulator backend.
+HP39gs/HP40gs ROMs in the ARM emulator backend. The same historical HPGCC39
+aplet/library boundary now also produces a model-1 HP39g+ hardware-validation
+package. Emulator/stock validation remains pending until a trustworthy HP39g+
+ARM firmware fixture is available.
 
 ## HP48gII
 

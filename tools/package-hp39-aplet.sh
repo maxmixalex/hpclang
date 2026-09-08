@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
-    echo "usage: $0 <stage0.hp> <output-dir> [hp39gs|hp40gs]" >&2
+    echo "usage: $0 <stage0.hp> <output-dir> [hp39gplus|hp39gs|hp40gs]" >&2
     exit 2
 fi
 
@@ -12,6 +12,10 @@ OUT="$(realpath -m "$2")"
 TARGET="${3:-hp39gs}"
 
 case "$TARGET" in
+    hp39gplus)
+        TARGET_LABEL="HP39g+"
+        MODEL_ID=1
+        ;;
     hp39gs)
         TARGET_LABEL="HP39gs"
         MODEL_ID=2

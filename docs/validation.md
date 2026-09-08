@@ -8,7 +8,7 @@ automation so a menu failure cannot be mistaken for an ABI/runtime regression.
 | Gate | Purpose |
 | --- | --- |
 | `CI / Core runtime` | host/link/runtime invariants for the LLVM-native core |
-| `CI / HP39 package` | build HP39gs/HP40gs hardware-validation packages |
+| `CI / HP39 package` | build HP39g+/HP39gs/HP40gs hardware-validation packages |
 | `E2E / Direct runtime` | boot official firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS and validate stock return |
 | `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI -> serial-disk transfer -> ARMToolbox39 -> HPC1 PASS |
 | `E2E / HP48gII stock launch` | original HP48gII UI -> Kermit transfer -> ARMToolbox48 -> HPCLANG.HP -> PrRUN -> HPC1 PASS |
@@ -47,8 +47,9 @@ SWI vector are restored before the stock calculator resumes.
 
 ## HP39gs real-hardware gate
 
-Use the `hpclang-hp39gs-hardware-validation` artifact from
-`CI / HP39 package`. Preserve the stock transfer filenames:
+Use the target-specific hardware-validation artifact from
+`CI / HP39 package` (including the model-1 HP39g+ package when testing that
+hardware). Preserve the stock transfer filenames:
 
 - `HPGCC000.000`;
 - `LIB275L.000`;
