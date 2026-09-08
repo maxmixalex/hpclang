@@ -53,6 +53,60 @@ int hpclang_keyboard_dedicated_is_down(
     const struct hpclang_keyboard_state *state,
     enum hpclang_keyboard_dedicated_key key);
 
+enum hpclang_keyboard_event_type {
+    HPCLANG_KEYBOARD_EVENT_DOWN = 1,
+    HPCLANG_KEYBOARD_EVENT_UP = 2,
+    HPCLANG_KEYBOARD_EVENT_REPEAT = 3
+};
+
+enum hpclang_keyboard_modifier {
+    HPCLANG_KEYBOARD_MOD_ON = 1u << 0,
+    HPCLANG_KEYBOARD_MOD_ALPHA = 1u << 1,
+    HPCLANG_KEYBOARD_MOD_LEFT_SHIFT = 1u << 2,
+    HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT = 1u << 3
+};
+
+/*
+ * Debounced keyboard event.
+ *
+ * scan_code uses the same hpclang raw encoding as hpclang_keyboard_state:
+ * 0..55 are matrix positions and 56..59 are the dedicated keys. It is a
+ * physical scan identity, not a model-neutral key label.
+ *
+ * modifiers describes the stable held modifier state after this event.
+ */
+struct hpclang_keyboard_event {
+    uint64_t timestamp_us;
+    uint32_t modifiers;
+    uint8_t type;
+    uint8_t scan_code;
+    uint16_t reserved;
+};
+
+/*
+ * Reset the polled event service to the current physical state. Keys already
+ * held at reset become the baseline and do not generate synthetic DOWN events.
+ */
+void hpclang_keyboard_events_reset(void);
+
+/*
+ * Configure debounce and autorepeat timing. repeat_interval_us == 0 disables
+ * repeat. The default is 20 ms debounce, 500 ms initial repeat delay, and
+ * 80 ms between repeats.
+ */
+void hpclang_keyboard_events_set_timing(
+    uint32_t debounce_us,
+    uint32_t repeat_delay_us,
+    uint32_t repeat_interval_us);
+
+/*
+ * Poll the physical keyboard and return one event when available.
+ *
+ * This function is synchronous: hpclang installs no keyboard IRQ or background
+ * timer. Applications that use events must call it regularly.
+ */
+int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event);
+
 #ifdef __cplusplus
 }
 #endif
