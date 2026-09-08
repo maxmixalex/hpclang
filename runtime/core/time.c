@@ -240,18 +240,18 @@ void hpclang_time_init(void)
     state.ready = 1;
 }
 
-uint64_t hpclang_time_monotonic_us(void)
+static int monotonic_now(uint64_t *value)
 {
     if (!state.ready) {
         hpclang_time_init();
         if (!state.ready)
-            return 0u;
+            return 0;
     }
 
     uint64_t rtc;
     uint16_t count;
     if (!sample(&rtc, &count) || rtc < state.origin_rtc)
-        return state.last_us;
+        return 0;
 
     uint64_t elapsed = hpclang_time_elapsed_us(
         rtc - state.origin_rtc,
@@ -261,17 +261,33 @@ uint64_t hpclang_time_monotonic_us(void)
         state.freq_num,
         state.freq_den);
 
-    if (elapsed < state.last_us)
-        return state.last_us;
+    if (elapsed > state.last_us)
+        state.last_us = elapsed;
 
-    state.last_us = elapsed;
-    return elapsed;
+    *value = state.last_us;
+    return 1;
+}
+
+uint64_t hpclang_time_monotonic_us(void)
+{
+    uint64_t value;
+    return monotonic_now(&value) ? value : state.last_us;
 }
 
 void hpclang_delay_us(uint64_t microseconds)
 {
-    uint64_t start = hpclang_time_monotonic_us();
+    if (microseconds == 0u)
+        return;
 
-    while (hpclang_time_monotonic_us() - start < microseconds)
-        ;
+    uint64_t start;
+    if (!monotonic_now(&start))
+        return;
+
+    for (;;) {
+        uint64_t now;
+        if (!monotonic_now(&now))
+            return;
+        if (now - start >= microseconds)
+            return;
+    }
 }

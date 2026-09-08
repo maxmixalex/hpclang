@@ -16,9 +16,12 @@ extern "C" {
 uint64_t hpclang_time_monotonic_us(void);
 
 /*
- * Busy-wait for at least the requested duration according to the monotonic
- * clock. This does not yield the CPU and is deliberately named delay rather
- * than sleep.
+ * Busy-wait for at least the requested duration while the monotonic clock is
+ * available. This does not yield the CPU and is deliberately named delay
+ * rather than sleep.
+ *
+ * If the stock timer/RTC service cannot be sampled, return rather than spin
+ * forever. All validated stock target configurations provide this service.
  */
 void hpclang_delay_us(uint64_t microseconds);
 
