@@ -10,6 +10,7 @@
 #include "timer.h"
 #include "headless-ui-init.h"
 #include "s3c2410/s3c2410_lcd.h"
+#include "qemu/cpu-common.h"
 
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
@@ -35,8 +36,6 @@ struct state {
     const char *prefix;
     const char *json;
     uint32_t result_addr;
-    uint8_t *dump_reference;
-    size_t dump_reference_size;
     uint32_t dump_addr;
     int saw_pass;
     int failed;
@@ -201,32 +200,6 @@ static uint32_t read_le32(const uint8_t *p)
            ((uint32_t)p[3] << 24);
 }
 
-static uint8_t *load_dump_reference(const char *path, size_t *size)
-{
-    FILE *f = fopen(path, "rb");
-    uint8_t *data;
-    long n;
-
-    if (!f)
-        return NULL;
-    if (fseek(f, 0, SEEK_END) != 0 ||
-        (n = ftell(f)) < 0 ||
-        fseek(f, 0, SEEK_SET) != 0) {
-        fclose(f);
-        return NULL;
-    }
-
-    data = malloc((size_t)n);
-    if (!data || fread(data, 1, (size_t)n, f) != (size_t)n) {
-        free(data);
-        fclose(f);
-        return NULL;
-    }
-    fclose(f);
-    *size = (size_t)n;
-    return data;
-}
-
 static int dump_candidate(struct state *s, uint32_t address)
 {
     static const uint8_t magic[8] = {
@@ -234,6 +207,7 @@ static int dump_candidate(struct state *s, uint32_t address)
     };
     uint8_t header[16];
     uint8_t *data;
+    uint8_t *physical;
 
     if (!guest_read(s->hdw, address, header, sizeof(header)) ||
         memcmp(header, magic, sizeof(magic)) != 0 ||
@@ -242,17 +216,22 @@ static int dump_candidate(struct state *s, uint32_t address)
         return 0;
 
     data = malloc(DUMP_BYTES);
-    if (!data)
+    physical = malloc(DUMP_BYTES);
+    if (!data || !physical) {
+        free(data);
+        free(physical);
         return 0;
+    }
     if (!guest_read(s->hdw, address + 16u, data, DUMP_BYTES)) {
         free(data);
+        free(physical);
         return 0;
     }
 
-    int match =
-        s->dump_reference_size == DUMP_BYTES &&
-        memcmp(data, s->dump_reference, DUMP_BYTES) == 0;
+    cpu_physical_memory_read(0, physical, DUMP_BYTES);
+    int match = memcmp(data, physical, DUMP_BYTES) == 0;
     free(data);
+    free(physical);
 
     if (!match) {
         fprintf(stderr,
@@ -578,21 +557,6 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (s.mode == MODE_DUMP) {
-        const char *reference = getenv("HPCLANG_BOOT_DUMP_REFERENCE");
-        if (!reference) {
-            fprintf(stderr, "stock dump mode needs boot reference\n");
-            return EXIT_FAILURE;
-        }
-        s.dump_reference =
-            load_dump_reference(reference, &s.dump_reference_size);
-        if (!s.dump_reference || s.dump_reference_size != DUMP_BYTES) {
-            fprintf(stderr, "boot dump reference must be exactly 16 KiB\n");
-            free(s.dump_reference);
-            return EXIT_FAILURE;
-        }
-    }
-
     if (s.mode == MODE_RUN) {
         unsigned long value;
         if (!result_text) {
@@ -622,7 +586,6 @@ int main(int argc, char **argv)
     main_loop(s.hdw);
     save_modules(s.hdw);
     exit_modules(s.hdw);
-    free(s.dump_reference);
 
     return s.failed ||
            ((s.mode == MODE_RUN || s.mode == MODE_DUMP) && !s.saw_pass)
