@@ -2,6 +2,22 @@
 
 Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/issues/1). This page records durable milestones, completed evidence, and completion criteria.
 
+## Scope of the completed milestones
+
+M0–M6 describe the **execution foundation**: compiler/runtime viability, the
+HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures,
+and automated E2E.
+
+They do **not** mean that hpclang already reproduces the application-facing
+feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. At the current stage the public
+hpclang headers expose the execution ABI, bootstrap contract, and model/family
+identity. Common calculator services such as graphics, keyboard input, timers,
+files/storage, Saturn/RPL object exchange, and higher-level UI facilities are
+still future SDK work.
+
+hpclang is also not intended to be binary-compatible with historical HPGCC
+executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
+
 ## Principles
 
 - one application ABI: HPC1 / hpclang v1;
@@ -114,21 +130,67 @@ Blocked:
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration. Host transfer tools are included only when they can be exercised through a maintained deterministic transport.
 
-## M7 — Common platform services
+## M7 — Application-facing calculator services
+
+**Planned. This is the next major implementation phase.**
+
+M7 is where hpclang becomes a practical calculator SDK rather than only a
+validated native execution environment.
+
+The minimum cross-platform service set should cover:
+
+- display and framebuffer/graphics primitives;
+- keyboard scanning and key events;
+- monotonic time, delays, and timers;
+- files and storage where the calculator exposes them;
+- calculator/Saturn object exchange;
+- RPL stack integration where applicable;
+- clean access to required stock-OS services;
+- model capability discovery when a service is not available everywhere.
+
+These APIs need hardware/emulator tests and representative real-application
+tests. The exact historical HPGCC function names are not the design target:
+compatibility wrappers may be added later where they materially ease porting,
+but the core API should remain coherent across `hp39`, `hp48`, and
+`hp4950`.
+
+### Historical HPGCC parity is not complete
+
+The old HPGCC SDKs included or supported substantial calculator-facing
+functionality beyond merely entering C code: screen/graphics, keyboard,
+file I/O, Saturn/RPL integration, OS/syscall access, and higher-level helper
+libraries. hpclang has not yet reimplemented that breadth.
+
+Therefore M0–M6 completion must not be reported as "HPGCC 1.x/2.x compatible"
+or "HPGCC feature complete".
+
+## M8 — Practical SDK and porting layer
 
 **Planned.**
 
-Add services behind common APIs only when required by real applications:
+After the common services exist:
 
-- display;
-- keyboard;
-- timers;
-- storage;
-- calculator object/stack integration.
+- establish stable application-facing headers;
+- provide examples that exercise graphics, input, timers, storage, and
+  calculator-object integration;
+- validate one or more non-trivial applications on each platform family;
+- document source-porting guidance from common HPGCC 1.x/2.x APIs where useful;
+- decide which compatibility wrappers are worth maintaining;
+- establish a stable packaging/build UX from a fresh LLVM-only checkout;
+- separate public application documentation from this internal Development
+  reference.
 
-The service layer must not recreate the historical HPGCC API by default. Each API should have a clear cross-platform purpose and defined behavior on all supported platform families.
+HPGCC binary compatibility is not a goal.
 
-## M8 — SDK stabilization
+HPGCC3 compatibility is also a separate question: HPGCC3 uses a revisioned
+library environment tied to a custom calculator ROM. hpclang currently follows
+the opposite non-ROM design and does not implement that ROMLIB ABI.
+
+C++ exceptions/RTTI, broader POSIX/libc hooks, advanced graphics/UI libraries,
+and additional compatibility APIs remain optional until a real application
+requires them.
+
+## M9 — SDK stabilization
 
 **Planned.**
 
@@ -136,10 +198,12 @@ Completion requires:
 
 - all three platform families to execute HPC1 through a supported path;
 - representative emulator coverage plus primary real-hardware coverage;
-- HP 39g+ either validated or explicitly documented as the remaining external hardware blocker;
-- coherent public headers and build UX;
-- examples that build from a fresh LLVM-only checkout;
-- application-facing documentation separated from this internal Development reference;
-- a stable packaging story for the supported calculator profiles.
+- HP 39g+ either validated or explicitly documented as the remaining external
+  hardware blocker;
+- the M7 calculator-service baseline to be usable by real applications;
+- stable public headers and packaging;
+- representative applications passing on all supported platform families;
+- coherent application-facing documentation and porting guidance.
 
-C++ exceptions/RTTI, broader POSIX/libc hooks, and additional compatibility APIs remain optional. Add them only when a real application requires them.
+Only at this stage should hpclang be described as a broadly usable replacement
+SDK rather than a completed execution foundation.
