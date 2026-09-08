@@ -6,9 +6,10 @@ compatibility layer, not automatically names for the new core API.
 
 ## Sources and method
 
-The comparison now uses three complete historical distribution archives as
+The comparison now uses four complete historical distribution archives as
 the primary function-level evidence:
 
+- HPGCC 1.0.3 beta for Linux;
 - HPGCC 1.1 with 39g support for Windows;
 - HPGCC 2.0 SP2 for Linux;
 - HPGCC3 R004.revA.
@@ -38,18 +39,20 @@ Primary references:
 
 ## HPGCC 1.0 baseline
 
-SourceForge still publishes the official `hpgcc-1.0.3-beta-Linux.tar.bz2`
-release dated 2004-10-26. Direct archive retrieval is not currently reliable
-from the automated environment, so the function-level cross-check below uses a
-mirror that preserves HPGCCLibrary Doxygen generated on 2004-10-20, six days
-before that release. The mirror is supporting evidence, not a replacement for
-the official release provenance.
+The official `hpgcc-1.0.3-beta-Linux.tar.bz2` distribution is now available
+as primary evidence and has been inspected directly. The bundled README still
+labels the package itself "Version 1.0", so this document uses the official
+distribution filename/release identity when referring to 1.0.3 rather than
+inferring a more specific internal version string.
 
-The 2004 public HPGCCLibrary file index contains only 13 headers:
+Unlike the earlier Doxygen mirror, the archive contains both installed public
+headers and the corresponding source tree. Its installed `include/` contains
+14 public headers:
 
 - `hpconio.h`
 - `hpctype.h`
 - `hpgcc49.h`
+- `hpgraphics.h`
 - `hpkeyb49.h`
 - `hpmath.h`
 - `hpscreen.h`
@@ -61,34 +64,52 @@ The 2004 public HPGCCLibrary file index contains only 13 headers:
 - `kos.h`
 - `syscall.h`
 
-Notably, that public file index does not yet contain the later mature
-`hpgraphics.h`, Saturn/RPL `saturn.h` / `satdir.h`, filesystem, or
-`win*.h` surfaces.
+The package also contains the full HPG, keyboard, system, stdio/file-support,
+CRT/MMU-loader, ARMToolbox, examples, and CVS-era source material. Its launcher
+documentation uses ARM Toolbox library 275 and `StrRUN`.
 
-The 1.0 keyboard header exposes 12 operations: `keyb_isKeyPressed`,
-`keyb_isAnyKeyPressed`, `keyb_waitKeyPressed`, the four directions,
-Alpha/left-shift/right-shift/ON tests, and `keyb_getkey`. The 1.1/2.0 common
-keyboard layer later grows to 18 implementation functions.
+This corrects one limitation of the previously used 2004 Doxygen mirror: that
+index omitted `hpgraphics.h`, but the official 1.0.3 distribution already
+ships HPG with 55 public drawing/surface/font functions.
 
-The 1.0 `hpscreen.h` is also a smaller pre-HPG graphics interface with
-`clearScreen`, `print`, raw LCD-pointer access, block drawing, and minifont
-helpers.
+The exact 1.0.3 → 1.1 comparison shows that the major API maturation happened
+at this boundary rather than between 1.1 and 2.0:
 
-`hptime.h` is empty in the 2004 generated public documentation. Timing is
-instead exposed through `hpsys.h`, including RTC/tick waits, PWM-counter
-access, timer setup/restore, and slow/normal clock helpers.
+- HPG grows from 55 to 59 public functions while retaining all 55 existing
+  declarations exactly. 1.1 only adds `hpg_font_get_advance`,
+  `hpg_font_get_height`, `hpg_get_height`, and `hpg_get_width`.
+- Keyboard grows from 12 to 17 public functions. Eleven of the 12 old
+  declarations are exact; `keyb_getkey(int wait)` changes from `char` to
+  `int`, and its implementation gains richer modifier/debounce semantics.
+  1.1 also adds the matrix-oriented `keyb_getkeyM`, `keyb_getmatrix`,
+  `keyb_getnextkey`, `keyb_isKeyPrM`, and `keyb_isShiftKeyPrM`.
+- The legacy screen API retains 9 declarations exactly and drops the three
+  minifont helpers `getMFData`, `writeLetMF`, and `writeStringMF`.
+- KOS retains all 15 old declarations exactly while adding 17 file/directory,
+  tick, beep, and attribute helpers.
+- `syscall.h` remains 9 / 9 signature-identical.
+- The system, stdio, and string surfaces receive more substantial cleanup:
+  `hpsys.h` has 16 exact declarations among 22 common names,
+  `hpstdio.h` has 22 exact declarations among 25 common names, and
+  `hpstring.h` has 16 exact declarations among 27 common names. These changes
+  include return-type fixes, typedef normalization, and const/size cleanup,
+  plus a few genuine semantic changes such as `sys_bcd2str`.
+
+The official 1.0.3 public headers do not yet contain the later `ggl.h`,
+`saturn.h`, `satdir.h`, `decNumber`, `win*.h`, or structured
+`fsystem.h` families.
 
 ### Compatibility consequence
 
-HPGCC 1.0 is treated as an **early source subset**, not as the maximum API
-surface hpclang should imitate. Compatibility design should preserve common
-1.0 source patterns where practical, while the mature common 1.1/2.0 surface
-is the principal historical baseline for M7.
+HPGCC 1.0.3 is no longer an uncertain mirror-derived baseline. It is a directly
+verified early SDK generation.
 
-Before claiming exact 1.0 parity, the official 1.0.3 archive itself should be
-retrieved and mechanically compared. The current mirror cross-check is enough
-to guide API design but is deliberately not recorded as byte-identical release
-evidence.
+For hpclang, the mature common HPGCC 1.1/2.0 surface remains the principal
+legacy compatibility target, but 1.0.3 changes two priorities:
+
+- broad HPG source compatibility can naturally cover the 1.0.3 HPG subset too;
+- keyboard/system compatibility must not assume that all 1.0-era signatures or
+  semantics are identical to the later stable 1.1/2.0 interface.
 
 ## Exact public-signature stability
 
@@ -98,6 +119,11 @@ following common public function declarations are **signature-identical**:
 
 | Public surface | Comparison | Exact common signatures |
 | --- | --- | ---: |
+| `hpgraphics.h` | 1.0.3 → 1.1 | 55 / 55 |
+| `hpkeyb49.h` | 1.0.3 → 1.1 | 11 / 12 |
+| `hpscreen.h` | 1.0.3 → 1.1 | 9 / 9 retained |
+| `kos.h` | 1.0.3 → 1.1 | 15 / 15 |
+| `syscall.h` | 1.0.3 → 1.1 | 9 / 9 |
 | `hpgraphics.h` | 1.1 → 2.0 | 59 / 59 |
 | `hpgraphics.h` | 2.0 → HPGCC3 | 59 / 59 |
 | `hpkeyb49.h` | 1.1 → 2.0 | 17 / 17 |
@@ -117,7 +143,8 @@ HPGCC3 adds only two public filesystem handle helpers beyond the HPGCC 2.0
 This changes the compatibility priority:
 
 - HPG is a strong candidate for broad source compatibility, not merely a loose
-  migration shim.
+  migration shim. Its core 55-function surface is already exact in 1.0.3 and
+  survives unchanged into 1.1.
 - Standard I/O and the HPGCC2/3 filesystem surface are also unusually stable.
 - KOS retains its HPGCC2 public function surface into HPGCC3, although hpclang
   should still avoid exposing raw OS-entry conventions as its canonical core.
@@ -494,5 +521,6 @@ but this inventory narrows the design target:
 - capability queries must expose real geometry/model differences required by
   those services.
 
-No M7.1 public function names should be frozen until those semantics are
-specified in the SDK design document.
+M7.1 public names are frozen service-by-service only after those semantics are
+specified in the SDK design document. Device information and monotonic time now
+meet that bar; keyboard and display/surface are the next services to define.
