@@ -1,43 +1,90 @@
 # Validation
 
-Validation is split into runtime tests and original-system launch tests so a calculator menu or transfer problem cannot be mistaken for a runtime regression.
+hpclang separates common-runtime correctness from calculator UI/package automation so a menu, transfer, or launcher failure cannot be mistaken for an ABI/runtime regression.
 
 ## Continuous gates
 
-| Gate | What it proves |
+| Gate | Purpose |
 | --- | --- |
-| `CI / Core runtime` | LLVM/LLD, compiler builtins, libc integration, and common runtime invariants |
-| `CI / HP39 package` | HP 39g+/39gs/40gs hardware-validation packages build correctly |
-| `E2E / Direct runtime` | the common HPC1 runtime executes and returns on HP 39gs, 40gs, 48gII, 49g+, and 50g fixtures |
-| `E2E / HP39/40 stock launch` | stock HP 39gs/40gs APLET UI and serial-disk transfer reach ARMToolbox39 and HPC1 |
-| `E2E / HP48gII stock launch` | stock HP 48gII Kermit transfer, ARMToolbox48, and `PrRUN` reach HPC1 |
-| `E2E / HP49/50 stock launch` | stock HP 49g+/50g SD/File Manager and ARMToolbox path reaches HPC1 |
-| `Maintenance / CI` | old Actions runs and generated CI evidence are pruned |
+| `CI / Core runtime` | host/link/runtime invariants for the LLVM-native core |
+| `CI / HP39 package` | build HP39g+/HP39gs/HP40gs hardware-validation packages |
+| `E2E / Direct runtime` | boot target-appropriate firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS, and validate stock return |
+| `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI → serial-disk transfer → ARMToolbox39 → HPC1 PASS |
+| `E2E / HP48gII stock launch` | original HP48gII UI → Kermit transfer → ARMToolbox48 → `HPCLANG.HP` → `PrRUN` → HPC1 PASS |
+| `E2E / HP49/50 stock launch` | original HP49g+/HP50g UI → SD/File Manager → ARMToolbox → `HPCLANG.HP` → `PrRUN` → HPC1 PASS |
+| `Maintenance / CI` | trim Actions history and CI evidence |
 
-HP 39g+ is deliberately absent from the Direct and stock-launch E2E matrices until a verified real-machine flash fixture is available.
+Direct runtime passes on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g. Full stock launch passes on the same five models. HP 39g+ is intentionally blocked until a trustworthy real-machine stock flash fixture exists.
 
 ## Runtime PASS contract
 
-The canonical runtime test covers initialized globals, BSS, static TLS, constructors, 32-bit and 64-bit division, ARMv4T-safe software floating point, libc memory/string operations, heap allocation, and `snprintf`. Success is recorded as the machine-readable word `0x50415353` and a visible `RUNTIME PASS`.
+The canonical runtime test validates:
 
-The Direct emulator gate additionally verifies that temporary mappings and the SWI vector are restored before stock execution resumes.
+- initialized globals and zeroed BSS;
+- static TLS;
+- constructors;
+- 32-bit and 64-bit division;
+- ARMv4T-safe software floating point;
+- libc memory/string operations;
+- heap allocation;
+- `snprintf`;
+- machine-readable `0x50415353` plus visible `RUNTIME PASS`.
 
-## Original-system launch tests
+The Direct emulator gate additionally verifies that temporary mappings and the SWI vector are restored before the stock calculator resumes.
 
-HP 39gs and HP 40gs boot the official 2.22 firmware and use the calculator's serial-disk path to request `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000`. The installed APLET launches through ARMToolbox39 and must produce the same HPC1 PASS result.
+## HP 39gs real-hardware gate
 
-HP 48gII boots the pinned full-NOR fixture, uses the stock Serial Kermit server to receive library 275 and `HPCLANG.HP`, installs the library into Port 0, and launches through ARMToolbox48/`PrRUN`.
+Use the target-specific hardware-validation artifact from `CI / HP39 package`. The HP39 transfer names are intentionally preserved:
 
-HP 49g+ and HP 50g use their separate native bootloaders with the shared official 2.15 OS. Both install ARMToolbox and `HPCLANG.HP` through the stock File Manager and use the same launch sequence.
+- `HPGCC000.000`;
+- `LIB275L.000`;
+- `HP39DIR.000`;
+- `HP39DIR.CUR`.
 
-Human-like key sequences are stored under `tests/e2e/sequences/`. Model fixture metadata is stored under `tests/e2e/targets/`. x50ng frontends under `tests/x50ng/` drive the calculator key matrix and LCD directly; CI does not use desktop-window automation or screen scraping.
+Transfer library 275 and the test aplet with Conn3x/HP Connectivity Kit, launch `HPCLANG HPC1 TEST`, and expect:
 
-## HP 39g+ blocker
+```text
+RUNTIME PASS
+```
 
-The remaining HP 39g+ work requires a real calculator. The retained research dumper can read stock NOR without programming or erasing it, and the 16 KiB boot-dump mechanism has already been verified byte-for-byte against emulated physical flash.
+After return, APLET/ENTER/ON must remain responsive. A stale LCD page until the stock UI repaints is acceptable; a frozen keyboard, reset, ADDRESS ERROR, or persistent calculator-state damage is not.
 
-When a real HP 39g+ is available, the next step is to obtain and verify its complete stock flash image, then add that fixture to Direct runtime and original-system launch tests. Until then, further HP 39g+ E2E work is intentionally paused.
+The real HP 39gs run has passed the complete canonical runtime and returned cleanly to the stock OS.
+
+The HP 39g+ model-1 hardware package is built by the same workflow, but that is not equivalent to native HP39g+ E2E validation.
+
+## HP 39gs/40gs stock emulator gate
+
+The `E2E / HP39/40 stock launch` matrix boots each official 2.22 ROM and uses the calculator's original serial-disk path to request `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000`.
+
+It then launches the installed hpclang aplet through ARMToolbox39 and requires the same machine-readable HPC1 PASS result.
+
+HP 40gs uses its own stock UI sequence because it must leave the CAS front end before APLET and its RECEIVE FROM menu has no IrDA entry.
+
+## HP 48gII Direct emulator gate
+
+The HP48gII Direct gate boots a verified 2 MiB full-NOR image, including its native HP48gII ARM bootloader, with 256 KiB physical RAM and a 131×64 display.
+
+The fixture is pinned by SHA-256 before being installed as persistent x50ng flash state. The same model-independent HPC1 image then produces machine-readable PASS and returns to a responsive stock environment.
+
+## HP 48gII stock emulator gate
+
+The `E2E / HP48gII stock launch` gate boots the verified 2 MiB full-NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, and starts the calculator's Kermit server.
+
+The host transfers historical ARMToolbox48 library 275 as `L275` plus the generated `HPCLANG.HP` object as `HPCLANG`. The calculator installs library 275 into Port 0, warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN`, and must produce the same machine-readable HPC1 PASS word.
+
+## HP 49g+/50g stock emulator gate
+
+The `E2E / HP49/50 stock launch` matrix uses each model's native ARM bootloader with the shared official 2.15 OS image.
+
+It installs the same ARMToolbox/library 275 package from the emulated SD card, copies the generated `HPCLANG.HP` object through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires the machine-readable HPC1 PASS result.
+
+HP 49g+ and HP 50g intentionally share the same install and launch sequences. Their separate bootloader files are target metadata; no model-specific hpclang runtime path is involved.
 
 ## Evidence retention
 
-LCD summaries are published to the image-only `ci-evidence` branch. Transient test artifacts use short retention windows, and the maintenance workflow prunes old Actions runs and evidence directories.
+LCD summaries are written to the dedicated `ci-evidence` orphan branch and tracked with Git LFS. The branch contains only images plus `.gitattributes`.
+
+Weekly maintenance keeps the newest 20 evidence run directories per family. Current workflows retain up to 20 completed Actions runs; transient E2E artifacts use short retention windows.
+
+See [E2E internals](e2e.md) for target profiles, sequence syntax, and x50ng integration, and [Fixture provenance](fixtures.md) for the external firmware/full-NOR inputs used by these gates.
