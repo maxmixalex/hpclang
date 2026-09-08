@@ -9,8 +9,6 @@
 #define GPGDAT REG32(0x07a00064u)
 
 #define MATRIX_ROWS_MASK 0x7fu
-#define MATRIX_CONFIG_BASE 0x0000aaa9u
-
 static void settle(void)
 {
     for (volatile unsigned n = 100u; n != 0u; --n)
@@ -28,7 +26,7 @@ void hpclang_keyboard_read(struct hpclang_keyboard_state *state)
          * output while the row pins keep the stock keyboard input setup.
          */
         GPGCON =
-            MATRIX_CONFIG_BASE |
+            (saved_gpgcon & UINT32_C(0x0000ffff)) |
             (UINT32_C(1) << ((column + 8u) * 2u));
         settle();
 

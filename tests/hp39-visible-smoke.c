@@ -12,11 +12,6 @@
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define LCDSADDR1 REG32(0x07300014u)
 
-#ifdef HPCLANG_E2E_WAIT_FOR_ENTER
-#define GPGCON REG32(0x07A00060u)
-#define GPGDAT REG32(0x07A00064u)
-#endif
-
 #define WIDTH      131
 #define MAX_HEIGHT 80
 #define STRIDE     20
@@ -152,26 +147,16 @@ static void clear(volatile uint8_t *fb, uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
-static void key_settle(void)
-{
-    for (volatile uint32_t n = 100u; n != 0; --n)
-        __asm__ volatile("nop");
-}
-
 static int enter_pressed(void)
 {
     /*
-     * HP49g+/50g keyboard matrix: ENTER is logical col 0 / row 6.
-     * Select column 0 on GPG[8], sample row 6 on GPGDAT bit 7, then restore
-     * the exact caller GPIO configuration instead of assuming HPGCC defaults.
+     * The interactive HP49g+/50g validation package uses ENTER, which is
+     * matrix column 0 / row 6 on that family. Reuse the public raw scanner
+     * instead of carrying a second GPIO implementation in the test payload.
      */
-    uint32_t saved_gpgcon = GPGCON;
-    GPGCON = (1u << 16) | 0xaaa9u;
-    key_settle();
-    int pressed = (GPGDAT & (1u << 7)) == 0;
-    GPGCON = saved_gpgcon;
-    key_settle();
-    return pressed;
+    struct hpclang_keyboard_state state;
+    hpclang_keyboard_read(&state);
+    return hpclang_keyboard_matrix_is_down(&state, 0u, 6u);
 }
 #endif
 
