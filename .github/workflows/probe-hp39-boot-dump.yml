@@ -1,0 +1,164 @@
+name: Probe / HP39 boot dump
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/hp39gplus/**"
+      - ".github/workflows/probe-hp39-boot-dump.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hp39gs:
+    runs-on: home-docker
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Load HP39gs target profile
+        run: python3 tools/e2e-target-env.py tests/e2e/targets/hp39gs.json >> "$GITHUB_ENV"
+
+      - name: Install fixture and x50ng dependencies
+        run: |
+          packages=(
+            ckermit socat innoextract
+            libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0
+            libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev
+          )
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'ok installed' \
+              || missing+=("$package")
+          done
+          if (( ${#missing[@]} )); then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${missing[@]}"
+          fi
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build read-only boot-dump aplet
+        run: |
+          $ATFE/bin/clang \
+            --target=arm-none-eabi -march=armv4t -marm \
+            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
+            -fno-stack-protector -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
+            -c research/hp39gplus/boot-dump.S \
+            -o build/hp39-boot-dump.o
+
+          $ATFE/bin/ld.lld -m armelf \
+            -T research/hp39gplus/boot-dump.ld \
+            build/hp39-boot-dump.o \
+            -o build/hp39-boot-dump.elf
+
+          $ATFE/bin/llvm-objcopy -O binary \
+            build/hp39-boot-dump.elf \
+            build/hp39-boot-dump.bin
+
+          python3 research/hp39gplus/boot-dump-wrap.py \
+            build/hp39-boot-dump.bin \
+            build/hp39-boot-dump.hp
+
+          chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
+          tools/bootstrap-hp39-aplet.sh
+          tools/package-hp39-aplet.sh \
+            build/hp39-boot-dump.hp \
+            dist/hp39-boot-dump \
+            hp39gs
+
+      - name: Fetch and build pinned x50ng probe
+        run: |
+          tools/fetch-x50ng.sh \
+            build/x50ng \
+            research/hp39gplus/x50ng-boot-dump-main.c \
+            little-apple \
+            host-uart0
+          make -C build/x50ng -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+      - name: Fetch official HP39gs firmware and known probe boot block
+        run: |
+          make -C build/x50ng/dist/firmware bootloaders
+          test "$(stat -c %s build/x50ng/dist/firmware/boot-50g.bin)" = 16384
+          curl -fL --retry 3 \
+            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+            -o "/tmp/$HPCLANG_E2E_ARCHIVE"
+          unzip -p "/tmp/$HPCLANG_E2E_ARCHIVE" \
+            "$HPCLANG_E2E_MEMBER" \
+            > build/hp39gs-2.22.bin
+
+      - name: Execute read-only dump through stock HP39gs path
+        run: |
+          set -euo pipefail
+          X50_TTY="$RUNNER_TEMP/hp39-bootdump-x50ng-uart"
+          KERMIT_TTY="$RUNNER_TEMP/hp39-bootdump-kermit-uart"
+
+          socat -d -d -x -v \
+            PTY,raw,echo=0,link="$X50_TTY" \
+            PTY,raw,echo=0,link="$KERMIT_TTY" \
+            2> build/hp39-bootdump-socat.log &
+          SOCAT_PID=$!
+
+          cleanup() {
+            kill "${KERMIT_PID:-}" "$SOCAT_PID" 2>/dev/null || true
+            wait "${KERMIT_PID:-}" 2>/dev/null || true
+            wait "$SOCAT_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 50); do
+            [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]] && break
+            sleep 0.1
+          done
+          [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
+
+          tools/run-hp39-kermit-server.sh \
+            "$KERMIT_TTY" \
+            dist/hp39-boot-dump \
+            "$GITHUB_WORKSPACE/build/hp39-bootdump-kermit-debug.log" \
+            > build/hp39-bootdump-kermit.out 2>&1 &
+          KERMIT_PID=$!
+
+          export HPCLANG_X50NG_UART0="$X50_TTY"
+          export HPCLANG_X50NG_LCD_HEIGHT=64
+          export HPCLANG_STOCK_MODE=dump
+          export HPCLANG_BOOT_DUMP_REFERENCE="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin"
+          export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+          export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp39-bootdump"
+          export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp39-bootdump.json"
+
+          mkdir -p build/hp39-bootdump-state
+          timeout 255s build/x50ng/dist/x50ng \
+            --datadir="$GITHUB_WORKSPACE/build/hp39-bootdump-state" \
+            --overwrite-config \
+            --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" \
+            --flash-full \
+            --bootloader="$GITHUB_WORKSPACE/build/x50ng/dist/firmware/boot-50g.bin" \
+            --firmware="$GITHUB_WORKSPACE/build/hp39gs-2.22.bin"
+
+          cat build/hp39-bootdump.json
+          grep -F '"status":"pass"' build/hp39-bootdump.json
+          grep -F 'sgetinit[HPGCC000.000]=0' build/hp39-bootdump-kermit-debug.log
+          grep -F 'sgetinit[LIB275L.000]=0' build/hp39-bootdump-kermit-debug.log
+
+      - name: Render evidence
+        if: always()
+        run: |
+          for pgm in build/hp39-bootdump-*.pgm; do
+            [[ -f "$pgm" ]] || continue
+            python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
+          done
+
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp39-boot-dump-probe
+          retention-days: 1
+          path: |
+            build/hp39-bootdump*
+          if-no-files-found: warn
