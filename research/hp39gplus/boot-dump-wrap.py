@@ -15,8 +15,11 @@ from pathlib import Path
 DUMP_BYTES = 0x4000
 HEADER_BYTES = 0x10
 OUTPUT_BYTES = DUMP_BYTES + HEADER_BYTES
+# Old PrRUN may discard one nibble to byte-align the ARM pointer. Request one
+# extra byte so the usable aligned span is always at least OUTPUT_BYTES.
+REQUEST_BYTES = OUTPUT_BYTES + 1
 FLAGS = 0x001  # old launcher, ARMToolbox-provided RAM, leave string on stack
-MEMORY_WORD = (FLAGS << 20) | OUTPUT_BYTES
+MEMORY_WORD = (FLAGS << 20) | REQUEST_BYTES
 LINK_MARKER = 0x3176B34C
 
 
@@ -52,7 +55,8 @@ def main() -> None:
 
     print(
         f"{args.output}: ARM={len(image)} bytes, output={OUTPUT_BYTES} bytes, "
-        f"flags=0x{FLAGS:x}, memory-word=0x{MEMORY_WORD:08x}"
+        f"request={REQUEST_BYTES} bytes, flags=0x{FLAGS:x}, "
+        f"memory-word=0x{MEMORY_WORD:08x}"
     )
 
 
