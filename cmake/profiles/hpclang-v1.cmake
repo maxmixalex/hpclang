@@ -16,6 +16,7 @@ set(HPCLANG_RUNTIME_START
 set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-events.c"
