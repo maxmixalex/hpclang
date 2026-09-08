@@ -132,10 +132,26 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**Planned. This is the next major implementation phase.**
+**In design. This is the next major implementation phase.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a
 validated native execution environment.
+
+### M7.0 — API inventory and compatibility design
+
+Before freezing the public service API:
+
+- [ ] inventory the public HPGCC 1.0/1.1 and 2.0 headers by functional area;
+- [ ] inventory the relevant HPGCC3 public interfaces separately;
+- [ ] classify each commonly used historical API as direct source-compatible,
+  compatibility-adapter, migration-only, or intentionally unsupported;
+- [ ] define ownership, error, coordinate, time-unit, string/buffer, and
+  capability-query conventions for the new core API;
+- [ ] define the C ABI boundary and C++ wrapper policy;
+- [ ] choose the first service slice only after the compatibility matrix is
+  reviewed.
+
+See [SDK API design](sdk-design.md).
 
 The minimum cross-platform service set should cover:
 
