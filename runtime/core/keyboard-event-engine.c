@@ -128,8 +128,13 @@ int hpclang_keyboard_event_engine_step(
     if (bits != engine->candidate_bits) {
         engine->candidate_bits = bits;
         engine->candidate_since_us = now_us;
-    } else if (bits != engine->stable_bits &&
-               now_us - engine->candidate_since_us >= engine->debounce_us) {
+        return 0;
+    }
+
+    if (bits != engine->stable_bits) {
+        if (now_us - engine->candidate_since_us < engine->debounce_us)
+            return 0;
+
         uint64_t old_bits = engine->stable_bits;
         engine->stable_bits = bits;
         engine->pending_up = old_bits & ~bits;
