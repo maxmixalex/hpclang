@@ -5,6 +5,7 @@
 
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
+#include <hpclang/keyboard.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
 
@@ -241,6 +242,35 @@ static uint32_t expected_family(uint32_t model)
     return HPCLANG_FAMILY_UNKNOWN;
 }
 
+#ifdef HPCLANG_E2E_KEYBOARD
+static int keyboard_transition(void)
+{
+    struct hpclang_keyboard_state state;
+    hpclang_keyboard_read(&state);
+    if (hpclang_keyboard_any_is_down(&state))
+        return 0;
+
+    uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
+    do {
+        hpclang_keyboard_read(&state);
+        if (hpclang_keyboard_any_is_down(&state))
+            break;
+    } while (hpclang_time_monotonic_us() < deadline);
+
+    if (!hpclang_keyboard_any_is_down(&state))
+        return 0;
+
+    deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
+    do {
+        hpclang_keyboard_read(&state);
+        if (!hpclang_keyboard_any_is_down(&state))
+            return 1;
+    } while (hpclang_time_monotonic_us() < deadline);
+
+    return 0;
+}
+#endif
+
 int main(void)
 {
     hpclang_diag_step(0x10);
@@ -266,6 +296,11 @@ int main(void)
         time_after - time_before < 3000u ||
         time_after - time_before > 200000u)
         return finish(0x0f, boot->model);
+
+#ifdef HPCLANG_E2E_KEYBOARD
+    if (!keyboard_transition())
+        return finish(0x10, boot->model);
+#endif
 
     hpclang_diag_step(0x11);
 

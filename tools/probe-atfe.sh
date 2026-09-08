@@ -38,6 +38,9 @@ VISIBLE_TEST_DEFINES=()
 if [[ "${HPCLANG_E2E_WAIT_FOR_ENTER:-0}" == "1" ]]; then
     VISIBLE_TEST_DEFINES+=(-DHPCLANG_E2E_WAIT_FOR_ENTER=1)
 fi
+if [[ "${HPCLANG_E2E_KEYBOARD:-0}" == "1" ]]; then
+    VISIBLE_TEST_DEFINES+=(-DHPCLANG_E2E_KEYBOARD=1)
+fi
 
 echo "== host generic soft-float self-test =="
 cc -std=c11 -O2 -Wall -Wextra -Werror \
@@ -68,12 +71,13 @@ echo
 "$CC" "${COMMON[@]}" -marm -O2 -fno-builtin     -c "$ROOT/runtime/core/armv4t-softfloat.c" -o "$OUT/armv4t-softfloat.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/runtime.c" -o "$OUT/runtime.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/device.c" -o "$OUT/device.o"
+"$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/keyboard.c" -o "$OUT/keyboard.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/time-math.c" -o "$OUT/time-math.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/core/time.c" -o "$OUT/time.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/runtime/libc/sbrk.c" -o "$OUT/sbrk.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-runtime-smoke.c" -o "$OUT/smoke.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/runtime.o" "$OUT/device.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o" "$OUT/smoke.o"     -o "$OUT/hpclang-atfe.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/runtime.o" "$OUT/device.o" "$OUT/keyboard.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o" "$OUT/smoke.o"     -o "$OUT/hpclang-atfe.elf"
 
 echo
 echo "== undefined global symbols =="
@@ -115,7 +119,7 @@ echo "== libc++ Armv4T smoke =="
 "$CXX" "${COMMON[@]}" -std=c++23 -Os     -c "$ROOT/tests/atfe-cxx-smoke.cpp" -o "$OUT/cxx-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/atfe-platform-stubs.c" -o "$OUT/platform-stubs.o"
 
-"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/runtime.o" "$OUT/device.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
+"$CXX" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/runtime.o" "$OUT/device.o" "$OUT/keyboard.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o" "$OUT/platform-stubs.o" "$OUT/cxx-smoke.o"     -o "$OUT/hpclang-atfe-cxx.elf"
 
 if "$READELF" -Ws "$OUT/hpclang-atfe-cxx.elf" | grep -E ' GLOBAL .* UND '; then
     echo "unexpected undefined global C++ symbols" >&2
@@ -171,7 +175,7 @@ echo "== HP39 hardware runtime validation =="
 "$CC" "${COMMON[@]}" "${VISIBLE_TEST_DEFINES[@]}" -Os     -c "$ROOT/tests/hp39-visible-smoke.c" -o "$OUT/hp39-visible-smoke.o"
 "$CC" "${COMMON[@]}" -Os     -c "$ROOT/tests/hp39-runtime-diag.c" -o "$OUT/hp39-runtime-diag.o"
 
-"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/hp39-runtime-diag.o" "$OUT/device.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
+"$CC" "${TARGET[@]}"     -nostartfiles     -Wl,--gc-sections     -Wl,-T,"$ROOT/runtime/core/link.ld"     "$OUT/start.o" "$OUT/armv4t-eabi-div.o" "$OUT/armv4t-softfloat-entry.o" "$OUT/armv4t-softfloat.o" "$OUT/hp39-runtime-diag.o" "$OUT/device.o" "$OUT/keyboard.o" "$OUT/time-math.o" "$OUT/time.o" "$OUT/sbrk.o"     "$OUT/hp39-visible-smoke.o"     -o "$OUT/hp39-visible.elf"
 
 python3 "$ROOT/tools/hpclang-pack.py"     "$OUT/hp39-visible.elf"     "$OUT/hp39-visible.hpc"
 

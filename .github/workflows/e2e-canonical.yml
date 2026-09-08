@@ -79,7 +79,7 @@ jobs:
         run: |
           export OUT="$GITHUB_WORKSPACE/build/canonical"
           chmod +x tools/probe-atfe.sh
-          tools/probe-atfe.sh
+          HPCLANG_E2E_KEYBOARD=1 tools/probe-atfe.sh
 
           $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" \
