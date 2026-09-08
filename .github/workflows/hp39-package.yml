@@ -121,21 +121,6 @@ jobs:
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
 
-          # Temporary provenance probe: selected HPGCC MMU/syscall source only.
-          rm -rf build/hpgcc39-mmu-source
-          mkdir -p build/hpgcc39-mmu-source
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/sys/sys_map.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/sys/sys_phys_malloc.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/syscall.h" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/crt0/MMUloader.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/crt0/MMUglobals.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/crt0/crt0.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/crt0/MMUld.script" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_push_string.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_stack_push_string.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn/sat_stack.c" build/hpgcc39-mmu-source/
-          cp ".cache/hp39-aplet/raw/app/sources/hplib/saturn.h" build/hpgcc39-mmu-source/
-
           tools/package-hp39-aplet.sh \
             build/atfe-probe/hp39gplus-hpc1.hp \
             dist/hp39gplus-hardware-validation \
@@ -180,14 +165,6 @@ jobs:
                       digest = sha256((root / name).read_bytes()).hexdigest()
                       out.write(f"{digest}  {name}\n")
           PY
-
-      - name: Upload temporary HPGCC39 MMU provenance sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: hpgcc39-mmu-provenance-sources
-          retention-days: 1
-          path: build/hpgcc39-mmu-source/
-          if-no-files-found: error
 
       - name: Upload HP39g+ hardware validation bundle
         uses: actions/upload-artifact@v7
