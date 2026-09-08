@@ -209,6 +209,25 @@ jobs:
             build/hpgcc39-strings.txt
           if-no-files-found: error
 
+      - name: Collect temporary HPGCC39 provenance sources
+        run: |
+          rm -rf build/hpgcc39-source
+          mkdir -p build/hpgcc39-source
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/SUPROM39.A" build/hpgcc39-source/
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/SEXE.s" build/hpgcc39-source/
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/LIB275/lib275.s" build/hpgcc39-source/
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/Skeleton/hpgccaplet.s" build/hpgcc39-source/
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/Skeleton/howtopatch.txt" build/hpgcc39-source/
+          cp ".cache/hp39-aplet/raw/app/sources/HP39-Aplet/hp2aplet/hp39wiz.c" build/hpgcc39-source/
+
+      - name: Upload temporary HPGCC39 provenance sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: hpgcc39-provenance-sources
+          retention-days: 1
+          path: build/hpgcc39-source/
+          if-no-files-found: error
+
       - name: Upload HP39g+ hardware validation bundle
         uses: actions/upload-artifact@v7
         with:
