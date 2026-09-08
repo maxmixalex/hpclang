@@ -74,17 +74,17 @@ Completion criterion:
 
 ## M5 — HP49g+/50g family
 
-**Direct runtime complete for HP49g+/50g; HP49g+ stock launch remains.**
+**Complete.**
 
 - [x] HP50g direct runtime E2E PASS + clean stock return.
 - [x] HP50g original-system ARMToolbox install -> HPCLANG.HP -> PrRUN -> PASS.
 - [x] add HP49g+ model 5 to the shared hp4950 Direct runtime matrix.
 - [x] HP49g+ direct runtime E2E PASS + clean stock return;
-- [ ] close the supported HP49g+ stock package/ARMToolbox path.
+- [x] close the supported HP49g+ stock package/ARMToolbox path.
 
-49g+ and 50g intentionally share the same hp4950 hardware backend. Model
-identity belongs in the hpclang launch context unless a genuine hardware
-difference requires otherwise.
+49g+ and 50g share the hp4950 hardware backend, the official 2.15 OS image,
+the stock File Manager/ARMToolbox sequences and the HPC1 ABI. Their distinct
+ARM bootloaders are target metadata rather than a runtime fork.
 
 Completion criterion:
 
@@ -100,8 +100,9 @@ Passing:
 - HP39gs direct runtime;
 - HP40gs direct runtime;
 - HP48gII direct runtime on a genuine full-NOR/medium-apple model;
-- HP49g+ direct runtime;
-- HP50g direct runtime;
+- HP49g+ direct runtime with its native ARM bootloader;
+- HP50g direct runtime with its native ARM bootloader;
+- HP49g+ full stock ARMToolbox/PrRUN launch;
 - HP50g full stock ARMToolbox/PrRUN launch;
 - HP48gII full stock Kermit/ARMToolbox48/PrRUN launch;
 - HP39gs full stock serial-disk/APLET launch;
@@ -112,7 +113,8 @@ Active expansion:
 - [x] HP48gII direct runtime;
 - [x] HP39gs/HP40gs stock serial-disk/APLET launch;
 - [x] HP48gII stock launch;
-- [ ] HP49g+ stock launch.
+- [x] HP49g+ stock launch;
+- [ ] HP39g+ sibling validation.
 
 Direct runtime owns common-bootstrap execution and return correctness.
 Stock-launch gates own calculator-side package/menu/launcher integration.
