@@ -43,6 +43,7 @@ jobs:
 
       - name: Build read-only boot-dump aplet
         run: |
+          mkdir -p build
           $ATFE/bin/clang \
             --target=arm-none-eabi -march=armv4t -marm \
             -mfpu=none -mfloat-abi=soft -mabi=aapcs \
