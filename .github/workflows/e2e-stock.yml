@@ -10,16 +10,10 @@ on:
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/m7-cxx-probe.cpp"
-      - "tests/x50ng/stock-launcher-main.c"
-      - "tests/e2e/sequences/hp50g-stock-install.seq"
-      - "tests/e2e/sequences/hp50g-stock-run.seq"
-      - "tests/x50ng/headless-ui-init.h"
-      - "tools/probe-atfe.sh"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
@@ -65,8 +59,8 @@ jobs:
       - name: Build ${{ matrix.target }} test payload
         run: |
           export OUT="$GITHUB_WORKSPACE/build/stock-payload"
-          chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
-          HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/probe-atfe.sh
+          chmod +x tools/build-e2e.sh tools/armtoolbox-wrap.py
+          HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/build-e2e.sh
           $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" -c platform/armtoolbox/stage0.S \
             -o build/stock-payload/stage0.o
@@ -112,7 +106,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-stock-hp4950-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-stock-hp4950-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/stock-launcher-main.c', 'tests/e2e/harness/x50ng/headless-ui-init.h') }}
       - name: Ensure x50ng runtime dependencies
         run: |
           packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
@@ -142,7 +136,7 @@ jobs:
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
-        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp4950
+        run: tools/fetch-x50ng.sh build/x50ng tests/e2e/harness/x50ng/stock-launcher-main.c hp4950
 
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -194,7 +188,7 @@ jobs:
 
           export HPCLANG_STOCK_MODE=run
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp50g-stock-run.seq"
-          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/stock-payload/hp39-visible.result-address")"
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/stock-payload/e2e.result-address")"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/stock-run"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/stock-run.json"
 
@@ -303,5 +297,5 @@ jobs:
             build/stock-run.json
             build/x50ng-stock-source.txt
             build/stock-payload/HPCLANG.HP
-            build/stock-payload/hp39-visible.result-address
+            build/stock-payload/e2e.result-address
           if-no-files-found: warn

@@ -10,16 +10,14 @@ on:
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/m7-cxx-probe.cpp"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/hp39-fixture-key.py"
       - "tools/package-hp39-aplet.sh"
-      - "tools/probe-atfe.sh"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/pgm-to-png.py"
@@ -29,8 +27,6 @@ on:
       - "tests/e2e/targets/hp39gs.json"
       - "tests/e2e/targets/hp40gs.json"
       - ".github/actions/setup-atfe/**"
-      - "tests/x50ng/stock-launcher-main.c"
-      - "tests/x50ng/headless-ui-init.h"
       - "tests/e2e/sequences/hp39-serial-fixture-probe.seq"
       - "tests/e2e/sequences/hp40-serial-fixture-probe.seq"
       - ".github/workflows/e2e-hp39-stock.yml"
@@ -80,11 +76,11 @@ jobs:
       - name: Build current ${{ matrix.target }} transfer set
         run: |
           chmod +x \
-            tools/probe-atfe.sh \
+            tools/build-e2e.sh \
             tools/bootstrap-hp39-aplet.sh \
             tools/package-hp39-aplet.sh \
             tools/run-hp39-kermit-server.sh
-          tools/probe-atfe.sh
+          OUT="$GITHUB_WORKSPACE/build/atfe-probe" tools/build-e2e.sh
 
           $ATFE/bin/clang \
             --target=arm-none-eabi -march=armv4t -marm \
@@ -120,7 +116,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-hp39-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/stock-launcher-main.c', 'tests/e2e/harness/x50ng/headless-ui-init.h') }}
 
       - name: Install x50ng build dependencies
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -141,7 +137,7 @@ jobs:
         run: |
           tools/fetch-x50ng.sh \
             build/x50ng \
-            tests/x50ng/stock-launcher-main.c \
+            tests/e2e/harness/x50ng/stock-launcher-main.c \
             hp39 \
             host-uart0
 
@@ -210,7 +206,7 @@ jobs:
           export HPCLANG_X50NG_UART0="$X50_TTY"
           export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
           export HPCLANG_STOCK_MODE=run
-          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/atfe-probe/hp39-visible.result-address")"
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/atfe-probe/e2e.result-address")"
           if [ "$TARGET" = hp40gs ]; then
             SEQUENCE=tests/e2e/sequences/hp40-serial-fixture-probe.seq
           else

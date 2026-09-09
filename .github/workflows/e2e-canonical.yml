@@ -10,14 +10,10 @@ on:
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/m7-cxx-probe.cpp"
-      - "tests/x50ng/e2e-main.c"
-      - "tests/x50ng/headless-ui-init.h"
-      - "tools/probe-atfe.sh"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
       - "tools/publish-ci-image.sh"
@@ -26,7 +22,6 @@ on:
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
-      - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
   pull_request:
     paths:
@@ -35,11 +30,6 @@ on:
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/x50ng/e2e-main.c"
-      - "tests/x50ng/headless-ui-init.h"
-      - "tools/probe-atfe.sh"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
       - "tools/publish-ci-image.sh"
@@ -47,7 +37,6 @@ on:
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
-      - "tests/e2e/targets/**"
       - ".github/workflows/e2e-canonical.yml"
 
 concurrency:
@@ -79,8 +68,8 @@ jobs:
       - name: Build canonical HPC1 and ${{ matrix.target }} stage0
         run: |
           export OUT="$GITHUB_WORKSPACE/build/canonical"
-          chmod +x tools/probe-atfe.sh
-          HPCLANG_E2E_KEYBOARD=1 tools/probe-atfe.sh
+          chmod +x tools/build-e2e.sh
+          HPCLANG_E2E_KEYBOARD=1 tools/build-e2e.sh
 
           $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL="$HPCLANG_E2E_MODEL" \
@@ -97,7 +86,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/e2e-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-canonical-${{ env.X50NG_BUILD_VARIANT }}-${{ runner.os }}-${{ runner.arch }}-003533d9-dist-v1-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/e2e-main.c', 'tests/e2e/harness/x50ng/headless-ui-init.h') }}
       - name: Ensure x50ng runtime dependencies
         run: |
           packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 git-lfs)
@@ -128,7 +117,7 @@ jobs:
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
         run: |
-          tools/fetch-x50ng.sh build/x50ng tests/x50ng/e2e-main.c "$X50NG_BUILD_VARIANT" reserve-ram
+          tools/fetch-x50ng.sh build/x50ng tests/e2e/harness/x50ng/e2e-main.c "$X50NG_BUILD_VARIANT" reserve-ram
 
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -166,7 +155,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           export HPCLANG_X50NG_STAGE0="$GITHUB_WORKSPACE/build/canonical/stage0.bin"
-          export HPCLANG_X50NG_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/canonical/hp39-visible.result-address")"
+          export HPCLANG_X50NG_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/canonical/e2e.result-address")"
           export HPCLANG_X50NG_BEFORE_PGM="$GITHUB_WORKSPACE/build/$TARGET-before.pgm"
           export HPCLANG_X50NG_PASS_PGM="$GITHUB_WORKSPACE/build/$TARGET-pass.pgm"
           export HPCLANG_X50NG_RETURN_PGM="$GITHUB_WORKSPACE/build/$TARGET-return.pgm"
@@ -259,5 +248,5 @@ jobs:
             build/${{ matrix.target }}-e2e.json
             build/x50ng-canonical-source.txt
             build/canonical/stage0.bin
-            build/canonical/hp39-visible.hpc
+            build/canonical/e2e.hpc
           if-no-files-found: warn

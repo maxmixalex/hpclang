@@ -10,15 +10,10 @@ on:
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/m7-cxx-probe.cpp"
-      - "tests/x50ng/stock-launcher-main.c"
-      - "tests/x50ng/headless-ui-init.h"
-      - "tests/e2e/sequences/hp48gii-stock-run.seq"
-      - "tools/probe-atfe.sh"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
@@ -48,8 +43,8 @@ jobs:
       - name: Build HP48gII HPC1 payload
         run: |
           export OUT="$GITHUB_WORKSPACE/build/hp48-payload"
-          chmod +x tools/probe-atfe.sh tools/armtoolbox-wrap.py
-          HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/probe-atfe.sh
+          chmod +x tools/build-e2e.sh tools/armtoolbox-wrap.py
+          HPCLANG_E2E_WAIT_FOR_ENTER=1 tools/build-e2e.sh
           $ATFE/bin/clang --target=arm-none-eabi -march=armv4t -marm \
             -DHPCLANG_STAGE0_MODEL=4 -c platform/armtoolbox/stage0.S \
             -o build/hp48-payload/stage0-hp48gii.o
@@ -81,7 +76,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: build/x50ng/dist
-          key: hpclang-x50ng-hp48-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/x50ng/stock-launcher-main.c', 'tests/x50ng/headless-ui-init.h') }}
+          key: hpclang-x50ng-hp48-stock-uart-${{ runner.os }}-${{ runner.arch }}-003533d9-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/stock-launcher-main.c', 'tests/e2e/harness/x50ng/headless-ui-init.h') }}
 
       - name: Install x50ng build dependencies
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -91,7 +86,7 @@ jobs:
 
       - name: Fetch and adapt pinned x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
-        run: tools/fetch-x50ng.sh build/x50ng tests/x50ng/stock-launcher-main.c hp48 host-uart0
+        run: tools/fetch-x50ng.sh build/x50ng tests/e2e/harness/x50ng/stock-launcher-main.c hp48 host-uart0
 
       - name: Build x50ng
         if: steps.x50ng-cache.outputs.cache-hit != 'true'
@@ -153,7 +148,7 @@ jobs:
           export HPCLANG_E2E_SEQUENCE="$GITHUB_WORKSPACE/tests/e2e/sequences/hp48gii-stock-run.seq"
           export HPCLANG_STOCK_PREFIX="$GITHUB_WORKSPACE/build/hp48"
           export HPCLANG_STOCK_JSON="$GITHUB_WORKSPACE/build/hp48.json"
-          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/hp48-payload/hp39-visible.result-address")"
+          export HPCLANG_STOCK_RESULT_ADDR="$(cat "$GITHUB_WORKSPACE/build/hp48-payload/e2e.result-address")"
 
           timeout 200s build/x50ng/dist/x50ng \
             --datadir="$GITHUB_WORKSPACE/build/hp48-state" \
@@ -243,5 +238,5 @@ jobs:
             build/hp48-kermit*
             build/hp48-socat.log
             build/hp48-payload/HPCLANG.HP
-            build/hp48-payload/hp39-visible.result-address
+            build/hp48-payload/e2e.result-address
           if-no-files-found: warn
