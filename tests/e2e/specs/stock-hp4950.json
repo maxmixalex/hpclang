@@ -1,0 +1,43 @@
+{
+  "heading": "${TARGET} full original-system launch",
+  "files": [
+    {
+      "path": "build/${TARGET}-setup.bin",
+      "size": 7673
+    }
+  ],
+  "required_files": [
+    "build/${TARGET}-install-port2.pgm",
+    "build/${TARGET}-install-armtoolbox.pgm"
+  ],
+  "captures": [
+    "build/${TARGET}-install-port-number.pgm",
+    "build/${TARGET}-install-files.pgm",
+    "build/${TARGET}-install-sd.pgm",
+    "build/${TARGET}-install-sd-setup.pgm",
+    "build/${TARGET}-install-setup-evaluated.pgm",
+    "build/${TARGET}-install-warmstart.pgm",
+    "build/${TARGET}-install-lib.pgm",
+    "build/${TARGET}-install-port2.pgm",
+    "build/${TARGET}-install-armtoolbox.pgm",
+    "build/${TARGET}-install-installed.pgm",
+    "build/${TARGET}-run-files.pgm",
+    "build/${TARGET}-run-sd.pgm",
+    "build/${TARGET}-run-sd-payload.pgm",
+    "build/${TARGET}-run-copy-destination.pgm",
+    "build/${TARGET}-run-copy-result.pgm",
+    "build/${TARGET}-run-recalled-in-filer.pgm",
+    "build/${TARGET}-run-filer-halt-menu.pgm",
+    "build/${TARGET}-run-payload-recalled.pgm",
+    "build/${TARGET}-run-lib.pgm",
+    "build/${TARGET}-run-port2.pgm",
+    "build/${TARGET}-run-armtoolbox.pgm",
+    "build/${TARGET}-run-pass.pgm",
+    "build/${TARGET}-run-returned.pgm",
+    "build/${TARGET}-run-failure.pgm"
+  ],
+  "json": [
+    "build/${TARGET}-install.json",
+    "build/${TARGET}-run.json"
+  ]
+}

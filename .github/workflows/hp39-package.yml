@@ -48,31 +48,18 @@ jobs:
 
       - name: Install HP39 packaging dependency
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends innoextract
+          if ! command -v innoextract >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends innoextract
+          fi
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build unified E2E application
+      - name: Build hardware-validation HPC1 and launchers
         run: |
-          chmod +x tools/build-e2e.sh tools/hpclang-pack.py tools/armtoolbox-wrap.py
-          OUT="$GITHUB_WORKSPACE/build/package" tools/build-e2e.sh
-
-      - name: Build HP39 family launchers
-        run: |
-          for spec in hp39gplus:1 hp39gs:2 hp40gs:3; do
-            TARGET="${spec%%:*}"
-            MODEL="${spec##*:}"
-
-            $ATFE/bin/clang               --target=arm-none-eabi -march=armv4t -marm               -mfpu=none -mfloat-abi=soft -mabi=aapcs               -fno-stack-protector -fno-unwind-tables               -fno-asynchronous-unwind-tables -fno-pic -fno-pie               -DHPCLANG_STAGE0_MODEL="$MODEL"               -c platform/armtoolbox/stage0.S               -o "build/package/stage0-$TARGET.o"
-
-            $ATFE/bin/ld.lld -m armelf               -T platform/armtoolbox/stage0.ld               "build/package/stage0-$TARGET.o"               build/package/stage0-bundle.o               -o "build/package/stage0-$TARGET.elf"
-
-            $ATFE/bin/llvm-objcopy -O binary               "build/package/stage0-$TARGET.elf"               "build/package/stage0-$TARGET.bin"
-
-            python3 tools/armtoolbox-wrap.py               "build/package/stage0-$TARGET.bin"               "build/package/$TARGET-hpc1.hp"
-          done
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh hardware "$GITHUB_WORKSPACE/build/package"
 
       - name: Restore HPGCC39 packaging cache
         uses: actions/cache@v6
@@ -87,7 +74,7 @@ jobs:
 
           for target in hp39gplus hp39gs hp40gs; do
             root="dist/$target-hardware-validation"
-            tools/package-hp39-aplet.sh               "build/package/$target-hpc1.hp"               "$root"               "$target"
+            tools/package-hp39-aplet.sh               "build/package/launchers/$target.hp"               "$root"               "$target"
             cp build/package/e2e.result-address "$root/E2E_RESULT_ADDRESS.txt"
             printf 'commit=%s\nworkflow_run=%s\n'               "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$root/BUILD_INFO.txt"
           done

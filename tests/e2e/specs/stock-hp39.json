@@ -1,0 +1,26 @@
+{
+  "heading": "${TARGET} full original-system launch",
+  "logs": [
+    {
+      "path": "build/${TARGET}-kermit-debug.log",
+      "contains": [
+        "sgetinit[HP39DIR.CUR]=0",
+        "sgetinit[HP39DIR.000]=0",
+        "sgetinit[HPGCC000.000]=0",
+        "sgetinit[LIB275L.000]=0"
+      ]
+    }
+  ],
+  "captures": [
+    "build/${TARGET}-stock-aplet-library.pgm",
+    "build/${TARGET}-stock-receive-menu.pgm",
+    "build/${TARGET}-stock-receive-serial-disk.pgm",
+    "build/${TARGET}-stock-remote-aplet.pgm",
+    "build/${TARGET}-stock-lazy-fetch.pgm",
+    "build/${TARGET}-stock-pass.pgm",
+    "build/${TARGET}-stock-failure.pgm"
+  ],
+  "json": [
+    "build/${TARGET}-stock.json"
+  ]
+}

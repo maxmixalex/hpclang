@@ -1,0 +1,195 @@
+name: E2E / Direct runtime
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "cmake/**"
+      - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/main.c"
+      - "tests/e2e/cpp.cpp"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/specs/direct.json"
+      - "tests/e2e/verify.py"
+      - "tests/e2e/report.py"
+      - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-direct.yml"
+  pull_request:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/**"
+      - "cmake/**"
+      - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/main.c"
+      - "tests/e2e/cpp.cpp"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/specs/direct.json"
+      - "tests/e2e/verify.py"
+      - "tests/e2e/report.py"
+      - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-direct.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Direct E2E
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build one Direct HPC1 and all launchers
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh direct "$GITHUB_WORKSPACE/build/e2e-direct"
+
+      - name: Upload Direct build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-direct-build
+          retention-days: 1
+          path: build/e2e-direct/
+          if-no-files-found: error
+
+  platform:
+    name: Prepare Direct / ${{ matrix.family }}
+    runs-on: home-docker
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        family: [hp39, hp48, hp4950]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare x50ng platform
+        uses: ./.github/actions/setup-x50ng
+        with:
+          mode: direct
+          family: ${{ matrix.family }}
+
+  target:
+    name: ${{ matrix.target }}
+    needs: [build, platform]
+    runs-on: home-docker
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - target: hp39gs
+            family: hp39
+          - target: hp40gs
+            family: hp39
+          - target: hp48gii
+            family: hp48
+          - target: hp49gplus
+            family: hp4950
+          - target: hp50g
+            family: hp4950
+    env:
+      TARGET: ${{ matrix.target }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Direct build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-direct-build
+          path: build/e2e
+
+      - name: Restore x50ng platform
+        uses: ./.github/actions/setup-x50ng
+        with:
+          mode: direct
+          family: ${{ matrix.family }}
+
+      - name: Prepare platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh direct "${{ matrix.family }}"
+
+      - name: Execute Direct E2E
+        run: bash tests/e2e/harness/run-direct.sh "$TARGET" build/e2e
+
+      - name: Generate LCD summary image
+        if: always()
+        run: |
+          python3 tests/e2e/report.py tests/e2e/specs/direct.json \
+            --image-out "build/$TARGET-summary.png" \
+            --image-only
+
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            "build/$TARGET-summary.png" \
+            "direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        run: |
+          args=(tests/e2e/specs/direct.json)
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+          fi
+          python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Direct E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}-direct-runtime-e2e
+          retention-days: 14
+          path: |
+            build/${{ matrix.target }}-*.pgm
+            build/${{ matrix.target }}-*.pgm.png
+            build/${{ matrix.target }}-e2e.json
+            build/${{ matrix.target }}-summary.png
+            build/e2e/launchers/${{ matrix.target }}.bin
+            build/e2e/e2e.hpc
+          if-no-files-found: warn
