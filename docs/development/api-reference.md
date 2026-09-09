@@ -135,7 +135,7 @@ claim that HP39 exposes a general POSIX filesystem.
 | font/text | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
-| hp4950 stream stdio | — | ✅ | builds but storage probe is Stock-only | 🧪 candidate validates read/create/truncate/write/seek/reopen on HP49g+/HP50g |
+| hp4950 stream stdio | — | ✅ | non-stream families validate clean ENOSYS in the common Stock payload | 🧪 candidate validates read/create/truncate/write/flush/seek+ftell/reopen/remove+ENOENT on HP49g+/HP50g |
 
 HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
 

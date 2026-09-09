@@ -92,8 +92,13 @@ output file. The calculator payload must:
 1. `fopen/fread/fclose` the known input;
 2. open the output as `w+b` and prove create/truncate semantics;
 3. `fwrite` + `fflush`;
-4. seek to a nonzero offset and read back through the same stream;
-5. close, reopen read-only, and prove the old tail was truncated.
+4. seek to a nonzero offset, verify `ftell`, read back through the same
+   stream, and verify the resulting position;
+5. close, reopen read-only, and prove the old tail was truncated;
+6. `remove` the output and require the next `fopen` to fail with
+   `ENOENT`;
+7. on HP39/40 and HP48, require the same stream `fopen` path to fail
+   cleanly with `ENOSYS` without issuing a KOS filesystem call.
 
 The runtime backend underneath those calls is hp4950-only
 `open/close/read/write/lseek/unlink` over the stock KOS filesystem table.
