@@ -87,3 +87,17 @@ The x50ng preparation helper accepts the same three platform names as hpclang: `
 ## HP 39g+ E2E
 
 HP 39g+ remains outside the automated matrices until a real-machine stock flash dump exists. The absence of that fixture must not be hidden by reusing a sibling or foreign bootloader and calling the result native HP39g+ validation.
+
+## CI build stages
+
+The E2E source project is target-independent. CI should therefore avoid rebuilding it once per calculator.
+
+The intended pipeline has three stages:
+
+1. **test application** — build one HPC1 application per test mode (Direct or Stock), including all calculator-testable public SDK coverage;
+2. **platform harness** — prepare the x50ng variant once per `test mode × platform` pair: `hp39`, `hp48`, or `hp4950`;
+3. **target execution** — apply only genuine target metadata such as firmware, bootloader, model ID, stock UI sequence, and transfer mechanism.
+
+The build stage may produce all target launchers from the same HPC1 image so target jobs do not need to download the Arm toolchain merely to relink stage0.
+
+GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
