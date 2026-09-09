@@ -166,9 +166,8 @@ monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
 and the first opaque display-surface primitives pass five-model Direct E2E.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
-full-stock matrices. Owned monochrome surfaces and blitting are now implemented and pass the
-five-model Direct matrix. Their full-stock closure is waiting only on the
-HP48gII stock UI-sequence rerun after a navigation timing flake. The remaining first-slice closure also
+full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
+matrix and the full-stock matrix. The remaining first-slice closure also
 includes a representative application example rather than more bootstrap work.
 
 The minimum cross-platform service set should cover:
