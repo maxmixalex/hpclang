@@ -1,4 +1,4 @@
-# HP39/40 stock launch through the original APLET UI and serial disk.
+# HP39gs stock launch through the original APLET UI and serial disk.
 # The stock ROM mounts the host directory over Kermit, reads HP39DIR.*, then
 # lazily fetches the selected aplet and library when ENTER launches it.
 2000 tap f6

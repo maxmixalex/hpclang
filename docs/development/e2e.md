@@ -55,7 +55,10 @@ Profiles do not carry empty placeholder fields.
 
 ## Sequence files
 
-Human-like key input belongs under `tests/e2e/sequences/`. A sequence is an absolute-time script:
+Human-like stock-UI key input belongs under `tests/e2e/sequences/`. Sequence
+filenames describe the target and lifecycle step (for example
+`hp39gs-stock-run.seq`), not the historical experiment that first established
+the path. A sequence is an absolute-time script:
 
 ```text
 9200 capture files

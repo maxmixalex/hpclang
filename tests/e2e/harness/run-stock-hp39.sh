@@ -16,8 +16,6 @@ FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
 curl -fL --retry 3     "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE"     -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
 unzip -p     "$ROOT/build/$HPCLANG_E2E_ARCHIVE"     "$HPCLANG_E2E_MEMBER"     > "$FIRMWARE"
 
-python3 "$ROOT/tools/hp39-fixture-key.py"     "$TARGET"     "$FIRMWARE"     "$ASSETS_DIR/$TARGET-stock-transfer"     | tee "$ROOT/build/$TARGET-fixture-key.txt"
-
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
 
@@ -45,9 +43,9 @@ export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 if [[ "$TARGET" == hp40gs ]]; then
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp40-serial-fixture-probe.seq"
+    SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
 else
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp39-serial-fixture-probe.seq"
+    SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
 fi
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
