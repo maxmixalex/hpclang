@@ -28,6 +28,7 @@ on:
       - "tests/e2e/**"
       - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 

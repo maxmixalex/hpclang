@@ -17,14 +17,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: build/x50ng/dist
-        key: >-
-          hpclang-x50ng-${{ inputs.mode }}-${{ inputs.family }}-${{ runner.os }}-${{ runner.arch }}-v3-${{
-          hashFiles('tools/prepare-x50ng.py',
-                    'tools/fetch-x50ng.sh',
-                    'tests/e2e/harness/x50ng/e2e-main.c',
-                    'tests/e2e/harness/x50ng/stock-launcher-main.c',
-                    'tests/e2e/harness/x50ng/headless-ui-init.h',
-                    '.github/actions/setup-x50ng/action.yml') }}
+        key: hpclang-x50ng-${{ inputs.mode }}-${{ inputs.family }}-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**', '.github/actions/setup-x50ng/action.yml') }}
 
     - name: Ensure x50ng runtime dependencies
       shell: bash

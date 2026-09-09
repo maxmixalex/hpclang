@@ -107,7 +107,10 @@ jobs:
         with:
           name: e2e-stock-build
           retention-days: 1
-          path: build/e2e-stock/
+          path: |
+            build/e2e-stock/e2e.hpc
+            build/e2e-stock/e2e.result-address
+            build/e2e-stock/launchers/*.hp
           if-no-files-found: error
 
   assets:
