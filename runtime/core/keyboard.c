@@ -38,18 +38,20 @@ void hpclang_keyboard_read(struct hpclang_keyboard_state *state)
     settle();
 
     /*
-     * ON/Alpha/left Shift/right Shift are dedicated GPF inputs on this
-     * calculator generation and read high while pressed.
+     * Four keys bypass the GPG matrix. GPF0 is ON on all validated models.
+     * GPF4/5/6 are preserved as raw physical inputs because their labels
+     * differ: HP39 uses comma/Alpha/Shift, while HP48/49/50 use
+     * Alpha/left-Shift/right-Shift.
      */
     uint32_t gpf = GPFDAT;
     if ((gpf & (1u << 0)) != 0u)
         bits |= UINT64_C(1) << HPCLANG_KEYBOARD_ON;
     if ((gpf & (1u << 4)) != 0u)
-        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_ALPHA;
+        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_GPF4;
     if ((gpf & (1u << 5)) != 0u)
-        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_LEFT_SHIFT;
+        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_GPF5;
     if ((gpf & (1u << 6)) != 0u)
-        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_RIGHT_SHIFT;
+        bits |= UINT64_C(1) << HPCLANG_KEYBOARD_GPF6;
 
     state->bits = bits;
 }
@@ -78,7 +80,7 @@ int hpclang_keyboard_dedicated_is_down(
     enum hpclang_keyboard_dedicated_key key)
 {
     if ((unsigned)key < HPCLANG_KEYBOARD_ON ||
-        (unsigned)key > HPCLANG_KEYBOARD_RIGHT_SHIFT)
+        (unsigned)key > HPCLANG_KEYBOARD_GPF6)
         return 0;
 
     return (int)((state->bits >> (unsigned)key) & UINT64_C(1));

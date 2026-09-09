@@ -61,34 +61,25 @@ int main(void)
     expect_none(&engine, BIT(7), 606999u);
     expect_event(&engine, BIT(7), 607000u, HPCLANG_KEYBOARD_EVENT_REPEAT, 7u);
 
-    /* A held physical shift is attached to subsequent key events. */
-    uint64_t shifted = BIT(7) | BIT(HPCLANG_KEYBOARD_LEFT_SHIFT);
+    /* Dedicated inputs participate in DOWN/UP ordering but never repeat. */
+    uint64_t shifted = BIT(7) | BIT(HPCLANG_KEYBOARD_GPF5);
     expect_none(&engine, shifted, 700000u);
-    struct hpclang_keyboard_event shift_down =
-        expect_event(&engine, shifted, 720000u,
-                     HPCLANG_KEYBOARD_EVENT_DOWN,
-                     HPCLANG_KEYBOARD_LEFT_SHIFT);
-    if ((shift_down.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) == 0u)
-        return EXIT_FAILURE;
+    expect_event(&engine, shifted, 720000u,
+                 HPCLANG_KEYBOARD_EVENT_DOWN,
+                 HPCLANG_KEYBOARD_GPF5);
 
     uint64_t chord = shifted | BIT(8);
     expect_none(&engine, chord, 800000u);
-    struct hpclang_keyboard_event chord_down =
-        expect_event(&engine, chord, 820000u,
-                     HPCLANG_KEYBOARD_EVENT_DOWN, 8u);
-    if ((chord_down.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) == 0u)
-        return EXIT_FAILURE;
+    expect_event(&engine, chord, 820000u,
+                 HPCLANG_KEYBOARD_EVENT_DOWN, 8u);
 
     /* The most recently pressed matrix key becomes the repeat source. */
     expect_none(&engine, chord, 1319999u);
-    struct hpclang_keyboard_event repeated =
-        expect_event(&engine, chord, 1320000u,
-                     HPCLANG_KEYBOARD_EVENT_REPEAT, 8u);
-    if ((repeated.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) == 0u)
-        return EXIT_FAILURE;
+    expect_event(&engine, chord, 1320000u,
+                 HPCLANG_KEYBOARD_EVENT_REPEAT, 8u);
 
-    /* Leave only the dedicated Shift key held; it must never autorepeat. */
-    uint64_t shift_only = BIT(HPCLANG_KEYBOARD_LEFT_SHIFT);
+    /* Leave only the dedicated input held; it must never autorepeat. */
+    uint64_t shift_only = BIT(HPCLANG_KEYBOARD_GPF5);
     expect_none(&engine, shift_only, 1400000u);
     expect_event(&engine, shift_only, 1420000u,
                  HPCLANG_KEYBOARD_EVENT_UP, 7u);
@@ -96,14 +87,10 @@ int main(void)
                  HPCLANG_KEYBOARD_EVENT_UP, 8u);
     expect_none(&engine, shift_only, 2000000u);
 
-    /* Modifier releases report the post-event modifier state. */
     expect_none(&engine, 0u, 2100000u);
-    struct hpclang_keyboard_event shift_up =
-        expect_event(&engine, 0u, 2120000u,
-                     HPCLANG_KEYBOARD_EVENT_UP,
-                     HPCLANG_KEYBOARD_LEFT_SHIFT);
-    if ((shift_up.modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) != 0u)
-        return EXIT_FAILURE;
+    expect_event(&engine, 0u, 2120000u,
+                 HPCLANG_KEYBOARD_EVENT_UP,
+                 HPCLANG_KEYBOARD_GPF5);
 
     /* Timing is configurable and repeat can be disabled without reset. */
     hpclang_keyboard_event_engine_set_timing(&engine, 0u, 100u, 0u);

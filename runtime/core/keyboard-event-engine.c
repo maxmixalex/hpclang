@@ -11,20 +11,6 @@ static int first_set(uint64_t bits)
     return -1;
 }
 
-static uint32_t modifiers(uint64_t bits)
-{
-    uint32_t value = 0u;
-    if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_ON)) != 0u)
-        value |= HPCLANG_KEYBOARD_MOD_ON;
-    if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_ALPHA)) != 0u)
-        value |= HPCLANG_KEYBOARD_MOD_ALPHA;
-    if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_LEFT_SHIFT)) != 0u)
-        value |= HPCLANG_KEYBOARD_MOD_LEFT_SHIFT;
-    if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_RIGHT_SHIFT)) != 0u)
-        value |= HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT;
-    return value;
-}
-
 static void fill_event(
     struct hpclang_keyboard_event *event,
     uint64_t timestamp_us,
@@ -33,7 +19,8 @@ static void fill_event(
     unsigned scan_code)
 {
     event->timestamp_us = timestamp_us;
-    event->modifiers = modifiers(state_bits);
+    (void)state_bits;
+    event->modifiers = 0u;
     event->type = (uint8_t)type;
     event->scan_code = (uint8_t)scan_code;
     event->key = HPCLANG_KEY_UNKNOWN;
