@@ -76,12 +76,14 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_height()` | ✅ | Visible surface height. |
 | `hpclang_surface_levels()` | ✅ | Current physical surfaces report two levels. |
 | `hpclang_surface_clear()` | ✅ | Clear with explicit 0–255 intensity. |
-| `hpclang_surface_get_pixel()` | 🧪 | Read one pixel; out-of-bounds reads white. New in the current change and awaiting the next Direct matrix. |
+| `hpclang_surface_get_pixel()` | ✅ | Read one pixel; out-of-bounds reads white. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_set_pixel()` | ✅ | Clipped pixel write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line; extreme off-screen spans clip before rasterization. |
-| `hpclang_surface_draw_rect()` | 🧪 | Outline rectangle with extent semantics. New in the current change and awaiting the next Direct matrix. |
+| `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
+| `hpclang_surface_blit()` | 🧪 | Representation-independent clipped copy with same-surface overlap support. Current matrix running. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang::surface_ref` | ✅ / 🧪 | Zero-owning C++ wrapper; new readback/outline methods follow the C validation state above. |
+| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | 🧪 | Explicit heap-owned two-level off-screen surface. Current matrix running. |
+| `hpclang::surface_ref` | ✅ / 🧪 | Zero-owning C++ wrapper; readback/outline are validated, while owned-surface/blit runtime coverage is running. |
 
 ## Validation by service
 
@@ -93,7 +95,8 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
 | keyboard events | ✅ | ✅ | 5/5 DOWN/UP PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
-| display get-pixel/draw-rect | ✅ after current change | ✅ after current change | pending next matrix | pending next payload run |
+| owned mono surface + blit | ✅ host | ✅ | current matrix running | current stock matrix running |
+| display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
 
 HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
@@ -134,17 +137,17 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | geometry | `hpg_get_width`, `hpg_get_height` | ✅ `hpclang_surface_width/height`. |
 | clipping state | `hpg_clip_reset`, `hpg_clip_set`, `hpg_clip` | ◐ Every primitive clips to surface bounds; mutable user clip rectangles are not implemented. |
 | clear | `hpg_clear_on`, `hpg_clear` | ✅ `hpclang_surface_clear`; default-screen/global-state variants belong in an adapter. |
-| pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅/🧪 write is validated; readback is awaiting the next five-model gate. |
+| pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅ Canonical read/write primitives are five-model validated; HPG wrappers remain absent. |
 | line | `hpg_draw_line_on`, `hpg_draw_line` | ✅ `hpclang_surface_draw_line`. |
-| rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅/🧪 fill is validated; outline is awaiting the next five-model gate. |
+| rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
 | circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ⬜ |
 | polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ⬜ |
 | fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ⬜ |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ⬜ E2E bitmap glyphs are internal test code, not SDK API. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
 | patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ⬜ |
-| owned images | mono/gray image allocation/free | ⬜ Opaque borrowed surface exists; owned surfaces are later work. |
-| blit | `hpg_blit` | ⬜ |
+| owned images | mono/gray image allocation/free | ◐ Owned mono surfaces are implemented; grayscale variants remain later work. |
+| blit | `hpg_blit` | ◐ Canonical blit is implemented; HPG state/argument adapter remains later work. |
 | XPM | mono/gray XPM loaders | ⬜ Best built above owned surfaces and blit rather than baked into the low-level surface ABI. |
 
 The current canonical primitives provide a clean implementation basis for 13 of the 59 mature HPG declarations when HPG default-screen and `_on` variants are counted separately. Zero HPG source-compatibility wrappers are claimed yet.
@@ -237,9 +240,9 @@ Binary compatibility with old HPGCC executables is not a goal. HPGCC3 custom-ROM
 
 Based on historical stability, example usage and current implementation dependencies:
 
-1. close the new mono readback/outline primitives through the five-model matrix;
+1. close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
 2. measure model-neutral key identities across the three platform families;
-3. add owned mono surfaces and blit before freezing fonts/text;
+3. freeze the first font/text layer on top of the surface ownership/blit boundary;
 4. establish calculator storage/file services and wire standard stdio where semantics fit;
 5. design Saturn/RPL object and stack handles;
 6. only then begin HPG/keyboard/stdio compatibility headers.
