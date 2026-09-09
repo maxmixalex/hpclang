@@ -230,7 +230,7 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
-static int stock_stream_storage_test(uint32_t model)
+static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
         model != HPCLANG_MODEL_HP50G) {
@@ -238,9 +238,9 @@ static int stock_stream_storage_test(uint32_t model)
         FILE *unavailable = fopen("HPCLANG.TST", "rb");
         if (unavailable != NULL) {
             fclose(unavailable);
-            return 0;
+            return 0x31u;
         }
-        return errno == ENOSYS;
+        return errno == ENOSYS ? 0u : 0x32u;
     }
 
     static const char input_expected[] = "HPCLANG-STORAGE\n";
@@ -249,7 +249,7 @@ static int stock_stream_storage_test(uint32_t model)
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)
-        return 0;
+        return 0x33u;
 
     memset(buffer, 0, sizeof(buffer));
     size_t got = fread(
@@ -258,20 +258,24 @@ static int stock_stream_storage_test(uint32_t model)
     if (got != sizeof(input_expected) - 1u ||
         input_close != 0 ||
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
-        return 0;
+        return 0x34u;
 
     FILE *output = fopen("HPCLANG.OUT", "w+b");
     if (output == NULL)
-        return 0;
+        return 0x35u;
 
     size_t written = fwrite(
         output_expected, 1u, sizeof(output_expected) - 1u, output);
     if (written != sizeof(output_expected) - 1u ||
-        fflush(output) != 0 ||
-        fseek(output, 7L, SEEK_SET) != 0 ||
+        fflush(output) != 0) {
+        fclose(output);
+        return 0x36u;
+    }
+
+    if (fseek(output, 7L, SEEK_SET) != 0 ||
         ftell(output) != 7L) {
         fclose(output);
-        return 0;
+        return 0x37u;
     }
 
     memset(buffer, 0, sizeof(buffer));
@@ -280,15 +284,15 @@ static int stock_stream_storage_test(uint32_t model)
         memcmp(buffer, "write", 5u) != 0 ||
         ftell(output) != 12L) {
         fclose(output);
-        return 0;
+        return 0x38u;
     }
 
     if (fclose(output) != 0)
-        return 0;
+        return 0x39u;
 
     output = fopen("HPCLANG.OUT", "rb");
     if (output == NULL)
-        return 0;
+        return 0x3au;
 
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(buffer), output);
@@ -297,19 +301,19 @@ static int stock_stream_storage_test(uint32_t model)
     if (output_close != 0 ||
         got != sizeof(output_expected) - 1u ||
         memcmp(buffer, output_expected, sizeof(output_expected) - 1u) != 0)
-        return 0;
+        return 0x3bu;
 
     if (remove("HPCLANG.OUT") != 0)
-        return 0;
+        return 0x3cu;
 
     errno = 0;
     output = fopen("HPCLANG.OUT", "rb");
     if (output != NULL) {
         fclose(output);
-        return 0;
+        return 0x3du;
     }
 
-    return errno == ENOENT;
+    return errno == ENOENT ? 0u : 0x3eu;
 }
 #endif
 
@@ -767,8 +771,9 @@ int main(void)
         return finish(0x12, boot->model);
 
 #ifdef HPCLANG_E2E_STORAGE
-    if (!stock_stream_storage_test(boot->model))
-        return finish(0x13, boot->model);
+    uint32_t storage_failure = stock_stream_storage_test(boot->model);
+    if (storage_failure != 0u)
+        return finish(storage_failure, boot->model);
 #endif
 
 #ifdef HPCLANG_E2E_KEYBOARD
