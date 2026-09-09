@@ -151,6 +151,8 @@ Before freezing the public service API:
 - [x] inventory the relevant HPGCC3 public interfaces separately;
 - [x] classify the major historical API families as direct source-compatible,
   compatibility-adapter, migration-only, or intentionally unsupported;
+- [x] publish a progress-oriented API reference with per-service validation and
+  HPGCC 1.0.3 / 1.1 / 2.0 SP2 / HPGCC3 comparison;
 - [ ] finish ownership, error, coordinate, string/buffer, and capability-query
   conventions for the remaining services;
 - [x] define the C ABI boundary and C++ wrapper policy;
