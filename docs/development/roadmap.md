@@ -9,11 +9,11 @@ HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures,
 and automated E2E.
 
 They do **not** mean that hpclang already reproduces the application-facing
-feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. At the current stage the public
-hpclang headers expose the execution ABI, bootstrap contract, and model/family
-identity. Common calculator services such as graphics, keyboard input, timers,
-files/storage, Saturn/RPL object exchange, and higher-level UI facilities are
-still future SDK work.
+feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device
+facts, monotonic time, the complete five-model physical keyboard/event core, and
+the first opaque display/surface primitives. Font/text, broader graphics,
+files/storage, Saturn/RPL object exchange, and higher-level UI facilities remain
+application-facing SDK work.
 
 hpclang is also not intended to be binary-compatible with historical HPGCC
 executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
@@ -161,16 +161,15 @@ Before freezing the public service API:
 
 See [SDK API design](sdk-design.md).
 
-M7.1 implementation is active. Device information, stock-preserving
-monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
-the complete source-backed physical-key identity tables for the five automated
-models pass host tests and a full 51-key-per-model Direct E2E matrix covering
-every physical key position. The full Stock matrix remains green as the
-regression gate. The complete keyboard
-tables use the historical HPGCC 49/50 matrix, the HPGCC 1.1-39G HP39 keycodes,
-and the validated S3C2410 scan layout; Direct E2E exercises both common ENTER
-and a family-specific key identity. HP39g+ key identity remains UNKNOWN until
-its blocked real-machine fixture is available.
+M7.1 implementation is active. Device information and the stock-preserving
+monotonic clock are stable. The keyboard slice is closed for every automated
+model: raw snapshots, debounce/repeat events, complete source-backed physical
+key identities, normalized modifier state, and all 51 physical keys pass the
+five-model Direct matrix. The final LCD evidence is arranged in physical
+calculator-keyboard geometry rather than electrical scan order. The mapping is
+grounded in the historical HPGCC 49/50 table, HPGCC 1.1-39G HP39 keycodes, and
+the validated S3C2410 scan layout. HP39g+ key identity remains UNKNOWN until its
+blocked real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct

@@ -83,7 +83,7 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct PASS; full-stock HP48 rerun pending after an unrelated UI-sequence flake. |
+| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct and full-stock matrices PASS. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
 
 ## Validation by service
