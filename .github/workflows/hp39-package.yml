@@ -74,9 +74,14 @@ jobs:
 
           for target in hp39gplus hp39gs hp40gs; do
             root="dist/$target-hardware-validation"
-            tools/package-hp39-aplet.sh               "build/package/launchers/$target.hp"               "$root"               "$target"
+            tools/package-hp39-aplet.sh \
+              "build/package/launchers/$target.hp" \
+              "$root" \
+              "$target"
             cp build/package/e2e.result-address "$root/E2E_RESULT_ADDRESS.txt"
-            printf 'commit=%s\nworkflow_run=%s\n'               "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$root/BUILD_INFO.txt"
+            printf 'commit=%s\nworkflow_run=%s\n' \
+              "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+              > "$root/BUILD_INFO.txt"
           done
 
       - name: Upload HP39g+ hardware validation bundle

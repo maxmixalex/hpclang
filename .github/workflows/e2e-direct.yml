@@ -91,7 +91,10 @@ jobs:
         with:
           name: e2e-direct-build
           retention-days: 1
-          path: build/e2e-direct/
+          path: |
+            build/e2e-direct/e2e.hpc
+            build/e2e-direct/e2e.result-address
+            build/e2e-direct/launchers/*.bin
           if-no-files-found: error
 
   platform:
