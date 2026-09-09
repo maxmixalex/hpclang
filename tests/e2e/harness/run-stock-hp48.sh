@@ -52,7 +52,9 @@ export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 
-timeout 200s "$ROOT/build/x50ng/dist/x50ng"     --datadir="$STATE"     --overwrite-config     --style="$ROOT/build/x50ng/dist/style-40g.css" &
+# The post-transfer sequence now starts after the host's full 35s + 70s
+# transfer window. Keep enough process lifetime for the final 60s PASS monitor.
+timeout 220s "$ROOT/build/x50ng/dist/x50ng"     --datadir="$STATE"     --overwrite-config     --style="$ROOT/build/x50ng/dist/style-40g.css" &
 X50_PID=$!
 
 # The sequence waits until the stock FILES menu has settled in Kermit server
