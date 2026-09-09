@@ -2,5 +2,6 @@
   "target": "hp39gplus",
   "family": "hp39",
   "model": 1,
-  "lcd_height": 64
+  "lcd_height": 64,
+  "automated_e2e": false
 }

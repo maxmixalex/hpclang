@@ -204,7 +204,13 @@ static int keyboard_transition(void)
     hpclang_keyboard_read(&raw);
     if (hpclang_keyboard_any_is_down(&raw))
         return 0;
+    if (hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ON) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ALPHA) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_LEFT_SHIFT) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_RIGHT_SHIFT))
+        return 0;
 
+    hpclang_keyboard_events_set_timing(5000u, 500000u, 0u);
     hpclang_keyboard_events_reset();
 
     struct hpclang_keyboard_event event;
