@@ -1,8 +1,10 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
@@ -307,13 +309,24 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x3cu;
 
     errno = 0;
+    int missing_fd = open("HPCLANG.OUT", O_RDONLY);
+    if (missing_fd >= 0) {
+        close(missing_fd);
+        return 0x3du;
+    }
+    if (errno != ENOENT)
+        return 0x40u + ((uint32_t)errno & 0x3fu);
+
+    errno = 0;
     output = fopen("HPCLANG.OUT", "rb");
     if (output != NULL) {
         fclose(output);
-        return 0x3du;
+        return 0x7du;
     }
 
-    return errno == ENOENT ? 0u : 0x3eu;
+    return errno == ENOENT
+        ? 0u
+        : 0x80u + ((uint32_t)errno & 0x7fu);
 }
 #endif
 
