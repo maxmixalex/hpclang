@@ -19,20 +19,6 @@ runs:
         path: build/x50ng/dist
         key: hpclang-x50ng-${{ inputs.mode }}-${{ inputs.family }}-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**', '.github/actions/setup-x50ng/action.yml') }}
 
-    - name: Ensure x50ng runtime dependencies
-      shell: bash
-      run: |
-        packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
-        missing=()
-        for package in "${packages[@]}"; do
-          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
-            grep -q 'ok installed' || missing+=("$package")
-        done
-        if (( ${#missing[@]} )); then
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "${missing[@]}"
-        fi
-
     - name: Install x50ng build dependencies
       if: steps.x50ng-cache.outputs.cache-hit != 'true'
       shell: bash

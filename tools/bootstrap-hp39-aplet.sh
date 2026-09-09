@@ -11,6 +11,13 @@ URL='https://sourceforge.net/projects/hpgcc/files/hpgcc/HPGCC-1.1%20with%2039G%2
 
 mkdir -p "$CACHE"
 
+if [[ -f "$SDK/.hpclang-prepared" &&
+      -f "$SDK/src/hp2aplet.c" &&
+      -f "$SDK/data/LIB275L.L39" ]]; then
+    echo "$SDK"
+    exit 0
+fi
+
 if [[ ! -f "$PKG" ]]; then
     curl -fL --retry 3 --retry-delay 2 "$URL" -o "$PKG"
 fi
@@ -20,5 +27,6 @@ mkdir -p "$RAW" "$SDK"
 
 innoextract -s -d "$RAW" "$PKG" >/dev/null
 python3 "$ROOT/tools/prepare-hp39-aplet.py" "$RAW" "$SDK"
+touch "$SDK/.hpclang-prepared"
 
 echo "$SDK"

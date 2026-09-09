@@ -102,7 +102,6 @@ jobs:
     runs-on: home-docker
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         family: [hp39, hp48, hp4950]
     steps:
@@ -114,6 +113,17 @@ jobs:
           mode: direct
           family: ${{ matrix.family }}
 
+      - name: Pack x50ng platform
+        run: tar -C build/x50ng -cf "build/x50ng-direct-${{ matrix.family }}.tar" dist
+
+      - name: Upload x50ng platform
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-direct-${{ matrix.family }}
+          retention-days: 1
+          path: build/x50ng-direct-${{ matrix.family }}.tar
+          if-no-files-found: error
+
   target:
     name: ${{ matrix.target }}
     needs: [build, platform]
@@ -121,7 +131,6 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - target: hp39gs
@@ -146,11 +155,16 @@ jobs:
           name: e2e-direct-build
           path: build/e2e
 
-      - name: Restore x50ng platform
-        uses: ./.github/actions/setup-x50ng
+      - name: Download x50ng platform
+        uses: actions/download-artifact@v7
         with:
-          mode: direct
-          family: ${{ matrix.family }}
+          name: x50ng-direct-${{ matrix.family }}
+          path: build/platform
+
+      - name: Unpack x50ng platform
+        run: |
+          mkdir -p build/x50ng
+          tar -C build/x50ng -xf "build/platform/x50ng-direct-${{ matrix.family }}.tar"
 
       - name: Prepare platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh direct "${{ matrix.family }}"

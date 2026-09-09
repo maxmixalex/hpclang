@@ -14,6 +14,9 @@ on:
       - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
@@ -29,6 +32,9 @@ on:
       - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 
@@ -38,6 +44,7 @@ concurrency:
 
 jobs:
   runtime:
+    name: Runtime and unit tests
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
@@ -62,7 +69,81 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build unified E2E project
+      - name: Build hardware-validation E2E
         run: |
           chmod +x tools/build-e2e.sh
           tools/build-e2e.sh hardware "$GITHUB_WORKSPACE/build/e2e"
+
+      - name: Upload hardware-validation build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-hardware-build
+          retention-days: 1
+          path: |
+            build/e2e/e2e.result-address
+            build/e2e/launchers/hp39gplus.hp
+            build/e2e/launchers/hp39gs.hp
+            build/e2e/launchers/hp40gs.hp
+          if-no-files-found: error
+
+  hp39-package:
+    name: HP39 package
+    needs: runtime
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download hardware-validation build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-hardware-build
+          path: build/package
+
+      - name: Install HP39 packaging dependency
+        run: |
+          if ! command -v innoextract >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Restore prepared HPGCC39 cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Prepare hardware-validation packages
+        run: |
+          chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
+          tools/bootstrap-hp39-aplet.sh
+
+          for target in hp39gplus hp39gs hp40gs; do
+            root="dist/$target-hardware-validation"
+            tools/package-hp39-aplet.sh               "build/package/launchers/$target.hp"               "$root"               "$target"
+            cp build/package/e2e.result-address "$root/E2E_RESULT_ADDRESS.txt"
+            printf 'commit=%s\nworkflow_run=%s\n'               "$GITHUB_SHA" "$GITHUB_RUN_ID"               > "$root/BUILD_INFO.txt"
+          done
+
+      - name: Upload HP39g+ hardware validation bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hpclang-hp39gplus-hardware-validation
+          retention-days: 30
+          path: dist/hp39gplus-hardware-validation/
+          if-no-files-found: error
+
+      - name: Upload HP39gs hardware validation bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hpclang-hp39gs-hardware-validation
+          retention-days: 30
+          path: dist/hp39gs-hardware-validation/
+          if-no-files-found: error
+
+      - name: Upload HP40gs hardware validation bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hpclang-hp40gs-hardware-validation
+          retention-days: 30
+          path: dist/hp40gs-hardware-validation/
+          if-no-files-found: error
