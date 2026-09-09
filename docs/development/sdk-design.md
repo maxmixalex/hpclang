@@ -385,8 +385,8 @@ new primitives close through the same gate before being marked validated. Raster
 from physical-display acquisition and has host tests for packed-pixel padding,
 rectangle clipping, and extreme off-screen line clipping. The visible runtime
 validation page draws through this API instead of accessing the LCD framebuffer
-directly. Broader HPG compatibility still requires owned images, blitting,
-fonts, clip state and additional drawing primitives.
+directly. Broader HPG compatibility still requires HPG-compatible image allocation and
+blit adapters, fonts/text, clip state, and additional drawing primitives.
 
 Together these services are sufficient for a small interactive program and can
 be validated without first solving persistent storage or RPL object lifetime.
