@@ -163,9 +163,13 @@ See [SDK API design](sdk-design.md).
 
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
-the measured 30-key model-neutral physical identity layer, and the first
-opaque display-surface primitives pass five-model Direct E2E. HP39g+ key
-identity remains UNKNOWN until its blocked real-machine fixture is available.
+the first measured 30-key model-neutral physical identity slice, and the first
+opaque display-surface primitives pass five-model Direct E2E. Keyboard identity
+is not considered complete at 30 keys: all remaining physical keys on each
+validated model (including model-specific primary keys such as SIN/COS/TAN,
+APLET/FILES, and their counterparts) must be measured and represented rather
+than guessed. HP39g+ key identity remains UNKNOWN until its blocked
+real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
@@ -175,7 +179,9 @@ includes a representative application example rather than more bootstrap work.
 The minimum cross-platform service set should cover:
 
 - display and framebuffer/graphics primitives;
-- keyboard scanning and key events;
+- keyboard scanning and key events, including complete physical-key identity
+  coverage for every validated model before the keyboard service is considered
+  closed;
 - monotonic time, delays, and timers;
 - files and storage where the calculator exposes them;
 - calculator/Saturn object exchange;
