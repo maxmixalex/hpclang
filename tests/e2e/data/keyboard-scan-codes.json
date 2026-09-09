@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "method": "x50ng semantic physical-key injection -> hpclang_keyboard_event_poll() raw scan_code",
+  "measurement_commit": "546b4ef8c7b4faea1354c2259e01614d6d94791f",
+  "x50ng_revision": "003533d9eca3f6ded36c6ab80b8dbc0563e31d9a",
+  "evidence": [
+    {
+      "workflow_run": 34311729901,
+      "job": 102339843342,
+      "targets": [
+        "hp39gs",
+        "hp40gs"
+      ]
+    },
+    {
+      "workflow_run": 34311768574,
+      "job": 102339991226,
+      "targets": [
+        "hp48gii"
+      ]
+    },
+    {
+      "workflow_run": 34311729901,
+      "job": 102339843261,
+      "targets": [
+        "hp49gplus",
+        "hp50g"
+      ]
+    }
+  ],
+  "models": {
+    "hp39gs": {
+      "status": "pass",
+      "scan_codes": {
+        "0": 27,
+        "1": 26,
+        "2": 19,
+        "3": 12,
+        "4": 25,
+        "5": 18,
+        "6": 11,
+        "7": 24,
+        "8": 17,
+        "9": 10,
+        "f1": 35,
+        "f2": 36,
+        "f3": 37,
+        "f4": 38,
+        "f5": 39,
+        "f6": 40,
+        "up": 42,
+        "down": 44,
+        "left": 43,
+        "right": 45,
+        "enter": 6,
+        "period": 20,
+        "divide": 2,
+        "multiply": 3,
+        "minus": 4,
+        "plus": 5,
+        "alpha": 57,
+        "left_shift": 58,
+        "right_shift": 59,
+        "on": 56
+      }
+    },
+    "hp40gs": {
+      "status": "pass",
+      "scan_codes": {
+        "0": 27,
+        "1": 26,
+        "2": 19,
+        "3": 12,
+        "4": 25,
+        "5": 18,
+        "6": 11,
+        "7": 24,
+        "8": 17,
+        "9": 10,
+        "f1": 35,
+        "f2": 36,
+        "f3": 37,
+        "f4": 38,
+        "f5": 39,
+        "f6": 40,
+        "up": 42,
+        "down": 44,
+        "left": 43,
+        "right": 45,
+        "enter": 6,
+        "period": 20,
+        "divide": 2,
+        "multiply": 3,
+        "minus": 4,
+        "plus": 5,
+        "alpha": 57,
+        "left_shift": 58,
+        "right_shift": 59,
+        "on": 56
+      }
+    },
+    "hp48gii": {
+      "status": "pass",
+      "scan_codes": {
+        "0": 27,
+        "1": 26,
+        "2": 19,
+        "3": 12,
+        "4": 25,
+        "5": 18,
+        "6": 11,
+        "7": 24,
+        "8": 17,
+        "9": 10,
+        "f1": 35,
+        "f2": 36,
+        "f3": 37,
+        "f4": 38,
+        "f5": 39,
+        "f6": 40,
+        "up": 42,
+        "down": 44,
+        "left": 43,
+        "right": 45,
+        "enter": 6,
+        "period": 20,
+        "divide": 2,
+        "multiply": 3,
+        "minus": 4,
+        "plus": 5,
+        "alpha": 57,
+        "left_shift": 58,
+        "right_shift": 59,
+        "on": 56
+      }
+    },
+    "hp49gplus": {
+      "status": "pass",
+      "scan_codes": {
+        "0": 27,
+        "1": 26,
+        "2": 19,
+        "3": 12,
+        "4": 25,
+        "5": 18,
+        "6": 11,
+        "7": 24,
+        "8": 17,
+        "9": 10,
+        "f1": 35,
+        "f2": 36,
+        "f3": 37,
+        "f4": 38,
+        "f5": 39,
+        "f6": 40,
+        "up": 42,
+        "down": 44,
+        "left": 43,
+        "right": 45,
+        "enter": 6,
+        "period": 20,
+        "divide": 2,
+        "multiply": 3,
+        "minus": 4,
+        "plus": 5,
+        "alpha": 57,
+        "left_shift": 58,
+        "right_shift": 59,
+        "on": 56
+      }
+    },
+    "hp50g": {
+      "status": "pass",
+      "scan_codes": {
+        "0": 27,
+        "1": 26,
+        "2": 19,
+        "3": 12,
+        "4": 25,
+        "5": 18,
+        "6": 11,
+        "7": 24,
+        "8": 17,
+        "9": 10,
+        "f1": 35,
+        "f2": 36,
+        "f3": 37,
+        "f4": 38,
+        "f5": 39,
+        "f6": 40,
+        "up": 42,
+        "down": 44,
+        "left": 43,
+        "right": 45,
+        "enter": 6,
+        "period": 20,
+        "divide": 2,
+        "multiply": 3,
+        "minus": 4,
+        "plus": 5,
+        "alpha": 57,
+        "left_shift": 58,
+        "right_shift": 59,
+        "on": 56
+      }
+    },
+    "hp39gplus": {
+      "status": "not_measured",
+      "reason": "blocked on trustworthy real-machine stock flash fixture"
+    }
+  }
+}

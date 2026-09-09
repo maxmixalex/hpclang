@@ -19,6 +19,9 @@ target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(keyboard_events test_keyboard_events.c "${HPCLANG_ROOT}/runtime/core/keyboard-event-engine.c")
 target_include_directories(test_keyboard_events PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(keyboard_keys test_keyboard_keys.c "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
+target_include_directories(test_keyboard_keys PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(display test_display.c "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_display PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 

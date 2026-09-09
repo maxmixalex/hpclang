@@ -67,6 +67,49 @@ enum hpclang_keyboard_modifier {
 };
 
 /*
+ * Model-neutral physical key identities.
+ *
+ * These values name only keys whose raw scan positions have been measured on
+ * HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains UNKNOWN until a
+ * trustworthy real-machine fixture is available.
+ *
+ * This layer does not perform Alpha/Shift-plane or text translation.
+ */
+enum hpclang_key {
+    HPCLANG_KEY_UNKNOWN = 0,
+    HPCLANG_KEY_F1 = 1,
+    HPCLANG_KEY_F2 = 2,
+    HPCLANG_KEY_F3 = 3,
+    HPCLANG_KEY_F4 = 4,
+    HPCLANG_KEY_F5 = 5,
+    HPCLANG_KEY_F6 = 6,
+    HPCLANG_KEY_UP = 7,
+    HPCLANG_KEY_DOWN = 8,
+    HPCLANG_KEY_LEFT = 9,
+    HPCLANG_KEY_RIGHT = 10,
+    HPCLANG_KEY_ENTER = 11,
+    HPCLANG_KEY_0 = 12,
+    HPCLANG_KEY_1 = 13,
+    HPCLANG_KEY_2 = 14,
+    HPCLANG_KEY_3 = 15,
+    HPCLANG_KEY_4 = 16,
+    HPCLANG_KEY_5 = 17,
+    HPCLANG_KEY_6 = 18,
+    HPCLANG_KEY_7 = 19,
+    HPCLANG_KEY_8 = 20,
+    HPCLANG_KEY_9 = 21,
+    HPCLANG_KEY_PERIOD = 22,
+    HPCLANG_KEY_DIVIDE = 23,
+    HPCLANG_KEY_MULTIPLY = 24,
+    HPCLANG_KEY_MINUS = 25,
+    HPCLANG_KEY_PLUS = 26,
+    HPCLANG_KEY_ALPHA = 27,
+    HPCLANG_KEY_LEFT_SHIFT = 28,
+    HPCLANG_KEY_RIGHT_SHIFT = 29,
+    HPCLANG_KEY_ON = 30
+};
+
+/*
  * Debounced keyboard event.
  *
  * scan_code uses the same hpclang raw encoding as hpclang_keyboard_state:
@@ -74,13 +117,17 @@ enum hpclang_keyboard_modifier {
  * physical scan identity, not a model-neutral key label.
  *
  * modifiers describes the stable held modifier state after this event.
+ *
+ * key is a fixed-width ABI slot containing one enum hpclang_key value. It is
+ * HPCLANG_KEY_UNKNOWN when this scan position has no verified portable
+ * identity on the current model.
  */
 struct hpclang_keyboard_event {
     uint64_t timestamp_us;
     uint32_t modifiers;
     uint8_t type;
     uint8_t scan_code;
-    uint16_t reserved;
+    uint16_t key;
 };
 
 /*

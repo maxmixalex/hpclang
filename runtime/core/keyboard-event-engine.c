@@ -36,7 +36,7 @@ static void fill_event(
     event->modifiers = modifiers(state_bits);
     event->type = (uint8_t)type;
     event->scan_code = (uint8_t)scan_code;
-    event->reserved = 0u;
+    event->key = HPCLANG_KEY_UNKNOWN;
 }
 
 void hpclang_keyboard_event_engine_init(

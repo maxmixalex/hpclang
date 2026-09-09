@@ -222,6 +222,8 @@ static int keyboard_transition(void)
             continue;
         if (event.type == HPCLANG_KEYBOARD_EVENT_DOWN &&
             event.scan_code < 60u) {
+            if (event.key != HPCLANG_KEY_ENTER)
+                return 0;
             down_scan = (int)event.scan_code;
             break;
         }
@@ -236,7 +238,7 @@ static int keyboard_transition(void)
             continue;
         if (event.type == HPCLANG_KEYBOARD_EVENT_UP &&
             event.scan_code == (uint8_t)down_scan)
-            return 1;
+            return event.key == HPCLANG_KEY_ENTER;
     }
 
     return 0;
