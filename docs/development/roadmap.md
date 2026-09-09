@@ -163,13 +163,13 @@ See [SDK API design](sdk-design.md).
 
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
-the initial common-key scan probe, the complete source-backed physical-key
-identity tables for the five automated models, and the first opaque
-display-surface primitives pass their host/build gates. The complete keyboard
+the initial common-key scan probe and the complete source-backed physical-key
+identity tables for the five automated models pass host tests and five-model
+Direct E2E, while the full Stock matrix remains green. The complete keyboard
 tables use the historical HPGCC 49/50 matrix, the HPGCC 1.1-39G HP39 keycodes,
-and the validated S3C2410 scan layout; Direct E2E also exercises a
-family-specific key identity. HP39g+ key identity remains UNKNOWN until its
-blocked real-machine fixture is available.
+and the validated S3C2410 scan layout; Direct E2E exercises both common ENTER
+and a family-specific key identity. HP39g+ key identity remains UNKNOWN until
+its blocked real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct

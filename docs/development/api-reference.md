@@ -62,7 +62,7 @@ The application-facing surface currently lives in:
 | `hpclang_keyboard_events_reset()` | ✅ | Establish current stable baseline without synthetic DOWN events. |
 | `hpclang_keyboard_events_set_timing()` | ✅ | Configure debounce and repeat timing. |
 | `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and model-neutral physical key identity. |
-| `enum hpclang_key` / `event.key` | 🧪 | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g are implemented from the historical HPGCC/HP39 key tables plus the validated raw scan layout. Common keys keep common enum values; layout-specific keys use `HP39_`, `HP48_`, or `HP4950_` values. HP39g+ remains UNKNOWN pending its real fixture. |
+| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g are implemented from the historical HPGCC/HP39 key tables plus the validated raw scan layout. Common keys keep common enum values; layout-specific keys use `HP39_`, `HP48_`, or `HP4950_` values. A common ENTER and a family-specific raw position pass five-model Direct E2E. HP39g+ remains UNKNOWN pending its real fixture. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
 
 ## Display and surfaces
