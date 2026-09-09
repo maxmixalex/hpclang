@@ -260,6 +260,32 @@ remain deferred until every platform has an explicit save/restore contract and
 Stock E2E proves clean return. Software off-screen buffering does not have this
 restriction.
 
+The source audit makes the physical-buffer requirements concrete. The S3C2410
+LCD controller scans a 160-pixel-wide line even though the application-visible
+calculator area is 131 pixels wide. Historical `sys_lcdsetmode()` therefore
+uses 20, 40, or 80 bytes per scan line for mono, 4-level, or 16-level mode and
+programs the lower DMA bound using `height + 5` scan lines. Its HPG wrapper
+also aligns the framebuffer to 16 bytes. A future hardware mode backend must
+derive those controller dimensions from platform data rather than treating the
+131-pixel surface stride as the DMA stride.
+
+More importantly, the framebuffer must be physically contiguous. Historical
+HPG obtains ordinary heap candidates and accepts one only when the virtual
+range maps to one continuous physical memory class, then cleans cache before
+handing the physical address to the LCD controller. HPC1 cannot assume that
+about its normal heap: ARMToolbox stage1 explicitly assembles the writable
+arena from an array of independently mapped 4 KiB physical pages. A physical
+grayscale/page-flip API therefore needs a platform-owned contiguous/DMA buffer
+allocator or reserved pool. It must not expose that requirement through the
+ordinary `hpclang_surface` storage ABI.
+
+Before any such backend is enabled, Direct E2E now gates LCD ownership
+preservation. It snapshots stable S3C2410 LCD configuration before HPC1 and
+compares it at the return sentinel, before harness restoration. Dynamic
+interrupt pending/source registers are intentionally excluded. Future physical
+mode switching must explicitly restore this state rather than relying on the
+host harness to repair it.
+
 Historical HPG's PAINT/XOR mode and repeating fill patterns are likewise
 graphics-context policy rather than surface representation. The clean core
 should not grow mutable `color/mode/pattern/font` fields to imitate

@@ -309,6 +309,12 @@ matter to the adapter design:
   horizontal spans; polygon filling uses a scanline edge algorithm;
 - physical mode changes and `hpg_flip` manipulate LCD mode/buffer ownership,
   including physical framebuffer allocation and LCD address registers.
+- the controller-side scan width is 160 pixels, so physical line storage is
+  20/40/80 bytes in mono/4-level/16-level mode even though HPG exposes a
+  131-pixel logical width;
+- historical physical buffers are 16-byte aligned and accepted only when their
+  virtual allocation maps to a physically continuous range; this is a DMA
+  requirement, not an `hpg_t` layout detail.
 
 These facts do **not** imply that the clean core should reproduce `hpg_t`.
 Geometry and software surfaces can be implemented independently beneath an HPG

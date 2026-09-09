@@ -28,7 +28,13 @@ The canonical runtime test validates:
 - `snprintf`;
 - machine-readable `0x50415353` plus visible `RUNTIME PASS`.
 
-The Direct emulator gate additionally verifies that temporary mappings and the SWI vector are restored before the stock calculator resumes.
+The Direct emulator gate additionally verifies that temporary mappings and the
+SWI vector are restored before the stock calculator resumes. It also snapshots
+stable S3C2410 LCD controller configuration (`LCDCON1..5`,
+`LCDSADDR1..3`, LUT/dither/TPAL, interrupt mask and LPCSEL) before HPC1 and
+requires an exact match at the return sentinel. Dynamic interrupt
+pending/source registers are excluded. This comparison occurs before harness
+restoration, so display-state damage cannot be hidden by host cleanup.
 
 ## HP 39gs real-hardware gate
 
