@@ -19,15 +19,21 @@ struct hpclang_surface;
 struct hpclang_surface *hpclang_display_surface(void);
 
 /*
- * Allocate an owned two-level surface initialized to white. The returned
- * surface has the same opaque drawing contract as the physical display but is
- * backed by process heap memory. Return NULL if allocation fails.
+ * Allocate an owned surface initialized to white. levels must be 2, 4, or 16;
+ * those correspond to 1, 2, or 4 implementation-private bits per pixel.
+ * Return NULL for unsupported levels, zero geometry, or allocation failure.
  */
+struct hpclang_surface *hpclang_surface_create(
+    uint32_t width,
+    uint32_t height,
+    uint32_t levels);
+
+/* Convenience constructor for a two-level owned surface. */
 struct hpclang_surface *hpclang_surface_create_mono(
     uint32_t width,
     uint32_t height);
 
-/* Release a surface returned by hpclang_surface_create_mono(). */
+/* Release a surface returned by an hpclang owned-surface constructor. */
 void hpclang_surface_destroy(struct hpclang_surface *surface);
 
 uint32_t hpclang_surface_width(const struct hpclang_surface *surface);
@@ -37,8 +43,9 @@ uint32_t hpclang_surface_levels(const struct hpclang_surface *surface);
 /*
  * Drawing coordinates use a top-left origin. Operations clip to the surface.
  *
- * intensity uses 0 for white and 255 for black. The current physical display
- * has two levels, so intermediate values are thresholded internally.
+ * intensity uses 0 for white and 255 for black. Each surface quantizes that
+ * range to its advertised level count; the current physical display has two
+ * levels while owned software surfaces may have 2, 4, or 16.
  */
 void hpclang_surface_clear(
     struct hpclang_surface *surface,
@@ -46,7 +53,9 @@ void hpclang_surface_clear(
 
 /*
  * Read one pixel as an hpclang intensity. Out-of-bounds coordinates read as
- * white (0). The current two-level display returns either 0 or 255.
+ * white (0). Returned values are expanded back to the 0..255 intensity
+ * range: 2-level surfaces return 0/255, 4-level surfaces 0/85/170/255, and
+ * 16-level surfaces multiples of 17.
  */
 uint8_t hpclang_surface_get_pixel(
     const struct hpclang_surface *surface,

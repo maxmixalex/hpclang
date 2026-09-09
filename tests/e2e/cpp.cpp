@@ -113,5 +113,23 @@ extern "C" int hpclang_e2e_cpp_test(void)
         return 7;
     }
     hpclang_surface_destroy(owned_raw);
+
+    hpclang_surface *gray_raw = hpclang_surface_create(4u, 1u, 4u);
+    if (gray_raw == nullptr)
+        return 8;
+    hpclang::surface_ref gray{gray_raw};
+    gray.set_pixel(0, 0, 0u);
+    gray.set_pixel(1, 0, 64u);
+    gray.set_pixel(2, 0, 128u);
+    gray.set_pixel(3, 0, 255u);
+    if (gray.levels() != 4u ||
+        gray.get_pixel(0, 0) != 0u ||
+        gray.get_pixel(1, 0) != 85u ||
+        gray.get_pixel(2, 0) != 170u ||
+        gray.get_pixel(3, 0) != 255u) {
+        hpclang_surface_destroy(gray_raw);
+        return 8;
+    }
+    hpclang_surface_destroy(gray_raw);
     return 0;
 }

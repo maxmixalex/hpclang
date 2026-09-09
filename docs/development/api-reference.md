@@ -85,7 +85,7 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | 🧪 | Explicit `hpclang_point` arrays; closed outline and even-odd fill with boundary inclusion. |
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct and full-stock matrices PASS. |
+| `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | 🧪 | Opaque heap-owned 2/4/16-level software surfaces; mono convenience retained. Packing stays private and cross-level blit uses the common intensity contract. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
 
 ## Fonts and text
@@ -116,7 +116,7 @@ core use case requires them.
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
 | keyboard events + key identity | ✅ | ✅ | 5/5 full 51-key DOWN/UP + scan + identity + modifier matrix PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
-| owned mono surface + blit | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
+| owned 2/4/16-level surface + blit | 🧪 | ✅ | candidate running | candidate running |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
 
@@ -167,7 +167,7 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | 🧪 Canonical explicit-surface character/text drawing is implemented and replaces the E2E-only glyph table; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
 | patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ⬜ |
-| owned images | mono/gray image allocation/free | ◐ Owned mono surfaces are implemented; grayscale variants remain later work. |
+| owned images | mono/gray image allocation/free | 🧪 Generic 2/4/16-level software surfaces now cover the clean-core ownership model; HPG constructors remain adapter work. |
 | blit | `hpg_blit` | ◐ Canonical blit is implemented; HPG state/argument adapter remains later work. |
 | XPM | mono/gray XPM loaders | ⬜ Best built above owned surfaces and blit rather than baked into the low-level surface ABI. |
 

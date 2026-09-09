@@ -13,9 +13,46 @@ enum clip_code {
     CLIP_BOTTOM = 1u << 3
 };
 
-static int black(uint8_t intensity)
+static uint32_t bits_per_pixel(uint32_t levels)
 {
-    return intensity >= 128u;
+    switch (levels) {
+    case 2u:
+        return 1u;
+    case 4u:
+        return 2u;
+    case 16u:
+        return 4u;
+    default:
+        return 0u;
+    }
+}
+
+static uint8_t quantize_intensity(uint8_t intensity, uint32_t bits)
+{
+    return (uint8_t)(intensity >> (8u - bits));
+}
+
+static uint8_t expand_intensity(uint8_t value, uint32_t bits)
+{
+    switch (bits) {
+    case 1u:
+        return value != 0u ? 255u : 0u;
+    case 2u:
+        return (uint8_t)(value * 85u);
+    case 4u:
+        return (uint8_t)(value * 17u);
+    default:
+        return 0u;
+    }
+}
+
+static uint8_t repeated_pixel_byte(uint8_t value, uint32_t bits)
+{
+    if (bits == 1u)
+        return value != 0u ? UINT8_C(0xff) : 0u;
+    if (bits == 2u)
+        return (uint8_t)(value | (value << 2) | (value << 4) | (value << 6));
+    return (uint8_t)(value | (value << 4));
 }
 
 static uint64_t magnitude(int64_t value)
@@ -122,15 +159,22 @@ static int clip_line(
     }
 }
 
-struct hpclang_surface *hpclang_surface_create_mono(
+struct hpclang_surface *hpclang_surface_create(
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    uint32_t levels)
 {
-    if (width == 0u || height == 0u)
+    uint32_t bits = bits_per_pixel(levels);
+    if (width == 0u || height == 0u || bits == 0u)
         return NULL;
 
-    uint32_t stride = (width >> 3) + ((width & 7u) != 0u);
-    if (height > SIZE_MAX / stride)
+    uint64_t row_bits = (uint64_t)width * bits;
+    uint64_t stride64 = (row_bits + 7u) >> 3;
+    if (stride64 == 0u || stride64 > UINT32_MAX)
+        return NULL;
+
+    uint32_t stride = (uint32_t)stride64;
+    if ((size_t)height > SIZE_MAX / (size_t)stride)
         return NULL;
 
     size_t bytes = (size_t)stride * height;
@@ -149,8 +193,15 @@ struct hpclang_surface *hpclang_surface_create_mono(
     surface->width = width;
     surface->height = height;
     surface->stride = stride;
-    surface->levels = 2u;
+    surface->levels = levels;
     return surface;
+}
+
+struct hpclang_surface *hpclang_surface_create_mono(
+    uint32_t width,
+    uint32_t height)
+{
+    return hpclang_surface_create(width, height, 2u);
 }
 
 void hpclang_surface_destroy(struct hpclang_surface *surface)
@@ -181,9 +232,15 @@ void hpclang_surface_clear(
     struct hpclang_surface *surface,
     uint8_t intensity)
 {
-    uint32_t full_bytes = surface->width >> 3;
-    uint32_t tail_bits = surface->width & 7u;
-    uint8_t value = black(intensity) ? UINT8_C(0xff) : 0u;
+    uint32_t bits = bits_per_pixel(surface->levels);
+    if (bits == 0u)
+        return;
+
+    uint64_t visible_bits = (uint64_t)surface->width * bits;
+    uint32_t full_bytes = (uint32_t)(visible_bits >> 3);
+    uint32_t tail_bits = (uint32_t)(visible_bits & 7u);
+    uint8_t value = repeated_pixel_byte(
+        quantize_intensity(intensity, bits), bits);
 
     for (uint32_t y = 0u; y < surface->height; ++y) {
         volatile uint8_t *row = surface->pixels + y * surface->stride;
@@ -210,10 +267,17 @@ uint8_t hpclang_surface_get_pixel(
         (uint32_t)y >= surface->height)
         return 0u;
 
+    uint32_t bits = bits_per_pixel(surface->levels);
+    if (bits == 0u)
+        return 0u;
+
+    uint32_t bit_index = (uint32_t)x * bits;
     const volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride + ((uint32_t)x >> 3);
-    uint8_t mask = (uint8_t)(1u << ((uint32_t)x & 7u));
-    return (*pixel & mask) != 0u ? 255u : 0u;
+        surface->pixels + (uint32_t)y * surface->stride + (bit_index >> 3);
+    uint32_t shift = bit_index & 7u;
+    uint8_t mask = (uint8_t)((1u << bits) - 1u);
+    uint8_t value = (uint8_t)((*pixel >> shift) & mask);
+    return expand_intensity(value, bits);
 }
 
 void hpclang_surface_set_pixel(
@@ -227,14 +291,21 @@ void hpclang_surface_set_pixel(
         (uint32_t)y >= surface->height)
         return;
 
-    volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride + ((uint32_t)x >> 3);
-    uint8_t mask = (uint8_t)(1u << ((uint32_t)x & 7u));
+    uint32_t bits = bits_per_pixel(surface->levels);
+    if (bits == 0u)
+        return;
 
-    if (black(intensity))
-        *pixel |= mask;
-    else
-        *pixel &= (uint8_t)~mask;
+    uint32_t bit_index = (uint32_t)x * bits;
+    volatile uint8_t *pixel =
+        surface->pixels + (uint32_t)y * surface->stride + (bit_index >> 3);
+    uint32_t shift = bit_index & 7u;
+    uint8_t field_mask =
+        (uint8_t)(((1u << bits) - 1u) << shift);
+    uint8_t value =
+        (uint8_t)(quantize_intensity(intensity, bits) << shift);
+
+    *pixel = (uint8_t)((*pixel & (uint8_t)~field_mask) |
+                       (value & field_mask));
 }
 
 static void draw_line(
