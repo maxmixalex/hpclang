@@ -228,6 +228,67 @@ static int display_height(uint32_t model)
         : 64;
 }
 
+#ifdef HPCLANG_E2E_STORAGE
+static int stock_stream_storage_test(uint32_t model)
+{
+    if (model != HPCLANG_MODEL_HP49GPLUS &&
+        model != HPCLANG_MODEL_HP50G)
+        return 1;
+
+    static const char input_expected[] = "HPCLANG-STORAGE\n";
+    static const char output_expected[] = "stream-write-seek";
+    char buffer[32];
+
+    FILE *input = fopen("HPCLANG.TST", "rb");
+    if (input == NULL)
+        return 0;
+
+    memset(buffer, 0, sizeof(buffer));
+    size_t got = fread(
+        buffer, 1u, sizeof(input_expected) - 1u, input);
+    int input_close = fclose(input);
+    if (got != sizeof(input_expected) - 1u ||
+        input_close != 0 ||
+        memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
+        return 0;
+
+    FILE *output = fopen("HPCLANG.OUT", "w+b");
+    if (output == NULL)
+        return 0;
+
+    size_t written = fwrite(
+        output, 1u, sizeof(output_expected) - 1u);
+    if (written != sizeof(output_expected) - 1u ||
+        fflush(output) != 0 ||
+        fseek(output, 7L, SEEK_SET) != 0) {
+        fclose(output);
+        return 0;
+    }
+
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, 5u, output);
+    if (got != 5u || memcmp(buffer, "write", 5u) != 0) {
+        fclose(output);
+        return 0;
+    }
+
+    if (fclose(output) != 0)
+        return 0;
+
+    output = fopen("HPCLANG.OUT", "rb");
+    if (output == NULL)
+        return 0;
+
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    int output_close = fclose(output);
+
+    return output_close == 0 &&
+           got == sizeof(output_expected) - 1u &&
+           memcmp(buffer, output_expected, sizeof(output_expected) - 1u) == 0;
+}
+#endif
+
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
 static int enter_pressed(void)
 {
@@ -680,6 +741,11 @@ int main(void)
 
     if (hpclang_e2e_cpp_test() != 0)
         return finish(0x12, boot->model);
+
+#ifdef HPCLANG_E2E_STORAGE
+    if (!stock_stream_storage_test(boot->model))
+        return finish(0x13, boot->model);
+#endif
 
 #ifdef HPCLANG_E2E_KEYBOARD
     if (!keyboard_transition(boot->model))

@@ -8,6 +8,7 @@ include("${HPCLANG_ROOT}/cmake/profiles/hpclang-v1.cmake")
 
 option(HPCLANG_E2E_WAIT_FOR_ENTER "Wait for ENTER on the result screen" OFF)
 option(HPCLANG_E2E_KEYBOARD "Exercise injected keyboard transitions" OFF)
+option(HPCLANG_E2E_STORAGE "Exercise stock stream-storage stdio path" OFF)
 
 add_executable(hpclang_e2e
     ${HPCLANG_RUNTIME_START}
@@ -29,6 +30,9 @@ if(HPCLANG_E2E_WAIT_FOR_ENTER)
 endif()
 if(HPCLANG_E2E_KEYBOARD)
     target_compile_definitions(hpclang_e2e PRIVATE HPCLANG_E2E_KEYBOARD=1)
+endif()
+if(HPCLANG_E2E_STORAGE)
+    target_compile_definitions(hpclang_e2e PRIVATE HPCLANG_E2E_STORAGE=1)
 endif()
 
 target_link_options(hpclang_e2e PRIVATE
