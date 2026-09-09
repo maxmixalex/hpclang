@@ -14,7 +14,7 @@ add_executable(hpclang_e2e
     ${HPCLANG_RUNTIME}
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
-    "${HPCLANG_ROOT}/runtime/libc/sbrk.c"
+    ${HPCLANG_LIBC}
     main.c
     cpp.cpp)
 
