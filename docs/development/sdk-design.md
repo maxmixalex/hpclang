@@ -109,6 +109,34 @@ M7.0 now mechanically inventories the public headers from complete HPGCC
 function-level compatibility matrix is recorded in
 [HPGCC compatibility inventory](hpgcc-compat.md).
 
+## Execution environment and hardware ownership
+
+hpclang separates **service semantics** from **hardware ownership policy**.
+
+The currently validated calculator path is stock-hosted: the HP operating
+system launches HPC1 code and expects control back afterwards. In that
+environment, platform code should borrow hardware state where practical,
+avoid unconditionally replacing stock IRQ/timer configuration, and restore any
+temporary state it changes. This reduces ROM-version coupling and makes clean
+return a meaningful contract.
+
+That rule must not be generalized into "hpclang never owns interrupts or
+timers". A hpclang-controlled bootloader or operating system has a different
+contract: it is responsible for initializing and owning the interrupt
+controller, clocks, timers, display, keyboard interrupts, DMA, and other
+hardware needed by the system.
+
+The public service layer should therefore remain usable in both environments.
+For example, keyboard events can be produced by synchronous GPIO polling in a
+stock-hosted backend and by an IRQ-fed queue in a bare-metal backend without
+changing the application-facing event representation. Likewise, monotonic time
+can observe a stock-configured timer today and use an hpclang-configured timer
+under 39gsX later.
+
+Do not freeze a public execution-environment enum until code genuinely needs
+one. For now this is an implementation/ownership boundary, not another target
+axis in the application ABI.
+
 ## Core API design rules
 
 ### Ownership and allocation
@@ -183,9 +211,17 @@ snapshot and emits `DOWN`, `UP`, and `REPEAT` events. Repeat timing is
 configurable, and each event carries the physically held ON/Alpha/left-Shift/
 right-Shift modifiers.
 
-The event service deliberately does **not** install an IRQ or background timer.
-Calling code drives progress by polling, so hpclang keeps ownership of the stock
-interrupt/timer configuration unchanged.
+The current **stock-hosted backend** deliberately does not install a keyboard
+IRQ or background timer. Calling code drives progress by polling, so an
+application launched from the HP OS does not steal interrupt/timer ownership
+from the environment it must later return to.
+
+This is a backend policy, not a permanent hpclang API or HPC1 restriction.
+A future bare-metal bootloader or hpclang-owned system such as 39gsX may own the
+interrupt controller and timers, feed the same event API from an IRQ-driven
+queue, and implement delays/deadlines from hpclang-managed timers. Application
+code should not have to change merely because the execution environment owns
+more of the hardware.
 
 It also does not implement sticky shift planes, Alpha lock, text translation,
 or model-neutral key labels yet. HPGCC3 combined those policies with an

@@ -26,7 +26,10 @@ executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
 - no required GCC, historical HPGCC runtime, or ROM replacement;
 - historical code is research evidence, not a compatibility mode;
 - emulator fixtures are generated or prepared from verified inputs rather than committed as opaque calculator-state snapshots;
-- model-specific differences remain metadata or platform code unless they genuinely require a different implementation.
+- model-specific differences remain metadata or platform code unless they genuinely require a different implementation;
+- stock-hosted backends preserve host hardware ownership where practical; a
+  future hpclang-owned bootloader/OS may own IRQs, timers, clocks and peripherals
+  without changing the application-facing service APIs.
 
 ## M0 — Unified application ABI
 
