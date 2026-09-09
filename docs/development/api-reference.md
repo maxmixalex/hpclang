@@ -62,8 +62,8 @@ The application-facing surface currently lives in:
 | `hpclang_keyboard_events_reset()` | ✅ | Establish current stable baseline without synthetic DOWN events. |
 | `hpclang_keyboard_events_set_timing()` | ✅ | Configure debounce and repeat timing. |
 | `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and physical key identity. |
-| `enum hpclang_key` / `event.key` | 🧪 | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g. Common keys keep common enum values; layout-specific keys use model/family prefixes. HP49g+ CAT/EQW and HP50g EVAL/quote are represented separately because those two primary labels differ at the same physical positions. Full 51-key Direct E2E pending this change. HP39g+ remains UNKNOWN pending its real fixture. |
-| `HPCLANG_KEYBOARD_MOD_SHIFT` | 🧪 | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. Five-model held-Shift Direct validation pending this change. |
+| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g. Common keys keep common enum values; layout-specific keys use model/family prefixes. HP49g+ CAT/EQW and HP50g EVAL/quote are represented separately because those two primary labels differ at the same physical positions. All 51 physical keys pass Direct E2E on all five automated models. HP39g+ remains UNKNOWN pending its real fixture. |
+| `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. Dedicated modifier state is exercised as part of the five-model 51-key Direct matrix. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
 
 ## Display and surfaces
@@ -94,7 +94,7 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | device info | — | ✅ | 5/5 PASS | covered by common payload |
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
-| keyboard events + key identity | ✅ | ✅ | full 51-key DOWN/UP + scan + identity + modifier matrix pending this change | not separately asserted |
+| keyboard events + key identity | ✅ | ✅ | 5/5 full 51-key DOWN/UP + scan + identity + modifier matrix PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
 | owned mono surface + blit | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |

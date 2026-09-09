@@ -106,3 +106,13 @@ Stock additionally prepares transfer/launcher assets once before the three famil
 x50ng's cache is for cross-run reuse. The workflows do not repack a freshly prepared x50ng tree into an intra-run artifact merely to hand it to target jobs; the family job owns both platform preparation and target execution. Build artifacts are reserved for the HPC1 application/launchers and genuinely shared Stock assets.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
+
+
+## Full-keyboard Direct validation
+
+Direct E2E injects every physical key position on each automated calculator
+model. The guest verifies DOWN/UP events, raw scan code, physical key identity,
+and dedicated-key modifier state for all 51 keys. Its final LCD screen renders
+a compact self-test-style matrix: passed positions are filled, and a failing
+position is left open and marked. The machine-readable result remains the
+actual gate; the LCD matrix is only a visual summary of the same checks.

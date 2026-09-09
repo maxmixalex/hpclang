@@ -243,15 +243,17 @@ Application code should not have to change merely because the execution
 environment owns more of the hardware.
 
 The event layer now also carries a **physical key identity** in `event.key`.
-The first Direct probe measured the common raw scan positions across all five
-automated models. Complete key identities are then filled from the historical
+The first Direct measurement established the common raw scan positions across
+all five automated models. Complete key identities are then filled from the historical
 keyboard tables instead of re-measuring every documented key: the stable
 HPGCC 1.1/2.0/HPGCC3 matrix table for HP49/50, the HPGCC 1.1-39G HP39
 `HEADER.H` keycodes plus the validated matrix layout for HP39gs/40gs, and the
 same documented electrical matrix for HP48gII. Direct E2E injects every one of the 51 physical key positions on each
 automated model and checks DOWN/UP, raw scan code, physical identity, and
-dedicated-key modifier state. This also preserves the HP49g+ CAT/EQW versus
-HP50g EVAL/quote primary-label distinction at their shared physical positions. The one-off scan probe is not a
+dedicated-key modifier state. The final guest screen renders a compact
+self-test-style key matrix so the same result is visible in LCD evidence. This
+also preserves the HP49g+ CAT/EQW versus HP50g EVAL/quote primary-label
+distinction at their shared physical positions. The one-off scan probe is not a
 runtime input and is not retained as repository data after its mapping has been
 incorporated into source and regression tests.
 
