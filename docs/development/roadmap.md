@@ -163,7 +163,9 @@ See [SDK API design](sdk-design.md).
 
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
-and the first opaque display-surface primitives pass five-model Direct E2E.
+the measured 30-key model-neutral physical identity layer, and the first
+opaque display-surface primitives pass five-model Direct E2E. HP39g+ key
+identity remains UNKNOWN until its blocked real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct

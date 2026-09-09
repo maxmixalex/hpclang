@@ -61,8 +61,8 @@ The application-facing surface currently lives in:
 | `hpclang_keyboard_dedicated_is_down()` | ✅ | ON, Alpha, left Shift, right Shift. |
 | `hpclang_keyboard_events_reset()` | ✅ | Establish current stable baseline without synthetic DOWN events. |
 | `hpclang_keyboard_events_set_timing()` | ✅ | Configure debounce and repeat timing. |
-| `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp and held modifiers. |
-| model-neutral key identity | ⬜ | Must be measured across families; raw scan coordinates are deliberately not portable key names. |
+| `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and model-neutral physical key identity. |
+| `enum hpclang_key` / `event.key` | ✅ | 30 common physical keys measured identically on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Unmeasured keys and HP39g+ report `HPCLANG_KEY_UNKNOWN`. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
 
 ## Display and surfaces
@@ -93,7 +93,7 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | device info | — | ✅ | 5/5 PASS | covered by common payload |
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
-| keyboard events | ✅ | ✅ | 5/5 DOWN/UP PASS | not separately asserted |
+| keyboard events + key identity | ✅ | ✅ | 5/5 DOWN/UP + ENTER identity PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
 | owned mono surface + blit | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
@@ -161,10 +161,10 @@ HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented hel
 | raw physical matrix | `keyb_getmatrix`, `keyb_isKeyPressed` | ✅ Native raw snapshot and coordinate query. Historical logical matrix numbering is not reused. |
 | any key | `keyb_isAnyKeyPressed` | ✅ |
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
-| arrows | `keyb_isLeft/Right/Up/Down` | ⬜ Waiting for measured model-neutral key identities. |
+| arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the five-model measured `hpclang_key` set. |
 | blocking wait | `keyb_waitKeyPressed` | ◐ Can be built by polling event/time services; no canonical blocking helper yet. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ DOWN/UP/REPEAT exists; historical key-plane/text translation does not. |
-| matrix keycode helpers | `keyb_isKeyPrM`, `keyb_isShiftKeyPrM` | ↪ Adapter concern after model-neutral identity is measured. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ DOWN/UP/REPEAT plus measured physical key identity exist; historical key-plane/text translation does not. |
+| matrix keycode helpers | `keyb_isKeyPrM`, `keyb_isShiftKeyPrM` | ↪ Adapter concern above the measured hpclang raw/semantic layers. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP message machinery | ◐ hpclang event semantics exist, but the stock backend is deliberately polled and does not copy HPGCC3 global queue/IRQ ownership. |
 
 ## Time, system and machine control
@@ -240,9 +240,9 @@ Binary compatibility with old HPGCC executables is not a goal. HPGCC3 custom-ROM
 
 Based on historical stability, example usage and current implementation dependencies:
 
-1. close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
-2. measure model-neutral key identities across the three platform families;
-3. freeze the first font/text layer on top of the surface ownership/blit boundary;
+1. ✅ close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
+2. ✅ measure and expose model-neutral physical key identities across the three validated platform families;
+3. **Next:** freeze the first font/text layer on top of the surface ownership/blit boundary;
 4. establish calculator storage/file services and wire standard stdio where semantics fit;
 5. design Saturn/RPL object and stack handles;
 6. only then begin HPG/keyboard/stdio compatibility headers.

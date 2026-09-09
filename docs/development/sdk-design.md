@@ -236,16 +236,24 @@ queue, and implement delays/deadlines from environment-managed timers.
 Application code should not have to change merely because the execution
 environment owns more of the hardware.
 
-It also does not implement sticky shift planes, Alpha lock, text translation,
-or model-neutral key labels yet. HPGCC3 combined those policies with an
-asynchronous message queue; hpclang keeps them above the physical/debounce
-layer. A future compatibility adapter can synthesize HPGCC-style
-`KEYDN/PRESS/KEYUP`, repeat, and shift-plane behavior from hpclang events
-without making those historical policies the core API.
+The event layer now also carries a model-neutral **physical key identity** in
+`event.key`. Thirty common keys (F1–F6, arrows, Enter, digits, decimal point,
+the four arithmetic operators, Alpha, both Shifts, and ON) were injected and
+measured through the public event API on HP39gs, HP40gs, HP48gII, HP49g+, and
+HP50g. All five produced the same raw scan mapping. The measured evidence is
+kept under `tests/e2e/data/keyboard-scan-codes.json`; the mapping is not
+inferred from the historical HP49g+ table.
 
-Model-neutral key identities will be added only after scan mappings have been
-measured across `hp39`, `hp48`, and `hp4950`, rather than inferred from
-the documented HP49g+ layout.
+HP39g+ deliberately returns `HPCLANG_KEY_UNKNOWN` until its real-machine
+fixture exists and the same measurement can be repeated there. Unmeasured
+physical scan positions also remain UNKNOWN instead of being guessed.
+
+Sticky shift planes, Alpha lock, and text translation are still higher layers.
+HPGCC3 combined those policies with an asynchronous message queue; hpclang
+keeps them above the physical/debounce layer. A future compatibility adapter
+can synthesize HPGCC-style `KEYDN/PRESS/KEYUP`, repeat, and shift-plane
+behavior from hpclang events without making those historical policies the core
+API.
 
 ### Time
 
@@ -342,10 +350,11 @@ clock are already implemented. The time service does not reconfigure the stock
 PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
 than deadlock if the stock clock service becomes unavailable.
 
-Raw keyboard state and the polled debounce/repeat event service are now
-implemented and pass the five-model Direct matrix. Model-neutral key
-translation remains deliberately pending until cross-family scan mappings are
-measured.
+Raw keyboard state, the polled debounce/repeat event service, and the first
+model-neutral physical-key identity layer are now implemented. The 30-key
+mapping is measured across all five automated models, and Direct E2E checks the
+semantic ENTER identity through the same public event path. Text/Alpha/Shift
+plane translation remains a separate higher layer.
 
 The first opaque display surface and clipped clear/pixel-readback/pixel-write/
 line/outline-rectangle/fill-rectangle primitives form the current primitive
