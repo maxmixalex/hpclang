@@ -81,6 +81,47 @@ void hpclang_surface_draw_rect(
     uint8_t intensity);
 
 /*
+ * Circles use an integer center/radius. A negative radius is a no-op.
+ * Rasterization is clipped before iterating visible rows/columns, so very
+ * large off-screen circles do not cause work proportional to their radius.
+ */
+void hpclang_surface_draw_circle(
+    struct hpclang_surface *surface,
+    int32_t center_x,
+    int32_t center_y,
+    int32_t radius,
+    uint8_t intensity);
+
+void hpclang_surface_fill_circle(
+    struct hpclang_surface *surface,
+    int32_t center_x,
+    int32_t center_y,
+    int32_t radius,
+    uint8_t intensity);
+
+struct hpclang_point {
+    int32_t x;
+    int32_t y;
+};
+
+/*
+ * Polygon vertices are connected in order and the last vertex is connected
+ * back to the first. Fill uses the even-odd rule. A NULL/empty polygon is a
+ * no-op; one- and two-point fills degrade to the corresponding outline.
+ */
+void hpclang_surface_draw_polygon(
+    struct hpclang_surface *surface,
+    const struct hpclang_point *points,
+    uint32_t point_count,
+    uint8_t intensity);
+
+void hpclang_surface_fill_polygon(
+    struct hpclang_surface *surface,
+    const struct hpclang_point *points,
+    uint32_t point_count,
+    uint8_t intensity);
+
+/*
  * Copy a rectangular source region to a destination surface. Source and
  * destination coordinates are clipped together so their pixel correspondence
  * is preserved. Overlap on the same surface is supported.

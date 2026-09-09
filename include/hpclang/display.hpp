@@ -2,6 +2,7 @@
 #define HPCLANG_DISPLAY_HPP
 
 #include <cstdint>
+#include <span>
 
 #include <hpclang/display.h>
 
@@ -69,6 +70,44 @@ public:
     {
         ::hpclang_surface_draw_rect(
             surface_, x, y, width, height, intensity);
+    }
+
+    void draw_circle(
+        std::int32_t center_x,
+        std::int32_t center_y,
+        std::int32_t radius,
+        std::uint8_t intensity) const noexcept
+    {
+        ::hpclang_surface_draw_circle(
+            surface_, center_x, center_y, radius, intensity);
+    }
+
+    void fill_circle(
+        std::int32_t center_x,
+        std::int32_t center_y,
+        std::int32_t radius,
+        std::uint8_t intensity) const noexcept
+    {
+        ::hpclang_surface_fill_circle(
+            surface_, center_x, center_y, radius, intensity);
+    }
+
+    void draw_polygon(
+        std::span<const ::hpclang_point> points,
+        std::uint8_t intensity) const noexcept
+    {
+        ::hpclang_surface_draw_polygon(
+            surface_, points.data(),
+            static_cast<std::uint32_t>(points.size()), intensity);
+    }
+
+    void fill_polygon(
+        std::span<const ::hpclang_point> points,
+        std::uint8_t intensity) const noexcept
+    {
+        ::hpclang_surface_fill_polygon(
+            surface_, points.data(),
+            static_cast<std::uint32_t>(points.size()), intensity);
     }
 
     void blit_from(

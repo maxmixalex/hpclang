@@ -75,7 +75,7 @@ extern "C" int hpclang_e2e_cpp_test(void)
     surface.draw_rect(-10, -10, 2, 2, 255u);
     surface.fill_rect(-10, -10, 2, 2, 255u);
 
-    hpclang_surface *owned_raw = hpclang_surface_create_mono(2u, 2u);
+    hpclang_surface *owned_raw = hpclang_surface_create_mono(12u, 12u);
     if (owned_raw == nullptr)
         return 4;
 
@@ -92,6 +92,25 @@ extern "C" int hpclang_e2e_cpp_test(void)
     if (owned.get_pixel(1, 0) != 255u) {
         hpclang_surface_destroy(owned_raw);
         return 5;
+    }
+
+    owned.clear(0u);
+    owned.draw_circle(5, 5, 3, 255u);
+    if (owned.get_pixel(5, 2) != 255u ||
+        owned.get_pixel(5, 5) != 0u) {
+        hpclang_surface_destroy(owned_raw);
+        return 7;
+    }
+
+    constexpr std::array<hpclang_point, 3> triangle{{
+        {1, 1}, {9, 1}, {5, 9},
+    }};
+    owned.clear(0u);
+    owned.fill_polygon(triangle, 255u);
+    if (owned.get_pixel(5, 4) != 255u ||
+        owned.get_pixel(0, 10) != 0u) {
+        hpclang_surface_destroy(owned_raw);
+        return 7;
     }
     hpclang_surface_destroy(owned_raw);
     return 0;

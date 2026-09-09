@@ -309,6 +309,294 @@ void hpclang_surface_draw_rect(
         draw_line(surface, right, top, right, bottom, intensity);
 }
 
+
+static uint32_t integer_sqrt(uint64_t value)
+{
+    uint64_t result = 0u;
+    uint64_t bit = UINT64_C(1) << 62;
+
+    while (bit > value)
+        bit >>= 2;
+
+    while (bit != 0u) {
+        if (value >= result + bit) {
+            value -= result + bit;
+            result = (result >> 1) + bit;
+        } else {
+            result >>= 1;
+        }
+        bit >>= 2;
+    }
+
+    return (uint32_t)result;
+}
+
+static int64_t accessible_max(uint32_t extent)
+{
+    if (extent == 0u)
+        return -1;
+    return extent - 1u > (uint32_t)INT32_MAX
+        ? INT32_MAX
+        : (int64_t)extent - 1;
+}
+
+static void fill_span(
+    struct hpclang_surface *surface,
+    int64_t x0,
+    int64_t x1,
+    int64_t y,
+    uint8_t intensity)
+{
+    int64_t xmax = accessible_max(surface->width);
+    int64_t ymax = accessible_max(surface->height);
+
+    if (xmax < 0 || ymax < 0 || y < 0 || y > ymax ||
+        x1 < 0 || x0 > xmax)
+        return;
+
+    if (x0 < 0)
+        x0 = 0;
+    if (x1 > xmax)
+        x1 = xmax;
+
+    for (int64_t x = x0; x <= x1; ++x)
+        hpclang_surface_set_pixel(
+            surface, (int32_t)x, (int32_t)y, intensity);
+}
+
+static int circle_bounds(
+    const struct hpclang_surface *surface,
+    int32_t center_x,
+    int32_t center_y,
+    int32_t radius,
+    int64_t *left,
+    int64_t *top,
+    int64_t *right,
+    int64_t *bottom)
+{
+    if (radius < 0)
+        return 0;
+
+    int64_t xmax = accessible_max(surface->width);
+    int64_t ymax = accessible_max(surface->height);
+    if (xmax < 0 || ymax < 0)
+        return 0;
+
+    int64_t r = radius;
+    int64_t raw_left = (int64_t)center_x - r;
+    int64_t raw_top = (int64_t)center_y - r;
+    int64_t raw_right = (int64_t)center_x + r;
+    int64_t raw_bottom = (int64_t)center_y + r;
+
+    if (raw_right < 0 || raw_bottom < 0 ||
+        raw_left > xmax || raw_top > ymax)
+        return 0;
+
+    *left = raw_left < 0 ? 0 : raw_left;
+    *top = raw_top < 0 ? 0 : raw_top;
+    *right = raw_right > xmax ? xmax : raw_right;
+    *bottom = raw_bottom > ymax ? ymax : raw_bottom;
+    return 1;
+}
+
+void hpclang_surface_draw_circle(
+    struct hpclang_surface *surface,
+    int32_t center_x,
+    int32_t center_y,
+    int32_t radius,
+    uint8_t intensity)
+{
+    int64_t left;
+    int64_t top;
+    int64_t right;
+    int64_t bottom;
+
+    if (!circle_bounds(
+            surface, center_x, center_y, radius,
+            &left, &top, &right, &bottom))
+        return;
+
+    uint64_t r = (uint32_t)radius;
+    uint64_t radius_squared = r * r;
+
+    for (int64_t y = top; y <= bottom; ++y) {
+        uint64_t dy = magnitude(y - center_y);
+        uint64_t dx = integer_sqrt(radius_squared - dy * dy);
+        int64_t x0 = (int64_t)center_x - (int64_t)dx;
+        int64_t x1 = (int64_t)center_x + (int64_t)dx;
+
+        if (x0 >= left && x0 <= right)
+            hpclang_surface_set_pixel(
+                surface, (int32_t)x0, (int32_t)y, intensity);
+        if (x1 != x0 && x1 >= left && x1 <= right)
+            hpclang_surface_set_pixel(
+                surface, (int32_t)x1, (int32_t)y, intensity);
+    }
+
+    for (int64_t x = left; x <= right; ++x) {
+        uint64_t dx = magnitude(x - center_x);
+        uint64_t dy = integer_sqrt(radius_squared - dx * dx);
+        int64_t y0 = (int64_t)center_y - (int64_t)dy;
+        int64_t y1 = (int64_t)center_y + (int64_t)dy;
+
+        if (y0 >= top && y0 <= bottom)
+            hpclang_surface_set_pixel(
+                surface, (int32_t)x, (int32_t)y0, intensity);
+        if (y1 != y0 && y1 >= top && y1 <= bottom)
+            hpclang_surface_set_pixel(
+                surface, (int32_t)x, (int32_t)y1, intensity);
+    }
+}
+
+void hpclang_surface_fill_circle(
+    struct hpclang_surface *surface,
+    int32_t center_x,
+    int32_t center_y,
+    int32_t radius,
+    uint8_t intensity)
+{
+    int64_t left;
+    int64_t top;
+    int64_t right;
+    int64_t bottom;
+
+    if (!circle_bounds(
+            surface, center_x, center_y, radius,
+            &left, &top, &right, &bottom))
+        return;
+
+    (void)left;
+    (void)right;
+
+    uint64_t r = (uint32_t)radius;
+    uint64_t radius_squared = r * r;
+
+    for (int64_t y = top; y <= bottom; ++y) {
+        uint64_t dy = magnitude(y - center_y);
+        uint64_t dx = integer_sqrt(radius_squared - dy * dy);
+        fill_span(
+            surface,
+            (int64_t)center_x - (int64_t)dx,
+            (int64_t)center_x + (int64_t)dx,
+            y,
+            intensity);
+    }
+}
+
+void hpclang_surface_draw_polygon(
+    struct hpclang_surface *surface,
+    const struct hpclang_point *points,
+    uint32_t point_count,
+    uint8_t intensity)
+{
+    if (points == NULL || point_count == 0u)
+        return;
+
+    if (point_count == 1u) {
+        hpclang_surface_set_pixel(
+            surface, points[0].x, points[0].y, intensity);
+        return;
+    }
+
+    for (uint32_t i = 0u; i < point_count; ++i) {
+        uint32_t next = i + 1u == point_count ? 0u : i + 1u;
+        draw_line(
+            surface,
+            points[i].x,
+            points[i].y,
+            points[next].x,
+            points[next].y,
+            intensity);
+    }
+}
+
+static int polygon_contains(
+    const struct hpclang_point *points,
+    uint32_t point_count,
+    int64_t x,
+    int64_t y)
+{
+    int inside = 0;
+    uint32_t previous = point_count - 1u;
+
+    for (uint32_t current = 0u; current < point_count; ++current) {
+        int64_t x0 = points[previous].x;
+        int64_t y0 = points[previous].y;
+        int64_t x1 = points[current].x;
+        int64_t y1 = points[current].y;
+
+        if ((y0 > y) != (y1 > y)) {
+            int64_t intersection = x0 + scaled_delta(
+                x1 - x0, y - y0, y1 - y0);
+            if (x < intersection)
+                inside = !inside;
+        }
+
+        previous = current;
+    }
+
+    return inside;
+}
+
+void hpclang_surface_fill_polygon(
+    struct hpclang_surface *surface,
+    const struct hpclang_point *points,
+    uint32_t point_count,
+    uint8_t intensity)
+{
+    if (points == NULL || point_count == 0u)
+        return;
+
+    if (point_count < 3u) {
+        hpclang_surface_draw_polygon(
+            surface, points, point_count, intensity);
+        return;
+    }
+
+    int64_t min_x = points[0].x;
+    int64_t max_x = points[0].x;
+    int64_t min_y = points[0].y;
+    int64_t max_y = points[0].y;
+
+    for (uint32_t i = 1u; i < point_count; ++i) {
+        if (points[i].x < min_x)
+            min_x = points[i].x;
+        if (points[i].x > max_x)
+            max_x = points[i].x;
+        if (points[i].y < min_y)
+            min_y = points[i].y;
+        if (points[i].y > max_y)
+            max_y = points[i].y;
+    }
+
+    int64_t xmax = accessible_max(surface->width);
+    int64_t ymax = accessible_max(surface->height);
+    if (xmax < 0 || ymax < 0 ||
+        max_x < 0 || max_y < 0 || min_x > xmax || min_y > ymax)
+        return;
+
+    if (min_x < 0)
+        min_x = 0;
+    if (min_y < 0)
+        min_y = 0;
+    if (max_x > xmax)
+        max_x = xmax;
+    if (max_y > ymax)
+        max_y = ymax;
+
+    for (int64_t y = min_y; y <= max_y; ++y) {
+        for (int64_t x = min_x; x <= max_x; ++x) {
+            if (polygon_contains(points, point_count, x, y))
+                hpclang_surface_set_pixel(
+                    surface, (int32_t)x, (int32_t)y, intensity);
+        }
+    }
+
+    /* Boundary pixels are part of a filled polygon. */
+    hpclang_surface_draw_polygon(
+        surface, points, point_count, intensity);
+}
+
 void hpclang_surface_blit(
     struct hpclang_surface *destination,
     int32_t destination_x,

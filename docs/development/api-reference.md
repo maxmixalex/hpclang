@@ -81,6 +81,8 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_set_pixel()` | ✅ | Clipped pixel write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line; extreme off-screen spans clip before rasterization. |
 | `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
+| `hpclang_surface_draw_circle()` / `hpclang_surface_fill_circle()` | 🧪 | Integer-radius circles clipped to visible rows/columns before rasterization; extreme radii do not imply radius-sized loops. |
+| `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | 🧪 | Explicit `hpclang_point` arrays; closed outline and even-odd fill with boundary inclusion. |
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
 | `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct and full-stock matrices PASS. |
@@ -159,8 +161,8 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅ Canonical read/write primitives are five-model validated; HPG wrappers remain absent. |
 | line | `hpg_draw_line_on`, `hpg_draw_line` | ✅ `hpclang_surface_draw_line`. |
 | rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
-| circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ⬜ |
-| polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ⬜ |
+| circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | 🧪 Canonical clipped outline/fill circle primitives implemented; HPG context wrappers remain later work. |
+| polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | 🧪 Canonical point-array outline/fill primitives implemented with even-odd fill; HPG array/state adapters remain later work. |
 | fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | 🧪 Canonical immutable mini/big fonts and metrics are implemented with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | 🧪 Canonical explicit-surface character/text drawing is implemented and replaces the E2E-only glyph table; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |

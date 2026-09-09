@@ -230,11 +230,17 @@ PAINT/XOR mode, font, fill pattern, and a mutable clip rectangle. hpclang should
 continue to keep the core surface explicit and avoid making that legacy
 graphics context its canonical state model.
 
-The next safe, representation-independent primitives are circles and polygons,
-followed by a deliberate clipping abstraction if application code needs a clip
-region beyond the surface bounds. A clip rectangle should not become hidden
-global state; a lightweight draw context/surface view or another explicit
-mechanism is preferable.
+The next safe, representation-independent primitives are circles and polygons.
+The `m7-display-shapes` candidate adds those without mutable graphics state:
+circles are clipped to visible rows/columns before rasterization, and polygons
+use explicit `hpclang_point` arrays with even-odd fill semantics. This avoids
+making huge off-screen circle radii proportional to runtime work and keeps the
+surface representation opaque.
+
+A deliberate clipping abstraction should follow only if application code needs
+a clip region beyond the surface bounds. A clip rectangle should not become
+hidden global state; a lightweight draw context/surface view or another
+explicit mechanism is preferable.
 
 Software-owned grayscale surfaces are also separable from physical LCD mode
 ownership. Historical HPG allocates 1-, 2-, and 4-bpp off-screen images and

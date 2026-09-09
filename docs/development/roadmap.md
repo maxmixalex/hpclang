@@ -174,9 +174,10 @@ The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
 matrix and the full-stock matrix. The Basic-Latin immutable mini/big font and
-explicit-surface text layer is now a validated candidate on
-`m7-font-text`; it deliberately leaves HPG's calculator-specific 256-entry
-font repertoire to compatibility work. The remaining first-slice closure also
+explicit-surface text layer is merged and validated; it deliberately leaves
+HPG's calculator-specific 256-entry font repertoire to compatibility work.
+A representation-independent circle/polygon candidate is now validating on
+`m7-display-shapes`. The remaining first-slice closure also
 includes a representative application example rather than more bootstrap work.
 
 The minimum cross-platform service set should cover:
