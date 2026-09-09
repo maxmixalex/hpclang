@@ -130,8 +130,8 @@ The public service layer should therefore remain usable in both environments.
 For example, keyboard events can be produced by synchronous GPIO polling in a
 stock-hosted backend and by an IRQ-fed queue in a bare-metal backend without
 changing the application-facing event representation. Likewise, monotonic time
-can observe a stock-configured timer today and use an hpclang-configured timer
-under 39gsX later.
+can observe a host-configured timer in a borrowed environment and use an
+environment-owned timer in a freestanding implementation.
 
 Do not freeze a public execution-environment enum until code genuinely needs
 one. For now this is an implementation/ownership boundary, not another target
@@ -217,11 +217,11 @@ application launched from the HP OS does not steal interrupt/timer ownership
 from the environment it must later return to.
 
 This is a backend policy, not a permanent hpclang API or HPC1 restriction.
-A future bare-metal bootloader or hpclang-owned system such as 39gsX may own the
+A freestanding execution environment that owns the machine may instead own the
 interrupt controller and timers, feed the same event API from an IRQ-driven
-queue, and implement delays/deadlines from hpclang-managed timers. Application
-code should not have to change merely because the execution environment owns
-more of the hardware.
+queue, and implement delays/deadlines from environment-managed timers.
+Application code should not have to change merely because the execution
+environment owns more of the hardware.
 
 It also does not implement sticky shift planes, Alpha lock, text translation,
 or model-neutral key labels yet. HPGCC3 combined those policies with an
