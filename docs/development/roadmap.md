@@ -27,9 +27,11 @@ executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
 - historical code is research evidence, not a compatibility mode;
 - emulator fixtures are generated or prepared from verified inputs rather than committed as opaque calculator-state snapshots;
 - model-specific differences remain metadata or platform code unless they genuinely require a different implementation;
-- stock-hosted backends preserve host hardware ownership where practical; a
-  future hpclang-owned bootloader/OS may own IRQs, timers, clocks and peripherals
-  without changing the application-facing service APIs.
+- stock-hosted backends preserve host hardware ownership where practical;
+  freestanding implementations may own IRQs, timers, clocks and peripherals
+  without changing the application-facing service APIs;
+- downstream firmware, operating systems, and applications remain consumers:
+  they must not become named hpclang targets, ABI branches, or dependencies.
 
 ## M0 — Unified application ABI
 
