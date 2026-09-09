@@ -18,6 +18,18 @@ struct hpclang_surface;
 /* Borrow the current physical display surface. */
 struct hpclang_surface *hpclang_display_surface(void);
 
+/*
+ * Allocate an owned two-level surface initialized to white. The returned
+ * surface has the same opaque drawing contract as the physical display but is
+ * backed by process heap memory. Return NULL if allocation fails.
+ */
+struct hpclang_surface *hpclang_surface_create_mono(
+    uint32_t width,
+    uint32_t height);
+
+/* Release a surface returned by hpclang_surface_create_mono(). */
+void hpclang_surface_destroy(struct hpclang_surface *surface);
+
 uint32_t hpclang_surface_width(const struct hpclang_surface *surface);
 uint32_t hpclang_surface_height(const struct hpclang_surface *surface);
 uint32_t hpclang_surface_levels(const struct hpclang_surface *surface);
@@ -67,6 +79,21 @@ void hpclang_surface_draw_rect(
     int32_t width,
     int32_t height,
     uint8_t intensity);
+
+/*
+ * Copy a rectangular source region to a destination surface. Source and
+ * destination coordinates are clipped together so their pixel correspondence
+ * is preserved. Overlap on the same surface is supported.
+ */
+void hpclang_surface_blit(
+    struct hpclang_surface *destination,
+    int32_t destination_x,
+    int32_t destination_y,
+    const struct hpclang_surface *source,
+    int32_t source_x,
+    int32_t source_y,
+    int32_t width,
+    int32_t height);
 
 void hpclang_surface_fill_rect(
     struct hpclang_surface *surface,

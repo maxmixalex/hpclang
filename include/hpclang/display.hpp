@@ -71,6 +71,20 @@ public:
             surface_, x, y, width, height, intensity);
     }
 
+    void blit_from(
+        surface_ref source,
+        std::int32_t destination_x,
+        std::int32_t destination_y,
+        std::int32_t source_x,
+        std::int32_t source_y,
+        std::int32_t width,
+        std::int32_t height) const noexcept
+    {
+        ::hpclang_surface_blit(
+            surface_, destination_x, destination_y,
+            source.surface_, source_x, source_y, width, height);
+    }
+
     void fill_rect(
         std::int32_t x,
         std::int32_t y,

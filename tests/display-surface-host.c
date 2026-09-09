@@ -123,6 +123,35 @@ int main(void)
     expect_row(2u, 0x007u);
     expect_row(3u, 0u);
 
-    puts("PASS: opaque surface clipping, readback and packed-pixel primitives.");
+    struct hpclang_surface *owned = hpclang_surface_create_mono(10u, 4u);
+    if (owned == NULL ||
+        hpclang_surface_width(owned) != 10u ||
+        hpclang_surface_height(owned) != 4u ||
+        hpclang_surface_levels(owned) != 2u ||
+        hpclang_surface_get_pixel(owned, 0, 0) != 0u)
+        fail("owned mono surface");
+
+    hpclang_surface_set_pixel(owned, 0, 0, 255u);
+    hpclang_surface_set_pixel(owned, 2, 0, 255u);
+    hpclang_surface_blit(owned, 1, 0, owned, 0, 0, 4, 1);
+    if (hpclang_surface_get_pixel(owned, 0, 0) != 255u ||
+        hpclang_surface_get_pixel(owned, 1, 0) != 255u ||
+        hpclang_surface_get_pixel(owned, 2, 0) != 0u ||
+        hpclang_surface_get_pixel(owned, 3, 0) != 255u ||
+        hpclang_surface_get_pixel(owned, 4, 0) != 0u)
+        fail("overlapping blit");
+
+    hpclang_surface_clear(&surface, 0u);
+    hpclang_surface_blit(&surface, 0, 3, owned, 0, 0, 5, 1);
+    expect_row(3u, (1u << 0) | (1u << 1) | (1u << 3));
+
+    hpclang_surface_clear(&surface, 0u);
+    hpclang_surface_blit(&surface, 0, 0, owned, -1, 0, 2, 1);
+    expect_row(0u, (1u << 1));
+
+    hpclang_surface_destroy(owned);
+    hpclang_surface_destroy(NULL);
+
+    puts("PASS: opaque surfaces, clipping, readback, ownership and blit.");
     return EXIT_SUCCESS;
 }
