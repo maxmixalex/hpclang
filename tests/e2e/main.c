@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -232,8 +233,15 @@ static int display_height(uint32_t model)
 static int stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
-        model != HPCLANG_MODEL_HP50G)
-        return 1;
+        model != HPCLANG_MODEL_HP50G) {
+        errno = 0;
+        FILE *unavailable = fopen("HPCLANG.TST", "rb");
+        if (unavailable != NULL) {
+            fclose(unavailable);
+            return 0;
+        }
+        return errno == ENOSYS;
+    }
 
     static const char input_expected[] = "HPCLANG-STORAGE\n";
     static const char output_expected[] = "stream-write-seek";
@@ -260,14 +268,17 @@ static int stock_stream_storage_test(uint32_t model)
         output_expected, 1u, sizeof(output_expected) - 1u, output);
     if (written != sizeof(output_expected) - 1u ||
         fflush(output) != 0 ||
-        fseek(output, 7L, SEEK_SET) != 0) {
+        fseek(output, 7L, SEEK_SET) != 0 ||
+        ftell(output) != 7L) {
         fclose(output);
         return 0;
     }
 
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, 5u, output);
-    if (got != 5u || memcmp(buffer, "write", 5u) != 0) {
+    if (got != 5u ||
+        memcmp(buffer, "write", 5u) != 0 ||
+        ftell(output) != 12L) {
         fclose(output);
         return 0;
     }
@@ -283,9 +294,22 @@ static int stock_stream_storage_test(uint32_t model)
     got = fread(buffer, 1u, sizeof(buffer), output);
     int output_close = fclose(output);
 
-    return output_close == 0 &&
-           got == sizeof(output_expected) - 1u &&
-           memcmp(buffer, output_expected, sizeof(output_expected) - 1u) == 0;
+    if (output_close != 0 ||
+        got != sizeof(output_expected) - 1u ||
+        memcmp(buffer, output_expected, sizeof(output_expected) - 1u) != 0)
+        return 0;
+
+    if (remove("HPCLANG.OUT") != 0)
+        return 0;
+
+    errno = 0;
+    output = fopen("HPCLANG.OUT", "rb");
+    if (output != NULL) {
+        fclose(output);
+        return 0;
+    }
+
+    return errno == ENOENT;
 }
 #endif
 
