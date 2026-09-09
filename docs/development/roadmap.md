@@ -244,3 +244,19 @@ Completion requires:
 
 Only at this stage should hpclang be described as a broadly usable replacement
 SDK rather than a completed execution foundation.
+
+
+## Unified test model
+
+Repository validation has two source-test layers:
+
+- `tests/unit/` contains host-side `test_*.c` tests for pure,
+  hardware-independent implementation logic;
+- `tests/e2e/` is one calculator-side hpclang consumer project. The same
+  source project is built into HPC1 and launched through each supported target
+  and stock/direct harness.
+
+Target profiles, stock UI sequences, and x50ng frontends are harness data, not
+separate test applications. New public SDK functionality should be added to the
+unified E2E application whenever it is calculator-testable, with a separate
+unit test only where pure implementation logic benefits from isolation.
