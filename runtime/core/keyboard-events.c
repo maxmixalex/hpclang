@@ -1,9 +1,11 @@
 #include <stdint.h>
 
+#include <hpclang/device.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/time.h>
 
 #include "keyboard-event-engine.h"
+#include "keyboard-key-map.h"
 
 static struct hpclang_keyboard_event_engine event_engine;
 static uint32_t debounce_us = 20000u;
@@ -58,9 +60,15 @@ int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
         return 0;
     }
 
-    return hpclang_keyboard_event_engine_step(
-        &event_engine,
-        state.bits,
-        now_us,
-        event);
+    if (!hpclang_keyboard_event_engine_step(
+            &event_engine,
+            state.bits,
+            now_us,
+            event))
+        return 0;
+
+    event->key = hpclang_keyboard_key_from_scan(
+        hpclang_device_info()->model,
+        event->scan_code);
+    return 1;
 }
