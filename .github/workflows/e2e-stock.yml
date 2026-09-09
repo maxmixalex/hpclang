@@ -35,7 +35,6 @@ on:
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp39-fixture-key.py"
       - "tools/package-hp39-aplet.sh"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
@@ -75,7 +74,6 @@ on:
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp39-fixture-key.py"
       - "tools/package-hp39-aplet.sh"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
@@ -235,7 +233,6 @@ jobs:
             build/*-*.json
             build/*-kermit*
             build/*-socat.log
-            build/*-fixture-key.txt
             build/*-setup.bin
             build/*-summary.png
             build/*-send/*

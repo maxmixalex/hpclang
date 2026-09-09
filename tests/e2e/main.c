@@ -21,6 +21,12 @@ static _Thread_local uint32_t hpclang_tls_zero;
 
 static volatile uint32_t hpclang_ctor_probe;
 
+#ifdef HPCLANG_E2E_KEYBOARD
+static uint64_t hpclang_keyboard_passed_bits;
+static uint8_t hpclang_keyboard_failed_scan = 0xffu;
+static unsigned hpclang_keyboard_passed_count;
+#endif
+
 static volatile uint32_t hpclang_u32_a = 1000003u;
 static volatile uint32_t hpclang_u32_b = 97u;
 static volatile uint64_t hpclang_u64_a = UINT64_C(0x123456789abcdef0);
@@ -107,6 +113,85 @@ static void hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
     glyph(surface, x + 4, y, digits[value & 15u]);
 }
 
+#ifdef HPCLANG_E2E_KEYBOARD
+static int keyboard_scan_exists(uint8_t scan)
+{
+    return scan <= 30u ||
+           (scan >= 35u && scan <= 50u) ||
+           (scan >= 56u && scan <= 59u);
+}
+
+static void keyboard_rect(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    int w,
+    int h,
+    int fill)
+{
+    for (int yy = 0; yy < h; ++yy) {
+        for (int xx = 0; xx < w; ++xx) {
+            if (fill || yy == 0 || yy == h - 1 || xx == 0 || xx == w - 1)
+                hpclang_surface_set_pixel(surface, x + xx, y + yy, 255u);
+        }
+    }
+}
+
+static void keyboard_cross(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    int w,
+    int h)
+{
+    int n = w < h ? w : h;
+    for (int i = 1; i < n - 1; ++i) {
+        hpclang_surface_set_pixel(surface, x + i, y + i, 255u);
+        hpclang_surface_set_pixel(surface, x + w - 1 - i, y + i, 255u);
+    }
+}
+
+static void keyboard_cell(
+    struct hpclang_surface *surface,
+    uint8_t scan,
+    int x,
+    int y,
+    int w,
+    int h)
+{
+    int passed =
+        (hpclang_keyboard_passed_bits & (UINT64_C(1) << scan)) != 0u;
+    keyboard_rect(surface, x, y, w, h, passed);
+    if (!passed && hpclang_keyboard_failed_scan == scan)
+        keyboard_cross(surface, x, y, w, h);
+}
+
+static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
+{
+    hpclang_surface_clear(surface, 0u);
+    text(surface, 4, 2, "KEY TEST");
+
+    for (uint8_t scan = 0u; scan < 56u; ++scan) {
+        if (!keyboard_scan_exists(scan))
+            continue;
+        int col = scan / 7u;
+        int row = scan % 7u;
+        keyboard_cell(surface, scan, 4 + col * 9, 10 + row * 6, 8, 5);
+    }
+
+    for (uint8_t scan = 56u; scan < 60u; ++scan)
+        keyboard_cell(surface, scan, 82, 10 + (scan - 56u) * 9, 12, 7);
+
+    if (pass) {
+        text(surface, 4, 55, "PASS 51");
+    } else {
+        text(surface, 4, 55, "FAIL");
+        if (hpclang_keyboard_failed_scan != 0xffu)
+            hex2(surface, 24, 55, hpclang_keyboard_failed_scan);
+    }
+}
+#endif
+
 static int display_height(uint32_t model)
 {
     return model == HPCLANG_MODEL_HP49GPLUS ||
@@ -160,7 +245,11 @@ static int finish(uint32_t failure, uint32_t model)
 
     hpclang_surface_clear(surface, 0u);
     if (failure == 0) {
+#ifdef HPCLANG_E2E_KEYBOARD
+        draw_keyboard_result(surface, 1);
+#else
         text(surface, 38, 28, "RUNTIME PASS");
+#endif
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
         text(surface, 39, 40, "ENTER TO EXIT");
 #endif
@@ -169,9 +258,16 @@ static int finish(uint32_t failure, uint32_t model)
         return 0;
     }
 
-    text(surface, 30, 24, "RUNTIME FAIL");
-    text(surface, 55, 36, "CODE");
-    hex2(surface, 75, 36, failure);
+#ifdef HPCLANG_E2E_KEYBOARD
+    if (failure == 0x10u) {
+        draw_keyboard_result(surface, 0);
+    } else
+#endif
+    {
+        text(surface, 30, 24, "RUNTIME FAIL");
+        text(surface, 55, 36, "CODE");
+        hex2(surface, 75, 36, failure);
+    }
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
     text(surface, 39, 48, "ENTER TO EXIT");
 #endif
@@ -460,6 +556,10 @@ static const struct expected_key_event *expected_keyboard(
 
 static int keyboard_transition(uint32_t model)
 {
+    hpclang_keyboard_passed_bits = 0u;
+    hpclang_keyboard_failed_scan = 0xffu;
+    hpclang_keyboard_passed_count = 0u;
+
     struct hpclang_keyboard_state raw;
     hpclang_keyboard_read(&raw);
     if (hpclang_keyboard_any_is_down(&raw))
@@ -487,8 +587,10 @@ static int keyboard_transition(uint32_t model)
             if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN ||
                 event.scan_code != want->scan ||
                 event.key != want->key ||
-                event.modifiers != want->down_modifiers)
+                event.modifiers != want->down_modifiers) {
+                hpclang_keyboard_failed_scan = want->scan;
                 return 0;
+            }
             awaiting_up = 1;
             continue;
         }
@@ -496,14 +598,24 @@ static int keyboard_transition(uint32_t model)
         if (event.type != HPCLANG_KEYBOARD_EVENT_UP ||
             event.scan_code != want->scan ||
             event.key != want->key ||
-            event.modifiers != 0u)
+            event.modifiers != 0u) {
+            hpclang_keyboard_failed_scan = want->scan;
             return 0;
+        }
 
+        hpclang_keyboard_passed_bits |= UINT64_C(1) << want->scan;
+        ++hpclang_keyboard_passed_count;
         awaiting_up = 0;
         ++index;
     }
 
-    return index == count && !awaiting_up;
+    if (index != count || awaiting_up) {
+        if (index < count)
+            hpclang_keyboard_failed_scan = expected[index].scan;
+        return 0;
+    }
+
+    return hpclang_keyboard_passed_count == 51u;
 }
 #endif
 

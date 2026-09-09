@@ -4,6 +4,16 @@ The remaining HP39g+ E2E blocker is provenance: there is no trustworthy public
 stock ARM firmware/boot fixture comparable to the HP39gs/HP40gs update
 archives.
 
+This directory is intentionally research-only but reproducible:
+
+- `boot-dump.S` is the read-only ARM payload;
+- `boot-dump.ld` links it as the flat ARM image expected by the old launcher;
+- `boot-dump-wrap.py` wraps that image for ARMToolbox39 old `PrRUN`;
+- `x50ng-boot-dump-main.c` is the retired emulator-side mechanism validator;
+- `extract-boot-dump.py` extracts a completed real-device dump object.
+
+None of these files participates in normal CI while HP39g+ remains blocked.
+
 `boot-dump.S` is a deliberately read-only research payload for the historical
 HPGCC39/ARMToolbox39 old `PrRUN` path. ARMToolbox requests one alignment
 slop byte beyond the 0x4010-byte result, then leaves the resulting string on
