@@ -13,6 +13,7 @@ The historical comparison is based on the complete HPGCC 1.0.3 beta, HPGCC 1.1 w
 | --- | --- |
 | ✅ | Native hpclang API exists and calculator-dependent behavior has passed the five-model Direct matrix. |
 | 🧪 | Implemented, but the new behavior is awaiting the next calculator matrix or has narrower validation. |
+| ⛔ | Blocker: implementation exists, but a required asset/contract is not yet frozen for release. |
 | ◐ | A cleaner hpclang primitive covers part of the historical behavior; compatibility semantics are incomplete. |
 | ⬜ | Planned or not implemented. |
 | ↪ | Prefer a different hpclang or standard-library API; a historical wrapper would be migration/compatibility only. |
@@ -94,8 +95,8 @@ The canonical layer is deliberately narrower than historical HPG:
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_font_mini()` | ✅ | Immutable built-in Basic Latin font; line height 6, advance 4. |
-| `hpclang_font_big()` | ✅ | Immutable built-in Basic Latin font; line height 8, advance 6. |
+| `hpclang_font_mini()` | ⛔ | API/metric stable (height 6, advance 4); current glyph table is provisional pending final font selection. |
+| `hpclang_font_big()` | ⛔ | API/metric stable (height 8, advance 6); current glyph table is provisional pending final font selection. |
 | `hpclang_font_height()` / `hpclang_font_advance()` | ✅ | Fixed metrics without exposing bitmap storage. |
 | `hpclang_surface_draw_char()` | ✅ | Foreground-only clipped glyph draw on an explicit surface and intensity. |
 | `hpclang_surface_draw_text()` | ✅ | Fixed advance; newline resets to the original x and moves by one font height. |
@@ -105,6 +106,20 @@ canonical v1 scope, not a claim that these built-ins reproduce HPG's historical
 256-entry calculator character set. HPG-specific glyph repertoire and custom
 font descriptors belong to the later compatibility layer unless an independent
 core use case requires them.
+
+## Storage model
+
+hpclang distinguishes two storage semantics:
+
+| Storage class | Platform status | Canonical direction |
+| --- | --- | --- |
+| byte-stream files | HP49g+/HP50g Stock KOS SD path proven by E2E read probe | private POSIX-style backend feeding picolibc `fopen/fread/fwrite/fseek`; no parallel hpclang stdio |
+| calculator object store | HP39gs/40gs stock format proven to contain directory, Zaplet/Aplet, Note, Program, Variable, List, Matrix, Library and related object types | typed/named object API; do not flatten into `FILE *` |
+| RPL/Saturn objects | HP48/49/50 historical platform capability | M7.3 typed object/stack bridge |
+
+The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the
+current directory. These names describe the stock object-store protocol, not a
+claim that HP39 exposes a general POSIX filesystem.
 
 ## Validation by service
 
@@ -165,7 +180,7 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
 | circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ✅ Canonical clipped outline/fill circle primitives are merged and five-model validated; HPG context wrappers remain later work. |
 | polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ✅ Canonical point-array outline/fill primitives with even-odd fill are merged and five-model validated; HPG array/state adapters remain later work. |
-| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ✅ Canonical immutable mini/big fonts and metrics are merged with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
+| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ⛔ Renderer and 6/4 + 8/6 metrics are stable, but final built-in glyph data is blocked pending font selection/provenance. HPG's two bundled 256-entry fonts are a compatibility candidate/reference, not automatically MIT-relicensed data. |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface character/text drawing is merged and five-model Direct/Stock validated; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
 | PAINT/XOR composite mode | HPG context mode | ↪ Historical XOR is per-context mutable state. If a clean-core compositing primitive is later needed, it should be explicit per operation rather than hidden in the surface. |
@@ -266,7 +281,7 @@ Based on historical stability, example usage and current implementation dependen
 
 1. ✅ close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
 2. ✅ measure and expose model-neutral physical key identities across the three validated platform families;
-3. ✅ freeze and validate the first Basic-Latin font/text layer on top of the surface ownership/blit boundary;
+3. ⛔ freeze final mini/big glyph data and provenance; renderer/metrics are validated but font selection remains a blocker;
 4. establish calculator storage/file services and wire standard stdio where semantics fit;
 5. design Saturn/RPL object and stack handles;
 6. only then begin HPG/keyboard/stdio compatibility headers.

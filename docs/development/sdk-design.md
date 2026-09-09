@@ -424,12 +424,25 @@ event timing.
 
 ### Storage and stdio
 
-Prefer making picolibc's standard C interfaces work where their semantics are
-appropriate instead of inventing parallel replacements for `fopen`,
-`fread`, and friends.
+Storage has two deliberately separate semantics.
 
-Calculator-specific volumes, ports, or object stores may need a lower service
-layer beneath those standard interfaces.
+**Byte-stream files.** Prefer making picolibc's standard C interfaces work
+where their semantics are appropriate instead of inventing parallel
+replacements for `fopen`, `fread`, and friends. HP49g+/HP50g have a stock
+KOS SD filesystem; the first E2E probe already proves that an HPC1 payload can
+resolve the KOS filesystem table and synchronously open/read/close a known file.
+The clean implementation target is private `open/close/read/write/lseek`
+hooks beneath picolibc. Raw KOS module/function IDs stay runtime-private.
+
+**Calculator objects.** HP39gs/40gs are not storage-less: the stock object-store
+protocol has typed named directory, Zaplet/Aplet, Note, Program, Variable,
+List, Matrix, Library and related records, rooted at `HP39DIR.000` with
+`HP39DIR.CUR` tracking the current directory. Those objects should get a
+typed/named object service, not synthetic POSIX file descriptors.
+
+HP48/49/50 RPL/Saturn objects likewise belong to the typed-object side and
+continue into M7.3. Physical medium (RAM/flash/SD) is backend detail unless an
+application genuinely needs it.
 
 ### Saturn/RPL integration
 
