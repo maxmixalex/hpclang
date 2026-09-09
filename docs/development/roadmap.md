@@ -261,7 +261,10 @@ separate test applications. New public SDK functionality should be added to the
 unified E2E application whenever it is calculator-testable, with a separate
 unit test only where pure implementation logic benefits from isolation.
 
-The CI implementation is being consolidated into a multi-stage E2E pipeline:
-build once per test mode, prepare emulator/harness once per platform, then run
-target-specific launch paths. Behavioral expectations belong in E2E specs and
-harness code rather than GitHub Actions YAML.
+The CI implementation now uses a family-level E2E pipeline: build one HPC1
+application per test mode, then run one job per platform family (`hp39`, `hp48`,
+or `hp4950`). Each family job prepares x50ng and runtime dependencies once and
+executes its automated sibling targets in parallel. HP 39g+ is explicitly
+excluded by target-profile metadata until its real stock fixture exists.
+Behavioral expectations remain in E2E specs and harness code rather than
+GitHub Actions YAML.
