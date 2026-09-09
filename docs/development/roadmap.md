@@ -157,11 +157,11 @@ Before freezing the public service API:
 
 See [SDK API design](sdk-design.md).
 
-M7.1 implementation is active. Device information and stock-preserving
-monotonic time are stable; raw keyboard snapshots pass five-model Direct E2E.
-A synchronous debounced/repeating keyboard-event service and the first opaque
-display surface primitives are implemented and are being closed against the
-same five-model Direct path.
+M7.1 implementation is active. Device information, stock-preserving
+monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
+and the first opaque display-surface primitives pass five-model Direct E2E.
+The remaining first-slice closure is the new C++23 wrapper/runtime probe and
+then a representative application example rather than more bootstrap work.
 
 The minimum cross-platform service set should cover:
 
