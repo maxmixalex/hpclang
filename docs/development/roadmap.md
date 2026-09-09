@@ -226,10 +226,11 @@ capability.
 - **Byte-stream filesystem:** HP49g+/HP50g expose the stock KOS SD-card
   filesystem. A Stock E2E probe has already resolved the original KOS
   filesystem table and successfully opened/read/closed a known SD file from
-  HPC1. The next implementation step is a private hp4950 backend for
-  `open/close/read/write/lseek`, allowing picolibc's normal
-  `fopen/fread/fwrite/fseek` surface to work without inventing parallel
-  hpclang stdio names.
+  HPC1. The `m7-storage-stdio` candidate now provides private hp4950
+  `open/close/read/write/lseek/unlink` hooks below picolibc, so the E2E
+  payload uses normal `fopen/fread/fwrite/fseek` instead of direct KOS
+  calls. Stock validation covers read, create/truncate, write, flush, seek,
+  reread and close before this slice can merge.
 - **Calculator object store:** HP39gs/40gs are not "storage-less". Their stock
   object-store format includes named directory, Zaplet/Aplet, Note, Program,
   Variable, List, Matrix, Library and related object types, with

@@ -113,7 +113,7 @@ hpclang distinguishes two storage semantics:
 
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
-| byte-stream files | HP49g+/HP50g Stock KOS SD path proven by E2E read probe | private POSIX-style backend feeding picolibc `fopen/fread/fwrite/fseek`; no parallel hpclang stdio |
+| byte-stream files | HP49g+/HP50g Stock KOS SD read probe proven; full stdio candidate validating | private `open/close/read/write/lseek/unlink` backend feeds picolibc `fopen/fread/fwrite/fseek/remove`; no parallel hpclang stdio |
 | calculator object store | HP39gs/40gs stock format proven to contain directory, Zaplet/Aplet, Note, Program, Variable, List, Matrix, Library and related object types | typed/named object API; do not flatten into `FILE *` |
 | RPL/Saturn objects | HP48/49/50 historical platform capability | M7.3 typed object/stack bridge |
 
@@ -135,6 +135,7 @@ claim that HP39 exposes a general POSIX filesystem.
 | font/text | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
+| hp4950 stream stdio | — | ✅ | builds but storage probe is Stock-only | 🧪 candidate validates read/create/truncate/write/seek/reopen on HP49g+/HP50g |
 
 HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
 
@@ -152,8 +153,8 @@ The following is a mechanical unique-public-function-name view of the major calc
 | system `hpsys.h` | 25 | 40 | 41 | — | monotonic time/device subset |
 | HPGCC3 `sys.h` | — | — | — | 61 | small generic subset only |
 | `hptime.h` | — | 3 | 3 | — | monotonic/chrono API instead |
-| `hpstdio.h` | 26 | 37 | 40 | — | formatting/libc works; filesystem stdio does not |
-| HPGCC3 `stdio.h` | — | — | — | 40 | formatting/libc works; filesystem stdio does not |
+| `hpstdio.h` | 26 | 37 | 40 | — | formatting/libc works; hp4950 filesystem stdio candidate is validating |
+| HPGCC3 `stdio.h` | — | — | — | 40 | formatting/libc works; hp4950 filesystem stdio candidate is validating |
 | structured `fsystem.h` | — | — | 41 | 43 | not implemented |
 | KOS `kos.h` | 15 | 32 | 33 | 33 | no canonical raw-KOS surface |
 | Saturn `saturn.h` | — | 50 | 58 | replaced | not implemented |

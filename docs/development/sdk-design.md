@@ -432,7 +432,11 @@ replacements for `fopen`, `fread`, and friends. HP49g+/HP50g have a stock
 KOS SD filesystem; the first E2E probe already proves that an HPC1 payload can
 resolve the KOS filesystem table and synchronously open/read/close a known file.
 The clean implementation target is private `open/close/read/write/lseek`
-hooks beneath picolibc. Raw KOS module/function IDs stay runtime-private.
+hooks beneath picolibc. The `m7-storage-stdio` candidate additionally wires
+`unlink` so standard `remove()` can map cleanly to stock delete semantics.
+Raw KOS module/function IDs stay runtime-private. Unsupported families return
+a normal unavailable-service error rather than pretending to expose an SD
+filesystem.
 
 **Calculator objects.** HP39gs/40gs are not storage-less: the stock object-store
 protocol has typed named directory, Zaplet/Aplet, Note, Program, Variable,
