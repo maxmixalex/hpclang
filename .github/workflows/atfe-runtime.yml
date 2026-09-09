@@ -62,8 +62,19 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror -Iinclude             runtime/bootstrap/mmu.c tests/bootstrap-mmu.c             -o /tmp/bootstrap-mmu
           /tmp/bootstrap-mmu
 
+      - name: Run unit tests
+        run: |
+          cmake -S tests/unit -B build/unit
+          cmake --build build/unit -j2
+          ctest --test-dir build/unit --output-on-failure
+
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
+
+      - name: Build unified E2E consumer project
+        run: |
+          chmod +x tools/build-e2e.sh tools/hpclang-pack.py
+          OUT="$GITHUB_WORKSPACE/build/e2e" tools/build-e2e.sh
 
       - name: Link compiler-rt and picolibc into HPC1
         run: |
