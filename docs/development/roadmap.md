@@ -163,13 +163,13 @@ See [SDK API design](sdk-design.md).
 
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
-the first measured 30-key model-neutral physical identity slice, and the first
-opaque display-surface primitives pass five-model Direct E2E. Keyboard identity
-is not considered complete at 30 keys: all remaining physical keys on each
-validated model (including model-specific primary keys such as SIN/COS/TAN,
-APLET/FILES, and their counterparts) must be measured and represented rather
-than guessed. HP39g+ key identity remains UNKNOWN until its blocked
-real-machine fixture is available.
+the initial common-key scan probe, the complete source-backed physical-key
+identity tables for the five automated models, and the first opaque
+display-surface primitives pass their host/build gates. The complete keyboard
+tables use the historical HPGCC 49/50 matrix, the HPGCC 1.1-39G HP39 keycodes,
+and the validated S3C2410 scan layout; Direct E2E also exercises a
+family-specific key identity. HP39g+ key identity remains UNKNOWN until its
+blocked real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
@@ -180,8 +180,9 @@ The minimum cross-platform service set should cover:
 
 - display and framebuffer/graphics primitives;
 - keyboard scanning and key events, including complete physical-key identity
-  coverage for every validated model before the keyboard service is considered
-  closed;
+  coverage for every validated model; documented source tables are preferred
+  over redundant per-key measurement, with emulator/hardware checks for the
+  model-specific mapping boundary;
 - monotonic time, delays, and timers;
 - files and storage where the calculator exposes them;
 - calculator/Saturn object exchange;

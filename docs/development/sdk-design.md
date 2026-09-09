@@ -236,17 +236,21 @@ queue, and implement delays/deadlines from environment-managed timers.
 Application code should not have to change merely because the execution
 environment owns more of the hardware.
 
-The event layer now also carries a model-neutral **physical key identity** in
-`event.key`. Thirty common keys (F1–F6, arrows, Enter, digits, decimal point,
-the four arithmetic operators, Alpha, both Shifts, and ON) were injected and
-measured through the public event API on HP39gs, HP40gs, HP48gII, HP49g+, and
-HP50g. All five produced the same raw scan mapping. The measured evidence is
-kept under `tests/e2e/data/keyboard-scan-codes.json`; the mapping is not
-inferred from the historical HP49g+ table.
+The event layer now also carries a **physical key identity** in `event.key`.
+The first Direct probe measured the common raw scan positions across all five
+automated models. Complete key identities are then filled from the historical
+keyboard tables instead of re-measuring every documented key: the stable
+HPGCC 1.1/2.0/HPGCC3 matrix table for HP49/50, the HPGCC 1.1-39G HP39
+`HEADER.H` keycodes plus the validated matrix layout for HP39gs/40gs, and the
+same documented electrical matrix for HP48gII. A representative family-specific
+raw position is still exercised in Direct E2E.
+
+Common keys retain common enum values; keys whose primary label belongs to one
+layout use `HP39_*`, `HP48_*`, or `HP4950_*` identities. Raw GPF4/5/6
+remain physical input names because the HP39 labels differ from HP48/49/50.
 
 HP39g+ deliberately returns `HPCLANG_KEY_UNKNOWN` until its real-machine
-fixture exists and the same measurement can be repeated there. Unmeasured
-physical scan positions also remain UNKNOWN instead of being guessed.
+fixture exists.
 
 Sticky shift planes, Alpha lock, and text translation are still higher layers.
 HPGCC3 combined those policies with an asynchronous message queue; hpclang
@@ -350,11 +354,12 @@ clock are already implemented. The time service does not reconfigure the stock
 PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
 than deadlock if the stock clock service becomes unavailable.
 
-Raw keyboard state, the polled debounce/repeat event service, and the first
-model-neutral physical-key identity layer are now implemented. The 30-key
-mapping is measured across all five automated models, and Direct E2E checks the
-semantic ENTER identity through the same public event path. Text/Alpha/Shift
-plane translation remains a separate higher layer.
+Raw keyboard state, the polled debounce/repeat event service, and complete
+physical-key identities for the five automated models are now implemented.
+The initial common scan probe is retained as evidence, while documented
+model-specific keys come from the HPGCC/HP39 tables. Direct E2E checks both a
+common ENTER identity and one family-specific identity through the same public
+event path. Text/Alpha/Shift-plane translation remains a separate higher layer.
 
 The first opaque display surface and clipped clear/pixel-readback/pixel-write/
 line/outline-rectangle/fill-rectangle primitives form the current primitive
