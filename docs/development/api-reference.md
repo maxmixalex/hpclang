@@ -169,11 +169,9 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
 | PAINT/XOR composite mode | HPG context mode | ↪ Historical XOR is per-context mutable state. If a clean-core compositing primitive is later needed, it should be explicit per operation rather than hidden in the surface. |
 | patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ↪ Historical 8-bit repeating masks belong naturally to the HPG adapter unless a non-HPG use case appears. |
-| XPM loaders | mono/gray4/gray16 XPM helpers | ↪ Convenience loader/adapter; not a core framebuffer contract. |
-| patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ⬜ |
 | owned images | mono/gray image allocation/free | 🧪 Generic 2/4/16-level software surfaces now cover the clean-core ownership model; HPG constructors remain adapter work. |
 | blit | `hpg_blit` | ◐ Canonical blit is implemented; HPG state/argument adapter remains later work. |
-| XPM | mono/gray XPM loaders | ⬜ Best built above owned surfaces and blit rather than baked into the low-level surface ABI. |
+| XPM | mono/gray4/gray16 XPM loaders | ↪ Convenience importers should be built above owned surfaces/blit or in the HPG adapter, not baked into the framebuffer ABI. |
 
 The current canonical primitives provide a clean implementation basis for 13 of the 59 mature HPG declarations when HPG default-screen and `_on` variants are counted separately. Zero HPG source-compatibility wrappers are claimed yet.
 
