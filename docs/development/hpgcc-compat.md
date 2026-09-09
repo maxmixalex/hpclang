@@ -315,6 +315,11 @@ matter to the adapter design:
 - historical physical buffers are 16-byte aligned and accepted only when their
   virtual allocation maps to a physically continuous range; this is a DMA
   requirement, not an `hpg_t` layout detail.
+- ARMToolbox's standard and HP48-specific system-memory extenders add pages
+  from one KOS allocation as consecutive 4 KiB MMU entries; this gives a
+  possible future DMA pool, but hpclang should request it only when physical
+  display ownership is needed rather than permanently shrinking every HPC1
+  heap.
 
 These facts do **not** imply that the clean core should reproduce `hpg_t`.
 Geometry and software surfaces can be implemented independently beneath an HPG
