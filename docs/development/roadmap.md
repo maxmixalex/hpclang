@@ -164,9 +164,9 @@ See [SDK API design](sdk-design.md).
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
 the complete source-backed physical-key identity tables for the five automated
-models pass host tests; a full 51-key-per-model Direct E2E matrix now covers
-every physical key position, while the full Stock matrix remains the regression
-gate. The complete keyboard
+models pass host tests and a full 51-key-per-model Direct E2E matrix covering
+every physical key position. The full Stock matrix remains green as the
+regression gate. The complete keyboard
 tables use the historical HPGCC 49/50 matrix, the HPGCC 1.1-39G HP39 keycodes,
 and the validated S3C2410 scan layout; Direct E2E exercises both common ENTER
 and a family-specific key identity. HP39g+ key identity remains UNKNOWN until
