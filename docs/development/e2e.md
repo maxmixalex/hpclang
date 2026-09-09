@@ -1,12 +1,18 @@
 # E2E internals
 
-The emulator tests are split by what they prove, not by which historical emulator happens to execute them.
+The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
+tests for pure implementation logic. `tests/e2e/` contains one calculator-side
+hpclang consumer project plus the harness data used to launch that same project
+through different targets.
+
+The emulator workflows are split by what they prove, not by which historical
+emulator happens to execute them.
 
 ## Test tiers
 
-**Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical HPC1 runtime, and then restores the stock execution state.
+**Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the unified E2E HPC1 application, and then restores the stock execution state.
 
-**Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable HPC1 PASS result.
+**Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same application.
 
 The two tiers are deliberately separate. Direct runtime owns common-bootstrap execution and return correctness. Stock launch owns calculator-side package, transfer, menu, and launcher integration.
 
@@ -63,7 +69,7 @@ The current model-specific sequences exist because the stock user interfaces are
 
 ## x50ng backend
 
-CI checks out a pinned external x50ng revision and replaces only its UI entry point with a headless test frontend from `tests/x50ng/`.
+CI checks out a pinned external x50ng revision and replaces only its UI entry point with a headless test frontend from `tests/e2e/harness/x50ng/`.
 
 Tests read the emulated LCD controller and drive the calculator key matrix directly. No GTK/SDL window automation, Xvfb, mouse coordinates, or host-screen scraping is used at runtime.
 
