@@ -90,15 +90,15 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 
 ## Fonts and text
 
-The candidate canonical layer is deliberately narrower than historical HPG:
+The canonical layer is deliberately narrower than historical HPG:
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_font_mini()` | 🧪 | Immutable built-in Basic Latin font; line height 6, advance 4. |
-| `hpclang_font_big()` | 🧪 | Immutable built-in Basic Latin font; line height 8, advance 6. |
-| `hpclang_font_height()` / `hpclang_font_advance()` | 🧪 | Fixed metrics without exposing bitmap storage. |
-| `hpclang_surface_draw_char()` | 🧪 | Foreground-only clipped glyph draw on an explicit surface and intensity. |
-| `hpclang_surface_draw_text()` | 🧪 | Fixed advance; newline resets to the original x and moves by one font height. |
+| `hpclang_font_mini()` | ✅ | Immutable built-in Basic Latin font; line height 6, advance 4. |
+| `hpclang_font_big()` | ✅ | Immutable built-in Basic Latin font; line height 8, advance 6. |
+| `hpclang_font_height()` / `hpclang_font_advance()` | ✅ | Fixed metrics without exposing bitmap storage. |
+| `hpclang_surface_draw_char()` | ✅ | Foreground-only clipped glyph draw on an explicit surface and intensity. |
+| `hpclang_surface_draw_text()` | ✅ | Fixed advance; newline resets to the original x and moves by one font height. |
 
 Bytes outside printable Basic Latin render as `?`. That is an intentional
 canonical v1 scope, not a claim that these built-ins reproduce HPG's historical
@@ -117,6 +117,7 @@ core use case requires them.
 | keyboard events + key identity | ✅ | ✅ | 5/5 full 51-key DOWN/UP + scan + identity + modifier matrix PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
 | owned 2/4/16-level surface + blit | 🧪 | ✅ | candidate running | candidate running |
+| font/text | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
 
@@ -163,9 +164,12 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
 | circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | 🧪 Canonical clipped outline/fill circle primitives implemented; HPG context wrappers remain later work. |
 | polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | 🧪 Canonical point-array outline/fill primitives implemented with even-odd fill; HPG array/state adapters remain later work. |
-| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | 🧪 Canonical immutable mini/big fonts and metrics are implemented with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
-| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | 🧪 Canonical explicit-surface character/text drawing is implemented and replaces the E2E-only glyph table; HPG mutable-context wrappers remain later work. |
+| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ✅ Canonical immutable mini/big fonts and metrics are merged with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
+| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface character/text drawing is merged and five-model Direct/Stock validated; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
+| PAINT/XOR composite mode | HPG context mode | ↪ Historical XOR is per-context mutable state. If a clean-core compositing primitive is later needed, it should be explicit per operation rather than hidden in the surface. |
+| patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ↪ Historical 8-bit repeating masks belong naturally to the HPG adapter unless a non-HPG use case appears. |
+| XPM loaders | mono/gray4/gray16 XPM helpers | ↪ Convenience loader/adapter; not a core framebuffer contract. |
 | patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ⬜ |
 | owned images | mono/gray image allocation/free | 🧪 Generic 2/4/16-level software surfaces now cover the clean-core ownership model; HPG constructors remain adapter work. |
 | blit | `hpg_blit` | ◐ Canonical blit is implemented; HPG state/argument adapter remains later work. |
