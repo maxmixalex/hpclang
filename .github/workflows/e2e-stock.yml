@@ -14,6 +14,7 @@ on:
       - "include/hpclang/**"
       - "tests/hp39-visible-smoke.c"
       - "tests/hp39-runtime-diag.c"
+      - "tests/m7-cxx-probe.cpp"
       - "tests/x50ng/stock-launcher-main.c"
       - "tests/e2e/sequences/hp50g-stock-install.seq"
       - "tests/e2e/sequences/hp50g-stock-run.seq"
