@@ -1,5 +1,8 @@
 name: E2E / HP39/40 stock launch
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -12,6 +15,9 @@ on:
       - "tools/probe-atfe.sh"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
       - "platform/armtoolbox/**"
       - "tests/e2e/targets/hp39gs.json"
       - "tests/e2e/targets/hp40gs.json"
@@ -48,7 +54,7 @@ jobs:
       - name: Install fixture and x50ng runtime dependencies
         run: |
           packages=(
-            ckermit socat innoextract
+            ckermit socat innoextract git-lfs
             libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0
           )
           missing=()
@@ -233,6 +239,48 @@ jobs:
             [[ -f "$pgm" ]] || continue
             python3 tools/pgm-to-png.py "$pgm" "$pgm.png"
           done
+
+      - name: Generate LCD summary image
+        if: always()
+        run: |
+          python3 tools/pgm-to-summary.py \
+            --image-only \
+            --image-out "build/$TARGET-stock-summary.png" \
+            "build/$TARGET-stock-aplet-library.pgm" \
+            "build/$TARGET-stock-receive-menu.pgm" \
+            "build/$TARGET-stock-receive-serial-disk.pgm" \
+            "build/$TARGET-stock-remote-aplet.pgm" \
+            "build/$TARGET-stock-lazy-fetch.pgm" \
+            "build/$TARGET-stock-pass.pgm" \
+            "build/$TARGET-stock-failure.pgm"
+
+      - name: Publish LCD summary image
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          chmod +x tools/publish-ci-image.sh
+          tools/publish-ci-image.sh \
+            "build/$TARGET-stock-summary.png" \
+            "full-hp3940-launch/$GITHUB_RUN_ID/$TARGET.png"
+
+      - name: Add LCD evidence to job summary
+        if: always()
+        run: |
+          IMAGE_URL=""
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            IMAGE_URL="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/full-hp3940-launch/$GITHUB_RUN_ID/$TARGET.png?raw=1"
+          fi
+          python3 tools/pgm-to-summary.py \
+            --heading "$TARGET full original-system serial-disk launch" \
+            --image-url "$IMAGE_URL" \
+            --json "build/$TARGET-stock.json" \
+            "build/$TARGET-stock-aplet-library.pgm" \
+            "build/$TARGET-stock-receive-menu.pgm" \
+            "build/$TARGET-stock-receive-serial-disk.pgm" \
+            "build/$TARGET-stock-remote-aplet.pgm" \
+            "build/$TARGET-stock-lazy-fetch.pgm" \
+            "build/$TARGET-stock-pass.pgm" \
+            "build/$TARGET-stock-failure.pgm" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload ${{ matrix.target }} stock-launch evidence
         if: always()
