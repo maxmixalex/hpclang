@@ -123,6 +123,51 @@ int main(void)
     expect_row(2u, 0x007u);
     expect_row(3u, 0u);
 
+    struct hpclang_surface *shapes = hpclang_surface_create_mono(11u, 11u);
+    if (shapes == NULL)
+        fail("shape surface allocation");
+
+    hpclang_surface_draw_circle(shapes, 5, 5, 3, 255u);
+    if (hpclang_surface_get_pixel(shapes, 5, 2) != 255u ||
+        hpclang_surface_get_pixel(shapes, 8, 5) != 255u ||
+        hpclang_surface_get_pixel(shapes, 5, 8) != 255u ||
+        hpclang_surface_get_pixel(shapes, 2, 5) != 255u ||
+        hpclang_surface_get_pixel(shapes, 5, 5) != 0u)
+        fail("circle outline");
+
+    hpclang_surface_clear(shapes, 0u);
+    hpclang_surface_fill_circle(shapes, 5, 5, 3, 255u);
+    if (hpclang_surface_get_pixel(shapes, 5, 5) != 255u ||
+        hpclang_surface_get_pixel(shapes, 2, 5) != 255u ||
+        hpclang_surface_get_pixel(shapes, 2, 2) != 0u)
+        fail("circle fill");
+
+    hpclang_surface_clear(shapes, 0u);
+    hpclang_surface_draw_circle(
+        shapes, 0, 0, INT32_MAX, 255u);
+    if (hpclang_surface_get_pixel(shapes, 0, 0) != 0u)
+        fail("extreme circle clipping");
+
+    static const struct hpclang_point triangle[] = {
+        {1, 1}, {9, 1}, {5, 9},
+    };
+    hpclang_surface_draw_polygon(
+        shapes, triangle, 3u, 255u);
+    if (hpclang_surface_get_pixel(shapes, 1, 1) != 255u ||
+        hpclang_surface_get_pixel(shapes, 9, 1) != 255u ||
+        hpclang_surface_get_pixel(shapes, 5, 9) != 255u ||
+        hpclang_surface_get_pixel(shapes, 5, 4) != 0u)
+        fail("polygon outline");
+
+    hpclang_surface_clear(shapes, 0u);
+    hpclang_surface_fill_polygon(
+        shapes, triangle, 3u, 255u);
+    if (hpclang_surface_get_pixel(shapes, 5, 4) != 255u ||
+        hpclang_surface_get_pixel(shapes, 0, 10) != 0u)
+        fail("polygon fill");
+
+    hpclang_surface_destroy(shapes);
+
     struct hpclang_surface *owned = hpclang_surface_create_mono(10u, 4u);
     if (owned == NULL ||
         hpclang_surface_width(owned) != 10u ||
@@ -152,6 +197,6 @@ int main(void)
     hpclang_surface_destroy(owned);
     hpclang_surface_destroy(NULL);
 
-    puts("PASS: opaque surfaces, clipping, readback, ownership and blit.");
+    puts("PASS: opaque surfaces, clipping, shapes, readback, ownership and blit.");
     return EXIT_SUCCESS;
 }
