@@ -79,6 +79,29 @@ struct cpu_snapshot {
     uint32_t fiq_regs[5];
 };
 
+/*
+ * Stable LCD controller configuration that a stock-hosted HPC1 application
+ * must leave untouched. Interrupt pending/source registers are deliberately
+ * excluded because they are dynamic status rather than configuration.
+ */
+struct lcd_snapshot {
+    uint32_t lcdcon1;
+    uint32_t lcdcon2;
+    uint32_t lcdcon3;
+    uint32_t lcdcon4;
+    uint32_t lcdcon5;
+    uint32_t lcdsaddr1;
+    uint32_t lcdsaddr2;
+    uint32_t lcdsaddr3;
+    uint32_t redlut;
+    uint32_t greenlut;
+    uint32_t bluelut;
+    uint32_t dithmode;
+    uint32_t tpal;
+    uint32_t lcdintmsk;
+    uint32_t lpcsel;
+};
+
 struct e2e {
     hdw_t *hdw;
     uint8_t *stage0;
@@ -91,6 +114,8 @@ struct e2e {
     const char *json;
 
     struct cpu_snapshot stock;
+    struct lcd_snapshot stock_lcd;
+    uint32_t lcd_state_diff;
     uint32_t old_data;
     uint32_t old_code;
     uint32_t old_stage;
@@ -373,6 +398,76 @@ static uint32_t lcd_framebuffer_phys(struct e2e *s)
            ((v << 1) & 0x003ffffeu);
 }
 
+static void snapshot_lcd(
+    const s3c2410_lcd_t *lcd,
+    struct lcd_snapshot *snapshot)
+{
+    snapshot->lcdcon1 = lcd->lcdcon1;
+    snapshot->lcdcon2 = lcd->lcdcon2;
+    snapshot->lcdcon3 = lcd->lcdcon3;
+    snapshot->lcdcon4 = lcd->lcdcon4;
+    snapshot->lcdcon5 = lcd->lcdcon5;
+    snapshot->lcdsaddr1 = lcd->lcdsaddr1;
+    snapshot->lcdsaddr2 = lcd->lcdsaddr2;
+    snapshot->lcdsaddr3 = lcd->lcdsaddr3;
+    snapshot->redlut = lcd->redlut;
+    snapshot->greenlut = lcd->greenlut;
+    snapshot->bluelut = lcd->bluelut;
+    snapshot->dithmode = lcd->dithmode;
+    snapshot->tpal = lcd->tpal;
+    snapshot->lcdintmsk = lcd->lcdintmsk;
+    snapshot->lpcsel = lcd->lpcsel;
+}
+
+static uint32_t lcd_diff_mask(
+    const struct lcd_snapshot *expected,
+    const struct lcd_snapshot *actual)
+{
+    uint32_t mask = 0u;
+
+#define LCD_DIFF(bit, field) \
+    do { \
+        if (expected->field != actual->field) \
+            mask |= UINT32_C(1) << (bit); \
+    } while (0)
+
+    LCD_DIFF(0, lcdcon1);
+    LCD_DIFF(1, lcdcon2);
+    LCD_DIFF(2, lcdcon3);
+    LCD_DIFF(3, lcdcon4);
+    LCD_DIFF(4, lcdcon5);
+    LCD_DIFF(5, lcdsaddr1);
+    LCD_DIFF(6, lcdsaddr2);
+    LCD_DIFF(7, lcdsaddr3);
+    LCD_DIFF(8, redlut);
+    LCD_DIFF(9, greenlut);
+    LCD_DIFF(10, bluelut);
+    LCD_DIFF(11, dithmode);
+    LCD_DIFF(12, tpal);
+    LCD_DIFF(13, lcdintmsk);
+    LCD_DIFF(14, lpcsel);
+
+#undef LCD_DIFF
+
+    return mask;
+}
+
+static uint32_t check_lcd_state(struct e2e *s)
+{
+    struct lcd_snapshot current;
+    snapshot_lcd(
+        (const s3c2410_lcd_t *)s->hdw->s3c2410_lcd,
+        &current);
+
+    uint32_t diff = lcd_diff_mask(&s->stock_lcd, &current);
+    if (diff != 0u) {
+        fprintf(stderr,
+                "LCD configuration changed before stock restore: 0x%08x\n",
+                diff);
+    }
+    return diff;
+}
+
 static int snapshot_stock(struct e2e *s)
 {
     if (!guest_read32(s->hdw, L1_DATA_VA, &s->old_data) ||
@@ -420,6 +515,10 @@ static int snapshot_stock(struct e2e *s)
     }
 
     snapshot_cpu(&s->stock, s->hdw->cpu);
+    snapshot_lcd(
+        (const s3c2410_lcd_t *)s->hdw->s3c2410_lcd,
+        &s->stock_lcd);
+    s->lcd_state_diff = 0u;
     return 1;
 }
 
@@ -478,7 +577,8 @@ static void json(struct e2e *s, const char *status)
         "  \"stock_tcfg0\":\"0x%08x\",\n"
         "  \"stock_tcfg1\":\"0x%08x\",\n"
         "  \"stock_tcon\":\"0x%08x\",\n"
-        "  \"stock_tcntb0\":\"0x%08x\"\n"
+        "  \"stock_tcntb0\":\"0x%08x\",\n"
+        "  \"lcd_state_diff\":\"0x%08x\"\n"
         "}\n",
         status,
         s->result,
@@ -503,7 +603,8 @@ static void json(struct e2e *s, const char *status)
         s->stock_tcfg0,
         s->stock_tcfg1,
         s->stock_tcon,
-        s->stock_tcntb0);
+        s->stock_tcntb0,
+        s->lcd_state_diff);
     fclose(f);
 }
 
@@ -587,6 +688,12 @@ static void monitor(void *arg)
     }
 
     if (s->saw_pass && s->hdw->cpu->regs[15] == SENTINEL_VA) {
+        s->lcd_state_diff = check_lcd_state(s);
+        if (s->lcd_state_diff != 0u) {
+            fail(s, "lcd-state");
+            return;
+        }
+
         if (!restore_stock(s)) {
             fail(s, "restore");
             return;
