@@ -303,6 +303,10 @@ matter to the adapter design:
 - text is fixed advance and newline returns to the block's original x;
 - clipping is per graphics context: `hpg_clip_set` replaces the rectangle,
   `hpg_clip` intersects it, and `hpg_clip_reset` restores the full surface;
+- the historical clip upper bound is consumed as exclusive by `_hpg_draw`;
+  `hpg_clip_set` and `hpg_clip_reset` establish that bound differently at
+  the surface edge, so source compatibility should preserve the old behavior
+  in adapter tests instead of promoting it into hpclang's canonical geometry;
 - mono/gray4/gray16 off-screen images use 1/2/4 bits per pixel respectively,
   while `hpg_blit` permits differing source/destination depths;
 - circle drawing uses integer midpoint geometry and filled circles use
