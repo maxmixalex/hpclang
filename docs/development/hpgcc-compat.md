@@ -316,9 +316,15 @@ adapter. Mutable color/font/pattern/clip state belongs naturally in that
 adapter. Physical grayscale/page-flip compatibility is conditional on a
 platform backend that can save and restore stock LCD state reliably.
 
-The current font candidate deliberately uses independently sourced
+The merged canonical font layer deliberately uses independently sourced
 public-domain bitmap data. HPG's original glyph bitmaps remain historical
 evidence only and are not a source for hpclang implementation data.
+
+Historical PAINT/XOR and repeating pattern state are also adapter concerns.
+The old draw backends apply those policies through mutable `hpg_t` fields;
+they do not reveal an additional framebuffer capability that the canonical
+surface ABI must copy. XPM loaders are convenience importers over owned images,
+not a reason to expose historical image packing.
 
 ## Legacy screen API
 

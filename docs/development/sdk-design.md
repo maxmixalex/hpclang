@@ -211,7 +211,7 @@ for hpclang. Historical HPG stores one byte per glyph row and exposes a
 over caller-owned row data. Text drawing is fixed advance, and newline resets
 to the original x coordinate and advances by one font height.
 
-The `m7-font-text` candidate uses independently sourced public-domain
+The merged font/text layer uses independently sourced public-domain
 bitmaps and intentionally defines printable Basic Latin as the canonical v1
 repertoire. The same independent X11 source also contains printable Latin-1
 (0xA0-0xFF), but that does not reproduce HPG's calculator-specific/control
@@ -259,6 +259,14 @@ does not currently own that hardware. Physical mode changes must therefore
 remain deferred until every platform has an explicit save/restore contract and
 Stock E2E proves clean return. Software off-screen buffering does not have this
 restriction.
+
+Historical HPG's PAINT/XOR mode and repeating fill patterns are likewise
+graphics-context policy rather than surface representation. The clean core
+should not grow mutable `color/mode/pattern/font` fields to imitate
+`hpg_t`. A future HPG adapter can hold those fields and dispatch explicit
+surface operations. If non-HPG applications later need compositing, the
+candidate core shape is an explicit operation/blend argument, not hidden
+per-surface state.
 
 Legacy `hpscreen.h` calls such as `getLCDPointer`, display-plane selection,
 packed 4-bit sprite operations, and direct OR/XOR block drawing are
