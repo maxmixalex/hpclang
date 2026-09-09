@@ -345,8 +345,10 @@ implemented and pass the five-model Direct matrix. Model-neutral key
 translation remains deliberately pending until cross-family scan mappings are
 measured.
 
-The first opaque display surface and clipped clear/pixel/line/fill-rectangle
-primitives also pass the five-model Direct matrix. Rasterization is separated
+The first opaque display surface and clipped clear/pixel-readback/pixel-write/
+line/outline-rectangle/fill-rectangle primitives form the current primitive
+set. The previously implemented subset passes the five-model Direct matrix;
+new primitives close through the same gate before being marked validated. Rasterization is separated
 from physical-display acquisition and has host tests for packed-pixel padding,
 rectangle clipping, and extreme off-screen line clipping. The visible runtime
 validation page draws through this API instead of accessing the LCD framebuffer

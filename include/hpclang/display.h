@@ -32,6 +32,15 @@ void hpclang_surface_clear(
     struct hpclang_surface *surface,
     uint8_t intensity);
 
+/*
+ * Read one pixel as an hpclang intensity. Out-of-bounds coordinates read as
+ * white (0). The current two-level display returns either 0 or 255.
+ */
+uint8_t hpclang_surface_get_pixel(
+    const struct hpclang_surface *surface,
+    int32_t x,
+    int32_t y);
+
 void hpclang_surface_set_pixel(
     struct hpclang_surface *surface,
     int32_t x,
@@ -44,6 +53,19 @@ void hpclang_surface_draw_line(
     int32_t y0,
     int32_t x1,
     int32_t y1,
+    uint8_t intensity);
+
+/*
+ * Draw an outline rectangle. width/height are extents, not inclusive end
+ * coordinates. Like the other primitives, the outline is geometrically
+ * clipped rather than replaced by an outline of the clipped bounding box.
+ */
+void hpclang_surface_draw_rect(
+    struct hpclang_surface *surface,
+    int32_t x,
+    int32_t y,
+    int32_t width,
+    int32_t height,
     uint8_t intensity);
 
 void hpclang_surface_fill_rect(

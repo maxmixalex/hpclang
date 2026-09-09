@@ -158,6 +158,22 @@ void hpclang_surface_clear(
     }
 }
 
+uint8_t hpclang_surface_get_pixel(
+    const struct hpclang_surface *surface,
+    int32_t x,
+    int32_t y)
+{
+    if (x < 0 || y < 0 ||
+        (uint32_t)x >= surface->width ||
+        (uint32_t)y >= surface->height)
+        return 0u;
+
+    const volatile uint8_t *pixel =
+        surface->pixels + (uint32_t)y * surface->stride + ((uint32_t)x >> 3);
+    uint8_t mask = (uint8_t)(1u << ((uint32_t)x & 7u));
+    return (*pixel & mask) != 0u ? 255u : 0u;
+}
+
 void hpclang_surface_set_pixel(
     struct hpclang_surface *surface,
     int32_t x,
@@ -179,19 +195,14 @@ void hpclang_surface_set_pixel(
         *pixel &= (uint8_t)~mask;
 }
 
-void hpclang_surface_draw_line(
+static void draw_line(
     struct hpclang_surface *surface,
-    int32_t x0_value,
-    int32_t y0_value,
-    int32_t x1_value,
-    int32_t y1_value,
+    int64_t x0,
+    int64_t y0,
+    int64_t x1,
+    int64_t y1,
     uint8_t intensity)
 {
-    int64_t x0 = x0_value;
-    int64_t y0 = y0_value;
-    int64_t x1 = x1_value;
-    int64_t y1 = y1_value;
-
     if (!clip_line(surface, &x0, &y0, &x1, &y1))
         return;
 
@@ -218,6 +229,42 @@ void hpclang_surface_draw_line(
             y0 += sy;
         }
     }
+}
+
+void hpclang_surface_draw_line(
+    struct hpclang_surface *surface,
+    int32_t x0,
+    int32_t y0,
+    int32_t x1,
+    int32_t y1,
+    uint8_t intensity)
+{
+    draw_line(surface, x0, y0, x1, y1, intensity);
+}
+
+void hpclang_surface_draw_rect(
+    struct hpclang_surface *surface,
+    int32_t x,
+    int32_t y,
+    int32_t width,
+    int32_t height,
+    uint8_t intensity)
+{
+    if (width <= 0 || height <= 0)
+        return;
+
+    int64_t left = x;
+    int64_t top = y;
+    int64_t right = left + (int64_t)width - 1;
+    int64_t bottom = top + (int64_t)height - 1;
+
+    draw_line(surface, left, top, right, top, intensity);
+    if (bottom != top)
+        draw_line(surface, left, bottom, right, bottom, intensity);
+
+    draw_line(surface, left, top, left, bottom, intensity);
+    if (right != left)
+        draw_line(surface, right, top, right, bottom, intensity);
 }
 
 void hpclang_surface_fill_rect(
