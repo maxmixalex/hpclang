@@ -69,8 +69,16 @@ int main(void)
     hpclang_surface_set_pixel(&surface, -1, 0, 255u);
     hpclang_surface_set_pixel(&surface, 10, 0, 255u);
     expect_row(0u, (1u << 0) | (1u << 9));
+    if (hpclang_surface_get_pixel(&surface, 0, 0) != 255u ||
+        hpclang_surface_get_pixel(&surface, 9, 0) != 255u ||
+        hpclang_surface_get_pixel(&surface, -1, 0) != 0u ||
+        hpclang_surface_get_pixel(&surface, 10, 0) != 0u)
+        fail("pixel readback");
+
     hpclang_surface_set_pixel(&surface, 9, 0, 0u);
     expect_row(0u, 1u << 0);
+    if (hpclang_surface_get_pixel(&surface, 9, 0) != 0u)
+        fail("cleared pixel readback");
 
     hpclang_surface_clear(&surface, 0u);
     hpclang_surface_fill_rect(&surface, -2, -1, 5, 3, 255u);
@@ -100,6 +108,21 @@ int main(void)
     expect_row(2u, 1u << 2);
     expect_row(3u, 1u << 3);
 
-    puts("PASS: opaque surface clipping and packed-pixel primitives.");
+    /* Clipping an outline must not invent borders at clipped edges. */
+    hpclang_surface_clear(&surface, 0u);
+    hpclang_surface_draw_rect(&surface, -2, -1, 5, 4, 255u);
+    expect_row(0u, 1u << 2);
+    expect_row(1u, 1u << 2);
+    expect_row(2u, 0x007u);
+    expect_row(3u, 0u);
+
+    hpclang_surface_draw_rect(
+        &surface, INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX, 255u);
+    expect_row(0u, 1u << 2);
+    expect_row(1u, 1u << 2);
+    expect_row(2u, 0x007u);
+    expect_row(3u, 0u);
+
+    puts("PASS: opaque surface clipping, readback and packed-pixel primitives.");
     return EXIT_SUCCESS;
 }

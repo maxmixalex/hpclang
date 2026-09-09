@@ -23,7 +23,11 @@ extern "C" int hpclang_m7_cxx_probe(void)
      * Exercise the C++ surface wrapper without changing the visible result:
      * fully clipped drawing must be a no-op.
      */
+    if (surface.get_pixel(-1, -1) != 0u)
+        return 3;
+
     surface.set_pixel(-1, -1, 255u);
+    surface.draw_rect(-10, -10, 2, 2, 255u);
     surface.fill_rect(-10, -10, 2, 2, 255u);
     return 0;
 }

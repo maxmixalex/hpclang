@@ -34,6 +34,13 @@ public:
         ::hpclang_surface_clear(surface_, intensity);
     }
 
+    [[nodiscard]] std::uint8_t get_pixel(
+        std::int32_t x,
+        std::int32_t y) const noexcept
+    {
+        return ::hpclang_surface_get_pixel(surface_, x, y);
+    }
+
     void set_pixel(
         std::int32_t x,
         std::int32_t y,
@@ -51,6 +58,17 @@ public:
     {
         ::hpclang_surface_draw_line(
             surface_, x0, y0, x1, y1, intensity);
+    }
+
+    void draw_rect(
+        std::int32_t x,
+        std::int32_t y,
+        std::int32_t width,
+        std::int32_t height,
+        std::uint8_t intensity) const noexcept
+    {
+        ::hpclang_surface_draw_rect(
+            surface_, x, y, width, height, intensity);
     }
 
     void fill_rect(

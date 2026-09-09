@@ -162,8 +162,9 @@ See [SDK API design](sdk-design.md).
 M7.1 implementation is active. Device information, stock-preserving
 monotonic time, raw keyboard snapshots, debounced/repeating keyboard events,
 and the first opaque display-surface primitives pass five-model Direct E2E.
-The remaining first-slice closure is the new C++23 wrapper/runtime probe and
-then a representative application example rather than more bootstrap work.
+The C++23 wrappers over real time/display services also pass the five-model
+Direct matrix. The remaining first-slice closure is a representative
+application example rather than more bootstrap work.
 
 The minimum cross-platform service set should cover:
 
@@ -205,6 +206,10 @@ After the common services exist:
 - document source-porting guidance from common HPGCC 1.x/2.x APIs where useful;
 - decide which compatibility wrappers are worth maintaining;
 - establish a stable packaging/build UX from a fresh LLVM-only checkout;
+- replace the remaining historical ARMToolbox/library-275 stock-launch boundary
+  with a minimal independently implemented launcher if doing so materially
+  improves packaging or portability; this is not a prerequisite for HPC1 or
+  the M7 service APIs;
 - separate public application documentation from this internal Development
   reference.
 
