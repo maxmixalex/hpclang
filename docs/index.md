@@ -23,6 +23,7 @@ HP 39g+ support builds and the read-only flash-dump mechanism has been verified,
 - [Application ABI](development/abi.md) — the stable HPC1 execution format and boot record.
 - [Platforms](development/platforms.md) — model identities, family grouping, and model-specific differences.
 - [Validation](development/validation.md) — what the continuous gates prove and what constitutes PASS.
+- [API reference and parity](development/api-reference.md) — current APIs, validation state, and version-by-version HPGCC progress.
 - [E2E internals](development/e2e.md) — target profiles, sequence files, x50ng integration, and stock transfer mechanisms.
 - [Fixture provenance](development/fixtures.md) — where firmware/full-NOR inputs come from and how they are verified.
 - [Roadmap](development/roadmap.md) — M0–M8 milestones and remaining work.

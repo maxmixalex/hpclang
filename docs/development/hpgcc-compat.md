@@ -4,6 +4,9 @@ This page records the M7.0 source-compatibility inventory. It is intentionally
 separate from the hpclang core API design: historical names are inputs to the
 compatibility layer, not automatically names for the new core API.
 
+For the current implementation dashboard and application-facing signatures, see
+[API reference and HPGCC parity](api-reference.md).
+
 ## Sources and method
 
 The comparison now uses four complete historical distribution archives as
