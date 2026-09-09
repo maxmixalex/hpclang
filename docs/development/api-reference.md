@@ -80,10 +80,10 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_set_pixel()` | ✅ | Clipped pixel write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line; extreme off-screen spans clip before rasterization. |
 | `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
-| `hpclang_surface_blit()` | 🧪 | Representation-independent clipped copy with same-surface overlap support. Current matrix running. |
+| `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct PASS; full-stock HP48 rerun pending after an unrelated UI-sequence flake. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | 🧪 | Explicit heap-owned two-level off-screen surface. Current matrix running. |
-| `hpclang::surface_ref` | ✅ / 🧪 | Zero-owning C++ wrapper; readback/outline are validated, while owned-surface/blit runtime coverage is running. |
+| `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct PASS; full-stock HP48 rerun pending after an unrelated UI-sequence flake. |
+| `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
 
 ## Validation by service
 
@@ -95,7 +95,7 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
 | keyboard events | ✅ | ✅ | 5/5 DOWN/UP PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
-| owned mono surface + blit | ✅ host | ✅ | current matrix running | current stock matrix running |
+| owned mono surface + blit | ✅ | ✅ | 5/5 PASS | HP39/40 + HP49/50 PASS; HP48 rerun pending |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
 
