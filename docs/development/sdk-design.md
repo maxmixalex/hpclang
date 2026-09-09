@@ -292,15 +292,21 @@ Compiler/language features that do not require unavailable OS facilities are
 expected to work, but the SDK must explicitly test the C++ standard level it
 claims.
 
-The next C++ validation work should cover:
+Current C++23 validation covers:
 
 - an explicit `-std=c++23` compile/link smoke;
 - templates, concepts, lambdas, constexpr/consteval;
 - `std::array`, `std::span`, `std::optional`, `std::string`, and
   `std::vector`;
-- allocation/new/delete at runtime;
-- global construction and destruction on the emulator;
-- C++ wrappers over at least one real M7 service.
+- heap-backed standard-library objects;
+- global construction;
+- header-only wrappers over the real monotonic-time and display-surface M7
+  services.
+
+The visible emulator payload now contains a C++23 translation unit that queries
+the real display surface and exercises monotonic time/delay before returning to
+the C validation program. Five-model runtime closure for that probe is tracked
+separately from compile/link coverage.
 
 Exceptions, RTTI, threading, locale-heavy facilities, iostream/file streams,
 and `std::filesystem` are separate capabilities. They should not be claimed
@@ -324,14 +330,17 @@ PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
 than deadlock if the stock clock service becomes unavailable.
 
 Raw keyboard state and the polled debounce/repeat event service are now
-implemented. Model-neutral key translation remains deliberately pending until
-cross-family scan mappings are measured.
+implemented and pass the five-model Direct matrix. Model-neutral key
+translation remains deliberately pending until cross-family scan mappings are
+measured.
 
 The first opaque display surface and clipped clear/pixel/line/fill-rectangle
-primitives are also implemented. The visible runtime validation page now draws
-through this API instead of accessing the LCD framebuffer directly. Broader
-HPG compatibility still requires owned images, blitting, fonts, clip state and
-additional drawing primitives.
+primitives also pass the five-model Direct matrix. Rasterization is separated
+from physical-display acquisition and has host tests for packed-pixel padding,
+rectangle clipping, and extreme off-screen line clipping. The visible runtime
+validation page draws through this API instead of accessing the LCD framebuffer
+directly. Broader HPG compatibility still requires owned images, blitting,
+fonts, clip state and additional drawing primitives.
 
 Together these services are sufficient for a small interactive program and can
 be validated without first solving persistent storage or RPL object lifetime.
