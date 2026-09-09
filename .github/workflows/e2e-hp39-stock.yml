@@ -7,6 +7,13 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "include/hpclang/**"
+      - "tests/hp39-visible-smoke.c"
+      - "tests/hp39-runtime-diag.c"
+      - "tests/m7-cxx-probe.cpp"
       - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
