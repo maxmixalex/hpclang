@@ -291,6 +291,35 @@ GGL documentation still exposes fixed LCD constants for its target environment,
 which reinforces that it is a target-specific graphics layer rather than a
 portable API contract.
 
+### Implementation evidence and compatibility boundary
+
+A source audit of the mature HPG implementation confirms several contracts that
+matter to the adapter design:
+
+- minifont is 6 pixels high with advance 4; bigfont is 8 pixels high with
+  advance 6;
+- both historical built-ins advertise 256 byte-indexed glyphs, while custom
+  fonts are descriptors over caller-owned `count * height` row bytes;
+- text is fixed advance and newline returns to the block's original x;
+- clipping is per graphics context: `hpg_clip_set` replaces the rectangle,
+  `hpg_clip` intersects it, and `hpg_clip_reset` restores the full surface;
+- mono/gray4/gray16 off-screen images use 1/2/4 bits per pixel respectively,
+  while `hpg_blit` permits differing source/destination depths;
+- circle drawing uses integer midpoint geometry and filled circles use
+  horizontal spans; polygon filling uses a scanline edge algorithm;
+- physical mode changes and `hpg_flip` manipulate LCD mode/buffer ownership,
+  including physical framebuffer allocation and LCD address registers.
+
+These facts do **not** imply that the clean core should reproduce `hpg_t`.
+Geometry and software surfaces can be implemented independently beneath an HPG
+adapter. Mutable color/font/pattern/clip state belongs naturally in that
+adapter. Physical grayscale/page-flip compatibility is conditional on a
+platform backend that can save and restore stock LCD state reliably.
+
+The current font candidate deliberately uses independently sourced
+public-domain bitmap data. HPG's original glyph bitmaps remain historical
+evidence only and are not a source for hpclang implementation data.
+
 ## Legacy screen API
 
 The 15 implementation names are unchanged between 1.1 and 2.0:
