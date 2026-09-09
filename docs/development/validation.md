@@ -83,6 +83,23 @@ before 110 seconds. The former 95-second resume point could race a valid slow
 transfer that completed around 97 seconds and produce a misleading `Too Few
 Arguments` UI failure even though serial transfer itself succeeded.
 
+## HP49g+/50g stream-storage gate
+
+M7.2 validates storage through **standard picolibc stdio**, not a public KOS
+API. The Stock SD fixture contains a known read file and a longer pre-existing
+output file. The calculator payload must:
+
+1. `fopen/fread/fclose` the known input;
+2. open the output as `w+b` and prove create/truncate semantics;
+3. `fwrite` + `fflush`;
+4. seek to a nonzero offset and read back through the same stream;
+5. close, reopen read-only, and prove the old tail was truncated.
+
+The runtime backend underneath those calls is hp4950-only
+`open/close/read/write/lseek/unlink` over the stock KOS filesystem table.
+HP39/40 calculator objects are deliberately excluded from this byte-stream
+gate.
+
 ## HP 49g+/50g stock emulator gate
 
 The `Stock / hp4950` family job uses each model's native ARM bootloader with the shared official 2.15 OS image.

@@ -439,6 +439,12 @@ hpclang provides the underlying storage hooks required by picolibc. A Stock
 HP49g+/HP50g probe has already resolved KOS filesystem entries and
 successfully opened/read/closed a known SD file from HPC1.
 
+The `m7-storage-stdio` candidate now implements those hooks privately:
+`open/close/read/write/lseek/unlink` resolve the stock KOS filesystem table
+at runtime only on the hp4950 family. Picolibc remains the public stdio layer.
+The E2E consumer intentionally uses ordinary `FILE *` calls to validate that
+the compatibility route is real rather than a test-only KOS wrapper.
+
 HP39gs/40gs must be treated separately: they have a stock calculator object
 store with named Note/Program/Zaplet(Aplet)/Variable/List/Matrix/Library
 objects and `HP39DIR.000` / `HP39DIR.CUR` directory metadata. That is
