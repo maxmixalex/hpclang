@@ -193,8 +193,10 @@ legacy state and forward primitive operations to an hpclang surface. A
 canonical draw-context type should be added only if non-HPG applications
 actually need shared mutable drawing state.
 
-Off-screen owned surfaces, blitting, fonts, clipping state, grayscale/double
-buffering, and composite modes remain later display work. None of them should
+Owned monochrome surfaces and representation-independent blitting now provide
+the next surface layer. Fonts should build on that ownership/copy boundary.
+Clipping state, grayscale/double buffering, and composite modes remain later
+display work. None of them should
 require exposing the physical framebuffer representation.
 
 ### Keyboard
