@@ -196,8 +196,66 @@ actually need shared mutable drawing state.
 Owned monochrome surfaces and representation-independent blitting now provide
 the next surface layer. Fonts should build on that ownership/copy boundary.
 Clipping state, grayscale/double buffering, and composite modes remain later
-display work. None of them should
-require exposing the physical framebuffer representation.
+display work. None of them should require exposing the physical framebuffer
+representation.
+
+### Font/text and display research checkpoint
+
+The historical HPG implementations sharpen the next boundary rather than
+changing the existing surface design.
+
+**Fonts and text.** HPG's built-in minifont and bigfont are fixed-advance
+bitmap fonts with the same 6/4 and 8/6 height/advance metrics already selected
+for hpclang. Historical HPG stores one byte per glyph row and exposes a
+256-entry byte-indexed font namespace; custom fonts are lightweight descriptors
+over caller-owned row data. Text drawing is fixed advance, and newline resets
+to the original x coordinate and advances by one font height.
+
+The experimental `m7-font-text` implementation already passes host, five-model
+Direct, and five-model Stock gates, but its independently sourced public-domain
+built-ins currently cover printable Basic Latin only. The same independent
+X11 bitmap source also contains printable Latin-1 (0xA0-0xFF), but not HPG's
+calculator-specific/control glyph range. Therefore font closure must decide
+the public byte repertoire explicitly rather than silently claiming that a
+95-glyph font reproduces HPG's 256-entry built-ins. Exact HPG bitmap data is
+not copied into hpclang.
+
+Custom HPG font allocation does not force a mutable font subsystem into the
+core. An HPG compatibility adapter can retain the historical caller-owned
+bitmap descriptor and rasterize through the same explicit surface primitives.
+The canonical API should only grow a custom-font constructor if a non-HPG
+application demonstrates that need.
+
+**Screen and graphics.** Historical `hpg_t` combines surface storage, color,
+PAINT/XOR mode, font, fill pattern, and a mutable clip rectangle. hpclang should
+continue to keep the core surface explicit and avoid making that legacy
+graphics context its canonical state model.
+
+The next safe, representation-independent primitives are circles and polygons,
+followed by a deliberate clipping abstraction if application code needs a clip
+region beyond the surface bounds. A clip rectangle should not become hidden
+global state; a lightweight draw context/surface view or another explicit
+mechanism is preferable.
+
+Software-owned grayscale surfaces are also separable from physical LCD mode
+ownership. Historical HPG allocates 1-, 2-, and 4-bpp off-screen images and
+uses the same drawing/blit interface across them. hpclang can generalize its
+private surface representation in that direction without exposing packing.
+
+Physical grayscale mode switching, hardware double buffering, and page flipping
+are a different category. Historical HPG allocates physical framebuffers,
+changes LCD mode, synchronizes the controller, and rewrites LCD address
+registers during `hpg_flip()`; its runtime relies on surrounding CRT startup/
+shutdown code to restore display hardware. A stock-hosted hpclang application
+does not currently own that hardware. Physical mode changes must therefore
+remain deferred until every platform has an explicit save/restore contract and
+Stock E2E proves clean return. Software off-screen buffering does not have this
+restriction.
+
+Legacy `hpscreen.h` calls such as `getLCDPointer`, display-plane selection,
+packed 4-bit sprite operations, and direct OR/XOR block drawing are
+representation-specific compatibility/migration facilities. They must not leak
+framebuffer addresses or packing into the core surface ABI.
 
 ### Keyboard
 
