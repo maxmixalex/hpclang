@@ -198,48 +198,264 @@ static uint32_t expected_family(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
-static uint16_t expected_family_key(uint32_t model)
+struct expected_key_event {
+    uint8_t scan;
+    uint16_t key;
+    uint32_t down_modifiers;
+};
+
+#define E(scan, key) { scan##u, key, 0u }
+#define EM(scan, key, mods) { scan##u, key, mods }
+
+static const struct expected_key_event hp39_keyboard[] = {
+    E(0, HPCLANG_KEY_HP39_DEL),
+    E(1, HPCLANG_KEY_HP39_LOG),
+    E(2, HPCLANG_KEY_DIVIDE),
+    E(3, HPCLANG_KEY_MULTIPLY),
+    E(4, HPCLANG_KEY_MINUS),
+    E(5, HPCLANG_KEY_PLUS),
+    E(6, HPCLANG_KEY_ENTER),
+    E(7, HPCLANG_KEY_HP39_X_THETA_T),
+    E(8, HPCLANG_KEY_HP39_LN),
+    E(9, HPCLANG_KEY_HP39_RIGHT_PAREN),
+    E(10, HPCLANG_KEY_9),
+    E(11, HPCLANG_KEY_6),
+    E(12, HPCLANG_KEY_3),
+    E(13, HPCLANG_KEY_HP39_NEGATE),
+    E(14, HPCLANG_KEY_HP39_DERIVATIVE),
+    E(15, HPCLANG_KEY_HP39_TAN),
+    E(16, HPCLANG_KEY_HP39_LEFT_PAREN),
+    E(17, HPCLANG_KEY_8),
+    E(18, HPCLANG_KEY_5),
+    E(19, HPCLANG_KEY_2),
+    E(20, HPCLANG_KEY_PERIOD),
+    E(21, HPCLANG_KEY_HP39_MATH),
+    E(22, HPCLANG_KEY_HP39_COS),
+    E(23, HPCLANG_KEY_HP39_POWER),
+    E(24, HPCLANG_KEY_7),
+    E(25, HPCLANG_KEY_4),
+    E(26, HPCLANG_KEY_1),
+    E(27, HPCLANG_KEY_0),
+    E(28, HPCLANG_KEY_HP39_VARS),
+    E(29, HPCLANG_KEY_HP39_SIN),
+    E(30, HPCLANG_KEY_HP39_SQUARE),
+    E(35, HPCLANG_KEY_F1),
+    E(36, HPCLANG_KEY_F2),
+    E(37, HPCLANG_KEY_F3),
+    E(38, HPCLANG_KEY_F4),
+    E(39, HPCLANG_KEY_F5),
+    E(40, HPCLANG_KEY_F6),
+    E(41, HPCLANG_KEY_HP39_SYMB),
+    E(42, HPCLANG_KEY_UP),
+    E(43, HPCLANG_KEY_LEFT),
+    E(44, HPCLANG_KEY_DOWN),
+    E(45, HPCLANG_KEY_RIGHT),
+    E(46, HPCLANG_KEY_HP39_PLOT),
+    E(47, HPCLANG_KEY_HP39_NUM),
+    E(48, HPCLANG_KEY_HP39_HOME),
+    E(49, HPCLANG_KEY_HP39_APLET),
+    E(50, HPCLANG_KEY_HP39_VIEWS),
+    EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
+    E(57, HPCLANG_KEY_HP39_COMMA),
+    EM(58, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+    EM(59, HPCLANG_KEY_HP39_SHIFT, HPCLANG_KEYBOARD_MOD_SHIFT),
+};
+
+static const struct expected_key_event hp48_keyboard[] = {
+    E(0, HPCLANG_KEY_HP48_BACKSPACE),
+    E(1, HPCLANG_KEY_HP48_TAN),
+    E(2, HPCLANG_KEY_DIVIDE),
+    E(3, HPCLANG_KEY_MULTIPLY),
+    E(4, HPCLANG_KEY_MINUS),
+    E(5, HPCLANG_KEY_PLUS),
+    E(6, HPCLANG_KEY_ENTER),
+    E(7, HPCLANG_KEY_HP48_SYMB),
+    E(8, HPCLANG_KEY_HP48_COS),
+    E(9, HPCLANG_KEY_HP48_RECIPROCAL),
+    E(10, HPCLANG_KEY_9),
+    E(11, HPCLANG_KEY_6),
+    E(12, HPCLANG_KEY_3),
+    E(13, HPCLANG_KEY_HP48_SPACE),
+    E(14, HPCLANG_KEY_HP48_QUOTE),
+    E(15, HPCLANG_KEY_HP48_SIN),
+    E(16, HPCLANG_KEY_HP48_X),
+    E(17, HPCLANG_KEY_8),
+    E(18, HPCLANG_KEY_5),
+    E(19, HPCLANG_KEY_2),
+    E(20, HPCLANG_KEY_PERIOD),
+    E(21, HPCLANG_KEY_HP48_EVAL),
+    E(22, HPCLANG_KEY_HP48_SQRT),
+    E(23, HPCLANG_KEY_HP48_NEGATE),
+    E(24, HPCLANG_KEY_7),
+    E(25, HPCLANG_KEY_4),
+    E(26, HPCLANG_KEY_1),
+    E(27, HPCLANG_KEY_0),
+    E(28, HPCLANG_KEY_HP48_HIST),
+    E(29, HPCLANG_KEY_HP48_POWER),
+    E(30, HPCLANG_KEY_HP48_EEX),
+    E(35, HPCLANG_KEY_F1),
+    E(36, HPCLANG_KEY_F2),
+    E(37, HPCLANG_KEY_F3),
+    E(38, HPCLANG_KEY_F4),
+    E(39, HPCLANG_KEY_F5),
+    E(40, HPCLANG_KEY_F6),
+    E(41, HPCLANG_KEY_HP48_APPS),
+    E(42, HPCLANG_KEY_UP),
+    E(43, HPCLANG_KEY_LEFT),
+    E(44, HPCLANG_KEY_DOWN),
+    E(45, HPCLANG_KEY_RIGHT),
+    E(46, HPCLANG_KEY_HP48_MODE),
+    E(47, HPCLANG_KEY_HP48_TOOL),
+    E(48, HPCLANG_KEY_HP48_VAR),
+    E(49, HPCLANG_KEY_HP48_STO),
+    E(50, HPCLANG_KEY_HP48_NXT),
+    EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
+    EM(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+    EM(58, HPCLANG_KEY_LEFT_SHIFT,
+       HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    EM(59, HPCLANG_KEY_RIGHT_SHIFT,
+       HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+};
+
+#define HP4950_SHARED(scan, key) E(scan, key)
+#define HP4950_SHARED_MOD(scan, key, mods) EM(scan, key, mods)
+
+static const struct expected_key_event hp49_keyboard[] = {
+    HP4950_SHARED(0, HPCLANG_KEY_HP4950_BACKSPACE),
+    HP4950_SHARED(1, HPCLANG_KEY_HP4950_TAN),
+    E(2, HPCLANG_KEY_DIVIDE),
+    E(3, HPCLANG_KEY_MULTIPLY),
+    E(4, HPCLANG_KEY_MINUS),
+    E(5, HPCLANG_KEY_PLUS),
+    E(6, HPCLANG_KEY_ENTER),
+    HP4950_SHARED(7, HPCLANG_KEY_HP4950_SYMB),
+    HP4950_SHARED(8, HPCLANG_KEY_HP4950_COS),
+    HP4950_SHARED(9, HPCLANG_KEY_HP4950_RECIPROCAL),
+    E(10, HPCLANG_KEY_9),
+    E(11, HPCLANG_KEY_6),
+    E(12, HPCLANG_KEY_3),
+    HP4950_SHARED(13, HPCLANG_KEY_HP4950_SPACE),
+    E(14, HPCLANG_KEY_HP49_EQW),
+    HP4950_SHARED(15, HPCLANG_KEY_HP4950_SIN),
+    HP4950_SHARED(16, HPCLANG_KEY_HP4950_X),
+    E(17, HPCLANG_KEY_8),
+    E(18, HPCLANG_KEY_5),
+    E(19, HPCLANG_KEY_2),
+    E(20, HPCLANG_KEY_PERIOD),
+    E(21, HPCLANG_KEY_HP49_CAT),
+    HP4950_SHARED(22, HPCLANG_KEY_HP4950_SQRT),
+    HP4950_SHARED(23, HPCLANG_KEY_HP4950_NEGATE),
+    E(24, HPCLANG_KEY_7),
+    E(25, HPCLANG_KEY_4),
+    E(26, HPCLANG_KEY_1),
+    E(27, HPCLANG_KEY_0),
+    HP4950_SHARED(28, HPCLANG_KEY_HP4950_HIST),
+    HP4950_SHARED(29, HPCLANG_KEY_HP4950_POWER),
+    HP4950_SHARED(30, HPCLANG_KEY_HP4950_EEX),
+    E(35, HPCLANG_KEY_F1),
+    E(36, HPCLANG_KEY_F2),
+    E(37, HPCLANG_KEY_F3),
+    E(38, HPCLANG_KEY_F4),
+    E(39, HPCLANG_KEY_F5),
+    E(40, HPCLANG_KEY_F6),
+    HP4950_SHARED(41, HPCLANG_KEY_HP4950_APPS),
+    E(42, HPCLANG_KEY_UP),
+    E(43, HPCLANG_KEY_LEFT),
+    E(44, HPCLANG_KEY_DOWN),
+    E(45, HPCLANG_KEY_RIGHT),
+    HP4950_SHARED(46, HPCLANG_KEY_HP4950_MODE),
+    HP4950_SHARED(47, HPCLANG_KEY_HP4950_TOOL),
+    HP4950_SHARED(48, HPCLANG_KEY_HP4950_VAR),
+    HP4950_SHARED(49, HPCLANG_KEY_HP4950_STO),
+    HP4950_SHARED(50, HPCLANG_KEY_HP4950_NXT),
+    EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
+    HP4950_SHARED_MOD(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+    HP4950_SHARED_MOD(
+        58, HPCLANG_KEY_LEFT_SHIFT,
+        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    HP4950_SHARED_MOD(
+        59, HPCLANG_KEY_RIGHT_SHIFT,
+        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+};
+
+static const struct expected_key_event hp50_keyboard[] = {
+    HP4950_SHARED(0, HPCLANG_KEY_HP4950_BACKSPACE),
+    HP4950_SHARED(1, HPCLANG_KEY_HP4950_TAN),
+    E(2, HPCLANG_KEY_DIVIDE),
+    E(3, HPCLANG_KEY_MULTIPLY),
+    E(4, HPCLANG_KEY_MINUS),
+    E(5, HPCLANG_KEY_PLUS),
+    E(6, HPCLANG_KEY_ENTER),
+    HP4950_SHARED(7, HPCLANG_KEY_HP4950_SYMB),
+    HP4950_SHARED(8, HPCLANG_KEY_HP4950_COS),
+    HP4950_SHARED(9, HPCLANG_KEY_HP4950_RECIPROCAL),
+    E(10, HPCLANG_KEY_9),
+    E(11, HPCLANG_KEY_6),
+    E(12, HPCLANG_KEY_3),
+    HP4950_SHARED(13, HPCLANG_KEY_HP4950_SPACE),
+    E(14, HPCLANG_KEY_HP50_QUOTE),
+    HP4950_SHARED(15, HPCLANG_KEY_HP4950_SIN),
+    HP4950_SHARED(16, HPCLANG_KEY_HP4950_X),
+    E(17, HPCLANG_KEY_8),
+    E(18, HPCLANG_KEY_5),
+    E(19, HPCLANG_KEY_2),
+    E(20, HPCLANG_KEY_PERIOD),
+    E(21, HPCLANG_KEY_HP50_EVAL),
+    HP4950_SHARED(22, HPCLANG_KEY_HP4950_SQRT),
+    HP4950_SHARED(23, HPCLANG_KEY_HP4950_NEGATE),
+    E(24, HPCLANG_KEY_7),
+    E(25, HPCLANG_KEY_4),
+    E(26, HPCLANG_KEY_1),
+    E(27, HPCLANG_KEY_0),
+    HP4950_SHARED(28, HPCLANG_KEY_HP4950_HIST),
+    HP4950_SHARED(29, HPCLANG_KEY_HP4950_POWER),
+    HP4950_SHARED(30, HPCLANG_KEY_HP4950_EEX),
+    E(35, HPCLANG_KEY_F1),
+    E(36, HPCLANG_KEY_F2),
+    E(37, HPCLANG_KEY_F3),
+    E(38, HPCLANG_KEY_F4),
+    E(39, HPCLANG_KEY_F5),
+    E(40, HPCLANG_KEY_F6),
+    HP4950_SHARED(41, HPCLANG_KEY_HP4950_APPS),
+    E(42, HPCLANG_KEY_UP),
+    E(43, HPCLANG_KEY_LEFT),
+    E(44, HPCLANG_KEY_DOWN),
+    E(45, HPCLANG_KEY_RIGHT),
+    HP4950_SHARED(46, HPCLANG_KEY_HP4950_MODE),
+    HP4950_SHARED(47, HPCLANG_KEY_HP4950_TOOL),
+    HP4950_SHARED(48, HPCLANG_KEY_HP4950_VAR),
+    HP4950_SHARED(49, HPCLANG_KEY_HP4950_STO),
+    HP4950_SHARED(50, HPCLANG_KEY_HP4950_NXT),
+    EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
+    HP4950_SHARED_MOD(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+    HP4950_SHARED_MOD(
+        58, HPCLANG_KEY_LEFT_SHIFT,
+        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    HP4950_SHARED_MOD(
+        59, HPCLANG_KEY_RIGHT_SHIFT,
+        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+};
+
+#undef HP4950_SHARED_MOD
+#undef HP4950_SHARED
+#undef EM
+#undef E
+
+static const struct expected_key_event *expected_keyboard(
+    uint32_t model,
+    size_t *count)
 {
+    *count = 51u;
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS)
-        return HPCLANG_KEY_HP39_SYMB;
+        return hp39_keyboard;
     if (model == HPCLANG_MODEL_HP48GII)
-        return HPCLANG_KEY_HP48_APPS;
-    if (model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G)
-        return HPCLANG_KEY_HP4950_APPS;
-    return HPCLANG_KEY_UNKNOWN;
-}
-
-static int wait_key_transition(uint16_t expected)
-{
-    struct hpclang_keyboard_event event;
-    int down_scan = -1;
-    uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
-
-    while (hpclang_time_monotonic_us() < deadline) {
-        if (!hpclang_keyboard_event_poll(&event))
-            continue;
-        if (event.type == HPCLANG_KEYBOARD_EVENT_DOWN &&
-            event.scan_code < 60u) {
-            if (event.key != expected)
-                return 0;
-            down_scan = (int)event.scan_code;
-            break;
-        }
-    }
-
-    if (down_scan < 0)
-        return 0;
-
-    deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
-    while (hpclang_time_monotonic_us() < deadline) {
-        if (!hpclang_keyboard_event_poll(&event))
-            continue;
-        if (event.type == HPCLANG_KEYBOARD_EVENT_UP &&
-            event.scan_code == (uint8_t)down_scan)
-            return event.key == expected;
-    }
-
-    return 0;
+        return hp48_keyboard;
+    if (model == HPCLANG_MODEL_HP49GPLUS)
+        return hp49_keyboard;
+    if (model == HPCLANG_MODEL_HP50G)
+        return hp50_keyboard;
+    *count = 0u;
+    return NULL;
 }
 
 static int keyboard_transition(uint32_t model)
@@ -248,21 +464,46 @@ static int keyboard_transition(uint32_t model)
     hpclang_keyboard_read(&raw);
     if (hpclang_keyboard_any_is_down(&raw))
         return 0;
-    if (hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ON) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF4) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF5) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF6))
-        return 0;
 
     hpclang_keyboard_events_set_timing(5000u, 500000u, 0u);
     hpclang_keyboard_events_reset();
 
-    if (!wait_key_transition(HPCLANG_KEY_ENTER))
+    size_t count = 0u;
+    const struct expected_key_event *expected = expected_keyboard(model, &count);
+    if (expected == NULL || count != 51u)
         return 0;
 
-    uint16_t family_key = expected_family_key(model);
-    return family_key != HPCLANG_KEY_UNKNOWN &&
-           wait_key_transition(family_key);
+    size_t index = 0u;
+    int awaiting_up = 0;
+    uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(12000000);
+
+    while (index < count && hpclang_time_monotonic_us() < deadline) {
+        struct hpclang_keyboard_event event;
+        if (!hpclang_keyboard_event_poll(&event))
+            continue;
+
+        const struct expected_key_event *want = &expected[index];
+        if (!awaiting_up) {
+            if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN ||
+                event.scan_code != want->scan ||
+                event.key != want->key ||
+                event.modifiers != want->down_modifiers)
+                return 0;
+            awaiting_up = 1;
+            continue;
+        }
+
+        if (event.type != HPCLANG_KEYBOARD_EVENT_UP ||
+            event.scan_code != want->scan ||
+            event.key != want->key ||
+            event.modifiers != 0u)
+            return 0;
+
+        awaiting_up = 0;
+        ++index;
+    }
+
+    return index == count && !awaiting_up;
 }
 #endif
 

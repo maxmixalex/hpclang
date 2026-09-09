@@ -96,10 +96,8 @@ static const uint16_t hp4950_key_map[60] = {
     [8] = HPCLANG_KEY_HP4950_COS,
     [9] = HPCLANG_KEY_HP4950_RECIPROCAL,
     [13] = HPCLANG_KEY_HP4950_SPACE,
-    [14] = HPCLANG_KEY_HP4950_QUOTE,
     [15] = HPCLANG_KEY_HP4950_SIN,
     [16] = HPCLANG_KEY_HP4950_X,
-    [21] = HPCLANG_KEY_HP4950_EVAL,
     [22] = HPCLANG_KEY_HP4950_SQRT,
     [23] = HPCLANG_KEY_HP4950_NEGATE,
     [28] = HPCLANG_KEY_HP4950_HIST,
@@ -141,6 +139,18 @@ uint16_t hpclang_keyboard_key_from_scan(
     if (common_key_map[scan_code] != HPCLANG_KEY_UNKNOWN)
         return common_key_map[scan_code];
 
+    if (model == HPCLANG_MODEL_HP49GPLUS) {
+        if (scan_code == 14u)
+            return HPCLANG_KEY_HP49_EQW;
+        if (scan_code == 21u)
+            return HPCLANG_KEY_HP49_CAT;
+    } else if (model == HPCLANG_MODEL_HP50G) {
+        if (scan_code == 14u)
+            return HPCLANG_KEY_HP50_QUOTE;
+        if (scan_code == 21u)
+            return HPCLANG_KEY_HP50_EVAL;
+    }
+
     return specific[scan_code];
 }
 
@@ -167,9 +177,11 @@ uint32_t hpclang_keyboard_modifiers_from_bits(
         if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_GPF4)) != 0u)
             value |= HPCLANG_KEYBOARD_MOD_ALPHA;
         if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_GPF5)) != 0u)
-            value |= HPCLANG_KEYBOARD_MOD_LEFT_SHIFT;
+            value |= HPCLANG_KEYBOARD_MOD_SHIFT |
+                     HPCLANG_KEYBOARD_MOD_LEFT_SHIFT;
         if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_GPF6)) != 0u)
-            value |= HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT;
+            value |= HPCLANG_KEYBOARD_MOD_SHIFT |
+                     HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT;
     }
 
     return value;

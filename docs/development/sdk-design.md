@@ -208,7 +208,9 @@ eight bytes and uses an hpclang-specific raw encoding:
 
 - bits 0–55 are the 8×7 S3C2410 matrix, packed as
   `column * 7 + row`;
-- bits 56–59 are the dedicated ON, Alpha, left-Shift, and right-Shift inputs.
+- bit 56 is the dedicated ON input;
+- bits 57–59 are raw GPF4/5/6 inputs whose key labels differ between HP39 and
+  HP48/49/50.
 
 Those matrix coordinates are physical scan positions, **not** portable key
 meanings. HPGCC 1.1 itself documents its logical row/column table as HP49g+
@@ -221,8 +223,12 @@ other callers that need instantaneous state.
 
 The second layer is a synchronous, polled event service. It debounces the raw
 snapshot and emits `DOWN`, `UP`, and `REPEAT` events. Repeat timing is
-configurable, and each event carries the physically held ON/Alpha/left-Shift/
-right-Shift modifiers.
+configurable, and each event carries physically held modifiers. Alpha and ON
+are portable bits. `HPCLANG_KEYBOARD_MOD_SHIFT` is a normalized physical
+Shift bit across all validated models; HP48/49/50 additionally expose
+left/right Shift bits. `hpclang_keyboard_event_matches()` provides a
+header-only key+modifier convenience check without adding another runtime ABI
+layer.
 
 The current **stock-hosted backend** deliberately does not install a keyboard
 IRQ or background timer. Calling code drives progress by polling, so an
@@ -242,8 +248,12 @@ automated models. Complete key identities are then filled from the historical
 keyboard tables instead of re-measuring every documented key: the stable
 HPGCC 1.1/2.0/HPGCC3 matrix table for HP49/50, the HPGCC 1.1-39G HP39
 `HEADER.H` keycodes plus the validated matrix layout for HP39gs/40gs, and the
-same documented electrical matrix for HP48gII. A representative family-specific
-raw position is still exercised in Direct E2E.
+same documented electrical matrix for HP48gII. Direct E2E injects every one of the 51 physical key positions on each
+automated model and checks DOWN/UP, raw scan code, physical identity, and
+dedicated-key modifier state. This also preserves the HP49g+ CAT/EQW versus
+HP50g EVAL/quote primary-label distinction at their shared physical positions. The one-off scan probe is not a
+runtime input and is not retained as repository data after its mapping has been
+incorporated into source and regression tests.
 
 Common keys retain common enum values; keys whose primary label belongs to one
 layout use `HP39_*`, `HP48_*`, or `HP4950_*` identities. Raw GPF4/5/6
@@ -252,7 +262,11 @@ remain physical input names because the HP39 labels differ from HP48/49/50.
 HP39g+ deliberately returns `HPCLANG_KEY_UNKNOWN` until its real-machine
 fixture exists.
 
-Sticky shift planes, Alpha lock, and text translation are still higher layers.
+The keyboard service deliberately stops at physical key identity plus modifier
+state. It does not translate model-specific combinations such as HP39
+`Shift+VARS` into application actions such as `CHARS`. That mapping belongs
+to a higher UI/shortcut or compatibility layer. Sticky Shift/Alpha policy and
+text translation therefore remain outside the raw/debounce event service.
 HPGCC3 combined those policies with an asynchronous message queue; hpclang
 keeps them above the physical/debounce layer. A future compatibility adapter
 can synthesize HPGCC-style `KEYDN/PRESS/KEYUP`, repeat, and shift-plane
