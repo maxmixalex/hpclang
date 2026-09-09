@@ -257,7 +257,7 @@ static int stock_stream_storage_test(uint32_t model)
         return 0;
 
     size_t written = fwrite(
-        output, 1u, sizeof(output_expected) - 1u);
+        output_expected, 1u, sizeof(output_expected) - 1u, output);
     if (written != sizeof(output_expected) - 1u ||
         fflush(output) != 0 ||
         fseek(output, 7L, SEEK_SET) != 0) {
