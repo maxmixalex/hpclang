@@ -81,11 +81,11 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_set_pixel()` | ✅ | Clipped pixel write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line; extreme off-screen spans clip before rasterization. |
 | `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
-| `hpclang_surface_draw_circle()` / `hpclang_surface_fill_circle()` | 🧪 | Integer-radius circles clipped to visible rows/columns before rasterization; extreme radii do not imply radius-sized loops. |
-| `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | 🧪 | Explicit `hpclang_point` arrays; closed outline and even-odd fill with boundary inclusion. |
+| `hpclang_surface_draw_circle()` / `hpclang_surface_fill_circle()` | ✅ | Integer-radius circles clipped to visible rows/columns before rasterization; Core, five-model Direct, and full-stock matrices PASS. |
+| `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | ✅ | Explicit `hpclang_point` arrays; closed outline and even-odd fill with boundary inclusion. Core, five-model Direct, and full-stock matrices PASS. |
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct and full-stock matrices PASS. |
 | `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | 🧪 | Opaque heap-owned 2/4/16-level software surfaces; mono convenience retained. Packing stays private and cross-level blit uses the common intensity contract. |
+| `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Opaque heap-owned 2/4/16-level software surfaces; mono convenience retained. Packing stays private and cross-level blit uses the common intensity contract. Core, five-model Direct, and full-stock matrices PASS. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
 
 ## Fonts and text
@@ -116,7 +116,7 @@ core use case requires them.
 | raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
 | keyboard events + key identity | ✅ | ✅ | 5/5 full 51-key DOWN/UP + scan + identity + modifier matrix PASS | not separately asserted |
 | display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
-| owned 2/4/16-level surface + blit | 🧪 | ✅ | candidate running | candidate running |
+| owned 2/4/16-level surface + blit | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | font/text | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
@@ -162,8 +162,8 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅ Canonical read/write primitives are five-model validated; HPG wrappers remain absent. |
 | line | `hpg_draw_line_on`, `hpg_draw_line` | ✅ `hpclang_surface_draw_line`. |
 | rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
-| circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | 🧪 Canonical clipped outline/fill circle primitives implemented; HPG context wrappers remain later work. |
-| polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | 🧪 Canonical point-array outline/fill primitives implemented with even-odd fill; HPG array/state adapters remain later work. |
+| circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ✅ Canonical clipped outline/fill circle primitives are merged and five-model validated; HPG context wrappers remain later work. |
+| polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ✅ Canonical point-array outline/fill primitives with even-odd fill are merged and five-model validated; HPG array/state adapters remain later work. |
 | fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ✅ Canonical immutable mini/big fonts and metrics are merged with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface character/text drawing is merged and five-model Direct/Stock validated; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
@@ -265,7 +265,7 @@ Based on historical stability, example usage and current implementation dependen
 
 1. ✅ close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
 2. ✅ measure and expose model-neutral physical key identities across the three validated platform families;
-3. 🧪 validate and freeze the first Basic-Latin font/text layer on top of the surface ownership/blit boundary;
+3. ✅ freeze and validate the first Basic-Latin font/text layer on top of the surface ownership/blit boundary;
 4. establish calculator storage/file services and wire standard stdio where semantics fit;
 5. design Saturn/RPL object and stack handles;
 6. only then begin HPG/keyboard/stdio compatibility headers.

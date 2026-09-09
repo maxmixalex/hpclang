@@ -71,6 +71,12 @@ The `Stock / hp48` family job boots the verified 2 MiB full-NOR fixture, switche
 
 The host transfers historical ARMToolbox48 library 275 as `L275` plus the generated `HPCLANG.HP` object as `HPCLANG`. The calculator installs library 275 into Port 0, warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN`, and must produce the same machine-readable HPC1 PASS word.
 
+The host Kermit process begins after 35 seconds and is allowed up to 70 seconds
+to complete. Calculator-side post-transfer automation therefore does not resume
+before 110 seconds. The former 95-second resume point could race a valid slow
+transfer that completed around 97 seconds and produce a misleading `Too Few
+Arguments` UI failure even though serial transfer itself succeeded.
+
 ## HP 49g+/50g stock emulator gate
 
 The `Stock / hp4950` family job uses each model's native ARM bootloader with the shared official 2.15 OS image.

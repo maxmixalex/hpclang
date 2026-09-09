@@ -176,11 +176,13 @@ full-stock matrices. Owned monochrome surfaces and blitting now pass both the fi
 matrix and the full-stock matrix. The Basic-Latin immutable mini/big font and
 explicit-surface text layer is merged and validated; it deliberately leaves
 HPG's calculator-specific 256-entry font repertoire to compatibility work.
-A representation-independent circle/polygon candidate is validating on
-`m7-display-shapes`, with a dependent `m7-surface-levels` candidate adding
-software-owned 2/4/16-level surfaces without taking physical LCD mode
-ownership. The remaining first-slice closure also
-includes a representative application example rather than more bootstrap work.
+Representation-independent circles/polygons and software-owned 2/4/16-level
+surfaces are now merged and pass Core, five-model Direct, and full-stock
+validation without taking physical LCD mode ownership. The HP48 Stock path was
+also hardened so its post-Kermit UI sequence starts only after the complete host
+transfer window rather than racing a slow successful transfer. The remaining
+first-slice closure includes a representative application example rather than
+more bootstrap work.
 
 The minimum cross-platform service set should cover:
 
