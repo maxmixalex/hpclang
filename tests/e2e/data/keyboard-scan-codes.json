@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "method": "x50ng semantic physical-key injection -> hpclang_keyboard_event_poll() raw scan_code",
+  "schema_version": 2,
+  "method": "x50ng physical input injection -> hpclang raw scan; semantic labels cross-checked against HPGCC keyboard tables and HP39 ROM keycodes",
   "measurement_commit": "546b4ef8c7b4faea1354c2259e01614d6d94791f",
   "x50ng_revision": "003533d9eca3f6ded36c6ab80b8dbc0563e31d9a",
   "evidence": [
@@ -58,10 +58,15 @@
         "multiply": 3,
         "minus": 4,
         "plus": 5,
-        "alpha": 57,
-        "left_shift": 58,
-        "right_shift": 59,
-        "on": 56
+        "on": 56,
+        "gpf4": 57,
+        "gpf5": 58,
+        "gpf6": 59
+      },
+      "semantic_correction": {
+        "gpf4": "comma",
+        "gpf5": "alpha",
+        "gpf6": "shift"
       }
     },
     "hp40gs": {
@@ -93,10 +98,15 @@
         "multiply": 3,
         "minus": 4,
         "plus": 5,
-        "alpha": 57,
-        "left_shift": 58,
-        "right_shift": 59,
-        "on": 56
+        "on": 56,
+        "gpf4": 57,
+        "gpf5": 58,
+        "gpf6": 59
+      },
+      "semantic_correction": {
+        "gpf4": "comma",
+        "gpf5": "alpha",
+        "gpf6": "shift"
       }
     },
     "hp48gii": {
@@ -132,6 +142,11 @@
         "left_shift": 58,
         "right_shift": 59,
         "on": 56
+      },
+      "semantic_correction": {
+        "gpf4": "alpha",
+        "gpf5": "left_shift",
+        "gpf6": "right_shift"
       }
     },
     "hp49gplus": {
@@ -167,6 +182,11 @@
         "left_shift": 58,
         "right_shift": 59,
         "on": 56
+      },
+      "semantic_correction": {
+        "gpf4": "alpha",
+        "gpf5": "left_shift",
+        "gpf6": "right_shift"
       }
     },
     "hp50g": {
@@ -202,11 +222,22 @@
         "left_shift": 58,
         "right_shift": 59,
         "on": 56
+      },
+      "semantic_correction": {
+        "gpf4": "alpha",
+        "gpf5": "left_shift",
+        "gpf6": "right_shift"
       }
     },
     "hp39gplus": {
       "status": "not_measured",
       "reason": "blocked on trustworthy real-machine stock flash fixture"
     }
-  }
+  },
+  "notes": [
+    "The original 30-key probe used HP49/50 x50ng names for GPF4/5/6 on every target. On HP39 those raw inputs are comma/Alpha/Shift, not Alpha/left-Shift/right-Shift.",
+    "HP49g+/HP50g full matrix identities come from the stable HPGCC 1.1/2.0/HPGCC3 keyboard table.",
+    "HP39gs/HP40gs identities come from HPGCC 1.1-39G HP39-Aplet/LIB275/HEADER.H keycodes combined with the validated S3C2410 scan layout and existing stock E2E aliases.",
+    "HP48gII uses the same electrical matrix described by HPGCC for HP49g+; common positions are directly measured in the existing five-model probe."
+  ]
 }

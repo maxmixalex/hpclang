@@ -58,6 +58,8 @@
 #define KEY_HOLD_US 100000LL
 #define KEYBOARD_PRESS_US (INJECT_US + 500000LL)
 #define KEYBOARD_RELEASE_US (INJECT_US + 1500000LL)
+#define FAMILY_KEY_PRESS_US (INJECT_US + 2000000LL)
+#define FAMILY_KEY_RELEASE_US (INJECT_US + 3000000LL)
 #define POLL_US 20000LL
 #define DEADLINE_US 8000000LL
 #define RETURN_ON_US 200000LL
@@ -117,6 +119,8 @@ static const struct key_action f_down = { HP4950_KEY_F, 1 };
 static const struct key_action f_up = { HP4950_KEY_F, 0 };
 static const struct key_action enter_down = { HP4950_KEY_ENTER, 1 };
 static const struct key_action enter_up = { HP4950_KEY_ENTER, 0 };
+static const struct key_action family_key_down = { HP4950_KEY_G, 1 };
+static const struct key_action family_key_up = { HP4950_KEY_G, 0 };
 static const struct key_action on_down = { HP4950_KEY_ON, 1 };
 static const struct key_action on_up = { HP4950_KEY_ON, 0 };
 
@@ -653,7 +657,9 @@ int main(int argc, char **argv)
         !tap(&f_down, &f_up, BOOT_OK_US) ||
         !later(inject, &s, INJECT_US) ||
         !later(key_cb, (void *)&enter_down, KEYBOARD_PRESS_US) ||
-        !later(key_cb, (void *)&enter_up, KEYBOARD_RELEASE_US)) {
+        !later(key_cb, (void *)&enter_up, KEYBOARD_RELEASE_US) ||
+        !later(key_cb, (void *)&family_key_down, FAMILY_KEY_PRESS_US) ||
+        !later(key_cb, (void *)&family_key_up, FAMILY_KEY_RELEASE_US)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");
         return EXIT_FAILURE;
     }

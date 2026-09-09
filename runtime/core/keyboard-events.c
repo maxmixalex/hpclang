@@ -67,8 +67,10 @@ int hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
             event))
         return 0;
 
-    event->key = hpclang_keyboard_key_from_scan(
-        hpclang_device_info()->model,
-        event->scan_code);
+    uint32_t model = hpclang_device_info()->model;
+    event->key = hpclang_keyboard_key_from_scan(model, event->scan_code);
+    event->modifiers = hpclang_keyboard_modifiers_from_bits(
+        model,
+        event_engine.stable_bits);
     return 1;
 }

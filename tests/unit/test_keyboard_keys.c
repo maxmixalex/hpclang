@@ -12,7 +12,7 @@ struct mapping {
     uint16_t key;
 };
 
-static const struct mapping measured[] = {
+static const struct mapping common[] = {
     {35u, HPCLANG_KEY_F1},
     {36u, HPCLANG_KEY_F2},
     {37u, HPCLANG_KEY_F3},
@@ -39,24 +39,20 @@ static const struct mapping measured[] = {
     {3u, HPCLANG_KEY_MULTIPLY},
     {4u, HPCLANG_KEY_MINUS},
     {5u, HPCLANG_KEY_PLUS},
-    {57u, HPCLANG_KEY_ALPHA},
-    {58u, HPCLANG_KEY_LEFT_SHIFT},
-    {59u, HPCLANG_KEY_RIGHT_SHIFT},
     {56u, HPCLANG_KEY_ON},
 };
 
-static int verified_model(uint32_t model)
+static int expect_map(
+    uint32_t model,
+    const struct mapping *map,
+    size_t count)
 {
-    for (size_t i = 0; i < sizeof(measured) / sizeof(measured[0]); ++i) {
-        uint16_t key = hpclang_keyboard_key_from_scan(model, measured[i].scan);
-        if (key != measured[i].key) {
-            fprintf(
-                stderr,
-                "model %u scan %u: key %u, expected %u\n",
-                model,
-                measured[i].scan,
-                key,
-                measured[i].key);
+    for (size_t i = 0; i < count; ++i) {
+        uint16_t key = hpclang_keyboard_key_from_scan(model, map[i].scan);
+        if (key != map[i].key) {
+            fprintf(stderr,
+                    "model %u scan %u: key %u, expected %u\n",
+                    model, map[i].scan, key, map[i].key);
             return 0;
         }
     }
@@ -74,19 +70,104 @@ int main(void)
     };
 
     for (size_t i = 0; i < sizeof(verified) / sizeof(verified[0]); ++i)
-        if (!verified_model(verified[i]))
+        if (!expect_map(
+                verified[i],
+                common,
+                sizeof(common) / sizeof(common[0])))
             return EXIT_FAILURE;
+
+    static const struct mapping hp39[] = {
+        {0u, HPCLANG_KEY_HP39_DEL},
+        {1u, HPCLANG_KEY_HP39_LOG},
+        {7u, HPCLANG_KEY_HP39_X_THETA_T},
+        {8u, HPCLANG_KEY_HP39_LN},
+        {9u, HPCLANG_KEY_HP39_RIGHT_PAREN},
+        {13u, HPCLANG_KEY_HP39_NEGATE},
+        {14u, HPCLANG_KEY_HP39_DERIVATIVE},
+        {15u, HPCLANG_KEY_HP39_TAN},
+        {16u, HPCLANG_KEY_HP39_LEFT_PAREN},
+        {21u, HPCLANG_KEY_HP39_MATH},
+        {22u, HPCLANG_KEY_HP39_COS},
+        {23u, HPCLANG_KEY_HP39_POWER},
+        {28u, HPCLANG_KEY_HP39_VARS},
+        {29u, HPCLANG_KEY_HP39_SIN},
+        {30u, HPCLANG_KEY_HP39_SQUARE},
+        {41u, HPCLANG_KEY_HP39_SYMB},
+        {46u, HPCLANG_KEY_HP39_PLOT},
+        {47u, HPCLANG_KEY_HP39_NUM},
+        {48u, HPCLANG_KEY_HP39_HOME},
+        {49u, HPCLANG_KEY_HP39_APLET},
+        {50u, HPCLANG_KEY_HP39_VIEWS},
+        {57u, HPCLANG_KEY_HP39_COMMA},
+        {58u, HPCLANG_KEY_ALPHA},
+        {59u, HPCLANG_KEY_HP39_SHIFT},
+    };
+    if (!expect_map(
+            HPCLANG_MODEL_HP39GS,
+            hp39,
+            sizeof(hp39) / sizeof(hp39[0])) ||
+        !expect_map(
+            HPCLANG_MODEL_HP40GS,
+            hp39,
+            sizeof(hp39) / sizeof(hp39[0])))
+        return EXIT_FAILURE;
+
+#define EXPECT_LAYOUT(model, prefix) do {                                      \
+    static const struct mapping layout[] = {                                   \
+        {0u, prefix##_BACKSPACE}, {1u, prefix##_TAN},                          \
+        {7u, prefix##_SYMB}, {8u, prefix##_COS},                               \
+        {9u, prefix##_RECIPROCAL}, {13u, prefix##_SPACE},                      \
+        {14u, prefix##_QUOTE}, {15u, prefix##_SIN},                            \
+        {16u, prefix##_X}, {21u, prefix##_EVAL},                               \
+        {22u, prefix##_SQRT}, {23u, prefix##_NEGATE},                          \
+        {28u, prefix##_HIST}, {29u, prefix##_POWER},                           \
+        {30u, prefix##_EEX}, {41u, prefix##_APPS},                             \
+        {46u, prefix##_MODE}, {47u, prefix##_TOOL},                            \
+        {48u, prefix##_VAR}, {49u, prefix##_STO}, {50u, prefix##_NXT},         \
+        {57u, HPCLANG_KEY_ALPHA}, {58u, HPCLANG_KEY_LEFT_SHIFT},               \
+        {59u, HPCLANG_KEY_RIGHT_SHIFT},                                        \
+    };                                                                          \
+    if (!expect_map(model, layout, sizeof(layout) / sizeof(layout[0])))         \
+        return EXIT_FAILURE;                                                    \
+} while (0)
+
+    EXPECT_LAYOUT(HPCLANG_MODEL_HP48GII, HPCLANG_KEY_HP48);
+    EXPECT_LAYOUT(HPCLANG_MODEL_HP49GPLUS, HPCLANG_KEY_HP4950);
+    EXPECT_LAYOUT(HPCLANG_MODEL_HP50G, HPCLANG_KEY_HP4950);
+#undef EXPECT_LAYOUT
+
+    uint64_t hp39_bits =
+        (UINT64_C(1) << HPCLANG_KEYBOARD_ON) |
+        (UINT64_C(1) << HPCLANG_KEYBOARD_GPF4) |
+        (UINT64_C(1) << HPCLANG_KEYBOARD_GPF5) |
+        (UINT64_C(1) << HPCLANG_KEYBOARD_GPF6);
+    uint32_t hp39_mod = hpclang_keyboard_modifiers_from_bits(
+        HPCLANG_MODEL_HP39GS, hp39_bits);
+    if (hp39_mod !=
+        (HPCLANG_KEYBOARD_MOD_ON |
+         HPCLANG_KEYBOARD_MOD_ALPHA |
+         HPCLANG_KEYBOARD_MOD_SHIFT))
+        return EXIT_FAILURE;
+
+    uint32_t hp50_mod = hpclang_keyboard_modifiers_from_bits(
+        HPCLANG_MODEL_HP50G, hp39_bits);
+    if (hp50_mod !=
+        (HPCLANG_KEYBOARD_MOD_ON |
+         HPCLANG_KEYBOARD_MOD_ALPHA |
+         HPCLANG_KEYBOARD_MOD_LEFT_SHIFT |
+         HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT))
+        return EXIT_FAILURE;
 
     if (hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP39GPLUS, 35u) !=
             HPCLANG_KEY_UNKNOWN ||
         hpclang_keyboard_key_from_scan(HPCLANG_MODEL_UNKNOWN, 35u) !=
             HPCLANG_KEY_UNKNOWN ||
-        hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP50G, 0u) !=
+        hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP50G, 31u) !=
             HPCLANG_KEY_UNKNOWN ||
         hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP50G, 60u) !=
             HPCLANG_KEY_UNKNOWN)
         return EXIT_FAILURE;
 
-    puts("PASS: measured model-neutral keyboard key map.");
+    puts("PASS: complete validated keyboard key maps.");
     return EXIT_SUCCESS;
 }

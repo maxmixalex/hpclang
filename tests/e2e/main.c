@@ -198,21 +198,19 @@ static uint32_t expected_family(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
-static int keyboard_transition(void)
+static uint16_t expected_family_key(uint32_t model)
 {
-    struct hpclang_keyboard_state raw;
-    hpclang_keyboard_read(&raw);
-    if (hpclang_keyboard_any_is_down(&raw))
-        return 0;
-    if (hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ON) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ALPHA) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_LEFT_SHIFT) ||
-        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_RIGHT_SHIFT))
-        return 0;
+    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS)
+        return HPCLANG_KEY_HP39_SYMB;
+    if (model == HPCLANG_MODEL_HP48GII)
+        return HPCLANG_KEY_HP48_APPS;
+    if (model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G)
+        return HPCLANG_KEY_HP4950_APPS;
+    return HPCLANG_KEY_UNKNOWN;
+}
 
-    hpclang_keyboard_events_set_timing(5000u, 500000u, 0u);
-    hpclang_keyboard_events_reset();
-
+static int wait_key_transition(uint16_t expected)
+{
     struct hpclang_keyboard_event event;
     int down_scan = -1;
     uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(3000000);
@@ -222,7 +220,7 @@ static int keyboard_transition(void)
             continue;
         if (event.type == HPCLANG_KEYBOARD_EVENT_DOWN &&
             event.scan_code < 60u) {
-            if (event.key != HPCLANG_KEY_ENTER)
+            if (event.key != expected)
                 return 0;
             down_scan = (int)event.scan_code;
             break;
@@ -238,10 +236,33 @@ static int keyboard_transition(void)
             continue;
         if (event.type == HPCLANG_KEYBOARD_EVENT_UP &&
             event.scan_code == (uint8_t)down_scan)
-            return event.key == HPCLANG_KEY_ENTER;
+            return event.key == expected;
     }
 
     return 0;
+}
+
+static int keyboard_transition(uint32_t model)
+{
+    struct hpclang_keyboard_state raw;
+    hpclang_keyboard_read(&raw);
+    if (hpclang_keyboard_any_is_down(&raw))
+        return 0;
+    if (hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_ON) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF4) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF5) ||
+        hpclang_keyboard_dedicated_is_down(&raw, HPCLANG_KEYBOARD_GPF6))
+        return 0;
+
+    hpclang_keyboard_events_set_timing(5000u, 500000u, 0u);
+    hpclang_keyboard_events_reset();
+
+    if (!wait_key_transition(HPCLANG_KEY_ENTER))
+        return 0;
+
+    uint16_t family_key = expected_family_key(model);
+    return family_key != HPCLANG_KEY_UNKNOWN &&
+           wait_key_transition(family_key);
 }
 #endif
 
@@ -280,7 +301,7 @@ int main(void)
         return finish(0x12, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
-    if (!keyboard_transition())
+    if (!keyboard_transition(boot->model))
         return finish(0x10, boot->model);
 #endif
 
