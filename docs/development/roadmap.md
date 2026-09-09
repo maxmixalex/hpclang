@@ -178,11 +178,20 @@ explicit-surface text layer is merged and validated; it deliberately leaves
 HPG's calculator-specific 256-entry font repertoire to compatibility work.
 Representation-independent circles/polygons and software-owned 2/4/16-level
 surfaces are now merged and pass Core, five-model Direct, and full-stock
-validation without taking physical LCD mode ownership. The HP48 Stock path was
-also hardened so its post-Kermit UI sequence starts only after the complete host
-transfer window rather than racing a slow successful transfer. The remaining
-first-slice closure includes a representative application example rather than
-more bootstrap work.
+validation without taking physical LCD mode ownership. Stable S3C2410 LCD
+configuration is also a machine-readable preservation gate before harness
+restore. The HP48 Stock path was hardened so its post-Kermit UI sequence starts
+only after the complete host transfer window rather than racing a slow
+successful transfer.
+
+The M7 clean-core display slice is therefore closed without inventing mutable
+clip/style state. Historical clip rectangles, PAINT/XOR, patterns, annunciator
+slots, XPM convenience loaders, and exact custom-font descriptors belong to
+compatibility or demonstrated future use cases. Physical gray4/gray16 and page
+flip stay deferred until a platform resource boundary can supply contiguous LCD
+DMA memory without permanently taxing every HPC1 heap. The remaining first
+slice closure includes a representative application example rather than more
+bootstrap work.
 
 The minimum cross-platform service set should cover:
 

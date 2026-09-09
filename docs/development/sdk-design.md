@@ -242,6 +242,15 @@ a clip region beyond the surface bounds. A clip rectangle should not become
 hidden global state; a lightweight draw context/surface view or another
 explicit mechanism is preferable.
 
+The current M7 clean-core slice stops here rather than inventing that
+abstraction pre-emptively. Every primitive already clips to surface bounds, and
+no native hpclang consumer yet needs a second clip region. Historical
+`hpg_clip_*` remains adapter state. This is also safer for compatibility:
+the old implementation treats the stored upper bound as exclusive during draw,
+while `hpg_clip_set()` and `hpg_clip_reset()` do not normalize that bound in
+quite the same way. Exact legacy behavior should be isolated in adapter tests
+instead of becoming a new canonical coordinate rule.
+
 Software-owned grayscale surfaces are also separable from physical LCD mode
 ownership. Historical HPG allocates 1-, 2-, and 4-bpp off-screen images and
 uses the same drawing/blit interface across them. hpclang now generalizes its
@@ -313,6 +322,15 @@ should not grow mutable `color/mode/pattern/font` fields to imitate
 surface operations. If non-HPG applications later need compositing, the
 candidate core shape is an explicit operation/blend argument, not hidden
 per-surface state.
+
+The six historical HPG indicators are another compatibility edge rather than a
+general surface primitive: HPG reaches them by deliberately drawing outside
+the 131-pixel visible width at x=131, rows 0..5 of the controller's 160-pixel
+scan line. Their semantic labels are HP49-style (remote, left/right shift,
+alpha, battery, wait) and are not a portable model contract. hpclang should
+only expose annunciators later through explicit model capabilities if a real
+application needs them; the opaque 131-pixel display surface must not be
+widened merely to reproduce this trick.
 
 Legacy `hpscreen.h` calls such as `getLCDPointer`, display-plane selection,
 packed 4-bit sprite operations, and direct OR/XOR block drawing are

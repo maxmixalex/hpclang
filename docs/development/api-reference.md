@@ -155,8 +155,9 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | HPG group | Historical calls | hpclang status |
 | --- | --- | --- |
 | lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; an adapter can provide legacy setup semantics later. |
-| display mode | `hpg_set_mode_mono`, `hpg_set_mode_gray4`, `hpg_set_mode_gray16`, `hpg_flip`, `hpg_set_indicator` | ⬜ Mono borrowed display exists; grayscale, double buffering, flip and annunciator control do not. |
+| display mode | `hpg_set_mode_mono`, `hpg_set_mode_gray4`, `hpg_set_mode_gray16`, `hpg_flip` | ⬜ Physical grayscale/double buffering/page flip are explicitly deferred pending a resource broker for contiguous LCD DMA memory. |
 | geometry | `hpg_get_width`, `hpg_get_height` | ✅ `hpclang_surface_width/height`. |
+| indicators | `hpg_set_indicator` | ↪ Historical HPG writes x=131, y=0..5 outside the visible 131-pixel surface and assigns HP49-style annunciator meanings. Keep this model-capability/adapter work rather than widening the canonical surface. |
 | clipping state | `hpg_clip_reset`, `hpg_clip_set`, `hpg_clip` | ◐ Every primitive clips to surface bounds; mutable user clip rectangles are not implemented. |
 | clear | `hpg_clear_on`, `hpg_clear` | ✅ `hpclang_surface_clear`; default-screen/global-state variants belong in an adapter. |
 | pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅ Canonical read/write primitives are five-model validated; HPG wrappers remain absent. |
