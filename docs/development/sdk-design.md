@@ -244,8 +244,11 @@ explicit mechanism is preferable.
 
 Software-owned grayscale surfaces are also separable from physical LCD mode
 ownership. Historical HPG allocates 1-, 2-, and 4-bpp off-screen images and
-uses the same drawing/blit interface across them. hpclang can generalize its
-private surface representation in that direction without exposing packing.
+uses the same drawing/blit interface across them. The `m7-surface-levels`
+candidate generalizes hpclang's private owned-surface representation to 2, 4,
+or 16 intensity levels while preserving one 0..255 public intensity contract.
+Packing remains opaque, and the existing representation-independent blit
+therefore works across level counts without a new image ABI.
 
 Physical grayscale mode switching, hardware double buffering, and page flipping
 are a different category. Historical HPG allocates physical framebuffers,

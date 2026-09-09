@@ -176,8 +176,10 @@ full-stock matrices. Owned monochrome surfaces and blitting now pass both the fi
 matrix and the full-stock matrix. The Basic-Latin immutable mini/big font and
 explicit-surface text layer is merged and validated; it deliberately leaves
 HPG's calculator-specific 256-entry font repertoire to compatibility work.
-A representation-independent circle/polygon candidate is now validating on
-`m7-display-shapes`. The remaining first-slice closure also
+A representation-independent circle/polygon candidate is validating on
+`m7-display-shapes`, with a dependent `m7-surface-levels` candidate adding
+software-owned 2/4/16-level surfaces without taking physical LCD mode
+ownership. The remaining first-slice closure also
 includes a representative application example rather than more bootstrap work.
 
 The minimum cross-platform service set should cover:

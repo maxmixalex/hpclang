@@ -168,6 +168,40 @@ int main(void)
 
     hpclang_surface_destroy(shapes);
 
+    if (hpclang_surface_create(4u, 1u, 3u) != NULL)
+        fail("unsupported owned surface levels");
+
+    struct hpclang_surface *gray4 = hpclang_surface_create(5u, 2u, 4u);
+    struct hpclang_surface *gray16 = hpclang_surface_create(5u, 2u, 16u);
+    if (gray4 == NULL || gray16 == NULL ||
+        hpclang_surface_levels(gray4) != 4u ||
+        hpclang_surface_levels(gray16) != 16u)
+        fail("software grayscale surface allocation");
+
+    hpclang_surface_set_pixel(gray4, 0, 0, 0u);
+    hpclang_surface_set_pixel(gray4, 1, 0, 64u);
+    hpclang_surface_set_pixel(gray4, 2, 0, 128u);
+    hpclang_surface_set_pixel(gray4, 3, 0, 255u);
+    if (hpclang_surface_get_pixel(gray4, 0, 0) != 0u ||
+        hpclang_surface_get_pixel(gray4, 1, 0) != 85u ||
+        hpclang_surface_get_pixel(gray4, 2, 0) != 170u ||
+        hpclang_surface_get_pixel(gray4, 3, 0) != 255u)
+        fail("four-level quantization");
+
+    hpclang_surface_blit(gray16, 0, 0, gray4, 0, 0, 4, 1);
+    if (hpclang_surface_get_pixel(gray16, 0, 0) != 0u ||
+        hpclang_surface_get_pixel(gray16, 1, 0) != 85u ||
+        hpclang_surface_get_pixel(gray16, 2, 0) != 170u ||
+        hpclang_surface_get_pixel(gray16, 3, 0) != 255u)
+        fail("cross-depth grayscale blit");
+
+    hpclang_surface_clear(gray16, 127u);
+    if (hpclang_surface_get_pixel(gray16, 4, 1) != 119u)
+        fail("sixteen-level clear quantization");
+
+    hpclang_surface_destroy(gray4);
+    hpclang_surface_destroy(gray16);
+
     struct hpclang_surface *owned = hpclang_surface_create_mono(10u, 4u);
     if (owned == NULL ||
         hpclang_surface_width(owned) != 10u ||
@@ -197,6 +231,6 @@ int main(void)
     hpclang_surface_destroy(owned);
     hpclang_surface_destroy(NULL);
 
-    puts("PASS: opaque surfaces, clipping, shapes, readback, ownership and blit.");
+    puts("PASS: opaque surfaces, clipping, shapes, software levels, readback, ownership and blit.");
     return EXIT_SUCCESS;
 }
