@@ -161,7 +161,10 @@ jobs:
             --style="$GITHUB_WORKSPACE/build/x50ng/dist/style-40g.css" &
           X50_PID=$!
 
-          sleep 31
+          # The stock FILES menu can take more than 500 ms to consume a key
+          # transition. The sequence leaves the server navigation 1 s between
+          # steps; start the host only after that path has settled.
+          sleep 35
           timeout 70s tools/run-hp48-kermit-send.sh \
             "$KERMIT_TTY" build/hp48-send build/hp48-kermit-debug.log L275_48=L275 HPCLANG.HP=HPCLANG \
             > build/hp48-kermit.out 2>&1

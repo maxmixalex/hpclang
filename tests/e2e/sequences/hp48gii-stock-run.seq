@@ -23,14 +23,14 @@
 # Start stock Kermit server.
 22000 tap files
 23500 tap down
-24000 tap enter
-25000 tap down
-25500 tap down
+24500 tap enter
 26000 tap down
-26500 tap down
 27000 tap down
-28000 tap enter
-30000 capture server-serial
+28000 tap down
+29000 tap down
+30000 tap down
+31500 tap enter
+33500 capture server-serial
 # Host sends L275 and HPCLANG, then FINISHes. Allow worst-case retry time.
 95000 capture after-transfer
 # Install ARMToolbox48 Library 275 into Port 0. With both variables present,
