@@ -10,9 +10,10 @@ and automated E2E.
 
 They do **not** mean that hpclang already reproduces the application-facing
 feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device
-facts, monotonic time, the complete five-model physical keyboard/event core, and
-the first opaque display/surface primitives. Font/text, broader graphics,
-files/storage, Saturn/RPL object exchange, and higher-level UI facilities remain
+facts, monotonic time, the complete five-model physical keyboard/event core,
+opaque 2/4/16-level software surfaces, geometry and a validated text renderer.
+Final built-in font data is blocked, hp4950 stream storage is under active
+implementation, and calculator-object/RPL storage plus higher-level UI remain
 application-facing SDK work.
 
 hpclang is also not intended to be binary-compatible with historical HPGCC
