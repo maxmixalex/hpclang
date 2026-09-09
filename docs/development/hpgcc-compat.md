@@ -276,6 +276,12 @@ common 1.1/2.0 implementation set includes operations such as:
 **Broad source-compatible adapter** for HPG. **Migration/adapter-later** for
 raw GGL.
 
+This is an explicit roadmap commitment: after the clean M7 display/text
+contracts are stable, M8 should ship a source-compatible `hpgraphics.h`
+adapter for the common 59-function HPG surface. HPG is therefore a supported
+porting target; it is not the canonical core API and does not imply binary
+compatibility with historical HPGCC runtimes.
+
 The 59 public HPG function signatures are identical in HPGCC 1.1, 2.0, and
 HPGCC3. hpclang should therefore aim to provide the complete common
 `hpgraphics.h` source surface once the core display/surface implementation is
@@ -331,9 +337,14 @@ adapter. Mutable color/font/pattern/clip state belongs naturally in that
 adapter. Physical grayscale/page-flip compatibility is conditional on a
 platform backend that can save and restore stock LCD state reliably.
 
-The merged canonical font layer deliberately uses independently sourced
-public-domain bitmap data. HPG's original glyph bitmaps remain historical
-evidence only and are not a source for hpclang implementation data.
+The font/text renderer and mini/big metrics are stable, but final built-in
+glyph data is now an explicit blocker. HPG itself bundles exactly two standard
+256-entry fonts (`hpg_get_minifont` and `hpg_get_bigfont`) with 6/4 and
+8/6 height/advance metrics. Those HPG tables are a strong compatibility
+reference and could be carried only under a clearly compatible licensing
+arrangement; they must not be silently copied and presented as MIT data.
+The current independently sourced public-domain tables remain provisional
+until the font decision is closed.
 
 Historical PAINT/XOR and repeating pattern state are also adapter concerns.
 The old draw backends apply those policies through mutable `hpg_t` fields;
@@ -423,8 +434,16 @@ user-facing stdio design.
 
 ### Compatibility decision
 
-The standard C names are **Direct**, once hpclang provides the underlying
-storage hooks required by picolibc.
+The standard C names are **Direct** on the byte-stream-storage platforms, once
+hpclang provides the underlying storage hooks required by picolibc. A Stock
+HP49g+/HP50g probe has already resolved KOS filesystem entries and
+successfully opened/read/closed a known SD file from HPC1.
+
+HP39gs/40gs must be treated separately: they have a stock calculator object
+store with named Note/Program/Zaplet(Aplet)/Variable/List/Matrix/Library
+objects and `HP39DIR.000` / `HP39DIR.CUR` directory metadata. That is
+real storage, but it is **not** the HPGCC 49/50 SD stdio model and should not be
+masqueraded as a POSIX filesystem.
 
 `fdelete` is an **Adapter/Migration** candidate to standard `remove()`.
 

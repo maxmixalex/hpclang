@@ -22,15 +22,21 @@ They are not vendored into the normal source tree unless their redistribution te
 
 ## Built-in bitmap fonts
 
-The first font/text layer mechanically extracts printable Basic Latin glyphs
-from the X11 misc-fixed 4x6 and 5x7 ISO10646-1 BDF fonts. The source BDF
-headers explicitly identify the fonts as public domain ("Share and enjoy.").
+**Blocker:** the final mini/big glyph source is not frozen yet.
 
-The committed tables are normalized bitmap data from those independent fonts,
-not HPGCC implementation or glyph data. The extraction source is recorded
-beside the tables in `runtime/core/font.c`. Historical HPG's additional
-calculator-specific byte glyphs remain compatibility evidence and are not
-copied into hpclang.
+The current implementation mechanically extracts printable Basic Latin glyphs
+from the X11 misc-fixed 4x6 and 5x7 ISO10646-1 BDF fonts. Those BDF headers
+identify the fonts as public domain ("Share and enjoy."), so the current tables
+are safe as an implementation candidate.
+
+Historical HPG also embeds two complete 256-entry bitmap fonts with the same
+6/4 and 8/6 metrics. Their source files are part of GPL-licensed HPGCC and carry
+HPGCC's linking/use exception, but that does not justify silently relicensing
+copied glyph tables as MIT source. If hpclang ultimately uses those exact
+tables, their provenance and applicable license must be preserved explicitly
+(or the data must live in an optional compatibility component under compatible
+terms). Until that decision is made, HPG glyphs remain reference material and
+the built-in font asset stays blocked.
 
 ## Implementation discipline
 

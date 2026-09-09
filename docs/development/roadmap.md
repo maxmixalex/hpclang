@@ -173,9 +173,13 @@ blocked real-machine fixture is available.
 The C++23 wrappers over real time/display services also pass the five-model
 Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
-matrix and the full-stock matrix. The Basic-Latin immutable mini/big font and
-explicit-surface text layer is merged and validated; it deliberately leaves
-HPG's calculator-specific 256-entry font repertoire to compatibility work.
+matrix and the full-stock matrix. The font/text renderer and mini/big metrics
+are merged and validated, but the **final built-in glyph data is a release
+blocker**. The current public-domain Basic-Latin tables are provisional while
+the project selects a suitable long-term bitmap source. Historical HPG bundles
+two 256-entry fonts with the same 6/4 and 8/6 metrics and is a useful
+compatibility candidate/reference, but its GPL licensing must not be silently
+relicensed into hpclang's MIT runtime.
 Representation-independent circles/polygons and software-owned 2/4/16-level
 surfaces are now merged and pass Core, five-model Direct, and full-stock
 validation without taking physical LCD mode ownership. Stable S3C2410 LCD
@@ -213,6 +217,34 @@ compatibility wrappers may be added later where they materially ease porting,
 but the core API should remain coherent across `hp39`, `hp48`, and
 `hp4950`.
 
+
+### M7.2 — Storage and standard I/O
+
+Storage is split by **semantics**, not by a misleading yes/no "filesystem"
+capability.
+
+- **Byte-stream filesystem:** HP49g+/HP50g expose the stock KOS SD-card
+  filesystem. A Stock E2E probe has already resolved the original KOS
+  filesystem table and successfully opened/read/closed a known SD file from
+  HPC1. The next implementation step is a private hp4950 backend for
+  `open/close/read/write/lseek`, allowing picolibc's normal
+  `fopen/fread/fwrite/fseek` surface to work without inventing parallel
+  hpclang stdio names.
+- **Calculator object store:** HP39gs/40gs are not "storage-less". Their stock
+  object-store format includes named directory, Zaplet/Aplet, Note, Program,
+  Variable, List, Matrix, Library and related object types, with
+  `HP39DIR.000` as the root directory object-store file and
+  `HP39DIR.CUR` as the current-directory pointer. This is not a POSIX
+  byte-stream filesystem and must not be forced through `FILE *`.
+- **RPL/Saturn objects:** HP48/49/50 also have calculator-object namespaces.
+  Their typed object/stack integration remains M7.3, but M7.2 and M7.3 share
+  the same architectural rule: preserve native object semantics instead of
+  pretending every stored calculator object is an ordinary file.
+
+The public model should therefore distinguish stream storage from calculator
+objects. Physical media (RAM/flash/SD) is backend detail unless an application
+genuinely needs it.
+
 ### Historical HPGCC parity is not complete
 
 The old HPGCC SDKs included or supported substantial calculator-facing
@@ -226,6 +258,14 @@ or "HPGCC feature complete".
 ## M8 — Practical SDK and porting layer
 
 **Planned.**
+
+HPG source compatibility is an explicit M8 goal, not an accidental side effect.
+The common 59-function `hpgraphics.h` surface is signature-stable across
+HPGCC 1.1, HPGCC 2.0 and HPGCC3, so hpclang should provide a broad
+source-compatible HPG adapter once its clean display/text primitives are
+stable. This does **not** make HPGCC binary compatibility a goal, and raw GGL,
+historical framebuffer pointers, physical grayscale/page-flip ownership and
+other representation-specific behavior remain separately gated.
 
 After the common services exist:
 
