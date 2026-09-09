@@ -279,6 +279,26 @@ grayscale/page-flip API therefore needs a platform-owned contiguous/DMA buffer
 allocator or reserved pool. It must not expose that requirement through the
 ordinary `hpclang_surface` storage ABI.
 
+The historical launchers show one feasible source for such memory, but also why
+hpclang should not reserve it unconditionally. The normal ARMToolbox and its
+HP48-specific variant use a single KOS allocation, page-align the usable
+interior, and append consecutive 4 KiB descriptors to the temporary 0x09000000
+page table. The normal path probes up to 120 KiB and intentionally leaves
+16 KiB to the OS; the HP48 path probes up to 48 KiB and leaves 4 KiB. The HP39
+Library 275 launcher has its own MMU path and an explicit `USESYSRAM` extension;
+hpclang's current Launcher V3 envelope selects that MMU/system-RAM path.
+
+A 16-level LCD plane needs 80 bytes per controller scan line. Two 64-row planes
+therefore need a little over 11 KiB, while two 80-row planes need about
+13.6 KiB before alignment/padding. Reserving four 4 KiB pages from every HPC1
+process merely so page flipping might be used would be a disproportionate heap
+tax on the smaller machines. The preferred future design is therefore a
+platform resource request/broker that obtains or reserves contiguous LCD memory
+only for applications that request physical display ownership, before ordinary
+heap use can consume the relevant pages. Until that boundary exists, physical
+gray4/gray16 and page flipping stay deferred; software 4/16-level surfaces are
+the supported grayscale model.
+
 Before any such backend is enabled, Direct E2E now gates LCD ownership
 preservation. It snapshots stable S3C2410 LCD configuration before HPC1 and
 compares it at the return sentinel, before harness restoration. Dynamic
