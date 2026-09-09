@@ -181,9 +181,13 @@ static void keyboard_cursor_cell(
     int passed = keyboard_scan_passed(scan);
 
     for (int yy = -3; yy <= 3; ++yy) {
-        for (int xx = -3; xx <= 3; ++xx) {
-            int distance = abs(xx) + abs(yy);
-            if (distance <= 3 && (passed || distance == 3))
+        int vertical = yy < 0 ? -yy : yy;
+        int half_width = vertical == 3 ? 1 : vertical == 2 ? 2 : 3;
+
+        for (int xx = -half_width; xx <= half_width; ++xx) {
+            int boundary =
+                vertical == 3 || xx == -half_width || xx == half_width;
+            if (passed || boundary)
                 hpclang_surface_set_pixel(
                     surface, cx + xx, cy + yy, 255u);
         }
