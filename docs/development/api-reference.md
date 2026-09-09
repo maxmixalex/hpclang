@@ -185,7 +185,7 @@ Historical `hpsys.h` mixes time, clock control, interrupt ownership, LCD state, 
 
 This is the largest practical SDK gap visible from the historical APIs.
 
-- HPGCC 1.x exposes file operations through `hpstdio.h` and KOS helpers.
+- HPGCC 1.x exposes file declarations through `hpstdio.h` and KOS helpers, but the HPGCC 1.1 Programming Guide explicitly documents its SD-card `fopen/fread/fwrite/...` path as HP49g+-only and warns not to use it on 48gII or 39g+.
 - HPGCC 2.0 adds the structured 41-function `fsystem.h`.
 - HPGCC3 retains those 41 declarations and adds `FSGetFileFromHandle` and `FSGetHandle`.
 
@@ -202,7 +202,7 @@ hpclang already validates picolibc formatting, memory/string operations, heap al
 | HPGCC2/3 `FS*` adapter | ⬜ |
 | KOS file API adapter | ⬜ |
 
-The intended direction is a small calculator storage service underneath picolibc where standard C semantics fit, with compatibility adapters above it rather than a parallel stdio universe.
+The intended direction is a small calculator storage service underneath picolibc where standard C semantics fit, with compatibility adapters above it rather than a parallel stdio universe. Platform backends must reflect real storage/host capabilities instead of treating the historical HP49g+ SD implementation as a universal calculator filesystem.
 
 ## Saturn/RPL and calculator objects
 

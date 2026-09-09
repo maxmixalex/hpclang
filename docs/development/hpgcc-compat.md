@@ -160,6 +160,8 @@ This changes the compatibility priority:
 
 ### Historical example usage
 
+The HPGCC 1.1 Programming Guide explicitly limits its documented SD-card `fopen/fread/fwrite/...` path to HP49g+ and warns against using those functions on 48gII or 39g+. Public declarations alone therefore do not establish cross-model filesystem semantics; hpclang storage compatibility must distinguish the historical API surface from the platform on which a historical implementation was actually supported.
+
 The bundled examples reinforce the same priorities. Mechanical call-site
 analysis found public hpclang-relevant API use in 38 HPGCC 1.1 example source
 files and 39 HPGCC 2.0 example source files.
