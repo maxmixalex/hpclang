@@ -1,0 +1,118 @@
+name: Setup x50ng
+description: Restore or build one pinned x50ng variant for an E2E test mode/platform pair.
+
+inputs:
+  mode:
+    description: direct or stock
+    required: true
+  family:
+    description: hp39, hp48, or hp4950
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore x50ng cache
+      id: x50ng-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: build/x50ng/dist
+        key: >-
+          hpclang-x50ng-${{ inputs.mode }}-${{ inputs.family }}-${{ runner.os }}-${{ runner.arch }}-v3-${{
+          hashFiles('tools/prepare-x50ng.py',
+                    'tools/fetch-x50ng.sh',
+                    'tests/e2e/harness/x50ng/e2e-main.c',
+                    'tests/e2e/harness/x50ng/stock-launcher-main.c',
+                    'tests/e2e/harness/x50ng/headless-ui-init.h',
+                    '.github/actions/setup-x50ng/action.yml') }}
+
+    - name: Ensure x50ng runtime dependencies
+      shell: bash
+      run: |
+        packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0)
+        missing=()
+        for package in "${packages[@]}"; do
+          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+            grep -q 'ok installed' || missing+=("$package")
+        done
+        if (( ${#missing[@]} )); then
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${missing[@]}"
+        fi
+
+    - name: Install x50ng build dependencies
+      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        packages=(git-lfs libglib2.0-dev libgtk-4-dev libncurses-dev liblua5.4-dev)
+        missing=()
+        for package in "${packages[@]}"; do
+          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+            grep -q 'ok installed' || missing+=("$package")
+        done
+        if (( ${#missing[@]} )); then
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "${missing[@]}"
+        fi
+
+    - name: Fetch and adapt pinned x50ng
+      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        FAMILY: ${{ inputs.family }}
+      run: |
+        case "$MODE" in
+          direct)
+            frontend=tests/e2e/harness/x50ng/e2e-main.c
+            options=(reserve-ram)
+            ;;
+          stock)
+            frontend=tests/e2e/harness/x50ng/stock-launcher-main.c
+            options=()
+            if [[ "$FAMILY" == hp39 || "$FAMILY" == hp48 ]]; then
+              options+=(host-uart0)
+            fi
+            ;;
+          *)
+            echo "unsupported x50ng test mode: $MODE" >&2
+            exit 2
+            ;;
+        esac
+
+        bash tools/fetch-x50ng.sh \
+          build/x50ng "$frontend" "$FAMILY" "${options[@]}"
+
+    - name: Build x50ng
+      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: build/x50ng
+      run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
+
+    - name: Prepare reusable platform firmware
+      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        FAMILY: ${{ inputs.family }}
+      run: |
+        case "$FAMILY" in
+          hp39)
+            make -C build/x50ng/dist/firmware bootloaders
+            ;;
+          hp48)
+            ;;
+          hp4950)
+            make -C build/x50ng/dist/firmware bootloaders official
+            ;;
+          *)
+            echo "unsupported x50ng family: $FAMILY" >&2
+            exit 2
+            ;;
+        esac
+
+    - name: Save x50ng cache
+      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: build/x50ng/dist
+        key: ${{ steps.x50ng-cache.outputs.cache-primary-key }}
