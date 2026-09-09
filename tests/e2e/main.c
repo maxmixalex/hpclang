@@ -114,11 +114,10 @@ static void hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
-static int keyboard_scan_exists(uint8_t scan)
+static int keyboard_scan_passed(uint8_t scan)
 {
-    return scan <= 30u ||
-           (scan >= 35u && scan <= 50u) ||
-           (scan >= 56u && scan <= 59u);
+    return
+        (hpclang_keyboard_passed_bits & (UINT64_C(1) << scan)) != 0u;
 }
 
 static void keyboard_rect(
@@ -131,7 +130,13 @@ static void keyboard_rect(
 {
     for (int yy = 0; yy < h; ++yy) {
         for (int xx = 0; xx < w; ++xx) {
-            if (fill || yy == 0 || yy == h - 1 || xx == 0 || xx == w - 1)
+            int corner =
+                (xx == 0 || xx == w - 1) &&
+                (yy == 0 || yy == h - 1);
+            if (corner)
+                continue;
+            if (fill || yy == 0 || yy == h - 1 ||
+                xx == 0 || xx == w - 1)
                 hpclang_surface_set_pixel(surface, x + xx, y + yy, 255u);
         }
     }
@@ -144,10 +149,12 @@ static void keyboard_cross(
     int w,
     int h)
 {
-    int n = w < h ? w : h;
-    for (int i = 1; i < n - 1; ++i) {
-        hpclang_surface_set_pixel(surface, x + i, y + i, 255u);
-        hpclang_surface_set_pixel(surface, x + w - 1 - i, y + i, 255u);
+    int cx = x + w / 2;
+    int cy = y + h / 2;
+
+    for (int i = -1; i <= 1; ++i) {
+        hpclang_surface_set_pixel(surface, cx + i, cy + i, 255u);
+        hpclang_surface_set_pixel(surface, cx + i, cy - i, 255u);
     }
 }
 
@@ -159,35 +166,97 @@ static void keyboard_cell(
     int w,
     int h)
 {
-    int passed =
-        (hpclang_keyboard_passed_bits & (UINT64_C(1) << scan)) != 0u;
+    int passed = keyboard_scan_passed(scan);
     keyboard_rect(surface, x, y, w, h, passed);
     if (!passed && hpclang_keyboard_failed_scan == scan)
         keyboard_cross(surface, x, y, w, h);
 }
 
+static void keyboard_cursor_cell(
+    struct hpclang_surface *surface,
+    uint8_t scan,
+    int cx,
+    int cy)
+{
+    int passed = keyboard_scan_passed(scan);
+
+    for (int yy = -3; yy <= 3; ++yy) {
+        for (int xx = -3; xx <= 3; ++xx) {
+            int distance = abs(xx) + abs(yy);
+            if (distance <= 3 && (passed || distance == 3))
+                hpclang_surface_set_pixel(
+                    surface, cx + xx, cy + yy, 255u);
+        }
+    }
+
+    if (!passed && hpclang_keyboard_failed_scan == scan) {
+        for (int i = -1; i <= 1; ++i) {
+            hpclang_surface_set_pixel(surface, cx + i, cy + i, 255u);
+            hpclang_surface_set_pixel(surface, cx + i, cy - i, 255u);
+        }
+    }
+}
+
+/*
+ * These scan positions are laid out by physical key position, not by the
+ * S3C2410 electrical matrix.  The five automated calculators share this
+ * chassis geometry: six menu keys, two rows of three control keys plus the
+ * four-key cursor cluster, then seven rows of five main keys.
+ */
+static const uint8_t keyboard_soft_scans[6] = {
+    35u, 36u, 37u, 38u, 39u, 40u,
+};
+
+static const uint8_t keyboard_control_scans[2][3] = {
+    {41u, 46u, 47u},
+    {48u, 49u, 50u},
+};
+
+static const uint8_t keyboard_main_scans[7][5] = {
+    {28u, 21u, 14u,  7u, 0u},
+    {29u, 22u, 15u,  8u, 1u},
+    {30u, 23u, 16u,  9u, 2u},
+    {57u, 24u, 17u, 10u, 3u},
+    {58u, 25u, 18u, 11u, 4u},
+    {59u, 26u, 19u, 12u, 5u},
+    {56u, 27u, 20u, 13u, 6u},
+};
+
 static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
 {
     hpclang_surface_clear(surface, 0u);
-    text(surface, 4, 2, "KEY TEST");
-
-    for (uint8_t scan = 0u; scan < 56u; ++scan) {
-        if (!keyboard_scan_exists(scan))
-            continue;
-        int col = scan / 7u;
-        int row = scan % 7u;
-        keyboard_cell(surface, scan, 4 + col * 9, 10 + row * 6, 8, 5);
-    }
-
-    for (uint8_t scan = 56u; scan < 60u; ++scan)
-        keyboard_cell(surface, scan, 82, 10 + (scan - 56u) * 9, 12, 7);
+    text(surface, 2, 1, "KEY TEST");
 
     if (pass) {
-        text(surface, 4, 55, "PASS 51");
+        text(surface, 99, 1, "PASS 51");
     } else {
-        text(surface, 4, 55, "FAIL");
+        text(surface, 99, 1, "FAIL");
         if (hpclang_keyboard_failed_scan != 0xffu)
-            hex2(surface, 24, 55, hpclang_keyboard_failed_scan);
+            hex2(surface, 116, 1, hpclang_keyboard_failed_scan);
+    }
+
+    for (int col = 0; col < 6; ++col)
+        keyboard_cell(
+            surface, keyboard_soft_scans[col],
+            4 + col * 21, 7, 17, 4);
+
+    for (int row = 0; row < 2; ++row) {
+        for (int col = 0; col < 3; ++col)
+            keyboard_cell(
+                surface, keyboard_control_scans[row][col],
+                4 + col * 26, 13 + row * 8, 20, 5);
+    }
+
+    keyboard_cursor_cell(surface, 42u, 105, 14);
+    keyboard_cursor_cell(surface, 43u,  96, 20);
+    keyboard_cursor_cell(surface, 45u, 114, 20);
+    keyboard_cursor_cell(surface, 44u, 105, 26);
+
+    for (int row = 0; row < 7; ++row) {
+        for (int col = 0; col < 5; ++col)
+            keyboard_cell(
+                surface, keyboard_main_scans[row][col],
+                4 + col * 26, 30 + row * 5, 19, 4);
     }
 }
 #endif
