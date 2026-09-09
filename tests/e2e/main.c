@@ -16,6 +16,14 @@
 
 int hpclang_e2e_cpp_test(void);
 
+#ifdef HPCLANG_E2E_STORAGE
+uint32_t hpclang_kos_swi3(
+    uint32_t index,
+    uint32_t arg1,
+    uint32_t arg2,
+    uint32_t arg3);
+#endif
+
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
 volatile uint32_t hpclang_bss_probe;
@@ -314,8 +322,21 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         close(missing_fd);
         return 0x3du;
     }
-    if (errno != ENOENT)
-        return 0x40u + ((uint32_t)errno & 0x3fu);
+    if (errno != ENOENT) {
+        typedef uint32_t (*raw_open_fn)(uint32_t, uint32_t);
+        uintptr_t open_addr = (uintptr_t)hpclang_kos_swi3(
+            218u, 1u, 0u, 0u);
+        if (open_addr == 0u)
+            return 0x1feu;
+
+        int32_t raw_error = (int32_t)((raw_open_fn)open_addr)(
+            (uint32_t)(uintptr_t)"HPCLANG.OUT", 1u);
+        if (raw_error >= 0) {
+            close(raw_error);
+            return 0x1ffu;
+        }
+        return 0x100u + ((uint32_t)(-raw_error) & 0xffu);
+    }
 
     errno = 0;
     output = fopen("HPCLANG.OUT", "rb");
