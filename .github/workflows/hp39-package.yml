@@ -8,13 +8,11 @@ on:
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/m7-cxx-probe.cpp"
-      - "tests/armv4t-softfloat-host.c"
+      - "cmake/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
-      - "tools/probe-atfe.sh"
       - "tools/prepare-hp39-aplet.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
@@ -27,15 +25,15 @@ on:
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-runtime-diag.c"
-      - "tests/armv4t-softfloat-host.c"
+      - "cmake/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
-      - "tools/probe-atfe.sh"
       - "tools/prepare-hp39-aplet.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/hp39-package.yml"
 
 concurrency:
@@ -56,60 +54,25 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build visible HPC1 and stock launcher bundle
+      - name: Build unified E2E application
         run: |
-          chmod +x             tools/probe-atfe.sh             tools/hpclang-pack.py             tools/armtoolbox-wrap.py
-          tools/probe-atfe.sh
+          chmod +x tools/build-e2e.sh tools/hpclang-pack.py tools/armtoolbox-wrap.py
+          OUT="$GITHUB_WORKSPACE/build/package" tools/build-e2e.sh
 
-      - name: Build HP39g+ model-1 launcher bundle
+      - name: Build HP39 family launchers
         run: |
-          $ATFE/bin/clang \
-            --target=arm-none-eabi -march=armv4t -marm \
-            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
-            -fno-stack-protector -fno-unwind-tables \
-            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
-            -DHPCLANG_STAGE0_MODEL=1 \
-            -c platform/armtoolbox/stage0.S \
-            -o build/atfe-probe/stage0-hp39gplus.o
+          for spec in hp39gplus:1 hp39gs:2 hp40gs:3; do
+            TARGET="${spec%%:*}"
+            MODEL="${spec##*:}"
 
-          $ATFE/bin/ld.lld -m armelf \
-            -T platform/armtoolbox/stage0.ld \
-            build/atfe-probe/stage0-hp39gplus.o \
-            build/atfe-probe/stage0-bundle.o \
-            -o build/atfe-probe/stage0-hp39gplus.elf
+            $ATFE/bin/clang               --target=arm-none-eabi -march=armv4t -marm               -mfpu=none -mfloat-abi=soft -mabi=aapcs               -fno-stack-protector -fno-unwind-tables               -fno-asynchronous-unwind-tables -fno-pic -fno-pie               -DHPCLANG_STAGE0_MODEL="$MODEL"               -c platform/armtoolbox/stage0.S               -o "build/package/stage0-$TARGET.o"
 
-          $ATFE/bin/llvm-objcopy -O binary \
-            build/atfe-probe/stage0-hp39gplus.elf \
-            build/atfe-probe/stage0-hp39gplus.bin
+            $ATFE/bin/ld.lld -m armelf               -T platform/armtoolbox/stage0.ld               "build/package/stage0-$TARGET.o"               build/package/stage0-bundle.o               -o "build/package/stage0-$TARGET.elf"
 
-          python3 tools/armtoolbox-wrap.py \
-            build/atfe-probe/stage0-hp39gplus.bin \
-            build/atfe-probe/hp39gplus-hpc1.hp
+            $ATFE/bin/llvm-objcopy -O binary               "build/package/stage0-$TARGET.elf"               "build/package/stage0-$TARGET.bin"
 
-      - name: Build HP40gs model-3 launcher bundle
-        run: |
-          $ATFE/bin/clang \
-            --target=arm-none-eabi -march=armv4t -marm \
-            -mfpu=none -mfloat-abi=soft -mabi=aapcs \
-            -fno-stack-protector -fno-unwind-tables \
-            -fno-asynchronous-unwind-tables -fno-pic -fno-pie \
-            -DHPCLANG_STAGE0_MODEL=3 \
-            -c platform/armtoolbox/stage0.S \
-            -o build/atfe-probe/stage0-hp40gs.o
-
-          $ATFE/bin/ld.lld -m armelf \
-            -T platform/armtoolbox/stage0.ld \
-            build/atfe-probe/stage0-hp40gs.o \
-            build/atfe-probe/stage0-bundle.o \
-            -o build/atfe-probe/stage0-hp40gs.elf
-
-          $ATFE/bin/llvm-objcopy -O binary \
-            build/atfe-probe/stage0-hp40gs.elf \
-            build/atfe-probe/stage0-hp40gs.bin
-
-          python3 tools/armtoolbox-wrap.py \
-            build/atfe-probe/stage0-hp40gs.bin \
-            build/atfe-probe/hp40gs-hpc1.hp
+            python3 tools/armtoolbox-wrap.py               "build/package/stage0-$TARGET.bin"               "build/package/$TARGET-hpc1.hp"
+          done
 
       - name: Restore HPGCC39 packaging cache
         uses: actions/cache@v6
@@ -117,55 +80,17 @@ jobs:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-v1
 
-      - name: Prepare HP39g+, HP39gs and HP40gs hardware-validation packages
+      - name: Prepare hardware-validation packages
         run: |
           chmod +x tools/bootstrap-hp39-aplet.sh tools/package-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
 
-          tools/package-hp39-aplet.sh \
-            build/atfe-probe/hp39gplus-hpc1.hp \
-            dist/hp39gplus-hardware-validation \
-            hp39gplus
-
-          tools/package-hp39-aplet.sh \
-            build/atfe-probe/hp39gs-hpc1.hp \
-            dist/hp39gs-hardware-validation \
-            hp39gs
-
-          tools/package-hp39-aplet.sh \
-            build/atfe-probe/hp40gs-hpc1.hp \
-            dist/hp40gs-hardware-validation \
-            hp40gs
-
-          for root in \
-            dist/hp39gplus-hardware-validation \
-            dist/hp39gs-hardware-validation \
-            dist/hp40gs-hardware-validation
-          do
-            cp build/atfe-probe/hp39-visible.result-address \
-              "$root/E2E_RESULT_ADDRESS.txt"
-            printf 'commit=%s\nworkflow_run=%s\n' \
-              "$GITHUB_SHA" "$GITHUB_RUN_ID" \
-              > "$root/BUILD_INFO.txt"
+          for target in hp39gplus hp39gs hp40gs; do
+            root="dist/$target-hardware-validation"
+            tools/package-hp39-aplet.sh               "build/package/$target-hpc1.hp"               "$root"               "$target"
+            cp build/package/e2e.result-address "$root/E2E_RESULT_ADDRESS.txt"
+            printf 'commit=%s\nworkflow_run=%s\n'               "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$root/BUILD_INFO.txt"
           done
-
-          python3 - <<'PY'
-          from hashlib import sha256
-          from pathlib import Path
-
-          for root in (
-              Path("dist/hp39gs-hardware-validation"),
-              Path("dist/hp40gs-hardware-validation"),
-          ):
-              names = sorted(
-                  p.name for p in root.iterdir()
-                  if p.is_file() and p.name != "SHA256SUMS.txt"
-              )
-              with (root / "SHA256SUMS.txt").open("w", encoding="ascii") as out:
-                  for name in names:
-                      digest = sha256((root / name).read_bytes()).hexdigest()
-                      out.write(f"{digest}  {name}\n")
-          PY
 
       - name: Upload HP39g+ hardware validation bundle
         uses: actions/upload-artifact@v7

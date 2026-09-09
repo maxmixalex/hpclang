@@ -8,14 +8,10 @@ on:
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/atfe-runtime-smoke.c"
-      - "tests/atfe-cxx-smoke.cpp"
-      - "tests/atfe-platform-stubs.c"
-      - "tests/*-host.c"
-      - "tests/bootstrap-mmu.c"
-      - "tests/hp39-visible-smoke.c"
-      - "tests/hp39-visible-smoke-irq.S"
-      - "tools/probe-atfe.sh"
+      - "cmake/**"
+      - "tests/unit/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
@@ -26,14 +22,12 @@ on:
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
       - "include/hpclang/**"
-      - "tests/atfe-runtime-smoke.c"
-      - "tests/atfe-cxx-smoke.cpp"
-      - "tests/atfe-platform-stubs.c"
-      - "tests/*-host.c"
-      - "tests/bootstrap-mmu.c"
-      - "tests/hp39-visible-smoke.c"
-      - "tools/probe-atfe.sh"
+      - "cmake/**"
+      - "tests/unit/**"
+      - "tests/e2e/**"
+      - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 
 concurrency:
@@ -57,11 +51,6 @@ jobs:
             exit 1
           fi
 
-      - name: Validate common MMU layout
-        run: |
-          cc -std=c11 -Wall -Wextra -Werror -Iinclude             runtime/bootstrap/mmu.c tests/bootstrap-mmu.c             -o /tmp/bootstrap-mmu
-          /tmp/bootstrap-mmu
-
       - name: Run unit tests
         run: |
           cmake -S tests/unit -B build/unit
@@ -71,12 +60,7 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build unified E2E consumer project
+      - name: Build unified E2E project
         run: |
           chmod +x tools/build-e2e.sh tools/hpclang-pack.py
           OUT="$GITHUB_WORKSPACE/build/e2e" tools/build-e2e.sh
-
-      - name: Link compiler-rt and picolibc into HPC1
-        run: |
-          chmod +x tools/probe-atfe.sh tools/hpclang-pack.py
-          tools/probe-atfe.sh
