@@ -271,10 +271,11 @@ uint8_t hpclang_surface_get_pixel(
     if (bits == 0u)
         return 0u;
 
-    uint32_t bit_index = (uint32_t)x * bits;
+    uint64_t bit_index = (uint64_t)(uint32_t)x * bits;
     const volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride + (bit_index >> 3);
-    uint32_t shift = bit_index & 7u;
+        surface->pixels + (uint32_t)y * surface->stride +
+        (size_t)(bit_index >> 3);
+    uint32_t shift = (uint32_t)(bit_index & 7u);
     uint8_t mask = (uint8_t)((1u << bits) - 1u);
     uint8_t value = (uint8_t)((*pixel >> shift) & mask);
     return expand_intensity(value, bits);
@@ -295,10 +296,11 @@ void hpclang_surface_set_pixel(
     if (bits == 0u)
         return;
 
-    uint32_t bit_index = (uint32_t)x * bits;
+    uint64_t bit_index = (uint64_t)(uint32_t)x * bits;
     volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride + (bit_index >> 3);
-    uint32_t shift = bit_index & 7u;
+        surface->pixels + (uint32_t)y * surface->stride +
+        (size_t)(bit_index >> 3);
+    uint32_t shift = (uint32_t)(bit_index & 7u);
     uint8_t field_mask =
         (uint8_t)(((1u << bits) - 1u) << shift);
     uint8_t value =
