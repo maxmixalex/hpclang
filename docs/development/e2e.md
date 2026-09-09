@@ -38,11 +38,12 @@ HP 49g+ and HP 50g use an emulated SD card to install ARMToolbox and copy genera
 - `target` — workflow and filename identity;
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
-- `lcd_height` — 64- or 80-line capture height.
+- `lcd_height` — 64- or 80-line capture height;
+- `automated_e2e` — optional automation eligibility; it defaults to true.
 
 Only targets distributed as per-model firmware archives add a `firmware` object. HP 39gs and HP 40gs use their hpcalc archive/member names.
 
-HP 39g+ intentionally has no `firmware` object. Its model/platform profile is useful for packaging, but no trustworthy public stock ARM flash fixture has been established.
+HP 39g+ intentionally has no `firmware` object and sets `"automated_e2e": false`. Its model/platform profile remains useful for packaging, but no trustworthy public stock ARM flash fixture has been established.
 
 HP 49g+ and HP 50g share the 2.15 OS image but carry distinct `bootloader` filenames because the bootloader difference is genuine per-model metadata.
 
@@ -92,12 +93,13 @@ HP 39g+ remains outside the automated matrices until a real-machine stock flash 
 
 The E2E source project is target-independent. CI should therefore avoid rebuilding it once per calculator.
 
-The intended pipeline has three stages:
+The implemented pipeline has two execution layers, plus one shared-asset stage for Stock:
 
-1. **test application** — build one HPC1 application per test mode (Direct or Stock), including all calculator-testable public SDK coverage;
-2. **platform harness** — prepare the x50ng variant once per `test mode × platform` pair: `hp39`, `hp48`, or `hp4950`;
-3. **target execution** — apply only genuine target metadata such as firmware, bootloader, model ID, stock UI sequence, and transfer mechanism.
+1. **test application** — build one HPC1 application per test mode (Direct or Stock), including all calculator-testable public SDK coverage and all target launchers;
+2. **family execution** — run one job for each of `hp39`, `hp48`, and `hp4950`. The job prepares/restores its x50ng variant once, installs runtime dependencies once, discovers eligible targets from `tests/e2e/targets/*.json`, and executes sibling targets in parallel.
 
-The build stage may produce all target launchers from the same HPC1 image so target jobs do not need to download the Arm toolchain merely to relink stage0.
+Stock additionally prepares transfer/launcher assets once before the three family jobs. HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
+
+x50ng's cache is for cross-run reuse. The workflows do not repack a freshly prepared x50ng tree into an intra-run artifact merely to hand it to target jobs; the family job owns both platform preparation and target execution. Build artifacts are reserved for the HPC1 application/launchers and genuinely shared Stock assets.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.

@@ -8,13 +8,11 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | --- | --- |
 | `CI / Core runtime` | host/link/runtime invariants for the LLVM-native core |
 | `CI / HP39 package` | build HP39g+/HP39gs/HP40gs hardware-validation packages |
-| `E2E / Direct runtime` | boot target-appropriate firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS, and validate stock return |
-| `E2E / HP39/40 stock launch` | original HP39gs/HP40gs APLET UI → serial-disk transfer → ARMToolbox39 → HPC1 PASS |
-| `E2E / HP48gII stock launch` | original HP48gII UI → Kermit transfer → ARMToolbox48 → `HPCLANG.HP` → `PrRUN` → HPC1 PASS |
-| `E2E / HP49/50 stock launch` | original HP49g+/HP50g UI → SD/File Manager → ARMToolbox → `HPCLANG.HP` → `PrRUN` → HPC1 PASS |
+| `E2E / Direct runtime` | family-level Direct jobs boot target-appropriate firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS, and validate stock return |
+| `E2E / Stock launch` | family-level Stock jobs drive the original transfer/UI/ARMToolbox launch path and require the same HPC1 PASS result |
 | `Maintenance / CI` | trim Actions history and CI evidence |
 
-Direct runtime passes on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g. Full stock launch passes on the same five models. HP 39g+ is intentionally blocked until a trustworthy real-machine stock flash fixture exists.
+Direct runtime passes on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g. Full stock launch passes on the same five models. Direct and Stock each use one runner per platform family; sibling targets share one x50ng/runtime setup and execute in parallel. HP 39g+ is intentionally blocked until a trustworthy real-machine stock flash fixture exists.
 
 ## Runtime PASS contract
 
@@ -55,7 +53,7 @@ The HP 39g+ model-1 hardware package is built by the same workflow, but that is 
 
 ## HP 39gs/40gs stock emulator gate
 
-The `E2E / HP39/40 stock launch` matrix boots each official 2.22 ROM and uses the calculator's original serial-disk path to request `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000`.
+The `Stock / hp39` family job boots each official 2.22 ROM and uses the calculator's original serial-disk path to request `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000`.
 
 It then launches the installed hpclang aplet through ARMToolbox39 and requires the same machine-readable HPC1 PASS result.
 
@@ -69,13 +67,13 @@ The fixture is pinned by SHA-256 before being installed as persistent x50ng flas
 
 ## HP 48gII stock emulator gate
 
-The `E2E / HP48gII stock launch` gate boots the verified 2 MiB full-NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, and starts the calculator's Kermit server.
+The `Stock / hp48` family job boots the verified 2 MiB full-NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, and starts the calculator's Kermit server.
 
 The host transfers historical ARMToolbox48 library 275 as `L275` plus the generated `HPCLANG.HP` object as `HPCLANG`. The calculator installs library 275 into Port 0, warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN`, and must produce the same machine-readable HPC1 PASS word.
 
 ## HP 49g+/50g stock emulator gate
 
-The `E2E / HP49/50 stock launch` matrix uses each model's native ARM bootloader with the shared official 2.15 OS image.
+The `Stock / hp4950` family job uses each model's native ARM bootloader with the shared official 2.15 OS image.
 
 It installs the same ARMToolbox/library 275 package from the emulated SD card, copies the generated `HPCLANG.HP` object through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires the machine-readable HPC1 PASS result.
 
