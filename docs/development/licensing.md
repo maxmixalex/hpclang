@@ -20,6 +20,18 @@ Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calcu
 
 They are not vendored into the normal source tree unless their redistribution terms are explicitly suitable. Where CI needs an external firmware fixture, the documentation must record what the fixture is, where it came from, and how its identity is checked.
 
+## Built-in bitmap fonts
+
+The first font/text layer mechanically extracts printable Basic Latin glyphs
+from the X11 misc-fixed 4x6 and 5x7 ISO10646-1 BDF fonts. The source BDF
+headers explicitly identify the fonts as public domain ("Share and enjoy.").
+
+The committed tables are normalized bitmap data from those independent fonts,
+not HPGCC implementation or glyph data. The extraction source is recorded
+beside the tables in `runtime/core/font.c`. Historical HPG's additional
+calculator-specific byte glyphs remain compatibility evidence and are not
+copied into hpclang.
+
 ## Implementation discipline
 
 For new runtime/platform code:

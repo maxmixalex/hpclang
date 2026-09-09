@@ -86,6 +86,24 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Explicit heap-owned two-level off-screen surface. Five-model Direct and full-stock matrices PASS. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
 
+## Fonts and text
+
+The candidate canonical layer is deliberately narrower than historical HPG:
+
+| API | Status | Contract |
+| --- | --- | --- |
+| `hpclang_font_mini()` | 🧪 | Immutable built-in Basic Latin font; line height 6, advance 4. |
+| `hpclang_font_big()` | 🧪 | Immutable built-in Basic Latin font; line height 8, advance 6. |
+| `hpclang_font_height()` / `hpclang_font_advance()` | 🧪 | Fixed metrics without exposing bitmap storage. |
+| `hpclang_surface_draw_char()` | 🧪 | Foreground-only clipped glyph draw on an explicit surface and intensity. |
+| `hpclang_surface_draw_text()` | 🧪 | Fixed advance; newline resets to the original x and moves by one font height. |
+
+Bytes outside printable Basic Latin render as `?`. That is an intentional
+canonical v1 scope, not a claim that these built-ins reproduce HPG's historical
+256-entry calculator character set. HPG-specific glyph repertoire and custom
+font descriptors belong to the later compatibility layer unless an independent
+core use case requires them.
+
 ## Validation by service
 
 | Service | Host | ARMv4T link | Direct runtime | Full stock launch |
@@ -143,8 +161,8 @@ HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
 | circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ⬜ |
 | polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ⬜ |
-| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ⬜ |
-| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ⬜ E2E bitmap glyphs are internal test code, not SDK API. |
+| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | 🧪 Canonical immutable mini/big fonts and metrics are implemented with an explicit Basic Latin repertoire; HPG's 256-entry built-ins/custom-font adapter remain compatibility work. |
+| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | 🧪 Canonical explicit-surface character/text drawing is implemented and replaces the E2E-only glyph table; HPG mutable-context wrappers remain later work. |
 | mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
 | patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ⬜ |
 | owned images | mono/gray image allocation/free | ◐ Owned mono surfaces are implemented; grayscale variants remain later work. |
@@ -243,7 +261,7 @@ Based on historical stability, example usage and current implementation dependen
 
 1. ✅ close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
 2. ✅ measure and expose model-neutral physical key identities across the three validated platform families;
-3. **Next:** freeze the first font/text layer on top of the surface ownership/blit boundary;
+3. 🧪 validate and freeze the first Basic-Latin font/text layer on top of the surface ownership/blit boundary;
 4. establish calculator storage/file services and wire standard stdio where semantics fit;
 5. design Saturn/RPL object and stack handles;
 6. only then begin HPG/keyboard/stdio compatibility headers.

@@ -25,5 +25,11 @@ target_include_directories(test_keyboard_keys PRIVATE "${HPCLANG_ROOT}/include" 
 hpclang_unit(display test_display.c "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_display PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(font
+    test_font.c
+    "${HPCLANG_ROOT}/runtime/core/font.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_font PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
