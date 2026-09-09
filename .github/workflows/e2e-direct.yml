@@ -21,6 +21,7 @@ on:
       - "tests/e2e/verify.py"
       - "tests/e2e/report.py"
       - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/run-family.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
       - "tools/build-e2e.sh"
@@ -52,6 +53,7 @@ on:
       - "tests/e2e/verify.py"
       - "tests/e2e/report.py"
       - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/run-family.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
       - "tools/build-e2e.sh"
@@ -97,54 +99,17 @@ jobs:
             build/e2e-direct/launchers/*.bin
           if-no-files-found: error
 
-  platform:
-    name: Prepare Direct / ${{ matrix.family }}
-    runs-on: home-docker
-    strategy:
-      fail-fast: false
-      matrix:
-        family: [hp39, hp48, hp4950]
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Prepare x50ng platform
-        uses: ./.github/actions/setup-x50ng
-        with:
-          mode: direct
-          family: ${{ matrix.family }}
-
-      - name: Pack x50ng platform
-        run: tar -C build/x50ng -cf "build/x50ng-direct-${{ matrix.family }}.tar" dist
-
-      - name: Upload x50ng platform
-        uses: actions/upload-artifact@v7
-        with:
-          name: x50ng-direct-${{ matrix.family }}
-          retention-days: 1
-          path: build/x50ng-direct-${{ matrix.family }}.tar
-          if-no-files-found: error
-
-  target:
-    name: ${{ matrix.target }}
-    needs: [build, platform]
+  family:
+    name: Direct / ${{ matrix.family }}
+    needs: build
     runs-on: home-docker
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: hp39gs
-            family: hp39
-          - target: hp40gs
-            family: hp39
-          - target: hp48gii
-            family: hp48
-          - target: hp49gplus
-            family: hp4950
-          - target: hp50g
-            family: hp4950
+        family: [hp39, hp48, hp4950]
     env:
-      TARGET: ${{ matrix.target }}
+      FAMILY: ${{ matrix.family }}
 
     steps:
       - uses: actions/checkout@v7
@@ -155,58 +120,54 @@ jobs:
           name: e2e-direct-build
           path: build/e2e
 
-      - name: Download x50ng platform
-        uses: actions/download-artifact@v7
+      - name: Prepare x50ng family
+        uses: ./.github/actions/setup-x50ng
         with:
-          name: x50ng-direct-${{ matrix.family }}
-          path: build/platform
-
-      - name: Unpack x50ng platform
-        run: |
-          mkdir -p build/x50ng
-          tar -C build/x50ng -xf "build/platform/x50ng-direct-${{ matrix.family }}.tar"
+          mode: direct
+          family: ${{ matrix.family }}
 
       - name: Prepare platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh direct "${{ matrix.family }}"
+        run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
 
-      - name: Execute Direct E2E
-        run: bash tests/e2e/harness/run-direct.sh "$TARGET" build/e2e
+      - name: Execute Direct family
+        run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
 
-      - name: Generate LCD summary image
+      - name: Generate and publish LCD evidence
         if: always()
         run: |
-          python3 tests/e2e/report.py tests/e2e/specs/direct.json \
-            --image-out "build/$TARGET-summary.png" \
-            --image-only
-
-      - name: Publish LCD summary image
-        if: always() && github.event_name != 'pull_request'
-        run: |
-          chmod +x tools/publish-ci-image.sh
-          tools/publish-ci-image.sh \
-            "build/$TARGET-summary.png" \
-            "direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
-
-      - name: Add LCD evidence to job summary
-        if: always()
-        run: |
-          args=(tests/e2e/specs/direct.json)
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
-          fi
-          python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+          targets_file="build/direct-$FAMILY-targets.txt"
+          [[ -f "$targets_file" ]] || exit 0
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            python3 tests/e2e/report.py tests/e2e/specs/direct.json \
+              --image-out "build/$TARGET-summary.png" \
+              --image-only
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              chmod +x tools/publish-ci-image.sh
+              tools/publish-ci-image.sh \
+                "build/$TARGET-summary.png" \
+                "direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
+            fi
+            args=(tests/e2e/specs/direct.json)
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+            fi
+            python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+          done < "$targets_file"
 
       - name: Upload Direct E2E evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.target }}-direct-runtime-e2e
+          name: ${{ matrix.family }}-direct-runtime-e2e
           retention-days: 14
           path: |
-            build/${{ matrix.target }}-*.pgm
-            build/${{ matrix.target }}-*.pgm.png
-            build/${{ matrix.target }}-e2e.json
-            build/${{ matrix.target }}-summary.png
-            build/e2e/launchers/${{ matrix.target }}.bin
+            build/*-*.pgm
+            build/*-*.pgm.png
+            build/*-e2e.json
+            build/*-summary.png
+            build/direct-${{ matrix.family }}-targets.txt
+            build/e2e/launchers/*.bin
             build/e2e/e2e.hpc
           if-no-files-found: warn

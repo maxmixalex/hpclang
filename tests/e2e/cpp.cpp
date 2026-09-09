@@ -80,7 +80,14 @@ extern "C" int hpclang_e2e_cpp_test(void)
         return 4;
 
     hpclang::surface_ref owned{owned_raw};
-    owned.set_pixel(0, 0, 255u);
+    owned.clear(0u);
+    owned.draw_line(0, 0, 1, 1, 255u);
+    if (owned.get_pixel(0, 0) != 255u ||
+        owned.get_pixel(1, 1) != 255u) {
+        hpclang_surface_destroy(owned_raw);
+        return 5;
+    }
+
     owned.blit_from(owned, 1, 0, 0, 0, 1, 1);
     if (owned.get_pixel(1, 0) != 255u) {
         hpclang_surface_destroy(owned_raw);
