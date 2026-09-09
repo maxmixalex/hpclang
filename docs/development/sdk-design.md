@@ -444,6 +444,14 @@ List, Matrix, Library and related records, rooted at `HP39DIR.000` with
 `HP39DIR.CUR` tracking the current directory. Those objects should get a
 typed/named object service, not synthetic POSIX file descriptors.
 
+The HP39 ROM symbol map also exposes object-store operations such as
+`DoGetObFrSto`, `DoSendObToSto`, `OpenIO` and `StdIOProc`. These are
+Saturn/System-RPL-side entry points, not ordinary ARM call targets. That is a
+useful implementation boundary: M7.2 can define the typed storage semantics,
+but invoking those native services safely should reuse the M7.3 Saturn/object
+bridge rather than teaching the ARM stdio backend to jump into calculator ROM
+internals directly.
+
 HP48/49/50 RPL/Saturn objects likewise belong to the typed-object side and
 continue into M7.3. Physical medium (RAM/flash/SD) is backend detail unless an
 application genuinely needs it.

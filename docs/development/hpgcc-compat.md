@@ -451,6 +451,12 @@ objects and `HP39DIR.000` / `HP39DIR.CUR` directory metadata. That is
 real storage, but it is **not** the HPGCC 49/50 SD stdio model and should not be
 masqueraded as a POSIX filesystem.
 
+The historical HP39 ROM entry map corroborates that distinction with native
+`DoGetObFrSto`, `DoSendObToSto`, `OpenIO` and `StdIOProc` symbols.
+They live on the Saturn/System-RPL side, so a future compatibility adapter
+should reach them through the typed object bridge rather than expose their ROM
+addresses or calling convention as hpclang ABI.
+
 `fdelete` is an **Adapter/Migration** candidate to standard `remove()`.
 
 The core storage service should expose calculator-specific volume/object-store
