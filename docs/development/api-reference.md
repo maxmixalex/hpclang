@@ -5,7 +5,7 @@ This is the progress-oriented API reference for hpclang. It deliberately answers
 1. What can a native hpclang application call today?
 2. How much of the historical HPGCC application surface has an hpclang equivalent yet?
 
-The historical comparison is based on the complete HPGCC 1.0.3 beta, HPGCC 1.1 with 39g support, HPGCC 2.0 SP2, and HPGCC3 R004.revA distribution archives. Declaration counts below come from their installed/public headers. They are not a compatibility percentage: one filesystem or Saturn function is not equivalent in engineering cost to one drawing primitive.
+The historical comparison is based on the complete HPGCC 1.0.3 beta, HPGCC 1.1 with 39g support, HPGCC 2.0 SP2, and HPGCC3 R004.revA distribution archives. Function counts below are de-duplicated public function names extracted from their installed/public headers. They are not a compatibility percentage: one filesystem or Saturn function is not equivalent in engineering cost to one drawing primitive.
 
 ## Status legend
 
@@ -100,7 +100,7 @@ HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash 
 
 ## Historical public-surface size
 
-The following is a mechanical declaration-count view of the major calculator-facing headers.
+The following is a mechanical unique-public-function-name view of the major calculator-facing headers.
 
 | Historical surface | 1.0.3 | 1.1 39G | 2.0 SP2 | HPGCC3 | hpclang today |
 | --- | ---: | ---: | ---: | ---: | --- |
