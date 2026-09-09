@@ -137,6 +137,17 @@ Do not freeze a public execution-environment enum until code genuinely needs
 one. For now this is an implementation/ownership boundary, not another target
 axis in the application ABI.
 
+Do not make downstream firmware, operating systems, or applications named
+dependencies of hpclang. They are consumers of the compiler/SDK contract, not
+inputs to it. A downstream project may motivate a generic capability, but it
+must not create a project-specific target, backend name, ABI branch, or public
+API in hpclang.
+
+Public API and compatibility decisions are grounded in the supported calculator
+hardware, validated stock behavior, the hpclang ABI, and the historical HPGCC
+interfaces being replaced or adapted. Downstream projects may be useful
+comparative evidence, but they do not define hpclang architecture.
+
 ## Core API design rules
 
 ### Ownership and allocation
