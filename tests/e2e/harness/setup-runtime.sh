@@ -8,7 +8,12 @@ fi
 
 MODE="$1"
 FAMILY="$2"
-packages=()
+packages=(
+    libglib2.0-0t64
+    libgtk-4-1
+    libncurses6
+    liblua5.4-0
+)
 
 if [[ "$MODE" == stock && ( "$FAMILY" == hp39 || "$FAMILY" == hp48 ) ]]; then
     packages+=(ckermit socat)
