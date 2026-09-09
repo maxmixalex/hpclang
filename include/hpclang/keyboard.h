@@ -66,6 +66,12 @@ enum hpclang_keyboard_modifier {
     HPCLANG_KEYBOARD_MOD_ALPHA = 1u << 1,
     HPCLANG_KEYBOARD_MOD_LEFT_SHIFT = 1u << 2,
     HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT = 1u << 3,
+
+    /*
+     * Normalized physical Shift state. This bit is set for the single HP39
+     * Shift key and for either HP48/49/50 Shift key. The LEFT/RIGHT bits above
+     * remain available when the distinction exists on the current model.
+     */
     HPCLANG_KEYBOARD_MOD_SHIFT = 1u << 4
 };
 
@@ -166,8 +172,6 @@ enum hpclang_key {
     HPCLANG_KEY_HP4950_STO,
     HPCLANG_KEY_HP4950_NXT,
     HPCLANG_KEY_HP4950_HIST,
-    HPCLANG_KEY_HP4950_EVAL,
-    HPCLANG_KEY_HP4950_QUOTE,
     HPCLANG_KEY_HP4950_SYMB,
     HPCLANG_KEY_HP4950_POWER,
     HPCLANG_KEY_HP4950_SQRT,
@@ -179,7 +183,14 @@ enum hpclang_key {
     HPCLANG_KEY_HP4950_X,
     HPCLANG_KEY_HP4950_RECIPROCAL,
     HPCLANG_KEY_HP4950_BACKSPACE,
-    HPCLANG_KEY_HP4950_SPACE
+    HPCLANG_KEY_HP4950_SPACE,
+
+    /* These two primary-key positions differ between HP49g+ and HP50g. */
+    HPCLANG_KEY_HP49_CAT = 0x0400,
+    HPCLANG_KEY_HP49_EQW,
+
+    HPCLANG_KEY_HP50_EVAL = 0x0500,
+    HPCLANG_KEY_HP50_QUOTE
 };
 
 /*

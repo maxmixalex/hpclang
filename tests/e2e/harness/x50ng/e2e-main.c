@@ -55,13 +55,11 @@
 #define BOOT_NO_US 2000000LL
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
-#define KEY_HOLD_US 100000LL
-#define KEYBOARD_PRESS_US (INJECT_US + 500000LL)
-#define KEYBOARD_RELEASE_US (INJECT_US + 1500000LL)
-#define FAMILY_KEY_PRESS_US (INJECT_US + 2000000LL)
-#define FAMILY_KEY_RELEASE_US (INJECT_US + 3000000LL)
+#define KEY_HOLD_US 50000LL
+#define KEYBOARD_FIRST_US (INJECT_US + 500000LL)
+#define KEYBOARD_STEP_US 120000LL
 #define POLL_US 20000LL
-#define DEADLINE_US 8000000LL
+#define DEADLINE_US 16000000LL
 #define RETURN_ON_US 200000LL
 #define RETURN_CAPTURE_US 800000LL
 
@@ -117,12 +115,67 @@ struct e2e {
 
 static const struct key_action f_down = { HP4950_KEY_F, 1 };
 static const struct key_action f_up = { HP4950_KEY_F, 0 };
-static const struct key_action enter_down = { HP4950_KEY_ENTER, 1 };
-static const struct key_action enter_up = { HP4950_KEY_ENTER, 0 };
-static const struct key_action family_key_down = { HP4950_KEY_G, 1 };
-static const struct key_action family_key_up = { HP4950_KEY_G, 0 };
 static const struct key_action on_down = { HP4950_KEY_ON, 1 };
 static const struct key_action on_up = { HP4950_KEY_ON, 0 };
+
+static const int keyboard_codes[] = {
+    HP4950_KEY_BACKSPACE,
+    HP4950_KEY_U,
+    HP4950_KEY_Z,
+    HP4950_KEY_MULTIPLY,
+    HP4950_KEY_MINUS,
+    HP4950_KEY_PLUS,
+    HP4950_KEY_ENTER,
+    HP4950_KEY_P,
+    HP4950_KEY_T,
+    HP4950_KEY_Y,
+    HP4950_KEY_9,
+    HP4950_KEY_6,
+    HP4950_KEY_3,
+    HP4950_KEY_SPACE,
+    HP4950_KEY_O,
+    HP4950_KEY_S,
+    HP4950_KEY_X,
+    HP4950_KEY_8,
+    HP4950_KEY_5,
+    HP4950_KEY_2,
+    HP4950_KEY_PERIOD,
+    HP4950_KEY_N,
+    HP4950_KEY_R,
+    HP4950_KEY_W,
+    HP4950_KEY_7,
+    HP4950_KEY_4,
+    HP4950_KEY_1,
+    HP4950_KEY_0,
+    HP4950_KEY_M,
+    HP4950_KEY_Q,
+    HP4950_KEY_V,
+    HP4950_KEY_A,
+    HP4950_KEY_B,
+    HP4950_KEY_C,
+    HP4950_KEY_D,
+    HP4950_KEY_E,
+    HP4950_KEY_F,
+    HP4950_KEY_G,
+    HP4950_KEY_UP,
+    HP4950_KEY_LEFT,
+    HP4950_KEY_DOWN,
+    HP4950_KEY_RIGHT,
+    HP4950_KEY_H,
+    HP4950_KEY_I,
+    HP4950_KEY_J,
+    HP4950_KEY_K,
+    HP4950_KEY_L,
+    HP4950_KEY_ON,
+    HP4950_KEY_ALPHA,
+    HP4950_KEY_LEFTSHIFT,
+    HP4950_KEY_RIGHTSHIFT,
+};
+
+static struct key_action keyboard_down[
+    sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
+static struct key_action keyboard_up[
+    sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
 
 static int guest_read32(hdw_t *h, uint32_t va, uint32_t *v)
 {
@@ -655,13 +708,26 @@ int main(int argc, char **argv)
 
     if (!tap(&f_down, &f_up, BOOT_NO_US) ||
         !tap(&f_down, &f_up, BOOT_OK_US) ||
-        !later(inject, &s, INJECT_US) ||
-        !later(key_cb, (void *)&enter_down, KEYBOARD_PRESS_US) ||
-        !later(key_cb, (void *)&enter_up, KEYBOARD_RELEASE_US) ||
-        !later(key_cb, (void *)&family_key_down, FAMILY_KEY_PRESS_US) ||
-        !later(key_cb, (void *)&family_key_up, FAMILY_KEY_RELEASE_US)) {
+        !later(inject, &s, INJECT_US)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");
         return EXIT_FAILURE;
+    }
+
+    size_t keyboard_count =
+        sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
+    for (size_t i = 0; i < keyboard_count; ++i) {
+        keyboard_down[i].key = keyboard_codes[i];
+        keyboard_down[i].down = 1;
+        keyboard_up[i].key = keyboard_codes[i];
+        keyboard_up[i].down = 0;
+
+        int64_t press_us = KEYBOARD_FIRST_US +
+            (int64_t)i * KEYBOARD_STEP_US;
+        if (!later(key_cb, &keyboard_down[i], press_us) ||
+            !later(key_cb, &keyboard_up[i], press_us + KEY_HOLD_US)) {
+            fprintf(stderr, "cannot schedule full-keyboard E2E actions\n");
+            return EXIT_FAILURE;
+        }
     }
 
     main_loop(s.hdw);

@@ -112,29 +112,90 @@ int main(void)
             sizeof(hp39) / sizeof(hp39[0])))
         return EXIT_FAILURE;
 
-#define EXPECT_LAYOUT(model, prefix) do {                                      \
-    static const struct mapping layout[] = {                                   \
-        {0u, prefix##_BACKSPACE}, {1u, prefix##_TAN},                          \
-        {7u, prefix##_SYMB}, {8u, prefix##_COS},                               \
-        {9u, prefix##_RECIPROCAL}, {13u, prefix##_SPACE},                      \
-        {14u, prefix##_QUOTE}, {15u, prefix##_SIN},                            \
-        {16u, prefix##_X}, {21u, prefix##_EVAL},                               \
-        {22u, prefix##_SQRT}, {23u, prefix##_NEGATE},                          \
-        {28u, prefix##_HIST}, {29u, prefix##_POWER},                           \
-        {30u, prefix##_EEX}, {41u, prefix##_APPS},                             \
-        {46u, prefix##_MODE}, {47u, prefix##_TOOL},                            \
-        {48u, prefix##_VAR}, {49u, prefix##_STO}, {50u, prefix##_NXT},         \
-        {57u, HPCLANG_KEY_ALPHA}, {58u, HPCLANG_KEY_LEFT_SHIFT},               \
-        {59u, HPCLANG_KEY_RIGHT_SHIFT},                                        \
-    };                                                                          \
-    if (!expect_map(model, layout, sizeof(layout) / sizeof(layout[0])))         \
-        return EXIT_FAILURE;                                                    \
-} while (0)
+static const struct mapping hp48[] = {
+        {0u, HPCLANG_KEY_HP48_BACKSPACE},
+        {1u, HPCLANG_KEY_HP48_TAN},
+        {7u, HPCLANG_KEY_HP48_SYMB},
+        {8u, HPCLANG_KEY_HP48_COS},
+        {9u, HPCLANG_KEY_HP48_RECIPROCAL},
+        {13u, HPCLANG_KEY_HP48_SPACE},
+        {14u, HPCLANG_KEY_HP48_QUOTE},
+        {15u, HPCLANG_KEY_HP48_SIN},
+        {16u, HPCLANG_KEY_HP48_X},
+        {21u, HPCLANG_KEY_HP48_EVAL},
+        {22u, HPCLANG_KEY_HP48_SQRT},
+        {23u, HPCLANG_KEY_HP48_NEGATE},
+        {28u, HPCLANG_KEY_HP48_HIST},
+        {29u, HPCLANG_KEY_HP48_POWER},
+        {30u, HPCLANG_KEY_HP48_EEX},
+        {41u, HPCLANG_KEY_HP48_APPS},
+        {46u, HPCLANG_KEY_HP48_MODE},
+        {47u, HPCLANG_KEY_HP48_TOOL},
+        {48u, HPCLANG_KEY_HP48_VAR},
+        {49u, HPCLANG_KEY_HP48_STO},
+        {50u, HPCLANG_KEY_HP48_NXT},
+        {57u, HPCLANG_KEY_ALPHA},
+        {58u, HPCLANG_KEY_LEFT_SHIFT},
+        {59u, HPCLANG_KEY_RIGHT_SHIFT},
+    };
+    if (!expect_map(
+            HPCLANG_MODEL_HP48GII,
+            hp48,
+            sizeof(hp48) / sizeof(hp48[0])))
+        return EXIT_FAILURE;
 
-    EXPECT_LAYOUT(HPCLANG_MODEL_HP48GII, HPCLANG_KEY_HP48);
-    EXPECT_LAYOUT(HPCLANG_MODEL_HP49GPLUS, HPCLANG_KEY_HP4950);
-    EXPECT_LAYOUT(HPCLANG_MODEL_HP50G, HPCLANG_KEY_HP4950);
-#undef EXPECT_LAYOUT
+    static const struct mapping hp4950_shared[] = {
+        {0u, HPCLANG_KEY_HP4950_BACKSPACE},
+        {1u, HPCLANG_KEY_HP4950_TAN},
+        {7u, HPCLANG_KEY_HP4950_SYMB},
+        {8u, HPCLANG_KEY_HP4950_COS},
+        {9u, HPCLANG_KEY_HP4950_RECIPROCAL},
+        {13u, HPCLANG_KEY_HP4950_SPACE},
+        {15u, HPCLANG_KEY_HP4950_SIN},
+        {16u, HPCLANG_KEY_HP4950_X},
+        {22u, HPCLANG_KEY_HP4950_SQRT},
+        {23u, HPCLANG_KEY_HP4950_NEGATE},
+        {28u, HPCLANG_KEY_HP4950_HIST},
+        {29u, HPCLANG_KEY_HP4950_POWER},
+        {30u, HPCLANG_KEY_HP4950_EEX},
+        {41u, HPCLANG_KEY_HP4950_APPS},
+        {46u, HPCLANG_KEY_HP4950_MODE},
+        {47u, HPCLANG_KEY_HP4950_TOOL},
+        {48u, HPCLANG_KEY_HP4950_VAR},
+        {49u, HPCLANG_KEY_HP4950_STO},
+        {50u, HPCLANG_KEY_HP4950_NXT},
+        {57u, HPCLANG_KEY_ALPHA},
+        {58u, HPCLANG_KEY_LEFT_SHIFT},
+        {59u, HPCLANG_KEY_RIGHT_SHIFT},
+    };
+    if (!expect_map(
+            HPCLANG_MODEL_HP49GPLUS,
+            hp4950_shared,
+            sizeof(hp4950_shared) / sizeof(hp4950_shared[0])) ||
+        !expect_map(
+            HPCLANG_MODEL_HP50G,
+            hp4950_shared,
+            sizeof(hp4950_shared) / sizeof(hp4950_shared[0])))
+        return EXIT_FAILURE;
+
+    static const struct mapping hp49_unique[] = {
+        {14u, HPCLANG_KEY_HP49_EQW},
+        {21u, HPCLANG_KEY_HP49_CAT},
+    };
+    static const struct mapping hp50_unique[] = {
+        {14u, HPCLANG_KEY_HP50_QUOTE},
+        {21u, HPCLANG_KEY_HP50_EVAL},
+    };
+    if (!expect_map(
+            HPCLANG_MODEL_HP49GPLUS,
+            hp49_unique,
+            sizeof(hp49_unique) / sizeof(hp49_unique[0])) ||
+        !expect_map(
+            HPCLANG_MODEL_HP50G,
+            hp50_unique,
+            sizeof(hp50_unique) / sizeof(hp50_unique[0])))
+        return EXIT_FAILURE;
+
 
     uint64_t hp39_bits =
         (UINT64_C(1) << HPCLANG_KEYBOARD_ON) |
@@ -154,6 +215,7 @@ int main(void)
     if (hp50_mod !=
         (HPCLANG_KEYBOARD_MOD_ON |
          HPCLANG_KEYBOARD_MOD_ALPHA |
+         HPCLANG_KEYBOARD_MOD_SHIFT |
          HPCLANG_KEYBOARD_MOD_LEFT_SHIFT |
          HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT))
         return EXIT_FAILURE;
