@@ -199,6 +199,7 @@ jobs:
 
       - name: Generate and publish LCD evidence
         if: always()
+        continue-on-error: true
         run: |
           targets_file="build/stock-$FAMILY-targets.txt"
           [[ -f "$targets_file" ]] || exit 0
