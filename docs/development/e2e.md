@@ -112,7 +112,8 @@ GitHub Actions YAML is orchestration, not the test specification. Expected files
 
 Direct E2E injects every physical key position on each automated calculator
 model. The guest verifies DOWN/UP events, raw scan code, physical key identity,
-and dedicated-key modifier state for all 51 keys. Its final LCD screen renders
-a compact self-test-style matrix: passed positions are filled, and a failing
-position is left open and marked. The machine-readable result remains the
-actual gate; the LCD matrix is only a visual summary of the same checks.
+and dedicated-key modifier state for all 51 keys. Its final LCD screen renders the physical keyboard rather than the electrical
+scan matrix: six menu keys, two three-key control rows beside the cursor
+cluster, and seven five-key main rows. Passed positions are filled, and a
+failing position is left open and marked. The machine-readable result remains
+the actual gate; the LCD diagram is only a visual summary of the same checks.
