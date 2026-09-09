@@ -6,6 +6,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
+#include <hpclang/font.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
@@ -40,77 +41,31 @@ static void hpclang_runtime_ctor(void)
     hpclang_ctor_probe = 0xc0def00du;
 }
 
-static uint32_t glyph_bits(char c)
+static void text(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    const char *s)
 {
-    switch (c) {
-    case 'A': return 0x2bedu;
-    case 'B': return 0x6baeu;
-    case 'C': return 0x3923u;
-    case 'D': return 0x6b6eu;
-    case 'E': return 0x79a7u;
-    case 'F': return 0x79a4u;
-    case 'G': return 0x396bu;
-    case 'H': return 0x5bedu;
-    case 'I': return 0x7497u;
-    case 'J': return 0x126au;
-    case 'K': return 0x5badu;
-    case 'L': return 0x4927u;
-    case 'M': return 0x5fedu;
-    case 'N': return 0x5ffdu;
-    case 'O': return 0x2b6au;
-    case 'P': return 0x6ba4u;
-    case 'Q': return 0x2b7bu;
-    case 'R': return 0x6badu;
-    case 'S': return 0x388eu;
-    case 'T': return 0x7492u;
-    case 'U': return 0x5b6fu;
-    case 'V': return 0x5b6au;
-    case 'W': return 0x5bfdu;
-    case 'X': return 0x5aadu;
-    case 'Y': return 0x5a92u;
-    case 'Z': return 0x72a7u;
-    case '0': return 0x7b6fu;
-    case '1': return 0x2c97u;
-    case '2': return 0x62a7u;
-    case '3': return 0x628eu;
-    case '4': return 0x5bc9u;
-    case '5': return 0x798eu;
-    case '6': return 0x39aau;
-    case '7': return 0x7292u;
-    case '8': return 0x2aaau;
-    case '9': return 0x2aceu;
-    default:  return 0;
-    }
+    hpclang_surface_draw_text(
+        surface, hpclang_font_mini(), x, y, s, 255u);
 }
 
-static void glyph(struct hpclang_surface *surface, int x, int y, char c)
-{
-    uint32_t rows = glyph_bits(c);
-
-    for (int yy = 0; yy < 5; ++yy) {
-        uint32_t row = (rows >> ((4 - yy) * 3)) & 7u;
-        for (int xx = 0; xx < 3; ++xx)
-            if (row & (1u << (2 - xx)))
-                hpclang_surface_set_pixel(surface, x + xx, y + yy, 255u);
-    }
-}
-
-static void text(struct hpclang_surface *surface, int x, int y, const char *s)
-{
-    while (*s) {
-        if (*s != ' ')
-            glyph(surface, x, y, *s);
-        x += 4;
-        ++s;
-    }
-}
-
-static void hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
+static void hex2(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    uint32_t value)
 {
     static const char digits[] = "0123456789ABCDEF";
+    const struct hpclang_font *font = hpclang_font_mini();
 
-    glyph(surface, x, y, digits[(value >> 4) & 15u]);
-    glyph(surface, x + 4, y, digits[value & 15u]);
+    hpclang_surface_draw_char(
+        surface, font, x, y,
+        (uint8_t)digits[(value >> 4) & 15u], 255u);
+    hpclang_surface_draw_char(
+        surface, font, x + (int)hpclang_font_advance(font), y,
+        (uint8_t)digits[value & 15u], 255u);
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD

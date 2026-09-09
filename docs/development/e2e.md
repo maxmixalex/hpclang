@@ -115,5 +115,7 @@ model. The guest verifies DOWN/UP events, raw scan code, physical key identity,
 and dedicated-key modifier state for all 51 keys. Its final LCD screen renders the physical keyboard rather than the electrical
 scan matrix: six menu keys, two three-key control rows beside the cursor
 cluster, and seven five-key main rows. Passed positions are filled, and a
-failing position is left open and marked. The machine-readable result remains
-the actual gate; the LCD diagram is only a visual summary of the same checks.
+failing position is left open and marked. The screen labels use the public
+font/text API, so calculator E2E exercises the same rasterization path instead
+of carrying a test-only glyph table. The machine-readable result remains the
+actual gate; the LCD diagram is only a visual summary of the same checks.
