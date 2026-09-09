@@ -32,7 +32,9 @@ set(HPCLANG_RUNTIME_SOFTFLOAT
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/armv4t-softfloat.c")
 set(HPCLANG_LIBC
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/sbrk.c"
-    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/platform.c")
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/platform.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/kos-call.S")
 
 # These implementation objects deliberately stay in ARM state. Application C/C++
 # remains Thumb-1; the EABI veneers provide the one explicit interworking edge.

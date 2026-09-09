@@ -37,6 +37,8 @@ timeout 45s "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}"     --flash
 
 mv "$SD/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
+printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
+printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"

@@ -19,7 +19,10 @@ case "$MODE" in
         E2E_CMAKE_ARGS=(-DHPCLANG_E2E_KEYBOARD=ON)
         ;;
     stock)
-        E2E_CMAKE_ARGS=(-DHPCLANG_E2E_WAIT_FOR_ENTER=ON)
+        E2E_CMAKE_ARGS=(
+            -DHPCLANG_E2E_WAIT_FOR_ENTER=ON
+            -DHPCLANG_E2E_STORAGE=ON
+        )
         ;;
     hardware)
         E2E_CMAKE_ARGS=()
