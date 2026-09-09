@@ -23,7 +23,7 @@ args=(
     "$ROOT/tools/prepare-x50ng.py"
     "$DEST"
     --frontend "$ROOT/$FRONTEND"
-    --headless-header "$ROOT/tests/x50ng/headless-ui-init.h"
+    --headless-header "$ROOT/tests/e2e/harness/x50ng/headless-ui-init.h"
 )
 
 if [[ "$FAMILY" == "hp39" ]]; then
