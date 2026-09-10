@@ -19,6 +19,7 @@
 
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
+#define PHASE_KEYBOARD_READY 0x4b425244u
 
 #define TEST_RAM_SIZE 0x00100000u
 #define TEST_PHYS 0x70000000u
@@ -56,7 +57,7 @@
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
 #define KEY_HOLD_US 50000LL
-#define KEYBOARD_FIRST_US (INJECT_US + 500000LL)
+#define KEYBOARD_FIRST_DELAY_US 20000LL
 #define KEYBOARD_STEP_US 120000LL
 #define POLL_US 20000LL
 #define DEADLINE_US 16000000LL
@@ -132,6 +133,7 @@ struct e2e {
 
     uint32_t result;
     int saw_pass;
+    int payload_keyboard_scheduled;
     int returned;
     int failed;
     int lcd_height;
@@ -272,6 +274,32 @@ static int tap(
 {
     return later(key_cb, (void *)down, us) &&
            later(key_cb, (void *)up, us + KEY_HOLD_US);
+}
+
+static int schedule_payload_keyboard(struct e2e *s)
+{
+    size_t count = sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
+
+    if (s->payload_keyboard_scheduled)
+        return 1;
+
+    for (size_t i = 0; i < count; ++i) {
+        keyboard_down[i].key = keyboard_codes[i];
+        keyboard_down[i].down = 1;
+        keyboard_up[i].key = keyboard_codes[i];
+        keyboard_up[i].down = 0;
+
+        int64_t press_us = KEYBOARD_FIRST_DELAY_US +
+            (int64_t)i * KEYBOARD_STEP_US;
+        if (!later(key_cb, &keyboard_down[i], press_us) ||
+            !later(key_cb, &keyboard_up[i], press_us + KEY_HOLD_US))
+            return 0;
+    }
+
+    s->payload_keyboard_scheduled = 1;
+    fprintf(stderr,
+            "HPC1 keyboard phase reached; scheduled %zu keys\n", count);
+    return 1;
 }
 
 static void snapshot_cpu(struct cpu_snapshot *s, CPUARMState *c)
@@ -552,6 +580,7 @@ static void json(struct e2e *s, const char *status)
         "  \"status\":\"%s\",\n"
         "  \"result\":\"0x%08x\",\n"
         "  \"saw_pass\":%s,\n"
+        "  \"payload_keyboard_scheduled\":%s,\n"
         "  \"returned\":%s,\n"
         "  \"pc\":\"0x%08x\",\n"
         "  \"saved_pc\":\"0x%08x\",\n"
@@ -583,6 +612,7 @@ static void json(struct e2e *s, const char *status)
         status,
         s->result,
         s->saw_pass ? "true" : "false",
+        s->payload_keyboard_scheduled ? "true" : "false",
         s->returned ? "true" : "false",
         s->hdw->cpu->regs[15],
         s->stock.regs[15],
@@ -670,8 +700,13 @@ static void monitor(void *arg)
         return;
     }
 
-    if (!s->saw_pass && guest_read32(s->hdw, s->result_addr, &v)) {
-        if (v == PASS_WORD) {
+    if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (!s->payload_keyboard_scheduled && v == PHASE_KEYBOARD_READY) {
+            if (!schedule_payload_keyboard(s)) {
+                fail(s, "keyboard-schedule");
+                return;
+            }
+        } else if (!s->saw_pass && v == PASS_WORD) {
             s->result = v;
             s->saw_pass = 1;
             if (!capture_lcd(s->hdw, s->pass_pgm, s->lcd_height)) {
@@ -818,23 +853,6 @@ int main(int argc, char **argv)
         !later(inject, &s, INJECT_US)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");
         return EXIT_FAILURE;
-    }
-
-    size_t keyboard_count =
-        sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
-    for (size_t i = 0; i < keyboard_count; ++i) {
-        keyboard_down[i].key = keyboard_codes[i];
-        keyboard_down[i].down = 1;
-        keyboard_up[i].key = keyboard_codes[i];
-        keyboard_up[i].down = 0;
-
-        int64_t press_us = KEYBOARD_FIRST_US +
-            (int64_t)i * KEYBOARD_STEP_US;
-        if (!later(key_cb, &keyboard_down[i], press_us) ||
-            !later(key_cb, &keyboard_up[i], press_us + KEY_HOLD_US)) {
-            fprintf(stderr, "cannot schedule full-keyboard E2E actions\n");
-            return EXIT_FAILURE;
-        }
     }
 
     main_loop(s.hdw);

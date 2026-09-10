@@ -4,19 +4,19 @@
 
 /*
  * Machine-readable synchronization point shared by Direct and Stock E2E.
- * The test-only linker wrapper flips this marker immediately before the
- * payload resets the public keyboard event queue and starts waiting for the
- * canonical 51-key sequence. Host harnesses can therefore inject keys only
- * when the payload is ready, independent of launcher/transport latency.
+ * Reuse hpclang_e2e_result as the single payload state channel: KBRD while
+ * the payload is waiting for the canonical 51-key sequence, then PASS/FAIL.
+ * The linker wrapper flips KBRD immediately after the public keyboard event
+ * queue has been reset, so host injection is independent of launcher latency.
  */
 #define HPCLANG_E2E_PHASE_KEYBOARD_READY UINT32_C(0x4b425244) /* KBRD */
 
-volatile uint32_t hpclang_e2e_phase;
+extern volatile uint32_t hpclang_e2e_result;
 
 void __real_hpclang_keyboard_events_reset(void);
 
 void __wrap_hpclang_keyboard_events_reset(void)
 {
-    hpclang_e2e_phase = HPCLANG_E2E_PHASE_KEYBOARD_READY;
     __real_hpclang_keyboard_events_reset();
+    hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_READY;
 }

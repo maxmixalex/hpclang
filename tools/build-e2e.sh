@@ -56,13 +56,6 @@ result_addr="$("$NM" -n "$OUT/e2e.elf" |
 test -n "$result_addr"
 printf '%s\n' "$result_addr" > "$OUT/e2e.result-address"
 
-if [[ "$MODE" == direct || "$MODE" == stock ]]; then
-    phase_addr="$("$NM" -n "$OUT/e2e.elf" |
-        awk '$3 == "hpclang_e2e_phase" {print "0x"$1}')"
-    test -n "$phase_addr"
-    printf '%s\n' "$phase_addr" > "$OUT/e2e.phase-address"
-fi
-
 "$NM" "$OUT/e2e.elf" | grep -q ' T hpclang_start$'
 if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
     grep -E ' GLOBAL .* UND '; then
