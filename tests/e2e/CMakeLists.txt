@@ -32,6 +32,7 @@ if(HPCLANG_E2E_KEYBOARD)
     target_compile_definitions(hpclang_e2e PRIVATE HPCLANG_E2E_KEYBOARD=1)
     target_sources(hpclang_e2e PRIVATE phase.c)
     target_link_options(hpclang_e2e PRIVATE
+        -Wl,--wrap=hpclang_keyboard_read
         -Wl,--wrap=hpclang_keyboard_events_reset)
 endif()
 if(HPCLANG_E2E_STORAGE)
