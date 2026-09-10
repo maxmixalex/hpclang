@@ -15,12 +15,11 @@ LD="$ATFE/bin/ld.lld"
 NM="$ATFE/bin/llvm-nm"
 
 case "$MODE" in
-    direct)
-        E2E_CMAKE_ARGS=(-DHPCLANG_E2E_KEYBOARD=ON)
-        ;;
-    stock)
+    direct|stock)
+        # Direct and Stock deliberately build the exact same application.
+        # Only the outer launcher/transport path is allowed to differ.
         E2E_CMAKE_ARGS=(
-            -DHPCLANG_E2E_WAIT_FOR_ENTER=ON
+            -DHPCLANG_E2E_KEYBOARD=ON
             -DHPCLANG_E2E_STORAGE=ON
         )
         ;;
@@ -50,11 +49,19 @@ PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" -j2
 
 cp "$OUT/cmake/hpclang-e2e.elf" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
+sha256sum "$OUT/e2e.hpc" | awk '{print $1}' > "$OUT/e2e.payload-sha256"
 
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
 test -n "$result_addr"
 printf '%s\n' "$result_addr" > "$OUT/e2e.result-address"
+
+if [[ "$MODE" == direct || "$MODE" == stock ]]; then
+    phase_addr="$("$NM" -n "$OUT/e2e.elf" |
+        awk '$3 == "hpclang_e2e_phase" {print "0x"$1}')"
+    test -n "$phase_addr"
+    printf '%s\n' "$phase_addr" > "$OUT/e2e.phase-address"
+fi
 
 "$NM" "$OUT/e2e.elf" | grep -q ' T hpclang_start$'
 if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |

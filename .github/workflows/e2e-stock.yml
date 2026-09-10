@@ -15,6 +15,7 @@ on:
       - "cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tests/e2e/sequences/**"
@@ -54,6 +55,7 @@ on:
       - "cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tests/e2e/sequences/**"
@@ -97,10 +99,11 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build one Stock HPC1 and all launchers
+      - name: Build shared E2E payload and Stock launchers
         run: |
           chmod +x tools/build-e2e.sh
           tools/build-e2e.sh stock "$GITHUB_WORKSPACE/build/e2e-stock"
+          echo "Shared payload SHA-256: $(cat build/e2e-stock/e2e.payload-sha256)"
 
       - name: Upload Stock build
         uses: actions/upload-artifact@v7
@@ -110,6 +113,8 @@ jobs:
           path: |
             build/e2e-stock/e2e.hpc
             build/e2e-stock/e2e.result-address
+            build/e2e-stock/e2e.phase-address
+            build/e2e-stock/e2e.payload-sha256
             build/e2e-stock/launchers/*.hp
           if-no-files-found: error
 
@@ -238,4 +243,5 @@ jobs:
             build/*-send/*
             build/stock-${{ matrix.family }}-targets.txt
             build/e2e/launchers/*.hp
+            build/e2e/e2e.payload-sha256
           if-no-files-found: warn
