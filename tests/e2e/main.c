@@ -417,6 +417,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
 
     return 0u;
 }
+#endif
 
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
 static int enter_pressed(void)
