@@ -534,7 +534,17 @@ int unlink(const char *path)
 
     int32_t result = (int32_t)((kos_fn1)addr)(
         (uint32_t)(uintptr_t)path);
-    if (result < 0)
+    if (result < 0) {
+        /*
+         * Stock KOS uses the same undocumented -200 sentinel for a missing
+         * path in delete as in fopen. Keep that interpretation local to the
+         * path operation; -200 is not a generic KOS errno.
+         */
+        if (kos_open_error_is_missing(result)) {
+            errno = ENOENT;
+            return -1;
+        }
         return set_kos_errno(result);
+    }
     return 0;
 }
