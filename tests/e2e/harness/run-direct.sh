@@ -17,6 +17,7 @@ done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGE
 
 X50="$ROOT/build/x50ng/dist/x50ng"
 STATE="$ROOT/build/$TARGET-state"
+rm -rf "$STATE"
 mkdir -p "$STATE"
 
 X50_ARGS=(
@@ -26,8 +27,13 @@ X50_ARGS=(
 
 case "$HPCLANG_E2E_FAMILY" in
     hp39)
-        curl -fL --retry 3             "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE"             -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
-        unzip -p             "$ROOT/build/$HPCLANG_E2E_ARCHIVE"             "$HPCLANG_E2E_MEMBER"             > "$ROOT/build/$TARGET-firmware.bin"
+        curl -fL --retry 3 \
+            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+            -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
+        unzip -p \
+            "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
+            "$HPCLANG_E2E_MEMBER" \
+            > "$ROOT/build/$TARGET-firmware.bin"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-40g.css"
             --flash-full
@@ -36,17 +42,28 @@ case "$HPCLANG_E2E_FAMILY" in
         )
         ;;
     hp48)
-        curl -fL --retry 3             https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin             -o "$ROOT/build/hp48gii-nor.bin"
-        printf '%s  %s\n'             4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937             "$ROOT/build/hp48gii-nor.bin" |
+        curl -fL --retry 3 \
+            https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin \
+            -o "$ROOT/build/hp48gii-nor.bin"
+        printf '%s  %s\n' \
+            4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 \
+            "$ROOT/build/hp48gii-nor.bin" |
             sha256sum -c -
-        python3 "$ROOT/tools/prepare-hp48gii-nor.py"             "$ROOT/build/hp48gii-nor.bin" "$STATE"
+        python3 "$ROOT/tools/prepare-hp48gii-nor.py" \
+            "$ROOT/build/hp48gii-nor.bin" "$STATE"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-40g.css"
         )
         ;;
     hp4950)
+        SD="$ROOT/build/$TARGET-sd"
+        rm -rf "$SD"
+        mkdir -p "$SD"
+        printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
+        printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-50g.css"
+            --sd-dir="$SD"
             --flash
             --bootloader="$ROOT/build/x50ng/dist/firmware/$HPCLANG_E2E_BOOTLOADER"
             --firmware="$ROOT/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"

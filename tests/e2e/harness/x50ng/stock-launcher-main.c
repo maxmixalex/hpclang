@@ -13,8 +13,12 @@
 
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
+#define PAYLOAD_KEY_HOLD_US 50000LL
+#define PAYLOAD_KEY_STEP_US 120000LL
+#define PAYLOAD_KEY_FIRST_DELAY_US 20000LL
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
+#define PHASE_KEYBOARD_READY 0x4b425244u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 
@@ -29,7 +33,9 @@ struct state {
     const char *prefix;
     const char *json;
     uint32_t result_addr;
+    uint32_t phase_addr;
     int saw_pass;
+    int payload_keyboard_scheduled;
     int failed;
     int lcd_height;
     int64_t deadline;
@@ -89,6 +95,70 @@ static const struct key_pair_ref key_pairs[] = {
 };
 #undef KEY_REF
 
+/*
+ * Exact physical-key sequence used by Direct E2E. x50ng exposes the same
+ * physical keyboard codes across the supported calculator chassis; the
+ * payload itself validates the model-specific scan/key/modifier mapping.
+ */
+static const int payload_keyboard_codes[] = {
+    HP4950_KEY_BACKSPACE,
+    HP4950_KEY_U,
+    HP4950_KEY_Z,
+    HP4950_KEY_MULTIPLY,
+    HP4950_KEY_MINUS,
+    HP4950_KEY_PLUS,
+    HP4950_KEY_ENTER,
+    HP4950_KEY_P,
+    HP4950_KEY_T,
+    HP4950_KEY_Y,
+    HP4950_KEY_9,
+    HP4950_KEY_6,
+    HP4950_KEY_3,
+    HP4950_KEY_SPACE,
+    HP4950_KEY_O,
+    HP4950_KEY_S,
+    HP4950_KEY_X,
+    HP4950_KEY_8,
+    HP4950_KEY_5,
+    HP4950_KEY_2,
+    HP4950_KEY_PERIOD,
+    HP4950_KEY_N,
+    HP4950_KEY_R,
+    HP4950_KEY_W,
+    HP4950_KEY_7,
+    HP4950_KEY_4,
+    HP4950_KEY_1,
+    HP4950_KEY_0,
+    HP4950_KEY_M,
+    HP4950_KEY_Q,
+    HP4950_KEY_V,
+    HP4950_KEY_A,
+    HP4950_KEY_B,
+    HP4950_KEY_C,
+    HP4950_KEY_D,
+    HP4950_KEY_E,
+    HP4950_KEY_F,
+    HP4950_KEY_G,
+    HP4950_KEY_UP,
+    HP4950_KEY_LEFT,
+    HP4950_KEY_DOWN,
+    HP4950_KEY_RIGHT,
+    HP4950_KEY_H,
+    HP4950_KEY_I,
+    HP4950_KEY_J,
+    HP4950_KEY_K,
+    HP4950_KEY_L,
+    HP4950_KEY_ON,
+    HP4950_KEY_ALPHA,
+    HP4950_KEY_LEFTSHIFT,
+    HP4950_KEY_RIGHTSHIFT,
+};
+
+static struct key_action payload_keyboard_down[
+    sizeof(payload_keyboard_codes) / sizeof(payload_keyboard_codes[0])];
+static struct key_action payload_keyboard_up[
+    sizeof(payload_keyboard_codes) / sizeof(payload_keyboard_codes[0])];
+
 static const struct key_pair_ref *find_key_pair(const char *name)
 {
     size_t n = sizeof(key_pairs) / sizeof(key_pairs[0]);
@@ -134,6 +204,34 @@ static int chord(
            later(key_cb, (void *)key_down, us + 30000) &&
            later(key_cb, (void *)key_up, us + 130000) &&
            later(key_cb, (void *)mod_up, us + 160000);
+}
+
+static int schedule_payload_keyboard(struct state *s)
+{
+    size_t count = sizeof(payload_keyboard_codes) /
+                   sizeof(payload_keyboard_codes[0]);
+
+    if (s->payload_keyboard_scheduled)
+        return 1;
+
+    for (size_t i = 0; i < count; ++i) {
+        payload_keyboard_down[i].key = payload_keyboard_codes[i];
+        payload_keyboard_down[i].down = 1;
+        payload_keyboard_up[i].key = payload_keyboard_codes[i];
+        payload_keyboard_up[i].down = 0;
+
+        int64_t press_us = PAYLOAD_KEY_FIRST_DELAY_US +
+            (int64_t)i * PAYLOAD_KEY_STEP_US;
+        if (!later(key_cb, &payload_keyboard_down[i], press_us) ||
+            !later(key_cb, &payload_keyboard_up[i],
+                   press_us + PAYLOAD_KEY_HOLD_US))
+            return 0;
+    }
+
+    s->payload_keyboard_scheduled = 1;
+    fprintf(stderr, "stock launcher: payload keyboard phase reached; "
+                    "scheduled %zu keys\n", count);
+    return 1;
 }
 
 static unsigned capture(hdw_t *h, const char *path, int height)
@@ -188,6 +286,7 @@ static void write_json(struct state *s, const char *status)
         "  \"mode\":\"%s\",\n"
         "  \"status\":\"%s\",\n"
         "  \"saw_pass\":%s,\n"
+        "  \"payload_keyboard_scheduled\":%s,\n"
         "  \"pc\":\"0x%08x\",\n"
         "  \"display_on\":%s,\n"
         "  \"sd_mounted\":%s\n"
@@ -195,6 +294,7 @@ static void write_json(struct state *s, const char *status)
         s->mode == MODE_INSTALL ? "install" : "run",
         status,
         s->saw_pass ? "true" : "false",
+        s->payload_keyboard_scheduled ? "true" : "false",
         s->hdw->cpu->regs[15],
         is_display_on() ? "true" : "false",
         emulator_is_sd_mounted() ? "true" : "false");
@@ -238,16 +338,24 @@ static void monitor(void *arg)
         return;
     }
 
+    if (!s->payload_keyboard_scheduled && s->phase_addr != 0u &&
+        guest_read32(s->hdw, s->phase_addr, &value) &&
+        value == PHASE_KEYBOARD_READY) {
+        if (!schedule_payload_keyboard(s)) {
+            fail(s, "keyboard-schedule");
+            return;
+        }
+    }
+
     if (guest_read32(s->hdw, s->result_addr, &value)) {
         if (value == PASS_WORD) {
             s->saw_pass = 1;
             capture_named(s, "pass");
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
             /*
-             * This gate proves the original-OS -> ARMToolbox -> HPC1 launch.
-             * Direct-runtime E2E separately proves hpclang's return path.
-             * Do not inject ENTER here: a pending keyboard interrupt during
-             * the stock launcher's teardown makes pinned x50ng abort.
+             * Capture at the exact same machine-readable PASS point as the
+             * Direct harness. Stock still stops here because injecting ENTER
+             * during the launcher teardown can trip pinned x50ng.
              */
             write_json(s, "pass");
             hdw_stop(s->hdw);
@@ -404,14 +512,28 @@ invalid_action:
     return 1;
 }
 
+static int parse_address(const char *text, uint32_t *value)
+{
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (!text)
+        return 0;
+    parsed = strtoul(text, &end, 0);
+    if (end == text || *end != '\0' || parsed > 0xfffffffful)
+        return 0;
+    *value = (uint32_t)parsed;
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     struct state s;
     const char *mode = getenv("HPCLANG_STOCK_MODE");
     const char *sequence = getenv("HPCLANG_E2E_SEQUENCE");
     const char *result_text = getenv("HPCLANG_STOCK_RESULT_ADDR");
+    const char *phase_text = getenv("HPCLANG_STOCK_PHASE_ADDR");
     const char *lcd_height_text = getenv("HPCLANG_X50NG_LCD_HEIGHT");
-    char *end = NULL;
 
     memset(&s, 0, sizeof(s));
     s.mode = mode && strcmp(mode, "run") == 0 ? MODE_RUN : MODE_INSTALL;
@@ -426,28 +548,25 @@ int main(int argc, char **argv)
     }
 
     if (s.mode == MODE_RUN) {
-        unsigned long value;
-        if (!result_text) {
-            fprintf(stderr, "stock run mode needs result address\n");
+        if (!parse_address(result_text, &s.result_addr)) {
+            fprintf(stderr, "stock run mode needs valid result address\n");
             return EXIT_FAILURE;
         }
-        value = strtoul(result_text, &end, 0);
-        if (end == result_text || *end != '\0' || value > 0xfffffffful) {
-            fprintf(stderr, "invalid stock result address\n");
+        if (!parse_address(phase_text, &s.phase_addr)) {
+            fprintf(stderr, "stock run mode needs valid phase address\n");
             return EXIT_FAILURE;
         }
-        s.result_addr = (uint32_t)value;
     }
 
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
     if (!sequence) {
-        fprintf(stderr, "missing HPCLANG_E2E_SEQUENCE\\n");
+        fprintf(stderr, "missing HPCLANG_E2E_SEQUENCE\n");
         return EXIT_FAILURE;
     }
     if (!schedule_sequence(&s, sequence)) {
-        fprintf(stderr, "cannot schedule stock launcher sequence\\n");
+        fprintf(stderr, "cannot schedule stock launcher sequence\n");
         return EXIT_FAILURE;
     }
 
