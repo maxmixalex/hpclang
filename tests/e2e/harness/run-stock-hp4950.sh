@@ -42,7 +42,11 @@ printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"
-export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+# Temporary stage1-capacity diagnostic. 0x090003fc is the final descriptor in
+# the launcher-provided coarse L2 page mapped at 0x09000000; stage0 writes a
+# FAIL-prefixed -stage1_return value here only when stage1 rejects the launch
+# before HPC1 mappings exist.
+export HPCLANG_STOCK_RESULT_ADDR=0x090003fc
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-run"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
 
