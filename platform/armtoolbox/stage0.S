@@ -5,12 +5,10 @@
 #error HPCLANG_STAGE0_MODEL must identify the packaged calculator model
 #endif
 
-.equ STAGE_WINDOW_BASE,   0x09000000
-.equ STAGE1_BASE,         0x09000400
-.equ STAGE_L1_SLOT,       0x07f00240
-.equ STAGE_DIAG_ADDR,     0x090003fc
-.equ STAGE_DIAG_FAIL,     0x46410000
-.equ SWI_VECTOR,          0x08000008
+.equ STAGE_WINDOW_BASE, 0x09000000
+.equ STAGE1_BASE,       0x09000400
+.equ STAGE_L1_SLOT,     0x07f00240
+.equ SWI_VECTOR,        0x08000008
 
 .section .text.stage0.entry,"ax",%progbits
 .global hpclang_armtoolbox_stage0
@@ -75,25 +73,6 @@ hpclang_armtoolbox_stage0:
     mov     lr, pc
     bx      r4
 
-    /*
-     * Diagnostic guard for Stock bring-up only: stage1 normally never returns
-     * while the E2E payload is holding KBRD/PASS/FAIL. If it rejects the launch
-     * before installing HPC1 mappings, expose -1..-4 through the final unused
-     * temporary L2 descriptor so the x50ng harness can distinguish the exact
-     * capacity/header failure. The diagnostic commit is intentionally
-     * short-lived and this branch is removed after the failing path is known.
-     */
-    cmp     r0, #0
-    bge     .Lstage1_returned
-    rsb     r1, r0, #0
-    ldr     r2, =STAGE_DIAG_FAIL
-    orr     r1, r1, r2
-    ldr     r2, =STAGE_DIAG_ADDR
-    str     r1, [r2]
-.Lstage1_diag_halt:
-    b       .Lstage1_diag_halt
-
-.Lstage1_returned:
     /* Restore the original stock-launcher stack. */
     ldr     sp, [sp]
 
