@@ -16,14 +16,6 @@
 
 int hpclang_e2e_cpp_test(void);
 
-#ifdef HPCLANG_E2E_STORAGE
-uint32_t hpclang_kos_swi3(
-    uint32_t index,
-    uint32_t arg1,
-    uint32_t arg2,
-    uint32_t arg3);
-#endif
-
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
 volatile uint32_t hpclang_bss_probe;
@@ -253,30 +245,32 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return errno == ENOSYS ? 0u : 0x32u;
     }
 
-    /*
-     * Establish the stock KOS fopen missing-file sentinel before any write or
-     * delete operation can leave an unrelated task-local LastError behind.
-     * HP's KOS returns -200 here on both HP49g+ and HP50g; historical HPGCC
-     * labels -200 "KOS_ERR_INVALIDPTR" with an explicit "FIXME: random guess",
-     * so its old symbolic name is not authoritative.
-     */
-    typedef uint32_t (*raw_open_fn)(uint32_t, uint32_t);
-    uintptr_t probe_open_addr = (uintptr_t)hpclang_kos_swi3(
-        218u, 1u, 0u, 0u);
-    if (probe_open_addr == 0u)
-        return 0x1fdu;
-    int32_t initial_missing = (int32_t)((raw_open_fn)probe_open_addr)(
-        (uint32_t)(uintptr_t)"HPCLANG.MIS", 1u);
-    if (initial_missing >= 0) {
-        close(initial_missing);
-        return 0x1fcu;
-    }
-    if (initial_missing != -200)
-        return 0x400u + ((uint32_t)(-initial_missing) & 0xffu);
-
     static const char input_expected[] = "HPCLANG-STORAGE\n";
     static const char output_expected[] = "stream-write-seek";
     char buffer[32];
+
+    /*
+     * Test missing-file semantics before any write/delete can leave unrelated
+     * stock-OS error state behind. This is also the public regression for the
+     * stock KOS -200 fopen sentinel.
+     */
+    errno = 0;
+    FILE *missing = fopen("HPCLANG.MIS", "rb");
+    if (missing != NULL) {
+        fclose(missing);
+        return 0x40u;
+    }
+    if (errno != ENOENT)
+        return 0x41u;
+
+    errno = 0;
+    missing = fopen("HPCLANG.MIS", "r+b");
+    if (missing != NULL) {
+        fclose(missing);
+        return 0x42u;
+    }
+    if (errno != ENOENT)
+        return 0x43u;
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)
@@ -343,43 +337,86 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         close(missing_fd);
         return 0x3du;
     }
-    if (errno != ENOENT) {
-        uintptr_t open_addr = (uintptr_t)hpclang_kos_swi3(
-            218u, 1u, 0u, 0u);
-        if (open_addr == 0u)
-            return 0x1feu;
-
-        int32_t raw_error = (int32_t)((raw_open_fn)open_addr)(
-            (uint32_t)(uintptr_t)"HPCLANG.OUT", 1u);
-        if (raw_error >= 0) {
-            close(raw_error);
-            return 0x1ffu;
-        }
-
-        /*
-         * KOS also maintains a task-local last-error value.  A raw fopen
-         * failure is not necessarily the filesystem reason itself, so expose
-         * GetLastError (syscall 22) separately before freezing errno mapping.
-         */
-        int32_t last_error = (int32_t)hpclang_kos_swi3(
-            22u, 0u, 0u, 0u);
-        if (last_error < 0)
-            return 0x200u + ((uint32_t)(-last_error) & 0xffu);
-        return 0x300u + ((uint32_t)last_error & 0xffu);
-    }
+    if (errno != ENOENT)
+        return 0x3eu;
 
     errno = 0;
     output = fopen("HPCLANG.OUT", "rb");
     if (output != NULL) {
         fclose(output);
-        return 0x7du;
+        return 0x3fu;
     }
+    if (errno != ENOENT)
+        return 0x44u;
 
-    return errno == ENOENT
-        ? 0u
-        : 0x80u + ((uint32_t)errno & 0x7fu);
+    /*
+     * "w" must create a genuinely missing file. This specifically exercises
+     * O_CREAT|O_TRUNC when KOS delete reports the path as absent.
+     */
+    static const char create_expected[] = "new-file";
+    output = fopen("HPCLANG.NEW", "w+b");
+    if (output == NULL)
+        return 0x45u;
+    written = fwrite(
+        create_expected, 1u, sizeof(create_expected) - 1u, output);
+    if (written != sizeof(create_expected) - 1u ||
+        fclose(output) != 0)
+        return 0x46u;
+
+    output = fopen("HPCLANG.NEW", "rb");
+    if (output == NULL)
+        return 0x47u;
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    output_close = fclose(output);
+    if (output_close != 0 ||
+        got != sizeof(create_expected) - 1u ||
+        memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
+        return 0x48u;
+    if (remove("HPCLANG.NEW") != 0)
+        return 0x49u;
+
+    /*
+     * HPGCC 2.0 documents a stock KOS bug where FILE_APPEND does not create a
+     * missing file. Standard fopen("a") must still create, then every later
+     * append must preserve existing contents.
+     */
+    output = fopen("HPCLANG.APP", "ab");
+    if (output == NULL)
+        return 0x4au;
+    if (fwrite("one", 1u, 3u, output) != 3u ||
+        fclose(output) != 0)
+        return 0x4bu;
+
+    output = fopen("HPCLANG.APP", "ab");
+    if (output == NULL)
+        return 0x4cu;
+    if (fwrite("-two", 1u, 4u, output) != 4u ||
+        fclose(output) != 0)
+        return 0x4du;
+
+    output = fopen("HPCLANG.APP", "rb");
+    if (output == NULL)
+        return 0x4eu;
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    output_close = fclose(output);
+    if (output_close != 0 ||
+        got != 7u ||
+        memcmp(buffer, "one-two", 7u) != 0)
+        return 0x4fu;
+
+    if (remove("HPCLANG.APP") != 0)
+        return 0x50u;
+
+    errno = 0;
+    if (remove("HPCLANG.APP") == 0)
+        return 0x51u;
+    if (errno != ENOENT)
+        return 0x52u;
+
+    return 0u;
 }
-#endif
 
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
 static int enter_pressed(void)

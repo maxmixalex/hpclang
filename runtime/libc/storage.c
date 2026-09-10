@@ -177,6 +177,28 @@ static int set_kos_errno(int32_t error)
     return -1;
 }
 
+static int kos_open_error_is_missing(int32_t error)
+{
+    /*
+     * On stock HP49g+/HP50g, a valid FILE_READONLY open of a missing path
+     * returns -200. Historical HPGCC named that value KOS_ERR_INVALIDPTR but
+     * explicitly marked the name as a random guess. Stock E2E verifies -200
+     * both before any writes and after delete, so interpret it as "missing"
+     * only in path-opening/existence contexts rather than in the generic KOS
+     * error table.
+     */
+    return error == -14 || error == -16 || error == -200;
+}
+
+static int set_kos_open_errno(int32_t error)
+{
+    if (kos_open_error_is_missing(error)) {
+        errno = ENOENT;
+        return -1;
+    }
+    return set_kos_errno(error);
+}
+
 static int unsupported(void)
 {
     errno = ENOSYS;
@@ -185,61 +207,166 @@ static int unsupported(void)
 
 int open(const char *path, int flags, ...)
 {
-    (void)path;
-
     if (!stream_storage_available())
         return unsupported();
 
 #ifdef O_EXCL
+    /*
+     * Stock KOS has no atomic create-exclusive primitive. Do not emulate
+     * O_EXCL with a racy probe/create pair and pretend it is POSIX-atomic.
+     */
     if ((flags & O_EXCL) != 0) {
         errno = ENOTSUP;
         return -1;
     }
 #endif
 
-    uint32_t kos_mode;
-    if ((flags & O_APPEND) != 0) {
-        kos_mode = KOS_FILE_APPEND;
-    } else if ((flags & O_ACCMODE) == O_RDONLY &&
-               (flags & (O_CREAT | O_TRUNC)) == 0) {
-        kos_mode = KOS_FILE_READONLY;
-    } else {
-        kos_mode = KOS_FILE_READWRITE;
+    int access = flags & O_ACCMODE;
+    int wants_create = (flags & O_CREAT) != 0;
+    int wants_truncate = (flags & O_TRUNC) != 0;
+    int wants_append = (flags & O_APPEND) != 0;
+
+    if (wants_truncate && access == O_RDONLY) {
+        errno = EINVAL;
+        return -1;
     }
 
     uintptr_t open_addr = kos_entry(KOS_FUNC_FOPEN);
     if (open_addr == 0u)
         return unsupported();
 
-    if ((flags & O_TRUNC) != 0) {
+    uintptr_t close_addr = kos_entry(KOS_FUNC_FCLOSE);
+    int exists_known = 0;
+    int exists = 0;
+    int created_empty = 0;
+
+    /*
+     * KOS FILE_READWRITE can create a missing file. Probe only when POSIX
+     * semantics require us to distinguish an existing file from a missing
+     * one, or when working around KOS's broken append-create behavior.
+     */
+    int need_probe =
+        wants_append ||
+        (access != O_RDONLY && !wants_create) ||
+        (access == O_RDONLY && wants_create);
+
+    if (need_probe) {
+        int32_t probe = (int32_t)((kos_fn2)open_addr)(
+            (uint32_t)(uintptr_t)path,
+            KOS_FILE_READONLY);
+        exists_known = 1;
+
+        if (probe >= 0) {
+            exists = 1;
+            if (close_addr == 0u)
+                return unsupported();
+            int32_t closed = (int32_t)((kos_fn1)close_addr)(
+                (uint32_t)probe);
+            if (closed < 0)
+                return set_kos_errno(closed);
+        } else if (!kos_open_error_is_missing(probe)) {
+            return set_kos_open_errno(probe);
+        }
+
+        if (!exists && !wants_create) {
+            errno = ENOENT;
+            return -1;
+        }
+    }
+
+    if (wants_truncate) {
         uintptr_t delete_addr = kos_entry(KOS_FUNC_FDELETE);
-        if (delete_addr != 0u) {
-            int32_t deleted = (int32_t)((kos_fn1)delete_addr)(
-                (uint32_t)(uintptr_t)path);
-            if (deleted < 0 && deleted != -14 && deleted != -16)
+        if (delete_addr == 0u)
+            return unsupported();
+
+        int32_t deleted = (int32_t)((kos_fn1)delete_addr)(
+            (uint32_t)(uintptr_t)path);
+        if (deleted < 0) {
+            if (!(wants_create && kos_open_error_is_missing(deleted)))
                 return set_kos_errno(deleted);
         }
+        exists_known = 1;
+        exists = 0;
+        created_empty = 1;
+    }
+
+    /*
+     * Historical HPGCC 2.0 carries PATCH_BROKEN_KOS_FOPEN_APPEND because
+     * FILE_APPEND does not create a missing file. For O_CREAT|O_APPEND,
+     * create once with FILE_READWRITE, close it, then reopen in FILE_APPEND so
+     * subsequent writes retain genuine append semantics.
+     */
+    if (wants_append && exists_known && !exists && wants_create) {
+        int32_t created = (int32_t)((kos_fn2)open_addr)(
+            (uint32_t)(uintptr_t)path,
+            KOS_FILE_READWRITE);
+        if (created < 0)
+            return set_kos_open_errno(created);
+
+        if (close_addr == 0u)
+            return unsupported();
+        int32_t closed = (int32_t)((kos_fn1)close_addr)(
+            (uint32_t)created);
+        if (closed < 0)
+            return set_kos_errno(closed);
+
+        exists = 1;
+        created_empty = 1;
+    }
+
+    /*
+     * O_RDONLY|O_CREAT is uncommon but valid. KOS has no read-only create
+     * mode, so materialize an empty file first and reopen it read-only.
+     */
+    if (access == O_RDONLY && wants_create &&
+        exists_known && !exists) {
+        int32_t created = (int32_t)((kos_fn2)open_addr)(
+            (uint32_t)(uintptr_t)path,
+            KOS_FILE_READWRITE);
+        if (created < 0)
+            return set_kos_open_errno(created);
+
+        if (close_addr == 0u)
+            return unsupported();
+        int32_t closed = (int32_t)((kos_fn1)close_addr)(
+            (uint32_t)created);
+        if (closed < 0)
+            return set_kos_errno(closed);
+
+        exists = 1;
+        created_empty = 1;
+    }
+
+    uint32_t kos_mode;
+    if (wants_append) {
+        kos_mode = KOS_FILE_APPEND;
+    } else if (access == O_RDONLY) {
+        kos_mode = KOS_FILE_READONLY;
+    } else {
+        kos_mode = KOS_FILE_READWRITE;
     }
 
     int32_t handle = (int32_t)((kos_fn2)open_addr)(
         (uint32_t)(uintptr_t)path,
         kos_mode);
     if (handle < 0)
-        return set_kos_errno(handle);
+        return set_kos_open_errno(handle);
 
     /*
      * KOS seek is a status-returning API, while POSIX lseek must return an
      * absolute file offset. Track the logical offset above the raw KOS handle.
      *
-     * A truncated file has known extent zero. Append opens deliberately start
-     * with an unknown position/extent because KOS owns the append cursor.
+     * Existing append files start at an unknown extent because the six basic
+     * KOS stream calls expose no tell/length primitive. A newly created or
+     * truncated append file is known to start at offset/extent zero.
      */
-    int append = (flags & O_APPEND) != 0;
-    int truncated = (flags & O_TRUNC) != 0;
+    int append_existing = wants_append && !created_empty;
     struct stream_fd_state *state =
-        stream_fd_claim(handle, !append, truncated);
+        stream_fd_claim(
+            handle,
+            !append_existing,
+            created_empty);
     if (state == NULL) {
-        uintptr_t close_addr = kos_entry(KOS_FUNC_FCLOSE);
         if (close_addr != 0u)
             (void)((kos_fn1)close_addr)((uint32_t)handle);
         errno = EMFILE;
