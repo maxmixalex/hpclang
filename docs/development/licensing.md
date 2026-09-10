@@ -30,13 +30,10 @@ identify the fonts as public domain ("Share and enjoy."), so the current tables
 are safe as an implementation candidate.
 
 Historical HPG also embeds two complete 256-entry bitmap fonts with the same
-6/4 and 8/6 metrics. Their source files are part of GPL-licensed HPGCC and carry
-HPGCC's linking/use exception, but that does not justify silently relicensing
-copied glyph tables as MIT source. If hpclang ultimately uses those exact
-tables, their provenance and applicable license must be preserved explicitly
-(or the data must live in an optional compatibility component under compatible
-terms). Until that decision is made, HPG glyphs remain reference material and
-the built-in font asset stays blocked.
+6/4 and 8/6 metrics. Those tables are useful only for understanding legacy HPG
+font behavior; they are not currently candidates for hpclang's built-in font
+assets and must not be copied into the runtime. The built-in font asset remains
+blocked until an explicitly selected redistributable source is approved.
 
 ## Implementation discipline
 
