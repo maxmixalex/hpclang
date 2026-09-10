@@ -11,18 +11,39 @@ struct hpclang_surface;
 struct hpclang_font;
 
 /*
- * Immutable built-in bitmap fonts.
+ * Calculator-native fonts. No glyph bitmap is embedded in the application:
+ * the runtime reads the active stock-ROM font through the Saturn mapping that
+ * the launcher already supplies in hpclang_boot_info.
  *
- * The canonical v1 repertoire is printable Basic Latin (0x20-0x7e). Bytes
- * outside that range render as '?'. This is an hpclang text contract, not a
- * claim to reproduce HPG's historical 256-entry calculator font namespace.
+ * default is the calculator's normal/main text font. mini and big expose the
+ * two native text sizes used by the stock environments; on HP39-family
+ * calculators big is the 5x8 main font and mini is the proportional small
+ * font. On HP48gII/49g+/50g they map to the stock minifont and bigfont.
  */
+const struct hpclang_font *hpclang_font_default(void);
 const struct hpclang_font *hpclang_font_mini(void);
 const struct hpclang_font *hpclang_font_big(void);
 
+/* Line metrics. advance is the nominal/fixed advance; proportional bitmap
+ * fonts should use hpclang_font_codepoint_advance() when laying out text. */
 uint32_t hpclang_font_height(const struct hpclang_font *font);
 uint32_t hpclang_font_advance(const struct hpclang_font *font);
+uint32_t hpclang_font_codepoint_advance(
+    const struct hpclang_font *font,
+    uint32_t codepoint);
 
+/* Draw one Unicode code point. Native calculator fonts fall back to '?' for
+ * code points outside their byte-oriented repertoire. */
+void hpclang_surface_draw_codepoint(
+    struct hpclang_surface *surface,
+    const struct hpclang_font *font,
+    int32_t x,
+    int32_t y,
+    uint32_t codepoint,
+    uint8_t intensity);
+
+/* Compatibility byte entry point. The byte value is interpreted directly as
+ * U+0000..U+00FF; it is not decoded as UTF-8. */
 void hpclang_surface_draw_char(
     struct hpclang_surface *surface,
     const struct hpclang_font *font,
@@ -31,6 +52,18 @@ void hpclang_surface_draw_char(
     uint8_t character,
     uint8_t intensity);
 
+/* UTF-8 text. x/y are the top-left of the first line. Invalid UTF-8 is
+ * replaced by U+FFFD and then by the selected font's fallback if necessary. */
+void hpclang_surface_draw_utf8(
+    struct hpclang_surface *surface,
+    const struct hpclang_font *font,
+    int32_t x,
+    int32_t y,
+    const char *text,
+    uint8_t intensity);
+
+/* draw_text is the canonical text API and has the same UTF-8 semantics as
+ * hpclang_surface_draw_utf8(). */
 void hpclang_surface_draw_text(
     struct hpclang_surface *surface,
     const struct hpclang_font *font,

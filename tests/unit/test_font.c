@@ -1,9 +1,22 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include <hpclang/abi.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include <hpclang/font-package.h>
+#include <hpclang/target.h>
+
+static struct hpclang_boot_info fake_boot = {
+    .model = HPCLANG_MODEL_HP50G,
+};
+
+const struct hpclang_boot_info *hpclang_boot_info(void)
+{
+    return &fake_boot;
+}
 
 static void fail(const char *message)
 {
@@ -11,80 +24,111 @@ static void fail(const char *message)
     exit(EXIT_FAILURE);
 }
 
-static void expect_glyph(
+static const uint8_t glyph_question_bitmap[] = {
+    0xe0u, 0x20u, 0x40u, 0x00u, 0x40u,
+};
+static const uint8_t glyph_a_bitmap[] = {
+    0x40u, 0xa0u, 0xe0u, 0xa0u, 0xa0u,
+};
+static const uint8_t glyph_omega_bitmap[] = {
+    0x70u, 0x88u, 0x88u, 0x50u, 0xd8u,
+};
+
+static const struct hpclang_bitmap_glyph glyph_question = {
+    .codepoint = '?', .bitmap = glyph_question_bitmap,
+    .width = 3u, .height = 5u, .advance = 4u, .stride = 1u,
+};
+static const struct hpclang_bitmap_glyph glyph_a = {
+    .codepoint = 'A', .bitmap = glyph_a_bitmap,
+    .width = 3u, .height = 5u, .advance = 5u, .stride = 1u,
+};
+static const struct hpclang_bitmap_glyph glyph_omega = {
+    .codepoint = 0x03a9u, .bitmap = glyph_omega_bitmap,
+    .width = 5u, .height = 5u, .advance = 6u, .stride = 1u,
+};
+
+static const struct hpclang_bitmap_glyph *const test_glyphs[] = {
+    &glyph_question, &glyph_a, &glyph_omega,
+};
+static const struct hpclang_bitmap_font_data test_data = {
+    .glyphs = test_glyphs,
+    .glyph_count = 3u,
+    .fallback_codepoint = '?',
+    .ascent = 5,
+    .descent = 1,
+    .line_height = 6u,
+    .nominal_advance = 4u,
+};
+static const struct hpclang_font test_font = HPCLANG_BITMAP_FONT(test_data);
+
+static void expect_pixel(
     const struct hpclang_surface *surface,
     int32_t x,
     int32_t y,
-    uint32_t width,
-    uint32_t height,
-    const uint8_t *rows)
+    uint8_t expected)
 {
-    for (uint32_t yy = 0u; yy < height; ++yy) {
-        for (uint32_t xx = 0u; xx < width; ++xx) {
-            uint32_t shift = width - 1u - xx;
-            uint8_t expected =
-                (rows[yy] & (uint8_t)(1u << shift)) != 0u ? 255u : 0u;
-            if (hpclang_surface_get_pixel(
-                    surface,
-                    x + (int32_t)xx,
-                    y + (int32_t)yy) != expected)
-                fail("glyph bitmap");
-        }
-    }
+    if (hpclang_surface_get_pixel(surface, x, y) != expected)
+        fail("pixel mismatch");
 }
 
 int main(void)
 {
     const struct hpclang_font *mini = hpclang_font_mini();
     const struct hpclang_font *big = hpclang_font_big();
-
-    if (hpclang_font_height(mini) != 6u ||
+    if (hpclang_font_default() != big ||
+        hpclang_font_height(mini) != 6u ||
         hpclang_font_advance(mini) != 4u ||
         hpclang_font_height(big) != 8u ||
         hpclang_font_advance(big) != 6u)
-        fail("built-in metrics");
+        fail("HP50 system font metrics");
 
-    struct hpclang_surface *surface = hpclang_surface_create_mono(24u, 24u);
+    fake_boot.model = HPCLANG_MODEL_HP39GS;
+    mini = hpclang_font_mini();
+    big = hpclang_font_big();
+    if (hpclang_font_default() != big ||
+        hpclang_font_height(mini) != 5u ||
+        hpclang_font_advance(mini) != 4u ||
+        hpclang_font_height(big) != 8u ||
+        hpclang_font_advance(big) != 6u)
+        fail("HP39 system font metrics");
+
+    if (hpclang_font_height(&test_font) != 6u ||
+        hpclang_font_advance(&test_font) != 4u ||
+        hpclang_font_codepoint_advance(&test_font, 'A') != 5u ||
+        hpclang_font_codepoint_advance(&test_font, 0x03a9u) != 6u ||
+        hpclang_font_codepoint_advance(&test_font, 'Z') != 4u)
+        fail("bitmap metrics or fallback");
+
+    struct hpclang_surface *surface = hpclang_surface_create_mono(32u, 20u);
     if (surface == NULL)
         fail("surface allocation");
 
-    static const uint8_t mini_a[6] = {
-        0x04u, 0x0au, 0x0eu, 0x0au, 0x0au, 0x00u,
-    };
-    static const uint8_t big_a[7] = {
-        0x0cu, 0x12u, 0x12u, 0x1eu, 0x12u, 0x12u, 0x00u,
-    };
-
-    hpclang_surface_draw_char(surface, mini, 1, 1, (uint8_t)'A', 255u);
-    expect_glyph(surface, 1, 1, 4u, 6u, mini_a);
+    hpclang_surface_clear(surface, 0u);
+    hpclang_surface_draw_codepoint(surface, &test_font, 1, 1, 'A', 255u);
+    expect_pixel(surface, 2, 1, 255u);
+    expect_pixel(surface, 1, 2, 255u);
+    expect_pixel(surface, 2, 3, 255u);
 
     hpclang_surface_clear(surface, 0u);
-    hpclang_surface_draw_char(surface, big, 1, 1, (uint8_t)'A', 255u);
-    expect_glyph(surface, 1, 1, 5u, 7u, big_a);
-    for (uint32_t x = 1u; x < 6u; ++x) {
-        if (hpclang_surface_get_pixel(surface, (int32_t)x, 8) != 0u)
-            fail("big-font eighth row");
-    }
+    hpclang_surface_draw_codepoint(surface, &test_font, 1, 1, 'Z', 255u);
+    /* Missing Z falls back to '?': first row is 111. */
+    expect_pixel(surface, 1, 1, 255u);
+    expect_pixel(surface, 2, 1, 255u);
+    expect_pixel(surface, 3, 1, 255u);
 
     hpclang_surface_clear(surface, 0u);
-    hpclang_surface_draw_text(surface, mini, 1, 1, "AA\nA", 255u);
-    if (hpclang_surface_get_pixel(surface, 2, 1) != 255u ||
-        hpclang_surface_get_pixel(surface, 6, 1) != 255u ||
-        hpclang_surface_get_pixel(surface, 2, 7) != 255u)
-        fail("advance or newline");
+    hpclang_surface_draw_text(surface, &test_font, 1, 1, "A\xce\xa9\nA", 255u);
+    /* A advances 5, then UTF-8 Omega starts at x=6. */
+    expect_pixel(surface, 2, 1, 255u);
+    expect_pixel(surface, 7, 1, 255u);
+    expect_pixel(surface, 2, 7, 255u);
 
     hpclang_surface_clear(surface, 0u);
-    hpclang_surface_draw_char(surface, mini, -2, -2, (uint8_t)'A', 255u);
-
-    /* Bytes outside canonical Basic Latin use the documented '?' fallback. */
-    hpclang_surface_clear(surface, 0u);
-    hpclang_surface_draw_char(surface, mini, 1, 1, 0xa0u, 255u);
-    static const uint8_t mini_question[6] = {
-        0x0cu, 0x02u, 0x04u, 0x00u, 0x04u, 0x00u,
-    };
-    expect_glyph(surface, 1, 1, 4u, 6u, mini_question);
+    hpclang_surface_draw_utf8(surface, &test_font, 1, 1, "\xff", 255u);
+    /* Invalid UTF-8 -> U+FFFD -> configured '?' fallback. */
+    expect_pixel(surface, 1, 1, 255u);
 
     hpclang_surface_destroy(surface);
-    puts("PASS: built-in fonts, metrics, clipping and text layout.");
+    puts("PASS: native-font roles, packaged bitmap metrics, UTF-8 and fallback.");
     return EXIT_SUCCESS;
 }
