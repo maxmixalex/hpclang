@@ -211,13 +211,13 @@ for hpclang. Historical HPG stores one byte per glyph row and exposes a
 over caller-owned row data. Text drawing is fixed advance, and newline resets
 to the original x coordinate and advances by one font height.
 
-The merged font/text layer uses independently sourced public-domain
-bitmaps and intentionally defines printable Basic Latin as the canonical v1
-repertoire. The same independent X11 source also contains printable Latin-1
-(0xA0-0xFF), but that does not reproduce HPG's calculator-specific/control
-glyph range. Expanding the clean core merely to imitate HPG's 256-entry count
-would therefore be misleading; HPG character-set parity remains adapter work.
-Exact HPG bitmap data is not copied into hpclang.
+The merged font/text layer currently uses provisional independently sourced
+public-domain bitmaps and intentionally defines printable Basic Latin as the
+canonical v1 repertoire. No candidate font pack from development research is
+to be imported automatically: the final built-in source remains explicitly
+blocked until selected and approved. HPG character-set parity remains adapter
+work, and historical HPG bitmap data is not a candidate for the canonical
+built-in assets.
 
 Custom HPG font allocation does not force a mutable font subsystem into the
 core. An HPG compatibility adapter can retain the historical caller-owned
