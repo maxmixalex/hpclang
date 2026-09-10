@@ -113,7 +113,6 @@ jobs:
           path: |
             build/e2e-stock/e2e.hpc
             build/e2e-stock/e2e.result-address
-            build/e2e-stock/e2e.phase-address
             build/e2e-stock/e2e.payload-sha256
             build/e2e-stock/launchers/*.hp
           if-no-files-found: error
