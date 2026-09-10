@@ -253,6 +253,27 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return errno == ENOSYS ? 0u : 0x32u;
     }
 
+    /*
+     * Establish the stock KOS fopen missing-file sentinel before any write or
+     * delete operation can leave an unrelated task-local LastError behind.
+     * HP's KOS returns -200 here on both HP49g+ and HP50g; historical HPGCC
+     * labels -200 "KOS_ERR_INVALIDPTR" with an explicit "FIXME: random guess",
+     * so its old symbolic name is not authoritative.
+     */
+    typedef uint32_t (*raw_open_fn)(uint32_t, uint32_t);
+    uintptr_t probe_open_addr = (uintptr_t)hpclang_kos_swi3(
+        218u, 1u, 0u, 0u);
+    if (probe_open_addr == 0u)
+        return 0x1fdu;
+    int32_t initial_missing = (int32_t)((raw_open_fn)probe_open_addr)(
+        (uint32_t)(uintptr_t)"HPCLANG.MIS", 1u);
+    if (initial_missing >= 0) {
+        close(initial_missing);
+        return 0x1fcu;
+    }
+    if (initial_missing != -200)
+        return 0x400u + ((uint32_t)(-initial_missing) & 0xffu);
+
     static const char input_expected[] = "HPCLANG-STORAGE\n";
     static const char output_expected[] = "stream-write-seek";
     char buffer[32];
@@ -323,7 +344,6 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x3du;
     }
     if (errno != ENOENT) {
-        typedef uint32_t (*raw_open_fn)(uint32_t, uint32_t);
         uintptr_t open_addr = (uintptr_t)hpclang_kos_swi3(
             218u, 1u, 0u, 0u);
         if (open_addr == 0u)
