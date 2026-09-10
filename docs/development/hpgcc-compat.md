@@ -338,13 +338,12 @@ adapter. Physical grayscale/page-flip compatibility is conditional on a
 platform backend that can save and restore stock LCD state reliably.
 
 The font/text renderer and mini/big metrics are stable, but final built-in
-glyph data is now an explicit blocker. HPG itself bundles exactly two standard
+glyph data is an explicit blocker. HPG itself bundles exactly two standard
 256-entry fonts (`hpg_get_minifont` and `hpg_get_bigfont`) with 6/4 and
-8/6 height/advance metrics. Those HPG tables are a strong compatibility
-reference and could be carried only under a clearly compatible licensing
-arrangement; they must not be silently copied and presented as MIT data.
-The current independently sourced public-domain tables remain provisional
-until the font decision is closed.
+8/6 height/advance metrics; that remains useful evidence for legacy HPG API
+semantics only. Those HPG tables are not under consideration as hpclang
+built-in assets. The current independently sourced public-domain tables remain
+provisional until an explicit final font source is selected and approved.
 
 Historical PAINT/XOR and repeating pattern state are also adapter concerns.
 The old draw backends apply those policies through mutable `hpg_t` fields;
