@@ -335,7 +335,17 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             close(raw_error);
             return 0x1ffu;
         }
-        return 0x100u + ((uint32_t)(-raw_error) & 0xffu);
+
+        /*
+         * KOS also maintains a task-local last-error value.  A raw fopen
+         * failure is not necessarily the filesystem reason itself, so expose
+         * GetLastError (syscall 22) separately before freezing errno mapping.
+         */
+        int32_t last_error = (int32_t)hpclang_kos_swi3(
+            22u, 0u, 0u, 0u);
+        if (last_error < 0)
+            return 0x200u + ((uint32_t)(-last_error) & 0xffu);
+        return 0x300u + ((uint32_t)last_error & 0xffu);
     }
 
     errno = 0;
