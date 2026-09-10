@@ -176,11 +176,10 @@ Direct matrix. Pixel readback and outline rectangles pass the same Direct and
 full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
 matrix and the full-stock matrix. The font/text renderer and mini/big metrics
 are merged and validated, but the **final built-in glyph data is a release
-blocker**. The current public-domain Basic-Latin tables are provisional while
-the project selects a suitable long-term bitmap source. Historical HPG bundles
-two 256-entry fonts with the same 6/4 and 8/6 metrics and is a useful
-compatibility candidate/reference, but its GPL licensing must not be silently
-relicensed into hpclang's MIT runtime.
+blocker**. The current public-domain Basic-Latin tables are provisional. No
+research font pack is imported automatically, and historical HPG font tables
+are not under consideration as hpclang built-in assets. Font work remains
+frozen until an explicit long-term redistributable source is selected.
 Representation-independent circles/polygons and software-owned 2/4/16-level
 surfaces are now merged and pass Core, five-model Direct, and full-stock
 validation without taking physical LCD mode ownership. Stable S3C2410 LCD
