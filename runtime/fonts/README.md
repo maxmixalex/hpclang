@@ -1,31 +1,87 @@
 # Font source package
 
-`fonts.zip` is the canonical custom-font source package for hpclang. It is tracked with Git LFS and must remain byte-for-byte identical to the reviewed source archive.
+`fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the reviewed upstream/source archive rather than being repacked into a build-specific format.
 
-The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it when auditing the source package or regenerating checked-in font assets. SDK users compiling C/C++ applications must not need Python, Pillow, fontTools, or anything from `tools/`.
+The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it to inspect source fonts or regenerate checked-in assets. SDK users compiling C/C++ applications do not need Python, Pillow, fontTools, or anything from `tools/`.
 
 The pipeline is:
 
-1. `runtime/fonts/fonts.zip` — canonical source archive, stored with Git LFS.
-2. `tools/hpclang-font.py` — verifies the archive manifest and parses supported BDF/newRPL-BMP/TTF/FON source faces.
-3. `tools/regenerate-font-assets.py` — batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`. Large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor.
-4. normal C/C++ build — consumes only those generated assets through CMake/clang/lld; no source-font parser runs here.
+1. `runtime/fonts/fonts.zip` — canonical raw `fonts/…` source tree stored with Git LFS.
+2. `tools/hpclang-font.py` — source-format parsers used by repository-maintenance tooling.
+3. `tools/regenerate-font-assets.py` — indexes the raw bundle and batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`. Large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor.
+4. normal C/C++ build — consumes only the checked-in generated assets through CMake/clang/lld; no source-font parser runs here.
 
-`STATIC` selection means the final HPC1 retains only explicitly selected glyph mappings. `FULL` retains the complete mapped repertoire of the selected face. These are linker/package semantics, not a reason to invoke Python during an application build. The batch catalog is deliberately independent of UI font roles: `mini`, `text`, and `edit-large` are semantic choices layered on top of the general arbitrary-metrics font ABI.
+The current generated catalog contains 308 faces. Font **choice** and font **import mode** are separate axes: a face may have arbitrary metrics, while `@mini`, `@text`, and `@edit-large` are semantic UI-role aliases.
 
-Repository-maintenance verification/regeneration is equivalent to:
+## Import modes
 
-```bash
-python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip verify
-python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip audit
-python3 tools/regenerate-font-assets.py --package runtime/fonts/fonts.zip
+`hpclang_target_font()` exposes exactly three import modes:
+
+### `STATIC_AUTO`
+
+Collect the static repertoire from string literals explicitly marked with `HPCLANG_UI_TEXT()` in the target's C/C++ sources. Ordinary unmarked literals are intentionally ignored, so diagnostics, paths, format strings and unrelated metadata cannot silently enlarge the font.
+
+```cmake
+hpclang_target_font(app
+    NAME ui_font
+    FONT @text
+    MODE STATIC_AUTO)
 ```
 
-The `Maintenance / Font assets` workflow performs the same steps with Git LFS materialized and commits changed generated assets on `m7-fonts-gallery`.
+```c
+const char *title = HPCLANG_UI_TEXT("Statistics");
+```
 
-Current reviewed source archive:
+`HPCLANG_UI_TEXT()` is an identity macro at runtime. Its argument must be one or more adjacent narrow UTF-8 string literals. Dynamic/generated/localized text whose complete repertoire cannot be seen this way should use `STATIC_EXPLICIT` or `FULL` instead.
 
-- size: `35,137,072` bytes
-- SHA-256: `6b0cf8eca97d52d9a410b4ebb2f77585b9d895d5dab46fb106ec8992791c4f86`
+### `STATIC_EXPLICIT`
 
-Do not replace this file with a re-packed ZIP, extracted directory, normalized-only database, or Git LFS pointer whose object has not actually been uploaded.
+Retain the exact codepoint set supplied by the application, plus the configured fallback when one is enabled. No source-string discovery occurs.
+
+```cmake
+hpclang_target_font(app
+    NAME numeric_font
+    FONT @text
+    MODE STATIC_EXPLICIT
+    CODEPOINTS 32 43 45 46 48 49 50 51 52 53 54 55 56 57)
+```
+
+Codepoints may be written as integer values or `U+XXXX` values.
+
+### `FULL`
+
+Retain the selected face's complete mapped repertoire.
+
+```cmake
+hpclang_target_font(app
+    NAME full_font
+    FONT some_generated_face_id
+    MODE FULL)
+```
+
+The static modes synthesize a descriptor that references only the selected glyphs. Every generated glyph and bitmap lives in its own ELF section, so normal `--gc-sections` removes the rest from the final HPC1 image. `FULL` binds the generated complete-face descriptor instead.
+
+## UI roles
+
+The semantic aliases are:
+
+- `@mini` — compact/proportional titles, soft menus and small UI text;
+- `@text` — normal body/editor text;
+- `@edit-large` — the larger fixed-cell EditLine/cursor-underlay role.
+
+The older `@normal` and `@large` spellings remain transitional aliases for `@text` and `@edit-large`; they are not additional roles.
+
+## Repository maintenance
+
+Regenerate the checked-in catalog only when the source bundle or source-format generator changes:
+
+```bash
+python3 tools/regenerate-font-assets.py \
+  --package runtime/fonts/fonts.zip \
+  --output-dir runtime/fonts/generated \
+  --chunk-glyphs 512
+```
+
+The `Maintenance / Font assets` workflow materializes the Git LFS object, checks that it is a valid ZIP rather than an unresolved pointer, regenerates the catalog, applies repository-size/diff checks, and commits changed generated assets on `m7-fonts-gallery`.
+
+Do not replace `fonts.zip` with an extracted directory, normalized-only database, or an unresolved Git LFS pointer. The checked-in generated catalog is derived build material; `fonts.zip` remains the source bundle.
