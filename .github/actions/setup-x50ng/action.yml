@@ -1,18 +1,35 @@
 name: Setup universal x50ng
-description: Restore or build the single pinned x50ng binary used by all hpclang E2E modes and families.
+description: Restore or build the single portable x50ng bundle used by all hpclang E2E modes and families.
 
 runs:
   using: composite
   steps:
-    - name: Restore universal x50ng cache
+    - name: Restore portable universal x50ng cache
       id: x50ng-cache
       uses: actions/cache/restore@v6
       with:
         path: build/x50ng/dist
-        key: hpclang-x50ng-universal-${{ runner.os }}-${{ runner.arch }}-v2-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**') }}
+        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**') }}
+        restore-keys: |
+          hpclang-x50ng-universal-${{ runner.os }}-${{ runner.arch }}-v1-0d5e9e458ab52c91bd2244f5bb735acfa2586ff79c3b6d8fdaf378972d2556ae
+
+    - name: Inspect restored x50ng state
+      id: x50ng-state
+      shell: bash
+      run: |
+        if [[ -x build/x50ng/dist/x50ng ]]; then
+          echo 'binary=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'binary=false' >> "$GITHUB_OUTPUT"
+        fi
+        if [[ -f build/x50ng/dist/.hpclang-portable ]]; then
+          echo 'portable=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'portable=false' >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Install x50ng build dependencies on cache miss
-      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       run: |
         packages=(git-lfs libglib2.0-dev liblua5.4-dev)
@@ -27,12 +44,12 @@ runs:
         fi
 
     - name: Fetch and adapt pinned x50ng
-      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       run: bash tools/fetch-x50ng.sh build/x50ng
 
     - name: Build universal headless x50ng
-      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       working-directory: build/x50ng
       run: |
@@ -43,8 +60,8 @@ runs:
           WITH_SDL2=no \
           LUA_VERSION=lua5.4
 
-    - name: Verify universal x50ng runtime dependencies
-      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+    - name: Verify newly built x50ng runtime dependencies
+      if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       working-directory: build/x50ng
       run: |
@@ -55,11 +72,77 @@ runs:
         fi
 
     - name: Prepare reusable firmware
-      if: steps.x50ng-cache.outputs.cache-hit != 'true'
+      if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       run: make -C build/x50ng/dist/firmware bootloaders official
 
-    - name: Save universal x50ng cache
+    - name: Install portable runtime tools and libraries
+      if: steps.x50ng-state.outputs.portable != 'true'
+      shell: bash
+      run: |
+        packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 ckermit socat)
+        missing=()
+        for package in "${packages[@]}"; do
+          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+            grep -q 'ok installed' || missing+=("$package")
+        done
+        if (( ${#missing[@]} )); then
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y --no-install-recommends "${missing[@]}"
+        fi
+
+    - name: Make x50ng bundle self-contained for E2E runners
+      if: steps.x50ng-state.outputs.portable != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        dist="$GITHUB_WORKSPACE/build/x50ng/dist"
+        tools="$dist/tools"
+        libs="$dist/runtime-lib"
+        mkdir -p "$tools" "$libs"
+
+        if command -v ckermit >/dev/null 2>&1; then
+          kermit="$(command -v ckermit)"
+        else
+          kermit="$(command -v kermit)"
+        fi
+        cp -L "$kermit" "$tools/kermit"
+        ln -sfn kermit "$tools/ckermit"
+        cp -L "$(command -v socat)" "$tools/socat"
+        chmod +x "$tools/kermit" "$tools/socat"
+
+        collect_deps() {
+          ldd "$1" | awk '
+            /=> \/[^ ]+/ { print $3 }
+            /^[[:space:]]*\/[^ ]+[[:space:]]+\(0x/ { print $1 }
+          '
+        }
+
+        {
+          collect_deps "$dist/x50ng"
+          collect_deps "$tools/kermit"
+          collect_deps "$tools/socat"
+        } | sort -u | while IFS= read -r library; do
+          [[ -n "$library" && -f "$library" ]] || continue
+          name="$(basename "$library")"
+          case "$name" in
+            libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|libresolv.so.*|libutil.so.*|ld-linux-*)
+              continue
+              ;;
+          esac
+          cp -L "$library" "$libs/$name"
+        done
+
+        env LD_LIBRARY_PATH="$libs" ldd "$dist/x50ng" | tee "$dist/x50ng.portable.ldd"
+        env LD_LIBRARY_PATH="$libs" ldd "$tools/kermit" > "$dist/kermit.portable.ldd"
+        env LD_LIBRARY_PATH="$libs" ldd "$tools/socat" > "$dist/socat.portable.ldd"
+        if grep -R 'not found' "$dist"/*.portable.ldd; then
+          echo "portable x50ng bundle has unresolved runtime libraries" >&2
+          exit 1
+        fi
+        touch "$dist/.hpclang-portable"
+
+    - name: Save portable universal x50ng cache
       if: steps.x50ng-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
