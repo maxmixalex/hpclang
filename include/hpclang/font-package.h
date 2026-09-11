@@ -12,11 +12,11 @@ extern "C" {
 /*
  * Generated bitmap-font ABI.
  *
- * The canonical custom-font source is the exact sdk/fonts/fonts.zip archive.
- * tools/hpclang-font.py reads that archive directly and emits only the selected
- * font/face and glyph set for an application build. Generated C descriptors are
- * build artifacts; they do not replace or normalize away the original package,
- * its licenses, provenance, mappings, or source font files.
+ * The canonical custom-font source is sdk/fonts/fonts.zip. Repository
+ * maintenance tooling validates that archive and regenerates checked-in
+ * linkable font assets when the source package changes. Normal application
+ * builds consume those assets directly; they do not run Python or source-font
+ * converters and do not depend on anything under tools/.
  */
 #define HPCLANG_FONT_PACKAGE_ABI 1u
 #define HPCLANG_FONT_PACKAGE_KIND_BITMAP 1u
@@ -42,9 +42,10 @@ struct hpclang_bitmap_font_data {
     uint16_t nominal_advance;
 };
 
-/* The wrapper is deliberately tiny. STATIC generation emits only requested
- * glyph records; FULL generation emits the selected face's complete mapped
- * repertoire. Normal section GC can still discard an entirely unused font. */
+/* The wrapper is deliberately tiny. STATIC descriptors reference only the
+ * selected mappings; FULL descriptors reference a selected face's complete
+ * mapped repertoire. Section GC removes unreferenced glyph/bitmap sections
+ * from the final HPC1 image. */
 struct hpclang_font {
     uint32_t abi;
     uint32_t kind;
