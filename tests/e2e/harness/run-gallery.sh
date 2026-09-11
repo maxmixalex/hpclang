@@ -91,7 +91,7 @@ export HPCLANG_X50NG_GALLERY_DIR="$FRAMES"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
-timeout 80s "$X50" "${X50_ARGS[@]}"
+timeout 330s "$X50" "${X50_ARGS[@]}"
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm "$FRAMES"/*.pgm; do
     [[ -f "$pgm" ]] || continue

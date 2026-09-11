@@ -12,6 +12,8 @@
 #define HPCLANG_E2E_PASS UINT32_C(0x50415353)
 #define HPCLANG_E2E_FAIL UINT32_C(0x46410000)
 #define HPCLANG_GALLERY_STATE UINT32_C(0x47000000)
+#define HPCLANG_GALLERY_COUNT_MAX UINT32_C(0x7ff)
+#define HPCLANG_GALLERY_INDEX_MAX UINT32_C(0xfff)
 
 volatile uint32_t hpclang_e2e_result;
 
@@ -226,7 +228,7 @@ static void draw_chrome(
     uint32_t height)
 {
     const struct hpclang_font *ui = hpclang_font_mini();
-    char counter[16];
+    char counter[20];
     (void)snprintf(counter, sizeof(counter), "%lu/%lu",
         (unsigned long)(index + 1u), (unsigned long)count);
 
@@ -255,13 +257,20 @@ static void draw_sample(
     uint32_t height)
 {
     const int32_t bottom = (int32_t)height - 10;
+    const uint32_t line_height = hpclang_font_height(view->font);
     int32_t y = 15;
 
-    y = draw_words(surface, view->font, y, bottom,
-        "ABCDEFGHIJKLM NOPQRSTUVWXYZ abcdefghijklm nopqrstuvwxyz");
-    if (y < bottom)
-        y = draw_words(surface, view->font, y, bottom,
-            "0123456789 ! ? # $ % & * + - / = < > ( ) [ ]");
+    if (line_height == 0u)
+        return;
+
+    if (y + (int32_t)line_height <= bottom) {
+        draw_centered_ascii(surface, view->font, y, "AaBbMmXxZz 012345");
+        y += (int32_t)line_height;
+    }
+    if (y + (int32_t)line_height <= bottom) {
+        draw_centered_ascii(surface, view->font, y, "6789 !?@#$%&*+-=/<>");
+        y += (int32_t)line_height;
+    }
     if (y < bottom)
         (void)draw_unicode(surface, view, y, bottom);
 }
@@ -285,9 +294,9 @@ static void draw_text_page(
 static void publish_state(uint32_t index, uint32_t count, uint32_t page)
 {
     hpclang_e2e_result = HPCLANG_GALLERY_STATE |
-        ((count & 0xffu) << 16) |
-        ((page & 0xffu) << 8) |
-        (index & 0xffu);
+        ((page & 1u) << 23) |
+        ((count & HPCLANG_GALLERY_COUNT_MAX) << 12) |
+        (index & HPCLANG_GALLERY_INDEX_MAX);
 }
 
 static int redraw(
@@ -327,7 +336,7 @@ int main(void)
         return fail(2);
 
     uint32_t count = gallery_count();
-    if (count == 0u || count > 255u)
+    if (count == 0u || count > HPCLANG_GALLERY_COUNT_MAX)
         return fail(3);
 
     uint32_t index = 0u;
