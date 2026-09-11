@@ -21,6 +21,7 @@
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
+#define RETURN_CAPTURE_US 800000LL
 
 enum stock_mode {
     MODE_INSTALL,
@@ -32,9 +33,15 @@ struct state {
     enum stock_mode mode;
     const char *prefix;
     const char *json;
+    const char *before_pgm;
+    const char *pass_pgm;
+    const char *return_pgm;
+    const char *runtime_json;
     uint32_t result_addr;
+    int saw_before;
     int saw_pass;
     int payload_keyboard_scheduled;
+    int returned;
     int failed;
     int lcd_height;
     int64_t deadline;
@@ -94,11 +101,6 @@ static const struct key_pair_ref key_pairs[] = {
 };
 #undef KEY_REF
 
-/*
- * Exact physical-key sequence used by Direct E2E. x50ng exposes the same
- * physical keyboard codes across the supported calculator chassis; the
- * payload itself validates the model-specific scan/key/modifier mapping.
- */
 static const int payload_keyboard_codes[] = {
     HP4950_KEY_BACKSPACE,
     HP4950_KEY_U,
@@ -286,6 +288,7 @@ static void write_json(struct state *s, const char *status)
         "  \"status\":\"%s\",\n"
         "  \"saw_pass\":%s,\n"
         "  \"payload_keyboard_scheduled\":%s,\n"
+        "  \"returned\":%s,\n"
         "  \"pc\":\"0x%08x\",\n"
         "  \"display_on\":%s,\n"
         "  \"sd_mounted\":%s\n"
@@ -294,9 +297,31 @@ static void write_json(struct state *s, const char *status)
         status,
         s->saw_pass ? "true" : "false",
         s->payload_keyboard_scheduled ? "true" : "false",
+        s->returned ? "true" : "false",
         s->hdw->cpu->regs[15],
         is_display_on() ? "true" : "false",
         emulator_is_sd_mounted() ? "true" : "false");
+    fclose(f);
+}
+
+static void write_runtime_json(struct state *s, const char *status)
+{
+    FILE *f = fopen(s->runtime_json, "w");
+    if (!f) return;
+    fprintf(
+        f,
+        "{\n"
+        "  \"status\":\"%s\",\n"
+        "  \"saw_pass\":%s,\n"
+        "  \"payload_keyboard_scheduled\":%s,\n"
+        "  \"returned\":%s,\n"
+        "  \"pc\":\"0x%08x\"\n"
+        "}\n",
+        status,
+        s->saw_pass ? "true" : "false",
+        s->payload_keyboard_scheduled ? "true" : "false",
+        s->returned ? "true" : "false",
+        s->hdw->cpu->regs[15]);
     fclose(f);
 }
 
@@ -306,6 +331,8 @@ static void fail(struct state *s, const char *why)
     fprintf(stderr, "stock launcher FAIL: %s\n", why);
     capture_named(s, "failure");
     write_json(s, why);
+    if (s->mode == MODE_RUN)
+        write_runtime_json(s, why);
     hdw_stop(s->hdw);
 }
 
@@ -321,10 +348,27 @@ static void finish_install(void *arg)
     hdw_stop(s->hdw);
 }
 
+static void finish_return(void *arg)
+{
+    struct state *s = arg;
+    unsigned pixels = capture(s->hdw, s->return_pgm, s->lcd_height);
+
+    if (!is_display_on() || pixels == 0) {
+        fail(s, "stock-resume");
+        return;
+    }
+
+    s->returned = 1;
+    write_runtime_json(s, "pass");
+    write_json(s, "pass");
+    hdw_stop(s->hdw);
+}
+
 static void monitor(void *arg)
 {
     struct state *s = arg;
     uint32_t value = 0;
+    int readable;
 
     if (s->deadline == 0) {
         if (!later(monitor, s, POLL_US))
@@ -337,8 +381,17 @@ static void monitor(void *arg)
         return;
     }
 
-    if (!s->payload_keyboard_scheduled &&
-        guest_read32(s->hdw, s->result_addr, &value) &&
+    if (!s->saw_before) {
+        if (!capture(s->hdw, s->before_pgm, s->lcd_height)) {
+            fail(s, "before-capture");
+            return;
+        }
+        s->saw_before = 1;
+    }
+
+    readable = guest_read32(s->hdw, s->result_addr, &value);
+
+    if (!s->payload_keyboard_scheduled && readable &&
         value == PHASE_KEYBOARD_READY) {
         if (!schedule_payload_keyboard(s)) {
             fail(s, "keyboard-schedule");
@@ -346,20 +399,34 @@ static void monitor(void *arg)
         }
     }
 
-    if (guest_read32(s->hdw, s->result_addr, &value)) {
-        if (value == PASS_WORD) {
+    if (readable) {
+        if (!s->saw_pass && value == PASS_WORD) {
             s->saw_pass = 1;
-            capture_named(s, "pass");
+            if (!capture(s->hdw, s->pass_pgm, s->lcd_height)) {
+                fail(s, "pass-capture");
+                return;
+            }
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
-            write_json(s, "pass");
-            hdw_stop(s->hdw);
-            return;
-        }
-        if ((value & 0xffff0000u) == FAIL_PREFIX) {
+            write_runtime_json(s, "pass-observed");
+        } else if ((value & 0xffff0000u) == FAIL_PREFIX) {
             fprintf(stderr, "stock runtime failure 0x%08x\n", value);
             fail(s, "runtime-fail");
             return;
         }
+    }
+
+    /*
+     * The payload never changes hpclang_e2e_result after PASS. A different
+     * value (or an unmapped address) therefore means stage0 has left HPC1 and
+     * restored the stock address space. Use the same wake-and-capture finish
+     * as Direct instead of declaring success at the PASS screen.
+     */
+    if (s->saw_pass && (!readable || value != PASS_WORD)) {
+        if (!tap(&on_down, &on_up, 0) ||
+            !later(finish_return, s, RETURN_CAPTURE_US)) {
+            fail(s, "return-timer");
+        }
+        return;
     }
 
     if (!later(monitor, s, POLL_US))
@@ -540,9 +607,17 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (s.mode == MODE_RUN && !parse_address(result_text, &s.result_addr)) {
-        fprintf(stderr, "stock run mode needs valid result address\n");
-        return EXIT_FAILURE;
+    if (s.mode == MODE_RUN) {
+        s.before_pgm = getenv("HPCLANG_X50NG_BEFORE_PGM");
+        s.pass_pgm = getenv("HPCLANG_X50NG_PASS_PGM");
+        s.return_pgm = getenv("HPCLANG_X50NG_RETURN_PGM");
+        s.runtime_json = getenv("HPCLANG_X50NG_E2E_JSON");
+        if (!parse_address(result_text, &s.result_addr) ||
+            !s.before_pgm || !s.pass_pgm || !s.return_pgm ||
+            !s.runtime_json) {
+            fprintf(stderr, "stock run mode needs canonical runtime outputs\n");
+            return EXIT_FAILURE;
+        }
     }
 
     config_t config = hpclang_x50ng_headless_config(argc, argv);
@@ -561,7 +636,8 @@ int main(int argc, char **argv)
     save_modules(s.hdw);
     exit_modules(s.hdw);
 
-    return s.failed || (s.mode == MODE_RUN && !s.saw_pass)
+    return s.failed ||
+           (s.mode == MODE_RUN && (!s.saw_pass || !s.returned))
         ? EXIT_FAILURE
         : EXIT_SUCCESS;
 }
