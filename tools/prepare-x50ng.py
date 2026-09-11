@@ -23,6 +23,15 @@ def copy_frontend(source: Path, destination: Path, entrypoint: str) -> None:
     destination.write_text(text.replace(old, f"int {entrypoint}(int argc, char **argv)", 1))
 
 
+def patch_ui_build(root: Path) -> None:
+    replace_once(
+        root / "Makefile",
+        "libui4x.a WITH_SDL=yes WITH_SDL2=no",
+        "libui4x.a WITH_SDL=$(WITH_SDL) WITH_SDL2=$(WITH_SDL2)",
+        "ui4x SDL selector inheritance",
+    )
+
+
 def patch_universal_flash(root: Path) -> None:
     replace_once(
         root / "src" / "flash.c",
@@ -290,6 +299,7 @@ def main() -> None:
 
     root = args.x50ng
     patch_frontends(root, args)
+    patch_ui_build(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
     patch_host_uart0(root)
