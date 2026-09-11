@@ -229,7 +229,7 @@ def write_index(path: Path, records: list[dict]) -> None:
             print(f"    {record['id']}", file=out)
         print(")", file=out)
         print("", file=out)
-        for record in records:
+        for number, record in enumerate(records):
             ident = record["id"]
             print(f"set(HPCLANG_FONT_{ident}_SELECTOR \"{cmake_quote(record['selector'])}\")", file=out)
             print(f"set(HPCLANG_FONT_{ident}_SOURCES", file=out)
@@ -244,7 +244,8 @@ def write_index(path: Path, records: list[dict]) -> None:
                 f'set(HPCLANG_FONT_{ident}_CODEPOINTS_FILE "${{CMAKE_CURRENT_LIST_DIR}}/{ident}.codepoints.cmake")',
                 file=out,
             )
-            print("", file=out)
+            if number + 1 < len(records):
+                print("", file=out)
 
 
 def clean_generated(out_dir: Path) -> None:
