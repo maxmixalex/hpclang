@@ -4,14 +4,15 @@ if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 endif()
 
+include("${HPCLANG_ROOT}/cmake/ui-text.cmake")
 include("${HPCLANG_ROOT}/runtime/fonts/generated/index.cmake")
 
 function(_hpclang_font_resolve out_id selector)
     if(selector STREQUAL "@mini")
         set(id newrpl_6a)
-    elseif(selector STREQUAL "@normal")
+    elseif(selector STREQUAL "@text" OR selector STREQUAL "@normal")
         set(id newrpl_8c)
-    elseif(selector STREQUAL "@large")
+    elseif(selector STREQUAL "@edit-large" OR selector STREQUAL "@large")
         set(id newrpl_10a)
     else()
         set(id "${selector}")
@@ -33,12 +34,46 @@ function(_hpclang_font_codepoint out_value input)
     set(${out_value} "${value}" PARENT_SCOPE)
 endfunction()
 
+function(_hpclang_font_target_sources out target)
+    get_target_property(_sources ${target} SOURCES)
+    get_target_property(_source_dir ${target} SOURCE_DIR)
+    if(NOT _sources)
+        set(${out} "" PARENT_SCOPE)
+        return()
+    endif()
+
+    set(_scan)
+    foreach(_source IN LISTS _sources)
+        if(_source MATCHES "^\\$<")
+            continue()
+        endif()
+        get_filename_component(_ext "${_source}" EXT)
+        string(TOLOWER "${_ext}" _ext)
+        if(NOT _ext MATCHES "^\\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$")
+            continue()
+        endif()
+        if(IS_ABSOLUTE "${_source}")
+            set(_absolute "${_source}")
+        else()
+            get_filename_component(_absolute "${_source}" ABSOLUTE BASE_DIR "${_source_dir}")
+        endif()
+        if(EXISTS "${_absolute}")
+            list(APPEND _scan "${_absolute}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _scan)
+    set(${out} "${_scan}" PARENT_SCOPE)
+endfunction()
+
 function(hpclang_target_font target)
     set(options)
     set(oneValueArgs NAME FONT MODE FALLBACK)
     set(multiValueArgs CODEPOINTS)
     cmake_parse_arguments(HF "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
+    if(NOT TARGET ${target})
+        message(FATAL_ERROR "hpclang_target_font target does not exist: ${target}")
+    endif()
     if(NOT HF_NAME OR NOT HF_FONT)
         message(FATAL_ERROR "hpclang_target_font requires NAME and FONT")
     endif()
@@ -47,17 +82,20 @@ function(hpclang_target_font target)
     endif()
 
     if(NOT HF_MODE)
-        set(HF_MODE STATIC)
+        set(HF_MODE STATIC_AUTO)
     endif()
-    if(NOT HF_MODE STREQUAL "STATIC" AND NOT HF_MODE STREQUAL "FULL")
-        message(FATAL_ERROR "hpclang_target_font MODE must be STATIC or FULL")
+    if(NOT HF_MODE STREQUAL "STATIC_AUTO" AND
+       NOT HF_MODE STREQUAL "STATIC_EXPLICIT" AND
+       NOT HF_MODE STREQUAL "FULL")
+        message(FATAL_ERROR
+            "hpclang_target_font MODE must be STATIC_AUTO, STATIC_EXPLICIT, or FULL")
     endif()
 
     _hpclang_font_resolve(font_id "${HF_FONT}")
 
-    # New generated catalogs can split large fonts over several assembly sources.
-    # Keep accepting the old singular SOURCE variable so an in-flight source-package
-    # update never makes the branch temporarily unbuildable before regeneration.
+    # Large generated faces may be split over several assembly translation
+    # units. Older in-flight catalogs used a singular SOURCE variable, which is
+    # still accepted while this branch is being consolidated.
     set(sources_var "HPCLANG_FONT_${font_id}_SOURCES")
     set(source_var "HPCLANG_FONT_${font_id}_SOURCE")
     if(DEFINED ${sources_var})
@@ -75,9 +113,6 @@ function(hpclang_target_font target)
     set(codepoints_var "HPCLANG_FONT_${font_id}_CODEPOINTS")
     set(codepoints_file_var "HPCLANG_FONT_${font_id}_CODEPOINTS_FILE")
 
-    # The batch catalog stores large repertoires in per-face files and loads only
-    # the one requested by the application. Old indexes still provide the list
-    # directly, so both generations remain source-compatible.
     if(DEFINED ${codepoints_file_var})
         include("${${codepoints_file_var}}")
     endif()
@@ -104,18 +139,43 @@ function(hpclang_target_font target)
         return()
     endif()
 
-    if(NOT HF_CODEPOINTS)
-        message(FATAL_ERROR "STATIC font selection requires CODEPOINTS")
+    set(selected)
+    if(HF_MODE STREQUAL "STATIC_EXPLICIT")
+        if(NOT HF_CODEPOINTS)
+            message(FATAL_ERROR "STATIC_EXPLICIT font selection requires CODEPOINTS")
+        endif()
+        foreach(raw IN LISTS HF_CODEPOINTS)
+            _hpclang_font_codepoint(cp "${raw}")
+            list(APPEND selected "${cp}")
+        endforeach()
+    else()
+        if(HF_CODEPOINTS)
+            message(FATAL_ERROR
+                "STATIC_AUTO derives its repertoire from HPCLANG_UI_TEXT and does not accept CODEPOINTS")
+        endif()
+        _hpclang_font_target_sources(ui_sources ${target})
+        if(NOT ui_sources)
+            message(FATAL_ERROR "STATIC_AUTO target ${target} has no scannable C/C++ sources")
+        endif()
+
+        # Source-content changes must refresh the configure-time repertoire.
+        # This preserves a normal incremental-build workflow without requiring
+        # Python or another host-side font scanner.
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ui_sources})
+        hpclang_collect_ui_text_codepoints(selected ${ui_sources})
+        if(NOT selected)
+            message(FATAL_ERROR
+                "STATIC_AUTO found no HPCLANG_UI_TEXT(\"...\") literals in target ${target}")
+        endif()
     endif()
 
-    set(selected)
-    foreach(raw IN LISTS HF_CODEPOINTS)
-        _hpclang_font_codepoint(cp "${raw}")
+    list(REMOVE_DUPLICATES selected)
+    list(SORT selected COMPARE NATURAL ORDER ASCENDING)
+    foreach(cp IN LISTS selected)
         list(FIND available "${cp}" found)
         if(found EQUAL -1)
-            message(FATAL_ERROR "${HF_FONT} has no mapping for code point ${raw}")
+            message(FATAL_ERROR "${HF_FONT} has no mapping for code point ${cp}")
         endif()
-        list(APPEND selected "${cp}")
     endforeach()
 
     if(NOT DEFINED HF_FALLBACK OR HF_FALLBACK STREQUAL "AUTO")
