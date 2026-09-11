@@ -8,7 +8,12 @@
 #include <vector>
 
 #include <hpclang/display.hpp>
+#include <hpclang/font.h>
 #include <hpclang/time.hpp>
+
+extern "C" const struct hpclang_font hpclang_e2e_ui_font;
+
+static const char hpclang_e2e_ui_probe[] = HPCLANG_UI_TEXT("Hp");
 
 volatile int hpclang_e2e_cxx_ctor_probe;
 
@@ -75,11 +80,44 @@ extern "C" int hpclang_e2e_cpp_test(void)
     surface.draw_rect(-10, -10, 2, 2, 255u);
     surface.fill_rect(-10, -10, 2, 2, 255u);
 
-    hpclang_surface *owned_raw = hpclang_surface_create_mono(12u, 12u);
+    hpclang_surface *owned_raw = hpclang_surface_create_mono(24u, 16u);
     if (owned_raw == nullptr)
         return 4;
 
     hpclang::surface_ref owned{owned_raw};
+
+    /*
+     * This font is produced by hpclang_target_font(STATIC_AUTO) from the
+     * HPCLANG_UI_TEXT("Hp") marker above. Touch metrics and rasterize it on an
+     * off-screen surface so the calculator matrix proves the generated .S
+     * glyph data, relocations, descriptor and bitmap renderer all work at
+     * runtime without changing the visible E2E evidence screen.
+     */
+    if (hpclang_font_height(&hpclang_e2e_ui_font) == 0u ||
+        hpclang_font_codepoint_advance(&hpclang_e2e_ui_font, 'H') == 0u ||
+        hpclang_font_codepoint_advance(&hpclang_e2e_ui_font, 'p') == 0u) {
+        hpclang_surface_destroy(owned_raw);
+        return 9;
+    }
+
+    owned.clear(0u);
+    hpclang_surface_draw_text(
+        owned_raw, &hpclang_e2e_ui_font, 0, 0,
+        hpclang_e2e_ui_probe, 255u);
+    bool generated_font_ink = false;
+    for (int y = 0; y < 16 && !generated_font_ink; ++y) {
+        for (int x = 0; x < 24; ++x) {
+            if (owned.get_pixel(x, y) != 0u) {
+                generated_font_ink = true;
+                break;
+            }
+        }
+    }
+    if (!generated_font_ink) {
+        hpclang_surface_destroy(owned_raw);
+        return 9;
+    }
+
     owned.clear(0u);
     owned.draw_line(0, 0, 1, 1, 255u);
     if (owned.get_pixel(0, 0) != 255u ||
