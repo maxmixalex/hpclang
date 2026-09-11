@@ -54,6 +54,7 @@ set(GALLERY_FACES
     "Tiny5|tiny5_tiny5_regular"
     "Tom Thumb|tom_thumb_tom_thumb"
     "X11 Fixed|x11_fixed_6x10"
+    "X11 Micro|x11_micro_micro"
 )
 
 # Printable ASCII is the common comparison repertoire.  The second group is a
