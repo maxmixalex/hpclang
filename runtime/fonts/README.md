@@ -1,6 +1,6 @@
 # Font source package
 
-`fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the reviewed upstream/source archive rather than being repacked into a build-specific format.
+`fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the upstream/source archive rather than being repacked into a build-specific format.
 
 The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it to inspect source fonts or regenerate checked-in assets. SDK users compiling C/C++ applications do not need Python, Pillow, fontTools, or anything from `tools/`.
 
@@ -11,7 +11,7 @@ The pipeline is:
 3. `tools/regenerate-font-assets.py` — indexes the raw bundle and batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`. Large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor.
 4. normal C/C++ build — consumes only the checked-in generated assets through CMake/clang/lld; no source-font parser runs here.
 
-The current generated catalog contains 308 faces. Font **choice** and font **import mode** are separate axes: a face may have arbitrary metrics, while `@mini`, `@text`, and `@edit-large` are semantic UI-role aliases.
+The current generated catalog contains 308 faces. Font **choice** and font **import mode** are separate axes: a face may have arbitrary metrics, while `@mini`, `@text`, and `@edit-large` are the three semantic UI-role selectors.
 
 ## Import modes
 
@@ -63,13 +63,13 @@ The static modes synthesize a descriptor that references only the selected glyph
 
 ## UI roles
 
-The semantic aliases are:
+The semantic role selectors are:
 
 - `@mini` — compact/proportional titles, soft menus and small UI text;
 - `@text` — normal body/editor text;
 - `@edit-large` — the larger fixed-cell EditLine/cursor-underlay role.
 
-The older `@normal` and `@large` spellings remain transitional aliases for `@text` and `@edit-large`; they are not additional roles.
+Those are the only semantic role selectors. Applications may also select any generated face by its catalog ID.
 
 ## Repository maintenance
 
@@ -82,6 +82,6 @@ python3 tools/regenerate-font-assets.py \
   --chunk-glyphs 512
 ```
 
-The `Maintenance / Font assets` workflow materializes the Git LFS object, checks that it is a valid ZIP rather than an unresolved pointer, regenerates the catalog, applies repository-size/diff checks, and commits changed generated assets on `m7-fonts-gallery`.
+The `Maintenance / Font assets` workflow checks out the Git LFS source bundle, regenerates the catalog, applies repository-size/diff checks, and commits changed generated assets on `m7-fonts-gallery`.
 
-Do not replace `fonts.zip` with an extracted directory, normalized-only database, or an unresolved Git LFS pointer. The checked-in generated catalog is derived build material; `fonts.zip` remains the source bundle.
+The checked-in generated catalog is derived build material; `fonts.zip` remains the single source bundle.

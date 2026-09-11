@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   regenerate:
-    name: Verify and regenerate fonts
+    name: Regenerate fonts
     runs-on: home-docker
     timeout-minutes: 30
 
@@ -29,14 +29,6 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-
-      - name: Materialize canonical font package
-        run: |
-          git lfs pull --include="runtime/fonts/fonts.zip" --exclude=""
-          # Catch an unresolved LFS pointer without duplicating Git/LFS object
-          # identity checks in CI. ZIP integrity is the useful local gate here.
-          test "$(wc -c < runtime/fonts/fonts.zip)" -gt 1000000
-          python3 -m zipfile -t runtime/fonts/fonts.zip
 
       - name: Prepare font maintenance environment
         run: |
@@ -79,10 +71,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: regenerate font assembly catalog"
-
-          # Development may advance this branch while the full font catalog is
-          # regenerating. Rebase the generated-only commit onto the current
-          # branch head instead of discarding a successful maintenance run.
           git fetch origin m7-fonts-gallery
           git rebase origin/m7-fonts-gallery
           git push origin HEAD:m7-fonts-gallery

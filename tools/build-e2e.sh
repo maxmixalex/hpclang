@@ -49,7 +49,6 @@ PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" -j2
 
 cp "$OUT/cmake/hpclang-e2e.elf" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
-sha256sum "$OUT/e2e.hpc" | awk '{print $1}' > "$OUT/e2e.payload-sha256"
 
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"

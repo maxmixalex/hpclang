@@ -33,7 +33,6 @@ struct state {
     const char *prefix;
     const char *json;
     uint32_t result_addr;
-    uint32_t phase_addr;
     int saw_pass;
     int payload_keyboard_scheduled;
     int failed;
@@ -338,8 +337,8 @@ static void monitor(void *arg)
         return;
     }
 
-    if (!s->payload_keyboard_scheduled && s->phase_addr != 0u &&
-        guest_read32(s->hdw, s->phase_addr, &value) &&
+    if (!s->payload_keyboard_scheduled &&
+        guest_read32(s->hdw, s->result_addr, &value) &&
         value == PHASE_KEYBOARD_READY) {
         if (!schedule_payload_keyboard(s)) {
             fail(s, "keyboard-schedule");
@@ -352,11 +351,6 @@ static void monitor(void *arg)
             s->saw_pass = 1;
             capture_named(s, "pass");
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
-            /*
-             * Capture at the exact same machine-readable PASS point as the
-             * Direct harness. Stock still stops here because injecting ENTER
-             * during the launcher teardown can trip pinned x50ng.
-             */
             write_json(s, "pass");
             hdw_stop(s->hdw);
             return;
@@ -532,7 +526,6 @@ int main(int argc, char **argv)
     const char *mode = getenv("HPCLANG_STOCK_MODE");
     const char *sequence = getenv("HPCLANG_E2E_SEQUENCE");
     const char *result_text = getenv("HPCLANG_STOCK_RESULT_ADDR");
-    const char *phase_text = getenv("HPCLANG_STOCK_PHASE_ADDR");
     const char *lcd_height_text = getenv("HPCLANG_X50NG_LCD_HEIGHT");
 
     memset(&s, 0, sizeof(s));
@@ -547,15 +540,9 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (s.mode == MODE_RUN) {
-        if (!parse_address(result_text, &s.result_addr)) {
-            fprintf(stderr, "stock run mode needs valid result address\n");
-            return EXIT_FAILURE;
-        }
-        if (!parse_address(phase_text, &s.phase_addr)) {
-            fprintf(stderr, "stock run mode needs valid phase address\n");
-            return EXIT_FAILURE;
-        }
+    if (s.mode == MODE_RUN && !parse_address(result_text, &s.result_addr)) {
+        fprintf(stderr, "stock run mode needs valid result address\n");
+        return EXIT_FAILURE;
     }
 
     config_t config = hpclang_x50ng_headless_config(argc, argv);
