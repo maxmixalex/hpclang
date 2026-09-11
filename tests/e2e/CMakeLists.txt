@@ -5,6 +5,7 @@ if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 endif()
 include("${HPCLANG_ROOT}/cmake/profiles/hpclang-v1.cmake")
+include("${HPCLANG_ROOT}/cmake/fonts.cmake")
 
 option(HPCLANG_E2E_WAIT_FOR_ENTER "Wait for ENTER on the result screen" OFF)
 option(HPCLANG_E2E_KEYBOARD "Exercise injected keyboard transitions" OFF)
@@ -24,6 +25,15 @@ target_compile_features(hpclang_e2e PRIVATE c_std_11 cxx_std_23)
 target_compile_options(hpclang_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
+
+# Keep one generated-font consumer in the canonical calculator payload. This
+# proves that STATIC_AUTO extraction, generated assembly, ARMv4T assembly/link,
+# bitmap-font lookup, and section-GC integration remain usable together.
+hpclang_target_font(hpclang_e2e
+    NAME hpclang_e2e_ui_font
+    FONT @text
+    MODE STATIC_AUTO
+    FALLBACK NONE)
 
 if(HPCLANG_E2E_WAIT_FOR_ENTER)
     target_compile_definitions(hpclang_e2e PRIVATE HPCLANG_E2E_WAIT_FOR_ENTER=1)
