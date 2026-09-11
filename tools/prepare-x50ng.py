@@ -76,17 +76,17 @@ static size_t hpclang_sram_size( void )
     char* end = NULL;
     unsigned long value;
 
-    if ( text == NULL || *text == '\0' )
+    if ( text == NULL || *text == '\\0' )
         return S3C2410_SRAM_DEFAULT_SIZE;
 
     errno = 0;
     value = strtoul( text, &end, 0 );
-    if ( errno != 0 || end == text || *end != '\0' ||
+    if ( errno != 0 || end == text || *end != '\\0' ||
          ( value != S3C2410_SRAM_DEFAULT_SIZE &&
            value != S3C2410_SRAM_HP48_SIZE ) ) {
         fprintf( stderr,
                  "hpclang-x50ng: unsupported SRAM size %s "
-                 "(expected 0x40000 or 0x80000)\n",
+                 "(expected 0x40000 or 0x80000)\\n",
                  text );
         return 0;
     }
@@ -212,7 +212,7 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
             if ( uart_regs->host_fd < 0 ) {
                 fprintf(
                     stderr,
-                    "s3c2410-uart0: cannot open host transport %s: %s\n",
+                    "s3c2410-uart0: cannot open host transport %s: %s\\n",
                     host_path,
                     strerror( errno ) );
                 return -errno;
