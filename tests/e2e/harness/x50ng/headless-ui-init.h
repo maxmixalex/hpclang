@@ -19,8 +19,8 @@
  *
  * HPGCC 1.1's c_loader treats ARMSYS r1 as SAT_CPU *, whose first member is
  * Read[257]. The native HP39 mini font is at Saturn nibble address 0x07e695.
- * Capture Read[0x7e] and five known glyph records so a Stock run can be
- * compared nibble-for-nibble with the independently decoded rom.39g table.
+ * Capture Read[0x7e] plus the candidate bank-qualified flash pages so the
+ * live mapping can be compared nibble-for-nibble with decoded rom.39g.
  */
 static inline int hpclang_probe_raw_read(
     void *cpu, uint32_t address, uint8_t *buffer, int length)
@@ -54,15 +54,37 @@ static inline int hpclang_probe_saturn_nibble(
     return 1;
 }
 
+static inline int hpclang_probe_font_records(
+    void *cpu,
+    uint32_t page,
+    char records[5][12])
+{
+    static const char glyphs[5] = { 'P', 'A', 'S', '5', '1' };
+
+    for (size_t i = 0; i < 5u; ++i) {
+        uint32_t record = 0x07e695u + (uint32_t)(uint8_t)glyphs[i] * 11u;
+        for (uint32_t n = 0; n < 11u; ++n) {
+            uint8_t value;
+            if (!hpclang_probe_saturn_nibble(cpu, page, record + n, &value))
+                return 0;
+            records[i][n] = "0123456789abcdef"[value & 0x0fu];
+        }
+        records[i][11] = '\0';
+    }
+    return 1;
+}
+
 static inline void hpclang_probe_stock_hp39_font(void *cpu)
 {
     static int emitted;
-    static const char glyphs[] = { 'P', 'A', 'S', '5', '1' };
     const char *stock_mode;
     uint32_t model;
     uint32_t saturn_state;
     uint32_t read_7e;
-    char records[sizeof(glyphs)][12];
+    char visible[5][12];
+    char bank0[5][12];
+    char bank1[5][12];
+    char bank2[5][12];
 
     if (emitted)
         return;
@@ -77,30 +99,28 @@ static inline void hpclang_probe_stock_hp39_font(void *cpu)
         saturn_state == 0u ||
         !hpclang_probe_raw_read32(
             cpu, saturn_state + 0x7eu * 4u, &read_7e) ||
-        read_7e == 0u)
+        read_7e == 0u ||
+        !hpclang_probe_font_records(cpu, read_7e, visible) ||
+        !hpclang_probe_font_records(cpu, 0x0005f000u, bank0) ||
+        !hpclang_probe_font_records(cpu, 0x0007f000u, bank1) ||
+        !hpclang_probe_font_records(cpu, 0x0009f000u, bank2))
         return;
-
-    for (size_t i = 0; i < sizeof(glyphs); ++i) {
-        uint32_t record = 0x07e695u + (uint32_t)(uint8_t)glyphs[i] * 11u;
-        for (uint32_t n = 0; n < 11u; ++n) {
-            uint8_t value;
-            if (!hpclang_probe_saturn_nibble(
-                    cpu, read_7e, record + n, &value))
-                return;
-            records[i][n] = "0123456789abcdef"[value & 0x0fu];
-        }
-        records[i][11] = '\0';
-    }
 
     emitted = 1;
     fprintf(
         stderr,
         "HP39 FONT PROBE model=%u saturn_state=%08x Read[7e]=%08x "
-        "P=%s A=%s S=%s 5=%s 1=%s\n",
+        "visible[P,A,S,5,1]=%s,%s,%s,%s,%s "
+        "bank0=%s,%s,%s,%s,%s "
+        "bank1=%s,%s,%s,%s,%s "
+        "bank2=%s,%s,%s,%s,%s\n",
         model,
         saturn_state,
         read_7e,
-        records[0], records[1], records[2], records[3], records[4]);
+        visible[0], visible[1], visible[2], visible[3], visible[4],
+        bank0[0], bank0[1], bank0[2], bank0[3], bank0[4],
+        bank1[0], bank1[1], bank1[2], bank1[3], bank1[4],
+        bank2[0], bank2[1], bank2[2], bank2[3], bank2[4]);
 }
 
 static inline int hpclang_probe_cpu_memory_rw_debug(
