@@ -3,6 +3,19 @@
 
 #include <stdint.h>
 
+/*
+ * Mark a compile-time UI string for STATIC_AUTO font repertoire collection.
+ *
+ * This is deliberately an identity macro at runtime: marked text remains an
+ * ordinary narrow UTF-8 C/C++ string. The hpclang CMake extractor recognizes
+ * only explicit HPCLANG_UI_TEXT("...") calls; unrelated literals, diagnostics,
+ * paths, format strings and metadata do not silently grow a static font.
+ *
+ * The argument must consist of one or more adjacent narrow string literals.
+ * Dynamic/generated text belongs with STATIC_EXPLICIT or FULL selection.
+ */
+#define HPCLANG_UI_TEXT(text) text
+
 #ifdef __cplusplus
 extern "C" {
 #endif
