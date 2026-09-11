@@ -12,7 +12,7 @@ extern "C" {
 /*
  * Generated bitmap-font ABI.
  *
- * The canonical custom-font source is sdk/fonts/fonts.zip. Repository
+ * The canonical custom-font source is runtime/fonts/fonts.zip. Repository
  * maintenance tooling validates that archive and regenerates checked-in
  * linkable font assets when the source package changes. Normal application
  * builds consume those assets directly; they do not run Python or source-font
