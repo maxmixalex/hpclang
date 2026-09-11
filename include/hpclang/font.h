@@ -24,9 +24,14 @@ struct hpclang_surface;
 struct hpclang_font;
 
 /*
- * Calculator-native fonts. No glyph bitmap is embedded in the application:
- * the runtime reads the active stock-ROM font through the Saturn mapping that
- * the launcher already supplies in hpclang_boot_info.
+ * Calculator-native fonts. No calculator glyph bitmap is embedded in the
+ * application and hpclang does not redistribute stock-ROM font data.
+ *
+ * The platform lookup is intentionally private. HP39/40 native raster tables
+ * are fixed physical stock-flash assets and are read through the physical ARM
+ * flash view. HP48gII/49g+/50g native fonts are stock Saturn objects resolved
+ * through the launch-provided logical Read[] mapping. Both mechanisms expose
+ * the same borrowed hpclang_font interface to applications.
  *
  * default is the calculator's normal/main text font. mini and big expose the
  * two native text sizes used by the stock environments; on HP39-family
