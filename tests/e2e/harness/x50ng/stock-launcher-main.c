@@ -21,6 +21,7 @@
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
+#define RETURN_ON_US 200000LL
 #define RETURN_CAPTURE_US 800000LL
 
 enum stock_mode {
@@ -422,7 +423,7 @@ static void monitor(void *arg)
      * as Direct instead of declaring success at the PASS screen.
      */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
-        if (!tap(&on_down, &on_up, 0) ||
+        if (!tap(&on_down, &on_up, RETURN_ON_US) ||
             !later(finish_return, s, RETURN_CAPTURE_US)) {
             fail(s, "return-timer");
         }

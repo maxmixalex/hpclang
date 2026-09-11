@@ -196,10 +196,15 @@ static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
 
     if (pass) {
         text(surface, 99, 1, "PASS 51");
-    } else {
+    } else if (hpclang_keyboard_failed_scan != 0xffu) {
         text(surface, 99, 1, "FAIL");
-        if (hpclang_keyboard_failed_scan != 0xffu)
-            hex2(surface, 116, 1, hpclang_keyboard_failed_scan);
+        hex2(surface, 116, 1, hpclang_keyboard_failed_scan);
+    } else {
+        char progress[8];
+        (void)snprintf(
+            progress, sizeof(progress), "KEY %02u",
+            hpclang_keyboard_passed_count);
+        text(surface, 105, 1, progress);
     }
 
     for (int col = 0; col < 6; ++col)
@@ -797,6 +802,9 @@ static int keyboard_transition(uint32_t model)
     if (expected == NULL || count != 51u)
         return 0;
 
+    struct hpclang_surface *surface = hpclang_display_surface();
+    draw_keyboard_result(surface, 0);
+
     size_t index = 0u;
     int awaiting_up = 0;
     uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(12000000);
@@ -829,6 +837,7 @@ static int keyboard_transition(uint32_t model)
 
         hpclang_keyboard_passed_bits |= UINT64_C(1) << want->scan;
         ++hpclang_keyboard_passed_count;
+        draw_keyboard_result(surface, 0);
         awaiting_up = 0;
         ++index;
     }

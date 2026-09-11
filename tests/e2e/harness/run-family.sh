@@ -64,11 +64,18 @@ printf '%s\n' "${TARGETS[@]}" > "$TARGETS_FILE"
 printf 'E2E %s/%s targets: %s\n' "$MODE" "$FAMILY" "${TARGETS[*]}"
 
 declare -a PIDS=()
+declare -a KEYBOARD_FRAME_DIRS=()
 for target in "${TARGETS[@]}"; do
     if [[ "$MODE" == direct ]]; then
-        bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
+        frames="$ROOT/build/$target-keyboard-frames"
+        rm -rf "$frames"
+        mkdir -p "$frames"
+        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+            bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
+        KEYBOARD_FRAME_DIRS+=("$frames")
     else
         bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
+        KEYBOARD_FRAME_DIRS+=("")
     fi
     PIDS+=("$!")
 done
@@ -81,6 +88,20 @@ for i in "${!PIDS[@]}"; do
         rc=$?
         printf 'FAIL %s (exit %d)\n' "${TARGETS[$i]}" "$rc" >&2
         status=1
+    fi
+
+    frame_dir="${KEYBOARD_FRAME_DIRS[$i]}"
+    if [[ -n "$frame_dir" ]]; then
+        shopt -s nullglob
+        keyboard_frames=("$frame_dir"/*.pgm)
+        shopt -u nullglob
+        if (( ${#keyboard_frames[@]} )); then
+            merged="$ROOT/build/${TARGETS[$i]}-keyboard-progress.pgm"
+            python3 "$ROOT/tools/merge-pgm-grid.py" \
+                "$merged" "${keyboard_frames[@]}"
+            python3 "$ROOT/tools/pgm-to-png.py" "$merged" "$merged.png"
+        fi
+        rm -rf "$frame_dir"
     fi
 done
 exit "$status"
