@@ -5,14 +5,14 @@ This is the progress-oriented API reference for hpclang. It deliberately answers
 1. What can a native hpclang application call today?
 2. How much of the historical HPGCC application surface has an hpclang equivalent yet?
 
-The historical comparison is based on the complete HPGCC 1.0.3 beta, HPGCC 1.1 with 39g support, HPGCC 2.0 SP2, and HPGCC3 R004.revA distribution archives. Function counts below are de-duplicated public function names extracted from their installed/public headers. They are not a compatibility percentage: one filesystem or Saturn function is not equivalent in engineering cost to one drawing primitive.
+The historical comparison is based on the complete HPGCC 1.0.3 beta, HPGCC 1.1 with 39g support, HPGCC 2.0 SP2, and HPGCC3 R004.revA distribution archives. Function counts below are de-duplicated public function names extracted from their installed/public headers. They are not a compatibility percentage.
 
 ## Status legend
 
 | Mark | Meaning |
 | --- | --- |
-| ✅ | Native hpclang API exists and calculator-dependent behavior has passed the five-model Direct matrix. |
-| 🧪 | Implemented, but the new behavior is awaiting the next calculator matrix or has narrower validation. |
+| ✅ | Native hpclang API exists and its calculator-dependent behavior has the required current validation. |
+| 🧪 | Implemented, but the new behavior is awaiting a broader calculator gate or has narrower validation. |
 | ⛔ | Blocker: implementation exists, but a required asset/contract is not yet frozen for release. |
 | ◐ | A cleaner hpclang primitive covers part of the historical behavior; compatibility semantics are incomplete. |
 | ⬜ | Planned or not implemented. |
@@ -25,7 +25,7 @@ Source-compatibility wrappers are not counted as implemented merely because the 
 
 `<hpclang/bootstrap.h>` is a launcher/platform contract. Normal applications should not use its MMU layout or launch-context structures.
 
-The application-facing surface currently lives in:
+The application-facing surface currently includes:
 
 - `<hpclang/abi.h>`
 - `<hpclang/target.h>`
@@ -33,6 +33,8 @@ The application-facing surface currently lives in:
 - `<hpclang/time.h>` and `<hpclang/time.hpp>`
 - `<hpclang/keyboard.h>`
 - `<hpclang/display.h>` and `<hpclang/display.hpp>`
+- `<hpclang/font.h>`
+- `<hpclang/font-package.h>` for generated bitmap-font descriptors/build products
 
 ## Execution and device identity
 
@@ -63,8 +65,8 @@ The application-facing surface currently lives in:
 | `hpclang_keyboard_events_reset()` | ✅ | Establish current stable baseline without synthetic DOWN events. |
 | `hpclang_keyboard_events_set_timing()` | ✅ | Configure debounce and repeat timing. |
 | `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and physical key identity. |
-| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g. Common keys keep common enum values; layout-specific keys use model/family prefixes. HP49g+ CAT/EQW and HP50g EVAL/quote are represented separately because those two primary labels differ at the same physical positions. All 51 physical keys pass Direct E2E on all five automated models. HP39g+ remains UNKNOWN pending its real fixture. |
-| `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. Dedicated modifier state is exercised as part of the five-model 51-key Direct matrix. |
+| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39gs/40gs, HP48gII, HP49g+, and HP50g. All 51 positions pass Direct E2E on all five automated models. HP39g+ remains UNKNOWN pending its real fixture. |
+| `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
 
 ## Display and surfaces
@@ -74,78 +76,97 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | API | Status | Contract |
 | --- | --- | --- |
 | `hpclang_display_surface()` | ✅ | Borrow the physical display as an opaque surface. |
-| `hpclang_surface_width()` | ✅ | Visible surface width. |
-| `hpclang_surface_height()` | ✅ | Visible surface height. |
+| `hpclang_surface_width()` / `hpclang_surface_height()` | ✅ | Visible geometry. |
 | `hpclang_surface_levels()` | ✅ | Current physical surfaces report two levels. |
 | `hpclang_surface_clear()` | ✅ | Clear with explicit 0–255 intensity. |
-| `hpclang_surface_get_pixel()` | ✅ | Read one pixel; out-of-bounds reads white. Five-model Direct and full-stock matrices PASS. |
-| `hpclang_surface_set_pixel()` | ✅ | Clipped pixel write. |
-| `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line; extreme off-screen spans clip before rasterization. |
-| `hpclang_surface_draw_rect()` | ✅ | Outline rectangle with extent semantics and geometric clipping. Five-model Direct and full-stock matrices PASS. |
-| `hpclang_surface_draw_circle()` / `hpclang_surface_fill_circle()` | ✅ | Integer-radius circles clipped to visible rows/columns before rasterization; Core, five-model Direct, and full-stock matrices PASS. |
-| `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | ✅ | Explicit `hpclang_point` arrays; closed outline and even-odd fill with boundary inclusion. Core, five-model Direct, and full-stock matrices PASS. |
-| `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. Five-model Direct and full-stock matrices PASS. |
-| `hpclang_surface_fill_rect()` | ✅ | Clipped filled rectangle. |
-| `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Opaque heap-owned 2/4/16-level software surfaces; mono convenience retained. Packing stays private and cross-level blit uses the common intensity contract. Core, five-model Direct, and full-stock matrices PASS. |
-| `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper; owned-surface/blit calls are exercised from the five-model C++23 runtime probe. |
+| `hpclang_surface_get_pixel()` / `hpclang_surface_set_pixel()` | ✅ | Clipped pixel read/write. |
+| `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line. |
+| `hpclang_surface_draw_rect()` / `hpclang_surface_fill_rect()` | ✅ | Extent-based clipped rectangles. |
+| `hpclang_surface_draw_circle()` / `hpclang_surface_fill_circle()` | ✅ | Integer-radius clipped circles. |
+| `hpclang_surface_draw_polygon()` / `hpclang_surface_fill_polygon()` | ✅ | Explicit point arrays; closed outline and even-odd fill. |
+| `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. |
+| `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Opaque heap-owned 2/4/16-level software surfaces. Packing remains private. |
+| `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper. |
 
 ## Fonts and text
 
-The canonical layer is deliberately narrower than historical HPG:
+hpclang deliberately separates **calculator-native fonts** from **generated custom fonts**.
+
+### Calculator-native fonts
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_font_mini()` | ⛔ | API/metric stable (height 6, advance 4); current glyph table is provisional pending final font selection. |
-| `hpclang_font_big()` | ⛔ | API/metric stable (height 8, advance 6); current glyph table is provisional pending final font selection. |
-| `hpclang_font_height()` / `hpclang_font_advance()` | ✅ | Fixed metrics without exposing bitmap storage. |
-| `hpclang_surface_draw_char()` | ✅ | Foreground-only clipped glyph draw on an explicit surface and intensity. |
-| `hpclang_surface_draw_text()` | ✅ | Fixed advance; newline resets to the original x and moves by one font height. |
+| `hpclang_font_default()` | ✅ | Borrow the calculator's normal/main native font; currently the same native selection as `hpclang_font_big()`. |
+| `hpclang_font_mini()` | ✅ | Borrow the native compact font. HP39/40 uses its stock proportional small font; HP48/49/50 uses the stock 6-pixel minifont. |
+| `hpclang_font_big()` | ✅ | Borrow the native main/big font. HP39/40 uses the stock 5×8 main raster; HP48/49/50 uses the stock 8-pixel bigfont. |
+| `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage. |
+| `hpclang_font_advance()` | ✅ | Nominal/fixed advance. |
+| `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
 
-Bytes outside printable Basic Latin render as `?`. That is an intentional
-canonical v1 scope, not a claim that these built-ins reproduce HPG's historical
-256-entry calculator character set. HPG-specific glyph repertoire and custom
-font descriptors belong to the later compatibility layer unless an independent
-core use case requires them.
+No HP glyph bitmap is linked into the application. HP39/40 fixed native rasters are read from physical stock flash. HP48gII/49g+/50g native font objects are resolved through the live Saturn logical mapping supplied by the launcher. This platform distinction is runtime-private.
+
+HP39 mini is five bitmap rows with a per-glyph advance (nominal 4); ASCII lowercase follows the stock small-font case-folding behavior. HP39 main is the stock 5×8 raster with nominal advance 6. HP48/49/50 mini/big retain the historical 6/4 and 8/6 line-height/advance conventions.
+
+### Generated custom fonts
+
+`hpclang_target_font()` is a CMake build API over the checked-in generated catalog. It emits a `struct hpclang_font` descriptor backed by only the glyphs selected for that target.
+
+The three repertoire modes are implemented and Core-CI-gated:
+
+| Mode | Contract |
+| --- | --- |
+| `STATIC_AUTO` | Collect code points only from explicit `HPCLANG_UI_TEXT("...")` markers in the target's C/C++ sources. Ordinary literals/comments/metadata do not grow the font. |
+| `STATIC_EXPLICIT` | Retain caller-supplied `CODEPOINTS` plus the configured fallback. No source-text discovery. |
+| `FULL` | Retain the selected generated face's complete mapped repertoire. |
+
+Generated convenience aliases are currently `@mini = newrpl_6a`, `@normal = newrpl_8c`, and `@large = newrpl_10a`; arbitrary generated face IDs and arbitrary metrics remain valid. These aliases do **not** redefine the native `hpclang_font_mini()/big()` functions.
+
+`HPCLANG_UI_TEXT(text)` is an identity macro at runtime. It exists solely as explicit build metadata for `STATIC_AUTO`.
+
+### Text drawing
+
+| API | Status | Contract |
+| --- | --- | --- |
+| `hpclang_surface_draw_codepoint()` | ✅ | Draw one Unicode code point with native fallback or generated mapping. |
+| `hpclang_surface_draw_char()` | ✅ | Compatibility byte entry point; byte value maps directly to U+0000..U+00FF. |
+| `hpclang_surface_draw_utf8()` | ✅ | Decode UTF-8; invalid sequences become U+FFFD then the selected font's fallback if needed. |
+| `hpclang_surface_draw_text()` | ✅ | Canonical UTF-8 text API; same semantics as `draw_utf8()`. |
+
+The UI-role vocabulary `mini` / `text` / `edit-large` is a design/policy axis for the separate Font Gallery and later UI layer. Dedicated public semantic-role selectors are **not** claimed yet.
 
 ## Storage model
 
-hpclang distinguishes two storage semantics:
+hpclang distinguishes byte streams from typed calculator objects.
 
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
-| byte-stream files | HP49g+/HP50g Stock KOS SD read probe proven; full stdio candidate validating | private `open/close/read/write/lseek/unlink` backend feeds picolibc `fopen/fread/fwrite/fseek/remove`; no parallel hpclang stdio |
-| calculator object store | HP39gs/40gs stock format proven to contain directory, Zaplet/Aplet, Note, Program, Variable, List, Matrix, Library and related object types | typed/named object API; do not flatten into `FILE *` |
-| RPL/Saturn objects | HP48/49/50 historical platform capability | M7.3 typed object/stack bridge |
+| byte-stream files | ✅ HP49g+/HP50g | private KOS-backed `open/close/read/write/lseek/unlink` feeds picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` for unsupported stream operations |
+| calculator object store | HP39gs/40gs format/protocol known; API not implemented | typed/named object API; do not flatten into `FILE *` |
+| RPL/Saturn objects | HP48/49/50 historical platform capability; API not implemented | M7.3 typed object/stack bridge |
 
-The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the
-current directory. These names describe the stock object-store protocol, not a
-claim that HP39 exposes a general POSIX filesystem.
+The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current directory. These names describe the stock object-store protocol, not a general POSIX filesystem.
 
 ## Validation by service
 
-| Service | Host | ARMv4T link | Direct runtime | Full stock launch |
+| Service | Host | ARMv4T link | Direct runtime | Stock evidence |
 | --- | --- | --- | --- | --- |
-| HPC1/runtime | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
+| HPC1/runtime | ✅ | ✅ | 5/5 PASS | all five stock paths have PASS evidence; current HP39 family job has a harness/input flake |
 | device info | — | ✅ | 5/5 PASS | covered by common payload |
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
-| raw keyboard | — | ✅ | 5/5 transition PASS | not separately asserted |
-| keyboard events + key identity | ✅ | ✅ | 5/5 full 51-key DOWN/UP + scan + identity + modifier matrix PASS | not separately asserted |
-| display clear/set/line/fill | ✅ | ✅ | 5/5 PASS | visible payload |
-| owned 2/4/16-level surface + blit | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
-| font/text | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
-| display get-pixel/draw-rect | ✅ | ✅ | 5/5 PASS | 5/5 PASS |
-| C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same HPC1 payload builds |
-| hp4950 stream stdio | — | ✅ | non-stream families validate clean ENOSYS in the common Stock payload | 🧪 candidate validates read/create/truncate/write/flush/seek+ftell/reopen/remove+ENOENT on HP49g+/HP50g |
+| keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | HP39 current family run flaky after payload entry; not used to override Direct correctness |
+| display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
+| native font/text | ✅ | ✅ | 5/5 PASS | corrected HP39 physical reader has HP40gs Stock visual PASS; hp48/hp4950 Stock green |
+| generated font selection | ✅ configure | ✅ | `STATIC_AUTO` visible `FONT OK` validated | gallery-specific matrix pending separate app |
+| C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
+| hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
 HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
 
 ## Historical public-surface size
 
-The following is a mechanical unique-public-function-name view of the major calculator-facing headers.
-
 | Historical surface | 1.0.3 | 1.1 39G | 2.0 SP2 | HPGCC3 | hpclang today |
 | --- | ---: | ---: | ---: | ---: | --- |
-| HPG `hpgraphics.h` | 55 | 59 | 59 | 59 | core surface primitives in progress; no HPG adapter yet |
+| HPG `hpgraphics.h` | 55 | 59 | 59 | 59 | clean core geometry/surface/text exists; no HPG adapter yet |
 | keyboard `hpkeyb49.h` | 12 | 17 | 17 | — | raw + event core implemented |
 | HPGCC3 `keyb.h` | — | — | — | 8 functions plus queue/macros | event core implemented; queue policy not copied |
 | legacy `hpscreen.h` | 12 | 9 | 9 | — | migrate to opaque surface |
@@ -153,10 +174,10 @@ The following is a mechanical unique-public-function-name view of the major calc
 | system `hpsys.h` | 25 | 40 | 41 | — | monotonic time/device subset |
 | HPGCC3 `sys.h` | — | — | — | 61 | small generic subset only |
 | `hptime.h` | — | 3 | 3 | — | monotonic/chrono API instead |
-| `hpstdio.h` | 26 | 37 | 40 | — | formatting/libc works; hp4950 filesystem stdio candidate is validating |
-| HPGCC3 `stdio.h` | — | — | — | 40 | formatting/libc works; hp4950 filesystem stdio candidate is validating |
-| structured `fsystem.h` | — | — | 41 | 43 | not implemented |
-| KOS `kos.h` | 15 | 32 | 33 | 33 | no canonical raw-KOS surface |
+| `hpstdio.h` | 26 | 37 | 40 | — | libc formatting plus hp4950 standard `FILE *` storage complete |
+| HPGCC3 `stdio.h` | — | — | — | 40 | hp4950 standard `FILE *` storage complete |
+| structured `fsystem.h` | — | — | 41 | 43 | no `FS*` adapter yet |
+| KOS `kos.h` | 15 | 32 | 33 | 33 | raw KOS kept private |
 | Saturn `saturn.h` | — | 50 | 58 | replaced | not implemented |
 | Saturn directory `satdir.h` | — | 29 | 29 | replaced | not implemented |
 | conio | 27 | 27 | 26 | 49 in new `conio.h` | not implemented as a subsystem |
@@ -166,31 +187,23 @@ HPGCC 1.1/2.0 also contain a substantial win widget/event family with 74 stable 
 
 ## HPG graphics: detailed progress
 
-HPG is unusually stable. All 55 HPG 1.0.3 declarations survive exactly into 1.1, which adds only four functions; all 59 declarations are signature-stable from 1.1 to 2.0 and remain present in HPGCC3.
+HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1, which adds four functions, and all 59 1.1 declarations remain signature-stable in 2.0 and HPGCC3.
 
 | HPG group | Historical calls | hpclang status |
 | --- | --- | --- |
-| lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; an adapter can provide legacy setup semantics later. |
-| display mode | `hpg_set_mode_mono`, `hpg_set_mode_gray4`, `hpg_set_mode_gray16`, `hpg_flip` | ⬜ Physical grayscale/double buffering/page flip are explicitly deferred pending a resource broker for contiguous LCD DMA memory. |
-| geometry | `hpg_get_width`, `hpg_get_height` | ✅ `hpclang_surface_width/height`. |
-| indicators | `hpg_set_indicator` | ↪ Historical HPG writes x=131, y=0..5 outside the visible 131-pixel surface and assigns HP49-style annunciator meanings. Keep this model-capability/adapter work rather than widening the canonical surface. |
-| clipping state | `hpg_clip_reset`, `hpg_clip_set`, `hpg_clip` | ◐ Every primitive clips to surface bounds; mutable user clip rectangles are not implemented. |
-| clear | `hpg_clear_on`, `hpg_clear` | ✅ `hpclang_surface_clear`; default-screen/global-state variants belong in an adapter. |
-| pixel | `hpg_draw_pixel_on`, `hpg_draw_pixel`, `hpg_get_pixel` | ✅ Canonical read/write primitives are five-model validated; HPG wrappers remain absent. |
-| line | `hpg_draw_line_on`, `hpg_draw_line` | ✅ `hpclang_surface_draw_line`. |
-| rectangle | `hpg_draw_rect_on`, `hpg_draw_rect`, `hpg_fill_rect_on`, `hpg_fill_rect` | ✅ Canonical outline/fill primitives are five-model validated; HPG coordinate/state adapters remain absent. |
-| circle | `hpg_draw_circle_on`, `hpg_draw_circle`, `hpg_fill_circle_on`, `hpg_fill_circle` | ✅ Canonical clipped outline/fill circle primitives are merged and five-model validated; HPG context wrappers remain later work. |
-| polygon | `hpg_draw_polygon_on`, `hpg_draw_polygon`, `hpg_fill_polygon_on`, `hpg_fill_polygon` | ✅ Canonical point-array outline/fill primitives with even-odd fill are merged and five-model validated; HPG array/state adapters remain later work. |
-| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, font metrics, allocation/free | ⛔ Renderer and 6/4 + 8/6 metrics are stable, but final built-in glyph data is blocked pending an explicitly selected font source/provenance. Historical HPG font data is not under consideration as a hpclang built-in asset; it is relevant only to legacy API behavior. |
-| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface character/text drawing is merged and five-model Direct/Stock validated; HPG mutable-context wrappers remain later work. |
-| mutable style | color, mode, pattern and font getters/setters | ↪ Canonical primitives take explicit intensity. An HPG adapter can own legacy mutable state. |
-| PAINT/XOR composite mode | HPG context mode | ↪ Historical XOR is per-context mutable state. If a clean-core compositing primitive is later needed, it should be explicit per operation rather than hidden in the surface. |
-| patterns | `hpg_alloc_pattern`, `hpg_free_pattern` | ↪ Historical 8-bit repeating masks belong naturally to the HPG adapter unless a non-HPG use case appears. |
-| owned images | mono/gray image allocation/free | ◐ Generic 2/4/16-level software surfaces cover the clean-core ownership model; HPG constructors remain adapter work. |
-| blit | `hpg_blit` | ◐ Canonical blit is implemented; HPG state/argument adapter remains later work. |
-| XPM | mono/gray4/gray16 XPM loaders | ↪ Convenience importers should be built above owned surfaces/blit or in the HPG adapter, not baked into the framebuffer ABI. |
+| lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; adapter can supply legacy setup semantics. |
+| display mode | mono/gray4/gray16, `hpg_flip` | ⬜ Physical grayscale/page flip deferred pending contiguous LCD-DMA resource ownership. |
+| geometry | width/height, pixel, line, rect, circle, polygon | ✅ Canonical primitives implemented; legacy context/coordinate wrappers absent. |
+| indicators | `hpg_set_indicator` | ↪ Model-specific compatibility/capability concern, not part of the visible surface ABI. |
+| clipping state | `hpg_clip_*` | ◐ Surface-bound clipping exists; mutable user clip state remains adapter work. |
+| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, metrics, allocation/free | ◐ Native and generated hpclang font systems are implemented; HPG's exact bundled-font/custom-descriptor source semantics still need an adapter. |
+| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface UTF-8/codepoint drawing exists; mutable HPG context wrapper absent. |
+| mutable style / PAINT/XOR / patterns | HPG context state | ↪ Adapter state, not canonical surface state. |
+| owned images | mono/gray images | ◐ Generic 2/4/16-level software surfaces cover the clean ownership model. |
+| blit | `hpg_blit` | ◐ Canonical blit implemented; HPG argument/context adapter pending. |
+| XPM | mono/gray loaders | ↪ Convenience importer/adapter work. |
 
-The current canonical primitives now cover the clean implementation basis for most stateless HPG geometry, text, software-image, and blit operations. Zero HPG source-compatibility wrappers are claimed yet; mutable context state, physical display ownership, and convenience loaders remain separate compatibility work.
+Zero HPG source-compatibility wrappers are claimed merely because the clean primitives exist.
 
 ## Keyboard: detailed progress
 
@@ -201,69 +214,58 @@ HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented hel
 | raw physical matrix | `keyb_getmatrix`, `keyb_isKeyPressed` | ✅ Native raw snapshot and coordinate query. Historical logical matrix numbering is not reused. |
 | any key | `keyb_isAnyKeyPressed` | ✅ |
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
-| arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the five-model measured `hpclang_key` set. |
+| arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
 | blocking wait | `keyb_waitKeyPressed` | ◐ Can be built by polling event/time services; no canonical blocking helper yet. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ DOWN/UP/REPEAT plus measured physical key identity exist; historical key-plane/text translation does not. |
-| matrix keycode helpers | `keyb_isKeyPrM`, `keyb_isShiftKeyPrM` | ↪ Adapter concern above the measured hpclang raw/semantic layers. |
-| HPGCC3 async queue | KEYDN/PRESS/KEYUP message machinery | ◐ hpclang event semantics exist, but the stock backend is deliberately polled and does not copy HPGCC3 global queue/IRQ ownership. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Physical DOWN/UP/REPEAT exists; historical key-plane/text translation does not. |
+| HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 
 ## Time, system and machine control
 
-Historical `hpsys.h` mixes time, clock control, interrupt ownership, LCD state, address mapping, physical allocation, tones and error helpers. hpclang intentionally does not recreate that mixture as one header.
+Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address mapping, physical allocation, tones and error helpers. hpclang intentionally splits those concerns.
 
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
 | elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Monotonic microseconds + explicit delay; source adapter absent. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC`, `asctime` | ⬜ |
-| clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API; only a generic policy API if a real use case requires it. |
-| interrupt ownership | `sys_intOff/on` | ✕ routine application API; execution safety belongs below the service boundary. |
-| timer hardware setup | `sys_setupTimers`, `sys_restoreTimers`, PWM helpers | ✕/↪ backend detail unless a genuine low-level capability needs exposure. |
-| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ surface/display API; grayscale and buffering still pending. |
-| virtual/physical mapping | `sys_map_v2p`, `sys_map_p2v`, `sys_mem_classify` | ✕ canonical application API. |
-| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ canonical application API; specialized DMA support may justify a later low-level API. |
-| tone/beep | `sys_playTone*`, `kos_beep` | ⬜ audio service not started. |
-| fatal helpers | `sys_error`, `sys_chkptr` | ↪ normal C/C++ error/assertion policy. |
+| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | ⬜ |
+| clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API unless a real generic policy use case appears. |
+| interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
+| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Surface/display API; physical grayscale ownership pending. |
+| virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
+| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ canonical API; specialized DMA resource support may justify a later low-level service. |
+| tone/beep | `sys_playTone*`, `kos_beep` | ⬜ |
 
 ## Files, stdio and storage
 
-This is the largest practical SDK gap visible from the historical APIs.
+HPGCC's historical SD stdio was not universally available: the 1.1 Programming Guide documents the normal file path for HP49g+ rather than HP48gII/39g+.
 
-- HPGCC 1.x exposes file declarations through `hpstdio.h` and KOS helpers, but the HPGCC 1.1 Programming Guide explicitly documents its SD-card `fopen/fread/fwrite/...` path as HP49g+-only and warns not to use it on 48gII or 39g+.
-- HPGCC 2.0 adds the structured 41-function `fsystem.h`.
-- HPGCC3 retains those 41 declarations and adds `FSGetFileFromHandle` and `FSGetHandle`.
-
-hpclang already validates picolibc formatting, memory/string operations, heap allocation and `snprintf`. That does not mean calculator filesystem-backed `fopen/fread/fwrite` works.
+hpclang now provides standard C stream semantics on the platform that actually has a suitable stock byte-stream filesystem:
 
 | Capability | Status |
 | --- | --- |
 | libc formatting/string/memory | ✅ |
 | heap-backed libc/C++ containers | ✅ |
-| calculator file open/read/seek/close | ⬜ |
+| HP49g+/HP50g file open/read/write/seek/close | ✅ through picolibc |
+| create/truncate/append/remove/ENOENT | ✅ Stock E2E |
+| unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | directory iteration | ⬜ |
-| writable files/storage | ⬜ |
-| standard `FILE *` integration | ⬜ |
 | HPGCC2/3 `FS*` adapter | ⬜ |
-| KOS file API adapter | ⬜ |
+| public raw KOS file API | ✕; backend remains private |
 
-The intended direction is a small calculator storage service underneath picolibc where standard C semantics fit, with compatibility adapters above it rather than a parallel stdio universe. Platform backends must reflect real storage/host capabilities instead of treating the historical HP49g+ SD implementation as a universal calculator filesystem.
+HP39 typed Aplet/Note/Program/etc. storage is deliberately a different M7.3-style object service rather than synthetic POSIX files.
 
 ## Saturn/RPL and calculator objects
 
-This is the other large M7 gap.
+HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions. HPGCC 2.0 extends that surface; HPGCC3 replaces it with a larger `sat3_*` environment.
 
-HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions. HPGCC 2.0 extends the Saturn surface while retaining the directory surface. HPGCC3 replaces that primary interface with a much larger `sat3_*` environment.
-
-Current hpclang status: **not implemented**.
-
-The canonical design will not expose Saturn addresses as ordinary C pointers. It needs explicit address/object handles, copy/convert operations, documented ownership, stack access where the host provides it, and compatibility adapters for useful historical calls.
+Current canonical hpclang status: **not implemented**. The core will not expose Saturn addresses as ordinary C pointers; it needs explicit address/object handles, copy/convert operations, ownership rules, and stack access where supported.
 
 ## KOS, raw syscalls and widgets
 
-The raw nine-function `syscall.h` surface is declaration-stable across all four historical generations examined. That makes it useful evidence, but not a good canonical application API because it exposes stock-environment calling conventions directly.
+The raw nine-function `syscall.h` surface is declaration-stable across all four historical generations examined. It remains useful evidence but is not a good canonical application API because it exposes stock calling conventions directly.
 
-Status: no canonical raw-syscall API. Required host services should be wrapped behind typed hpclang services; compatibility wrappers can be considered in M8.
+Status: no canonical raw-syscall API. Required host services stay behind typed hpclang services; compatibility wrappers can be considered in M8.
 
-HPGCC 1.1/2.0 win widgets and HPGCC3 GUI are also not implemented. Graphics/input/time/storage should stabilize first; a higher-level widget layer should be driven by real applications rather than copied wholesale.
+HPGCC 1.1/2.0 win widgets and HPGCC3 GUI are also not implemented. Graphics/input/time/storage should stabilize first.
 
 ## Compatibility classes
 
@@ -278,25 +280,18 @@ Binary compatibility with old HPGCC executables is not a goal. HPGCC3 custom-ROM
 
 ## Near-term API order
 
-Based on historical stability, example usage and current implementation dependencies:
+Based on historical stability, current implementation, and remaining dependencies:
 
-1. ✅ close owned mono surfaces and blit through host, C++23 and five-model runtime gates;
-2. ✅ measure and expose model-neutral physical key identities across the three validated platform families;
-3. ⛔ freeze final mini/big glyph data and provenance; renderer/metrics are validated but font selection remains a blocker;
-4. establish calculator storage/file services and wire standard stdio where semantics fit;
-5. design Saturn/RPL object and stack handles;
-6. only then begin HPG/keyboard/stdio compatibility headers.
+1. ✅ owned 2/4/16-level surfaces, geometry and blit;
+2. ✅ five-model physical keyboard identity/event core;
+3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
+4. ✅ hp4950 standard-C stream storage through picolibc;
+5. 🔄 finish the separate Font Gallery and decide whether public semantic UI-role selectors are justified;
+6. design Saturn/RPL and HP39 typed-object handles;
+7. only then begin broad HPG/keyboard/object compatibility headers.
 
 This preserves the dependency direction: historical HPGCC APIs are implemented on top of a coherent hpclang core, not used to define that core.
 
-
 ### Keyboard action boundary
 
-The public keyboard service stops at physical key identity plus modifier state.
-Model/user-interface actions such as HP39 `Shift+VARS -> CHARS` are not folded
-back into `enum hpclang_key`. This follows the same separation used by modern
-input stacks: key/scancode and modifier state remain in the keyboard layer,
-while shortcut-to-command mappings belong to a higher application or
-compatibility layer. HPGCC source compatibility may reproduce its historical
-key-plane behavior in the compatibility adapter without changing the clean core
-ABI.
+The public keyboard service stops at physical key identity plus modifier state. Model/user-interface actions such as HP39 `Shift+VARS -> CHARS` are not folded back into `enum hpclang_key`. Shortcut-to-command mappings belong to a higher application or compatibility layer.
