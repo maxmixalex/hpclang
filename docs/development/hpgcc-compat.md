@@ -1,124 +1,23 @@
 # HPGCC compatibility inventory
 
-This page records the M7.0 source-compatibility inventory. It is intentionally
-separate from the hpclang core API design: historical names are inputs to the
-compatibility layer, not automatically names for the new core API.
-
-For the current implementation dashboard and application-facing signatures, see
-[API reference and HPGCC parity](api-reference.md).
+This page records the M7 source-compatibility inventory. Historical names are inputs to the compatibility layer, not automatically names for the hpclang core API. For current implementation status, see [API reference and HPGCC parity](api-reference.md).
 
 ## Sources and method
 
-The comparison now uses four complete historical distribution archives as
-the primary function-level evidence:
+Primary function-level evidence comes from complete historical distributions:
 
-- HPGCC 1.0.3 beta for Linux;
-- HPGCC 1.1 with 39g support for Windows;
-- HPGCC 2.0 SP2 for Linux;
+- HPGCC 1.0.3 beta;
+- HPGCC 1.1 with 39g support;
+- HPGCC 2.0 SP2;
 - HPGCC3 R004.revA.
 
-Their installed/public headers were parsed directly, and their source trees and
-examples were used to distinguish public declarations from internal helpers and
-to estimate which interfaces real historical applications actually used.
+Installed/public headers were mechanically inventoried, while source trees and examples were used to distinguish declarations from actual platform behavior. Older SourceForge tags remain useful cross-version evidence. HPGCC3 is a design/compatibility data point, not an hpclang ROMLIB ABI target.
 
-The older SourceForge tags `frozen_1.1_MMU_trunk` and
-`frozen_2.0_VC_release` remain useful provenance/cross-version evidence.
+Primary references include the SourceForge HP-GCC releases, hpcalc's HPGCC 2.0 SP2 archive, and HPGCC3 documentation.
 
-HPGCC3 is treated separately as both a compatibility data point and a design
-reference. Its ROMLIB/custom-ROM ABI is not an hpclang ABI target.
+## Public API stability
 
-Primary references:
-
-- SourceForge HP-GCC releases:
-  <https://sourceforge.net/projects/hpgcc/files/hpgcc/>
-- hpcalc HPGCC 2.0 SP2 archive:
-  <https://www.hpcalc.org/details/6384>
-- HPGCC3 filesystem documentation:
-  <https://hpgcc3.org/documentation/html/fsystem_8h.html>
-- HPGCC3 GGL documentation:
-  <https://hpgcc3.org/documentation/html/ggl_8h.html>
-- HPGCC3 Saturn documentation:
-  <https://hpgcc3.org/documentation/html/group__grconst.html>
-
-## HPGCC 1.0 baseline
-
-The official `hpgcc-1.0.3-beta-Linux.tar.bz2` distribution is now available
-as primary evidence and has been inspected directly. The bundled README still
-labels the package itself "Version 1.0", so this document uses the official
-distribution filename/release identity when referring to 1.0.3 rather than
-inferring a more specific internal version string.
-
-Unlike the earlier Doxygen mirror, the archive contains both installed public
-headers and the corresponding source tree. Its installed `include/` contains
-14 public headers:
-
-- `hpconio.h`
-- `hpctype.h`
-- `hpgcc49.h`
-- `hpgraphics.h`
-- `hpkeyb49.h`
-- `hpmath.h`
-- `hpscreen.h`
-- `hpstdio.h`
-- `hpstdlib.h`
-- `hpstring.h`
-- `hpsys.h`
-- `hptime.h`
-- `kos.h`
-- `syscall.h`
-
-The package also contains the full HPG, keyboard, system, stdio/file-support,
-CRT/MMU-loader, ARMToolbox, examples, and CVS-era source material. Its launcher
-documentation uses ARM Toolbox library 275 and `StrRUN`.
-
-This corrects one limitation of the previously used 2004 Doxygen mirror: that
-index omitted `hpgraphics.h`, but the official 1.0.3 distribution already
-ships HPG with 55 public drawing/surface/font functions.
-
-The exact 1.0.3 → 1.1 comparison shows that the major API maturation happened
-at this boundary rather than between 1.1 and 2.0:
-
-- HPG grows from 55 to 59 public functions while retaining all 55 existing
-  declarations exactly. 1.1 only adds `hpg_font_get_advance`,
-  `hpg_font_get_height`, `hpg_get_height`, and `hpg_get_width`.
-- Keyboard grows from 12 to 17 public functions. Eleven of the 12 old
-  declarations are exact; `keyb_getkey(int wait)` changes from `char` to
-  `int`, and its implementation gains richer modifier/debounce semantics.
-  1.1 also adds the matrix-oriented `keyb_getkeyM`, `keyb_getmatrix`,
-  `keyb_getnextkey`, `keyb_isKeyPrM`, and `keyb_isShiftKeyPrM`.
-- The legacy screen API retains 9 declarations exactly and drops the three
-  minifont helpers `getMFData`, `writeLetMF`, and `writeStringMF`.
-- KOS retains all 15 old declarations exactly while adding 17 file/directory,
-  tick, beep, and attribute helpers.
-- `syscall.h` remains 9 / 9 signature-identical.
-- The system, stdio, and string surfaces receive more substantial cleanup:
-  `hpsys.h` has 16 exact declarations among 22 common names,
-  `hpstdio.h` has 22 exact declarations among 25 common names, and
-  `hpstring.h` has 16 exact declarations among 27 common names. These changes
-  include return-type fixes, typedef normalization, and const/size cleanup,
-  plus a few genuine semantic changes such as `sys_bcd2str`.
-
-The official 1.0.3 public headers do not yet contain the later `ggl.h`,
-`saturn.h`, `satdir.h`, `decNumber`, `win*.h`, or structured
-`fsystem.h` families.
-
-### Compatibility consequence
-
-HPGCC 1.0.3 is no longer an uncertain mirror-derived baseline. It is a directly
-verified early SDK generation.
-
-For hpclang, the mature common HPGCC 1.1/2.0 surface remains the principal
-legacy compatibility target, but 1.0.3 changes two priorities:
-
-- broad HPG source compatibility can naturally cover the 1.0.3 HPG subset too;
-- keyboard/system compatibility must not assume that all 1.0-era signatures or
-  semantics are identical to the later stable 1.1/2.0 interface.
-
-## Exact public-signature stability
-
-The release archives show substantially stronger API continuity than a
-filename/source inventory alone suggests. After normalizing whitespace, the
-following common public function declarations are **signature-identical**:
+The historical releases are more source-stable than their runtime implementations suggest.
 
 | Public surface | Comparison | Exact common signatures |
 | --- | --- | ---: |
@@ -140,472 +39,189 @@ following common public function declarations are **signature-identical**:
 | `fsystem.h` | 2.0 → HPGCC3 | 41 / 41 |
 | `kos.h` | 2.0 → HPGCC3 | 33 / 33 |
 
-HPGCC3 adds only two public filesystem handle helpers beyond the HPGCC 2.0
-`fsystem.h` surface: `FSGetFileFromHandle` and `FSGetHandle`.
+HPGCC3 adds two public filesystem handle helpers beyond HPGCC 2.0: `FSGetFileFromHandle` and `FSGetHandle`.
 
-This changes the compatibility priority:
+Compatibility consequence:
 
-- HPG is a strong candidate for broad source compatibility, not merely a loose
-  migration shim. Its core 55-function surface is already exact in 1.0.3 and
-  survives unchanged into 1.1.
-- Standard I/O and the HPGCC2/3 filesystem surface are also unusually stable.
-- KOS retains its HPGCC2 public function surface into HPGCC3, although hpclang
-  should still avoid exposing raw OS-entry conventions as its canonical core.
-- Saturn/RPL is stable from 1.1 to 2.0, but HPGCC3 deliberately replaces that
-  interface with the much larger `sat3_*` API, so hpclang needs its own typed
-  object model plus adapters.
-- Keyboard is stable from 1.1 to 2.0 but is redesigned in HPGCC3 around raw
-  matrix state plus an asynchronous message queue. Several old convenience
-  calls become macros, and some signatures change.
+- HPG is a strong broad source-compatibility target;
+- standard C I/O should use standard C names rather than hpclang-specific duplicates;
+- raw KOS/Saturn/MMU behavior stays below cleaner hpclang services;
+- keyboard and HPG mutable-state semantics belong in adapters above the clean core.
 
-### Historical example usage
+## HPGCC 1.0.3 → 1.1
 
-The HPGCC 1.1 Programming Guide explicitly limits its documented SD-card `fopen/fread/fwrite/...` path to HP49g+ and warns against using those functions on 48gII or 39g+. Public declarations alone therefore do not establish cross-model filesystem semantics; hpclang storage compatibility must distinguish the historical API surface from the platform on which a historical implementation was actually supported.
+The official 1.0.3 distribution already ships HPG with 55 public functions. HPGCC 1.1 preserves all 55 declarations and adds only `hpg_font_get_advance`, `hpg_font_get_height`, `hpg_get_height`, and `hpg_get_width`.
 
-The bundled examples reinforce the same priorities. Mechanical call-site
-analysis found public hpclang-relevant API use in 38 HPGCC 1.1 example source
-files and 39 HPGCC 2.0 example source files.
+Keyboard grows from 12 to 17 public functions. Eleven old declarations remain exact; `keyb_getkey(int wait)` changes return type from `char` to `int`, and matrix helpers are added.
 
-Frequently used calculator-specific calls include:
+The legacy screen API drops the three older minifont helpers `getMFData`, `writeLetMF`, and `writeStringMF`. KOS expands significantly while retaining its prior common declarations.
 
-- HPG drawing: `hpg_fill_rect`, `hpg_set_color`, `hpg_draw_text`,
-  `hpg_clear`, `hpg_draw_line`, `hpg_flip`;
-- keyboard polling: `keyb_isAnyKeyPressed`, `keyb_waitKeyPressed`,
-  `keyb_isKeyPressed`, `keyb_isON`;
-- timing/power: `sys_waitRTCTicks`, `sys_RTC_seconds`,
-  `sys_slowOn`, `sys_slowOff`;
-- low-level graphics in performance-sensitive code: `ggl_bitblt`.
+This confirms that the principal HPG compatibility surface is already mature by 1.1, while keyboard/system compatibility needs more care around the 1.0 boundary.
 
-This supports implementing display, keyboard, and time before higher-level
-widget compatibility.
+## Historical example usage
 
-## Stability between HPGCC 1.1 and 2.0
+HPGCC 1.1/2.0 examples heavily use:
 
-A filename-level API implementation comparison gives the following picture.
-Private helpers beginning with an underscore are excluded.
+- HPG geometry/text: `hpg_fill_rect`, `hpg_set_color`, `hpg_draw_text`, `hpg_clear`, `hpg_draw_line`, `hpg_flip`;
+- keyboard polling: `keyb_isAnyKeyPressed`, `keyb_waitKeyPressed`, `keyb_isKeyPressed`, `keyb_isON`;
+- timing/power: `sys_waitRTCTicks`, `sys_RTC_seconds`, `sys_slowOn`, `sys_slowOff`;
+- low-level GGL in performance-sensitive code.
 
-| Area | HPGCC 1.1 | HPGCC 2.0 | Stable public implementation names |
-| --- | ---: | ---: | ---: |
-| HPG/GGL graphics | 106 | 105 | about 105 |
-| Keyboard | 18 | 18 | 18 |
-| Legacy screen | 15 | 15 | 15 |
-| System/time/libc support | 50 | 50 | 49 |
-| File I/O | 17 | 11 | 11 |
-| Saturn/object bridge | 71 | 73 | 70 |
-| KOS/stock OS helpers | 37 | 28 | 28 |
-| win widget/event library | 74 | 74 | 74 |
-
-This matters for hpclang: the user-facing portions of HPGCC 1.1 and 2.0 are
-mostly stable even though the calculator launch/runtime implementation changed
-substantially between those releases.
-
-The compatibility layer can therefore target a meaningful common HPGCC source
-surface instead of maintaining one wrapper set per historical release.
+The HPGCC 1.1 Programming Guide documents normal SD-card `fopen/fread/fwrite/...` use for HP49g+ and warns against treating HP48gII/39g+ as the same filesystem platform. Public declaration stability therefore does not imply universal platform semantics.
 
 ## Keyboard
 
-The following 18 implementation names are present in both 1.1 and 2.0:
+The 1.1/2.0 keyboard API is source-stable but mixes layers that hpclang separates:
 
-- `keyb_getkey`
-- `keyb_getkeyM`
-- `keyb_getmatrix`
-- `keyb_getnextkey`
-- `keyb_isAlpha`
-- `keyb_isAnyKeyPressed`
-- `keyb_isDown`
-- `keyb_isKeyPrM`
-- `keyb_isKeyPressed`
-- `keyb_isLS`
-- `keyb_isLeft`
-- `keyb_isON`
-- `keyb_isRS`
-- `keyb_isRight`
-- `keyb_isShiftKeyPrM`
-- `keyb_isUp`
-- `keyb_read_keymap`
-- `keyb_waitKeyPressed`
+1. raw physical matrix/state;
+2. translated key identity/events;
+3. blocking/repeat/text-plane policy.
 
-### Compatibility decision
+Compatibility decision: **Adapter**, with selected queries becoming effectively Direct.
 
-**Adapter**, with selected functions likely becoming effectively Direct.
+The hpclang core already supplies raw state, 51-key physical identity, DOWN/UP/REPEAT, and modifier state. Historical key-plane/text translation and blocking helpers remain adapter work.
 
-The hpclang core should distinguish:
-
-1. raw physical key state / matrix scanning;
-2. translated key events;
-3. blocking wait/repeat policy.
-
-Historical HPGCC mixes these layers. Compatibility wrappers can reproduce the
-common old calls, but the core API should not.
-
-Likely first compatibility targets after the core keyboard service exists:
-
-- `keyb_isKeyPressed`
-- `keyb_isAnyKeyPressed`
-- `keyb_getmatrix`
-- `keyb_getkey`
-- `keyb_waitKeyPressed`
+HPGCC3's asynchronous queue is useful comparative evidence but does not require hpclang's stock-hosted backend to install global keyboard IRQ ownership.
 
 ## Graphics: HPG and GGL
 
-HPG and GGL are the largest historical application-facing subsystem. The
-common 1.1/2.0 implementation set includes operations such as:
+HPG is the principal graphics compatibility target. Its 59 public function signatures are identical across HPGCC 1.1, 2.0 and HPGCC3.
 
-- initialization and mode selection:
-  `hpg_init`, `hpg_set_mode`, `hpg_set_mode_mono`,
-  `hpg_set_mode_gray4`, `hpg_set_mode_gray16`;
-- geometry:
-  `hpg_draw_pixel`, `hpg_draw_line`, `hpg_draw_rect`,
-  `hpg_fill_rect`, `hpg_draw_circle`, `hpg_fill_circle`,
-  `hpg_draw_polygon`, `hpg_fill_polygon`;
-- text/fonts:
-  `hpg_draw_text`, `hpg_draw_letter`, `hpg_set_font`,
-  `hpg_get_font`, `hpg_get_bigfont`, `hpg_get_minifont`;
-- surfaces/images:
-  `hpg_alloc_mono_image`, `hpg_alloc_gray4_image`,
-  `hpg_alloc_gray16_image`, `hpg_free_image`, `hpg_blit`;
-- clipping/state:
-  `hpg_clip`, `hpg_clip_set`, `hpg_clip_reset`,
-  `hpg_set_color`, `hpg_set_pattern`, `hpg_flip`;
-- low-level GGL:
-  `ggl_initscr`, `ggl_bitblt`, `ggl_hline`, `ggl_vline`,
-  `ggl_rect`, `ggl_scrollup`, `ggl_scrolldn`, and related operations.
+Compatibility decision:
 
-### Compatibility decision
+- **Broad source-compatible Adapter** for HPG after clean primitives are stable;
+- **Migration/adapter-later** for raw GGL and representation-specific screen helpers.
 
-**Broad source-compatible adapter** for HPG. **Migration/adapter-later** for
-raw GGL.
+The hpclang core already provides opaque physical/software surfaces, clipped pixel/line/rectangle/circle/polygon operations, cross-level blit, native/generated fonts, and UTF-8/codepoint text drawing. That is enough clean machinery for many HPG wrappers without reproducing `hpg_t` as the core state model.
 
-This is an explicit roadmap commitment: after the clean M7 display/text
-contracts are stable, M8 should ship a source-compatible `hpgraphics.h`
-adapter for the common 59-function HPG surface. HPG is therefore a supported
-porting target; it is not the canonical core API and does not imply binary
-compatibility with historical HPGCC runtimes.
+Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter. Physical gray4/gray16 and `hpg_flip` remain separately gated because they require contiguous LCD DMA memory and reliable stock-state restoration.
 
-The 59 public HPG function signatures are identical in HPGCC 1.1, 2.0, and
-HPGCC3. hpclang should therefore aim to provide the complete common
-`hpgraphics.h` source surface once the core display/surface implementation is
-mature, rather than selecting only a handful of legacy drawing calls.
+## Native calculator fonts: important platform split
 
-The new core should use an explicit surface/display model with queryable
-geometry and pixel capabilities. HPG compatibility wrappers can map common
-draw operations onto that model.
+This area needs careful terminology because historical HPG contains **two different notions of “font”**:
 
-GGL exposes assumptions and packed-pixel details that are valuable for fast
-legacy programs but should not define the cross-platform core. HPGCC3's own
-GGL documentation still exposes fixed LCD constants for its target environment,
-which reinforces that it is a target-specific graphics layer rather than a
-portable API contract.
+1. HPG's own bundled `hpg_get_minifont()` / `hpg_get_bigfont()` bitmap tables used by the HPG drawing library;
+2. calculator-native font helpers under `hplib/stdio`, which locate fonts owned by the stock calculator environment.
 
-### Implementation evidence and compatibility boundary
+The first is legacy HPG compatibility data. The second is the relevant evidence for hpclang's borrowed native-font implementation.
 
-A source audit of the mature HPG implementation confirms several contracts that
-matter to the adapter design:
+### HP48gII / HP49g+ / HP50g path
 
-- minifont is 6 pixels high with advance 4; bigfont is 8 pixels high with
-  advance 6;
-- both historical built-ins advertise 256 byte-indexed glyphs, while custom
-  fonts are descriptors over caller-owned `count * height` row bytes;
-- text is fixed advance and newline returns to the block's original x;
-- clipping is per graphics context: `hpg_clip_set` replaces the rectangle,
-  `hpg_clip` intersects it, and `hpg_clip_reset` restores the full surface;
-- the historical clip upper bound is consumed as exclusive by `_hpg_draw`;
-  `hpg_clip_set` and `hpg_clip_reset` establish that bound differently at
-  the surface edge, so source compatibility should preserve the old behavior
-  in adapter tests instead of promoting it into hpclang's canonical geometry;
-- mono/gray4/gray16 off-screen images use 1/2/4 bits per pixel respectively,
-  while `hpg_blit` permits differing source/destination depths;
-- circle drawing uses integer midpoint geometry and filled circles use
-  horizontal spans; polygon filling uses a scanline edge algorithm;
-- physical mode changes and `hpg_flip` manipulate LCD mode/buffer ownership,
-  including physical framebuffer allocation and LCD address registers.
-- the controller-side scan width is 160 pixels, so physical line storage is
-  20/40/80 bytes in mono/4-level/16-level mode even though HPG exposes a
-  131-pixel logical width;
-- historical physical buffers are 16-byte aligned and accepted only when their
-  virtual allocation maps to a physically continuous range; this is a DMA
-  requirement, not an `hpg_t` layout detail.
-- ARMToolbox's standard and HP48-specific system-memory extenders add pages
-  from one KOS allocation as consecutive 4 KiB MMU entries; this gives a
-  possible future DMA pool, but hpclang should request it only when physical
-  display ownership is needed rather than permanently shrinking every HPC1
-  heap.
+Historical HPGCC explicitly resolves calculator-native fonts through the logical Saturn address map:
 
-These facts do **not** imply that the clean core should reproduce `hpg_t`.
-Geometry and software surfaces can be implemented independently beneath an HPG
-adapter. Mutable color/font/pattern/clip state belongs naturally in that
-adapter. Physical grayscale/page-flip compatibility is conditional on a
-platform backend that can save and restore stock LCD state reliably.
+- `hplib/stdio/get_minifont.c` returns `sat_map_s2a(0x812c8)` and documents the stable minifont entry in RAM; it also carries the HP48gII compatibility note;
+- `hplib/stdio/get_bigfont.c` starts at `sat_map_s2a(0x84d82)` and skips the object/name header;
+- `hplib/saturn/sat_map_s2a.c` implements that conversion as `_saturn_cpu->Read[sat_addr >> 12] + (sat_addr & 0xfff)/2`.
 
-The font/text renderer and mini/big metrics are stable, but final built-in
-glyph data is an explicit blocker. HPG itself bundles exactly two standard
-256-entry fonts (`hpg_get_minifont` and `hpg_get_bigfont`) with 6/4 and
-8/6 height/advance metrics; that remains useful evidence for legacy HPG API
-semantics only. Those HPG tables are not under consideration as hpclang
-built-in assets. The current independently sourced public-domain tables remain
-provisional until an explicit final font source is selected and approved.
+So for this family, using the launch-preserved `SAT_CPU->Read[]` logical mapping is directly grounded in HPGCC source behavior.
 
-Historical PAINT/XOR and repeating pattern state are also adapter concerns.
-The old draw backends apply those policies through mutable `hpg_t` fields;
-they do not reveal an additional framebuffer capability that the canonical
-surface ABI must copy. XPM loaders are convenience importers over owned images,
-not a reason to expose historical image packing.
+### HP39/40 path
+
+HPGCC's HP39 support is not wired through those same native-font locator helpers. The HP39 Aplet/Library 275 support carries an HP39-specific ROM entry map; `SUPROM39.A` defines `Put3x5` at `#3F20A` and `Put5x7` at `#38C7E`, and the HP39 library code invokes those stock text routines.
+
+This is strong historical evidence that HP39's text environment is a separate stock-ROM path rather than merely “the 48/49/50 font helper with another model ID.”
+
+However, evidence must not be overstated: HPGCC does **not** provide the hpclang physical raster constants `0x07E695` and `0x07C651`. Those exact HP39 mini/main table bases, record layouts, and the need to bypass the live logical bank for fixed raster assets were established independently by stock-ROM reverse engineering and emulator pixel validation.
+
+Compatibility consequence:
+
+- the common hpclang font API correctly hides the family-specific lookup mechanism;
+- HP39 fixed native raster access may use physical flash while ordinary Saturn RAM/object access still uses `Read[]`;
+- HP48/49/50 native lookup should retain logical `Read[]` behavior;
+- neither physical ROM addresses nor `Read[]` pointers belong in the public font ABI;
+- historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
+
+## Font/text compatibility boundary
+
+Historical HPG fonts expose two standard 256-entry byte-indexed fonts plus caller-owned custom descriptors, fixed-advance text layout, and mutable font selection through `hpg_t`.
+
+hpclang's canonical font system is intentionally broader and cleaner:
+
+- calculator-native borrowed fonts;
+- generated custom fonts with arbitrary metrics and Unicode mappings;
+- `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL` link-time repertoire selection;
+- UTF-8/codepoint rendering;
+- no hidden mutable graphics context in the core.
+
+Compatibility decision: **Adapter**. HPG's exact byte-indexed/custom-descriptor behavior can be reproduced above hpclang surfaces/fonts without making it the canonical representation.
 
 ## Legacy screen API
 
-The 15 implementation names are unchanged between 1.1 and 2.0:
-
-- `LCDOff`, `LCDOn`
-- `clearScreen`
-- `drawBlockOR`, `drawBlockOR4bit`
-- `drawBlockXOR`, `drawBlockXOR4bitC`
-- `fillTiles`
-- `getBlock4bit`
-- `getLCDPointer`
-- `getMF`
-- `invertScreen`
-- `print`
-- `setDisplayPlane`
-- `testBlock4bitC`
-
-### Compatibility decision
-
-Mixed **Direct/Adapter/Migration**.
-
-Simple semantic operations such as `clearScreen` and `invertScreen` can be
-compatibility wrappers.
-
-Raw LCD pointer, memory-format, and display-plane functions must not define the
-core display ABI. They depend on physical framebuffer representation and may
-be Migration-only or exposed through explicitly unsafe/low-level platform
-interfaces where genuinely useful.
+Simple semantic operations such as clear/invert can be Direct/Adapter wrappers. Raw LCD pointers, packed sprite formats, display-plane selection, and direct memory-format assumptions are Migration/low-level concerns and must not define the opaque surface ABI.
 
 ## Time and system services
 
-The historical sys layer combines several different concerns:
+Historical `hpsys.h` mixes delays, timer setup, LCD hardware state, clock changes, interrupts/MMU/physical allocation, tones, and libc-like helpers.
 
-- delays and timers:
-  `sys_waitTicks`, `sys_waitRTCTicks`, `sys_RTC_seconds`,
-  `sys_delta_seconds`, `sys_setupTimers`, `sys_restoreTimers`,
-  `sys_setRTCTickPeriod`, `sys_updateTimer`;
-- LCD controller state:
-  `sys_lcdsave`, `sys_lcdrestore`, `sys_lcdsetmode`,
-  `sys_LCDSynch`, `sys_lcdgetheight`;
-- power/clock:
-  `sys_sleep`, `sys_slowOn`, `sys_slowOff`;
-- privileged/memory operations:
-  `sys_intOn`, `sys_intOff`, `sys_map`, `sys_phys_malloc`;
-- libc-like functions historically supplied by HPGCC itself:
-  `malloc`, `calloc`, `realloc`, `memcpy`, `qsort`, and others.
+Compatibility decision is split by responsibility:
 
-### Compatibility decision
-
-Split by responsibility.
-
-- Time/delay: **Adapter** to hpclang monotonic time and deadline APIs.
-- LCD mode/controller: **Migration**, except safe high-level behavior exposed
-  by the display API.
-- Interrupt/MMU/physical allocation: **Unsupported as normal application API**
-  or explicitly internal/unsafe.
-- Standard libc functions: **Direct through picolibc**, not hpclang wrappers.
-
-Do not reintroduce a parallel `hpclang_malloc`, `hpclang_memcpy`, or
-`hpclang_qsort` API.
+- time/delay: **Adapter** to unit-explicit monotonic time;
+- LCD mode/controller: **Migration**, except safe behavior exposed by display services;
+- interrupts/MMU/physical allocation: **Unsupported as routine application API** or internal/unsafe;
+- standard libc: **Direct through picolibc**, not duplicate hpclang wrappers;
+- tone/beep: future service if justified.
 
 ## File I/O and standard C I/O
 
-Both 1.1 and 2.0 provide the familiar implementation names:
+The stable historical standard-C names should remain standard C where semantics fit.
 
-- `fopen`
-- `fclose`
-- `fread`
-- `fwrite`
-- `fseek`
-- `feof`
-- `fgetc`
-- `fgets`
-- `fputc`
-- `fputs`
-- `fdelete`
+HP49g+/HP50g now use private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Stock E2E validates ordinary `FILE *` read, create/truncate, write/flush, seek/ftell, reopen, append/create, remove and `ENOENT` behavior.
 
-The extra 1.1 files are duplicated lower KOS wrappers rather than a separate
-user-facing stdio design.
+HP39/40 and HP48 return clean `ENOSYS` for unsupported byte-stream operations rather than pretending their calculator-object stores are SD files.
 
-### Compatibility decision
+`fdelete` is naturally an Adapter/Migration candidate to standard `remove()`.
 
-The standard C names are **Direct** on the byte-stream-storage platforms, once
-hpclang provides the underlying storage hooks required by picolibc. A Stock
-HP49g+/HP50g probe has already resolved KOS filesystem entries and
-successfully opened/read/closed a known SD file from HPC1.
+The HPGCC 2.0 / HPGCC3 `fsystem.h` surface remains a possible source adapter after directory/path/object semantics justify it; the historical `FS_FILE` representation should not become the hpclang core ABI.
 
-The `m7-storage-stdio` candidate now implements those hooks privately:
-`open/close/read/write/lseek/unlink` resolve the stock KOS filesystem table
-at runtime only on the hp4950 family. Picolibc remains the public stdio layer.
-The E2E consumer intentionally uses ordinary `FILE *` calls to validate that
-the compatibility route is real rather than a test-only KOS wrapper.
+## HP39 calculator objects
 
-HP39gs/40gs must be treated separately: they have a stock calculator object
-store with named Note/Program/Zaplet(Aplet)/Variable/List/Matrix/Library
-objects and `HP39DIR.000` / `HP39DIR.CUR` directory metadata. That is
-real storage, but it is **not** the HPGCC 49/50 SD stdio model and should not be
-masqueraded as a POSIX filesystem.
+HP39gs/40gs have real storage, but it is typed calculator-object storage: directory, Zaplet/Aplet, Note, Program, Variable, List, Matrix, Library and related records, with `HP39DIR.000` / `HP39DIR.CUR` metadata.
 
-The historical HP39 ROM entry map corroborates that distinction with native
-`DoGetObFrSto`, `DoSendObToSto`, `OpenIO` and `StdIOProc` symbols.
-They live on the Saturn/System-RPL side, so a future compatibility adapter
-should reach them through the typed object bridge rather than expose their ROM
-addresses or calling convention as hpclang ABI.
-
-`fdelete` is an **Adapter/Migration** candidate to standard `remove()`.
-
-The core storage service should expose calculator-specific volume/object-store
-facts needed to implement standard I/O rather than replace standard I/O.
-
-The HPGCC 2.0 and HPGCC3 `fsystem.h` surfaces are also much more stable than
-previously assumed: all 41 HPGCC 2.0 public function signatures are unchanged
-in HPGCC3, which adds only two handle helpers.
-
-The `FS_FILE` ABI still should not become hpclang's canonical storage ABI, but
-a source-compatible `FS*` adapter becomes a reasonable M7.2 goal after the
-core storage layer and standard C I/O backend exist.
+Historical HP39 ROM maps expose System-RPL-side operations such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc`. A future implementation should reach them through the typed Saturn/object bridge rather than publish ROM addresses or flatten objects into `FILE *`.
 
 ## Saturn / RPL object bridge
 
-The common 1.1/2.0 surface is broad. Representative groups include:
+The common 1.1/2.0 `sat_*` surface is broad: raw memory/object inspection, stack operations, push/pop conversions, directory/variable access, and temporary object construction.
 
-- raw object/memory:
-  `sat_peek`, `sat_poke`, `sat_skipob`, `sat_check_type`;
-- stack operations:
-  `sat_stack`, `sat_stack_drop`, `sat_stack_swap`,
-  `sat_stack_nip`, `sat_stack_list`;
-- push/pop conversions:
-  `sat_push_real`, `sat_pop_real`, `sat_push_string`,
-  `sat_pop_str`, `sat_push_zint_llong`, `sat_pop_zint_llong`;
-- object conversion:
-  `sat_real2double`, `sat_double2real`, `sat_decode_real`;
-- directories/variables:
-  `sat_dir_open`, `sat_dir_close`, `sat_dir_getobject`,
-  `sat_dir_rclobject`, `sat_dir_chdir`, `sat_dir_getcwd`;
-- object construction:
-  `sat_createtemp`, `sat_push_bint`, `sat_push_char`,
-  `sat_push_comp`.
-
-2.0 adds a few helpers such as `sat_memmove`,
-`sat_shrinklastob`, and `sat_stack_pop_stdargs`; 1.1 contains
-`sat_moveup` instead.
-
-### Compatibility decision
-
-**Adapter**, deferred until the object-lifetime model is designed.
-
-This subsystem is too important to model as raw pointers. The hpclang core
-should use explicit Saturn address/object types or opaque handles, with clear
-copy/borrow/ownership semantics.
-
-Compatibility wrappers can later map the stable and widely used `sat_*`
-operations onto that core.
-
-HPGCC3's Saturn API is particularly useful as a design reference because it
-introduces an explicit `SAT_OBJECT` type and allocation/object descriptors
-rather than treating every calculator object as an ordinary C pointer.
+Compatibility decision: **Adapter**, deferred until the canonical ownership/lifetime model exists. The core should use explicit Saturn address/object types or opaque handles. HPGCC3's `SAT_OBJECT` direction is useful design evidence but not an ABI target.
 
 ## KOS and direct stock-OS calls
 
-The common KOS implementation includes disk enumeration, RTC access, LCD
-contrast, serial number, reset/beep, and direct stock-OS file/directory
-operations.
-
-### Compatibility decision
-
-Mostly **Migration/Internal**.
-
-The new core should expose portable capabilities such as time, storage,
-display state, and device information. It should not make historical KOS
-entry numbers or raw stock-OS call conventions part of the hpclang public ABI.
-
-A low-level stock-OS escape hatch can be considered later if real software
-requires operations that cannot be represented cleanly.
+Raw KOS entry numbers and calling conventions remain **Migration/Internal**. Portable device/time/storage/display services should hide them. A low-level escape hatch may be considered only for real use cases that cannot be represented cleanly.
 
 ## win widget/event library
 
-The 74 implementation names are stable between 1.1 and 2.0. The library
-contains:
+The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if real ports justify it**. Recreating historical widgets before stable display/input/time/object services would invert the dependency order.
 
-- widgets and widget geometry/state;
-- boxes/layout;
-- text;
-- images;
-- progress controls;
-- checkboxes;
-- choice controls;
-- soft menus;
-- event registration/posting;
-- focus traversal;
-- timer events;
-- repaint/event loop management.
+## Compatibility matrix
 
-### Compatibility decision
-
-**Migration initially; compatibility layer later if justified by real ports.**
-
-Reimplementing the historical widget library before the display, keyboard, and
-time primitives exist would invert the dependency order.
-
-M7 should first establish the lower service layer. A later UI toolkit may
-either provide win compatibility or offer a smaller modern API with adapters
-for common historical widgets.
-
-## HPGCC3 design input
-
-HPGCC3 is not a compatibility baseline, but three design choices are useful:
-
-1. **Filesystem:** explicit file objects, volumes, directories, attributes,
-   path rules, and error codes.
-2. **Graphics:** surfaces and explicit drawing targets are preferable to
-   assuming every draw call targets one global LCD pointer.
-3. **Saturn objects:** an explicit object descriptor type is safer than
-   exposing Saturn addresses as ordinary application pointers.
-
-These ideas can inform hpclang while avoiding HPGCC3's ROMLIB/custom-ROM ABI.
-
-## Initial compatibility matrix
-
-| Historical area | Core hpclang direction | Compatibility class | M7 priority |
+| Historical area | Core hpclang direction | Compatibility class | Priority |
 | --- | --- | --- | --- |
-| standard libc/string/math | picolibc/libm | Direct | already/core |
-| keyboard `keyb_*` | raw state + event service | Adapter | **M7.1** |
-| HPG graphics `hpg_*` | display/surface service | Adapter | **M7.1** |
-| legacy screen helpers | display service | mixed | M7.1/later |
-| time `sys_*Ticks*` | monotonic time/deadlines | Adapter | **M7.1** |
-| stdio file functions | picolibc backed by storage service | Direct | M7.2 |
-| HPGCC3 `FS*` | design reference only | Migration | M7.2 |
-| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3 |
+| standard libc/string/math | picolibc/libm | Direct | implemented/core |
+| keyboard `keyb_*` | raw state + event service | Adapter | M7/M8 |
+| HPG graphics `hpg_*` | display/surface/font service | Adapter | M8 |
+| legacy screen helpers | display service | mixed | M8/later |
+| time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
+| standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
+| HPGCC2/3 `FS*` | future adapter above storage/object services | Migration/Adapter | later |
+| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3/M8 |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
-| `win*` widgets | future UI toolkit | Migration, adapter later | M7.4 |
+| `win*` widgets | future UI toolkit | Migration, adapter later | later |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
 
-## M7.1 design consequence
+## Design consequence
 
-The first vertical slice remains:
+Historical source compatibility remains important, but it must sit on the clean dependency stack already established:
 
 ```text
-capabilities
-+ monotonic time
-+ keyboard
-+ display/surface
+device + time
+keyboard/events
+display/surfaces
+native/generated fonts + text
+standard stream I/O where real byte-stream storage exists
+calculator-object/Saturn bridge
+--------------------------------
+HPGCC compatibility adapters
 ```
 
-but this inventory narrows the design target:
-
-- keyboard must be able to support the five most common `keyb_*` wrappers
-  without forcing their semantics into the core;
-- display must support HPG-style pixel/line/rect/text compatibility without
-  fixing the core to one framebuffer format;
-- time must be monotonic and unit-explicit while allowing historical
-  tick-based wrappers to be implemented;
-- capability queries must expose real geometry/model differences required by
-  those services.
-
-M7.1 public names are frozen service-by-service only after those semantics are
-specified in the SDK design document. Device information and monotonic time now
-meet that bar; keyboard and display/surface are the next services to define.
+In particular, the verified HP39-vs-HP48/49/50 native-font difference belongs below the public font interface and should never leak into source-compatible application code.
