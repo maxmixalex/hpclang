@@ -98,6 +98,8 @@ hpclang_armtoolbox_stage0:
 /*
  * Publish the L1[0x90] install/remove. This is deliberately local to the
  * position-independent stage0; the normal common bootstrap uses sync.S.
+ * Restore the stock SWI vector inside the supervisor handler, before
+ * exception-return can expose a temporary vector to a pending interrupt.
  */
 .type .Lpublish_stage_map,%function
 .Lpublish_stage_map:
@@ -106,11 +108,11 @@ hpclang_armtoolbox_stage0:
     adr     r3, .Lstage_map_supervisor
     swp     r4, r3, [r2]
     swi     0
-    str     r4, [r2]
     ldmfd   sp!, {r0-r4, pc}
 
 .align 2
 .Lstage_map_supervisor:
+    str     r4, [r2]
     stmfd   sp!, {r0, lr}
     ldr     r0, =STAGE_L1_SLOT
     bic     r0, r0, #31
@@ -137,12 +139,12 @@ hpclang_armtoolbox_stage0:
     adr     r1, .Lstage_code_supervisor
     swp     r4, r1, [r2]
     swi     0
-    str     r4, [r2]
 
     ldmfd   sp!, {r0-r5, pc}
 
 .align 2
 .Lstage_code_supervisor:
+    str     r4, [r2]
     stmfd   sp!, {r0-r2, lr}
 4:
     cmp     r0, r3
