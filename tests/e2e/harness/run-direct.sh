@@ -15,6 +15,14 @@ while IFS= read -r line; do
     export "$line"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
+export HPCLANG_X50NG_HARNESS=direct
+if [[ "$HPCLANG_E2E_FAMILY" == hp48 ]]; then
+    export HPCLANG_X50NG_SRAM_SIZE=0x00040000
+else
+    export HPCLANG_X50NG_SRAM_SIZE=0x00080000
+fi
+unset HPCLANG_X50NG_UART0 || true
+
 X50="$ROOT/build/x50ng/dist/x50ng"
 STATE="$ROOT/build/$TARGET-state"
 rm -rf "$STATE"
