@@ -104,8 +104,9 @@ static uintptr_t saturn_page_base(uint32_t saturn_nibble_address)
         return 0u;
 
     /* HPGCC's SAT_CPU starts with Read[257]. The launch ABI deliberately
-     * preserves that Saturn-state pointer, so native assets can be read
-     * without copying ROM font data into hpclang. */
+     * preserves that Saturn-state pointer for logical Saturn RAM/object
+     * access. Fixed HP39 ROM raster assets intentionally do not use this
+     * live bank view; see hp39_physical_nibble(). */
     const uint32_t *read_map =
         (const uint32_t *)(uintptr_t)boot->saturn_state;
     return (uintptr_t)read_map[saturn_nibble_address >> 12];
@@ -130,6 +131,31 @@ static uint8_t saturn_byte(uint32_t address)
                      (uint8_t)(saturn_nibble(address + 1u) << 4));
 }
 
+static uint8_t hp39_physical_nibble(uint32_t address)
+{
+    /*
+     * HP39/40's stock mini/main raster tables are identified by physical
+     * Saturn ROM nibble addresses. The ARM view exposes that flash from
+     * physical/virtual address zero, packed two Saturn nibbles per byte.
+     *
+     * Do not resolve these through SAT_CPU->Read[]: that table represents the
+     * currently selected logical Saturn bank. HP39gs 2.22 was observed with
+     * Read[0x7e] -> 0x0009f000 while the fixed mini-font raster at 0x07e695
+     * physically lives at ARM byte address 0x0003f34a.
+     */
+    const volatile uint8_t *p =
+        (const volatile uint8_t *)(uintptr_t)(address >> 1);
+    uint8_t value = *p;
+    return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
+                                  (uint8_t)(value & 0x0fu);
+}
+
+static uint8_t hp39_physical_byte(uint32_t address)
+{
+    return (uint8_t)(hp39_physical_nibble(address) |
+                     (uint8_t)(hp39_physical_nibble(address + 1u) << 4));
+}
+
 static uint32_t native_byte_codepoint(uint32_t codepoint)
 {
     return codepoint <= 0xffu ? codepoint : (uint32_t)'?';
@@ -147,10 +173,10 @@ static uint32_t hp39_mini_codepoint(uint32_t codepoint)
 
 static uint32_t hp39_mini_advance(uint32_t codepoint)
 {
-    /* Corrected reverse-engineering checkpoint: 0x07E695 is the start of
-     * 256 records, each 1 advance nibble + 10 bitmap nibbles. */
+    /* 0x07E695 is the physical Saturn-ROM start of 256 records, each
+     * 1 advance nibble + 10 bitmap nibbles. */
     uint32_t index = hp39_mini_codepoint(codepoint);
-    uint32_t advance = saturn_nibble(0x07e695u + index * 11u);
+    uint32_t advance = hp39_physical_nibble(0x07e695u + index * 11u);
     return advance != 0u ? advance : 4u;
 }
 
@@ -219,7 +245,7 @@ static void draw_hp39_mini(
     uint32_t index = hp39_mini_codepoint(codepoint);
     uint32_t record = 0x07e695u + index * 11u;
     for (uint32_t yy = 0u; yy < 5u; ++yy) {
-        uint8_t row = saturn_byte(record + 1u + yy * 2u);
+        uint8_t row = hp39_physical_byte(record + 1u + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
                 hpclang_surface_set_pixel(
@@ -238,7 +264,7 @@ static void draw_hp39_main(
     uint32_t index = native_byte_codepoint(codepoint);
     uint32_t record = 0x07c651u + index * 16u;
     for (uint32_t yy = 0u; yy < 8u; ++yy) {
-        uint8_t row = saturn_byte(record + yy * 2u);
+        uint8_t row = hp39_physical_byte(record + yy * 2u);
         for (uint32_t xx = 0u; xx < 5u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
                 hpclang_surface_set_pixel(
