@@ -1,5 +1,5 @@
 {
-  "heading": "${TARGET} direct hpclang runtime",
+  "heading": "${TARGET} hpclang runtime",
   "required_files": [
     "build/${TARGET}-e2e.json",
     "build/${TARGET}-before.pgm",

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# != 2 ]]; then
-    echo "usage: $0 <target> <direct-build-dir>" >&2
+    echo "usage: $0 <target> <runtime-build-dir>" >&2
     exit 2
 fi
 
@@ -90,4 +90,4 @@ for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
 done
 
-python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/direct.json"
+python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
-    echo "usage: $0 <target> <stock-build-dir> <assets-dir>" >&2
+    echo "usage: $0 <target> <runtime-build-dir> <assets-dir>" >&2
     exit 2
 fi
 
@@ -42,6 +42,10 @@ cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
 printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
 printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
+export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
+export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
+export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
+export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
@@ -51,9 +55,10 @@ export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
 timeout 45s "$ROOT/build/x50ng/dist/x50ng" \
     "${COMMON_ARGS[@]}"
 
-for pgm in "$ROOT"/build/"$TARGET"-install-*.pgm "$ROOT"/build/"$TARGET"-run-*.pgm; do
+for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue
     python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
 done
 
+python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/stock-hp4950.json"
