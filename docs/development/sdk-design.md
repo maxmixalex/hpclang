@@ -1,9 +1,6 @@
 # SDK API design
 
-M7 adds the application-facing calculator services that turn the validated HPC1
-execution environment into a practical SDK.
-
-This document records design constraints before public service names are frozen.
+M7 adds the application-facing calculator services that turn the validated HPC1 execution environment into a practical SDK. This document records durable design constraints; implementation status belongs primarily in [API reference](api-reference.md), [roadmap](roadmap.md), and [validation](validation.md).
 
 ## Goals
 
@@ -19,14 +16,7 @@ The application API should:
 
 ## Non-goals
 
-The core API is not required to be:
-
-- binary-compatible with HPGCC 1.x/2.x executables;
-- source-identical to every historical HPGCC header;
-- ABI-compatible with HPGCC3 ROMLIB;
-- dependent on a replacement calculator ROM;
-- POSIX-complete;
-- object-oriented internally.
+The core API is not required to be binary-compatible with HPGCC executables, source-identical to every historical header, ABI-compatible with HPGCC3 ROMLIB, dependent on a replacement calculator ROM, POSIX-complete, or object-oriented internally.
 
 Compatibility is primarily a **source-porting** concern.
 
@@ -34,525 +24,160 @@ Compatibility is primarily a **source-porting** concern.
 
 ### 1. Stable C service ABI
 
-The platform/runtime boundary and the canonical public service implementation use
-a C ABI.
-
-This layer owns primitive values, explicit buffers, opaque handles, fixed-width
-integers, and stable structs whose layout is intentionally controlled.
-
-C++ standard-library types must never cross this boundary.
-
-Reasons include:
-
-- C is usable by C++, Rust, and other future front ends;
-- it avoids coupling the SDK ABI to a particular libc++ revision;
-- Arm Toolchain for Embedded uses libc++'s unstable ABI configuration;
-- calculator-side services often map naturally to explicit low-level operations.
+The platform/runtime boundary and canonical public services use a C ABI. This layer owns primitive values, explicit buffers, opaque handles, fixed-width integers, and intentionally controlled structs. C++ standard-library types never cross this boundary.
 
 ### 2. Modern C++ wrappers
 
-`hpclang/*.hpp` may provide zero-cost or low-cost wrappers around the C layer:
-
-- RAII ownership for resources that need release;
-- scoped state restoration;
-- `std::span` views over buffers;
-- strongly typed coordinates, durations, and flags where useful;
-- iterators/ranges where they do not add hidden allocation;
-- overloads accepting `std::string_view` without storing libc++ objects in the
-  platform ABI.
-
-The C++ layer is a convenience surface, not a second platform implementation.
+`hpclang/*.hpp` may provide zero-cost or low-cost wrappers around the C layer: RAII, `std::span`, strongly typed coordinates/durations, and `std::string_view` inputs where no C++ object becomes part of the platform ABI.
 
 ### 3. HPGCC source-compatibility layer
 
-A separate compatibility surface should forward historical source patterns to
-the new core API.
-
-Compatibility headers must not become the canonical implementation API.
-
-Each historical interface should be classified as one of:
-
-| Class | Meaning |
-| --- | --- |
-| Direct | Same source-level behavior can be provided safely and cheaply. |
-| Adapter | A wrapper can preserve common source usage but semantics or types need translation. |
-| Migration | No compatibility wrapper; document the hpclang replacement. |
-| Unsupported | The historical behavior conflicts with hpclang architecture or cannot be provided reliably. |
-
-Binary compatibility with old HPGCC executables is not a goal.
-
-## Historical API inventory
-
-The official HPGCC 1.1/2.0 source trees contain public functionality in areas
-including:
-
-- screen/graphics;
-- keyboard;
-- file I/O;
-- Saturn memory and stack integration;
-- calculator OS/KOS calls;
-- system services;
-- stdio helpers;
-- strings/math helpers;
-- higher-level window/widgets in the HPGCC library tree.
-
-HPGCC 2.0 is not a strict superset of 1.1. In particular, the HP39 and HP48
-platform-specific paths present in 1.1 are not simply preserved as active 2.0
-targets.
-
-HPGCC3 must be inventoried separately. It uses a revisioned library environment
-and includes more structured subsystems such as its filesystem. Its API may
-provide useful design ideas, but its ROMLIB ABI is not the hpclang ABI.
-
-M7.0 now mechanically inventories the public headers from complete HPGCC
-1.0.3, 1.1, 2.0 SP2, and HPGCC3 distribution archives. The resulting
-function-level compatibility matrix is recorded in
-[HPGCC compatibility inventory](hpgcc-compat.md).
+Historical names are implemented above the clean core, never the other way around. Each historical interface is classified as Direct, Adapter, Migration, or Unsupported. Binary compatibility is not a goal.
 
 ## Execution environment and hardware ownership
 
 hpclang separates **service semantics** from **hardware ownership policy**.
 
-The currently validated calculator path is stock-hosted: the HP operating
-system launches HPC1 code and expects control back afterwards. In that
-environment, platform code should borrow hardware state where practical,
-avoid unconditionally replacing stock IRQ/timer configuration, and restore any
-temporary state it changes. This reduces ROM-version coupling and makes clean
-return a meaningful contract.
+The validated stock-hosted environment borrows the HP OS and must return control afterwards. Platform code should therefore preserve IRQ/timer/clock/display state where practical and restore temporary changes. A future hpclang-controlled bootloader or OS may legitimately own those peripherals while exposing the same application-facing services.
 
-That rule must not be generalized into "hpclang never owns interrupts or
-timers". A hpclang-controlled bootloader or operating system has a different
-contract: it is responsible for initializing and owning the interrupt
-controller, clocks, timers, display, keyboard interrupts, DMA, and other
-hardware needed by the system.
+Do not freeze a public execution-environment enum until code genuinely needs one. Do not make downstream firmware, operating systems, or applications named hpclang targets or dependencies.
 
-The public service layer should therefore remain usable in both environments.
-For example, keyboard events can be produced by synchronous GPIO polling in a
-stock-hosted backend and by an IRQ-fed queue in a bare-metal backend without
-changing the application-facing event representation. Likewise, monotonic time
-can observe a host-configured timer in a borrowed environment and use an
-environment-owned timer in a freestanding implementation.
-
-Do not freeze a public execution-environment enum until code genuinely needs
-one. For now this is an implementation/ownership boundary, not another target
-axis in the application ABI.
-
-Do not make downstream firmware, operating systems, or applications named
-dependencies of hpclang. They are consumers of the compiler/SDK contract, not
-inputs to it. A downstream project may motivate a generic capability, but it
-must not create a project-specific target, backend name, ABI branch, or public
-API in hpclang.
-
-Public API and compatibility decisions are grounded in the supported calculator
-hardware, validated stock behavior, the hpclang ABI, and the historical HPGCC
-interfaces being replaced or adapted. Downstream projects may be useful
-comparative evidence, but they do not define hpclang architecture.
-
-## Core API design rules
+## Core API rules
 
 ### Ownership and allocation
 
-Low-level calls should not allocate unless allocation is the purpose of the
-operation.
-
-Functions that write data should normally accept caller-provided buffers or
-return explicit opaque owned objects.
-
-Any returned ownership must have an obvious matching release operation.
+Low-level calls should not allocate unless allocation is the operation. Writing functions normally accept caller-provided buffers or explicit owned handles. Every owned resource needs an obvious release path.
 
 ### Errors
 
-Do not use global implicit error state as the primary hpclang interface.
-
-The C core should use explicit status values and output parameters where an
-operation can fail for ordinary reasons. Compatibility wrappers may translate
-those results into historical conventions.
+The C core should use explicit status values/output parameters for normal failure. Historical wrappers may translate those results into legacy conventions.
 
 ### Coordinates and display geometry
 
-Do not hard-code 131×64 or 131×80 assumptions into common API contracts.
+Do not hard-code 131×64 or 131×80 into common contracts. The physical display is a borrowed opaque surface with queryable geometry and intensity capability. Framebuffer address, stride, and bit packing remain private.
 
-Display size and pixel/plane capabilities should be queryable. Coordinates
-should have one documented origin and clipping rule across platforms.
+Drawing primitives take explicit intensity rather than a hidden mutable global graphics context. Historical HPG's `hpg_t` color/mode/font/pattern/clip state belongs in the compatibility adapter unless a non-HPG application demonstrates a clean-core need.
 
-The first display abstraction is an opaque **surface**. The physical display is
-a borrowed surface whose framebuffer address, stride, and bit packing remain
-runtime-private. Applications can query geometry and color-level capability,
-then use clipped clear/pixel/line/fill-rectangle primitives.
+Owned 2/4/16-level software surfaces and representation-independent blit are supported without exposing packing.
 
-Drawing primitives currently take their intensity explicitly instead of
-introducing a mutable core drawing-context object. Intensity uses 0 for white
-and 255 for black; the current two-level physical surface thresholds
-intermediate values internally. This also lines up cleanly with HPG's historic
-256-value virtual color convention in monochrome mode without exposing HPG's
-object layout.
+### Physical grayscale and page flipping
 
-Historical HPG stores the pixel target, clip, color, PAINT/XOR mode, font, and
-fill pattern together in `hpg_t`. The compatibility adapter can retain that
-legacy state and forward primitive operations to an hpclang surface. A
-canonical draw-context type should be added only if non-HPG applications
-actually need shared mutable drawing state.
+Physical LCD mode switching is separate from software surfaces. Historical HPG changes controller mode and framebuffer addresses and relies on runtime teardown to restore them. A stock-hosted hpclang app cannot assume that ownership.
 
-Owned monochrome surfaces and representation-independent blitting now provide
-the next surface layer. Fonts should build on that ownership/copy boundary.
-Clipping state, grayscale/double buffering, and composite modes remain later
-display work. None of them should require exposing the physical framebuffer
-representation.
+The S3C2410 controller scans a 160-pixel-wide line even though the visible calculator surface is 131 pixels. Historical mono/gray4/gray16 physical storage therefore uses 20/40/80 bytes per scan line, and buffers must be physically contiguous and aligned. HPC1's ordinary heap is assembled from independently mapped pages, so it is not a safe DMA allocation contract.
 
-### Font/text and display research checkpoint
+A future physical gray/page-flip API therefore needs an on-demand platform resource broker or contiguous DMA pool. It must not permanently reserve scarce pages from every application merely to support an optional display mode. Until that boundary exists, software 4/16-level surfaces are the supported grayscale model.
 
-The historical HPG implementations sharpen the next boundary rather than
-changing the existing surface design.
+Direct E2E snapshots stable LCD configuration before HPC1 and compares it before harness restoration, so future physical display ownership must explicitly restore stock state.
 
-**Fonts and text.** HPG's built-in minifont and bigfont are fixed-advance
-bitmap fonts with the same 6/4 and 8/6 height/advance metrics already selected
-for hpclang. Historical HPG stores one byte per glyph row and exposes a
-256-entry byte-indexed font namespace; custom fonts are lightweight descriptors
-over caller-owned row data. Text drawing is fixed advance, and newline resets
-to the original x coordinate and advances by one font height.
+## Fonts and text
 
-The merged font/text layer currently uses provisional independently sourced
-public-domain bitmaps and intentionally defines printable Basic Latin as the
-canonical v1 repertoire. No candidate font pack from development research is
-to be imported automatically: the final built-in source remains explicitly
-blocked until selected and approved. HPG character-set parity remains adapter
-work, and historical HPG bitmap data is not a candidate for the canonical
-built-in assets.
+The font design has **two independent source classes** and a common rendering API.
 
-Custom HPG font allocation does not force a mutable font subsystem into the
-core. An HPG compatibility adapter can retain the historical caller-owned
-bitmap descriptor and rasterize through the same explicit surface primitives.
-The canonical API should only grow a custom-font constructor if a non-HPG
-application demonstrates that need.
+### Calculator-native fonts
 
-**Screen and graphics.** Historical `hpg_t` combines surface storage, color,
-PAINT/XOR mode, font, fill pattern, and a mutable clip rectangle. hpclang should
-continue to keep the core surface explicit and avoid making that legacy
-graphics context its canonical state model.
+`hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` return borrowed descriptors over calculator-owned font assets. hpclang does not embed or redistribute HP ROM glyph bitmaps.
 
-The next safe, representation-independent primitives are circles and polygons.
-The merged geometry layer adds those without mutable graphics state: circles
-are clipped to visible rows/columns before rasterization, and polygons use
-explicit `hpclang_point` arrays with even-odd fill semantics. This avoids
-making huge off-screen circle radii proportional to runtime work and keeps the
-surface representation opaque.
+The implementation deliberately differs by platform family:
 
-A deliberate clipping abstraction should follow only if application code needs
-a clip region beyond the surface bounds. A clip rectangle should not become
-hidden global state; a lightweight draw context/surface view or another
-explicit mechanism is preferable.
+- **HP39/40:** native mini/main rasters are fixed physical stock-ROM assets. They are read through the physical ARM flash view, not the current logical Saturn bank mapping. The mini table is proportional; per-codepoint advance is exposed by `hpclang_font_codepoint_advance()`.
+- **HP48gII/49g+/50g:** native minifont/bigfont are stock Saturn objects resolved through the launch-provided logical `SAT_CPU->Read[]` map.
 
-The current M7 clean-core slice stops here rather than inventing that
-abstraction pre-emptively. Every primitive already clips to surface bounds, and
-no native hpclang consumer yet needs a second clip region. Historical
-`hpg_clip_*` remains adapter state. This is also safer for compatibility:
-the old implementation treats the stored upper bound as exclusive during draw,
-while `hpg_clip_set()` and `hpg_clip_reset()` do not normalize that bound in
-quite the same way. Exact legacy behavior should be isolated in adapter tests
-instead of becoming a new canonical coordinate rule.
+This difference is not an hpclang invention. Historical HPGCC's calculator-native helper path explicitly resolves the HP48-compatible minifont at Saturn `0x812c8` and bigfont object at `0x84d82` through `sat_map_s2a()`, whose implementation indexes `_saturn_cpu->Read[]`. The HPGCC HP39 Aplet/Library 275 support instead binds HP39 stock ROM text entries such as `Put3x5` and `Put5x7`.
 
-Software-owned grayscale surfaces are also separable from physical LCD mode
-ownership. Historical HPG allocates 1-, 2-, and 4-bpp off-screen images and
-uses the same drawing/blit interface across them. hpclang now generalizes its
-private owned-surface representation to 2, 4, or 16 intensity levels while
-preserving one 0..255 public intensity contract.
-Packing remains opaque, and the existing representation-independent blit
-therefore works across level counts without a new image ABI.
+The exact hpclang HP39 raster locations (`0x07E695` mini and `0x07C651` main in physical Saturn nibble space) come from independent HP39 stock-ROM reverse engineering and pixel/renderer validation. They must not be described as HPGCC constants.
 
-Physical grayscale mode switching, hardware double buffering, and page flipping
-are a different category. Historical HPG allocates physical framebuffers,
-changes LCD mode, synchronizes the controller, and rewrites LCD address
-registers during `hpg_flip()`; its runtime relies on surrounding CRT startup/
-shutdown code to restore display hardware. A stock-hosted hpclang application
-does not currently own that hardware. Physical mode changes must therefore
-remain deferred until every platform has an explicit save/restore contract and
-Stock E2E proves clean return. Software off-screen buffering does not have this
-restriction.
+This distinction is implementation-only. Applications receive the same opaque font interface and must not learn physical ROM addresses or `Read[]` internals.
 
-The source audit makes the physical-buffer requirements concrete. The S3C2410
-LCD controller scans a 160-pixel-wide line even though the application-visible
-calculator area is 131 pixels wide. Historical `sys_lcdsetmode()` therefore
-uses 20, 40, or 80 bytes per scan line for mono, 4-level, or 16-level mode and
-programs the lower DMA bound using `height + 5` scan lines. Its HPG wrapper
-also aligns the framebuffer to 16 bytes. A future hardware mode backend must
-derive those controller dimensions from platform data rather than treating the
-131-pixel surface stride as the DMA stride.
+### Generated custom fonts
 
-More importantly, the framebuffer must be physically contiguous. Historical
-HPG obtains ordinary heap candidates and accepts one only when the virtual
-range maps to one continuous physical memory class, then cleans cache before
-handing the physical address to the LCD controller. HPC1 cannot assume that
-about its normal heap: ARMToolbox stage1 explicitly assembles the writable
-arena from an array of independently mapped 4 KiB physical pages. A physical
-grayscale/page-flip API therefore needs a platform-owned contiguous/DMA buffer
-allocator or reserved pool. It must not expose that requirement through the
-ordinary `hpclang_surface` storage ABI.
+Generated fonts use the checked-in bitmap-font catalog produced from the canonical source bundle. Normal application builds do not parse source font files or require Python/fontTools/Pillow.
 
-The historical launchers show one feasible source for such memory, but also why
-hpclang should not reserve it unconditionally. The normal ARMToolbox and its
-HP48-specific variant use a single KOS allocation, page-align the usable
-interior, and append consecutive 4 KiB descriptors to the temporary 0x09000000
-page table. The normal path probes up to 120 KiB and intentionally leaves
-16 KiB to the OS; the HP48 path probes up to 48 KiB and leaves 4 KiB. The HP39
-Library 275 launcher has its own MMU path and an explicit `USESYSRAM` extension;
-hpclang's current Launcher V3 envelope selects that MMU/system-RAM path.
+`hpclang_target_font()` supports exactly three repertoire modes:
 
-A 16-level LCD plane needs 80 bytes per controller scan line. Two 64-row planes
-therefore need a little over 11 KiB, while two 80-row planes need about
-13.6 KiB before alignment/padding. Reserving four 4 KiB pages from every HPC1
-process merely so page flipping might be used would be a disproportionate heap
-tax on the smaller machines. The preferred future design is therefore a
-platform resource request/broker that obtains or reserves contiguous LCD memory
-only for applications that request physical display ownership, before ordinary
-heap use can consume the relevant pages. Until that boundary exists, physical
-gray4/gray16 and page flipping stay deferred; software 4/16-level surfaces are
-the supported grayscale model.
+- `STATIC_AUTO`: collect only code points from explicit `HPCLANG_UI_TEXT("...")` markers in the target's sources;
+- `STATIC_EXPLICIT`: retain explicitly supplied code points plus the configured fallback;
+- `FULL`: retain the selected face's complete mapped repertoire.
 
-Before any such backend is enabled, Direct E2E now gates LCD ownership
-preservation. It snapshots stable S3C2410 LCD configuration before HPC1 and
-compares it at the return sentinel, before harness restoration. Dynamic
-interrupt pending/source registers are intentionally excluded. Future physical
-mode switching must explicitly restore this state rather than relying on the
-host harness to repair it.
+`HPCLANG_UI_TEXT` is an identity macro at runtime. It is build metadata, not a runtime font/string type. Ordinary literals, diagnostics, paths, format strings, comments, and fake marker text do not influence `STATIC_AUTO`.
 
-Historical HPG's PAINT/XOR mode and repeating fill patterns are likewise
-graphics-context policy rather than surface representation. The clean core
-should not grow mutable `color/mode/pattern/font` fields to imitate
-`hpg_t`. A future HPG adapter can hold those fields and dispatch explicit
-surface operations. If non-HPG applications later need compositing, the
-candidate core shape is an explicit operation/blend argument, not hidden
-per-surface state.
+Generated glyph/bitmap sections remain individually garbage-collectable. The wrapper ABI supports arbitrary metrics and faces; convenience aliases `@mini`, `@normal`, and `@large` are policy, not a restriction on the format.
 
-The six historical HPG indicators are another compatibility edge rather than a
-general surface primitive: HPG reaches them by deliberately drawing outside
-the 131-pixel visible width at x=131, rows 0..5 of the controller's 160-pixel
-scan line. Their semantic labels are HP49-style (remote, left/right shift,
-alpha, battery, wait) and are not a portable model contract. hpclang should
-only expose annunciators later through explicit model capabilities if a real
-application needs them; the opaque 131-pixel display surface must not be
-widened merely to reproduce this trick.
+### Text API and UI roles
 
-Legacy `hpscreen.h` calls such as `getLCDPointer`, display-plane selection,
-packed 4-bit sprite operations, and direct OR/XOR block drawing are
-representation-specific compatibility/migration facilities. They must not leak
-framebuffer addresses or packing into the core surface ABI.
+The canonical renderer accepts code points and UTF-8. Invalid UTF-8 becomes U+FFFD and then the selected font's fallback when necessary. `hpclang_surface_draw_char()` remains a direct byte/U+0000..U+00FF compatibility entry point.
 
-### Keyboard
+The design vocabulary `mini` / `text` / `edit-large` describes semantic UI roles, not exactly three physical font formats. Dedicated public selectors for those roles are not frozen merely because the terms are useful in Font Gallery and UI research.
 
-Separate raw physical-key state from higher-level key events.
+Font Gallery is deliberately a **separate HPC1 E2E application**. It should exercise native fonts, generated aliases/arbitrary faces, metrics, representative repertoire, and both 64- and 80-line layouts without expanding the canonical runtime/keyboard/storage payload.
 
-The first stable layer is now `<hpclang/keyboard.h>`. A snapshot is exactly
-eight bytes and uses an hpclang-specific raw encoding:
+### HPG compatibility consequence
 
-- bits 0–55 are the 8×7 S3C2410 matrix, packed as
-  `column * 7 + row`;
-- bit 56 is the dedicated ON input;
-- bits 57–59 are raw GPF4/5/6 inputs whose key labels differ between HP39 and
-  HP48/49/50.
+Historical HPG's bundled minifont/bigfont and caller-owned custom font descriptors are compatibility semantics, not the canonical hpclang asset model. An HPG adapter may retain the historical mutable font/context state and render through hpclang surfaces/fonts without exposing native ROM storage.
 
-Those matrix coordinates are physical scan positions, **not** portable key
-meanings. HPGCC 1.1 itself documents its logical row/column table as HP49g+
-specific, with HP39g+ different and HP48gII not verified. hpclang therefore
-does not make the historical HPGCC `keymatrix` bit numbering its core ABI.
+## Keyboard
 
-The raw reader is synchronous and does not install an IRQ, alter the clock
-tree, or retain GPIO changes after it returns. It is suitable for games and
-other callers that need instantaneous state.
+The public keyboard core separates raw physical state from higher-level events.
 
-The second layer is a synchronous, polled event service. It debounces the raw
-snapshot and emits `DOWN`, `UP`, and `REPEAT` events. Repeat timing is
-configurable, and each event carries physically held modifiers. Alpha and ON
-are portable bits. `HPCLANG_KEYBOARD_MOD_SHIFT` is a normalized physical
-Shift bit across all validated models; HP48/49/50 additionally expose
-left/right Shift bits. `hpclang_keyboard_event_matches()` provides a
-header-only key+modifier convenience check without adding another runtime ABI
-layer.
+A snapshot is eight bytes: bits 0–55 are the 8×7 matrix (`column * 7 + row`), bit 56 is ON, and bits 57–59 are raw GPF4/5/6 inputs whose labels vary by family. Matrix coordinates are physical scan positions, not portable meanings and not the historical HPGCC keymatrix numbering.
 
-The current **stock-hosted backend** deliberately does not install a keyboard
-IRQ or background timer. Calling code drives progress by polling, so an
-application launched from the HP OS does not steal interrupt/timer ownership
-from the environment it must later return to.
+The stock-hosted backend synchronously polls GPIO and does not install a keyboard IRQ or background timer. The second layer debounces that state and emits DOWN/UP/REPEAT events with timestamp, modifiers, raw scan, and physical key identity. A freestanding backend may feed the same event contract from IRQs later.
 
-This is a backend policy, not a permanent hpclang API or HPC1 restriction.
-A freestanding execution environment that owns the machine may instead own the
-interrupt controller and timers, feed the same event API from an IRQ-driven
-queue, and implement delays/deadlines from environment-managed timers.
-Application code should not have to change merely because the execution
-environment owns more of the hardware.
+All 51 physical positions pass Direct E2E on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ stays UNKNOWN until its real fixture exists.
 
-The event layer now also carries a **physical key identity** in `event.key`.
-The first Direct measurement established the common raw scan positions across
-all five automated models. Complete key identities are then filled from the historical
-keyboard tables instead of re-measuring every documented key: the stable
-HPGCC 1.1/2.0/HPGCC3 matrix table for HP49/50, the HPGCC 1.1-39G HP39
-`HEADER.H` keycodes plus the validated matrix layout for HP39gs/40gs, and the
-same documented electrical matrix for HP48gII. Direct E2E injects every one of the 51 physical key positions on each
-automated model and checks DOWN/UP, raw scan code, physical identity, and
-dedicated-key modifier state. The final guest screen renders those positions
-in physical keyboard geometry rather than electrical scan order so the same
-result is recognizable in LCD evidence. This also preserves the HP49g+
-CAT/EQW versus HP50g EVAL/quote primary-label
-distinction at their shared physical positions. The one-off scan probe is not a
-runtime input and is not retained as repository data after its mapping has been
-incorporated into source and regression tests.
+The service stops at physical key identity plus modifier state. Model/UI shortcuts and text/Alpha/Shift-plane translation belong above it.
 
-Common keys retain common enum values; keys whose primary label belongs to one
-layout use `HP39_*`, `HP48_*`, or `HP4950_*` identities. Raw GPF4/5/6
-remain physical input names because the HP39 labels differ from HP48/49/50.
+## Time
 
-HP39g+ deliberately returns `HPCLANG_KEY_UNKNOWN` until its real-machine
-fixture exists.
+All time APIs name their unit. Monotonic microseconds form the basis for delays, deadlines, and event timing. The stock backend observes existing timer/RTC state instead of taking hardware ownership.
 
-The keyboard service deliberately stops at physical key identity plus modifier
-state. It does not translate model-specific combinations such as HP39
-`Shift+VARS` into application actions such as `CHARS`. That mapping belongs
-to a higher UI/shortcut or compatibility layer. Sticky Shift/Alpha policy and
-text translation therefore remain outside the raw/debounce event service.
-HPGCC3 combined those policies with an asynchronous message queue; hpclang
-keeps them above the physical/debounce layer. A future compatibility adapter
-can synthesize HPGCC-style `KEYDN/PRESS/KEYUP`, repeat, and shift-plane
-behavior from hpclang events without making those historical policies the core
-API.
+## Storage and stdio
 
-### Time
+Storage is split by **semantics**, not by media.
 
-All new time APIs must name or encode their unit. Avoid historical interfaces
-whose integer meaning depends on timer source or model clock.
+### Byte-stream files
 
-A monotonic time base should be the foundation for delays, deadlines, and
-event timing.
+HP49g+/HP50g now provide private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Public code uses ordinary `FILE *` APIs. Stock E2E covers read, create/truncate, write/flush, nonzero seek/ftell, reopen, append/create, remove and `ENOENT`.
 
-### Storage and stdio
+HP39/40 and HP48 do not pretend to expose that SD byte-stream service; unsupported stream operations fail cleanly with `ENOSYS`.
 
-Storage has two deliberately separate semantics.
+Raw KOS module/function IDs remain runtime-private.
 
-**Byte-stream files.** Prefer making picolibc's standard C interfaces work
-where their semantics are appropriate instead of inventing parallel
-replacements for `fopen`, `fread`, and friends. HP49g+/HP50g have a stock
-KOS SD filesystem; the first E2E probe already proves that an HPC1 payload can
-resolve the KOS filesystem table and synchronously open/read/close a known file.
-The clean implementation target is private `open/close/read/write/lseek`
-hooks beneath picolibc. The `m7-storage-stdio` candidate additionally wires
-`unlink` so standard `remove()` can map cleanly to stock delete semantics.
-Raw KOS module/function IDs stay runtime-private. Unsupported families return
-a normal unavailable-service error rather than pretending to expose an SD
-filesystem.
+### Calculator objects
 
-**Calculator objects.** HP39gs/40gs are not storage-less: the stock object-store
-protocol has typed named directory, Zaplet/Aplet, Note, Program, Variable,
-List, Matrix, Library and related records, rooted at `HP39DIR.000` with
-`HP39DIR.CUR` tracking the current directory. Those objects should get a
-typed/named object service, not synthetic POSIX file descriptors.
+HP39gs/40gs have a real typed object store: directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related records, rooted at `HP39DIR.000` with `HP39DIR.CUR` tracking the current directory. These are not POSIX files and need a typed/named object service.
 
-The HP39 ROM symbol map also exposes object-store operations such as
-`DoGetObFrSto`, `DoSendObToSto`, `OpenIO` and `StdIOProc`. These are
-Saturn/System-RPL-side entry points, not ordinary ARM call targets. That is a
-useful implementation boundary: M7.2 can define the typed storage semantics,
-but invoking those native services safely should reuse the M7.3 Saturn/object
-bridge rather than teaching the ARM stdio backend to jump into calculator ROM
-internals directly.
+The HP39 ROM exposes System-RPL-side object operations such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc`. A future implementation should reach them through the typed Saturn/object bridge rather than make their addresses/calling conventions public ARM ABI.
 
-HP48/49/50 RPL/Saturn objects likewise belong to the typed-object side and
-continue into M7.3. Physical medium (RAM/flash/SD) is backend detail unless an
-application genuinely needs it.
+HP48/49/50 RPL/Saturn objects belong to the same typed-object side.
 
-### Saturn/RPL integration
+## Saturn/RPL integration
 
-Saturn addresses and RPL objects should not be exposed as ordinary C pointers.
+Saturn addresses and RPL objects should never be ordinary C pointers. Use explicit address/object types or opaque handles with documented borrow/copy/ownership semantics. Historical `sat_*` APIs are adapters above this model.
 
-Use explicit address/object types or opaque handles, with conversion/copy
-operations whose ownership and lifetime are documented.
+## Capabilities
 
-### Capabilities
-
-A program should be able to query genuine model/platform capabilities such as
-storage, transfer mechanism, display geometry, or optional stock-OS services.
-
-Capability queries must describe real differences, not become a substitute for
-clean platform implementations.
+Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
 
 ## Modern C++ profile
 
-hpclang currently uses Arm Toolchain for Embedded 22.1.0, Clang/LLVM, libc++,
-libc++abi, compiler-rt, and picolibc.
+hpclang uses Clang/LLVM, libc++, libc++abi, compiler-rt, and picolibc with `-fno-exceptions` and `-fno-rtti`. This is a modern embedded C++ profile, not unrestricted hosted C++.
 
-The repository already link-tests:
+Current C++23 validation includes templates/concepts/lambdas/constexpr, `std::array`, `std::span`, `std::optional`, `std::string`, `std::vector`, heap-backed objects, global construction, and wrappers over real time/display services.
 
-- a C++ `main()`;
-- global/static C++ construction;
-- `std::string`;
-- libc++ linked into an ARMv4T HPC1 image.
+Exceptions, RTTI, threading, locale-heavy facilities, iostream/file streams, and `std::filesystem` are separate capabilities and are not claimed without dedicated runtime support.
 
-Current build flags deliberately use:
+## Current dependency order
 
-```text
--fno-exceptions
--fno-rtti
-```
-
-Therefore current support should be described as a modern embedded C++ profile,
-not unrestricted hosted C++.
-
-Compiler/language features that do not require unavailable OS facilities are
-expected to work, but the SDK must explicitly test the C++ standard level it
-claims.
-
-Current C++23 validation covers:
-
-- an explicit `-std=c++23` compile/link smoke;
-- templates, concepts, lambdas, constexpr/consteval;
-- `std::array`, `std::span`, `std::optional`, `std::string`, and
-  `std::vector`;
-- heap-backed standard-library objects;
-- global construction;
-- header-only wrappers over the real monotonic-time and display-surface M7
-  services.
-
-The visible emulator payload now contains a C++23 translation unit that queries
-the real display surface and exercises monotonic time/delay before returning to
-the C validation program. Five-model runtime closure for that probe is tracked
-separately from compile/link coverage.
-
-Exceptions, RTTI, threading, locale-heavy facilities, iostream/file streams,
-and `std::filesystem` are separate capabilities. They should not be claimed
-until their runtime requirements are implemented and tested.
-
-## First implementation slice
-
-The historical compatibility matrix now exists, so M7.1 uses this vertical
-slice:
+The clean-core order is now:
 
 ```text
 device/capability facts
 + monotonic time
-+ keyboard
-+ display/surface
++ physical keyboard/events
++ display/software surfaces
++ native/generated fonts and UTF-8 text
++ hp4950 standard stream I/O
 ```
 
-The stable device-information API and stock-preserving monotonic microsecond
-clock are already implemented. The time service does not reconfigure the stock
-PLL, Timer0, RTC, or IRQ state; delays busy-wait on that clock and return rather
-than deadlock if the stock clock service becomes unavailable.
-
-Raw keyboard state, the polled debounce/repeat event service, and complete
-physical-key identities for the five automated models are now implemented.
-The initial common scan probe is retained as evidence, while documented
-model-specific keys come from the HPGCC/HP39 tables. Direct E2E checks both a
-common ENTER identity and one family-specific identity through the same public
-event path. Text/Alpha/Shift-plane translation remains a separate higher layer.
-
-The first opaque display surface and clipped clear/pixel-readback/pixel-write/
-line/outline-rectangle/fill-rectangle primitives form the current primitive
-set. The previously implemented subset passes the five-model Direct matrix;
-new primitives close through the same gate before being marked validated. Rasterization is separated
-from physical-display acquisition and has host tests for packed-pixel padding,
-rectangle clipping, and extreme off-screen line clipping. The visible runtime
-validation page draws through this API instead of accessing the LCD framebuffer
-directly. Broader HPG compatibility still requires HPG-compatible image allocation and
-blit adapters, fonts/text, clip state, and additional drawing primitives.
-
-Together these services are sufficient for a small interactive program and can
-be validated without first solving persistent storage or RPL object lifetime.
-
-The first slice should end with one non-trivial C example and one C++ example
-running through the normal E2E path.
+These foundations are implemented. The next architectural work is focused Font Gallery/UI-role evidence and typed calculator objects/Saturn integration. HPGCC compatibility headers should continue to be built on top of those clean services rather than define them.
