@@ -31,5 +31,15 @@ hpclang_unit(font
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_font PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+# Configure-only test of the SDK font build API. It verifies that STATIC_AUTO,
+# STATIC_EXPLICIT and FULL remain semantically distinct without assembling the
+# ARM font sources on the host.
+add_test(
+    NAME font_cmake_modes
+    COMMAND "${CMAKE_COMMAND}"
+        "-DHPCLANG_ROOT=${HPCLANG_ROOT}"
+        -S "${HPCLANG_ROOT}/tests/font-cmake"
+        -B "${CMAKE_CURRENT_BINARY_DIR}/font-cmake")
+
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
