@@ -79,4 +79,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: regenerate font assembly catalog"
+
+          # Development may advance this branch while the full font catalog is
+          # regenerating. Rebase the generated-only commit onto the current
+          # branch head instead of discarding a successful maintenance run.
+          git fetch origin m7-fonts-gallery
+          git rebase origin/m7-fonts-gallery
           git push origin HEAD:m7-fonts-gallery
