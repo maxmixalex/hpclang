@@ -68,7 +68,7 @@ export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 
 mkdir -p "$ROOT/build/$TARGET-state"
-timeout 255s "$ROOT/build/x50ng/dist/x50ng" \
+timeout 315s "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$ROOT/build/$TARGET-state" \
     --overwrite-config \
     --style="$ROOT/build/x50ng/dist/style-40g.css" \

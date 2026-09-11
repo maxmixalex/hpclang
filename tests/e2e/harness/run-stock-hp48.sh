@@ -62,14 +62,18 @@ export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 
-timeout 220s "$ROOT/build/x50ng/dist/x50ng" \
+# The current canonical launcher is roughly 40 KiB. At 9600 baud with the
+# stock-compatible 80-byte Kermit packets and control-byte quoting it needs
+# more than the historical 70 s transfer window. Keep the emulator alive past
+# the conservative host-transfer window plus the final 60 s PASS monitor.
+timeout 270s "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$STATE" \
     --overwrite-config \
     --style="$ROOT/build/x50ng/dist/style-40g.css" &
 X50_PID=$!
 
 sleep 35
-timeout 70s "$ROOT/tools/run-hp48-kermit-send.sh" \
+timeout 110s "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
     L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
