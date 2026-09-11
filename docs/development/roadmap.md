@@ -11,10 +11,11 @@ and automated E2E.
 They do **not** mean that hpclang already reproduces the application-facing
 feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device
 facts, monotonic time, the complete five-model physical keyboard/event core,
-opaque 2/4/16-level software surfaces, geometry and a validated text renderer.
-Final built-in font data is blocked, hp4950 stream storage is under active
-implementation, and calculator-object/RPL storage plus higher-level UI remain
-application-facing SDK work.
+opaque 2/4/16-level software surfaces, geometry, a validated text renderer,
+and hp4950 stream stdio through picolibc. The active font-package work is
+closing reusable font selection/import semantics above that renderer;
+calculator-object/RPL storage and higher-level UI remain application-facing SDK
+work.
 
 hpclang is also not intended to be binary-compatible with historical HPGCC
 executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
@@ -145,107 +146,104 @@ validated native execution environment.
 
 ### M7.0 — API inventory and compatibility design
 
-Before freezing the public service API:
-
-- [x] inventory the public HPGCC 1.0.3/1.1 and 2.0 headers by functional area
-  from complete distribution archives;
+- [x] inventory the public HPGCC 1.0.3/1.1 and 2.0 headers by functional area from complete distribution archives;
 - [x] inventory the relevant HPGCC3 public interfaces separately;
-- [x] classify the major historical API families as direct source-compatible,
-  compatibility-adapter, migration-only, or intentionally unsupported;
-- [x] publish a progress-oriented API reference with per-service validation and
-  HPGCC 1.0.3 / 1.1 / 2.0 SP2 / HPGCC3 comparison;
-- [ ] finish ownership, error, coordinate, string/buffer, and capability-query
-  conventions for the remaining services;
+- [x] classify major historical API families as direct source-compatible, compatibility-adapter, migration-only, or intentionally unsupported;
+- [x] publish a progress-oriented API reference with per-service validation and HPGCC 1.0.3 / 1.1 / 2.0 SP2 / HPGCC3 comparison;
 - [x] define the C ABI boundary and C++ wrapper policy;
-- [x] choose the first service slice: device/capability facts + monotonic time +
-  keyboard + display/surface.
+- [x] establish common conventions through the implemented device/time/keyboard/display/storage slices;
+- [ ] finish conventions only when remaining object/UI services expose genuinely new ownership, error, string/buffer, or capability-query requirements.
 
 See [SDK API design](sdk-design.md).
 
-M7.1 implementation is active. Device information and the stock-preserving
-monotonic clock are stable. The keyboard slice is closed for every automated
-model: raw snapshots, debounce/repeat events, complete source-backed physical
-key identities, normalized modifier state, and all 51 physical keys pass the
-five-model Direct matrix. The final LCD evidence is arranged in physical
-calculator-keyboard geometry rather than electrical scan order. The mapping is
-grounded in the historical HPGCC 49/50 table, HPGCC 1.1-39G HP39 keycodes, and
-the validated S3C2410 scan layout. HP39g+ key identity remains UNKNOWN until its
-blocked real-machine fixture is available.
-The C++23 wrappers over real time/display services also pass the five-model
-Direct matrix. Pixel readback and outline rectangles pass the same Direct and
-full-stock matrices. Owned monochrome surfaces and blitting now pass both the five-model Direct
-matrix and the full-stock matrix. The font/text renderer and mini/big metrics
-are merged and validated, but the **final built-in glyph data is a release
-blocker**. The current public-domain Basic-Latin tables are provisional. No
-research font pack is imported automatically, and historical HPG font tables
-are not under consideration as hpclang built-in assets. Font work remains
-frozen until an explicit long-term redistributable source is selected.
-Representation-independent circles/polygons and software-owned 2/4/16-level
-surfaces are now merged and pass Core, five-model Direct, and full-stock
-validation without taking physical LCD mode ownership. Stable S3C2410 LCD
-configuration is also a machine-readable preservation gate before harness
-restore. The HP48 Stock path was hardened so its post-Kermit UI sequence starts
-only after the complete host transfer window rather than racing a slow
-successful transfer.
+### M7.1 — Common services, display, keyboard, and fonts
 
-The M7 clean-core display slice is therefore closed without inventing mutable
-clip/style state. Historical clip rectangles, PAINT/XOR, patterns, annunciator
-slots, XPM convenience loaders, and exact custom-font descriptors belong to
-compatibility or demonstrated future use cases. Physical gray4/gray16 and page
-flip stay deferred until a platform resource boundary can supply contiguous LCD
-DMA memory without permanently taxing every HPC1 heap. The remaining first
-slice closure includes a representative application example rather than more
-bootstrap work.
+Device information, stock-preserving monotonic time, keyboard scanning/events,
+physical key identity, the C++23 wrappers, display geometry, opaque software
+surfaces, blitting, text rendering, and LCD ownership preservation are all
+implemented and validated on the current five-model emulator matrix. HP39g+ key
+identity remains UNKNOWN until its blocked real-machine fixture exists.
 
-The minimum cross-platform service set should cover:
+The display clean-core boundary is intentionally explicit: representation-
+independent circles/polygons and owned 2/4/16-level surfaces are supported;
+historical mutable clip/style state, PAINT/XOR, patterns, annunciator slots,
+XPM convenience loaders, and raw framebuffer-pointer behavior remain
+compatibility/future-use work. Physical gray4/gray16 and page flipping remain
+deferred until a platform resource boundary can supply contiguous LCD DMA
+memory without permanently taxing every HPC1 heap.
 
-- display and framebuffer/graphics primitives;
-- keyboard scanning and key events, including complete physical-key identity
-  coverage for every validated model; documented source tables are preferred
-  over redundant per-key measurement, with emulator/hardware checks for the
-  model-specific mapping boundary;
-- monotonic time, delays, and timers;
-- files and storage where the calculator exposes them;
-- calculator/Saturn object exchange;
-- RPL stack integration where applicable;
-- clean access to required stock-OS services;
-- model capability discovery when a service is not available everywhere.
+#### Font package/gallery closure
 
-These APIs need hardware/emulator tests and representative real-application
-tests. The exact historical HPGCC function names are not the design target:
-compatibility wrappers may be added later where they materially ease porting,
-but the core API should remain coherent across `hp39`, `hp48`, and
-`hp4950`.
+The old provisional Basic-Latin built-in tables are no longer the architectural
+endpoint. `m7-fonts-gallery` now contains the canonical source bundle and a
+repository-maintenance generator that produces build-time-ready assembly assets.
+Normal application builds consume the checked-in generated catalog and do not
+run Python or parse source fonts.
 
+Current evidence:
+
+- [x] Git LFS materialization of the canonical source bundle in CI;
+- [x] BDF, TTF, FON, and newRPL BMP+TXT source parsing;
+- [x] complete batch generation of **308 faces / 1,779,042 glyph mappings / 3,797 assembly sources**;
+- [x] large faces split into bounded assembly chunks;
+- [x] individual glyph/bitmap ELF sections remain independently eligible for linker garbage collection;
+- [x] generated catalog is checked into `m7-fonts-gallery`.
+
+The import contract has **three distinct modes**:
+
+- [ ] `STATIC_AUTO` — derive the retained character repertoire only from string literals explicitly marked with `UI_TEXT`. Ordinary C/C++ string literals, diagnostics, paths, format strings, metadata, and unrelated data must not be scanned implicitly.
+- [ ] `STATIC_EXPLICIT` — retain exactly the caller-supplied charset/codepoints (plus any explicitly selected fallback required by the font contract). No automatic source-text discovery occurs.
+- [ ] `FULL` — retain the selected face's complete mapped repertoire.
+
+`STATIC_AUTO` and `STATIC_EXPLICIT` are two different ways to define a static
+repertoire; they must not collapse back into one ambiguous `STATIC` mode.
+`UI_TEXT` is explicit build metadata for the automatic mode, not a replacement
+for normal string literals and not a runtime font type.
+
+UI font choice is a separate semantic axis from import mode. The common UI roles
+are:
+
+- `mini` — compact/proportional titles, soft menus, and small UI text;
+- `text` — normal body/editor text (the primary general UI text role);
+- `edit-large` — the larger fixed-cell EditLine/cursor-underlay role.
+
+These roles are aliases/policy. The underlying bitmap-font ABI continues to
+support arbitrary metrics, arbitrary generated faces, and explicit custom font
+selection; it is not restricted to three physical fonts.
+
+M7.1 font closure requires:
+
+- [ ] implement the three modes end to end in CMake/build tooling;
+- [ ] implement the `UI_TEXT` annotation/metadata extraction used by `STATIC_AUTO`;
+- [ ] add deterministic tests proving unmarked string literals do not affect `STATIC_AUTO` output;
+- [ ] validate `STATIC_EXPLICIT` subset retention and `FULL` complete-face retention;
+- [ ] expose/freeze `mini` / `text` / `edit-large` semantic selectors while preserving general face selection;
+- [ ] update API, licensing, HPGCC-compatibility, validation, and user-facing font documentation;
+- [ ] run the appropriate ARM/Core and calculator E2E gates, then merge the completed slice to `main`.
 
 ### M7.2 — Storage and standard I/O
+
+**hp4950 byte-stream stdio complete and merged to `main`.**
 
 Storage is split by **semantics**, not by a misleading yes/no "filesystem"
 capability.
 
-- **Byte-stream filesystem:** HP49g+/HP50g expose the stock KOS SD-card
-  filesystem. A Stock E2E probe has already resolved the original KOS
-  filesystem table and successfully opened/read/closed a known SD file from
-  HPC1. The `m7-storage-stdio` candidate now provides private hp4950
-  `open/close/read/write/lseek/unlink` hooks below picolibc, so the E2E
-  payload uses normal `fopen/fread/fwrite/fseek/remove` instead of direct
-  KOS calls. Stock validation covers read, create/truncate, write, flush,
-  nonzero seek/ftell, reread, remove/ENOENT, and clean ENOSYS on non-stream
-  families before this slice can merge.
-- **Calculator object store:** HP39gs/40gs are not "storage-less". Their stock
-  object-store format includes named directory, Zaplet/Aplet, Note, Program,
-  Variable, List, Matrix, Library and related object types, with
-  `HP39DIR.000` as the root directory object-store file and
-  `HP39DIR.CUR` as the current-directory pointer. This is not a POSIX
-  byte-stream filesystem and must not be forced through `FILE *`.
-- **RPL/Saturn objects:** HP48/49/50 also have calculator-object namespaces.
-  Their typed object/stack integration remains M7.3, but M7.2 and M7.3 share
-  the same architectural rule: preserve native object semantics instead of
-  pretending every stored calculator object is an ordinary file.
+- [x] **Byte-stream filesystem:** HP49g+/HP50g use private KOS-backed `open`, `close`, `read`, `write`, `lseek`, and `unlink` hooks below picolibc. Public consumers use normal `FILE *` APIs. Stock validation covers read, create/truncate, write/flush, nonzero seek/ftell, reread, close/reopen, remove/ENOENT, and clean ENOSYS on non-stream families.
+- [ ] **Calculator object store:** HP39gs/40gs are not storage-less. Their stock object-store includes named directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related object types, with `HP39DIR.000` as the root object-store file and `HP39DIR.CUR` as the current-directory pointer. This is not POSIX byte-stream storage and must not be forced through `FILE *`.
+- [ ] **RPL/Saturn objects:** HP48/49/50 expose calculator-object namespaces whose typed object/stack integration remains separate from byte-stream stdio.
 
-The public model should therefore distinguish stream storage from calculator
+The public model therefore distinguishes stream storage from calculator
 objects. Physical media (RAM/flash/SD) is backend detail unless an application
 genuinely needs it.
+
+### M7.3 — Calculator objects and stack integration
+
+**Planned.**
+
+- [ ] design the HP39 typed object-store API around native object semantics;
+- [ ] design HP48/49/50 Saturn/RPL object exchange without pretending objects are files;
+- [ ] add stack integration where applicable;
+- [ ] keep platform-specific representation below a coherent common capability/API boundary.
 
 ### Historical HPGCC parity is not complete
 
@@ -272,18 +270,13 @@ other representation-specific behavior remain separately gated.
 After the common services exist:
 
 - establish stable application-facing headers;
-- provide examples that exercise graphics, input, timers, storage, and
-  calculator-object integration;
+- provide examples that exercise graphics, input, timers, storage, and calculator-object integration;
 - validate one or more non-trivial applications on each platform family;
 - document source-porting guidance from common HPGCC 1.x/2.x APIs where useful;
 - decide which compatibility wrappers are worth maintaining;
 - establish a stable packaging/build UX from a fresh LLVM-only checkout;
-- replace the remaining historical ARMToolbox/library-275 stock-launch boundary
-  with a minimal independently implemented launcher if doing so materially
-  improves packaging or portability; this is not a prerequisite for HPC1 or
-  the M7 service APIs;
-- separate public application documentation from this internal Development
-  reference.
+- replace the remaining historical ARMToolbox/library-275 stock-launch boundary with a minimal independently implemented launcher if doing so materially improves packaging or portability; this is not a prerequisite for HPC1 or the M7 service APIs;
+- separate public application documentation from this internal Development reference.
 
 HPGCC binary compatibility is not a goal.
 
@@ -303,8 +296,7 @@ Completion requires:
 
 - all three platform families to execute HPC1 through a supported path;
 - representative emulator coverage plus primary real-hardware coverage;
-- HP 39g+ either validated or explicitly documented as the remaining external
-  hardware blocker;
+- HP 39g+ either validated or explicitly documented as the remaining external hardware blocker;
 - the M7 calculator-service baseline to be usable by real applications;
 - stable public headers and packaging;
 - representative applications passing on all supported platform families;
@@ -313,23 +305,19 @@ Completion requires:
 Only at this stage should hpclang be described as a broadly usable replacement
 SDK rather than a completed execution foundation.
 
-
 ## Unified test model
 
 Repository validation has two source-test layers:
 
-- `tests/unit/` contains host-side `test_*.c` tests for pure,
-  hardware-independent implementation logic;
-- `tests/e2e/` is one calculator-side hpclang consumer project. The same
-  source project is built into HPC1 and launched through each supported target
-  and stock/direct harness.
+- `tests/unit/` contains host-side `test_*.c` tests for pure, hardware-independent implementation logic;
+- `tests/e2e/` is one calculator-side hpclang consumer project. The same source project is built into HPC1 and launched through each supported target and stock/direct harness.
 
 Target profiles, stock UI sequences, and x50ng frontends are harness data, not
 separate test applications. New public SDK functionality should be added to the
 unified E2E application whenever it is calculator-testable, with a separate
 unit test only where pure implementation logic benefits from isolation.
 
-The CI implementation now uses a family-level E2E pipeline: build one HPC1
+The CI implementation uses a family-level E2E pipeline: build one HPC1
 application per test mode, then run one job per platform family (`hp39`, `hp48`,
 or `hp4950`). Each family job prepares x50ng and runtime dependencies once and
 executes its automated sibling targets in parallel. HP 39g+ is explicitly
