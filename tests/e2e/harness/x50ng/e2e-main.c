@@ -59,6 +59,7 @@
 #define KEY_HOLD_US 50000LL
 #define KEYBOARD_FIRST_DELAY_US 20000LL
 #define KEYBOARD_STEP_US 120000LL
+#define KEYBOARD_CAPTURE_DELAY_US 10000LL
 #define POLL_US 20000LL
 #define DEADLINE_US 16000000LL
 #define RETURN_ON_US 200000LL
@@ -140,6 +141,11 @@ struct e2e {
     int64_t deadline;
 };
 
+struct keyboard_capture_event {
+    struct e2e *state;
+    size_t index;
+};
+
 static const struct key_action f_down = { HP4950_KEY_F, 1 };
 static const struct key_action f_up = { HP4950_KEY_F, 0 };
 static const struct key_action on_down = { HP4950_KEY_ON, 1 };
@@ -203,6 +209,8 @@ static struct key_action keyboard_down[
     sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
 static struct key_action keyboard_up[
     sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
+static struct keyboard_capture_event keyboard_capture_events[
+    sizeof(keyboard_codes) / sizeof(keyboard_codes[0]) + 1u];
 
 static int guest_read32(hdw_t *h, uint32_t va, uint32_t *v)
 {
@@ -251,6 +259,22 @@ static unsigned capture_lcd(hdw_t *h, const char *path, int height)
     return nonzero;
 }
 
+static void capture_keyboard_frame(void *arg)
+{
+    const struct keyboard_capture_event *event = arg;
+    const char *dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
+    char path[512];
+
+    if (dir == NULL || *dir == '\0')
+        return;
+    snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, event->index);
+    if (!capture_lcd(
+            event->state->hdw, path, event->state->lcd_height)) {
+        fprintf(stderr,
+                "blank keyboard progress capture %zu\n", event->index);
+    }
+}
+
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
     hdw_timer_t *t = timer_new(HDW_TIMER_REALTIME, fn, arg);
@@ -279,9 +303,21 @@ static int tap(
 static int schedule_payload_keyboard(struct e2e *s)
 {
     size_t count = sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
+    const char *keyboard_dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
+    int capture_progress = keyboard_dir != NULL && *keyboard_dir != '\0';
 
     if (s->payload_keyboard_scheduled)
         return 1;
+
+    if (capture_progress) {
+        keyboard_capture_events[0].state = s;
+        keyboard_capture_events[0].index = 0u;
+        if (!later(
+                capture_keyboard_frame,
+                &keyboard_capture_events[0],
+                KEYBOARD_CAPTURE_DELAY_US))
+            return 0;
+    }
 
     for (size_t i = 0; i < count; ++i) {
         keyboard_down[i].key = keyboard_codes[i];
@@ -294,11 +330,22 @@ static int schedule_payload_keyboard(struct e2e *s)
         if (!later(key_cb, &keyboard_down[i], press_us) ||
             !later(key_cb, &keyboard_up[i], press_us + KEY_HOLD_US))
             return 0;
+
+        if (capture_progress) {
+            keyboard_capture_events[i + 1u].state = s;
+            keyboard_capture_events[i + 1u].index = i + 1u;
+            if (!later(
+                    capture_keyboard_frame,
+                    &keyboard_capture_events[i + 1u],
+                    press_us + KEY_HOLD_US + KEYBOARD_CAPTURE_DELAY_US))
+                return 0;
+        }
     }
 
     s->payload_keyboard_scheduled = 1;
     fprintf(stderr,
-            "HPC1 keyboard phase reached; scheduled %zu keys\n", count);
+            "HPC1 keyboard phase reached; scheduled %zu keys%s\n",
+            count, capture_progress ? " with merged-progress evidence" : "");
     return 1;
 }
 
@@ -759,7 +806,6 @@ static void inject(void *arg)
         fail(s, "before-capture");
         return;
     }
-
     if (!guest_write32(
             s->hdw,
             L1_INJECT_VA,
