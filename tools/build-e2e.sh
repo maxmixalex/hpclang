@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <direct|stock|hardware> [out-dir]" >&2
+    echo "usage: $0 <runtime|hardware> [out-dir]" >&2
     exit 2
 fi
 
@@ -15,9 +15,7 @@ LD="$ATFE/bin/ld.lld"
 NM="$ATFE/bin/llvm-nm"
 
 case "$MODE" in
-    direct|stock)
-        # Direct and Stock deliberately build the exact same application.
-        # Only the outer launcher/transport path is allowed to differ.
+    runtime)
         E2E_CMAKE_ARGS=(
             -DHPCLANG_E2E_KEYBOARD=ON
             -DHPCLANG_E2E_STORAGE=ON
