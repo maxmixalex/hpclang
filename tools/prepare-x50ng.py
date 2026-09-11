@@ -270,11 +270,11 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     index = matches[0]
     original = lines[index]
     leading = original[: len(original) - len(original.lstrip())]
-    newline = "\n" if original.endswith("\n") else ""
+    continuation = chr(92)
     lines[index:index + 1] = [
-        f"{leading}./src/hpclang_direct.c \\\n",
-        f"{leading}./src/hpclang_stock.c \\\n",
-        original if newline else original,
+        f"{leading}./src/hpclang_direct.c {continuation}\n",
+        f"{leading}./src/hpclang_stock.c {continuation}\n",
+        original,
     ]
     makefile.write_text("".join(lines))
 
