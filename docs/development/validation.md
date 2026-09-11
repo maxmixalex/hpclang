@@ -15,7 +15,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 
 Direct runtime passes on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g. HP 39g+ is intentionally blocked until a trustworthy real-machine stock flash fixture exists.
 
-Stock launch status must be reported from the latest run rather than assumed from an older all-green checkpoint. In the current font-gallery diagnostic run, hp48 and hp4950 families pass, HP39gs reaches canonical PASS and return, while HP40gs timed out before payload entry. That HP40gs result is a Stock transport/UI flake to repeat; it is not evidence of a font/runtime failure.
+Stock launch status must be reported from the latest run rather than inferred from an older all-green checkpoint. For the physical-font fix, hp48 and hp4950 Stock families are green. HP39gs and HP40gs have each independently completed the full Stock serial/APLET/ARMToolbox path in recent runs, and HP40gs produced a visually correct `FONT OK` PASS frame with the new physical-ROM reader. The bounded rerun of the family job brought both HP39gs and HP40gs into the payload, then both failed the keyboard transition with `0x46410010`. Because the five-model Direct 51-key gate remains green, this is tracked as a Stock harness/input-synchronization flake rather than a font/runtime regression.
 
 ## Runtime PASS contract
 
@@ -46,11 +46,25 @@ These are separate claims and must remain separately observable:
 
 A nonblank `return.pgm` that still contains hpclang's last frame is insufficient for item 3. The harness must not manufacture success by copying the pre-launch framebuffer back. Each family should issue a harmless native UI action after control-flow restoration and then require a visibly stock-owned frame. HP39 real-hardware guidance already uses **APLET** for this purpose.
 
-## HP39 native-font regression gate
+## Native-font validation and provenance
 
-HP39 native font data is calculator-owned ROM content and is not redistributed by hpclang. Reverse engineering has independently closed the mini-font layout used by the stock renderer: physical Saturn base `0x07E695`, 11 nibbles per record, first nibble advance plus five bitmap rows. Stock `Put3x5` uses the same table layout.
+Calculator-native font bitmaps are borrowed stock assets and are never redistributed by hpclang. The public font API hides two platform-specific lookup mechanisms that historical code and ROM evidence show are genuinely different.
 
-A diagnostic HP39gs 2.22 run proved why the first hpclang reader produced stable corruption: logical `SAT_CPU->Read[]` was pointing the `0x7e` Saturn page at ARM `0x0009f000`, i.e. a different physical ROM bank than the fixed native raster asset. Therefore fixed HP39 ROM raster addresses must be resolved as physical flash assets; ordinary Saturn RAM/objects continue to use the live `Read[]` map. The production mapping is not considered complete until Direct and Stock screenshots validate it, and temporary bank-probe code must be removed afterwards.
+For HP48gII/49g+/50g, historical HPGCC's calculator-native helpers use the live logical Saturn map: `hplib/stdio/get_minifont.c` resolves `0x812c8` through `sat_map_s2a()`, `get_bigfont.c` resolves `0x84d82` the same way, and `sat_map_s2a()` is exactly `_saturn_cpu->Read[sat_addr >> 12] + offset`. hpclang therefore keeps native HP48/49/50 lookup on the launch-provided `SAT_CPU->Read[]` view.
+
+HP39/40 is a separate stock-ROM path. HPGCC's HP39 Aplet/Library 275 support binds the HP39 ROM text entries `Put3x5` and `Put5x7` rather than reusing the HP48/49/50 RAM-font locator. Independent HP39 ROM reverse engineering then closes the raster tables themselves: mini-font physical Saturn base `0x07E695`, 11 nibbles per record with one advance nibble plus five bitmap rows, and main-font base `0x07C651`, 16 nibbles per record. These exact physical table addresses come from HP39 stock-ROM analysis, not from an HPGCC C constant.
+
+A diagnostic HP39gs 2.22 run proved why the first hpclang reader produced stable corruption: logical `SAT_CPU->Read[]` pointed Saturn page `0x7e` at ARM `0x0009f000`, a different physical bank from the fixed raster asset at physical `0x07E695` / ARM byte `0x0003f34a`. The production reader now accesses those HP39 fixed ROM rasters through the physical flash mapping without changing the bank latch; ordinary Saturn RAM/object access continues to use `Read[]`.
+
+Validation is closed for that mapping:
+
+- HP39gs Direct: PASS with visually correct `FONT OK`;
+- HP40gs Direct: PASS with visually correct `FONT OK`;
+- HP40gs Stock/ARMToolbox: PASS with visually correct `FONT OK`;
+- temporary font-bank diagnostics removed;
+- Core font-selection modes and HP39 hardware packages pass CI.
+
+The remaining Stock/hp39 keyboard flake is downstream of this font proof and is not a blocker for the physical-ROM font mapping.
 
 ## HP 39gs real-hardware gate
 
@@ -76,6 +90,18 @@ The `Stock / hp39` family job boots each official 2.22 ROM and uses the calculat
 It then launches the installed hpclang aplet through ARMToolbox39 and requires the same machine-readable HPC1 PASS result. Visible-return automation should mirror the real-hardware APLET check after control-flow restoration.
 
 HP 40gs uses its own stock UI sequence because it must leave the CAS front end before APLET and its RECEIVE FROM menu has no IrDA entry.
+
+### Current Stock keyboard flake and repair boundary
+
+The current Stock launcher waits for the guest's `PHASE_KEYBOARD_READY` marker and then schedules all 51 key down/up pairs on x50ng's realtime timer. Direct uses the same 50 ms hold and 120 ms step values and passes on all five automated models. The guest keyboard test is intentionally strict: after resetting its event baseline, any event other than the expected next DOWN/UP pair fails immediately with `0x10` (`0x46410010` in the shared result word).
+
+That makes the first repair attempt a **small, harness-local synchronization change**, not a keyboard-runtime rewrite. Preferred order:
+
+1. make Stock key progression closed-loop or explicitly acknowledge guest progress instead of pre-scheduling all 51 pairs;
+2. publish the same 52-frame keyboard progression evidence already available in Direct so the first divergent key is visible;
+3. if needed, add an explicit release-all/quiescent baseline handshake after Stock UI/ARMToolbox launch and before the first injected key.
+
+Only if those bounded changes still reproduce a failure should investigation move into x50ng GPIO/IRQ behavior. That escalation is deliberately not part of the current font-gallery critical path; a short real-hardware keyboard run is preferable to an open-ended emulator-internals investigation.
 
 ## HP 48gII Direct emulator gate
 
