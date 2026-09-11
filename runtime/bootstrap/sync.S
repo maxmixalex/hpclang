@@ -13,6 +13,11 @@
  * HP39/40, HP48gII and HP49/50 launcher sources all use SWI 0 for privileged
  * ARM system work; HP39 real hardware and the later 49/50 launcher both use
  * this vector-patching mechanism for cache/MMU maintenance.
+ *
+ * Every temporary SWI handler restores the original vector while still in
+ * supervisor exception context, before exception-return can re-enable the
+ * caller's IRQ/FIQ state. Restoring it in the caller after SWI return leaves a
+ * race where a pending interrupt can observe the temporary handler.
  */
 .global hpclang_mmu_sync
 .type hpclang_mmu_sync,%function
@@ -29,11 +34,11 @@ hpclang_mmu_sync:
      */
     swi     0
 
-    str     r4, [r2]
     ldmfd   sp!, {r2-r5, pc}
 
 .align 2
 .Lsupervisor:
+    str     r4, [r2]
     stmfd   sp!, {r0-r3, lr}
 
     /*
@@ -88,12 +93,12 @@ hpclang_cache_clean:
     adr     r1, .Lclean_supervisor
     swp     r4, r1, [r2]
     swi     0
-    str     r4, [r2]
 
     ldmfd   sp!, {r2-r5, pc}
 
 .align 2
 .Lclean_supervisor:
+    str     r4, [r2]
     stmfd   sp!, {r0-r2, lr}
 1:
     cmp     r0, r3
@@ -130,12 +135,12 @@ hpclang_irq_save_disable:
     adr     r3, .Lirq_disable_supervisor
     swp     r4, r3, [r2]
     swi     0
-    str     r4, [r2]
 
     ldmfd   sp!, {r1-r5, pc}
 
 .align 2
 .Lirq_disable_supervisor:
+    str     r4, [r2]
     /*
      * SPSR_svc is the exact caller CPSR captured by SWI entry. Return it in
      * r0, but modify the exception-return SPSR so the caller resumes with both
@@ -164,12 +169,17 @@ hpclang_irq_restore:
     swp     r4, r3, [r2]
     mov     r0, r5
     swi     0
-    str     r4, [r2]
 
     ldmfd   sp!, {r1-r5, pc}
 
 .align 2
 .Lirq_restore_supervisor:
+    /*
+     * The saved CPSR may re-enable IRQ/FIQ on exception return. Restore the
+     * stock SWI vector first so a pending keyboard/timer interrupt can never
+     * observe this one-shot handler after movs pc,lr.
+     */
+    str     r4, [r2]
     msr     spsr_cxsf, r0
     movs    pc, lr
 .size hpclang_irq_restore, .-hpclang_irq_restore
