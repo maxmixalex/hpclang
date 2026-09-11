@@ -54,3 +54,7 @@ python3 "$ROOT/tools/prepare-x50ng.py" \
     --stock-frontend "$ROOT/tests/e2e/harness/x50ng/stock-launcher-main.c" \
     --selector "$ROOT/tests/e2e/harness/x50ng/main.c" \
     --headless-header "$ROOT/tests/e2e/harness/x50ng/headless-ui-init.h"
+
+python3 "$ROOT/tools/prepare-x50ng-gallery.py" \
+    "$DEST" \
+    --gallery-frontend "$ROOT/tests/e2e/harness/x50ng/gallery-main.c"
