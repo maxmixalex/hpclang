@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <runtime|hardware> [out-dir]" >&2
+    echo "usage: $0 <runtime|hardware|font-gallery> [out-dir]" >&2
     exit 2
 fi
 
@@ -14,6 +14,10 @@ CC="$ATFE/bin/clang"
 LD="$ATFE/bin/ld.lld"
 NM="$ATFE/bin/llvm-nm"
 
+E2E_SOURCE="$ROOT/tests/e2e"
+E2E_TARGET="hpclang_e2e"
+E2E_ELF="hpclang-e2e.elf"
+
 case "$MODE" in
     runtime)
         E2E_CMAKE_ARGS=(
@@ -22,6 +26,12 @@ case "$MODE" in
         )
         ;;
     hardware)
+        E2E_CMAKE_ARGS=()
+        ;;
+    font-gallery)
+        E2E_SOURCE="$ROOT/tests/e2e/font-gallery"
+        E2E_TARGET="hpclang_font_gallery"
+        E2E_ELF="hpclang-font-gallery.elf"
         E2E_CMAKE_ARGS=()
         ;;
     *)
@@ -34,7 +44,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/launchers"
 
 cmake_args=(
-    -S "$ROOT/tests/e2e"
+    -S "$E2E_SOURCE"
     -B "$OUT/cmake"
     -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/toolchains/hpclang-armv4t.cmake"
     -DHPCLANG_ROOT="$ROOT"
@@ -43,9 +53,9 @@ cmake_args=(
 )
 
 PATH="$ATFE/bin:$PATH" cmake "${cmake_args[@]}"
-PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" -j2
+PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" --target "$E2E_TARGET" -j2
 
-cp "$OUT/cmake/hpclang-e2e.elf" "$OUT/e2e.elf"
+cp "$OUT/cmake/$E2E_ELF" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
 
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
