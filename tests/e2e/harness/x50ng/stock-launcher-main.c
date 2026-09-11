@@ -418,14 +418,12 @@ static void monitor(void *arg)
     /*
      * The payload never changes hpclang_e2e_result after PASS. A different
      * value (or an unmapped address) therefore means stage0 has left HPC1 and
-     * restored the stock address space. Use the same wake-and-capture finish
-     * as Direct instead of declaring success at the PASS screen.
+     * restored the stock address space. Do not inject a wake key here: the
+     * transition back to the stock UI is itself part of the return-path gate.
      */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
-        if (!tap(&on_down, &on_up, 0) ||
-            !later(finish_return, s, RETURN_CAPTURE_US)) {
+        if (!later(finish_return, s, RETURN_CAPTURE_US))
             fail(s, "return-timer");
-        }
         return;
     }
 
