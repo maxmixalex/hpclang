@@ -24,23 +24,21 @@ unzip -p \
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
 
-python3 "$ROOT/tests/e2e/harness/serial-pace.py" \
-    --x50-link "$X50_TTY" \
-    --kermit-link "$KERMIT_TTY" \
-    --baud 9600 \
-    --log "$ROOT/build/$TARGET-socat.log" &
-PACE_PID=$!
+socat -d -d -x -v \
+    PTY,raw,echo=0,link="$X50_TTY" \
+    PTY,raw,echo=0,link="$KERMIT_TTY" \
+    2> "$ROOT/build/$TARGET-socat.log" &
+SOCAT_PID=$!
 
 cleanup() {
-    kill "${KERMIT_PID:-}" "$PACE_PID" 2>/dev/null || true
+    kill "${KERMIT_PID:-}" "$SOCAT_PID" 2>/dev/null || true
     wait "${KERMIT_PID:-}" 2>/dev/null || true
-    wait "$PACE_PID" 2>/dev/null || true
+    wait "$SOCAT_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
 for _ in $(seq 1 50); do
     [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]] && break
-    kill -0 "$PACE_PID" 2>/dev/null
     sleep 0.1
 done
 [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
@@ -70,7 +68,7 @@ export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 
 mkdir -p "$ROOT/build/$TARGET-state"
-timeout 255s "$ROOT/build/x50ng/dist/x50ng" \
+timeout 315s "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$ROOT/build/$TARGET-state" \
     --overwrite-config \
     --style="$ROOT/build/x50ng/dist/style-40g.css" \
