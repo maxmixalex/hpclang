@@ -1,0 +1,16 @@
+{
+  "heading": "${TARGET} hpclang Font Gallery",
+  "required_files": [
+    "build/${TARGET}-e2e.json",
+    "build/${TARGET}-before.pgm",
+    "build/${TARGET}-pass.pgm",
+    "build/${TARGET}-return.pgm"
+  ],
+  "captures": [
+    "build/${TARGET}-pass.pgm",
+    "build/${TARGET}-return.pgm"
+  ],
+  "json": [
+    "build/${TARGET}-e2e.json"
+  ]
+}

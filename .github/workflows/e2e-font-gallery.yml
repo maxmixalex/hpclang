@@ -1,0 +1,189 @@
+name: E2E / Font Gallery
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "runtime/fonts/generated/**"
+      - "include/hpclang/**"
+      - "cmake/**"
+      - "tests/e2e/font-gallery/**"
+      - "tests/e2e/harness/**"
+      - "tests/e2e/specs/font-gallery.json"
+      - "tests/e2e/targets/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-image.sh"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-font-gallery.yml"
+  pull_request:
+    paths:
+      - "runtime/core/**"
+      - "runtime/libc/**"
+      - "runtime/bootstrap/**"
+      - "runtime/fonts/generated/**"
+      - "include/hpclang/**"
+      - "cmake/**"
+      - "tests/e2e/font-gallery/**"
+      - "tests/e2e/harness/**"
+      - "tests/e2e/specs/font-gallery.json"
+      - "tests/e2e/targets/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/prepare-hp48gii-nor.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/pgm-to-png.py"
+      - "tools/pgm-to-summary.py"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-font-gallery.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Font Gallery
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build Font Gallery payload and launchers
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery"
+
+      - name: Upload Font Gallery build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-font-gallery-build
+          retention-days: 1
+          path: |
+            build/e2e-font-gallery/e2e.hpc
+            build/e2e-font-gallery/e2e.result-address
+            build/e2e-font-gallery/launchers/*.bin
+          if-no-files-found: error
+
+  x50ng:
+    name: Prepare universal x50ng
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore or build universal x50ng
+        uses: ./.github/actions/setup-x50ng
+
+      - name: Pack universal x50ng
+        run: tar -C build/x50ng -czf build/x50ng-universal.tar.gz dist
+
+      - name: Upload universal x50ng
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-universal
+          retention-days: 1
+          path: build/x50ng-universal.tar.gz
+          if-no-files-found: error
+
+  direct:
+    name: Gallery / ${{ matrix.family }}
+    needs: [build, x50ng]
+    runs-on: home-docker
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [hp39, hp48, hp4950]
+    env:
+      FAMILY: ${{ matrix.family }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Font Gallery build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-build
+          path: build/e2e
+
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Prepare platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
+
+      - name: Execute Font Gallery family
+        run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
+
+      - name: Generate and publish Font Gallery evidence
+        if: always()
+        continue-on-error: true
+        run: |
+          targets_file="build/direct-$FAMILY-targets.txt"
+          [[ -f "$targets_file" ]] || exit 0
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
+              --image-out "build/$TARGET-font-gallery.png" \
+              --image-only
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              chmod +x tools/publish-ci-image.sh
+              tools/publish-ci-image.sh \
+                "build/$TARGET-font-gallery.png" \
+                "font-gallery/$GITHUB_RUN_ID/$TARGET.png"
+            fi
+            args=(tests/e2e/specs/font-gallery.json)
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+            fi
+            python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+          done < "$targets_file"
+
+      - name: Upload Font Gallery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.family }}-font-gallery-e2e
+          retention-days: 14
+          path: |
+            build/*-before.pgm
+            build/*-before.pgm.png
+            build/*-pass.pgm
+            build/*-pass.pgm.png
+            build/*-return.pgm
+            build/*-return.pgm.png
+            build/*-e2e.json
+            build/*-font-gallery.png
+            build/direct-${{ matrix.family }}-targets.txt
+            build/e2e/e2e.hpc
+          if-no-files-found: warn
