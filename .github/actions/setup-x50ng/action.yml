@@ -30,7 +30,7 @@ runs:
       if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       run: |
-        packages=(git-lfs libglib2.0-dev liblua5.4-dev)
+        packages=(git-lfs libglib2.0-dev liblua5.4-dev libgtk-4-dev libncurses-dev)
         missing=()
         for package in "${packages[@]}"; do
           dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
@@ -46,17 +46,11 @@ runs:
       shell: bash
       run: bash tools/fetch-x50ng.sh build/x50ng
 
-    - name: Build universal headless x50ng
+    - name: Build universal headless-frontend x50ng
       if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       working-directory: build/x50ng
-      run: |
-        make -j2 \
-          WITH_GTK=no \
-          WITH_NCURSES=no \
-          WITH_SDL=no \
-          WITH_SDL2=no \
-          LUA_VERSION=lua5.4
+      run: make -j2 LUA_VERSION=lua5.4
 
     - name: Verify newly built x50ng runtime dependencies
       if: steps.x50ng-state.outputs.binary != 'true'
@@ -64,8 +58,8 @@ runs:
       working-directory: build/x50ng
       run: |
         ldd dist/x50ng | tee dist/x50ng.ldd
-        if grep -E 'libgtk|libncurses|libtinfo' dist/x50ng.ldd; then
-          echo "universal E2E x50ng unexpectedly links a GUI/TUI backend" >&2
+        if grep -q 'not found' dist/x50ng.ldd; then
+          echo "universal E2E x50ng has unresolved runtime libraries" >&2
           exit 1
         fi
 
