@@ -11,6 +11,7 @@ on:
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
       - "runtime/fonts/generated/**"
+      - "platform/armtoolbox/**"
       - "include/hpclang/**"
       - "cmake/**"
       - "tests/e2e/font-gallery/**"
@@ -27,6 +28,9 @@ on:
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
       - "tools/publish-ci-image.sh"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -36,6 +40,7 @@ on:
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
       - "runtime/fonts/generated/**"
+      - "platform/armtoolbox/**"
       - "include/hpclang/**"
       - "cmake/**"
       - "tests/e2e/font-gallery/**"
@@ -51,6 +56,9 @@ on:
       - "tools/fetch-x50ng.sh"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/prepare-hp39-aplet.py"
+      - "tools/package-hp39-aplet.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -83,6 +91,7 @@ jobs:
             build/e2e-font-gallery/e2e.hpc
             build/e2e-font-gallery/e2e.result-address
             build/e2e-font-gallery/launchers/*.bin
+            build/e2e-font-gallery/launchers/*.hp
           if-no-files-found: error
 
   x50ng:
@@ -106,8 +115,52 @@ jobs:
           path: build/x50ng-universal.tar.gz
           if-no-files-found: error
 
+  stock-assets:
+    name: Prepare shared Stock assets
+    needs: build
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Font Gallery build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-build
+          path: build/e2e
+
+      - name: Restore HPGCC39 asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Restore hpcalc asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hpcalc
+          key: hpclang-hpcalc-static-v1
+
+      - name: Install asset preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare shared Stock assets
+        run: bash tests/e2e/harness/prepare-stock-assets.sh build/e2e build/assets
+
+      - name: Upload shared Stock assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-assets
+          retention-days: 1
+          path: build/assets/
+          if-no-files-found: error
+
   direct:
-    name: Gallery / ${{ matrix.family }}
+    name: Direct Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
     timeout-minutes: 15
@@ -154,26 +207,26 @@ jobs:
             [[ -n "$TARGET" ]] || continue
             export TARGET
             python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
-              --image-out "build/$TARGET-font-gallery.png" \
+              --image-out "build/$TARGET-font-gallery-direct.png" \
               --image-only
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
               chmod +x tools/publish-ci-image.sh
               tools/publish-ci-image.sh \
-                "build/$TARGET-font-gallery.png" \
-                "font-gallery/$GITHUB_RUN_ID/$TARGET.png"
+                "build/$TARGET-font-gallery-direct.png" \
+                "font-gallery/direct/$GITHUB_RUN_ID/$TARGET.png"
             fi
             args=(tests/e2e/specs/font-gallery.json)
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/direct/$GITHUB_RUN_ID/$TARGET.png?raw=1")
             fi
             python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
 
-      - name: Upload Font Gallery evidence
+      - name: Upload Direct Font Gallery evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-font-gallery-e2e
+          name: ${{ matrix.family }}-direct-font-gallery-e2e
           retention-days: 14
           path: |
             build/*-before.pgm
@@ -183,7 +236,95 @@ jobs:
             build/*-return.pgm
             build/*-return.pgm.png
             build/*-e2e.json
-            build/*-font-gallery.png
+            build/*-font-gallery-direct.png
             build/direct-${{ matrix.family }}-targets.txt
+            build/e2e/e2e.hpc
+          if-no-files-found: warn
+
+  stock:
+    name: Stock Gallery / ${{ matrix.family }}
+    needs: [build, x50ng, stock-assets]
+    runs-on: home-docker
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [hp39, hp48, hp4950]
+    env:
+      FAMILY: ${{ matrix.family }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Font Gallery build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-build
+          path: build/e2e
+
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Download shared Stock assets
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-assets
+          path: build/assets
+
+      - name: Prepare platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
+
+      - name: Execute Stock Font Gallery family
+        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
+
+      - name: Generate and publish Stock Font Gallery evidence
+        if: always()
+        continue-on-error: true
+        run: |
+          targets_file="build/stock-$FAMILY-targets.txt"
+          [[ -f "$targets_file" ]] || exit 0
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
+              --image-out "build/$TARGET-font-gallery-stock.png" \
+              --image-only
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              chmod +x tools/publish-ci-image.sh
+              tools/publish-ci-image.sh \
+                "build/$TARGET-font-gallery-stock.png" \
+                "font-gallery/stock/$GITHUB_RUN_ID/$TARGET.png"
+            fi
+            args=(tests/e2e/specs/font-gallery.json)
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/stock/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+            fi
+            python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+          done < "$targets_file"
+
+      - name: Upload Stock Font Gallery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.family }}-stock-font-gallery-e2e
+          retention-days: 14
+          path: |
+            build/*-*.pgm
+            build/*-*.pgm.png
+            build/*-*.json
+            build/*-kermit*
+            build/*-socat.log
+            build/*-setup.bin
+            build/*-font-gallery-stock.png
+            build/*-send/*
+            build/stock-${{ matrix.family }}-targets.txt
             build/e2e/e2e.hpc
           if-no-files-found: warn
