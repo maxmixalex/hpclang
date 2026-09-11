@@ -22,6 +22,69 @@ def load_font_tool():
 
 hf = load_font_tool()
 
+
+class PackageView:
+    """Read either the historical manifest-bearing package or the canonical raw fonts/ tree."""
+
+    def __init__(self, path):
+        import zipfile
+
+        self.path = Path(path)
+        self.z = zipfile.ZipFile(path)
+        names = self.z.namelist()
+        self._name_set = set(names)
+        self.synthetic_manifest = "fonts/manifest.json" not in self._name_set
+        if not self.synthetic_manifest:
+            self.root = "fonts/"
+            self.manifest = json.loads(self.z.read("fonts/manifest.json"))
+            self.files = {entry["path"]: entry for entry in self.manifest["files"]}
+            return
+
+        if not any(name.startswith("fonts/") for name in names):
+            raise ValueError("font package has neither fonts/manifest.json nor a fonts/ source tree")
+        self.root = "fonts/"
+        entries = []
+        for name in names:
+            if name.endswith("/") or not name.startswith(self.root):
+                continue
+            logical = name[len(self.root) :]
+            data = self.z.read(name)
+            ext = Path(logical).suffix.lower()
+            sibling_txt = str(Path(logical).with_suffix(".txt")).replace("\\", "/")
+            is_font = ext in {".bdf", ".ttf", ".fon"} or (
+                ext == ".bmp" and self.root + sibling_txt in self._name_set
+            )
+            entries.append(
+                {
+                    "path": logical,
+                    "bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "is_font": is_font,
+                    "format": ext.lstrip("."),
+                    "family": logical.split("/", 1)[0],
+                }
+            )
+        self.manifest = {"schema": "hpclang-font-package-index-v1", "files": entries}
+        self.files = {entry["path"]: entry for entry in entries}
+
+    def data(self, path):
+        return self.z.read(self.root + path)
+
+    def fonts(self):
+        return [entry for entry in self.manifest["files"] if entry.get("is_font")]
+
+    def verify(self):
+        corrupt = self.z.testzip()
+        if corrupt is not None:
+            return [corrupt]
+        bad = []
+        for entry in self.manifest["files"]:
+            data = self.data(entry["path"])
+            if len(data) != entry["bytes"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+                bad.append(entry["path"])
+        return bad
+
+
 SPECIAL_IDS = {
     "newrpl/bitmap-masters/Font6_mediumA.bmp": "newrpl_6a",
     "newrpl/bitmap-masters/Font8_StyleC.bmp": "newrpl_8c",
@@ -210,7 +273,7 @@ def main() -> int:
     if args.chunk_glyphs <= 0:
         parser.error("--chunk-glyphs must be positive")
 
-    package = hf.Package(args.package)
+    package = PackageView(args.package)
     bad = package.verify()
     if bad:
         raise SystemExit("package verification failed:\n" + "\n".join(bad))
@@ -268,6 +331,7 @@ def main() -> int:
             {
                 "package": str(args.package),
                 "package_sha256": hashlib.sha256(Path(args.package).read_bytes()).hexdigest(),
+                "source_index": package.manifest,
                 "faces": records,
             },
             out,
