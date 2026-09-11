@@ -4,10 +4,11 @@
     "build/${TARGET}-e2e.json",
     "build/${TARGET}-before.pgm",
     "build/${TARGET}-pass.pgm",
-    "build/${TARGET}-return.pgm"
+    "build/${TARGET}-return.pgm",
+    "build/${TARGET}-font-gallery.pgm"
   ],
   "captures": [
-    "build/${TARGET}-pass.pgm",
+    "build/${TARGET}-font-gallery.pgm",
     "build/${TARGET}-return.pgm"
   ],
   "json": [
