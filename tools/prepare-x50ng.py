@@ -23,30 +23,21 @@ def copy_frontend(source: Path, destination: Path, entrypoint: str) -> None:
     destination.write_text(text.replace(old, f"int {entrypoint}(int argc, char **argv)", 1))
 
 
-def patch_ui_build(root: Path) -> None:
+def verify_ui_build_inheritance(root: Path) -> None:
     makefile = root / "Makefile"
-    lines = makefile.read_text().splitlines(keepends=True)
     matches = []
-    for index, line in enumerate(lines):
+    for index, line in enumerate(makefile.read_text().splitlines()):
         tokens = line.split()
         if (
-            "libui4x.a" in line
-            and "WITH_SDL=yes" in tokens
-            and "WITH_SDL2=no" in tokens
+            "libui4x.a" in tokens
+            and "WITH_SDL=$(WITH_SDL)" in tokens
+            and "WITH_SDL2=$(WITH_SDL2)" in tokens
         ):
             matches.append(index)
     if len(matches) != 1:
         raise SystemExit(
-            f"{makefile}: expected one ui4x SDL selector line, found {len(matches)}"
+            f"{makefile}: expected one inherited ui4x SDL selector line, found {len(matches)}"
         )
-
-    index = matches[0]
-    lines[index] = lines[index].replace(
-        "WITH_SDL=yes", "WITH_SDL=$(WITH_SDL)", 1
-    ).replace(
-        "WITH_SDL2=no", "WITH_SDL2=$(WITH_SDL2)", 1
-    )
-    makefile.write_text("".join(lines))
 
 
 def patch_universal_flash(root: Path) -> None:
@@ -316,7 +307,7 @@ def main() -> None:
 
     root = args.x50ng
     patch_frontends(root, args)
-    patch_ui_build(root)
+    verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
     patch_host_uart0(root)
