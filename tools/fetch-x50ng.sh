@@ -48,6 +48,9 @@ if (( ! submodule_ok )); then
     exit 1
 fi
 
+echo 'Pinned x50ng Makefile selector context:'
+grep -nE 'ui4x|WITH_SDL' "$DEST/Makefile" || true
+
 python3 "$ROOT/tools/prepare-x50ng.py" \
     "$DEST" \
     --direct-frontend "$ROOT/tests/e2e/harness/x50ng/e2e-main.c" \
