@@ -253,11 +253,17 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     shutil.copy2(args.selector, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
 
-    replace_once(
-        root / "Makefile",
-        "\t./src/main.c\n",
-        "\t./src/hpclang_direct.c \\\n\t./src/hpclang_stock.c \\\n\t./src/main.c\n",
-        "hpclang universal frontend sources",
+    makefile = root / "Makefile"
+    text = makefile.read_text()
+    anchor = "\t./src/main.c"
+    if text.count(anchor) != 1:
+        raise SystemExit(f"{makefile}: hpclang universal frontend sources anchor changed")
+    makefile.write_text(
+        text.replace(
+            anchor,
+            "\t./src/hpclang_direct.c \\\n\t./src/hpclang_stock.c \\\n\t./src/main.c",
+            1,
+        )
     )
 
 
