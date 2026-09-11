@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import sys
@@ -24,32 +23,24 @@ hf = load_font_tool()
 
 
 class PackageView:
-    """Read the canonical raw fonts/ tree and the older manifest package shape."""
+    """Read the canonical raw fonts/ tree from runtime/fonts/fonts.zip."""
 
     def __init__(self, path):
         import zipfile
 
         self.path = Path(path)
         self.z = zipfile.ZipFile(path)
+        self.root = "fonts/"
         names = self.z.namelist()
         self._name_set = set(names)
-        self.synthetic_manifest = "fonts/manifest.json" not in self._name_set
-        self.root = "fonts/"
-
-        if not self.synthetic_manifest:
-            self.manifest = json.loads(self.z.read("fonts/manifest.json"))
-            self.files = {entry["path"]: entry for entry in self.manifest["files"]}
-            return
-
-        if not any(name.startswith(self.root) for name in names):
-            raise ValueError("font package has neither fonts/manifest.json nor a fonts/ source tree")
+        if not any(name.startswith(self.root) and not name.endswith("/") for name in names):
+            raise ValueError("font package has no fonts/ source tree")
 
         entries = []
         for name in names:
             if name.endswith("/") or not name.startswith(self.root):
                 continue
             logical = name[len(self.root) :]
-            data = self.z.read(name)
             ext = Path(logical).suffix.lower()
             sibling_txt = str(Path(logical).with_suffix(".txt")).replace("\\", "/")
             is_font = ext in {".bdf", ".ttf", ".fon"} or (
@@ -58,7 +49,7 @@ class PackageView:
             entries.append(
                 {
                     "path": logical,
-                    "bytes": len(data),
+                    "bytes": self.z.getinfo(name).file_size,
                     "is_font": is_font,
                     "format": ext.lstrip("."),
                     "family": logical.split("/", 1)[0],
@@ -72,26 +63,6 @@ class PackageView:
 
     def fonts(self):
         return [entry for entry in self.manifest["files"] if entry.get("is_font")]
-
-    def verify(self):
-        """Validate archive readability; honor hashes only when supplied externally."""
-        corrupt = self.z.testzip()
-        if corrupt is not None:
-            return [corrupt]
-        if self.synthetic_manifest:
-            return []
-
-        bad = []
-        for entry in self.manifest["files"]:
-            data = self.data(entry["path"])
-            expected_bytes = entry.get("bytes")
-            expected_sha = entry.get("sha256")
-            if expected_bytes is not None and len(data) != expected_bytes:
-                bad.append(entry["path"])
-                continue
-            if expected_sha is not None and hashlib.sha256(data).hexdigest() != expected_sha:
-                bad.append(entry["path"])
-        return bad
 
 
 SPECIAL_IDS = {
@@ -287,10 +258,6 @@ def main() -> int:
         parser.error("--chunk-glyphs must be positive")
 
     package = PackageView(args.package)
-    bad = package.verify()
-    if bad:
-        raise SystemExit("package verification failed:\n" + "\n".join(bad))
-
     rows = hf.catalog(package)
     if args.selector:
         wanted = set(args.selector)

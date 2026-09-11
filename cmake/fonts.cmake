@@ -10,9 +10,9 @@ include("${HPCLANG_ROOT}/runtime/fonts/generated/index.cmake")
 function(_hpclang_font_resolve out_id selector)
     if(selector STREQUAL "@mini")
         set(id newrpl_6a)
-    elseif(selector STREQUAL "@text" OR selector STREQUAL "@normal")
+    elseif(selector STREQUAL "@text")
         set(id newrpl_8c)
-    elseif(selector STREQUAL "@edit-large" OR selector STREQUAL "@large")
+    elseif(selector STREQUAL "@edit-large")
         set(id newrpl_10a)
     else()
         set(id "${selector}")
@@ -93,18 +93,11 @@ function(hpclang_target_font target)
 
     _hpclang_font_resolve(font_id "${HF_FONT}")
 
-    # Large generated faces may be split over several assembly translation
-    # units. Older in-flight catalogs used a singular SOURCE variable, which is
-    # still accepted while this branch is being consolidated.
     set(sources_var "HPCLANG_FONT_${font_id}_SOURCES")
-    set(source_var "HPCLANG_FONT_${font_id}_SOURCE")
-    if(DEFINED ${sources_var})
-        set(font_sources "${${sources_var}}")
-    elseif(DEFINED ${source_var})
-        set(font_sources "${${source_var}}")
-    else()
+    if(NOT DEFINED ${sources_var})
         message(FATAL_ERROR "unknown pre-generated hpclang font: ${HF_FONT}")
     endif()
+    set(font_sources "${${sources_var}}")
 
     set(ascent_var "HPCLANG_FONT_${font_id}_ASCENT")
     set(descent_var "HPCLANG_FONT_${font_id}_DESCENT")
@@ -113,12 +106,7 @@ function(hpclang_target_font target)
     set(codepoints_var "HPCLANG_FONT_${font_id}_CODEPOINTS")
     set(codepoints_file_var "HPCLANG_FONT_${font_id}_CODEPOINTS_FILE")
 
-    if(DEFINED ${codepoints_file_var})
-        include("${${codepoints_file_var}}")
-    endif()
-    if(NOT DEFINED ${codepoints_var})
-        message(FATAL_ERROR "pre-generated hpclang font has no codepoint catalog: ${HF_FONT}")
-    endif()
+    include("${${codepoints_file_var}}")
     set(available "${${codepoints_var}}")
 
     set(out_dir "${CMAKE_CURRENT_BINARY_DIR}/hpclang-fonts")
@@ -158,9 +146,6 @@ function(hpclang_target_font target)
             message(FATAL_ERROR "STATIC_AUTO target ${target} has no scannable C/C++ sources")
         endif()
 
-        # Source-content changes must refresh the configure-time repertoire.
-        # This preserves a normal incremental-build workflow without requiring
-        # Python or another host-side font scanner.
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ui_sources})
         hpclang_collect_ui_text_codepoints(selected ${ui_sources})
         if(NOT selected)

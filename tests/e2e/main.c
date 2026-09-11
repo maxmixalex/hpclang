@@ -15,6 +15,9 @@
 #include <hpclang/time.h>
 
 int hpclang_e2e_cpp_test(void);
+extern const struct hpclang_font hpclang_e2e_ui_font;
+
+static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
 
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
@@ -187,7 +190,9 @@ static const uint8_t keyboard_main_scans[7][5] = {
 static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
 {
     hpclang_surface_clear(surface, 0u);
-    text(surface, 2, 1, "KEY TEST");
+    hpclang_surface_draw_text(
+        surface, &hpclang_e2e_ui_font, 2, 1,
+        hpclang_e2e_font_label, 255u);
 
     if (pass) {
         text(surface, 99, 1, "PASS 51");

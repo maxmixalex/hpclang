@@ -26,12 +26,11 @@ target_compile_options(hpclang_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 
-# Keep one generated-font consumer in the canonical calculator payload. This
-# proves that STATIC_AUTO extraction, generated assembly, ARMv4T assembly/link,
-# bitmap-font lookup, and section-GC integration remain usable together.
+# The generated mini font is both exercised off-screen by the C++ probe and
+# rendered visibly in the normal PASS screenshot as the "FONT OK" label.
 hpclang_target_font(hpclang_e2e
     NAME hpclang_e2e_ui_font
-    FONT @text
+    FONT @mini
     MODE STATIC_AUTO
     FALLBACK NONE)
 

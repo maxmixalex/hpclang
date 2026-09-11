@@ -89,7 +89,6 @@ jobs:
         run: |
           chmod +x tools/build-e2e.sh
           tools/build-e2e.sh direct "$GITHUB_WORKSPACE/build/e2e-direct"
-          echo "Shared payload SHA-256: $(cat build/e2e-direct/e2e.payload-sha256)"
 
       - name: Upload Direct build
         uses: actions/upload-artifact@v7
@@ -99,7 +98,6 @@ jobs:
           path: |
             build/e2e-direct/e2e.hpc
             build/e2e-direct/e2e.result-address
-            build/e2e-direct/e2e.payload-sha256
             build/e2e-direct/launchers/*.bin
           if-no-files-found: error
 
@@ -175,5 +173,4 @@ jobs:
             build/direct-${{ matrix.family }}-targets.txt
             build/e2e/launchers/*.bin
             build/e2e/e2e.hpc
-            build/e2e/e2e.payload-sha256
           if-no-files-found: warn

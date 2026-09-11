@@ -8,16 +8,10 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET="$1"
-APP_DIR="$(realpath "$2")"
 
 while IFS= read -r line; do
     export "$line"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
-
-# Direct and Stock use hpclang_e2e_result as the single payload state channel.
-# Keep the launcher's phase-address compatibility input for now, but point it
-# at the result word: KBRD -> PASS/FAIL all travel through that one address.
-export HPCLANG_STOCK_PHASE_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 
 case "$HPCLANG_E2E_FAMILY" in
     hp39)
