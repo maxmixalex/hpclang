@@ -50,7 +50,7 @@ runs:
       if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       working-directory: build/x50ng
-      run: make -j2 LUA_VERSION=lua5.4
+      run: make -j2 WITH_SDL=no WITH_SDL2=no LUA_VERSION=lua5.4
 
     - name: Verify newly built x50ng runtime dependencies
       if: steps.x50ng-state.outputs.binary != 'true'
