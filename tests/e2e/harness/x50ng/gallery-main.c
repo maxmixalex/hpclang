@@ -28,11 +28,13 @@
 #define STAGE_SIZE (STAGE_PAGES * 0x1000u)
 #define INJECT_L2_PHYS (TEST_PHYS + STAGE_SIZE)
 #define INJECT_PHYS (INJECT_L2_PHYS + 0x1000u)
-#define INJECT_PAGES 64u
+#define INJECT_PAGES 159u
 #define INJECT_VA 0x30000000u
 #define STAGE0_VA (INJECT_VA + 0x1000u)
-#define SYNTH_STACK_TOP (INJECT_VA + 0x3f000u - 16u)
-#define SENTINEL_VA (INJECT_VA + 0x3f000u)
+#define SYNTH_STACK_TOP \
+    (INJECT_VA + (INJECT_PAGES - 2u) * 0x1000u - 16u)
+#define SENTINEL_VA \
+    (INJECT_VA + (INJECT_PAGES - 1u) * 0x1000u)
 
 #define L1_DATA_VA 0x07f00044u
 #define L1_CODE_VA 0x07f00048u
@@ -47,7 +49,7 @@
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
 #define POLL_US 20000LL
-#define DEADLINE_US 60000000LL
+#define DEADLINE_US 300000000LL
 #define KEY_HOLD_US 50000LL
 #define KEY_SETTLE_US 120000LL
 #define RETURN_ON_US 200000LL
@@ -211,7 +213,7 @@ static unsigned capture_lcd(hdw_t *h, const char *path, int height)
 static int capture_gallery(struct state *s, uint32_t index, uint32_t page)
 {
     char path[512];
-    snprintf(path, sizeof(path), "%s/%02u-%s.pgm",
+    snprintf(path, sizeof(path), "%s/%04u-%s.pgm",
         s->gallery_dir, index, page == 0u ? "sample" : "text");
     if (!capture_lcd(s->hdw, path, s->lcd_height))
         return 0;
@@ -403,11 +405,11 @@ static void finish_return(void *arg)
 
 static int drive_gallery(struct state *s, uint32_t value)
 {
-    uint32_t count = (value >> 16) & 0xffu;
-    uint32_t page = (value >> 8) & 0xffu;
-    uint32_t index = value & 0xffu;
+    uint32_t page = (value >> 23) & 1u;
+    uint32_t count = (value >> 12) & 0x7ffu;
+    uint32_t index = value & 0xfffu;
 
-    if (count == 0u || index >= count || page > 1u)
+    if (count == 0u || index >= count)
         return 0;
     if (s->key_busy || timer_get_clock() < s->next_action)
         return 1;
