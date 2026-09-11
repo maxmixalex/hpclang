@@ -10,6 +10,7 @@ on:
       - "include/hpclang/**"
       - "cmake/**"
       - "tests/unit/**"
+      - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/cpp.cpp"
@@ -31,6 +32,7 @@ on:
       - "include/hpclang/**"
       - "cmake/**"
       - "tests/unit/**"
+      - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
       - "tests/e2e/cpp.cpp"
@@ -72,6 +74,11 @@ jobs:
           cmake --build build/unit -j2
           ctest --test-dir build/unit --output-on-failure
 
+      - name: Verify font selection modes
+        run: |
+          cmake -S tests/font-cmake -B build/font-cmake \
+            -DHPCLANG_ROOT="$GITHUB_WORKSPACE"
+
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
@@ -105,18 +112,19 @@ jobs:
           name: e2e-hardware-build
           path: build/package
 
-      - name: Install HP39 packaging dependency
-        run: |
-          if ! command -v innoextract >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends innoextract
-          fi
-
       - name: Restore prepared HPGCC39 cache
         uses: actions/cache@v6
         with:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install HP39 packaging dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends innoextract
+          fi
 
       - name: Prepare hardware-validation packages
         run: |
@@ -125,9 +133,14 @@ jobs:
 
           for target in hp39gplus hp39gs hp40gs; do
             root="dist/$target-hardware-validation"
-            tools/package-hp39-aplet.sh               "build/package/launchers/$target.hp"               "$root"               "$target"
+            tools/package-hp39-aplet.sh \
+              "build/package/launchers/$target.hp" \
+              "$root" \
+              "$target"
             cp build/package/e2e.result-address "$root/E2E_RESULT_ADDRESS.txt"
-            printf 'commit=%s\nworkflow_run=%s\n'               "$GITHUB_SHA" "$GITHUB_RUN_ID"               > "$root/BUILD_INFO.txt"
+            printf 'commit=%s\nworkflow_run=%s\n' \
+              "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+              > "$root/BUILD_INFO.txt"
           done
 
       - name: Upload HP39g+ hardware validation bundle

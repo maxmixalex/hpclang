@@ -117,9 +117,10 @@ jobs:
           path: .cache/hpcalc
           key: hpclang-hpcalc-static-v1
 
-      - name: Install asset preparation dependency
+      - name: Install asset preparation dependency on cache miss
         run: |
-          if ! command -v innoextract >/dev/null 2>&1; then
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends innoextract
           fi
