@@ -24,12 +24,29 @@ def copy_frontend(source: Path, destination: Path, entrypoint: str) -> None:
 
 
 def patch_ui_build(root: Path) -> None:
-    replace_once(
-        root / "Makefile",
-        "libui4x.a WITH_SDL=yes WITH_SDL2=no",
-        "libui4x.a WITH_SDL=$(WITH_SDL) WITH_SDL2=$(WITH_SDL2)",
-        "ui4x SDL selector inheritance",
+    makefile = root / "Makefile"
+    lines = makefile.read_text().splitlines(keepends=True)
+    matches = []
+    for index, line in enumerate(lines):
+        tokens = line.split()
+        if (
+            "libui4x.a" in line
+            and "WITH_SDL=yes" in tokens
+            and "WITH_SDL2=no" in tokens
+        ):
+            matches.append(index)
+    if len(matches) != 1:
+        raise SystemExit(
+            f"{makefile}: expected one ui4x SDL selector line, found {len(matches)}"
+        )
+
+    index = matches[0]
+    lines[index] = lines[index].replace(
+        "WITH_SDL=yes", "WITH_SDL=$(WITH_SDL)", 1
+    ).replace(
+        "WITH_SDL2=no", "WITH_SDL2=$(WITH_SDL2)", 1
     )
+    makefile.write_text("".join(lines))
 
 
 def patch_universal_flash(root: Path) -> None:
@@ -59,17 +76,17 @@ static size_t hpclang_sram_size( void )
     char* end = NULL;
     unsigned long value;
 
-    if ( text == NULL || *text == '\\0' )
+    if ( text == NULL || *text == '\0' )
         return S3C2410_SRAM_DEFAULT_SIZE;
 
     errno = 0;
     value = strtoul( text, &end, 0 );
-    if ( errno != 0 || end == text || *end != '\\0' ||
+    if ( errno != 0 || end == text || *end != '\0' ||
          ( value != S3C2410_SRAM_DEFAULT_SIZE &&
            value != S3C2410_SRAM_HP48_SIZE ) ) {
         fprintf( stderr,
                  "hpclang-x50ng: unsupported SRAM size %s "
-                 "(expected 0x40000 or 0x80000)\\n",
+                 "(expected 0x40000 or 0x80000)\n",
                  text );
         return 0;
     }
@@ -195,7 +212,7 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
             if ( uart_regs->host_fd < 0 ) {
                 fprintf(
                     stderr,
-                    "s3c2410-uart0: cannot open host transport %s: %s\\n",
+                    "s3c2410-uart0: cannot open host transport %s: %s\n",
                     host_path,
                     strerror( errno ) );
                 return -errno;
