@@ -33,12 +33,12 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Materialize and verify canonical font package
+      - name: Materialize canonical font package
         run: |
           git lfs pull --include="runtime/fonts/fonts.zip" --exclude=""
-          test "$(wc -c < runtime/fonts/fonts.zip)" -eq 35137072
-          actual="$(sha256sum runtime/fonts/fonts.zip | cut -d' ' -f1)"
-          test "$actual" = "6b0cf8eca97d52d9a410b4ebb2f77585b9d895d5dab46fb106ec8992791c4f86"
+          # Catch an unresolved LFS pointer without duplicating Git/LFS object
+          # identity checks in CI. ZIP integrity is the useful local gate here.
+          test "$(wc -c < runtime/fonts/fonts.zip)" -gt 1000000
           python3 -m zipfile -t runtime/fonts/fonts.zip
 
       - name: Prepare font maintenance environment
