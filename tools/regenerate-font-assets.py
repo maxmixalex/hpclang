@@ -24,7 +24,7 @@ hf = load_font_tool()
 
 
 class PackageView:
-    """Read either the historical manifest-bearing package or the canonical raw fonts/ tree."""
+    """Read the canonical raw fonts/ tree and the older manifest package shape."""
 
     def __init__(self, path):
         import zipfile
@@ -34,15 +34,16 @@ class PackageView:
         names = self.z.namelist()
         self._name_set = set(names)
         self.synthetic_manifest = "fonts/manifest.json" not in self._name_set
+        self.root = "fonts/"
+
         if not self.synthetic_manifest:
-            self.root = "fonts/"
             self.manifest = json.loads(self.z.read("fonts/manifest.json"))
             self.files = {entry["path"]: entry for entry in self.manifest["files"]}
             return
 
-        if not any(name.startswith("fonts/") for name in names):
+        if not any(name.startswith(self.root) for name in names):
             raise ValueError("font package has neither fonts/manifest.json nor a fonts/ source tree")
-        self.root = "fonts/"
+
         entries = []
         for name in names:
             if name.endswith("/") or not name.startswith(self.root):
@@ -58,7 +59,6 @@ class PackageView:
                 {
                     "path": logical,
                     "bytes": len(data),
-                    "sha256": hashlib.sha256(data).hexdigest(),
                     "is_font": is_font,
                     "format": ext.lstrip("."),
                     "family": logical.split("/", 1)[0],
@@ -74,13 +74,22 @@ class PackageView:
         return [entry for entry in self.manifest["files"] if entry.get("is_font")]
 
     def verify(self):
+        """Validate archive readability; honor hashes only when supplied externally."""
         corrupt = self.z.testzip()
         if corrupt is not None:
             return [corrupt]
+        if self.synthetic_manifest:
+            return []
+
         bad = []
         for entry in self.manifest["files"]:
             data = self.data(entry["path"])
-            if len(data) != entry["bytes"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+            expected_bytes = entry.get("bytes")
+            expected_sha = entry.get("sha256")
+            if expected_bytes is not None and len(data) != expected_bytes:
+                bad.append(entry["path"])
+                continue
+            if expected_sha is not None and hashlib.sha256(data).hexdigest() != expected_sha:
                 bad.append(entry["path"])
         return bad
 
@@ -99,18 +108,21 @@ def cmake_quote(value: str) -> str:
 def face_id(row: dict, used: dict[str, str]) -> str:
     selector = row["selector"]
     if selector in SPECIAL_IDS:
-        ident = SPECIAL_IDS[selector]
+        base = SPECIAL_IDS[selector]
     else:
         family = str(row.get("family") or Path(row["path"]).parent.name or "font")
         stem = Path(row["path"]).stem
         face = str(row.get("face") or "")
         raw = "_".join(part for part in (family, stem, face) if part)
-        ident = hf.c_ident(raw).lower().strip("_") or "font"
-        if ident[0].isdigit():
-            ident = "font_" + ident
-    owner = used.get(ident)
-    if owner is not None and owner != selector:
-        ident += "_" + hashlib.sha256(selector.encode("utf-8")).hexdigest()[:8]
+        base = hf.c_ident(raw).lower().strip("_") or "font"
+        if base[0].isdigit():
+            base = "font_" + base
+
+    ident = base
+    suffix = 2
+    while ident in used and used[ident] != selector:
+        ident = f"{base}_{suffix}"
+        suffix += 1
     used[ident] = selector
     return ident
 
@@ -331,7 +343,6 @@ def main() -> int:
         json.dump(
             {
                 "package": str(args.package),
-                "package_sha256": hashlib.sha256(Path(args.package).read_bytes()).hexdigest(),
                 "source_index": package.manifest,
                 "faces": records,
             },
