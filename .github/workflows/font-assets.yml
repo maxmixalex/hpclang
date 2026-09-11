@@ -38,6 +38,18 @@ jobs:
           git lfs pull --include="runtime/fonts/fonts.zip" --exclude=""
           test "$(wc -c < runtime/fonts/fonts.zip)" -gt 1000000
           sha256sum runtime/fonts/fonts.zip
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("runtime/fonts/fonts.zip") as archive:
+              names = archive.namelist()
+              manifests = [name for name in names if name.lower().endswith("manifest.json")]
+              print("manifest candidates:")
+              for name in manifests:
+                  print("  ", name)
+              print("first archive entries:")
+              for name in names[:30]:
+                  print("  ", name)
+          PY
 
       - name: Prepare font maintenance environment
         run: |
