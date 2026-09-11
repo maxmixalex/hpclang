@@ -20,20 +20,17 @@ Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calcu
 
 They are not vendored into the normal source tree unless their redistribution terms are explicitly suitable. Where CI needs an external firmware fixture, the documentation must record what the fixture is, where it came from, and how its identity is checked.
 
-## Built-in bitmap fonts
+## Font assets
 
-**Blocker:** the final mini/big glyph source is not frozen yet.
+The old provisional Basic-Latin tables are no longer the long-term custom-font source. `runtime/fonts/fonts.zip` is the reviewed source bundle used to regenerate the checked-in font catalog. It contains upstream font families together with their source distributions/license material; redistribution decisions are made per included family rather than inferred from historical HPGCC code.
 
-The current implementation mechanically extracts printable Basic Latin glyphs
-from the X11 misc-fixed 4x6 and 5x7 ISO10646-1 BDF fonts. Those BDF headers
-identify the fonts as public domain ("Share and enjoy."), so the current tables
-are safe as an implementation candidate.
+Repository-maintenance tooling parses the selected BDF, TTF, FON, and newRPL bitmap sources and emits independent hpclang assembly assets. Normal application builds consume only those generated assets and do not execute source-font tooling.
 
-Historical HPG also embeds two complete 256-entry bitmap fonts with the same
-6/4 and 8/6 metrics. Those tables are useful only for understanding legacy HPG
-font behavior; they are not currently candidates for hpclang's built-in font
-assets and must not be copied into the runtime. The built-in font asset remains
-blocked until an explicitly selected redistributable source is approved.
+The stock-ROM fonts exposed by `hpclang_font_mini()`, `hpclang_font_big()`, and `hpclang_font_default()` are a separate case: hpclang reads the calculator's own active ROM data at runtime and does not copy those ROM bitmap tables into the repository.
+
+Historical HPG font tables remain compatibility evidence only. They must not be copied into hpclang merely to reproduce the old 256-entry HPG character namespace.
+
+The custom-font build contract has three repertoire modes—`STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`—but those modes do not change licensing. A generated application must still use a face whose upstream terms permit the intended redistribution/use. The source bundle and its accompanying license material are therefore the provenance reference; generated `.S` files are derived build assets, not a substitute for upstream license notices.
 
 ## Implementation discipline
 
