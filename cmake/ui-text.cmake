@@ -115,6 +115,17 @@ endfunction()
 
 function(_hpclang_ui_text_extract_file out source)
     file(READ "${source}" _data)
+
+    # Most application/runtime files do not contain a marker. Avoid entering
+    # the character-by-character lexer for those files; they remain registered
+    # in CMAKE_CONFIGURE_DEPENDS by the caller, so adding a marker later still
+    # causes CMake to reconfigure and rescan the file.
+    string(FIND "${_data}" "HPCLANG_UI_TEXT" _marker_hint)
+    if(_marker_hint EQUAL -1)
+        set(${out} "" PARENT_SCOPE)
+        return()
+    endif()
+
     string(LENGTH "${_data}" _len)
     set(_i 0)
     set(_line 1)
