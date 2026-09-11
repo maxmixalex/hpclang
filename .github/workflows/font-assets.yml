@@ -10,9 +10,6 @@ on:
       - m7-fonts-gallery
     paths:
       - "runtime/fonts/fonts.zip"
-      - "runtime/fonts/README.md"
-      - "include/hpclang/font-package.h"
-      - "cmake/fonts.cmake"
       - "tools/hpclang-font.py"
       - "tools/regenerate-font-assets.py"
       - ".github/workflows/font-assets.yml"
