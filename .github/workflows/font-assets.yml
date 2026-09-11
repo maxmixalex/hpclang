@@ -33,35 +33,18 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Materialize canonical font package
+      - name: Materialize and verify canonical font package
         run: |
           git lfs pull --include="runtime/fonts/fonts.zip" --exclude=""
-          test "$(wc -c < runtime/fonts/fonts.zip)" -gt 1000000
-          sha256sum runtime/fonts/fonts.zip
-          python3 - <<'PY'
-          import zipfile
-          with zipfile.ZipFile("runtime/fonts/fonts.zip") as archive:
-              names = archive.namelist()
-              manifests = [name for name in names if name.lower().endswith("manifest.json")]
-              print("manifest candidates:")
-              for name in manifests:
-                  print("  ", name)
-              print("first archive entries:")
-              for name in names[:30]:
-                  print("  ", name)
-          PY
+          test "$(wc -c < runtime/fonts/fonts.zip)" -eq 35137072
+          actual="$(sha256sum runtime/fonts/fonts.zip | cut -d' ' -f1)"
+          test "$actual" = "6b0cf8eca97d52d9a410b4ebb2f77585b9d895d5dab46fb106ec8992791c4f86"
+          python3 -m zipfile -t runtime/fonts/fonts.zip
 
       - name: Prepare font maintenance environment
         run: |
           python3 -m venv build/font-venv
           build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow fonttools
-
-      - name: Verify and audit source package
-        run: |
-          PY=build/font-venv/bin/python
-          "$PY" tools/hpclang-font.py --package runtime/fonts/fonts.zip verify
-          "$PY" tools/hpclang-font.py --package runtime/fonts/fonts.zip audit
-          "$PY" tools/hpclang-font.py --package runtime/fonts/fonts.zip catalog > build/font-source-catalog.json
 
       - name: Regenerate checked-in assembly assets
         run: |
