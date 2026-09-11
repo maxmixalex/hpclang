@@ -30,6 +30,6 @@ for package in "${packages[@]}"; do
 done
 
 if (( ${#missing[@]} )); then
-    sudo apt-get update -qq
-    sudo apt-get install -y --no-install-recommends "${missing[@]}"
+    sudo -E apt-get update -qq
+    sudo -E apt-get install -y --no-install-recommends "${missing[@]}"
 fi

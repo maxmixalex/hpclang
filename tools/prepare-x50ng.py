@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a pinned x50ng checkout for one hpclang headless E2E frontend."""
+"""Prepare one pinned x50ng build for all hpclang headless E2E modes/models."""
 
 from __future__ import annotations
 
@@ -13,6 +13,97 @@ def replace_once(path: Path, old: str, new: str, what: str) -> None:
     if old not in text:
         raise SystemExit(f"{path}: {what} anchor changed")
     path.write_text(text.replace(old, new, 1))
+
+
+def copy_frontend(source: Path, destination: Path, entrypoint: str) -> None:
+    text = source.read_text()
+    old = "int main(int argc, char **argv)"
+    if text.count(old) != 1:
+        raise SystemExit(f"{source}: expected exactly one x50ng frontend main()")
+    destination.write_text(text.replace(old, f"int {entrypoint}(int argc, char **argv)", 1))
+
+
+def patch_universal_flash(root: Path) -> None:
+    replace_once(
+        root / "src" / "flash.c",
+        'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
+        '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0 &&
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP48GIIMAGE", 16 ) != 0''',
+        "universal HP39/40/48 firmware headers",
+    )
+
+
+def patch_runtime_sram(root: Path) -> None:
+    path = root / "src" / "sram.c"
+
+    replace_once(
+        path,
+        "#define S3C2410_SRAM_SIZE 0x00080000\n",
+        '''#define S3C2410_SRAM_DEFAULT_SIZE 0x00080000
+#define S3C2410_SRAM_HP48_SIZE 0x00040000
+
+static size_t hpclang_sram_size( void )
+{
+    const char* text = getenv( "HPCLANG_X50NG_SRAM_SIZE" );
+    char* end = NULL;
+    unsigned long value;
+
+    if ( text == NULL || *text == '\\0' )
+        return S3C2410_SRAM_DEFAULT_SIZE;
+
+    errno = 0;
+    value = strtoul( text, &end, 0 );
+    if ( errno != 0 || end == text || *end != '\\0' ||
+         ( value != S3C2410_SRAM_DEFAULT_SIZE &&
+           value != S3C2410_SRAM_HP48_SIZE ) ) {
+        fprintf( stderr,
+                 "hpclang-x50ng: unsupported SRAM size %s "
+                 "(expected 0x40000 or 0x80000)\\n",
+                 text );
+        return 0;
+    }
+
+    return ( size_t )value;
+}
+''',
+        "runtime SRAM selector",
+    )
+    replace_once(
+        path,
+        "    sram->size = 0x00080000;\n",
+        "    if ( sram->size == 0 ) return -EINVAL;\n",
+        "SRAM load keeps runtime-selected size",
+    )
+    replace_once(
+        path,
+        '''    sram->data = ( void* )-1;
+    sram->shadow = ( void* )-1;
+    sram->offset = phys_ram_size;
+    phys_ram_size += S3C2410_SRAM_SIZE;
+    phys_ram_size += S3C2410_SRAM_SIZE;
+
+    cpu_register_physical_memory( S3C2410_SRAM_BASE, S3C2410_SRAM_SIZE, sram->offset | IO_MEM_RAM );
+    cpu_register_physical_memory( S3C2410_SRAM_BASE + S3C2410_SRAM_SIZE, S3C2410_SRAM_SIZE,
+                                  ( sram->offset + S3C2410_SRAM_SIZE ) | IO_MEM_RAM );''',
+        '''    sram->data = ( void* )-1;
+    sram->shadow = ( void* )-1;
+    sram->size = hpclang_sram_size();
+    if ( sram->size == 0 ) {
+        free( sram );
+        module->user_data = NULL;
+        return -EINVAL;
+    }
+    sram->offset = phys_ram_size;
+    phys_ram_size += sram->size;
+    phys_ram_size += sram->size;
+
+    cpu_register_physical_memory( S3C2410_SRAM_BASE, sram->size, sram->offset | IO_MEM_RAM );
+    cpu_register_physical_memory( S3C2410_SRAM_BASE + sram->size, sram->size,
+                                  ( sram->offset + sram->size ) | IO_MEM_RAM );''',
+        "runtime SRAM map size",
+    )
 
 
 def patch_host_uart0(root: Path) -> None:
@@ -34,7 +125,6 @@ def patch_host_uart0(root: Path) -> None:
 } s3c2410_uart_reg_t;""",
         "UART host state",
     )
-
     replace_once(
         path,
         "static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )\n",
@@ -146,64 +236,46 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
     )
 
 
+def patch_reserved_ram(root: Path) -> None:
+    replace_once(
+        root / "src" / "module.c",
+        "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
+        "    /* hpclang E2E reserved RAM, inert unless the Direct harness maps it. */\n"
+        "    phys_ram_size += 0x00100000;\n\n"
+        "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
+        "reserved E2E RAM",
+    )
+
+
+def patch_frontends(root: Path, args: argparse.Namespace) -> None:
+    copy_frontend(args.direct_frontend, root / "src" / "hpclang_direct.c", "hpclang_direct_main")
+    copy_frontend(args.stock_frontend, root / "src" / "hpclang_stock.c", "hpclang_stock_main")
+    shutil.copy2(args.selector, root / "src" / "main.c")
+    shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
+
+    replace_once(
+        root / "Makefile",
+        "\t./src/main.c\n",
+        "\t./src/hpclang_direct.c \\\n\t./src/hpclang_stock.c \\\n\t./src/main.c\n",
+        "hpclang universal frontend sources",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
-    parser.add_argument("--frontend", type=Path, required=True)
+    parser.add_argument("--direct-frontend", type=Path, required=True)
+    parser.add_argument("--stock-frontend", type=Path, required=True)
+    parser.add_argument("--selector", type=Path, required=True)
     parser.add_argument("--headless-header", type=Path, required=True)
-    parser.add_argument("--hp39", action="store_true")
-    parser.add_argument("--hp48", action="store_true")
-    parser.add_argument("--host-uart0", action="store_true")
-    parser.add_argument("--reserve-ram", action="store_true")
     args = parser.parse_args()
 
     root = args.x50ng
-    shutil.copy2(args.frontend, root / "src" / "main.c")
-    shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
-
-    if args.hp39:
-        replace_once(
-            root / "src" / "flash.c",
-            'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
-            '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0''',
-            "HP39 firmware header",
-        )
-
-    if args.hp48:
-        replace_once(
-            root / "src" / "sram.c",
-            "#define S3C2410_SRAM_SIZE 0x00080000",
-            "#define S3C2410_SRAM_SIZE 0x00040000",
-            "HP48gII SRAM mapping size",
-        )
-        replace_once(
-            root / "src" / "sram.c",
-            "    sram->size = 0x00080000;",
-            "    sram->size = S3C2410_SRAM_SIZE;",
-            "HP48gII SRAM backing size",
-        )
-        replace_once(
-            root / "src" / "flash.c",
-            'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
-            '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP48GIIMAGE", 16 ) != 0''',
-            "HP48gII firmware header",
-        )
-
-    if args.host_uart0:
-        patch_host_uart0(root)
-
-    if args.reserve_ram:
-        replace_once(
-            root / "src" / "module.c",
-            "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
-            "    /* hpclang E2E reserved RAM. */\n"
-            "    phys_ram_size += 0x00100000;\n\n"
-            "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
-            "reserved RAM",
-        )
+    patch_frontends(root, args)
+    patch_universal_flash(root)
+    patch_runtime_sram(root)
+    patch_host_uart0(root)
+    patch_reserved_ram(root)
 
 
 if __name__ == "__main__":

@@ -92,6 +92,27 @@ jobs:
             build/e2e-runtime/launchers/*.hp
           if-no-files-found: error
 
+  x50ng:
+    name: Prepare universal x50ng
+    runs-on: home-docker
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore or build universal x50ng
+        uses: ./.github/actions/setup-x50ng
+
+      - name: Pack universal x50ng
+        run: tar -C build/x50ng -czf build/x50ng-universal.tar.gz dist
+
+      - name: Upload universal x50ng
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-universal
+          retention-days: 1
+          path: build/x50ng-universal.tar.gz
+          if-no-files-found: error
+
   stock-assets:
     name: Prepare shared Stock assets
     needs: build
@@ -121,8 +142,8 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends innoextract
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
           fi
 
       - name: Prepare shared Stock assets
@@ -138,7 +159,7 @@ jobs:
 
   direct:
     name: Direct / ${{ matrix.family }}
-    needs: build
+    needs: [build, x50ng]
     runs-on: home-docker
     timeout-minutes: 15
     strategy:
@@ -157,11 +178,16 @@ jobs:
           name: e2e-runtime-build
           path: build/e2e
 
-      - name: Prepare x50ng family
-        uses: ./.github/actions/setup-x50ng
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
         with:
-          mode: direct
-          family: ${{ matrix.family }}
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
 
       - name: Prepare platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
@@ -211,7 +237,7 @@ jobs:
 
   stock:
     name: Stock / ${{ matrix.family }}
-    needs: [build, stock-assets]
+    needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
     strategy:
@@ -230,17 +256,22 @@ jobs:
           name: e2e-runtime-build
           path: build/e2e
 
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
       - name: Download shared Stock assets
         uses: actions/download-artifact@v7
         with:
           name: e2e-stock-assets
           path: build/assets
-
-      - name: Prepare x50ng family
-        uses: ./.github/actions/setup-x50ng
-        with:
-          mode: stock
-          family: ${{ matrix.family }}
 
       - name: Prepare platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
