@@ -807,6 +807,12 @@ static int keyboard_transition(uint32_t model)
 
     size_t index = 0u;
     int awaiting_up = 0;
+    /*
+     * x50ng injects E2E keys from its realtime clock while this timeout uses
+     * the calculator's stock Timer0. Their rates can differ substantially in
+     * emulation, so bound inactivity between accepted events instead of the
+     * total 51-key host-realtime sequence.
+     */
     uint64_t deadline = hpclang_time_monotonic_us() + UINT64_C(12000000);
 
     while (index < count && hpclang_time_monotonic_us() < deadline) {
@@ -824,6 +830,7 @@ static int keyboard_transition(uint32_t model)
                 return 0;
             }
             awaiting_up = 1;
+            deadline = hpclang_time_monotonic_us() + UINT64_C(12000000);
             continue;
         }
 
@@ -840,6 +847,7 @@ static int keyboard_transition(uint32_t model)
         draw_keyboard_result(surface, 0);
         awaiting_up = 0;
         ++index;
+        deadline = hpclang_time_monotonic_us() + UINT64_C(12000000);
     }
 
     if (index != count || awaiting_up) {
