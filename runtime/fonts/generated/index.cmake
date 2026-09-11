@@ -57,13 +57,13 @@ set(HPCLANG_FONT_IDS
     boutique_bitmap_9x9_boutiquebitmap9x9_3d
     boutique_bitmap_9x9_boutiquebitmap9x9_blur
     boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93
-    boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2
+    boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2
     boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot
     boutique_bitmap_9x9_boutiquebitmap9x9_gradient
     boutique_bitmap_9x9_boutiquebitmap9x9_square_dot
     boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93
     boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93
-    boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f
+    boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2
     cherry_cherry_10_b
     cherry_cherry_10_r
     cherry_cherry_11_b
@@ -1920,41 +1920,41 @@ set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_LINE_HEIGHT 14)
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_NOMINAL_ADVANCE 12)
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93.codepoints.cmake")
 
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_SELECTOR "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9_Bold_1.93.ttf")
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0000.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0001.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0002.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0003.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0004.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0005.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0006.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0007.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0008.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0009.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0010.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0011.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0012.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0013.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0014.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0015.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0016.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0017.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0018.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0019.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0020.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0021.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0022.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0023.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0024.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_0025.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_full.S"
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_SELECTOR "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9_Bold_1.93.ttf")
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0000.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0001.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0002.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0003.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0004.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0005.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0006.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0007.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0008.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0009.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0010.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0011.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0012.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0013.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0014.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0015.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0016.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0017.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0018.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0019.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0020.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0021.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0022.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0023.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0024.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0025.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_full.S"
 )
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_ASCENT 10)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_DESCENT 4)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_LINE_HEIGHT 14)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_NOMINAL_ADVANCE 13)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_49edf4a2.codepoints.cmake")
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_ASCENT 10)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_DESCENT 4)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_LINE_HEIGHT 14)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_NOMINAL_ADVANCE 13)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2.codepoints.cmake")
 
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_SELECTOR "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Circle_Dot.ttf")
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_SOURCES
@@ -2107,43 +2107,43 @@ set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_LINE_HEIGHT 1
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_NOMINAL_ADVANCE 12)
 set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93.codepoints.cmake")
 
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_SELECTOR "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9HK_Bold_1.93.ttf")
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0000.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0001.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0002.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0003.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0004.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0005.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0006.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0007.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0008.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0009.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0010.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0011.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0012.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0013.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0014.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0015.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0016.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0017.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0018.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0019.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0020.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0021.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0022.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0023.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0024.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0025.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0026.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_0027.S"
-    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_full.S"
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_SELECTOR "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9HK_Bold_1.93.ttf")
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0000.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0001.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0002.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0003.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0004.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0005.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0006.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0007.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0008.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0009.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0010.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0011.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0012.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0013.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0014.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0015.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0016.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0017.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0018.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0019.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0020.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0021.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0022.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0023.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0024.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0025.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0026.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0027.S"
+    "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_full.S"
 )
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_ASCENT 10)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_DESCENT 4)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_LINE_HEIGHT 14)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_NOMINAL_ADVANCE 13)
-set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_08c8522f.codepoints.cmake")
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_ASCENT 10)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_DESCENT 4)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_LINE_HEIGHT 14)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_NOMINAL_ADVANCE 13)
+set(HPCLANG_FONT_boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2.codepoints.cmake")
 
 set(HPCLANG_FONT_cherry_cherry_10_b_SELECTOR "cherry/cherry-10-b.bdf")
 set(HPCLANG_FONT_cherry_cherry_10_b_SOURCES
