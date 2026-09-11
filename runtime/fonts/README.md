@@ -6,7 +6,7 @@ The archive is **not** consumed by normal application builds. Python code under 
 
 The intended pipeline is:
 
-1. `sdk/fonts/fonts.zip` — canonical source archive, stored with Git LFS.
+1. `runtime/fonts/fonts.zip` — canonical source archive, stored with Git LFS.
 2. repository-maintenance importer — validates provenance/mappings and regenerates checked-in linkable font assets when the source archive changes.
 3. normal C/C++ build — consumes only those generated assets through CMake/clang/lld; no source-font parser runs here.
 

@@ -4,7 +4,7 @@ if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 endif()
 
-include("${HPCLANG_ROOT}/sdk/fonts/generated/index.cmake")
+include("${HPCLANG_ROOT}/runtime/fonts/generated/index.cmake")
 
 function(_hpclang_font_resolve out_id selector)
     if(selector STREQUAL "@mini")
