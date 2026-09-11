@@ -1,20 +1,39 @@
 # E2E internals
 
 The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
-tests for pure implementation logic. `tests/e2e/` contains one calculator-side
-hpclang consumer project plus the harness data used to launch that same project
-through different targets.
+tests for pure implementation logic. `tests/e2e/` contains calculator-side
+HPC1 applications plus the harness data used to launch them through different
+targets.
+
+The canonical runtime application and focused visual/sample applications are
+separate executables. In particular, Font Gallery is a **separate E2E
+application**; it must not grow as extra screens inside the canonical runtime
+test merely to reuse its launch harness.
 
 The emulator workflows are split by what they prove, not by which historical
 emulator happens to execute them.
 
 ## Test tiers
 
-**Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the unified E2E HPC1 application, and then restores the stock execution state.
+**Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 
-**Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same application.
+**Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same runtime application.
 
-The two tiers are deliberately separate. Direct runtime owns common-bootstrap execution and return correctness. Stock launch owns calculator-side package, transfer, menu, and launcher integration.
+The two tiers are deliberately separate. Direct runtime owns common-bootstrap execution and restoration correctness. Stock launch owns calculator-side package, transfer, menu, and launcher integration. A Stock job may additionally probe the post-return UI, but that visible-return evidence is not interchangeable with reaching HPC1 PASS.
+
+## Return evidence
+
+Return validation has three distinct observations:
+
+1. **payload PASS** — the guest reaches machine-readable `0x50415353`;
+2. **control-flow restoration** — stage0 leaves HPC1 and the stock address space / saved machine state becomes active again;
+3. **visible Stock-UI restoration** — after a harmless native UI action, the LCD is visibly redrawn by the stock OS rather than merely retaining the last hpclang framebuffer.
+
+A nonblank stale hpclang frame proves neither item 2 nor item 3. The harness
+must not copy the pre-launch framebuffer back into place and call that a return.
+For HP39 hardware validation the established post-return action is **APLET**;
+a valid return opens/redraws the normal APLET library. Other families should
+use an equally harmless model-appropriate Stock-UI action.
 
 ## Stock transfer mechanisms
 
@@ -94,28 +113,42 @@ HP 39g+ remains outside the automated matrices until a real-machine stock flash 
 
 ## CI build stages
 
-The E2E source project is target-independent. CI should therefore avoid rebuilding it once per calculator.
+E2E applications are target-independent. CI should therefore avoid rebuilding a selected application once per calculator.
 
-The implemented pipeline has two execution layers, plus one shared-asset stage for Stock:
+For the canonical runtime application, the implemented pipeline has one shared build plus two execution tiers and one shared-asset stage for Stock:
 
-1. **test application** — build one HPC1 application per test mode (Direct or Stock), including all calculator-testable public SDK coverage and all target launchers;
-2. **family execution** — run one job for each of `hp39`, `hp48`, and `hp4950`. The job prepares/restores its x50ng variant once, installs runtime dependencies once, discovers eligible targets from `tests/e2e/targets/*.json`, and executes sibling targets in parallel.
+1. **application build** — build one canonical runtime HPC1 application and all target launchers;
+2. **Direct family execution** — run `hp39`, `hp48`, and `hp4950` against that same artifact;
+3. **Stock family execution** — drive the original package/UI/launcher paths against that same artifact; Stock transfer assets are prepared once and shared.
 
-Stock additionally prepares transfer/launcher assets once before the three family jobs. HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
+Direct and Stock therefore do **not** have separately compiled runtime payloads.
+A focused application such as Font Gallery should get its own build artifact,
+specification and evidence path while reusing the common target/harness
+infrastructure where appropriate.
 
-x50ng's cache is for cross-run reuse. The workflows do not repack a freshly prepared x50ng tree into an intra-run artifact merely to hand it to target jobs; the family job owns both platform preparation and target execution. Build artifacts are reserved for the HPC1 application/launchers and genuinely shared Stock assets.
+HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
 
+## Full-keyboard validation and progression evidence
 
-## Full-keyboard Direct validation
+The canonical runtime E2E injects every physical key position on each automated calculator model. The guest verifies DOWN/UP events, raw scan code, physical key identity, and dedicated-key modifier state for all 51 keys.
 
-Direct E2E injects every physical key position on each automated calculator
-model. The guest verifies DOWN/UP events, raw scan code, physical key identity,
-and dedicated-key modifier state for all 51 keys. Its final LCD screen renders the physical keyboard rather than the electrical
-scan matrix: six menu keys, two three-key control rows beside the cursor
-cluster, and seven five-key main rows. Passed positions are filled, and a
-failing position is left open and marked. The screen labels use the public
-font/text API, so calculator E2E exercises the same rasterization path instead
-of carrying a test-only glyph table. The machine-readable result remains the
-actual gate; the LCD diagram is only a visual summary of the same checks.
+The final LCD screen renders the physical keyboard rather than the electrical scan matrix: six menu keys, two three-key control rows beside the cursor cluster, and seven five-key main rows. Passed positions are filled, and a failing position is left open and marked. The screen labels use the public font/text API, so calculator E2E exercises the same rasterization path instead of carrying a test-only glyph table. The machine-readable result remains the actual gate; the LCD diagram is a visual summary of the same checks.
+
+Direct currently captures an initial hollow keyboard plus one frame after every accepted key release: **52 progression frames** for the 51-key test. Stock should mirror the same capture schedule. The merged progression contact sheet is supplementary evidence and should be published separately from the canonical `before / pass / return` summary rather than being squeezed into that three-frame layout.
+
+## Font Gallery application
+
+Font Gallery is a focused visual/sample E2E application, not part of the
+canonical runtime test. Its acceptance surface should include:
+
+- native semantic roles (`mini`, normal `text`, and `edit-large`) where the target supplies them;
+- generated convenience aliases and arbitrary generated face selection;
+- height, advance, baseline/spacing and representative character coverage;
+- 64-line and 80-line display layouts;
+- deterministic screenshots/contact sheets that can be inspected independently of runtime PASS evidence.
+
+Keeping the gallery separate prevents font exploration from inflating the
+runtime ABI/keyboard/storage test and makes the gallery useful as both visual
+regression evidence and a developer-facing sample application.
