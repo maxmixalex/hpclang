@@ -54,24 +54,43 @@ function(hpclang_target_font target)
     endif()
 
     _hpclang_font_resolve(font_id "${HF_FONT}")
+
+    # New generated catalogs can split large fonts over several assembly sources.
+    # Keep accepting the old singular SOURCE variable so an in-flight source-package
+    # update never makes the branch temporarily unbuildable before regeneration.
+    set(sources_var "HPCLANG_FONT_${font_id}_SOURCES")
     set(source_var "HPCLANG_FONT_${font_id}_SOURCE")
-    if(NOT DEFINED ${source_var})
+    if(DEFINED ${sources_var})
+        set(font_sources "${${sources_var}}")
+    elseif(DEFINED ${source_var})
+        set(font_sources "${${source_var}}")
+    else()
         message(FATAL_ERROR "unknown pre-generated hpclang font: ${HF_FONT}")
     endif()
-    set(font_source "${${source_var}}")
 
     set(ascent_var "HPCLANG_FONT_${font_id}_ASCENT")
     set(descent_var "HPCLANG_FONT_${font_id}_DESCENT")
     set(line_var "HPCLANG_FONT_${font_id}_LINE_HEIGHT")
     set(advance_var "HPCLANG_FONT_${font_id}_NOMINAL_ADVANCE")
     set(codepoints_var "HPCLANG_FONT_${font_id}_CODEPOINTS")
+    set(codepoints_file_var "HPCLANG_FONT_${font_id}_CODEPOINTS_FILE")
+
+    # The batch catalog stores large repertoires in per-face files and loads only
+    # the one requested by the application. Old indexes still provide the list
+    # directly, so both generations remain source-compatible.
+    if(DEFINED ${codepoints_file_var})
+        include("${${codepoints_file_var}}")
+    endif()
+    if(NOT DEFINED ${codepoints_var})
+        message(FATAL_ERROR "pre-generated hpclang font has no codepoint catalog: ${HF_FONT}")
+    endif()
     set(available "${${codepoints_var}}")
 
     set(out_dir "${CMAKE_CURRENT_BINARY_DIR}/hpclang-fonts")
     file(MAKE_DIRECTORY "${out_dir}")
     set(out_c "${out_dir}/${HF_NAME}.c")
 
-    target_sources(${target} PRIVATE "${font_source}")
+    target_sources(${target} PRIVATE ${font_sources})
 
     if(HF_MODE STREQUAL "FULL")
         if(HF_CODEPOINTS)
