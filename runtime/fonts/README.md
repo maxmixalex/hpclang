@@ -7,15 +7,28 @@ The archive is **not** consumed by normal application builds. Python code under 
 The pipeline is:
 
 1. `runtime/fonts/fonts.zip` — canonical raw `fonts/…` source tree stored with Git LFS.
-2. `tools/hpclang-font.py` — source-format parsers used by repository-maintenance tooling.
+2. `tools/hpclang-font.py` — source-format parsers plus direct raw-package inspection/explicit compilation tooling.
 3. `tools/regenerate-font-assets.py` — indexes the raw bundle and batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`. Large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor.
 4. normal C/C++ build — consumes only the checked-in generated assets through CMake/clang/lld; no source-font parser runs here.
 
-The current generated catalog contains 308 faces. Font **choice** and font **import mode** are separate axes: a face may have arbitrary metrics, while `@mini`, `@text`, and `@edit-large` are the three semantic UI-role selectors.
+The current generated catalog contains **308 faces / 1,779,042 glyph mappings / 3,797 assembly sources**.
+
+Two font sources must not be conflated:
+
+- `hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` expose the calculator's active **native stock-ROM fonts** at runtime; they do not embed a gallery font in the application.
+- `hpclang_target_font()` selects a **custom/generated font** from the checked-in gallery assets.
+
+For custom fonts, the convenience aliases are fixed as:
+
+- `@mini` → newRPL `Font6_mediumA` (`newrpl_6a`);
+- `@normal` → newRPL `Font8_StyleC` (`newrpl_8c`);
+- `@large` → newRPL `Font10_StyleA` (`newrpl_10a`).
+
+These aliases are only defaults. Applications may select any generated catalog face by ID, and the bitmap-font ABI supports arbitrary metrics and proportional advances.
 
 ## Import modes
 
-`hpclang_target_font()` exposes exactly three import modes:
+`hpclang_target_font()` exposes exactly three repertoire modes.
 
 ### `STATIC_AUTO`
 
@@ -24,7 +37,7 @@ Collect the static repertoire from string literals explicitly marked with `HPCLA
 ```cmake
 hpclang_target_font(app
     NAME ui_font
-    FONT @text
+    FONT @normal
     MODE STATIC_AUTO)
 ```
 
@@ -41,7 +54,7 @@ Retain the exact codepoint set supplied by the application, plus the configured 
 ```cmake
 hpclang_target_font(app
     NAME numeric_font
-    FONT @text
+    FONT @normal
     MODE STATIC_EXPLICIT
     CODEPOINTS 32 43 45 46 48 49 50 51 52 53 54 55 56 57)
 ```
@@ -61,17 +74,17 @@ hpclang_target_font(app
 
 The static modes synthesize a descriptor that references only the selected glyphs. Every generated glyph and bitmap lives in its own ELF section, so normal `--gc-sections` removes the rest from the final HPC1 image. `FULL` binds the generated complete-face descriptor instead.
 
-## UI roles
-
-The semantic role selectors are:
-
-- `@mini` — compact/proportional titles, soft menus and small UI text;
-- `@text` — normal body/editor text;
-- `@edit-large` — the larger fixed-cell EditLine/cursor-underlay role.
-
-Those are the only semantic role selectors. Applications may also select any generated face by its catalog ID.
+`tools/hpclang-font.py compile` is intentionally narrower: it supports `STATIC_EXPLICIT` and `FULL`. `STATIC_AUTO` belongs to `hpclang_target_font()` because it must inspect the actual CMake target's marked source literals.
 
 ## Repository maintenance
+
+Verify or inspect the raw canonical package directly:
+
+```bash
+python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip verify
+python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip catalog
+python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip inspect @normal
+```
 
 Regenerate the checked-in catalog only when the source bundle or source-format generator changes:
 
@@ -84,4 +97,4 @@ python3 tools/regenerate-font-assets.py \
 
 The `Maintenance / Font assets` workflow checks out the Git LFS source bundle, regenerates the catalog, applies repository-size/diff checks, and commits changed generated assets on `m7-fonts-gallery`.
 
-The checked-in generated catalog is derived build material; `fonts.zip` remains the single source bundle.
+The checked-in generated catalog is derived build material; `fonts.zip` remains the single source bundle and license/provenance reference.

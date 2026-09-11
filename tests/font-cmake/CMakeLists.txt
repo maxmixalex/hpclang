@@ -12,7 +12,7 @@ target_include_directories(font_mode_probe PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_target_font(font_mode_probe
     NAME auto_font
-    FONT @text
+    FONT @normal
     MODE STATIC_AUTO
     FALLBACK NONE)
 
@@ -25,7 +25,7 @@ hpclang_target_font(font_mode_probe
 
 hpclang_target_font(font_mode_probe
     NAME full_font
-    FONT @edit-large
+    FONT @large
     MODE FULL)
 
 function(require_contains path needle)

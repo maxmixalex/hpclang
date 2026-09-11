@@ -8,11 +8,13 @@ include("${HPCLANG_ROOT}/cmake/ui-text.cmake")
 include("${HPCLANG_ROOT}/runtime/fonts/generated/index.cmake")
 
 function(_hpclang_font_resolve out_id selector)
+    # These are convenience aliases for custom/generated fonts only.
+    # hpclang_font_default()/mini()/big() are a separate native-ROM surface.
     if(selector STREQUAL "@mini")
         set(id newrpl_6a)
-    elseif(selector STREQUAL "@text")
+    elseif(selector STREQUAL "@normal")
         set(id newrpl_8c)
-    elseif(selector STREQUAL "@edit-large")
+    elseif(selector STREQUAL "@large")
         set(id newrpl_10a)
     else()
         set(id "${selector}")
