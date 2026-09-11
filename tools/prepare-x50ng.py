@@ -254,17 +254,29 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
 
     makefile = root / "Makefile"
-    text = makefile.read_text()
-    anchor = "\t./src/main.c"
-    if text.count(anchor) != 1:
-        raise SystemExit(f"{makefile}: hpclang universal frontend sources anchor changed")
-    makefile.write_text(
-        text.replace(
-            anchor,
-            "\t./src/hpclang_direct.c \\\n\t./src/hpclang_stock.c \\\n\t./src/main.c",
-            1,
+    lines = makefile.read_text().splitlines(keepends=True)
+    matches = []
+    for index, line in enumerate(lines):
+        logical = line.strip()
+        if logical.endswith("\\"):
+            logical = logical[:-1].rstrip()
+        if logical.endswith("src/main.c"):
+            matches.append(index)
+    if len(matches) != 1:
+        raise SystemExit(
+            f"{makefile}: expected one src/main.c source line, found {len(matches)}"
         )
-    )
+
+    index = matches[0]
+    original = lines[index]
+    leading = original[: len(original) - len(original.lstrip())]
+    newline = "\n" if original.endswith("\n") else ""
+    lines[index:index + 1] = [
+        f"{leading}./src/hpclang_direct.c \\\n",
+        f"{leading}./src/hpclang_stock.c \\\n",
+        original if newline else original,
+    ]
+    makefile.write_text("".join(lines))
 
 
 def main() -> None:
