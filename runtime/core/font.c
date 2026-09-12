@@ -15,10 +15,34 @@
 #define FONT_KIND_HP4950_BIG  0x1004u
 
 /* x50ng's HP39gs/40gs KINPO loader places the 16-byte update header at NOR
- * +0x4000 and the 1 MiB Saturn ROM body immediately after it. rom.39g offsets
- * therefore map to the private physical-NOR alias at +0x4010. */
-#define HP39_UPDATE_ROM_OFFSET 0x00004010u
-#define HP39_NOR_SECTION_BYTES 0x00100000u
+ * +0x4000 and the 1 MiB Saturn ROM body immediately after it. The native main
+ * and mini font tables lie wholly inside physical NOR pages 0x42 and 0x43,
+ * which the bootstrap exposes at HPCLANG_CODE_WINDOW_BASE. */
+#define HP39_UPDATE_ROM_OFFSET      0x00004010u
+#define HP39_FONT_NOR_PHYS_BASE     0x00042000u
+#define HP39_FONT_WINDOW_BYTES      0x00002000u
+
+#define HP39_MAIN_FIRST_NIBBLE      0x0007c651u
+#define HP39_MAIN_LAST_NIBBLE       (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
+#define HP39_MINI_FIRST_NIBBLE      0x0007e695u
+#define HP39_MINI_LAST_NIBBLE       (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
+
+_Static_assert(
+    HP39_UPDATE_ROM_OFFSET + (HP39_MAIN_FIRST_NIBBLE >> 1) >=
+        HP39_FONT_NOR_PHYS_BASE,
+    "HP39 main font must start inside private NOR window");
+_Static_assert(
+    HP39_UPDATE_ROM_OFFSET + (HP39_MAIN_LAST_NIBBLE >> 1) <
+        HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES,
+    "HP39 main font must fit inside private NOR window");
+_Static_assert(
+    HP39_UPDATE_ROM_OFFSET + (HP39_MINI_FIRST_NIBBLE >> 1) >=
+        HP39_FONT_NOR_PHYS_BASE,
+    "HP39 mini font must start inside private NOR window");
+_Static_assert(
+    HP39_UPDATE_ROM_OFFSET + (HP39_MINI_LAST_NIBBLE >> 1) <
+        HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES,
+    "HP39 mini font must fit inside private NOR window");
 
 static const struct hpclang_font hp39_mini = {
     HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
@@ -138,7 +162,7 @@ static uint8_t saturn_byte(uint32_t address)
                      (uint8_t)(saturn_nibble(address + 1u) << 4));
 }
 
-static uintptr_t hp39_flash_alias_base(void)
+static uintptr_t hp39_font_window_base(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (boot == NULL ||
@@ -146,12 +170,9 @@ static uintptr_t hp39_flash_alias_base(void)
          boot->model != HPCLANG_MODEL_HP40GS))
         return 0u;
 
-    uintptr_t base = boot->platform_cookie;
-    if ((base & (HP39_NOR_SECTION_BYTES - 1u)) != 0u ||
-        base < (uintptr_t)HPCLANG_FLASH_ALIAS_MIN_BASE ||
-        base > (uintptr_t)HPCLANG_FLASH_ALIAS_MAX_BASE)
-        return 0u;
-    return base;
+    return boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE
+        ? boot->platform_cookie
+        : 0u;
 }
 
 static uint8_t hp39_physical_nibble(uint32_t address)
@@ -169,19 +190,21 @@ static uint8_t hp39_physical_nibble(uint32_t address)
 
     /*
      * HP39gs/40gs stock mini/main raster tables are specified in Saturn ROM
-     * nibble addresses. Their KINPO firmware body is a packed 1 MiB rom.39g
-     * image at physical NOR +0x4010. The bootstrap publishes the actual
-     * temporary physical-NOR alias VA through the opaque platform cookie.
-     * Validate that private token before dereferencing it so a missing or stale
-     * launcher/runtime contract fails closed instead of touching arbitrary VA.
+     * nibble addresses. Their KINPO firmware body is packed at physical NOR
+     * +0x4010. Bootstrap maps only the two physical NOR pages that contain the
+     * font tables into the private prefix of hpclang's own code coarse table.
+     * Validate the opaque cookie and the physical offset before dereferencing
+     * that window so a stale launcher/runtime contract fails closed.
      */
-    uintptr_t alias_base = hp39_flash_alias_base();
+    uintptr_t window_base = hp39_font_window_base();
     uint32_t byte_offset = HP39_UPDATE_ROM_OFFSET + (address >> 1);
-    if (alias_base == 0u || byte_offset >= HP39_NOR_SECTION_BYTES)
+    if (window_base == 0u ||
+        byte_offset < HP39_FONT_NOR_PHYS_BASE ||
+        byte_offset >= HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES)
         return 0u;
 
-    const volatile uint8_t *p =
-        (const volatile uint8_t *)(alias_base + byte_offset);
+    const volatile uint8_t *p = (const volatile uint8_t *)(
+        window_base + (byte_offset - HP39_FONT_NOR_PHYS_BASE));
     uint8_t value = *p;
     return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
                                   (uint8_t)(value & 0x0fu);
