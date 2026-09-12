@@ -77,16 +77,24 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build interactive Font Gallery and launchers
+      - name: Build exhaustive Direct and compact Stock Gallery payloads
         run: |
           set -o pipefail
           mkdir -p build
           chmod +x tools/build-e2e.sh
-          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery" 2>&1 | tee build/e2e-font-gallery-build.log
+          {
+            echo '=== exhaustive Direct Gallery ==='
+            tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery-full"
+            echo '=== compact Stock Gallery ==='
+            tools/build-e2e.sh font-gallery-stock "$GITHUB_WORKSPACE/build/e2e-font-gallery-stock"
+          } 2>&1 | tee build/e2e-font-gallery-build.log
 
-      - name: Record Font Gallery size
+      - name: Record Font Gallery sizes
         run: |
-          "$ATFE/bin/llvm-size" -A build/e2e-font-gallery/e2e.elf | tee build/e2e-font-gallery/e2e.size.txt
+          "$ATFE/bin/llvm-size" -A build/e2e-font-gallery-full/e2e.elf \
+            | tee build/e2e-font-gallery-full/e2e.size.txt
+          "$ATFE/bin/llvm-size" -A build/e2e-font-gallery-stock/e2e.elf \
+            | tee build/e2e-font-gallery-stock/e2e.size.txt
 
       - name: Upload Font Gallery build diagnostics
         if: always()
@@ -96,25 +104,42 @@ jobs:
           retention-days: 1
           path: |
             build/e2e-font-gallery-build.log
-            build/e2e-font-gallery/e2e.hpc
-            build/e2e-font-gallery/e2e.elf
-            build/e2e-font-gallery/e2e.result-address
-            build/e2e-font-gallery/launchers/*.bin
-            build/e2e-font-gallery/launchers/*.hp
+            build/e2e-font-gallery-full/e2e.hpc
+            build/e2e-font-gallery-full/e2e.elf
+            build/e2e-font-gallery-full/e2e.result-address
+            build/e2e-font-gallery-full/launchers/*.bin
+            build/e2e-font-gallery-stock/e2e.hpc
+            build/e2e-font-gallery-stock/e2e.elf
+            build/e2e-font-gallery-stock/e2e.result-address
+            build/e2e-font-gallery-stock/launchers/*.bin
+            build/e2e-font-gallery-stock/launchers/*.hp
           if-no-files-found: warn
 
-      - name: Upload Font Gallery build
+      - name: Upload exhaustive Direct Gallery build
         uses: actions/upload-artifact@v7
         with:
           name: e2e-font-gallery-build
           retention-days: 1
           path: |
-            build/e2e-font-gallery/e2e.hpc
-            build/e2e-font-gallery/e2e.elf
-            build/e2e-font-gallery/e2e.size.txt
-            build/e2e-font-gallery/e2e.result-address
-            build/e2e-font-gallery/launchers/*.bin
-            build/e2e-font-gallery/launchers/*.hp
+            build/e2e-font-gallery-full/e2e.hpc
+            build/e2e-font-gallery-full/e2e.elf
+            build/e2e-font-gallery-full/e2e.size.txt
+            build/e2e-font-gallery-full/e2e.result-address
+            build/e2e-font-gallery-full/launchers/*.bin
+          if-no-files-found: error
+
+      - name: Upload compact Stock Gallery build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-build
+          retention-days: 1
+          path: |
+            build/e2e-font-gallery-stock/e2e.hpc
+            build/e2e-font-gallery-stock/e2e.elf
+            build/e2e-font-gallery-stock/e2e.size.txt
+            build/e2e-font-gallery-stock/e2e.result-address
+            build/e2e-font-gallery-stock/launchers/*.bin
+            build/e2e-font-gallery-stock/launchers/*.hp
           if-no-files-found: error
 
   x50ng:
@@ -153,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download Font Gallery build
+      - name: Download exhaustive Direct Gallery build
         uses: actions/download-artifact@v7
         with:
           name: e2e-font-gallery-build
@@ -232,10 +257,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download Font Gallery build
+      - name: Download compact Stock Gallery build
         uses: actions/download-artifact@v7
         with:
-          name: e2e-font-gallery-build
+          name: e2e-font-gallery-stock-build
           path: build/e2e
 
       - name: Download universal x50ng
