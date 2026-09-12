@@ -1,0 +1,67 @@
+# HP48gII compact Stock Font Gallery through stock Kermit + ARMToolbox48.
+# The install/launch path deliberately mirrors hp48gii-stock-run.seq; only the
+# post-launch Gallery captures differ from the canonical runtime sequence.
+2000 tap f6
+4000 tap f6
+# Factory default is ALG; use RPN for the stack-based library install.
+5000 tap mode
+5500 tap neg
+6000 tap f6
+7000 capture home-rpn
+# Configure wire I/O to Serial.
+8000 tap files
+9500 tap down
+10000 tap enter
+11500 tap down
+12000 tap down
+12500 tap down
+13000 tap down
+14000 tap enter
+16000 tap up
+17000 tap f2
+18000 tap down
+18500 tap enter
+20000 tap enter
+# Start stock Kermit server.
+22000 tap files
+23500 tap down
+24500 tap enter
+26000 tap down
+27000 tap down
+28000 tap down
+29000 tap down
+30000 tap down
+31500 tap enter
+33500 capture server-serial
+# Host begins Kermit at t=35s and may use the full 110s transfer budget.
+150000 capture after-transfer
+# Install ARMToolbox48 Library 275 into Port 0. HPCLANG is F1 and L275 is F2.
+151000 tap var
+152000 capture vars-before-install
+153000 tap f2
+154000 capture l275-stack
+155000 tap zero
+156000 tap enter
+157000 capture port-zero-stack
+158000 tap sto
+160000 capture stored
+162000 chord on f3
+168000 capture after-warmstart
+169000 tap var
+170000 capture vars-after-install
+171000 tap f1
+173000 capture hpclang-stack
+# Library 275 is the first LIB entry; ARMTo exposes PrRUN on F1.
+175000 chord rshift two
+176500 capture lib-menu
+177500 tap f1
+179000 capture armtoolbox
+180000 tap f1
+# Compact Gallery contains native mini, native main, and one generated control.
+183000 monitor 60000
+188000 capture native-mini
+190000 tap right
+192000 capture native-main
+194000 tap right
+196000 capture generated-control
+198000 tap on
