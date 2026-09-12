@@ -55,6 +55,8 @@ Historical GCC code generation, libgcc, r9/r10 static-base conventions, and lega
 
 The common bootstrap installs the HPC1 mappings, enters the application, restores temporary state, and returns to the calculator OS.
 
+The common code coarse table also has a launcher/runtime-private prefix before `HPCLANG_CODE_BASE`. Platform code may use that prefix for narrowly scoped small-page mappings without borrowing arbitrary stock L1 entries; this does not change the HPC1 application ABI. HP39gs/40gs native-font access is the first production user of that mechanism, mapping only two uncached stock-NOR pages below public code.
+
 HP 39gs real hardware plus the current emulator gates validate the design. HP 39g+, HP 39gs, and HP 40gs share the `hp39` platform; HP 48gII uses `hp48`; HP 49g+ and HP 50g share `hp4950`.
 
 ## M3 — HP39 platform
@@ -74,6 +76,8 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 - [ ] Automate the original-system HP 39g+ install/launch path available on real stock firmware.
 
 The HP 39g+ items are **blocked**, not active research tasks. Do not substitute a sibling or foreign bootloader and call it native HP39g+ validation.
+
+The retained HP39g+ NOR dumper validates a transient physical-flash mapping mechanism; it does not establish that HP39g+ shares HP39gs/40gs firmware identity or native-font offsets.
 
 The preferred fixture path uses the stock ROM's own transfer/install logic. Direct SRAM/flash patching is a fallback only. The obsolete Conn3x GUI itself is not part of the runtime regression contract.
 
@@ -181,6 +185,8 @@ The font system has two intentionally separate sources:
 
 The native implementation is platform-specific below the common API. HP39/40 uses fixed physical stock-ROM raster tables, while HP48gII/49g+/50g resolves stock native font objects through the live logical Saturn `Read[]` mapping. Historical HPGCC source independently supports that family split: its HP48-compatible native helpers use `sat_map_s2a()` / `Read[]`, whereas the HP39 Aplet package binds HP39 stock `Put3x5` / `Put5x7` ROM entries. The exact HP39 physical raster bases are established by stock-ROM reverse engineering, not copied from an HPGCC constant.
 
+HP39gs/40gs now expose those fixed rasters through two uncached 4 KiB mappings in hpclang's own bootstrap-private code-L2 prefix: physical NOR pages `0x00042000` and `0x00043000` appear at the private window beginning `0x01200000`; public HPC1 code still begins at `0x01220000`. This replaced a long-lived high-L1 section alias after diagnostics proved that the active LCD framebuffer itself overlaps the physical L1-table region and can overwrite the selected descriptor word during Gallery drawing. `platform_cookie` carries the private window base only as an opaque launcher/runtime token, so no application ABI was added.
+
 Current evidence:
 
 - [x] Git LFS materialization of the canonical source bundle in CI;
@@ -190,9 +196,12 @@ Current evidence:
 - [x] individual glyph/bitmap ELF sections remain independently eligible for linker garbage collection;
 - [x] generated catalog is checked into `m7-fonts-gallery`;
 - [x] HP39 mini/main physical-ROM reader validated on HP39gs/40gs Direct screenshots and HP40gs Stock screenshot;
-- [x] Core font-selection modes and HP39 package build pass after the physical-ROM change;
+- [x] long-lived HP39 high-L1 alias failure root cause proven: framebuffer bytes overlapped the active L1 descriptor storage; production code uses the owned two-page L2 window instead;
+- [x] Core font-selection/window/MMU tests, ARM hardware-validation build, and HP39 package build pass after the mapping change;
+- [x] targeted HP39 exhaustive Gallery traverses **310 entries / 620 captures** on both HP39gs and HP40gs with PASS and settled return;
 - [x] exhaustive Direct Font Gallery traverses **310 entries (308 generated faces plus two native entries) and both SAMPLE/TEXT pages, 620 captures per target**, on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g; all five reach PASS and settled return;
-- [x] compact HP50g Stock Gallery validates live Saturn `Read[]` native mini/main fonts, a representative generated face, the original UI/ARMToolbox launch path, PASS, and settled stock return.
+- [x] compact HP50g Stock Gallery validates live Saturn `Read[]` native mini/main fonts, a representative generated face, the original UI/ARMToolbox launch path, PASS, and settled stock return;
+- [x] formal production `E2E / Font Gallery` run **34698825657 / #42** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`.
 
 The import contract has **three distinct modes**:
 
@@ -217,10 +226,11 @@ M7.1 font closure now requires:
 - [x] prove ordinary/unmarked literals do not affect `STATIC_AUTO` output;
 - [x] validate `STATIC_EXPLICIT` subset retention and `FULL` complete-face retention in Core CI;
 - [x] separate calculator-native assets from generated custom/font-package assets;
-- [x] validate the corrected HP39 physical-ROM native reader;
+- [x] validate the corrected HP39 physical-ROM native reader through the owned two-page L2 window;
 - [x] build Font Gallery as a separate HPC1 E2E application and exhaustively render all 308 generated faces across the five automated models and both 64/80-line layouts;
 - [x] keep the developer-facing font API direct; do not add public `mini` / `text` / `edit-large` semantic role selectors;
 - [x] validate the compact standard-HPC1 Stock Gallery on HP50g with live native fonts and one generated control face;
+- [x] close the formal production Gallery matrix after the HP39 mapping fix (`E2E / Font Gallery` #42);
 - [ ] add compact HP48gII Stock Gallery evidence for the 64-line live Saturn native-font path;
 - [ ] merge the completed font slice to `main` after the final HP48 Stock Gallery and documentation/evidence review.
 
@@ -300,7 +310,7 @@ Repository validation has two source-test layers:
 
 The canonical **runtime** E2E application owns ABI/runtime/device/time/display/keyboard/storage regression coverage and is launched through the supported Direct and Stock harnesses. Visual/demo-heavy or independently scoped features should use separate E2E applications when that keeps the runtime gate deterministic. Font Gallery is the first explicit example: it gets its own executable/target and evidence path rather than adding pages to the runtime payload.
 
-Font Gallery intentionally separates exhaustive asset/rendering coverage from Stock integration coverage. The exhaustive Direct payload walks all generated faces and both pages; compact Stock payloads keep the normal standard-HPC1/ARMToolbox resource envelope and validate live calculator-native assets plus a representative generated face. A synthetic Direct fixture must not fabricate Saturn mapping state merely to make native-font screenshots look plausible.
+Font Gallery intentionally separates exhaustive asset/rendering coverage from Stock integration coverage. The exhaustive Direct payload walks all generated faces and both pages; compact Stock payloads keep the normal standard-HPC1/ARMToolbox resource envelope and validate live calculator-native assets plus a representative generated face. A synthetic Direct fixture must not fabricate Saturn mapping state merely to make native-font screenshots look plausible. The production Gallery matrix is independently gated and its current formal closure is run `34698825657` / #42.
 
 Target profiles, stock UI sequences, x50ng frontends, and common reporting remain shared harness data. A focused E2E app should reuse that infrastructure rather than create a parallel emulator framework.
 
