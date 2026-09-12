@@ -13,12 +13,13 @@
  * state to become idle before the event engine is reset. A genuinely stuck key
  * still reaches the normal E2E failure path after the bounded wait.
  *
- * The reset wrapper then reuses hpclang_e2e_result as the single payload state
- * channel: KBRD while the payload is waiting for the canonical 51-key sequence,
- * KACK(n) after each complete DOWN->UP transition, followed by PASS/FAIL.
- * Direct may still inject its deterministic sequence eagerly; Stock uses the
- * acknowledgements to serialize host-realtime injection against calculator
- * Timer0 so the two clocks cannot outrun each other.
+ * The reset wrapper reuses hpclang_e2e_result as the single payload state
+ * channel: KBRD while the payload waits for the canonical sequence, KACK(n)
+ * after a complete DOWN->UP transition has returned to the caller and the
+ * caller has successfully continued to its next poll, followed by PASS/FAIL.
+ * Delaying KACK until that next poll matters: an invalid UP never receives an
+ * acknowledgement, so Stock cannot advance past a transition the calculator
+ * test rejected. The 51st key needs no KACK because PASS/FAIL is the next state.
  */
 #define HPCLANG_E2E_PHASE_KEYBOARD_READY UINT32_C(0x4b425244) /* KBRD */
 #define HPCLANG_E2E_PHASE_KEYBOARD_ACK UINT32_C(0x4b410000)   /* KA + count */
@@ -32,6 +33,7 @@ int __real_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event);
 
 static int first_keyboard_read = 1;
 static uint32_t keyboard_ack_count;
+static uint32_t keyboard_pending_ack;
 
 void __wrap_hpclang_keyboard_read(struct hpclang_keyboard_state *state)
 {
@@ -55,16 +57,23 @@ void __wrap_hpclang_keyboard_events_reset(void)
 {
     __real_hpclang_keyboard_events_reset();
     keyboard_ack_count = 0u;
+    keyboard_pending_ack = 0u;
     hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_READY;
 }
 
 int __wrap_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
 {
+    if (keyboard_pending_ack != 0u) {
+        hpclang_e2e_result =
+            HPCLANG_E2E_PHASE_KEYBOARD_ACK |
+            (keyboard_pending_ack & 0xffffu);
+        keyboard_pending_ack = 0u;
+    }
+
     int available = __real_hpclang_keyboard_event_poll(event);
     if (available && event->type == HPCLANG_KEYBOARD_EVENT_UP) {
         ++keyboard_ack_count;
-        hpclang_e2e_result =
-            HPCLANG_E2E_PHASE_KEYBOARD_ACK | (keyboard_ack_count & 0xffffu);
+        keyboard_pending_ack = keyboard_ack_count;
     }
     return available;
 }
