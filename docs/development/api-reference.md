@@ -23,7 +23,7 @@ Source-compatibility wrappers are not counted as implemented merely because the 
 
 ## What is public application API
 
-`<hpclang/bootstrap.h>` is a launcher/platform contract. Normal applications should not use its MMU layout or launch-context structures.
+`<hpclang/bootstrap.h>` is a launcher/platform contract. Normal applications should not use its MMU layout, private code-window constants, or launch-context structures. Likewise, `hpclang_boot_info().platform_cookie` is opaque platform state; applications must not infer the current HP39 private-window meaning from it.
 
 The application-facing surface currently includes:
 
@@ -103,9 +103,13 @@ hpclang deliberately separates **calculator-native fonts** from **generated cust
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
 
-No HP glyph bitmap is linked into the application. HP39/40 fixed native rasters are read from physical stock flash. HP48gII/49g+/50g native font objects are resolved through the live Saturn logical mapping supplied by the launcher. This platform distinction is runtime-private.
+No HP glyph bitmap is linked into the application. HP48gII/49g+/50g native font objects are resolved through the live Saturn logical mapping supplied by the launcher. HP39gs/40gs fixed native rasters are physical stock-ROM assets; the launcher maps only physical NOR pages `0x00042000` and `0x00043000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime accepts that mapping only when the opaque `platform_cookie` matches the expected private-window base. None of those addresses or tokens are public font API.
+
+The HP39 two-page window replaced an experimental long-lived high-L1 NOR section alias. Runtime diagnostics proved the alias descriptor words could themselves lie inside the active LCD framebuffer's physical interval and be overwritten by ordinary drawing. The fix is therefore an MMU-ownership correction below the font API, not an application ABI change.
 
 HP39 mini is five bitmap rows with a per-glyph advance (nominal 4); ASCII lowercase follows the stock small-font case-folding behavior. HP39 main is the stock 5×8 raster with nominal advance 6. HP48/49/50 mini/big retain the historical 6/4 and 8/6 line-height/advance conventions.
+
+HP39g+ is intentionally not inferred from its siblings. It retains the non-physical fallback path until a trustworthy real-hardware full-flash fixture establishes its own native layout.
 
 ### Generated custom fonts
 
@@ -132,7 +136,7 @@ Generated convenience aliases are currently `@mini = newrpl_6a`, `@normal = newr
 | `hpclang_surface_draw_utf8()` | ✅ | Decode UTF-8; invalid sequences become U+FFFD then the selected font's fallback if needed. |
 | `hpclang_surface_draw_text()` | ✅ | Canonical UTF-8 text API; same semantics as `draw_utf8()`. |
 
-The UI-role vocabulary `mini` / `text` / `edit-large` is a design/policy axis for the separate Font Gallery and later UI layer. Dedicated public semantic-role selectors are **not** claimed yet.
+There is deliberately no public core semantic-role API such as `mini` / `text` / `edit-large`. Applications select native or generated fonts directly; a future UI toolkit/theme layer may define its own role vocabulary above this API.
 
 ## Storage model
 
@@ -155,12 +159,12 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
 | keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | HP39 current family run flaky after payload entry; not used to override Direct correctness |
 | display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
-| native font/text | ✅ | ✅ | 5/5 PASS | corrected HP39 physical reader has HP40gs Stock visual PASS; hp48/hp4950 Stock green |
-| generated font selection | ✅ configure | ✅ | `STATIC_AUTO` visible `FONT OK` validated | gallery-specific matrix pending separate app |
+| native font/text | ✅ | ✅ | HP39 targeted exhaustive 310/620 each; production Gallery Direct families green | HP40gs visual Stock evidence plus HP50g live-native compact Stock Gallery; HP48 compact live-native Gallery still open |
+| generated font selection | ✅ configure | ✅ | production Gallery #42 exhaustively traverses 308 generated faces on all five automated targets | HP50g compact Stock control green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
-HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
+Formal `E2E / Font Gallery` run **34698825657 / #42** is green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
 
 ## Historical public-surface size
 
@@ -286,7 +290,7 @@ Based on historical stability, current implementation, and remaining dependencie
 2. ✅ five-model physical keyboard identity/event core;
 3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
 4. ✅ hp4950 standard-C stream storage through picolibc;
-5. 🔄 finish the separate Font Gallery and decide whether public semantic UI-role selectors are justified;
+5. ✅ separate exhaustive Direct Font Gallery plus HP50g compact Stock live-native control; HP48gII compact Stock live-native evidence remains the final font-validation item;
 6. design Saturn/RPL and HP39 typed-object handles;
 7. only then begin broad HPG/keyboard/object compatibility headers.
 
