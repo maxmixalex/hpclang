@@ -1,0 +1,22 @@
+name: Debug / Font Gallery build
+
+on:
+  push:
+    paths:
+      - ".github/workflows/debug-font-gallery-build.yml"
+
+jobs:
+  build:
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+      - name: Configure and build both Gallery profiles
+        run: |
+          set -o pipefail
+          mkdir -p build
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery-full"
+          tools/build-e2e.sh font-gallery-stock "$GITHUB_WORKSPACE/build/e2e-font-gallery-stock"
