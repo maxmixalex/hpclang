@@ -54,9 +54,15 @@ hpclang_mmu_sync:
     blo     1b
 
     /*
-     * L1[0x11] and L1[0x12] are adjacent and share a cache line. Clean that
-     * line after either install or restore.
+     * L1[0x11] and L1[0x12] are adjacent and share a cache line. The optional
+     * HP39/40 physical-NOR alias is L1[0x0a] and lives in another line. Clean
+     * both lines after install and restore; cleaning the alias line is harmless
+     * when that optional mapping is disabled.
      */
+    add     r2, r1, #(0x0a * 4)
+    bic     r2, r2, #31
+    mcr     p15, 0, r2, c7, c10, 1
+
     add     r2, r1, #(0x11 * 4)
     bic     r2, r2, #31
     mcr     p15, 0, r2, c7, c10, 1
