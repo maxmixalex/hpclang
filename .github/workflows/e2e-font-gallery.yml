@@ -59,7 +59,6 @@ on:
       - "tools/merge-pgm-grid.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
-      - "tools/publish-ci-image.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -80,6 +79,7 @@ jobs:
 
       - name: Build interactive Font Gallery and launchers
         run: |
+          set -o pipefail
           mkdir -p build
           chmod +x tools/build-e2e.sh
           tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery" 2>&1 | tee build/e2e-font-gallery-build.log
