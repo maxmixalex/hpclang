@@ -18,6 +18,7 @@
  * +0x4000 and the 1 MiB Saturn ROM body immediately after it. rom.39g offsets
  * therefore map to the private physical-NOR alias at +0x4010. */
 #define HP39_UPDATE_ROM_OFFSET 0x00004010u
+#define HP39_NOR_SECTION_BYTES 0x00100000u
 
 static const struct hpclang_font hp39_mini = {
     HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
@@ -137,6 +138,22 @@ static uint8_t saturn_byte(uint32_t address)
                      (uint8_t)(saturn_nibble(address + 1u) << 4));
 }
 
+static uintptr_t hp39_flash_alias_base(void)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot == NULL ||
+        (boot->model != HPCLANG_MODEL_HP39GS &&
+         boot->model != HPCLANG_MODEL_HP40GS))
+        return 0u;
+
+    uintptr_t base = boot->platform_cookie;
+    if ((base & (HP39_NOR_SECTION_BYTES - 1u)) != 0u ||
+        base < (uintptr_t)HPCLANG_FLASH_ALIAS_MIN_BASE ||
+        base > (uintptr_t)HPCLANG_FLASH_ALIAS_MAX_BASE)
+        return 0u;
+    return base;
+}
+
 static uint8_t hp39_physical_nibble(uint32_t address)
 {
     uint32_t model = active_model();
@@ -147,15 +164,24 @@ static uint8_t hp39_physical_nibble(uint32_t address)
     if (model == HPCLANG_MODEL_HP39GPLUS)
         return saturn_nibble(address);
 
+    if (model != HPCLANG_MODEL_HP39GS && model != HPCLANG_MODEL_HP40GS)
+        return 0u;
+
     /*
      * HP39gs/40gs stock mini/main raster tables are specified in Saturn ROM
      * nibble addresses. Their KINPO firmware body is a packed 1 MiB rom.39g
-     * image at physical NOR +0x4010. The bootstrap maps physical NOR 0 read-only
-     * at HPCLANG_FLASH_ALIAS_BASE for exactly the lifetime of HPC1, avoiding
-     * both the stock low-VA map and the current Saturn bank selection.
+     * image at physical NOR +0x4010. The bootstrap publishes the actual
+     * temporary physical-NOR alias VA through the opaque platform cookie.
+     * Validate that private token before dereferencing it so a missing or stale
+     * launcher/runtime contract fails closed instead of touching arbitrary VA.
      */
-    const volatile uint8_t *p = (const volatile uint8_t *)(uintptr_t)(
-        HPCLANG_FLASH_ALIAS_BASE + HP39_UPDATE_ROM_OFFSET + (address >> 1));
+    uintptr_t alias_base = hp39_flash_alias_base();
+    uint32_t byte_offset = HP39_UPDATE_ROM_OFFSET + (address >> 1);
+    if (alias_base == 0u || byte_offset >= HP39_NOR_SECTION_BYTES)
+        return 0u;
+
+    const volatile uint8_t *p =
+        (const volatile uint8_t *)(alias_base + byte_offset);
     uint8_t value = *p;
     return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
                                   (uint8_t)(value & 0x0fu);
