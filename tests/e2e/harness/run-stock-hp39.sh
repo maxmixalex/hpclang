@@ -60,15 +60,15 @@ export HPCLANG_STOCK_MODE=run
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 if [[ "$TARGET" == hp40gs ]]; then
     SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
-    # HP40gs has independently reached full Stock PASS, but its serial-disk
-    # lazy LIB275L fetch is occasionally slower than HP39gs in CI. The target
-    # sequence carries a bounded retry tail through 400 s; keep the emulator
-    # alive long enough for that tail plus payload execution/return.
-    X50_TIMEOUT=450
 else
     SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
-    X50_TIMEOUT=315
 fi
+# Both stock serial-disk paths now carry the same bounded sparse retry tail.
+# HP39gs has been observed still making valid HPGCC000.000 Kermit progress at
+# the former ~295 s cutoff; HP40gs independently completes its lazy-fetch chain
+# later in the same 400 s range. Keep the emulator alive for that evidence-based
+# envelope plus payload execution and clean return.
+X50_TIMEOUT=450
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
