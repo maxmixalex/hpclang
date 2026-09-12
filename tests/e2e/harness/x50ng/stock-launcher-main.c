@@ -457,12 +457,6 @@ static void monitor(void *arg)
         }
     }
 
-    /*
-     * The payload never changes hpclang_e2e_result after PASS. A different
-     * value (or an unmapped address) therefore means stage0 has left HPC1 and
-     * restored the stock address space. The return screenshot is captured only
-     * after that stock framebuffer has both changed from PASS and settled.
-     */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
         s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
         if (!later(finish_return, s, RETURN_POLL_US))
