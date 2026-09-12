@@ -24,6 +24,8 @@
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
 #define RETURN_DEADLINE_US 2000000LL
+#define RETURN_REPAINT_DELAY_US 20000LL
+#define RETURN_REPAINT_SETTLE_US 180000LL
 #define RETURN_STABLE_OBSERVATIONS 4u
 
 enum stock_mode {
@@ -45,6 +47,7 @@ struct state {
     int saw_before;
     int saw_pass;
     int payload_keyboard_scheduled;
+    int return_repaint_scheduled;
     int returned;
     int failed;
     int lcd_height;
@@ -210,6 +213,38 @@ static int chord(
            later(key_cb, (void *)key_down, us + 30000) &&
            later(key_cb, (void *)key_up, us + 130000) &&
            later(key_cb, (void *)mod_up, us + 160000);
+}
+
+static int schedule_return_repaint(struct state *s)
+{
+    const char *target;
+    const struct key_action *down_action;
+    const struct key_action *up_action;
+    const char *name;
+
+    if (s->return_repaint_scheduled)
+        return 1;
+
+    target = getenv("TARGET");
+    if (target != NULL &&
+        (strcmp(target, "hp39gs") == 0 || strcmp(target, "hp40gs") == 0)) {
+        down_action = &aplet_down;
+        up_action = &aplet_up;
+        name = "APLET";
+    } else {
+        down_action = &var_down;
+        up_action = &var_up;
+        name = "VAR";
+    }
+
+    if (!tap(down_action, up_action, RETURN_REPAINT_DELAY_US))
+        return 0;
+
+    s->return_repaint_scheduled = 1;
+    fprintf(stderr,
+            "stock launcher: control returned; scheduled native %s repaint\n",
+            name);
+    return 1;
 }
 
 static int schedule_payload_keyboard(struct state *s)
@@ -460,12 +495,18 @@ static void monitor(void *arg)
     /*
      * The payload never changes hpclang_e2e_result after PASS. A different
      * value (or an unmapped address) therefore means stage0 has left HPC1 and
-     * restored the stock address space. The return screenshot is captured only
-     * after that stock framebuffer has both changed from PASS and settled.
+     * restored the stock address space. Prove visible return independently by
+     * issuing one harmless native UI action, then require the framebuffer to
+     * change from the PASS baseline and settle. HP39 uses the established
+     * APLET redraw check; HP48/49/50 use VAR.
      */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
+        if (!schedule_return_repaint(s)) {
+            fail(s, "return-repaint-timer");
+            return;
+        }
         s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
-        if (!later(finish_return, s, RETURN_POLL_US))
+        if (!later(finish_return, s, RETURN_REPAINT_SETTLE_US))
             fail(s, "return-timer");
         return;
     }
