@@ -46,6 +46,23 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     boot->saturn_state = launch->saturn_state;
     boot->platform_cookie = launch->platform_cookie;
 
+    /*
+     * TEMPORARY E2E DIAGNOSTIC: the rest of the boot page is private bootstrap
+     * storage. Record exactly what the bootstrap sees after MMU publication
+     * and before entering HPC1 so the host can distinguish a failed install
+     * from a later Data Abort/exception-side page-table change. Remove after
+     * the HP39 physical-NOR alias is closed.
+     */
+    if (launch->mmu.section_alias_l1_index != 0u) {
+        volatile uint32_t *diag =
+            (volatile uint32_t *)(uintptr_t)(HPCLANG_BOOT_BASE + 0x20u);
+        diag[0] = UINT32_C(0x414c4931); /* "ALI1" */
+        diag[1] = launch->mmu.section_alias_l1_index;
+        diag[2] = launch->mmu.l1[launch->mmu.section_alias_l1_index];
+        diag[3] = saved.section_alias_l1;
+        diag[4] = (uint32_t)launch->platform_cookie;
+    }
+
     uintptr_t entry = HPCLANG_CODE_BASE + launch->entry_offset;
     uintptr_t stack_top =
         HPCLANG_BOOT_BASE +
