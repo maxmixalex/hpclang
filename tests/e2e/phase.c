@@ -15,17 +15,23 @@
  *
  * The reset wrapper then reuses hpclang_e2e_result as the single payload state
  * channel: KBRD while the payload is waiting for the canonical 51-key sequence,
- * followed by PASS/FAIL.
+ * KACK(n) after each complete DOWN->UP transition, followed by PASS/FAIL.
+ * Direct may still inject its deterministic sequence eagerly; Stock uses the
+ * acknowledgements to serialize host-realtime injection against calculator
+ * Timer0 so the two clocks cannot outrun each other.
  */
 #define HPCLANG_E2E_PHASE_KEYBOARD_READY UINT32_C(0x4b425244) /* KBRD */
+#define HPCLANG_E2E_PHASE_KEYBOARD_ACK UINT32_C(0x4b410000)   /* KA + count */
 #define HPCLANG_E2E_LAUNCH_RELEASE_TIMEOUT_US UINT64_C(2000000)
 
 extern volatile uint32_t hpclang_e2e_result;
 
 void __real_hpclang_keyboard_read(struct hpclang_keyboard_state *state);
 void __real_hpclang_keyboard_events_reset(void);
+int __real_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event);
 
 static int first_keyboard_read = 1;
+static uint32_t keyboard_ack_count;
 
 void __wrap_hpclang_keyboard_read(struct hpclang_keyboard_state *state)
 {
@@ -48,5 +54,17 @@ void __wrap_hpclang_keyboard_read(struct hpclang_keyboard_state *state)
 void __wrap_hpclang_keyboard_events_reset(void)
 {
     __real_hpclang_keyboard_events_reset();
+    keyboard_ack_count = 0u;
     hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_READY;
+}
+
+int __wrap_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
+{
+    int available = __real_hpclang_keyboard_event_poll(event);
+    if (available && event->type == HPCLANG_KEYBOARD_EVENT_UP) {
+        ++keyboard_ack_count;
+        hpclang_e2e_result =
+            HPCLANG_E2E_PHASE_KEYBOARD_ACK | (keyboard_ack_count & 0xffffu);
+    }
+    return available;
 }
