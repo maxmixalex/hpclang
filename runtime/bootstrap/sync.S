@@ -8,6 +8,7 @@
  *
  * r0 = start of the 4 KiB L2 workspace (virtual address)
  * r1 = active L1 table (virtual address)
+ * r2 = optional section-alias L1 index, or zero when disabled
  *
  * The stock calculator environment exposes the SWI vector at 0x08000008.
  * HP39/40, HP48gII and HP49/50 launcher sources all use SWI 0 for privileged
@@ -23,14 +24,15 @@
 .type hpclang_mmu_sync,%function
 hpclang_mmu_sync:
     stmfd   sp!, {r2-r5, lr}
+    mov     r5, r2
 
     ldr     r2, =0x08000008
     adr     r3, .Lsupervisor
     swp     r4, r3, [r2]
 
     /*
-     * Preserve the two MVAs as supervisor arguments:
-     * r0 = L2 workspace, r1 = L1 table.
+     * Preserve the MMU arguments across SWI entry:
+     * r0 = L2 workspace, r1 = L1 table, r5 = optional alias L1 index.
      */
     swi     0
 
@@ -54,14 +56,16 @@ hpclang_mmu_sync:
     blo     1b
 
     /*
-     * L1[0x11] and L1[0x12] are adjacent and share a cache line. The optional
-     * HP39/40 physical-NOR alias is VA 0x0a000000, therefore L1[0xa0]. Clean
-     * both lines after install and restore; cleaning the alias line is harmless
-     * when that optional mapping is disabled.
+     * L1[0x11] and L1[0x12] are adjacent and share a cache line. The HP39/40
+     * physical-NOR alias is selected dynamically, so clean the cache line that
+     * contains the actual selected descriptor after both install and restore.
      */
-    add     r2, r1, #(0xa0 * 4)
+    cmp     r5, #0
+    beq     .Lalias_clean_done
+    add     r2, r1, r5, lsl #2
     bic     r2, r2, #31
     mcr     p15, 0, r2, c7, c10, 1
+.Lalias_clean_done:
 
     add     r2, r1, #(0x11 * 4)
     bic     r2, r2, #31
