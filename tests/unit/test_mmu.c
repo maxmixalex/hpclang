@@ -18,24 +18,20 @@ int main(void)
         0x08080000u,
         0x08081000u,
     };
+    const uint32_t private_pages[] = {
+        0x00042000u,
+        0x00043000u,
+    };
 
     memset(l1, 0, sizeof(l1));
     memset(workspace, 0xa5, sizeof(workspace));
 
     assert(HPCLANG_L1_DATA_INDEX == 0x11u);
     assert(HPCLANG_L1_CODE_INDEX == 0x12u);
-    assert(HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX == 0xa0u);
-    assert(HPCLANG_FLASH_ALIAS_LAST_L1_INDEX == 0xffu);
-    assert(HPCLANG_FLASH_ALIAS_MIN_BASE == 0x0a000000u);
-    assert(HPCLANG_FLASH_ALIAS_MAX_BASE == 0x0ff00000u);
+    assert(HPCLANG_CODE_WINDOW_BASE == 0x01200000u);
     assert(HPCLANG_CODE_L2_FIRST == 0x20u);
+    assert(HPCLANG_CODE_WINDOW_PAGE_CAPACITY == 32u);
     assert(HPCLANG_CODE_PAGE_CAPACITY == 224u);
-
-    /* Selection is live: prefer A0 when free and move on when stock owns it. */
-    assert(hpclang_mmu_find_free_section_alias(NULL) == 0u);
-    assert(hpclang_mmu_find_free_section_alias(l1) == 0xa0u);
-    l1[0xa0] = 0xaaa66c4au;
-    assert(hpclang_mmu_find_free_section_alias(l1) == 0xa1u);
 
     l1[HPCLANG_L1_DATA_INDEX] = 0x12345012u;
     l1[HPCLANG_L1_CODE_INDEX] = 0x6789a012u;
@@ -48,8 +44,8 @@ int main(void)
         .rw_page_count = 3,
         .code_pages = code_pages,
         .code_page_count = 2,
-        .section_alias_l1_index = 0xa1u,
-        .section_alias_phys = 0u,
+        .code_window_pages = private_pages,
+        .code_window_page_count = 2,
     };
 
     hpclang_mmu_prepare(&layout);
@@ -62,41 +58,29 @@ int main(void)
     assert(data[2] == 0x0807fffeu);
     assert(data[3] == 0);
 
-    assert(code[0] == 0);
-    assert(code[31] == 0);
+    /* Private physical NOR pages are uncached and precede application code. */
+    assert(code[0] == 0x00042ff2u);
+    assert(code[1] == 0x00043ff2u);
+    assert(code[2] == 0u);
+    assert(code[31] == 0u);
     assert(code[32] == 0x08080ffeu);
     assert(code[33] == 0x08081ffeu);
-    assert(code[34] == 0);
+    assert(code[34] == 0u);
 
     struct hpclang_mmu_saved saved;
-    assert(hpclang_mmu_install(&layout, &saved) == 0);
+    hpclang_mmu_install(&layout, &saved);
 
     assert(saved.data_l1 == 0x12345012u);
     assert(saved.code_l1 == 0x6789a012u);
-    assert(saved.section_alias_l1 == 0u);
-    assert(l1[0xa0] == 0xaaa66c4au);
-    assert(l1[0xa1] == 0x00000c12u);
     assert(l1[0x11] == 0x0803f011u);
     assert(l1[0x12] == 0x0803f411u);
 
     hpclang_mmu_restore(&layout, &saved);
-    assert(l1[0xa0] == 0xaaa66c4au);
-    assert(l1[0xa1] == 0u);
     assert(l1[0x11] == 0x12345012u);
     assert(l1[0x12] == 0x6789a012u);
 
-    /*
-     * Simulate the selected slot being claimed after selection but before the
-     * IRQ-masked install boundary. Installation must fail without touching any
-     * hpclang or stock descriptor.
-     */
-    l1[0xa1] = 0xdead0012u;
-    assert(hpclang_mmu_install(&layout, &saved) != 0);
-    assert(l1[0xa1] == 0xdead0012u);
-    assert(l1[0x11] == 0x12345012u);
-    assert(l1[0x12] == 0x6789a012u);
-
-    const struct hpclang_mmu_layout no_alias = {
+    /* No private window leaves the complete pre-code prefix unmapped. */
+    const struct hpclang_mmu_layout no_window = {
         .l1 = l1,
         .l2_workspace = workspace,
         .l2_workspace_phys = 0x0803f000u,
@@ -104,22 +88,25 @@ int main(void)
         .rw_page_count = 3,
         .code_pages = code_pages,
         .code_page_count = 2,
-        .section_alias_l1_index = 0u,
-        .section_alias_phys = 0u,
+        .code_window_pages = NULL,
+        .code_window_page_count = 0,
     };
-    l1[0xa0] = 0x13579012u;
-    assert(hpclang_mmu_install(&no_alias, &saved) == 0);
-    assert(saved.section_alias_l1 == 0u);
-    assert(l1[0xa0] == 0x13579012u);
-    hpclang_mmu_restore(&no_alias, &saved);
-    assert(l1[0xa0] == 0x13579012u);
+    hpclang_mmu_prepare(&no_window);
+    code = workspace + HPCLANG_L2_ENTRIES;
+    assert(code[0] == 0u);
+    assert(code[31] == 0u);
+    assert(code[32] == 0x08080ffeu);
 
-    /* Exhausting the private high window fails closed. */
-    for (uint32_t i = HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX;
-         i <= HPCLANG_FLASH_ALIAS_LAST_L1_INDEX;
-         ++i)
-        l1[i] = 0x00000c12u;
-    assert(hpclang_mmu_find_free_section_alias(l1) == 0u);
+    /* An invalid oversized private window fails closed instead of overlapping
+       the application code entries. */
+    struct hpclang_mmu_layout oversized = no_window;
+    oversized.code_window_pages = private_pages;
+    oversized.code_window_page_count = HPCLANG_CODE_WINDOW_PAGE_CAPACITY + 1u;
+    hpclang_mmu_prepare(&oversized);
+    code = workspace + HPCLANG_L2_ENTRIES;
+    assert(code[0] == 0u);
+    assert(code[31] == 0u);
+    assert(code[32] == 0x08080ffeu);
 
     return 0;
 }
