@@ -59,7 +59,6 @@ on:
       - "tools/merge-pgm-grid.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
-      - "tools/publish-ci-image.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -172,7 +171,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [hp39]
+        family: [hp39, hp48, hp4950]
     env:
       FAMILY: ${{ matrix.family }}
 
@@ -251,7 +250,6 @@ jobs:
           if-no-files-found: warn
 
   stock-gallery-hp50g:
-    if: ${{ false }}
     name: Stock Gallery / hp50g
     needs: [build, x50ng]
     runs-on: home-docker
