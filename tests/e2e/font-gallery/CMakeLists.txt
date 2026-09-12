@@ -54,10 +54,9 @@ set(GALLERY_CODEPOINTS
     114 115 116 117 118 119 120 121 122
 )
 
-# Typography-oriented Unicode probe. Script examples come before math/symbols
-# so the small calculator viewport shows the language coverage first. Block,
-# box-drawing and geometric stress glyphs belong in a separate diagnostic; in
-# the Gallery they looked like rendering corruption and consumed payload bytes.
+# Typography-oriented Unicode probe. The runtime Gallery groups these into a
+# script-first feature row (Kana/Hangul/Han before generic symbols) so locale
+# variants remain distinguishable on the 131-pixel LCD.
 set(GALLERY_UNICODE_CODEPOINTS
     # Accented Latin.
     192 193 196 199 201 209 214 220 223 230 248 339
@@ -77,8 +76,8 @@ list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
 # Keep the historically useful Powerline sample globally. Controller glyphs
 # are sampled only from BoutiqueBitmap9x9, whose ordinary mapping uses the
 # E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx. PUA glyphs
-# are linked whenever present, but only a face without a usable text repertoire
-# exposes them as the primary Gallery specimen.
+# remain secondary feature repertoire for text-capable faces instead of
+# replacing their typography specimen.
 set(GALLERY_FIXED_PRIVATE_CODEPOINTS
     57504 57520 57521 57522 57523
 )
@@ -102,6 +101,7 @@ file(WRITE "${catalog_h}"
 "    uint32_t unicode_count;\n"
 "    const uint32_t *private_codepoints;\n"
 "    uint32_t private_count;\n"
+"    uint32_t text_capable;\n"
 "};\n"
 "extern const struct hpclang_gallery_face hpclang_gallery_faces[];\n"
 "extern const uint32_t hpclang_gallery_face_count;\n"
@@ -158,9 +158,10 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
 
     set(selected_private)
 
-    # Retain real PUA mappings in the linked face so this remains an exhaustive
-    # asset build. For text-capable faces they are secondary repertoire, not a
-    # reason to replace both typography specimen pages with an icon grid.
+    # Retain real PUA mappings in the linked face. Unlike the old catalog, keep
+    # those codepoints visible to the Gallery even when the same face is also a
+    # usable text font: controller and patched-icon repertoires are precisely
+    # the features the Gallery is meant to expose.
     foreach(cp IN LISTS GALLERY_FIXED_PRIVATE_CODEPOINTS)
         list(FIND available "${cp}" private_found)
         if(NOT private_found EQUAL -1)
@@ -218,6 +219,16 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     string(REPLACE "-" " " face_label "${face_label}")
     string(REPLACE "_" " " face_label "${face_label}")
 
+    # Avoid spending the entire second chrome row repeating the family name.
+    # This is particularly important for Ark Pixel where the distinguishing
+    # locale suffix used to be clipped off-screen.
+    set(face_prefix "${family_label} ")
+    string(LENGTH "${face_prefix}" face_prefix_len)
+    string(SUBSTRING "${face_label}" 0 ${face_prefix_len} face_prefix_actual)
+    if(face_prefix_actual STREQUAL face_prefix)
+        string(SUBSTRING "${face_label}" ${face_prefix_len} -1 face_label)
+    endif()
+
     string(REPLACE "\\" "\\\\" family_label_c "${family_label}")
     string(REPLACE "\"" "\\\"" family_label_c "${family_label_c}")
     string(REPLACE "\\" "\\\\" face_label_c "${face_label}")
@@ -239,10 +250,7 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         set(unicode_pointer "0")
     endif()
 
-    # The current Gallery UI intentionally interprets private_count != 0 as a
-    # symbol-first face. Hide private rows from text-capable faces rather than
-    # making the UI infer semantics from the mere presence of a PUA mapping.
-    if(selected_private AND NOT text_capable)
+    if(selected_private)
         file(APPEND "${catalog_c}"
             "static const uint32_t private_${face_index}[] = {")
         foreach(cp IN LISTS selected_private)
@@ -257,7 +265,7 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     endif()
 
     string(APPEND catalog_rows
-        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${unicode_pointer}, ${unicode_count}u, ${private_pointer}, ${private_count}u},\n")
+        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${unicode_pointer}, ${unicode_count}u, ${private_pointer}, ${private_count}u, ${text_capable}u},\n")
     math(EXPR face_index "${face_index} + 1")
 endforeach()
 
