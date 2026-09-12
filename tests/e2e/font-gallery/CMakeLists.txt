@@ -23,20 +23,29 @@ target_compile_options(hpclang_font_gallery PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 
-# The Gallery intentionally links every generated face in the catalog.  Each
+# The Gallery intentionally links every generated face in the catalog. Each
 # face retains only the comparison repertoire below, so large Unicode families
 # remain practical while every size/weight/language variant stays browsable.
 set(GALLERY_FONT_IDS ${HPCLANG_FONT_IDS})
 list(SORT GALLERY_FONT_IDS)
 
-# Printable ASCII is the common comparison repertoire.  The second group is a
-# deliberately broad Unicode probe: Latin-1, Greek/math, arrows/blocks, CJK,
-# and Hangul.  Private-use mappings are sampled separately from each face's
-# real cmap so icon/controller fonts display their actual reserved glyphs.
-set(GALLERY_CODEPOINTS)
-foreach(cp RANGE 32 126)
-    list(APPEND GALLERY_CODEPOINTS "${cp}")
-endforeach()
+# Keep exactly the printable ASCII characters that are drawn with the selected
+# generated face in main.c. Gallery chrome, face/family names and counters use
+# the calculator-native mini font, so retaining all printable ASCII in every
+# generated face would add dead comparison glyphs without increasing coverage.
+# The two sample strings and the pangram text together cover these 61 values.
+set(GALLERY_CODEPOINTS
+    32 33 35 36 37 38 42 43 44 45 46 47
+    48 49 50 51 52 53 54 55 56 57
+    60 61 62 63 64 65 66 77 80 83 84 88 90
+    97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113
+    114 115 116 117 118 119 120 121 122
+)
+
+# The second group is a deliberately broad Unicode probe: Latin-1, Greek/math,
+# arrows/blocks, CJK, and Hangul. Private-use mappings are sampled separately
+# from each face's real cmap so icon/controller fonts display their actual
+# reserved glyphs.
 set(GALLERY_UNICODE_CODEPOINTS
     163 165 169 176 177 181 215 247 8364
     916 931 937 945 946 955 960
@@ -48,12 +57,12 @@ set(GALLERY_UNICODE_CODEPOINTS
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
 
-# Keep the historically useful Powerline sample globally.  Controller glyphs
+# Keep the historically useful Powerline sample globally. Controller glyphs
 # are sampled only from BoutiqueBitmap9x9, whose ordinary mapping uses the
-# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx.  The exact
-# glyph codepoints remain cmap-derived: one real mapping per page.  Restricting
+# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx. The exact
+# glyph codepoints remain cmap-derived: one real mapping per page. Restricting
 # those pages to their owning family prevents unrelated PUA shards from making
-# the all-face Gallery too large for ARMToolbox/Direct launchers.
+# the all-face Gallery larger without improving its visible coverage.
 set(GALLERY_FIXED_PRIVATE_CODEPOINTS
     57504 57520 57521 57522 57523
 )
@@ -116,7 +125,7 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     set(selected_private)
 
     # These fixed PUA samples were already present in the compact all-face
-    # Gallery.  Retain only mappings that the selected face actually exposes.
+    # Gallery. Retain only mappings that the selected face actually exposes.
     foreach(cp IN LISTS GALLERY_FIXED_PRIVATE_CODEPOINTS)
         list(FIND available "${cp}" private_found)
         if(NOT private_found EQUAL -1)
@@ -125,9 +134,9 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         endif()
     endforeach()
 
-    # Controller/button repertoires are not Unicode emoji.  BoutiqueBitmap9x9
+    # Controller/button repertoires are not Unicode emoji. BoutiqueBitmap9x9
     # is the font family that defines them, so only its faces probe these PUA
-    # pages.  Take one actual mapped glyph per page instead of hard-coding a
+    # pages. Take one actual mapped glyph per page instead of hard-coding a
     # particular button codepoint such as E866/E966/EA66.
     if(font_id MATCHES "^boutique_bitmap_9x9_")
         foreach(wanted_page IN LISTS GALLERY_CONTROLLER_PUA_PAGES)
@@ -226,8 +235,17 @@ target_sources(hpclang_font_gallery PRIVATE "${catalog_c}")
 message(STATUS
     "Font Gallery: ${face_index} generated faces from ${family_count} families + 2 native faces")
 
+# Generated font assets are immutable lookup data and the Gallery never relies
+# on glyph/bitmap object address identity. Allow lld to fold equal read-only
+# sections here so repeated language/style variants share identical glyphs and
+# bitmaps. Keep this Gallery-only: normal SDK applications retain ordinary C
+# address-identity semantics.
 target_link_options(hpclang_font_gallery PRIVATE
-    -nostartfiles -Wl,--gc-sections "-Wl,-T,${HPCLANG_LINKER_SCRIPT}")
+    -nostartfiles
+    -Wl,--gc-sections
+    -Wl,--icf=all
+    -Wl,--ignore-data-address-equality
+    "-Wl,-T,${HPCLANG_LINKER_SCRIPT}")
 set_target_properties(hpclang_font_gallery PROPERTIES
     OUTPUT_NAME hpclang-font-gallery
     SUFFIX ".elf")
