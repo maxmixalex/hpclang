@@ -58,6 +58,16 @@ PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" --target "$E2E_TARGET" -j2
 cp "$OUT/cmake/$E2E_ELF" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
 
+# HPC1 remains the public, model-independent application artifact.  The large
+# all-face Font Gallery uses an internal compressed staging copy only inside
+# its calculator launchers so it can fit the historical Launcher V3 envelope.
+# Canonical runtime/hardware E2E deliberately keep exercising the raw path.
+STAGED_HPC1="$OUT/e2e.hpc"
+if [[ "$MODE" == font-gallery ]]; then
+    STAGED_HPC1="$OUT/e2e.hpz1"
+    python3 "$ROOT/tools/stage-hpc1-lz4.py" "$OUT/e2e.hpc" "$STAGED_HPC1"
+fi
+
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
 test -n "$result_addr"
@@ -132,7 +142,7 @@ __stage1_blob_end:
 .set __stage1_blob_size, __stage1_blob_end - __stage1_blob_start
 .align 2
 __hpc1_blob_start:
-.incbin "$OUT/e2e.hpc"
+.incbin "$STAGED_HPC1"
 __hpc1_blob_end:
 EOF
 "$CC" "${COMMON[@]}" -c "$OUT/stage0-bundle.S" -o "$OUT/stage0-bundle.o"
