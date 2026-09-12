@@ -11,6 +11,7 @@
 #include "options.h"
 #include "timer.h"
 #include "headless-ui-init.h"
+#include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
@@ -63,7 +64,9 @@
 #define POLL_US 20000LL
 #define DEADLINE_US 16000000LL
 #define RETURN_ON_US 200000LL
-#define RETURN_CAPTURE_US 800000LL
+#define RETURN_POLL_US 50000LL
+#define RETURN_DEADLINE_US 2000000LL
+#define RETURN_STABLE_OBSERVATIONS 4u
 
 struct key_action {
     int key;
@@ -117,6 +120,7 @@ struct e2e {
 
     struct cpu_snapshot stock;
     struct lcd_snapshot stock_lcd;
+    struct hpclang_lcd_quiescence return_quiescence;
     uint32_t lcd_state_diff;
     uint32_t old_data;
     uint32_t old_code;
@@ -139,6 +143,7 @@ struct e2e {
     int failed;
     int lcd_height;
     int64_t deadline;
+    int64_t return_deadline;
 };
 
 struct keyboard_capture_event {
@@ -597,6 +602,13 @@ static int snapshot_stock(struct e2e *s)
     return 1;
 }
 
+static int return_is_settled(const struct e2e *s)
+{
+    return s->return_quiescence.changed_from_baseline &&
+           s->return_quiescence.stable_observations >=
+               RETURN_STABLE_OBSERVATIONS;
+}
+
 static void json(struct e2e *s, const char *status)
 {
     FILE *f = fopen(s->json, "w");
@@ -629,6 +641,8 @@ static void json(struct e2e *s, const char *status)
         "  \"saw_pass\":%s,\n"
         "  \"payload_keyboard_scheduled\":%s,\n"
         "  \"returned\":%s,\n"
+        "  \"return_settled\":%s,\n"
+        "  \"return_observations\":%u,\n"
         "  \"pc\":\"0x%08x\",\n"
         "  \"saved_pc\":\"0x%08x\",\n"
         "  \"l1_data\":\"0x%08x\",\n"
@@ -661,6 +675,8 @@ static void json(struct e2e *s, const char *status)
         s->saw_pass ? "true" : "false",
         s->payload_keyboard_scheduled ? "true" : "false",
         s->returned ? "true" : "false",
+        return_is_settled(s) ? "true" : "false",
+        s->return_quiescence.observations,
         s->hdw->cpu->regs[15],
         s->stock.regs[15],
         data, code, stage, inject, swi, s->old_swi,
@@ -725,16 +741,35 @@ static int restore_stock(struct e2e *s)
 static void finish_return(void *arg)
 {
     struct e2e *s = arg;
-    unsigned pixels = capture_lcd(s->hdw, s->return_pgm, s->lcd_height);
 
-    if (!is_display_on() || pixels == 0 ||
-        s->hdw->cpu->regs[15] == SENTINEL_VA) {
+    if (!is_display_on() || s->hdw->cpu->regs[15] == SENTINEL_VA) {
         fail(s, "stock-resume");
         return;
     }
 
-    json(s, "pass");
-    hdw_stop(s->hdw);
+    if (hpclang_lcd_quiescence_observe(
+            &s->return_quiescence,
+            s->hdw,
+            LCD_W,
+            s->lcd_height,
+            RETURN_STABLE_OBSERVATIONS)) {
+        unsigned pixels = capture_lcd(
+            s->hdw, s->return_pgm, s->lcd_height);
+        if (pixels == 0u) {
+            fail(s, "stock-resume");
+            return;
+        }
+        json(s, "pass");
+        hdw_stop(s->hdw);
+        return;
+    }
+
+    if (timer_get_clock() >= s->return_deadline) {
+        fail(s, "return-unsettled");
+        return;
+    }
+    if (!later(finish_return, s, RETURN_POLL_US))
+        fail(s, "return-timer");
 }
 
 static void monitor(void *arg)
@@ -776,12 +811,18 @@ static void monitor(void *arg)
             return;
         }
 
+        hpclang_lcd_quiescence_seed(
+            &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
         if (!restore_stock(s)) {
             fail(s, "restore");
             return;
         }
+        s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
         if (!tap(&on_down, &on_up, RETURN_ON_US) ||
-            !later(finish_return, s, RETURN_CAPTURE_US))
+            !later(
+                finish_return,
+                s,
+                RETURN_ON_US + KEY_HOLD_US + RETURN_POLL_US))
             fail(s, "return-timer");
         return;
     }
@@ -905,7 +946,8 @@ int main(int argc, char **argv)
     exit_modules(s.hdw);
     free(s.stage0);
 
-    return (s.failed || !s.saw_pass || !s.returned)
+    return (s.failed || !s.saw_pass || !s.returned ||
+            !return_is_settled(&s))
         ? EXIT_FAILURE
         : EXIT_SUCCESS;
 }
