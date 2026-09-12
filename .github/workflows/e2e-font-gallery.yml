@@ -77,9 +77,28 @@ jobs:
 
       - name: Build interactive Font Gallery and launchers
         run: |
+          mkdir -p build
           chmod +x tools/build-e2e.sh
-          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery"
+          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery" 2>&1 | tee build/e2e-font-gallery-build.log
+
+      - name: Record Font Gallery size
+        run: |
           "$ATFE/bin/llvm-size" -A build/e2e-font-gallery/e2e.elf | tee build/e2e-font-gallery/e2e.size.txt
+
+      - name: Upload Font Gallery build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-font-gallery-build-diagnostics
+          retention-days: 1
+          path: |
+            build/e2e-font-gallery-build.log
+            build/e2e-font-gallery/e2e.hpc
+            build/e2e-font-gallery/e2e.elf
+            build/e2e-font-gallery/e2e.result-address
+            build/e2e-font-gallery/launchers/*.bin
+            build/e2e-font-gallery/launchers/*.hp
+          if-no-files-found: warn
 
       - name: Upload Font Gallery build
         uses: actions/upload-artifact@v7
