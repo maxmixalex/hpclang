@@ -92,6 +92,20 @@ int main(void)
         hpclang_font_advance(big) != 6u)
         fail("HP39 system font metrics");
 
+    /* A missing, unaligned, or out-of-window private alias must never be
+     * dereferenced. The native mini-font reader fails closed to its nominal
+     * advance when the launcher/runtime cookie contract is invalid. */
+    fake_boot.platform_cookie = 0u;
+    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+        fail("HP39 missing alias cookie");
+    fake_boot.platform_cookie = 0x0a000123u;
+    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+        fail("HP39 unaligned alias cookie");
+    fake_boot.platform_cookie = 0x09900000u;
+    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+        fail("HP39 out-of-window alias cookie");
+    fake_boot.platform_cookie = 0u;
+
     if (hpclang_font_height(&test_font) != 6u ||
         hpclang_font_advance(&test_font) != 4u ||
         hpclang_font_codepoint_advance(&test_font, 'A') != 5u ||
