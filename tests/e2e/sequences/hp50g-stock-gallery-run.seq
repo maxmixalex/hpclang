@@ -1,0 +1,36 @@
+# HP50g Stock Font Gallery launch through the original UI and ARMToolbox.
+# This deliberately samples the two native ROM-backed faces plus the first
+# generated face. Direct Gallery owns exhaustive traversal of all 315 faces.
+# The longer post-copy delay accounts for the ~228 KiB all-face launcher.
+2000 chord lshift files
+4200 capture files
+4500 tap up
+4800 tap f6
+6500 capture sd
+6900 tap enter
+7200 tap down
+7600 capture sd-payload
+8000 tap f2
+9200 capture copy-destination
+9500 tap down
+9800 tap f6
+20000 capture copy-result
+20500 tap f4
+21800 capture recalled-in-filer
+22200 tap nxt
+22600 tap nxt
+23400 capture filer-halt-menu
+23800 tap f1
+25100 capture payload-recalled
+25600 chord rshift two
+26850 capture lib
+27200 tap f1
+28500 capture armtoolbox
+28900 tap f1
+32000 monitor 90000
+40000 capture native-mini
+41500 tap right
+43000 capture native-main
+44500 tap right
+46000 capture generated-control
+47500 tap on
