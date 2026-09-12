@@ -61,20 +61,19 @@ jobs:
           git diff --check
           git status --short runtime/fonts/generated
 
-      - name: Audit Ark Pixel semantic parity and locale variants
+      - name: Audit complete font catalog semantic parity and duplicates
         run: |
           PY=build/font-venv/bin/python
           mkdir -p build/font-audit
           "$PY" tools/audit-font-assets.py \
             --package runtime/fonts/fonts.zip \
             --generated-dir runtime/fonts/generated \
-            --family ark-pixel \
-            --json build/font-audit/ark-pixel.json \
-            | tee build/font-audit/ark-pixel.txt
+            --json build/font-audit/all-fonts.json \
+            | tee build/font-audit/all-fonts.txt
           {
-            echo '### Ark Pixel font asset audit'
+            echo '### Complete font asset audit'
             echo '```text'
-            cat build/font-audit/ark-pixel.txt
+            cat build/font-audit/all-fonts.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
