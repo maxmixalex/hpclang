@@ -4,18 +4,17 @@
  * ARMv4 short-descriptor format used by the Samsung S3C2410-class MMU:
  *
  *   L1 coarse-table descriptor: physical table base | 0x11
- *   L1 1 MiB section descriptor: physical section base | 0xc12
- *   L2 4 KiB small-page descriptor: physical page base | 0xffe
+ *   L2 4 KiB small-page RAM descriptor: physical page base | 0xffe
+ *   L2 4 KiB small-page uncached descriptor: physical page base | 0xff2
  *
- * 0xc12 matches the read-only physical-flash alias already proven by the
- * retained HP39g+ NOR dumper. 0xffe is the same full-access/cacheable
- * small-page descriptor used by the historical launchers. hpclang deliberately
- * uses coarse tables for code and writable memory; the optional section alias
- * is bootstrap-private and exists only while HPC1 is running.
+ * Both small-page forms use full-access AP bits. Normal HPC1 RAM/code keeps
+ * the historical cacheable/buffered 0xffe descriptor. Bootstrap-private ROM
+ * windows use 0xff2 so physical NOR is never made cacheable merely to expose a
+ * fixed asset such as the HP39 native font tables.
  */
-#define COARSE_L1_FLAGS  0x0011u
-#define SECTION_L1_FLAGS 0x0c12u
-#define SMALL_L2_FLAGS   0x0ffeu
+#define COARSE_L1_FLAGS          0x0011u
+#define SMALL_L2_FLAGS           0x0ffeu
+#define SMALL_L2_UNCACHED_FLAGS  0x0ff2u
 
 static volatile uint32_t *data_l2(const struct hpclang_mmu_layout *layout)
 {
@@ -25,20 +24,6 @@ static volatile uint32_t *data_l2(const struct hpclang_mmu_layout *layout)
 static volatile uint32_t *code_l2(const struct hpclang_mmu_layout *layout)
 {
     return layout->l2_workspace + HPCLANG_L2_ENTRIES;
-}
-
-uint32_t hpclang_mmu_find_free_section_alias(const volatile uint32_t *l1)
-{
-    if (l1 == 0)
-        return 0u;
-
-    for (uint32_t i = HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX;
-         i <= HPCLANG_FLASH_ALIAS_LAST_L1_INDEX;
-         ++i) {
-        if (l1[i] == 0u)
-            return i;
-    }
-    return 0u;
 }
 
 void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout)
@@ -54,49 +39,36 @@ void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout)
     for (uint32_t i = 0; i < layout->rw_page_count; ++i)
         data[HPCLANG_DATA_L2_FIRST + i] = layout->rw_pages[i] | SMALL_L2_FLAGS;
 
+    if (layout->code_window_pages != 0 &&
+        layout->code_window_page_count <= HPCLANG_CODE_WINDOW_PAGE_CAPACITY) {
+        for (uint32_t i = 0; i < layout->code_window_page_count; ++i) {
+            code[i] =
+                (layout->code_window_pages[i] & 0xfffff000u) |
+                SMALL_L2_UNCACHED_FLAGS;
+        }
+    }
+
     for (uint32_t i = 0; i < layout->code_page_count; ++i)
         code[HPCLANG_CODE_L2_FIRST + i] = layout->code_pages[i] | SMALL_L2_FLAGS;
 }
 
-int hpclang_mmu_install(
+void hpclang_mmu_install(
     const struct hpclang_mmu_layout *layout,
     struct hpclang_mmu_saved *saved)
 {
-    /*
-     * A platform shim may have selected the alias before bootstrap masked
-     * interrupts. Re-check ownership at the point of installation and fail
-     * without changing any descriptor if stock code has claimed it meanwhile.
-     */
-    if (layout->section_alias_l1_index != 0u &&
-        layout->l1[layout->section_alias_l1_index] != 0u)
-        return -1;
-
     saved->data_l1 = layout->l1[HPCLANG_L1_DATA_INDEX];
     saved->code_l1 = layout->l1[HPCLANG_L1_CODE_INDEX];
-    saved->section_alias_l1 = 0u;
 
     layout->l1[HPCLANG_L1_DATA_INDEX] =
         layout->l2_workspace_phys | COARSE_L1_FLAGS;
     layout->l1[HPCLANG_L1_CODE_INDEX] =
         (layout->l2_workspace_phys + HPCLANG_L2_BYTES) | COARSE_L1_FLAGS;
-
-    if (layout->section_alias_l1_index != 0u) {
-        saved->section_alias_l1 =
-            layout->l1[layout->section_alias_l1_index];
-        layout->l1[layout->section_alias_l1_index] =
-            (layout->section_alias_phys & 0xfff00000u) | SECTION_L1_FLAGS;
-    }
-    return 0;
 }
 
 void hpclang_mmu_restore(
     const struct hpclang_mmu_layout *layout,
     const struct hpclang_mmu_saved *saved)
 {
-    if (layout->section_alias_l1_index != 0u)
-        layout->l1[layout->section_alias_l1_index] =
-            saved->section_alias_l1;
-
     layout->l1[HPCLANG_L1_DATA_INDEX] = saved->data_l1;
     layout->l1[HPCLANG_L1_CODE_INDEX] = saved->code_l1;
 }
