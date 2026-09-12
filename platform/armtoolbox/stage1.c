@@ -12,6 +12,11 @@
 #define ARMSYS_PAGE_COUNT   0x914u
 #define ARMSYS_L2_PHYS      0x920u
 
+#define HP39_MAIN_FIRST_NIBBLE   0x0007c651u
+#define HP39_MINI_FIRST_NIBBLE   0x0007e695u
+#define HP4950_MINI_FIRST_NIBBLE 0x000812c8u
+#define HP4950_BIG_OBJECT_NIBBLE 0x00084d82u
+
 /*
  * HP39gs/40gs native mini/main font records live entirely in these two NOR
  * pages. Keep this launcher-private: the runtime sees only the virtual window
@@ -40,6 +45,51 @@ static int hpc1_header_ok(const struct hpclang_image_header *header)
            header->magic[1] == 'P' &&
            header->magic[2] == 'C' &&
            header->magic[3] == '1';
+}
+
+static int saturn_read_pages_present(
+    const void *saturn_state,
+    uint32_t first_nibble,
+    uint32_t second_nibble)
+{
+    if (saturn_state == NULL)
+        return 0;
+
+    /* HPGCC ARMSYS begins with SAT_CPU.Read[257]. A real stock launch therefore
+       carries non-zero mappings for the ROM pages used by the native font
+       objects. Direct E2E's synthetic ARMSYS intentionally contains only the
+       allocator/page-pool fields at 0x914+, so those Read[] entries are zero. */
+    const uint32_t *read_map = (const uint32_t *)saturn_state;
+    return read_map[first_nibble >> 12] != 0u &&
+           read_map[second_nibble >> 12] != 0u;
+}
+
+static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
+{
+    switch (model) {
+    case HPCLANG_MODEL_HP39GPLUS:
+    case HPCLANG_MODEL_HP39GS:
+    case HPCLANG_MODEL_HP40GS:
+        return saturn_read_pages_present(
+                   saturn_state,
+                   HP39_MAIN_FIRST_NIBBLE,
+                   HP39_MINI_FIRST_NIBBLE)
+            ? (uintptr_t)saturn_state
+            : 0u;
+
+    case HPCLANG_MODEL_HP48GII:
+    case HPCLANG_MODEL_HP49GPLUS:
+    case HPCLANG_MODEL_HP50G:
+        return saturn_read_pages_present(
+                   saturn_state,
+                   HP4950_MINI_FIRST_NIBBLE,
+                   HP4950_BIG_OBJECT_NIBBLE)
+            ? (uintptr_t)saturn_state
+            : 0u;
+
+    default:
+        return 0u;
+    }
 }
 
 /*
@@ -153,7 +203,10 @@ int hpclang_armtoolbox_stage1(
 
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
-    launch.saturn_state = (uintptr_t)saturn_state;
+    /* Only advertise a Saturn state when its Read[] map actually contains the
+       native ROM pages used by the runtime. This keeps Direct E2E's synthetic
+       allocator block from masquerading as a live stock Saturn mapping. */
+    launch.saturn_state = live_saturn_state(saturn_state, model);
     if (launch.mmu.code_window_page_count != 0u) {
         launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
     } else {
