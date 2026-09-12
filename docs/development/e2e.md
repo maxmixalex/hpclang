@@ -111,6 +111,8 @@ The x50ng preparation helper accepts the same three platform names as hpclang: `
 
 HP 39g+ remains outside the automated matrices until a real-machine stock flash dump exists. The absence of that fixture must not be hidden by reusing a sibling or foreign bootloader and calling the result native HP39g+ validation.
 
+The retained HP39g+ NOR-dumper experiment is useful evidence for a transient physical-NOR mapping mechanism only. It is not evidence that HP39g+ shares HP39gs/40gs flash identity or their native-font physical offsets.
+
 ## CI build stages
 
 E2E applications are target-independent. CI should therefore avoid rebuilding a selected application once per calculator.
@@ -122,9 +124,9 @@ For the canonical runtime application, the implemented pipeline has one shared b
 3. **Stock family execution** — drive the original package/UI/launcher paths against that same artifact; Stock transfer assets are prepared once and shared.
 
 Direct and Stock therefore do **not** have separately compiled runtime payloads.
-A focused application such as Font Gallery should get its own build artifact,
+A focused application such as Font Gallery gets its own build artifact,
 specification and evidence path while reusing the common target/harness
-infrastructure where appropriate.
+infrastructure.
 
 HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
 
@@ -140,15 +142,14 @@ Direct currently captures an initial hollow keyboard plus one frame after every 
 
 ## Font Gallery application
 
-Font Gallery is a focused visual/sample E2E application, not part of the
-canonical runtime test. Its acceptance surface should include:
+Font Gallery is a focused visual/sample E2E application, not part of the canonical runtime test. The public font core itself has no semantic theme-role layer: the Gallery selects calculator-native `hpclang_font_mini()` / `hpclang_font_big()` entries and generated font products directly.
 
-- native semantic roles (`mini`, normal `text`, and `edit-large`) where the target supplies them;
-- generated convenience aliases and arbitrary generated face selection;
-- height, advance, baseline/spacing and representative character coverage;
-- 64-line and 80-line display layouts;
-- deterministic screenshots/contact sheets that can be inspected independently of runtime PASS evidence.
+The exhaustive Direct Gallery traverses **310 entries** — 308 generated faces plus two native entries — and renders both SAMPLE and TEXT pages, producing **620 captures per target**. The production matrix runs one family job for `hp39`, `hp48`, and `hp4950`, covering HP39gs, HP40gs, HP48gII, HP49g+, and HP50g and therefore both 64- and 80-line display layouts. It validates generated aliases/arbitrary face selection, metrics/spacing, representative coverage, deterministic pagination, PASS and settled return.
 
-Keeping the gallery separate prevents font exploration from inflating the
-runtime ABI/keyboard/storage test and makes the gallery useful as both visual
-regression evidence and a developer-facing sample application.
+Native-font evidence is intentionally family-aware. The synthetic Direct launcher does not fabricate a live Saturn `Read[]` map, so exhaustive generated-font rendering is authoritative on all five targets, while HP48/49/50 native-font pixels require a real Stock logical map. HP50g's compact Stock Gallery closes the hp4950 live-native path through the original UI/ARMToolbox launch and one generated control face. Compact HP48gII Stock Gallery remains the outstanding 64-line live-native evidence item.
+
+HP39gs/40gs are different: their fixed native raster tables are physical stock-ROM assets. Production bootstrap maps only the two required physical NOR pages (`0x00042000` and `0x00043000`) as uncached small pages in the private prefix of hpclang's own code L2 table. This design was chosen after diagnostics proved that a long-lived high-L1 NOR section alias could have its descriptor word overwritten by the active LCD framebuffer itself. Font Gallery therefore also serves as the regression gate for this bootstrap-private mapping.
+
+Formal production run **34698825657 / #42** is green across the Build stage, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`. The earlier targeted HP39 exhaustive run independently completed 310 entries / 620 captures on both HP39gs and HP40gs.
+
+Keeping Gallery separate prevents font exploration from inflating the runtime ABI/keyboard/storage test and lets its visual evidence evolve independently of canonical runtime PASS evidence.
