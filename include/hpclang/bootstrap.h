@@ -12,16 +12,23 @@ extern "C" {
 #define HPCLANG_L1_CODE_INDEX       (HPCLANG_CODE_BASE >> 20)
 
 /*
- * Private bootstrap-only section alias used by HP39/40 runtime services that
- * must address a fixed physical NOR asset rather than the stock Saturn bank
- * view. This address is not part of the application ABI.
+ * Private bootstrap-only section-alias window used by HP39gs/40gs runtime
+ * services that must address fixed physical NOR assets rather than the stock
+ * Saturn bank view. These addresses are not part of the application ABI.
  *
- * 0x0a000000 is the same high section proved safe by the retained read-only
- * HP39g+ NOR dumper. The active stock L1 descriptor is saved and restored with
- * the ordinary HPC1 mappings, so no alias survives application return.
+ * The retained read-only HP39g+ NOR dumper proved L1[0xa0] / VA 0x0a000000 as
+ * a usable high section when that descriptor is empty. Production bootstrap
+ * code does not assume that slot remains free: it scans this contiguous high
+ * window and borrows only a currently empty descriptor, then re-checks
+ * ownership immediately before installing the mapping.
  */
-#define HPCLANG_FLASH_ALIAS_BASE    0x0a000000u
-#define HPCLANG_L1_FLASH_ALIAS_INDEX (HPCLANG_FLASH_ALIAS_BASE >> 20)
+#define HPCLANG_L1_SECTION_SHIFT             20u
+#define HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX   0x0a0u
+#define HPCLANG_FLASH_ALIAS_LAST_L1_INDEX    0x0ffu
+#define HPCLANG_FLASH_ALIAS_MIN_BASE \
+    (HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX << HPCLANG_L1_SECTION_SHIFT)
+#define HPCLANG_FLASH_ALIAS_MAX_BASE \
+    (HPCLANG_FLASH_ALIAS_LAST_L1_INDEX << HPCLANG_L1_SECTION_SHIFT)
 
 #define HPCLANG_L2_ENTRIES          256u
 #define HPCLANG_L2_BYTES            (HPCLANG_L2_ENTRIES * sizeof(uint32_t))
@@ -83,11 +90,13 @@ struct hpclang_launch_context {
     uint32_t model;
     uint32_t entry_offset;
     uintptr_t saturn_state;
+    /* Opaque model-specific token copied verbatim into hpclang_boot_info. */
     uintptr_t platform_cookie;
 };
 
+uint32_t hpclang_mmu_find_free_section_alias(const volatile uint32_t *l1);
 void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout);
-void hpclang_mmu_install(
+int hpclang_mmu_install(
     const struct hpclang_mmu_layout *layout,
     struct hpclang_mmu_saved *saved);
 void hpclang_mmu_restore(
