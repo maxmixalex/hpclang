@@ -118,13 +118,22 @@ int hpclang_armtoolbox_stage1(
 
     /*
      * HP39gs/40gs 2.22 use the KINPO update-image layout exercised by the
-     * stock and Direct fixtures. Give runtime code a stable, read-only view of
+     * stock and Direct fixtures. Give runtime code a read-only view of
      * physical NOR instead of relying on whatever low virtual mapping or
      * Saturn bank happens to be active. HP39g+ intentionally remains excluded
      * until a trustworthy stock flash fixture establishes its layout.
+     *
+     * Stock HP39gs already owns L1[0xa0] on the current fixture, so do not
+     * hard-code the retained dumper's old slot. Select an empty high section
+     * now; common bootstrap re-checks that descriptor after masking interrupts
+     * and immediately before installing it.
      */
+    uint32_t flash_alias_index = 0u;
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
-        launch.mmu.section_alias_l1_index = HPCLANG_L1_FLASH_ALIAS_INDEX;
+        flash_alias_index = hpclang_mmu_find_free_section_alias(launch.mmu.l1);
+        if (flash_alias_index == 0u)
+            return -5;
+        launch.mmu.section_alias_l1_index = flash_alias_index;
         launch.mmu.section_alias_phys = 0u;
     } else {
         launch.mmu.section_alias_l1_index = 0u;
@@ -134,7 +143,13 @@ int hpclang_armtoolbox_stage1(
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
     launch.saturn_state = (uintptr_t)saturn_state;
-    launch.platform_cookie = old_l2_phys;
+    if (flash_alias_index != 0u) {
+        launch.platform_cookie =
+            (uintptr_t)flash_alias_index << HPCLANG_L1_SECTION_SHIFT;
+    } else {
+        /* Preserve the historical private token on platforms without aliasing. */
+        launch.platform_cookie = old_l2_phys;
+    }
 
     return hpclang_bootstrap_run(&launch);
 }
