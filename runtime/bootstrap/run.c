@@ -13,6 +13,15 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
 {
     struct hpclang_mmu_saved saved;
 
+    /*
+     * The optional section alias borrows a high virtual section only for the
+     * lifetime of HPC1. Match the retained HP39g+ read-only NOR dumper's
+     * ownership rule: never overwrite a mapping already owned by stock code.
+     */
+    if (launch->mmu.section_alias_l1_index != 0u &&
+        launch->mmu.l1[launch->mmu.section_alias_l1_index] != 0u)
+        return -5;
+
     hpclang_mmu_prepare(&launch->mmu);
 
     /*
