@@ -27,6 +27,20 @@ static volatile uint32_t *code_l2(const struct hpclang_mmu_layout *layout)
     return layout->l2_workspace + HPCLANG_L2_ENTRIES;
 }
 
+uint32_t hpclang_mmu_find_free_section_alias(const volatile uint32_t *l1)
+{
+    if (l1 == 0)
+        return 0u;
+
+    for (uint32_t i = HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX;
+         i <= HPCLANG_FLASH_ALIAS_LAST_L1_INDEX;
+         ++i) {
+        if (l1[i] == 0u)
+            return i;
+    }
+    return 0u;
+}
+
 void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout)
 {
     volatile uint32_t *data = data_l2(layout);
@@ -44,10 +58,19 @@ void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout)
         code[HPCLANG_CODE_L2_FIRST + i] = layout->code_pages[i] | SMALL_L2_FLAGS;
 }
 
-void hpclang_mmu_install(
+int hpclang_mmu_install(
     const struct hpclang_mmu_layout *layout,
     struct hpclang_mmu_saved *saved)
 {
+    /*
+     * A platform shim may have selected the alias before bootstrap masked
+     * interrupts. Re-check ownership at the point of installation and fail
+     * without changing any descriptor if stock code has claimed it meanwhile.
+     */
+    if (layout->section_alias_l1_index != 0u &&
+        layout->l1[layout->section_alias_l1_index] != 0u)
+        return -1;
+
     saved->data_l1 = layout->l1[HPCLANG_L1_DATA_INDEX];
     saved->code_l1 = layout->l1[HPCLANG_L1_CODE_INDEX];
     saved->section_alias_l1 = 0u;
@@ -63,6 +86,7 @@ void hpclang_mmu_install(
         layout->l1[layout->section_alias_l1_index] =
             (layout->section_alias_phys & 0xfff00000u) | SECTION_L1_FLAGS;
     }
+    return 0;
 }
 
 void hpclang_mmu_restore(
