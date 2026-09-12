@@ -22,7 +22,7 @@ extern "C" {
  * The code coarse table owns the complete 0x01200000..0x012fffff section,
  * while the public application image starts at HPCLANG_CODE_BASE=0x01220000.
  * Entries before HPCLANG_CODE_L2_FIRST are therefore bootstrap-private and may
- * expose small read-only platform assets without borrowing stock L1 slots.
+ * expose small platform assets without borrowing stock L1 slots.
  */
 #define HPCLANG_CODE_WINDOW_BASE \
     (HPCLANG_L1_CODE_INDEX << 20)
@@ -41,7 +41,7 @@ extern "C" {
  * code_pages[0] backs HPCLANG_CODE_BASE and contains the first page of the
  * HPC1 payload (the 16-byte HPC1 container header is not mapped).
  *
- * code_window_pages, when non-NULL, are mapped read-only/non-cacheable at
+ * code_window_pages, when non-NULL, are mapped non-cacheable/non-buffered at
  * HPCLANG_CODE_WINDOW_BASE before the application code range. The window is a
  * private launcher/runtime facility; applications must not depend on it.
  * Its page count must not exceed HPCLANG_CODE_WINDOW_PAGE_CAPACITY.
