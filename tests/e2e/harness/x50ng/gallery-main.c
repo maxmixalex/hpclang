@@ -21,6 +21,7 @@
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define GALLERY_PREFIX 0x47000000u
+#define GALLERY_NEXT_FACE 0x00400000u
 
 #define TEST_RAM_SIZE 0x00100000u
 #define TEST_PHYS 0x70000000u
@@ -435,8 +436,9 @@ static void settle_return(void *arg)
 static int drive_gallery(struct state *s, uint32_t value)
 {
     uint32_t page = (value >> 23) & 1u;
-    uint32_t count = (value >> 12) & 0x7ffu;
+    uint32_t count = (value >> 12) & 0x3ffu;
     uint32_t index = value & 0xfffu;
+    int next_same_family = (value & GALLERY_NEXT_FACE) != 0u;
 
     if (count == 0u || index >= count)
         return 0;
@@ -472,7 +474,8 @@ static int drive_gallery(struct state *s, uint32_t value)
     case GALLERY_WAIT_SAMPLE_RETURN:
         if (index == s->gallery_index && page == 0u) {
             if (s->gallery_index + 1u < s->gallery_count) {
-                if (!gallery_tap(s, HP4950_KEY_RIGHT))
+                int key = next_same_family ? HP4950_KEY_DOWN : HP4950_KEY_RIGHT;
+                if (!gallery_tap(s, key))
                     return 0;
                 s->gallery_phase = GALLERY_WAIT_NEXT;
             } else {
