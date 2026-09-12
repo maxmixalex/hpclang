@@ -13,9 +13,20 @@
 #define ARMSYS_L2_PHYS      0x920u
 
 #define HP39_MAIN_FIRST_NIBBLE   0x0007c651u
+#define HP39_MAIN_LAST_NIBBLE    (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
 #define HP39_MINI_FIRST_NIBBLE   0x0007e695u
+#define HP39_MINI_LAST_NIBBLE    (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
 #define HP4950_MINI_FIRST_NIBBLE 0x000812c8u
+#define HP4950_MINI_LAST_NIBBLE  (HP4950_MINI_FIRST_NIBBLE + 7u + 255u * 6u + 5u)
 #define HP4950_BIG_OBJECT_NIBBLE 0x00084d82u
+/* get_bigfont() skips either 8 bytes or 9 + name_length bytes before the
+   256-record, 16-nibble raster. Require the worst-case name length so every
+   Read[] page the runtime may dereference is present before publishing the
+   Saturn state. */
+#define HP4950_BIG_MAX_NAME_BYTES 255u
+#define HP4950_BIG_LAST_NIBBLE \
+    (HP4950_BIG_OBJECT_NIBBLE + \
+     2u * (9u + HP4950_BIG_MAX_NAME_BYTES) + 255u * 16u + 15u)
 
 /*
  * HP39gs/40gs native mini/main font records live entirely in these two NOR
@@ -47,21 +58,26 @@ static int hpc1_header_ok(const struct hpclang_image_header *header)
            header->magic[3] == '1';
 }
 
-static int saturn_read_pages_present(
+static int saturn_read_range_present(
     const void *saturn_state,
     uint32_t first_nibble,
-    uint32_t second_nibble)
+    uint32_t last_nibble)
 {
-    if (saturn_state == NULL)
+    if (saturn_state == NULL || last_nibble < first_nibble)
         return 0;
 
     /* HPGCC ARMSYS begins with SAT_CPU.Read[257]. A real stock launch therefore
-       carries non-zero mappings for the ROM pages used by the native font
+       carries non-zero mappings for every ROM page used by the native font
        objects. Direct E2E's synthetic ARMSYS intentionally contains only the
-       allocator/page-pool fields at 0x914+, so those Read[] entries are zero. */
+       allocator/page-pool fields at 0x914+, so these Read[] entries are zero. */
     const uint32_t *read_map = (const uint32_t *)saturn_state;
-    return read_map[first_nibble >> 12] != 0u &&
-           read_map[second_nibble >> 12] != 0u;
+    uint32_t first_page = first_nibble >> 12;
+    uint32_t last_page = last_nibble >> 12;
+    for (uint32_t page = first_page; page <= last_page; ++page) {
+        if (read_map[page] == 0u)
+            return 0;
+    }
+    return 1;
 }
 
 static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
@@ -70,20 +86,28 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
     case HPCLANG_MODEL_HP39GPLUS:
     case HPCLANG_MODEL_HP39GS:
     case HPCLANG_MODEL_HP40GS:
-        return saturn_read_pages_present(
+        return saturn_read_range_present(
                    saturn_state,
                    HP39_MAIN_FIRST_NIBBLE,
-                   HP39_MINI_FIRST_NIBBLE)
+                   HP39_MAIN_LAST_NIBBLE) &&
+               saturn_read_range_present(
+                   saturn_state,
+                   HP39_MINI_FIRST_NIBBLE,
+                   HP39_MINI_LAST_NIBBLE)
             ? (uintptr_t)saturn_state
             : 0u;
 
     case HPCLANG_MODEL_HP48GII:
     case HPCLANG_MODEL_HP49GPLUS:
     case HPCLANG_MODEL_HP50G:
-        return saturn_read_pages_present(
+        return saturn_read_range_present(
                    saturn_state,
                    HP4950_MINI_FIRST_NIBBLE,
-                   HP4950_BIG_OBJECT_NIBBLE)
+                   HP4950_MINI_LAST_NIBBLE) &&
+               saturn_read_range_present(
+                   saturn_state,
+                   HP4950_BIG_OBJECT_NIBBLE,
+                   HP4950_BIG_LAST_NIBBLE)
             ? (uintptr_t)saturn_state
             : 0u;
 
@@ -203,9 +227,9 @@ int hpclang_armtoolbox_stage1(
 
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
-    /* Only advertise a Saturn state when its Read[] map actually contains the
-       native ROM pages used by the runtime. This keeps Direct E2E's synthetic
-       allocator block from masquerading as a live stock Saturn mapping. */
+    /* Only advertise a Saturn state when its Read[] map contains every ROM
+       page the current native-font runtime may dereference. This keeps Direct
+       E2E's synthetic allocator block from masquerading as a live stock map. */
     launch.saturn_state = live_saturn_state(saturn_state, model);
     if (launch.mmu.code_window_page_count != 0u) {
         launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
