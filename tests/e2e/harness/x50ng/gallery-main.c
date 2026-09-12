@@ -11,6 +11,7 @@
 #include "options.h"
 #include "timer.h"
 #include "headless-ui-init.h"
+#include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
@@ -53,7 +54,10 @@
 #define KEY_HOLD_US 50000LL
 #define KEY_SETTLE_US 120000LL
 #define RETURN_ON_US 200000LL
-#define RETURN_CAPTURE_US 800000LL
+#define RETURN_SETTLE_FIRST_US 300000LL
+#define RETURN_SETTLE_INTERVAL_US 50000LL
+#define RETURN_SETTLE_TIMEOUT_US 2000000LL
+#define RETURN_SETTLE_STABLE 4u
 
 struct cpu_snapshot {
     uint32_t regs[16];
@@ -108,9 +112,12 @@ struct state {
     int64_t next_action;
     struct key_release key_release;
 
+    struct hpclang_lcd_quiescence return_quiescence;
+    int64_t return_settle_deadline;
     uint32_t result;
     int saw_pass;
     int returned;
+    int return_settled;
     int failed;
     int64_t deadline;
 };
@@ -346,6 +353,8 @@ static void write_json(struct state *s, const char *status)
         "  \"gallery_frames\":%u,\n"
         "  \"saw_pass\":%s,\n"
         "  \"returned\":%s,\n"
+        "  \"return_settled\":%s,\n"
+        "  \"return_settle_observations\":%u,\n"
         "  \"pc\":\"0x%08x\"\n"
         "}\n",
         status,
@@ -354,6 +363,8 @@ static void write_json(struct state *s, const char *status)
         s->gallery_frames,
         s->saw_pass ? "true" : "false",
         s->returned ? "true" : "false",
+        s->return_settled ? "true" : "false",
+        s->return_quiescence.observations,
         s->hdw->cpu->regs[15]);
     fclose(f);
 }
@@ -390,17 +401,35 @@ static int restore_stock(struct state *s)
     return 1;
 }
 
-static void finish_return(void *arg)
+static void settle_return(void *arg)
 {
     struct state *s = arg;
-    if (!is_display_on() ||
-        !capture_lcd(s->hdw, s->return_pgm, s->lcd_height) ||
-        s->hdw->cpu->regs[15] == SENTINEL_VA) {
-        fail(s, "stock-resume");
+
+    if (timer_get_clock() >= s->return_settle_deadline) {
+        fail(s, "return-not-settled");
         return;
     }
-    write_json(s, "pass");
-    hdw_stop(s->hdw);
+
+    if (is_display_on() &&
+        hpclang_lcd_quiescence_observe(
+            &s->return_quiescence,
+            s->hdw,
+            LCD_W,
+            s->lcd_height,
+            RETURN_SETTLE_STABLE)) {
+        if (!capture_lcd(s->hdw, s->return_pgm, s->lcd_height) ||
+            s->hdw->cpu->regs[15] == SENTINEL_VA) {
+            fail(s, "stock-resume");
+            return;
+        }
+        s->return_settled = 1;
+        write_json(s, "pass");
+        hdw_stop(s->hdw);
+        return;
+    }
+
+    if (!later(settle_return, s, RETURN_SETTLE_INTERVAL_US))
+        fail(s, "return-settle-timer");
 }
 
 static int drive_gallery(struct state *s, uint32_t value)
@@ -494,6 +523,8 @@ static void monitor(void *arg)
                 fail(s, "pass-capture");
                 return;
             }
+            hpclang_lcd_quiescence_seed(
+                &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
             fprintf(stderr,
                 "Font Gallery PASS after %u faces / %u captures\n",
                 s->gallery_count, s->gallery_frames);
@@ -509,8 +540,10 @@ static void monitor(void *arg)
             fail(s, "restore");
             return;
         }
+        s->return_settle_deadline =
+            timer_get_clock() + RETURN_SETTLE_TIMEOUT_US;
         if (!tap(&on_down, &on_up, RETURN_ON_US) ||
-            !later(finish_return, s, RETURN_CAPTURE_US)) {
+            !later(settle_return, s, RETURN_SETTLE_FIRST_US)) {
             fail(s, "return-timer");
         }
         return;
@@ -616,7 +649,7 @@ int main(int argc, char **argv)
     main_loop(s.hdw);
     exit_modules(s.hdw);
     free(s.stage0);
-    return (s.failed || !s.saw_pass || !s.returned)
+    return (s.failed || !s.saw_pass || !s.returned || !s.return_settled)
         ? EXIT_FAILURE
         : EXIT_SUCCESS;
 }
