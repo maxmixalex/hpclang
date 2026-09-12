@@ -12,6 +12,7 @@ on:
       - "runtime/fonts/fonts.zip"
       - "tools/hpclang-font.py"
       - "tools/regenerate-font-assets.py"
+      - "tools/audit-font-assets.py"
       - ".github/workflows/font-assets.yml"
 
 concurrency:
@@ -59,6 +60,32 @@ jobs:
           fi
           git diff --check
           git status --short runtime/fonts/generated
+
+      - name: Audit Ark Pixel semantic parity and locale variants
+        run: |
+          PY=build/font-venv/bin/python
+          mkdir -p build/font-audit
+          "$PY" tools/audit-font-assets.py \
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --family ark-pixel \
+            --json build/font-audit/ark-pixel.json \
+            | tee build/font-audit/ark-pixel.txt
+          {
+            echo '### Ark Pixel font asset audit'
+            echo '```text'
+            cat build/font-audit/ark-pixel.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload font audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: font-asset-audit
+          path: build/font-audit/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Commit regenerated assets
         if: github.event_name == 'push'
