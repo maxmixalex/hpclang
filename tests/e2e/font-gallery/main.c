@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
@@ -37,6 +38,8 @@ struct gallery_view {
     uint32_t unicode_count;
     const uint32_t *private_codepoints;
     uint32_t private_count;
+    uint32_t text_capable;
+    uint32_t native;
 };
 
 /*
@@ -142,7 +145,7 @@ static struct gallery_view gallery_at(uint32_t index)
             "Native", "calculator minifont", hpclang_font_mini(),
             native_unicode,
             (uint32_t)(sizeof(native_unicode) / sizeof(native_unicode[0])),
-            NULL, 0u,
+            NULL, 0u, 1u, 1u,
         };
         return view;
     }
@@ -151,7 +154,7 @@ static struct gallery_view gallery_at(uint32_t index)
             "Native", "calculator main font", hpclang_font_default(),
             native_unicode,
             (uint32_t)(sizeof(native_unicode) / sizeof(native_unicode[0])),
-            NULL, 0u,
+            NULL, 0u, 1u, 1u,
         };
         return view;
     }
@@ -166,6 +169,8 @@ static struct gallery_view gallery_at(uint32_t index)
         face->unicode_count,
         face->private_codepoints,
         face->private_count,
+        face->text_capable,
+        0u,
     };
     return view;
 }
@@ -277,6 +282,19 @@ static void chrome_text(
     }
 }
 
+static void chrome_text_centered(
+    struct hpclang_surface *surface,
+    int32_t y,
+    const char *text)
+{
+    size_t n = strlen(text);
+    int32_t width = n != 0u ? (int32_t)(n * 5u - 1u) : 0;
+    int32_t x = (LCD_WIDTH - width) / 2;
+    if (x < CONTENT_LEFT)
+        x = CONTENT_LEFT;
+    chrome_text(surface, x, y, CONTENT_RIGHT, text);
+}
+
 static int32_t text_width(const struct hpclang_font *font, const char *text)
 {
     int32_t width = 0;
@@ -316,20 +334,11 @@ static void draw_centered_ascii(
     draw_ascii_clipped(surface, font, x, y, CONTENT_RIGHT + 1, text);
 }
 
-static int friendly_unicode(uint32_t cp)
-{
-    /* Box-drawing, block elements and geometric shapes are valuable stress
-       probes, but they make a normal specimen look like rendering corruption.
-       Keep them out of the display Gallery; a diagnostic probe can own them. */
-    return !(cp >= 0x2500u && cp <= 0x25ffu);
-}
-
 static int32_t draw_codepoint_rows(
     struct hpclang_surface *surface,
     const struct hpclang_font *font,
     const uint32_t *codepoints,
     uint32_t count,
-    int filter_unicode,
     int32_t y,
     int32_t bottom,
     uint32_t max_glyphs)
@@ -342,8 +351,6 @@ static int32_t draw_codepoint_rows(
     uint32_t drawn = 0u;
     for (uint32_t i = 0u; i < count && drawn < max_glyphs; ++i) {
         uint32_t cp = codepoints[i];
-        if (filter_unicode && !friendly_unicode(cp))
-            continue;
         uint32_t advance = hpclang_font_codepoint_advance(font, cp);
         if (advance == 0u)
             continue;
@@ -354,10 +361,95 @@ static int32_t draw_codepoint_rows(
         if (y + (int32_t)line_height > bottom)
             break;
         hpclang_surface_draw_codepoint(surface, font, x, y, cp, 255u);
-        x += (int32_t)advance + 1;
+        /* The font's own advance already includes its intended side bearing.
+           Gallery must not add synthetic tracking on top of it. */
+        x += (int32_t)advance;
         ++drawn;
     }
     return drawn != 0u ? y + (int32_t)line_height : y;
+}
+
+static int cp_in_range(uint32_t cp, uint32_t lo, uint32_t hi)
+{
+    return cp >= lo && cp <= hi;
+}
+
+static void append_unique(
+    uint32_t *out,
+    uint32_t *count,
+    uint32_t capacity,
+    uint32_t cp)
+{
+    if (*count >= capacity)
+        return;
+    for (uint32_t i = 0u; i < *count; ++i) {
+        if (out[i] == cp)
+            return;
+    }
+    out[(*count)++] = cp;
+}
+
+static void append_unicode_range(
+    const struct gallery_view *view,
+    uint32_t *out,
+    uint32_t *count,
+    uint32_t capacity,
+    uint32_t lo,
+    uint32_t hi,
+    uint32_t limit)
+{
+    uint32_t added = 0u;
+    for (uint32_t i = 0u;
+         i < view->unicode_count && *count < capacity && added < limit; ++i) {
+        uint32_t cp = view->unicode_codepoints[i];
+        if (!cp_in_range(cp, lo, hi))
+            continue;
+        uint32_t before = *count;
+        append_unique(out, count, capacity, cp);
+        if (*count != before)
+            ++added;
+    }
+}
+
+static uint32_t build_feature_probe(
+    const struct gallery_view *view,
+    uint32_t *out,
+    uint32_t capacity)
+{
+    uint32_t count = 0u;
+
+    /* Private-use repertoire is where controller and Powerline-style glyphs
+       live. Show it first when a face has any. */
+    for (uint32_t i = 0u; i < view->private_count && count < capacity && i < 6u; ++i)
+        append_unique(out, &count, capacity, view->private_codepoints[i]);
+
+    /* Script-first ordering makes locale-specific faces visibly different in
+       a 131px viewport instead of spending the whole row on Latin symbols. */
+    append_unicode_range(view, out, &count, capacity, 0x3040u, 0x30ffu, 4u); /* Kana */
+    append_unicode_range(view, out, &count, capacity, 0xac00u, 0xd7afu, 2u); /* Hangul */
+    append_unicode_range(view, out, &count, capacity, 0x3400u, 0x9fffu, 4u); /* Han */
+    append_unicode_range(view, out, &count, capacity, 0x0370u, 0x03ffu, 3u); /* Greek */
+    append_unicode_range(view, out, &count, capacity, 0x2190u, 0x22ffu, 4u); /* arrows/math */
+
+    /* Finally fill from the remaining curated repertoire (Latin accents,
+       currency and other symbols). */
+    for (uint32_t i = 0u; i < view->unicode_count && count < capacity; ++i)
+        append_unique(out, &count, capacity, view->unicode_codepoints[i]);
+    return count;
+}
+
+static int32_t draw_features(
+    struct hpclang_surface *surface,
+    const struct gallery_view *view,
+    int32_t y,
+    int32_t bottom,
+    uint32_t max_glyphs)
+{
+    uint32_t probe[24];
+    uint32_t count = build_feature_probe(view, probe,
+        (uint32_t)(sizeof(probe) / sizeof(probe[0])));
+    return draw_codepoint_rows(
+        surface, view->font, probe, count, y, bottom, max_glyphs);
 }
 
 static int32_t draw_words(
@@ -422,17 +514,18 @@ static int32_t draw_words(
     return y;
 }
 
-static void draw_chevron(
+static void draw_nav_triangle(
     struct hpclang_surface *surface,
     int right,
     int32_t center_y)
 {
-    /* Fixed 6x11 raster, inset from the LCD edge. It is deliberately independent
-       of both the specimen font and the Gallery chrome font. */
-    int32_t tip = right ? 127 : 3;
-    int32_t tail = right ? 122 : 8;
-    hpclang_surface_draw_line(surface, tail, center_y - 5, tip, center_y, 255u);
-    hpclang_surface_draw_line(surface, tip, center_y, tail, center_y + 5, 255u);
+    /* A compact filled 3x5 pixel triangle is deliberately quieter than the
+       previous 6x11 line-chevron and leaves the specimen as the focal point. */
+    for (int32_t d = 0; d < 3; ++d) {
+        int32_t x = right ? 127 - d : 3 + d;
+        for (int32_t y = center_y - d; y <= center_y + d; ++y)
+            hpclang_surface_set_pixel(surface, x, y, 255u);
+    }
 }
 
 static void draw_chrome(
@@ -442,8 +535,21 @@ static void draw_chrome(
 {
     chrome_text(surface, CHROME_LEFT, 1, CHROME_RIGHT, view->family);
     chrome_text(surface, CHROME_LEFT, 8, CHROME_RIGHT, view->face);
-    draw_chevron(surface, 0, (int32_t)height / 2 + 2);
-    draw_chevron(surface, 1, (int32_t)height / 2 + 2);
+    draw_nav_triangle(surface, 0, (int32_t)height / 2 + 2);
+    draw_nav_triangle(surface, 1, (int32_t)height / 2 + 2);
+}
+
+static int native_raster_available(const struct hpclang_device_info *device)
+{
+    if (device->model == HPCLANG_MODEL_HP39GS ||
+        device->model == HPCLANG_MODEL_HP40GS)
+        return 1;
+
+    /* HP48gII/49g+/50g native fonts require the live Saturn Read[] map carried
+       by a stock launch. Synthetic Direct launchers intentionally do not fake
+       one. HP39g+ also remains evidence-gated and uses its launch-provided map. */
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    return boot != NULL && boot->saturn_state != 0u;
 }
 
 static void draw_basic_page(
@@ -459,21 +565,15 @@ static void draw_basic_page(
     if (line_height == 0u)
         return;
 
-    if (view->private_count != 0u) {
-        y = draw_codepoint_rows(
-            surface, font, view->private_codepoints, view->private_count,
-            0, y, bottom, 12u);
-        if (y < bottom)
-            (void)draw_codepoint_rows(
-                surface, font, view->unicode_codepoints, view->unicode_count,
-                1, y, bottom, 10u);
+    if (!view->text_capable) {
+        (void)draw_features(surface, view, y, bottom, 18u);
         return;
     }
 
     if (line_height >= 18u) {
         int32_t centered_y = CONTENT_TOP +
             (bottom - CONTENT_TOP - (int32_t)line_height) / 2;
-        draw_centered_ascii(surface, font, centered_y, "Aa 09");
+        draw_centered_ascii(surface, font, centered_y, "Quick");
         return;
     }
 
@@ -486,14 +586,13 @@ static void draw_basic_page(
         draw_centered_ascii(surface, font, y, "0123456789");
         y += (int32_t)line_height;
     }
-    if (line_height < 12u && y + (int32_t)line_height <= bottom) {
+
+    uint32_t feature_count = view->unicode_count + view->private_count;
+    if (feature_count != 0u && y < bottom) {
+        (void)draw_features(surface, view, y, bottom, 16u);
+    } else if (line_height < 12u && y + (int32_t)line_height <= bottom) {
         draw_centered_ascii(surface, font, y, "!?%&@# +-=/*");
-        y += (int32_t)line_height;
     }
-    if (y < bottom)
-        (void)draw_codepoint_rows(
-            surface, font, view->unicode_codepoints, view->unicode_count,
-            1, y, bottom, 16u);
 }
 
 static void draw_paragraph_page(
@@ -509,19 +608,13 @@ static void draw_paragraph_page(
     if (line_height == 0u)
         return;
 
-    if (view->private_count != 0u) {
-        y = draw_codepoint_rows(
-            surface, font, view->private_codepoints, view->private_count,
-            0, y, bottom, 12u);
-        if (y < bottom)
-            (void)draw_codepoint_rows(
-                surface, font, view->unicode_codepoints, view->unicode_count,
-                1, y, bottom, 12u);
+    if (!view->text_capable) {
+        (void)draw_features(surface, view, y, bottom, 18u);
         return;
     }
 
     if (line_height >= 15u) {
-        draw_centered_ascii(surface, font, CONTENT_TOP, "Quick fox");
+        draw_centered_ascii(surface, font, CONTENT_TOP, "Quick");
         if (CONTENT_TOP + (int32_t)line_height * 2 <= bottom)
             draw_centered_ascii(
                 surface, font, CONTENT_TOP + (int32_t)line_height, "012345");
@@ -534,10 +627,8 @@ static void draw_paragraph_page(
         CONTENT_TOP,
         bottom,
         "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. 0123456789.");
-    if (y < bottom)
-        (void)draw_codepoint_rows(
-            surface, font, view->unicode_codepoints, view->unicode_count,
-            1, y, bottom, 12u);
+    if (y < bottom && (view->unicode_count != 0u || view->private_count != 0u))
+        (void)draw_features(surface, view, y, bottom, 12u);
 }
 
 static int next_is_same_family(uint32_t index, uint32_t count)
@@ -560,6 +651,7 @@ static void publish_state(uint32_t index, uint32_t count, uint32_t page)
 
 static int redraw(
     struct hpclang_surface *surface,
+    const struct hpclang_device_info *device,
     uint32_t index,
     uint32_t count,
     uint32_t page,
@@ -573,6 +665,13 @@ static int redraw(
 
     hpclang_surface_clear(surface, 0u);
     draw_chrome(surface, &view, height);
+
+    if (view.native && !native_raster_available(device)) {
+        chrome_text_centered(surface, (int32_t)height / 2, "NATIVE MAP UNAVAILABLE");
+        publish_state(index, count, page);
+        return 1;
+    }
+
     if (page == 0u)
         draw_basic_page(surface, &view, height);
     else
@@ -601,7 +700,7 @@ int main(void)
     uint32_t index = 0u;
     uint32_t page = 0u;
     remember_face(index);
-    if (!redraw(surface, index, count, page, device->display_height))
+    if (!redraw(surface, device, index, count, page, device->display_height))
         return fail(4);
 
     hpclang_keyboard_events_reset();
@@ -640,7 +739,7 @@ int main(void)
         }
 
         if (changed &&
-            !redraw(surface, index, count, page, device->display_height))
+            !redraw(surface, device, index, count, page, device->display_height))
             return fail(5);
     }
 }
