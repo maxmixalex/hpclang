@@ -45,7 +45,7 @@ int main(void)
 
     assert(HPCLANG_L1_DATA_INDEX == 0x11u);
     assert(HPCLANG_L1_CODE_INDEX == 0x12u);
-    assert(HPCLANG_L1_FLASH_ALIAS_INDEX == 0x0au);
+    assert(HPCLANG_L1_FLASH_ALIAS_INDEX == 0xa0u);
     assert(HPCLANG_CODE_L2_FIRST == 0x20u);
     assert(HPCLANG_CODE_PAGE_CAPACITY == 224u);
 
@@ -66,12 +66,12 @@ int main(void)
     assert(saved.data_l1 == 0x12345012u);
     assert(saved.code_l1 == 0x6789a012u);
     assert(saved.section_alias_l1 == 0xabcdef12u);
-    assert(l1[0x0a] == 0x00000c12u);
+    assert(l1[0xa0] == 0x00000c12u);
     assert(l1[0x11] == 0x0803f011u);
     assert(l1[0x12] == 0x0803f411u);
 
     hpclang_mmu_restore(&layout, &saved);
-    assert(l1[0x0a] == 0xabcdef12u);
+    assert(l1[0xa0] == 0xabcdef12u);
     assert(l1[0x11] == 0x12345012u);
     assert(l1[0x12] == 0x6789a012u);
 
@@ -86,12 +86,12 @@ int main(void)
         .section_alias_l1_index = 0u,
         .section_alias_phys = 0u,
     };
-    l1[0x0a] = 0x13579012u;
+    l1[0xa0] = 0x13579012u;
     hpclang_mmu_install(&no_alias, &saved);
     assert(saved.section_alias_l1 == 0u);
-    assert(l1[0x0a] == 0x13579012u);
+    assert(l1[0xa0] == 0x13579012u);
     hpclang_mmu_restore(&no_alias, &saved);
-    assert(l1[0x0a] == 0x13579012u);
+    assert(l1[0xa0] == 0x13579012u);
 
     return 0;
 }
