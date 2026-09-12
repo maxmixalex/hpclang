@@ -48,7 +48,11 @@ A platform implementation owns calculator-specific work: native packaging, physi
 
 The common ARM bootstrap receives a small family-specific launch context, installs the HPC1 virtual layout, enters the application, restores the original mappings and privileged state, and returns to the calculator OS.
 
-Calculator-model policy must not leak into application code unless an actual user-visible hardware difference requires it. Platform differences remain below the HPC1 boundary; model identity is passed separately in the boot record.
+The code coarse table owns the full `0x01200000..0x012FFFFF` section while public HPC1 code begins at `0x01220000`. The bootstrap may therefore use the unused prefix before `HPCLANG_CODE_BASE` for narrowly scoped **private** small-page mappings without borrowing arbitrary stock L1 entries. These mappings are launcher/runtime implementation state, not application memory.
+
+HP39gs/40gs native-font access uses this mechanism: only physical NOR pages `0x00042000` and `0x00043000` are mapped uncached into the first two private code-window pages. This replaced an experimental long-lived high-L1 section alias after runtime evidence showed that the stock HP39 LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite an otherwise-empty descriptor word during drawing. The production design therefore publishes only hpclang-owned L1/L2 state for the font window.
+
+Calculator-model policy must not leak into application code unless an actual user-visible hardware difference requires it. Platform differences remain below the HPC1 boundary; model identity is passed separately in the boot record. `platform_cookie` remains an opaque launcher/runtime token and does not expose the private code window as application ABI.
 
 ## Platform families and model profiles
 
@@ -60,6 +64,8 @@ The platform family is the implementation unit for launch and low-level integrat
 
 A model profile is narrower. It records real per-model facts such as model ID, firmware source, bootloader identity, LCD height, or stock transfer sequence. It must not create a runtime fork merely because a calculator has a different product name.
 
+HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs flash identity. Its native physical-font layout remains blocked on a trustworthy real-machine full-flash fixture.
+
 ## Common platform services
 
 Display, keyboard, timers, storage, and calculator-object/stack integration are planned behind common APIs. They should be added only after a real application needs them and after the affected families have a stable execution path.
@@ -69,6 +75,8 @@ The project does not copy the historical HPGCC API surface wholesale. Historical
 ## Non-ROM policy
 
 The supported SDK must work through ordinary calculator software mechanisms. ROM replacement or ROM patching may be studied as an optional research or compatibility environment, but it is not part of the normal hpclang architecture.
+
+Read-only access to calculator-owned stock assets through launcher-private mappings does not change this policy: hpclang does not replace or modify the calculator ROM, and the mappings remain below the application ABI.
 
 ## Historical execution models
 
