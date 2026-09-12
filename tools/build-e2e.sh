@@ -63,7 +63,8 @@ result_addr="$("$NM" -n "$OUT/e2e.elf" |
 test -n "$result_addr"
 printf '%s\n' "$result_addr" > "$OUT/e2e.result-address"
 
-"$NM" "$OUT/e2e.elf" | grep -q ' T hpclang_start$'
+"$NM" "$OUT/e2e.elf" |
+    awk '$2 == "T" && $3 == "hpclang_start" { found = 1 } END { exit !found }'
 if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
     grep -E ' GLOBAL .* UND '; then
     echo "unexpected undefined E2E symbols" >&2
