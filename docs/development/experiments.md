@@ -99,3 +99,18 @@ The 2.0 transition removes, among other active 1.1 paths:
 Later source may contain attic copies or related binaries, but that does not make the 2.0 runtime a backwards-compatible family bundle.
 
 This finding is why hpclang uses multiple historical HPGCC generations as evidence while maintaining one new LLVM-native runtime.
+
+## Rejected compressed Font Gallery staging (`HPZ1`)
+
+During Font Gallery bring-up, an experimental launcher-private staging envelope named `HPZ1` was used to test whether compressing a large standard HPC1 image could preserve a single exhaustive Gallery payload through the historical ARMToolbox/Launcher V3 object boundary.
+
+The experiment was intentionally internal: `e2e.hpc` remained a normal HPC1 image, and `HPZ1` was never an application ABI or public package format. A small raw-LZ4 encoder compressed the Gallery body and stage1 expanded it directly into final code pages.
+
+The experiment proved two useful points:
+
+- the historical wrapped object-size limit can be bypassed by compressing the launcher payload;
+- doing so does **not** solve the real stock-launch resource limit. HP50g reached the native launcher path but reported `Error: Insufficient Memory` before hpclang entered, even though the compressed transfer object fit the wrapper.
+
+ELF accounting also showed why compiler flags are not a substitute for validation architecture here: after section GC and Gallery-only read-only ICF, about 96% of the roughly 795 KiB exhaustive image was font/catalog asset data rather than optimizable program code. `-Oz` or LTO could not plausibly make that one payload small enough for the stock path.
+
+`HPZ1` was therefore removed. Production and validation use standard HPC1 only. Exhaustive Direct Gallery validates every generated face with a synthetic test resource window sized for the existing HPC1 code-page ceiling, while a compact standard-HPC1 Stock Gallery validates the real native UI → ARMToolbox → HPC1 launch path. This keeps exhaustive font coverage and stock-launch integration as separate claims without creating a new package format for a test workload.
