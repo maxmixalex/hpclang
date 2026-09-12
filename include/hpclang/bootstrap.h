@@ -11,31 +11,22 @@ extern "C" {
 #define HPCLANG_L1_DATA_INDEX       (HPCLANG_BOOT_BASE >> 20)
 #define HPCLANG_L1_CODE_INDEX       (HPCLANG_CODE_BASE >> 20)
 
-/*
- * Private bootstrap-only section-alias window used by HP39gs/40gs runtime
- * services that must address fixed physical NOR assets rather than the stock
- * Saturn bank view. These addresses are not part of the application ABI.
- *
- * The retained read-only HP39g+ NOR dumper proved L1[0xa0] / VA 0x0a000000 as
- * a usable high section when that descriptor is empty. Production bootstrap
- * code does not assume that slot remains free: it scans this contiguous high
- * window and borrows only a currently empty descriptor, then re-checks
- * ownership immediately before installing the mapping.
- */
-#define HPCLANG_L1_SECTION_SHIFT             20u
-#define HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX   0x0a0u
-#define HPCLANG_FLASH_ALIAS_LAST_L1_INDEX    0x0ffu
-#define HPCLANG_FLASH_ALIAS_MIN_BASE \
-    (HPCLANG_FLASH_ALIAS_FIRST_L1_INDEX << HPCLANG_L1_SECTION_SHIFT)
-#define HPCLANG_FLASH_ALIAS_MAX_BASE \
-    (HPCLANG_FLASH_ALIAS_LAST_L1_INDEX << HPCLANG_L1_SECTION_SHIFT)
-
 #define HPCLANG_L2_ENTRIES          256u
 #define HPCLANG_L2_BYTES            (HPCLANG_L2_ENTRIES * sizeof(uint32_t))
 #define HPCLANG_L2_WORKSPACE_BYTES  HPCLANG_PAGE_SIZE
 
 #define HPCLANG_DATA_L2_FIRST       0u
 #define HPCLANG_CODE_L2_FIRST       ((HPCLANG_CODE_BASE & 0x000fffffu) >> 12)
+
+/*
+ * The code coarse table owns the complete 0x01200000..0x012fffff section,
+ * while the public application image starts at HPCLANG_CODE_BASE=0x01220000.
+ * Entries before HPCLANG_CODE_L2_FIRST are therefore bootstrap-private and may
+ * expose small read-only platform assets without borrowing stock L1 slots.
+ */
+#define HPCLANG_CODE_WINDOW_BASE \
+    (HPCLANG_L1_CODE_INDEX << 20)
+#define HPCLANG_CODE_WINDOW_PAGE_CAPACITY HPCLANG_CODE_L2_FIRST
 
 #define HPCLANG_RW_PAGE_CAPACITY    HPCLANG_L2_ENTRIES
 #define HPCLANG_CODE_PAGE_CAPACITY  (HPCLANG_L2_ENTRIES - HPCLANG_CODE_L2_FIRST)
@@ -50,13 +41,13 @@ extern "C" {
  * code_pages[0] backs HPCLANG_CODE_BASE and contains the first page of the
  * HPC1 payload (the 16-byte HPC1 container header is not mapped).
  *
+ * code_window_pages, when non-NULL, are mapped read-only/non-cacheable at
+ * HPCLANG_CODE_WINDOW_BASE before the application code range. The window is a
+ * private launcher/runtime facility; applications must not depend on it.
+ * Its page count must not exceed HPCLANG_CODE_WINDOW_PAGE_CAPACITY.
+ *
  * l2_workspace points to one writable 4 KiB physical page. Its first 1 KiB is
  * the data coarse table; its second 1 KiB is the code coarse table.
- *
- * section_alias_l1_index == 0 disables the optional section alias. When it is
- * nonzero, section_alias_phys is the 1 MiB-aligned physical section mapped at
- * that L1 index for the lifetime of HPC1. This is a private launcher/runtime
- * facility, not an application-visible memory contract.
  */
 struct hpclang_mmu_layout {
     volatile uint32_t *l1;
@@ -69,14 +60,13 @@ struct hpclang_mmu_layout {
     const uint32_t *code_pages;
     uint32_t code_page_count;
 
-    uint32_t section_alias_l1_index;
-    uint32_t section_alias_phys;
+    const uint32_t *code_window_pages;
+    uint32_t code_window_page_count;
 };
 
 struct hpclang_mmu_saved {
     uint32_t data_l1;
     uint32_t code_l1;
-    uint32_t section_alias_l1;
 };
 
 /*
@@ -94,9 +84,8 @@ struct hpclang_launch_context {
     uintptr_t platform_cookie;
 };
 
-uint32_t hpclang_mmu_find_free_section_alias(const volatile uint32_t *l1);
 void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout);
-int hpclang_mmu_install(
+void hpclang_mmu_install(
     const struct hpclang_mmu_layout *layout,
     struct hpclang_mmu_saved *saved);
 void hpclang_mmu_restore(
