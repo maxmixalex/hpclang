@@ -123,13 +123,21 @@ This is strong historical evidence that HP39's text environment is a separate st
 
 However, evidence must not be overstated: HPGCC does **not** provide the hpclang physical raster constants `0x07E695` and `0x07C651`. Those exact HP39 mini/main table bases, record layouts, and the need to bypass the live logical bank for fixed raster assets were established independently by stock-ROM reverse engineering and emulator pixel validation.
 
+The production HP39gs/40gs implementation now exposes only the two required physical NOR pages, `0x00042000` and `0x00043000`, as uncached 4 KiB small pages inside the bootstrap-private prefix of hpclang's own code coarse table. Runtime receives the exact private window base only through the opaque `platform_cookie`; no physical ROM address or private mapping becomes public font ABI.
+
+This replaced an experimental long-lived high-L1 section alias. The alias mechanism itself was valid — the retained HP39g+ NOR dumper remains useful evidence for a transient `L1[A0]`/section mapping — but it was not safe as persistent runtime storage on HP39gs/40gs. Diagnostics proved that the active LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite a descriptor word during ordinary drawing. A descriptor that reads zero is therefore not necessarily a safe long-lived slot.
+
+The retained dumper must also not be over-interpreted as HP39g+ firmware-identity evidence. HP39g+ remains excluded from the gs/40gs physical-font layout until a trustworthy real-hardware full-flash fixture establishes its own mapping.
+
 Compatibility consequence:
 
 - the common hpclang font API correctly hides the family-specific lookup mechanism;
-- HP39 fixed native raster access may use physical flash while ordinary Saturn RAM/object access still uses `Read[]`;
+- HP39 fixed native raster access may use bootstrap-private physical flash mappings while ordinary Saturn RAM/object access still uses `Read[]`;
 - HP48/49/50 native lookup should retain logical `Read[]` behavior;
-- neither physical ROM addresses nor `Read[]` pointers belong in the public font ABI;
+- neither physical ROM addresses, private code-window VAs, `platform_cookie` meaning nor `Read[]` pointers belong in the public font ABI;
 - historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
+
+The production Font Gallery gate now covers this boundary directly: targeted HP39 exhaustive validation completes 310 entries / 620 captures on both HP39gs and HP40gs, and formal `E2E / Font Gallery` run `34698825657` / #42 is green across all Direct families plus the HP50g Stock live-native control.
 
 ## Font/text compatibility boundary
 
