@@ -15,16 +15,17 @@
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
 #define PAYLOAD_KEY_HOLD_US 50000LL
-#define PAYLOAD_KEY_STEP_US 120000LL
 #define PAYLOAD_KEY_FIRST_DELAY_US 20000LL
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define PHASE_KEYBOARD_READY 0x4b425244u
+#define PHASE_KEYBOARD_ACK 0x4b410000u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
 #define RETURN_DEADLINE_US 2000000LL
 #define RETURN_REPAINT_DELAY_US 20000LL
+#define HP48_RETURN_REPAINT_DELAY_US 250000LL
 #define RETURN_REPAINT_SETTLE_US 180000LL
 #define RETURN_STABLE_OBSERVATIONS 4u
 
@@ -47,6 +48,7 @@ struct state {
     int saw_before;
     int saw_pass;
     int payload_keyboard_scheduled;
+    size_t payload_keyboard_sent;
     int return_repaint_scheduled;
     int returned;
     int failed;
@@ -221,6 +223,7 @@ static int schedule_return_repaint(struct state *s)
     const struct key_action *down_action;
     const struct key_action *up_action;
     const char *name;
+    int64_t delay = RETURN_REPAINT_DELAY_US;
 
     if (s->return_repaint_scheduled)
         return 1;
@@ -235,15 +238,49 @@ static int schedule_return_repaint(struct state *s)
         down_action = &var_down;
         up_action = &var_up;
         name = "VAR";
+        /*
+         * HP48gII has already restored the stock Saturn address space when
+         * the result word disappears, but the stock UI scheduler is not yet
+         * guaranteed to consume a key 20 ms later. The same VAR action is
+         * proven by the stock install/run sequence; defer only this target's
+         * repaint so the returned Saturn loop can become responsive first.
+         */
+        if (target != NULL && strcmp(target, "hp48gii") == 0)
+            delay = HP48_RETURN_REPAINT_DELAY_US;
     }
 
-    if (!tap(down_action, up_action, RETURN_REPAINT_DELAY_US))
+    if (!tap(down_action, up_action, delay))
         return 0;
 
     s->return_repaint_scheduled = 1;
     fprintf(stderr,
-            "stock launcher: control returned; scheduled native %s repaint\n",
-            name);
+            "stock launcher: control returned; scheduled native %s repaint "
+            "after %lld us\n",
+            name, (long long)delay);
+    return 1;
+}
+
+static int schedule_payload_keyboard_key(struct state *s, size_t index)
+{
+    size_t count = sizeof(payload_keyboard_codes) /
+                   sizeof(payload_keyboard_codes[0]);
+    if (index >= count)
+        return 0;
+
+    payload_keyboard_down[index].key = payload_keyboard_codes[index];
+    payload_keyboard_down[index].down = 1;
+    payload_keyboard_up[index].key = payload_keyboard_codes[index];
+    payload_keyboard_up[index].down = 0;
+
+    if (!later(
+            key_cb, &payload_keyboard_down[index],
+            PAYLOAD_KEY_FIRST_DELAY_US) ||
+        !later(
+            key_cb, &payload_keyboard_up[index],
+            PAYLOAD_KEY_FIRST_DELAY_US + PAYLOAD_KEY_HOLD_US))
+        return 0;
+
+    s->payload_keyboard_sent = index + 1u;
     return 1;
 }
 
@@ -254,24 +291,14 @@ static int schedule_payload_keyboard(struct state *s)
 
     if (s->payload_keyboard_scheduled)
         return 1;
-
-    for (size_t i = 0; i < count; ++i) {
-        payload_keyboard_down[i].key = payload_keyboard_codes[i];
-        payload_keyboard_down[i].down = 1;
-        payload_keyboard_up[i].key = payload_keyboard_codes[i];
-        payload_keyboard_up[i].down = 0;
-
-        int64_t press_us = PAYLOAD_KEY_FIRST_DELAY_US +
-            (int64_t)i * PAYLOAD_KEY_STEP_US;
-        if (!later(key_cb, &payload_keyboard_down[i], press_us) ||
-            !later(key_cb, &payload_keyboard_up[i],
-                   press_us + PAYLOAD_KEY_HOLD_US))
-            return 0;
-    }
+    if (count == 0u || !schedule_payload_keyboard_key(s, 0u))
+        return 0;
 
     s->payload_keyboard_scheduled = 1;
-    fprintf(stderr, "stock launcher: payload keyboard phase reached; "
-                    "scheduled %zu keys\n", count);
+    fprintf(stderr,
+            "stock launcher: payload keyboard phase reached; started "
+            "%zu-key acknowledged sequence\n",
+            count);
     return 1;
 }
 
@@ -471,6 +498,21 @@ static void monitor(void *arg)
         if (!schedule_payload_keyboard(s)) {
             fail(s, "keyboard-schedule");
             return;
+        }
+    } else if (s->payload_keyboard_scheduled && readable &&
+               (value & 0xffff0000u) == PHASE_KEYBOARD_ACK) {
+        size_t count = sizeof(payload_keyboard_codes) /
+                       sizeof(payload_keyboard_codes[0]);
+        size_t ack = (size_t)(value & 0xffffu);
+        if (ack == 0u || ack > count || ack > s->payload_keyboard_sent) {
+            fail(s, "keyboard-ack");
+            return;
+        }
+        if (ack == s->payload_keyboard_sent && ack < count) {
+            if (!schedule_payload_keyboard_key(s, ack)) {
+                fail(s, "keyboard-schedule");
+                return;
+            }
         }
     }
 
