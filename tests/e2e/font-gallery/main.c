@@ -27,6 +27,8 @@ struct gallery_view {
     const struct hpclang_font *font;
     const uint32_t *unicode_codepoints;
     uint32_t unicode_count;
+    const uint32_t *private_codepoints;
+    uint32_t private_count;
 };
 
 static void hold_result(void)
@@ -51,17 +53,19 @@ static struct gallery_view gallery_at(uint32_t index)
 {
     if (index == 0u) {
         const struct gallery_view view = {
-            "Native Mini", "calculator minifont", hpclang_font_mini(),
+            "Native", "calculator minifont", hpclang_font_mini(),
             native_unicode,
             (uint32_t)(sizeof(native_unicode) / sizeof(native_unicode[0])),
+            NULL, 0u,
         };
         return view;
     }
     if (index == 1u) {
         const struct gallery_view view = {
-            "Native Main", "calculator main font", hpclang_font_default(),
+            "Native", "calculator main font", hpclang_font_default(),
             native_unicode,
             (uint32_t)(sizeof(native_unicode) / sizeof(native_unicode[0])),
+            NULL, 0u,
         };
         return view;
     }
@@ -74,8 +78,44 @@ static struct gallery_view gallery_at(uint32_t index)
         face->font,
         face->unicode_codepoints,
         face->unicode_count,
+        face->private_codepoints,
+        face->private_count,
     };
     return view;
+}
+
+static uint32_t gallery_family_first(uint32_t index)
+{
+    struct gallery_view current = gallery_at(index);
+    while (index > 0u) {
+        struct gallery_view previous = gallery_at(index - 1u);
+        if (strcmp(previous.family, current.family) != 0)
+            break;
+        --index;
+    }
+    return index;
+}
+
+static uint32_t gallery_next_family(uint32_t index, uint32_t count)
+{
+    uint32_t first = gallery_family_first(index);
+    struct gallery_view current = gallery_at(first);
+    uint32_t next = first + 1u;
+    while (next < count) {
+        struct gallery_view candidate = gallery_at(next);
+        if (strcmp(candidate.family, current.family) != 0)
+            return next;
+        ++next;
+    }
+    return 0u;
+}
+
+static uint32_t gallery_previous_family(uint32_t index, uint32_t count)
+{
+    uint32_t first = gallery_family_first(index);
+    if (first == 0u)
+        return gallery_family_first(count - 1u);
+    return gallery_family_first(first - 1u);
 }
 
 static int32_t ascii_width(const struct hpclang_font *font, const char *text)
@@ -180,20 +220,22 @@ static int32_t draw_words(
     return y;
 }
 
-static int32_t draw_unicode(
+static int32_t draw_codepoints(
     struct hpclang_surface *surface,
-    const struct gallery_view *view,
+    const struct hpclang_font *font,
+    const uint32_t *codepoints,
+    uint32_t count,
     int32_t y,
     int32_t bottom)
 {
-    uint32_t line_height = hpclang_font_height(view->font);
-    if (line_height == 0u || view->unicode_count == 0u)
+    uint32_t line_height = hpclang_font_height(font);
+    if (line_height == 0u || codepoints == NULL || count == 0u)
         return y;
 
     int32_t x = 8;
-    for (uint32_t i = 0u; i < view->unicode_count; ++i) {
-        uint32_t cp = view->unicode_codepoints[i];
-        uint32_t advance = hpclang_font_codepoint_advance(view->font, cp);
+    for (uint32_t i = 0u; i < count; ++i) {
+        uint32_t cp = codepoints[i];
+        uint32_t advance = hpclang_font_codepoint_advance(font, cp);
         if (advance == 0u)
             continue;
         if (x + (int32_t)advance > 123) {
@@ -202,7 +244,34 @@ static int32_t draw_unicode(
         }
         if (y + (int32_t)line_height > bottom)
             break;
-        hpclang_surface_draw_codepoint(surface, view->font, x, y, cp, 255u);
+        hpclang_surface_draw_codepoint(surface, font, x, y, cp, 255u);
+        x += (int32_t)advance + 1;
+    }
+    return y + (int32_t)line_height;
+}
+
+static int32_t draw_codepoint_line(
+    struct hpclang_surface *surface,
+    const struct hpclang_font *font,
+    const uint32_t *codepoints,
+    uint32_t count,
+    int32_t y,
+    int32_t bottom)
+{
+    uint32_t line_height = hpclang_font_height(font);
+    if (line_height == 0u || codepoints == NULL || count == 0u ||
+        y + (int32_t)line_height > bottom)
+        return y;
+
+    int32_t x = 8;
+    for (uint32_t i = 0u; i < count; ++i) {
+        uint32_t advance = hpclang_font_codepoint_advance(font, codepoints[i]);
+        if (advance == 0u)
+            continue;
+        if (x + (int32_t)advance > 123)
+            break;
+        hpclang_surface_draw_codepoint(
+            surface, font, x, y, codepoints[i], 255u);
         x += (int32_t)advance + 1;
     }
     return y + (int32_t)line_height;
@@ -263,6 +332,15 @@ static void draw_sample(
     if (line_height == 0u)
         return;
 
+    /* Show real private-use mappings first when a face has them.  Keeping the
+       special sample to one line guarantees that ordinary comparison rows are
+       still visible, while the catalog ordering puts one glyph from each PUA
+       page first (for example separate controller-button families). */
+    if (view->private_count != 0u)
+        y = draw_codepoint_line(
+            surface, view->font, view->private_codepoints,
+            view->private_count, y, bottom);
+
     if (y + (int32_t)line_height <= bottom) {
         draw_centered_ascii(surface, view->font, y, "AaBbMmXxZz 012345");
         y += (int32_t)line_height;
@@ -272,7 +350,9 @@ static void draw_sample(
         y += (int32_t)line_height;
     }
     if (y < bottom)
-        (void)draw_unicode(surface, view, y, bottom);
+        (void)draw_codepoints(
+            surface, view->font, view->unicode_codepoints,
+            view->unicode_count, y, bottom);
 }
 
 static void draw_text_page(
@@ -288,7 +368,9 @@ static void draw_text_page(
         bottom,
         "The quick brown fox jumps over the lazy dog. Sphinx of black quartz, judge my vow. Pack my box with five dozen liquor jugs. 0123456789.");
     if (y < bottom)
-        (void)draw_unicode(surface, view, y, bottom);
+        (void)draw_codepoints(
+            surface, view->font, view->unicode_codepoints,
+            view->unicode_count, y, bottom);
 }
 
 static void publish_state(uint32_t index, uint32_t count, uint32_t page)
@@ -361,6 +443,12 @@ int main(void)
             changed = 1;
         } else if (event.key == HPCLANG_KEY_RIGHT) {
             index = (index + 1u) % count;
+            changed = 1;
+        } else if (event.key == HPCLANG_KEY_UP) {
+            index = gallery_previous_family(index, count);
+            changed = 1;
+        } else if (event.key == HPCLANG_KEY_DOWN) {
+            index = gallery_next_family(index, count);
             changed = 1;
         } else if (event.key == HPCLANG_KEY_ENTER &&
                    event.type == HPCLANG_KEYBOARD_EVENT_DOWN) {
