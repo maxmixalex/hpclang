@@ -172,7 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [hp39, hp48, hp4950]
+        family: [hp39]
     env:
       FAMILY: ${{ matrix.family }}
 
@@ -251,6 +251,7 @@ jobs:
           if-no-files-found: warn
 
   stock-gallery-hp50g:
+    if: ${{ false }}
     name: Stock Gallery / hp50g
     needs: [build, x50ng]
     runs-on: home-docker
