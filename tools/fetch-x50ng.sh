@@ -58,3 +58,6 @@ python3 "$ROOT/tools/prepare-x50ng.py" \
 python3 "$ROOT/tools/prepare-x50ng-gallery.py" \
     "$DEST" \
     --gallery-frontend "$ROOT/tests/e2e/harness/x50ng/gallery-main.c"
+
+cp "$ROOT/tests/e2e/harness/x50ng/lcd-quiescence.h" \
+   "$DEST/src/lcd-quiescence.h"
