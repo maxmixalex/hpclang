@@ -1,0 +1,71 @@
+name: Debug / Gallery presentation E2E
+
+permissions:
+  contents: read
+  actions: read
+
+on:
+  push:
+    paths:
+      - ".github/workflows/debug-gallery-presentation-e2e.yml"
+
+concurrency:
+  group: gallery-presentation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gallery-presentation:
+    runs-on: home-docker
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build current exhaustive Gallery
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e"
+
+      - name: Reuse universal x50ng from formal run 42
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+          repository: zyf722/hpclang
+          run-id: 34698825657
+          github-token: ${{ github.token }}
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Prepare Direct runtimes
+        run: |
+          bash tests/e2e/harness/setup-runtime.sh direct hp39
+          bash tests/e2e/harness/setup-runtime.sh direct hp48
+
+      - name: Validate HP39gs native and generated presentation
+        run: bash tests/e2e/harness/run-gallery.sh hp39gs build/e2e
+
+      - name: Validate HP48gII Direct native-unavailable and generated presentation
+        run: bash tests/e2e/harness/run-gallery.sh hp48gii build/e2e
+
+      - name: Upload presentation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gallery-presentation-e2e
+          retention-days: 1
+          path: |
+            build/hp39gs-*.pgm
+            build/hp39gs-*.pgm.png
+            build/hp39gs-*.json
+            build/hp39gs-font-gallery-frames/**
+            build/hp48gii-*.pgm
+            build/hp48gii-*.pgm.png
+            build/hp48gii-*.json
+            build/hp48gii-font-gallery-frames/**
+          if-no-files-found: warn
