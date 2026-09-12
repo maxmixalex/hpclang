@@ -23,11 +23,24 @@ target_compile_options(hpclang_font_gallery PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 
-# The Gallery intentionally links every generated face in the catalog. Each
-# face retains only the comparison repertoire below, so large Unicode families
-# remain practical while every size/weight/language variant stays browsable.
+# Full Gallery is the exhaustive font-validation payload used by Direct E2E.
+# Stock E2E validates the real calculator UI -> ARMToolbox -> HPC1 launch path,
+# so it uses one generated face in addition to the two native faces. Keeping
+# those responsibilities separate avoids making the stock launcher carry
+# hundreds of font assets that do not add launcher coverage.
+set(HPCLANG_GALLERY_PROFILE "full" CACHE STRING
+    "Font Gallery profile: full or stock-smoke")
+set_property(CACHE HPCLANG_GALLERY_PROFILE PROPERTY STRINGS full stock-smoke)
+
 set(GALLERY_FONT_IDS ${HPCLANG_FONT_IDS})
 list(SORT GALLERY_FONT_IDS)
+if(HPCLANG_GALLERY_PROFILE STREQUAL "stock-smoke")
+    list(GET GALLERY_FONT_IDS 0 GALLERY_STOCK_FACE)
+    set(GALLERY_FONT_IDS "${GALLERY_STOCK_FACE}")
+elseif(NOT HPCLANG_GALLERY_PROFILE STREQUAL "full")
+    message(FATAL_ERROR
+        "HPCLANG_GALLERY_PROFILE must be full or stock-smoke")
+endif()
 
 # Keep exactly the printable ASCII characters that are drawn with the selected
 # generated face in main.c. Gallery chrome, face/family names and counters use
@@ -233,7 +246,7 @@ file(APPEND "${catalog_c}"
 target_sources(hpclang_font_gallery PRIVATE "${catalog_c}")
 
 message(STATUS
-    "Font Gallery: ${face_index} generated faces from ${family_count} families + 2 native faces")
+    "Font Gallery (${HPCLANG_GALLERY_PROFILE}): ${face_index} generated faces from ${family_count} families + 2 native faces")
 
 # Generated font assets are immutable lookup data and the Gallery never relies
 # on glyph/bitmap object address identity. Allow lld to fold equal read-only

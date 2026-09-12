@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <runtime|hardware|font-gallery> [out-dir]" >&2
+    echo "usage: $0 <runtime|hardware|font-gallery|font-gallery-stock> [out-dir]" >&2
     exit 2
 fi
 
@@ -17,6 +17,7 @@ NM="$ATFE/bin/llvm-nm"
 E2E_SOURCE="$ROOT/tests/e2e"
 E2E_TARGET="hpclang_e2e"
 E2E_ELF="hpclang-e2e.elf"
+WRAP_LAUNCHERS=1
 
 case "$MODE" in
     runtime)
@@ -32,7 +33,14 @@ case "$MODE" in
         E2E_SOURCE="$ROOT/tests/e2e/font-gallery"
         E2E_TARGET="hpclang_font_gallery"
         E2E_ELF="hpclang-font-gallery.elf"
-        E2E_CMAKE_ARGS=()
+        E2E_CMAKE_ARGS=(-DHPCLANG_GALLERY_PROFILE=full)
+        WRAP_LAUNCHERS=0
+        ;;
+    font-gallery-stock)
+        E2E_SOURCE="$ROOT/tests/e2e/font-gallery"
+        E2E_TARGET="hpclang_font_gallery"
+        E2E_ELF="hpclang-font-gallery.elf"
+        E2E_CMAKE_ARGS=(-DHPCLANG_GALLERY_PROFILE=stock-smoke)
         ;;
     *)
         echo "unsupported E2E mode: $MODE" >&2
@@ -57,16 +65,6 @@ PATH="$ATFE/bin:$PATH" cmake --build "$OUT/cmake" --target "$E2E_TARGET" -j2
 
 cp "$OUT/cmake/$E2E_ELF" "$OUT/e2e.elf"
 python3 "$ROOT/tools/hpclang-pack.py" "$OUT/e2e.elf" "$OUT/e2e.hpc"
-
-# HPC1 remains the public, model-independent application artifact.  The large
-# all-face Font Gallery uses an internal compressed staging copy only inside
-# its calculator launchers so it can fit the historical Launcher V3 envelope.
-# Canonical runtime/hardware E2E deliberately keep exercising the raw path.
-STAGED_HPC1="$OUT/e2e.hpc"
-if [[ "$MODE" == font-gallery ]]; then
-    STAGED_HPC1="$OUT/e2e.hpz1"
-    python3 "$ROOT/tools/stage-hpc1-lz4.py" "$OUT/e2e.hpc" "$STAGED_HPC1"
-fi
 
 result_addr="$("$NM" -n "$OUT/e2e.elf" |
     awk '$3 == "hpclang_e2e_result" {print "0x"$1}')"
@@ -142,7 +140,7 @@ __stage1_blob_end:
 .set __stage1_blob_size, __stage1_blob_end - __stage1_blob_start
 .align 2
 __hpc1_blob_start:
-.incbin "$STAGED_HPC1"
+.incbin "$OUT/e2e.hpc"
 __hpc1_blob_end:
 EOF
 "$CC" "${COMMON[@]}" -c "$OUT/stage0-bundle.S" -o "$OUT/stage0-bundle.o"
@@ -162,9 +160,11 @@ while read -r target model; do
         "$OUT/launchers/$target.elf" \
         "$OUT/launchers/$target.bin"
 
-    python3 "$ROOT/tools/armtoolbox-wrap.py" \
-        "$OUT/launchers/$target.bin" \
-        "$OUT/launchers/$target.hp"
+    if (( WRAP_LAUNCHERS )); then
+        python3 "$ROOT/tools/armtoolbox-wrap.py" \
+            "$OUT/launchers/$target.bin" \
+            "$OUT/launchers/$target.hp"
+    fi
 done < <(
     python3 - "$ROOT/tests/e2e/targets" <<'PY'
 import json
@@ -177,4 +177,8 @@ for path in sorted(Path(sys.argv[1]).glob("*.json")):
 PY
 )
 
-printf 'PASS: %s E2E application and all target launchers built.\n' "$MODE"
+if (( WRAP_LAUNCHERS )); then
+    printf 'PASS: %s E2E application and wrapped target launchers built.\n' "$MODE"
+else
+    printf 'PASS: %s E2E application and raw Direct target launchers built.\n' "$MODE"
+fi

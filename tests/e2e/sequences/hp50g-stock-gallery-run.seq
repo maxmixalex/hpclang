@@ -1,7 +1,7 @@
 # HP50g Stock Font Gallery launch through the original UI and ARMToolbox.
-# This deliberately samples the two native ROM-backed faces plus the first
-# generated face. Direct Gallery owns exhaustive traversal of all 315 faces.
-# The longer post-copy delay accounts for the ~228 KiB all-face launcher.
+# Exhaustive traversal of all 308 generated faces belongs to Direct Gallery.
+# This compact Stock payload proves the native UI -> ARMToolbox -> standard
+# HPC1 path with both native faces and one representative generated face.
 2000 chord lshift files
 4200 capture files
 4500 tap up
