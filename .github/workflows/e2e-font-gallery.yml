@@ -331,3 +331,149 @@ jobs:
             build/e2e/e2e.hpc
             build/e2e/e2e.size.txt
           if-no-files-found: warn
+
+  stock-native-evidence-hp48gii:
+    name: Stock native-font evidence / hp48gii
+    needs: [build, x50ng]
+    runs-on: home-docker
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download compact Stock Gallery build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-build
+          path: build/e2e
+
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Restore HPGCC39 asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install asset preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare ARMToolbox48 library
+        run: |
+          bash tools/bootstrap-hp39-aplet.sh >/dev/null
+          mkdir -p build/assets
+          cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/assets/L275_48
+          sha256sum build/assets/L275_48
+
+      - name: Prepare Stock platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock hp48
+
+      - name: Launch Gallery through stock HP48gII ARMToolbox48
+        id: hp48_launch
+        continue-on-error: true
+        run: bash tests/e2e/harness/run-stock-gallery-hp48gii.sh build/e2e build/assets
+
+      - name: Validate live native-font evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          build = Path('build')
+          frames = [
+              build / 'hp48gii-stock-gallery-native-mini.pgm',
+              build / 'hp48gii-stock-gallery-native-main.pgm',
+              build / 'hp48gii-stock-gallery-generated-control.pgm',
+          ]
+          digests = []
+          for path in frames:
+              data = path.read_bytes()
+              try:
+                  magic, geometry, maxval, pixels = data.split(b'\n', 3)
+              except ValueError as exc:
+                  raise SystemExit(f'{path}: malformed PGM') from exc
+              if magic != b'P5' or maxval != b'255':
+                  raise SystemExit(f'{path}: unexpected PGM header')
+              width, height = map(int, geometry.split())
+              pixels = pixels[: width * height]
+              if len(pixels) != width * height:
+                  raise SystemExit(f'{path}: truncated PGM')
+              if not any(pixel != 255 for pixel in pixels):
+                  raise SystemExit(f'{path}: blank capture')
+              digests.append(hashlib.sha256(data).hexdigest())
+          if len(set(digests)) != len(digests):
+              raise SystemExit('HP48 Stock Gallery mini/main/control captures are not distinct')
+
+          state = json.loads((build / 'hp48gii-stock-gallery.json').read_text())
+          if not state.get('saw_pass'):
+              raise SystemExit(f'HP48 Stock Gallery did not reach HPC1 PASS: {state}')
+          status = state.get('status')
+          if status not in {'pass', 'return-unsettled'}:
+              raise SystemExit(f'unexpected HP48 Stock Gallery status: {status!r}')
+          print('PASS HP48 live-native evidence: mini/main/control distinct; HPC1 PASS observed')
+          print(f'visible-return status remains separate: {status}')
+          PY
+
+          frames=(
+            build/hp48gii-stock-gallery-native-mini.pgm
+            build/hp48gii-stock-gallery-native-main.pgm
+            build/hp48gii-stock-gallery-generated-control.pgm
+          )
+          python3 tools/merge-pgm-grid.py build/hp48gii-font-gallery.pgm "${frames[@]}"
+          python3 tools/pgm-to-png.py build/hp48gii-font-gallery.pgm build/hp48gii-font-gallery.pgm.png
+
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            chmod +x tools/publish-ci-image.sh
+            tools/publish-ci-image.sh \
+              build/hp48gii-font-gallery.pgm.png \
+              "stock-font-gallery/$GITHUB_RUN_ID/hp48gii-native.png"
+          fi
+
+          {
+            echo '## HP48gII Stock native-font evidence'
+            echo
+            echo '- Original Stock UI + Serial Kermit + ARMToolbox48 reached HPC1 PASS.'
+            echo '- Calculator minifont, calculator main font, and generated control captures are present, nonblank, and distinct.'
+            echo '- This gate owns live Saturn `Read[]` native-font evidence only.'
+            echo '- Stock visible-return settling remains a separate gate; `return-unsettled` here does not count as a visible-return PASS.'
+            echo '- Launch-step outcome: `${{ steps.hp48_launch.outcome }}`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload HP48 Stock native-font evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp48gii-stock-native-font-evidence
+          retention-days: 14
+          path: |
+            build/hp48gii-before.pgm
+            build/hp48gii-before.pgm.png
+            build/hp48gii-pass.pgm
+            build/hp48gii-pass.pgm.png
+            build/hp48gii-return.pgm
+            build/hp48gii-return.pgm.png
+            build/hp48gii-e2e.json
+            build/hp48gii-font-gallery.pgm
+            build/hp48gii-font-gallery.pgm.png
+            build/hp48gii-stock-gallery-*.pgm
+            build/hp48gii-stock-gallery-*.pgm.png
+            build/hp48gii-stock-gallery*.json
+            build/hp48gii-stock-gallery-kermit*
+            build/hp48gii-stock-gallery-socat.log
+            build/e2e/e2e.hpc
+            build/e2e/e2e.size.txt
+          if-no-files-found: warn
