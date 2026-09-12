@@ -32,4 +32,13 @@
 260000 tap enter
 270000 tap enter
 280000 tap enter
-43500 monitor 250000
+
+# A slow CI transfer can still be fetching LIB275L at the old ~294 s monitor
+# deadline. Keep a bounded tail, but space retries far enough apart that once
+# one ENTER launches the canonical payload, its strict keyboard phase and
+# return normally finish before another retry can be injected.
+310000 tap enter
+340000 tap enter
+370000 tap enter
+400000 tap enter
+43500 monitor 390000
