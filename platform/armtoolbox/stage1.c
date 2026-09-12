@@ -3,6 +3,7 @@
 
 #include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
+#include <hpclang/target.h>
 
 #define STAGE_WINDOW_BASE   0x09000000u
 #define STAGE_CODE_OFFSET   0x00000400u
@@ -114,6 +115,21 @@ int hpclang_armtoolbox_stage1(
     launch.mmu.rw_page_count = rw_count;
     launch.mmu.code_pages = code_pages;
     launch.mmu.code_page_count = code_count;
+
+    /*
+     * HP39gs/40gs 2.22 use the KINPO update-image layout exercised by the
+     * stock and Direct fixtures. Give runtime code a stable, read-only view of
+     * physical NOR instead of relying on whatever low virtual mapping or
+     * Saturn bank happens to be active. HP39g+ intentionally remains excluded
+     * until a trustworthy stock flash fixture establishes its layout.
+     */
+    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
+        launch.mmu.section_alias_l1_index = HPCLANG_L1_FLASH_ALIAS_INDEX;
+        launch.mmu.section_alias_phys = 0u;
+    } else {
+        launch.mmu.section_alias_l1_index = 0u;
+        launch.mmu.section_alias_phys = 0u;
+    }
 
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
