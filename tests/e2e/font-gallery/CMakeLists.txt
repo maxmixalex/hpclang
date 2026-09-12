@@ -47,6 +47,20 @@ set(GALLERY_UNICODE_CODEPOINTS
     20320 22909 19990 30028 26085 26412 35486 54620 44544
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
+
+# Keep the historically useful Powerline sample, then discover controller
+# glyphs only from the PUA page families actually used by BoutiqueBitmap9x9:
+# E8xx/E9xx/EAxx in the ordinary mapping and EFxx/F0xx/F1xx in its HK remap.
+# The exact glyph codepoints remain cmap-derived: one real mapping per page.
+# This avoids linking arbitrary PUA shards from every font face, which made the
+# all-face Gallery far too large for either the ARMToolbox wrapper or Direct
+# injection window.
+set(GALLERY_FIXED_PRIVATE_CODEPOINTS
+    57504 57520 57521 57522 57523
+)
+set(GALLERY_CONTROLLER_PUA_PAGES
+    232 233 234 239 240 241
+)
 set(GALLERY_PRIVATE_MAX 12)
 
 set(catalog_h "${CMAKE_CURRENT_BINARY_DIR}/font-gallery-catalog.h")
@@ -100,44 +114,42 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         endif()
     endforeach()
 
-    # Preserve a small, representative private-use repertoire.  The first
-    # pass takes one real mapped codepoint from each 0x100-codepoint page so
-    # related icon sets (for example E8xx/E9xx/EAxx controller families) are
-    # all visible.  The second pass fills the remaining slots with additional
-    # real mappings without hard-coding any particular font's assignments.
     set(selected_private)
-    set(private_pages)
-    foreach(cp IN LISTS available)
-        if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
-            math(EXPR private_page "${cp} / 256")
-            list(FIND private_pages "${private_page}" private_page_found)
-            if(private_page_found EQUAL -1)
-                list(APPEND private_pages "${private_page}")
-                list(APPEND selected_private "${cp}")
-                list(LENGTH selected_private private_count)
-                if(private_count GREATER_EQUAL GALLERY_PRIVATE_MAX)
+
+    # These fixed PUA samples were already present in the compact all-face
+    # Gallery.  Retain only mappings that the selected face actually exposes.
+    foreach(cp IN LISTS GALLERY_FIXED_PRIVATE_CODEPOINTS)
+        list(FIND available "${cp}" private_found)
+        if(NOT private_found EQUAL -1)
+            list(APPEND selected "${cp}")
+            list(APPEND selected_private "${cp}")
+        endif()
+    endforeach()
+
+    # Controller/button repertoires are not Unicode emoji.  Take one actual
+    # mapped glyph from each known controller PUA page, without hard-coding a
+    # particular button codepoint such as E866/E966/EA66.
+    foreach(wanted_page IN LISTS GALLERY_CONTROLLER_PUA_PAGES)
+        foreach(cp IN LISTS available)
+            if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
+                math(EXPR private_page "${cp} / 256")
+                if(private_page EQUAL wanted_page)
+                    list(FIND selected_private "${cp}" private_found)
+                    if(private_found EQUAL -1)
+                        list(APPEND selected "${cp}")
+                        list(APPEND selected_private "${cp}")
+                    endif()
                     break()
                 endif()
             endif()
-        endif()
-    endforeach()
-    list(LENGTH selected_private private_count)
-    if(private_count LESS GALLERY_PRIVATE_MAX)
-        foreach(cp IN LISTS available)
-            if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
-                list(FIND selected_private "${cp}" private_found)
-                if(private_found EQUAL -1)
-                    list(APPEND selected_private "${cp}")
-                    list(LENGTH selected_private private_count)
-                    if(private_count GREATER_EQUAL GALLERY_PRIVATE_MAX)
-                        break()
-                    endif()
-                endif()
-            endif()
         endforeach()
-    endif()
-    if(selected_private)
-        list(APPEND selected ${selected_private})
+    endforeach()
+
+    list(REMOVE_DUPLICATES selected)
+    list(REMOVE_DUPLICATES selected_private)
+    list(LENGTH selected_private private_count)
+    if(private_count GREATER GALLERY_PRIVATE_MAX)
+        list(SUBLIST selected_private 0 ${GALLERY_PRIVATE_MAX} selected_private)
     endif()
 
     if(NOT selected)
