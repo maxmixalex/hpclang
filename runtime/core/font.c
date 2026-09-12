@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/font-package.h>
@@ -12,6 +13,11 @@
 #define FONT_KIND_HP39_MAIN   0x1002u
 #define FONT_KIND_HP4950_MINI 0x1003u
 #define FONT_KIND_HP4950_BIG  0x1004u
+
+/* x50ng's HP39gs/40gs KINPO loader places the 16-byte update header at NOR
+ * +0x4000 and the 1 MiB Saturn ROM body immediately after it. rom.39g offsets
+ * therefore map to the private physical-NOR alias at +0x4010. */
+#define HP39_UPDATE_ROM_OFFSET 0x00004010u
 
 static const struct hpclang_font hp39_mini = {
     HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
@@ -105,8 +111,8 @@ static uintptr_t saturn_page_base(uint32_t saturn_nibble_address)
 
     /* HPGCC's SAT_CPU starts with Read[257]. The launch ABI deliberately
      * preserves that Saturn-state pointer for logical Saturn RAM/object
-     * access. Fixed HP39 ROM raster assets intentionally do not use this
-     * live bank view; see hp39_physical_nibble(). */
+     * access. Fixed HP39gs/40gs ROM raster assets intentionally do not use
+     * this live bank view; see hp39_physical_nibble(). */
     const uint32_t *read_map =
         (const uint32_t *)(uintptr_t)boot->saturn_state;
     return (uintptr_t)read_map[saturn_nibble_address >> 12];
@@ -133,18 +139,23 @@ static uint8_t saturn_byte(uint32_t address)
 
 static uint8_t hp39_physical_nibble(uint32_t address)
 {
+    uint32_t model = active_model();
+
+    /* HP39g+ still lacks a trustworthy stock full-flash fixture. Do not infer
+       the gs/40gs update-image layout for it; retain the live Saturn mapping
+       until its own NOR layout is evidenced on real hardware. */
+    if (model == HPCLANG_MODEL_HP39GPLUS)
+        return saturn_nibble(address);
+
     /*
-     * HP39/40's stock mini/main raster tables are identified by physical
-     * Saturn ROM nibble addresses. The ARM view exposes that flash from
-     * physical/virtual address zero, packed two Saturn nibbles per byte.
-     *
-     * Do not resolve these through SAT_CPU->Read[]: that table represents the
-     * currently selected logical Saturn bank. HP39gs 2.22 was observed with
-     * Read[0x7e] -> 0x0009f000 while the fixed mini-font raster at 0x07e695
-     * physically lives at ARM byte address 0x0003f34a.
+     * HP39gs/40gs stock mini/main raster tables are specified in Saturn ROM
+     * nibble addresses. Their KINPO firmware body is a packed 1 MiB rom.39g
+     * image at physical NOR +0x4010. The bootstrap maps physical NOR 0 read-only
+     * at HPCLANG_FLASH_ALIAS_BASE for exactly the lifetime of HPC1, avoiding
+     * both the stock low-VA map and the current Saturn bank selection.
      */
-    const volatile uint8_t *p =
-        (const volatile uint8_t *)(uintptr_t)(address >> 1);
+    const volatile uint8_t *p = (const volatile uint8_t *)(uintptr_t)(
+        HPCLANG_FLASH_ALIAS_BASE + HP39_UPDATE_ROM_OFFSET + (address >> 1));
     uint8_t value = *p;
     return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
                                   (uint8_t)(value & 0x0fu);
