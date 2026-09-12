@@ -9,6 +9,7 @@
 #include "options.h"
 #include "timer.h"
 #include "headless-ui-init.h"
+#include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
 
 #define LCD_W 131
@@ -21,7 +22,9 @@
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
-#define RETURN_CAPTURE_US 800000LL
+#define RETURN_POLL_US 50000LL
+#define RETURN_DEADLINE_US 2000000LL
+#define RETURN_STABLE_OBSERVATIONS 4u
 
 enum stock_mode {
     MODE_INSTALL,
@@ -38,6 +41,7 @@ struct state {
     const char *return_pgm;
     const char *runtime_json;
     uint32_t result_addr;
+    struct hpclang_lcd_quiescence return_quiescence;
     int saw_before;
     int saw_pass;
     int payload_keyboard_scheduled;
@@ -45,6 +49,7 @@ struct state {
     int failed;
     int lcd_height;
     int64_t deadline;
+    int64_t return_deadline;
 };
 
 struct key_action { int key; int down; };
@@ -277,6 +282,13 @@ static int guest_read32(hdw_t *h, uint32_t address, uint32_t *value)
     return 1;
 }
 
+static int return_is_settled(const struct state *s)
+{
+    return s->return_quiescence.changed_from_baseline &&
+           s->return_quiescence.stable_observations >=
+               RETURN_STABLE_OBSERVATIONS;
+}
+
 static void write_json(struct state *s, const char *status)
 {
     FILE *f = fopen(s->json, "w");
@@ -289,6 +301,8 @@ static void write_json(struct state *s, const char *status)
         "  \"saw_pass\":%s,\n"
         "  \"payload_keyboard_scheduled\":%s,\n"
         "  \"returned\":%s,\n"
+        "  \"return_settled\":%s,\n"
+        "  \"return_observations\":%u,\n"
         "  \"pc\":\"0x%08x\",\n"
         "  \"display_on\":%s,\n"
         "  \"sd_mounted\":%s\n"
@@ -298,6 +312,8 @@ static void write_json(struct state *s, const char *status)
         s->saw_pass ? "true" : "false",
         s->payload_keyboard_scheduled ? "true" : "false",
         s->returned ? "true" : "false",
+        return_is_settled(s) ? "true" : "false",
+        s->return_quiescence.observations,
         s->hdw->cpu->regs[15],
         is_display_on() ? "true" : "false",
         emulator_is_sd_mounted() ? "true" : "false");
@@ -315,12 +331,16 @@ static void write_runtime_json(struct state *s, const char *status)
         "  \"saw_pass\":%s,\n"
         "  \"payload_keyboard_scheduled\":%s,\n"
         "  \"returned\":%s,\n"
+        "  \"return_settled\":%s,\n"
+        "  \"return_observations\":%u,\n"
         "  \"pc\":\"0x%08x\"\n"
         "}\n",
         status,
         s->saw_pass ? "true" : "false",
         s->payload_keyboard_scheduled ? "true" : "false",
         s->returned ? "true" : "false",
+        return_is_settled(s) ? "true" : "false",
+        s->return_quiescence.observations,
         s->hdw->cpu->regs[15]);
     fclose(f);
 }
@@ -351,17 +371,37 @@ static void finish_install(void *arg)
 static void finish_return(void *arg)
 {
     struct state *s = arg;
-    unsigned pixels = capture(s->hdw, s->return_pgm, s->lcd_height);
 
-    if (!is_display_on() || pixels == 0) {
+    if (!is_display_on()) {
         fail(s, "stock-resume");
         return;
     }
 
-    s->returned = 1;
-    write_runtime_json(s, "pass");
-    write_json(s, "pass");
-    hdw_stop(s->hdw);
+    if (hpclang_lcd_quiescence_observe(
+            &s->return_quiescence,
+            s->hdw,
+            LCD_W,
+            s->lcd_height,
+            RETURN_STABLE_OBSERVATIONS)) {
+        unsigned pixels = capture(
+            s->hdw, s->return_pgm, s->lcd_height);
+        if (pixels == 0u) {
+            fail(s, "stock-resume");
+            return;
+        }
+        s->returned = 1;
+        write_runtime_json(s, "pass");
+        write_json(s, "pass");
+        hdw_stop(s->hdw);
+        return;
+    }
+
+    if (timer_get_clock() >= s->return_deadline) {
+        fail(s, "return-unsettled");
+        return;
+    }
+    if (!later(finish_return, s, RETURN_POLL_US))
+        fail(s, "return-timer");
 }
 
 static void monitor(void *arg)
@@ -406,6 +446,8 @@ static void monitor(void *arg)
                 fail(s, "pass-capture");
                 return;
             }
+            hpclang_lcd_quiescence_seed(
+                &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
             write_runtime_json(s, "pass-observed");
         } else if ((value & 0xffff0000u) == FAIL_PREFIX) {
@@ -418,11 +460,12 @@ static void monitor(void *arg)
     /*
      * The payload never changes hpclang_e2e_result after PASS. A different
      * value (or an unmapped address) therefore means stage0 has left HPC1 and
-     * restored the stock address space. Do not inject a wake key here: the
-     * transition back to the stock UI is itself part of the return-path gate.
+     * restored the stock address space. The return screenshot is captured only
+     * after that stock framebuffer has both changed from PASS and settled.
      */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
-        if (!later(finish_return, s, RETURN_CAPTURE_US))
+        s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
+        if (!later(finish_return, s, RETURN_POLL_US))
             fail(s, "return-timer");
         return;
     }
@@ -635,7 +678,8 @@ int main(int argc, char **argv)
     exit_modules(s.hdw);
 
     return s.failed ||
-           (s.mode == MODE_RUN && (!s.saw_pass || !s.returned))
+           (s.mode == MODE_RUN &&
+            (!s.saw_pass || !s.returned || !return_is_settled(&s)))
         ? EXIT_FAILURE
         : EXIT_SUCCESS;
 }
