@@ -9,6 +9,8 @@ on:
       - m7-fonts-gallery
     paths:
       - ".github/workflows/e2e-font-gallery-hp48-stock.yml"
+      - "tests/e2e/harness/run-stock-gallery-hp48gii.sh"
+      - "tests/e2e/sequences/hp48gii-stock-gallery-run.seq"
   workflow_dispatch:
 
 concurrency:
