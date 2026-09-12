@@ -42,40 +42,43 @@ elseif(NOT HPCLANG_GALLERY_PROFILE STREQUAL "full")
         "HPCLANG_GALLERY_PROFILE must be full or stock-smoke")
 endif()
 
-# Keep exactly the printable ASCII characters that are drawn with the selected
-# generated face in main.c. Gallery chrome, face/family names and counters use
-# the calculator-native mini font, so retaining all printable ASCII in every
-# generated face would add dead comparison glyphs without increasing coverage.
-# The two sample strings and the pangram text together cover these 61 values.
+# Keep exactly the printable ASCII characters that the visible Gallery pages
+# can draw. The specimen intentionally stays compact; retaining every printable
+# ASCII glyph in every generated face would inflate the exhaustive payload
+# without increasing visual coverage.
 set(GALLERY_CODEPOINTS
     32 33 35 36 37 38 42 43 44 45 46 47
     48 49 50 51 52 53 54 55 56 57
-    60 61 62 63 64 65 66 77 80 83 84 88 90
+    60 61 62 63 64 65 66 67 77 80 81 83 84 88 89 90
     97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113
     114 115 116 117 118 119 120 121 122
 )
 
-# The second group is a deliberately broad Unicode probe: Latin-1, Greek/math,
-# arrows/blocks, CJK, and Hangul. Private-use mappings are sampled separately
-# from each face's real cmap so icon/controller fonts display their actual
-# reserved glyphs.
+# Typography-oriented Unicode probe. Script examples come before math/symbols
+# so the small calculator viewport shows the language coverage first. Block,
+# box-drawing and geometric stress glyphs belong in a separate diagnostic; in
+# the Gallery they looked like rendering corruption and consumed payload bytes.
 set(GALLERY_UNICODE_CODEPOINTS
+    # Accented Latin.
+    192 193 196 199 201 209 214 220 223 230 248 339
     163 165 169 176 177 181 215 247 8364
+    # Japanese kana, Han samples (你好世界 / 日本語), then Hangul (한글).
+    12354 12356 12358 12360 12362
+    12450 12452 12454 12456 12458
+    20320 22909 19990 30028 26085 26412 35486
+    54620 44544
+    # Greek / mathematics and directional arrows.
     916 931 937 945 946 955 960
-    8592 8593 8594 8595 8596
     8730 8734 8776 8800 8804 8805
-    9472 9474 9484 9488 9492 9496 9500 9508 9516 9524 9532
-    9608 9617 9632 9679
-    20320 22909 19990 30028 26085 26412 35486 54620 44544
+    8592 8593 8594 8595 8596
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
 
 # Keep the historically useful Powerline sample globally. Controller glyphs
 # are sampled only from BoutiqueBitmap9x9, whose ordinary mapping uses the
-# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx. The exact
-# glyph codepoints remain cmap-derived: one real mapping per page. Restricting
-# those pages to their owning family prevents unrelated PUA shards from making
-# the all-face Gallery larger without improving its visible coverage.
+# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx. PUA glyphs
+# are linked whenever present, but only a face without a usable text repertoire
+# exposes them as the primary Gallery specimen.
 set(GALLERY_FIXED_PRIVATE_CODEPOINTS
     57504 57520 57521 57522 57523
 )
@@ -122,6 +125,24 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     include("${${codepoints_file_var}}")
     set(available "${${codepoints_var}}")
 
+    # A face is typography-capable when its real cmap has whitespace, a digit,
+    # and at least two alphabetic positions. This deliberately uses repertoire
+    # rather than family names: text fonts that also ship Powerline/controller
+    # PUA glyphs must still behave like text fonts in the Gallery.
+    list(FIND available "32" text_space)
+    list(FIND available "48" text_zero)
+    list(FIND available "65" text_upper_a)
+    list(FIND available "97" text_lower_a)
+    list(FIND available "66" text_upper_b)
+    list(FIND available "98" text_lower_b)
+    set(text_capable 0)
+    if(NOT text_space EQUAL -1 AND NOT text_zero EQUAL -1)
+        if((NOT text_upper_a EQUAL -1 OR NOT text_lower_a EQUAL -1) AND
+           (NOT text_upper_b EQUAL -1 OR NOT text_lower_b EQUAL -1))
+            set(text_capable 1)
+        endif()
+    endif()
+
     set(selected)
     set(selected_unicode)
     foreach(cp IN LISTS GALLERY_CODEPOINTS)
@@ -137,8 +158,9 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
 
     set(selected_private)
 
-    # These fixed PUA samples were already present in the compact all-face
-    # Gallery. Retain only mappings that the selected face actually exposes.
+    # Retain real PUA mappings in the linked face so this remains an exhaustive
+    # asset build. For text-capable faces they are secondary repertoire, not a
+    # reason to replace both typography specimen pages with an icon grid.
     foreach(cp IN LISTS GALLERY_FIXED_PRIVATE_CODEPOINTS)
         list(FIND available "${cp}" private_found)
         if(NOT private_found EQUAL -1)
@@ -193,6 +215,8 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     list(APPEND gallery_family_roots "${family_label}")
     string(REPLACE "-" " " family_label "${family_label}")
     get_filename_component(face_label "${${selector_var}}" NAME_WE)
+    string(REPLACE "-" " " face_label "${face_label}")
+    string(REPLACE "_" " " face_label "${face_label}")
 
     string(REPLACE "\\" "\\\\" family_label_c "${family_label}")
     string(REPLACE "\"" "\\\"" family_label_c "${family_label_c}")
@@ -215,7 +239,10 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         set(unicode_pointer "0")
     endif()
 
-    if(selected_private)
+    # The current Gallery UI intentionally interprets private_count != 0 as a
+    # symbol-first face. Hide private rows from text-capable faces rather than
+    # making the UI infer semantics from the mere presence of a PUA mapping.
+    if(selected_private AND NOT text_capable)
         file(APPEND "${catalog_c}"
             "static const uint32_t private_${face_index}[] = {")
         foreach(cp IN LISTS selected_private)
