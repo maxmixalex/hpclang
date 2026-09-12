@@ -1,0 +1,86 @@
+name: Debug / HP48 compact Stock Gallery
+
+permissions:
+  contents: read
+  actions: read
+
+on:
+  push:
+    paths:
+      - ".github/workflows/debug-hp48-stock-gallery.yml"
+
+concurrency:
+  group: hp48-stock-gallery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hp48-stock-gallery:
+    runs-on: home-docker
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Reuse compact Gallery build from formal run 42
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-build
+          path: build/e2e
+          repository: zyf722/hpclang
+          run-id: 34698825657
+          github-token: ${{ github.token }}
+
+      - name: Reuse universal x50ng from formal run 42
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+          repository: zyf722/hpclang
+          run-id: 34698825657
+          github-token: ${{ github.token }}
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Restore HPGCC39 asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install asset preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare ARMToolbox48 library
+        run: |
+          bash tools/bootstrap-hp39-aplet.sh >/dev/null
+          mkdir -p build/assets
+          cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/assets/L275_48
+          sha256sum build/assets/L275_48
+
+      - name: Prepare Stock HP48 runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock hp48
+
+      - name: Run compact HP48 Stock Gallery
+        run: bash tests/e2e/harness/run-stock-gallery-hp48gii.sh build/e2e build/assets
+
+      - name: Upload HP48 Stock Gallery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp48gii-stock-font-gallery-debug
+          retention-days: 1
+          path: |
+            build/hp48gii-*.pgm
+            build/hp48gii-*.pgm.png
+            build/hp48gii-*.json
+            build/hp48gii-stock-gallery-kermit*
+            build/hp48gii-stock-gallery-socat.log
+            build/hp48gii-stock-gallery-send/*
+          if-no-files-found: warn
