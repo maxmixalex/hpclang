@@ -49,18 +49,31 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     /*
      * TEMPORARY E2E DIAGNOSTIC: the rest of the boot page is private bootstrap
      * storage. Record exactly what the bootstrap sees after MMU publication
-     * and before entering HPC1 so the host can distinguish a failed install
-     * from a later Data Abort/exception-side page-table change. Remove after
-     * the HP39 physical-NOR alias is closed.
+     * and before entering HPC1. Also perform two byte reads through the same
+     * private HP39 NOR alias that the native minifont will use. The first is
+     * the mini-font table's first byte; the second is the 'A' advance byte,
+     * which is the first native-font byte the Gallery's initial redraw should
+     * request. Remove this entire block after the alias path is closed.
      */
     if (launch->mmu.section_alias_l1_index != 0u) {
         volatile uint32_t *diag =
             (volatile uint32_t *)(uintptr_t)(HPCLANG_BOOT_BASE + 0x20u);
-        diag[0] = UINT32_C(0x414c4931); /* "ALI1" */
+        uintptr_t alias = launch->platform_cookie;
+        const volatile uint8_t *nor0 =
+            (const volatile uint8_t *)(alias + UINT32_C(0x0004335a));
+        const volatile uint8_t *nor_a =
+            (const volatile uint8_t *)(alias + UINT32_C(0x000434c0));
+
+        diag[0] = UINT32_C(0x414c4932); /* "ALI2" */
         diag[1] = launch->mmu.section_alias_l1_index;
         diag[2] = launch->mmu.l1[launch->mmu.section_alias_l1_index];
         diag[3] = saved.section_alias_l1;
-        diag[4] = (uint32_t)launch->platform_cookie;
+        diag[4] = (uint32_t)alias;
+        diag[5] = UINT32_C(0x50524230); /* "PRB0": read about to start */
+        diag[6] = (uint32_t)*nor0;
+        diag[7] = UINT32_C(0x50524241); /* "PRBA": 'A' read about to start */
+        diag[8] = (uint32_t)*nor_a;
+        diag[9] = UINT32_C(0x444f4e45); /* "DONE" */
     }
 
     uintptr_t entry = HPCLANG_CODE_BASE + launch->entry_offset;
