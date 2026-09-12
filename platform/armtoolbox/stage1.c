@@ -12,6 +12,21 @@
 #define ARMSYS_PAGE_COUNT   0x914u
 #define ARMSYS_L2_PHYS      0x920u
 
+/*
+ * HP39gs/40gs native mini/main font records live entirely in these two NOR
+ * pages. Keep this launcher-private: the runtime sees only the virtual window
+ * base through platform_cookie.
+ */
+static const uint32_t hp39_font_nor_pages[] = {
+    0x00042000u,
+    0x00043000u,
+};
+
+_Static_assert(
+    sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]) <=
+        HPCLANG_CODE_WINDOW_PAGE_CAPACITY,
+    "HP39 native font window must fit before HPCLANG_CODE_BASE");
+
 void hpclang_cache_clean(const void *start, uint32_t size);
 
 static uint32_t load32(const void *base, uint32_t offset)
@@ -115,39 +130,34 @@ int hpclang_armtoolbox_stage1(
     launch.mmu.rw_page_count = rw_count;
     launch.mmu.code_pages = code_pages;
     launch.mmu.code_page_count = code_count;
+    launch.mmu.code_window_pages = NULL;
+    launch.mmu.code_window_page_count = 0u;
 
     /*
      * HP39gs/40gs 2.22 use the KINPO update-image layout exercised by the
-     * stock and Direct fixtures. Give runtime code a read-only view of
-     * physical NOR instead of relying on whatever low virtual mapping or
-     * Saturn bank happens to be active. HP39g+ intentionally remains excluded
-     * until a trustworthy stock flash fixture establishes its layout.
+     * stock and Direct fixtures. Their native mini/main rasters occupy only
+     * physical NOR pages 0x42 and 0x43. Expose those pages in the unused prefix
+     * of hpclang's own L1[0x12] coarse table instead of borrowing a stock L1
+     * descriptor: the stock LCD framebuffer itself occupies bytes inside the
+     * otherwise-empty L1 table, so a long-lived high-section alias is unsafe.
      *
-     * Stock HP39gs already owns L1[0xa0] on the current fixture, so do not
-     * hard-code the retained dumper's old slot. Select an empty high section
-     * now; common bootstrap re-checks that descriptor after masking interrupts
-     * and immediately before installing it.
+     * HP39g+ intentionally remains excluded until a trustworthy real-hardware
+     * full-flash fixture establishes its own physical layout.
      */
-    uint32_t flash_alias_index = 0u;
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
-        flash_alias_index = hpclang_mmu_find_free_section_alias(launch.mmu.l1);
-        if (flash_alias_index == 0u)
-            return -5;
-        launch.mmu.section_alias_l1_index = flash_alias_index;
-        launch.mmu.section_alias_phys = 0u;
-    } else {
-        launch.mmu.section_alias_l1_index = 0u;
-        launch.mmu.section_alias_phys = 0u;
+        launch.mmu.code_window_pages = hp39_font_nor_pages;
+        launch.mmu.code_window_page_count =
+            (uint32_t)(sizeof(hp39_font_nor_pages) /
+                       sizeof(hp39_font_nor_pages[0]));
     }
 
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
     launch.saturn_state = (uintptr_t)saturn_state;
-    if (flash_alias_index != 0u) {
-        launch.platform_cookie =
-            (uintptr_t)flash_alias_index << HPCLANG_L1_SECTION_SHIFT;
+    if (launch.mmu.code_window_page_count != 0u) {
+        launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
     } else {
-        /* Preserve the historical private token on platforms without aliasing. */
+        /* Preserve the historical private token on platforms without a window. */
         launch.platform_cookie = old_l2_phys;
     }
 
