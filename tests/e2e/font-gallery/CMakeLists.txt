@@ -48,13 +48,12 @@ set(GALLERY_UNICODE_CODEPOINTS
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
 
-# Keep the historically useful Powerline sample, then discover controller
-# glyphs only from the PUA page families actually used by BoutiqueBitmap9x9:
-# E8xx/E9xx/EAxx in the ordinary mapping and EFxx/F0xx/F1xx in its HK remap.
-# The exact glyph codepoints remain cmap-derived: one real mapping per page.
-# This avoids linking arbitrary PUA shards from every font face, which made the
-# all-face Gallery far too large for either the ARMToolbox wrapper or Direct
-# injection window.
+# Keep the historically useful Powerline sample globally.  Controller glyphs
+# are sampled only from BoutiqueBitmap9x9, whose ordinary mapping uses the
+# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx.  The exact
+# glyph codepoints remain cmap-derived: one real mapping per page.  Restricting
+# those pages to their owning family prevents unrelated PUA shards from making
+# the all-face Gallery too large for ARMToolbox/Direct launchers.
 set(GALLERY_FIXED_PRIVATE_CODEPOINTS
     57504 57520 57521 57522 57523
 )
@@ -126,24 +125,27 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         endif()
     endforeach()
 
-    # Controller/button repertoires are not Unicode emoji.  Take one actual
-    # mapped glyph from each known controller PUA page, without hard-coding a
+    # Controller/button repertoires are not Unicode emoji.  BoutiqueBitmap9x9
+    # is the font family that defines them, so only its faces probe these PUA
+    # pages.  Take one actual mapped glyph per page instead of hard-coding a
     # particular button codepoint such as E866/E966/EA66.
-    foreach(wanted_page IN LISTS GALLERY_CONTROLLER_PUA_PAGES)
-        foreach(cp IN LISTS available)
-            if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
-                math(EXPR private_page "${cp} / 256")
-                if(private_page EQUAL wanted_page)
-                    list(FIND selected_private "${cp}" private_found)
-                    if(private_found EQUAL -1)
-                        list(APPEND selected "${cp}")
-                        list(APPEND selected_private "${cp}")
+    if(font_id MATCHES "^boutique_bitmap_9x9_")
+        foreach(wanted_page IN LISTS GALLERY_CONTROLLER_PUA_PAGES)
+            foreach(cp IN LISTS available)
+                if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
+                    math(EXPR private_page "${cp} / 256")
+                    if(private_page EQUAL wanted_page)
+                        list(FIND selected_private "${cp}" private_found)
+                        if(private_found EQUAL -1)
+                            list(APPEND selected "${cp}")
+                            list(APPEND selected_private "${cp}")
+                        endif()
+                        break()
                     endif()
-                    break()
                 endif()
-            endif()
+            endforeach()
         endforeach()
-    endforeach()
+    endif()
 
     list(REMOVE_DUPLICATES selected)
     list(REMOVE_DUPLICATES selected_private)
