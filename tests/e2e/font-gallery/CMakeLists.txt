@@ -31,8 +31,8 @@ list(SORT GALLERY_FONT_IDS)
 
 # Printable ASCII is the common comparison repertoire.  The second group is a
 # deliberately broad Unicode probe: Latin-1, Greek/math, arrows/blocks, CJK,
-# Hangul, Powerline/private-use symbols, and the Unicode game-controller emoji.
-# Each face receives only the intersection with its real generated mapping.
+# and Hangul.  Private-use mappings are sampled separately from each face's
+# real cmap so icon/controller fonts display their actual reserved glyphs.
 set(GALLERY_CODEPOINTS)
 foreach(cp RANGE 32 126)
     list(APPEND GALLERY_CODEPOINTS "${cp}")
@@ -45,10 +45,9 @@ set(GALLERY_UNICODE_CODEPOINTS
     9472 9474 9484 9488 9492 9496 9500 9508 9516 9524 9532
     9608 9617 9632 9679
     20320 22909 19990 30028 26085 26412 35486 54620 44544
-    57504 57520 57521 57522 57523
-    127918
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
+set(GALLERY_PRIVATE_MAX 12)
 
 set(catalog_h "${CMAKE_CURRENT_BINARY_DIR}/font-gallery-catalog.h")
 set(catalog_c "${CMAKE_CURRENT_BINARY_DIR}/font-gallery-catalog.c")
@@ -63,6 +62,8 @@ file(WRITE "${catalog_h}"
 "    const struct hpclang_font *font;\n"
 "    const uint32_t *unicode_codepoints;\n"
 "    uint32_t unicode_count;\n"
+"    const uint32_t *private_codepoints;\n"
+"    uint32_t private_count;\n"
 "};\n"
 "extern const struct hpclang_gallery_face hpclang_gallery_faces[];\n"
 "extern const uint32_t hpclang_gallery_face_count;\n"
@@ -98,6 +99,47 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
             endif()
         endif()
     endforeach()
+
+    # Preserve a small, representative private-use repertoire.  The first
+    # pass takes one real mapped codepoint from each 0x100-codepoint page so
+    # related icon sets (for example E8xx/E9xx/EAxx controller families) are
+    # all visible.  The second pass fills the remaining slots with additional
+    # real mappings without hard-coding any particular font's assignments.
+    set(selected_private)
+    set(private_pages)
+    foreach(cp IN LISTS available)
+        if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
+            math(EXPR private_page "${cp} / 256")
+            list(FIND private_pages "${private_page}" private_page_found)
+            if(private_page_found EQUAL -1)
+                list(APPEND private_pages "${private_page}")
+                list(APPEND selected_private "${cp}")
+                list(LENGTH selected_private private_count)
+                if(private_count GREATER_EQUAL GALLERY_PRIVATE_MAX)
+                    break()
+                endif()
+            endif()
+        endif()
+    endforeach()
+    list(LENGTH selected_private private_count)
+    if(private_count LESS GALLERY_PRIVATE_MAX)
+        foreach(cp IN LISTS available)
+            if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
+                list(FIND selected_private "${cp}" private_found)
+                if(private_found EQUAL -1)
+                    list(APPEND selected_private "${cp}")
+                    list(LENGTH selected_private private_count)
+                    if(private_count GREATER_EQUAL GALLERY_PRIVATE_MAX)
+                        break()
+                    endif()
+                endif()
+            endif()
+        endforeach()
+    endif()
+    if(selected_private)
+        list(APPEND selected ${selected_private})
+    endif()
+
     if(NOT selected)
         message(FATAL_ERROR "Font Gallery face has no display repertoire: ${font_id}")
     endif()
@@ -137,8 +179,22 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         set(unicode_pointer "0")
     endif()
 
+    if(selected_private)
+        file(APPEND "${catalog_c}"
+            "static const uint32_t private_${face_index}[] = {")
+        foreach(cp IN LISTS selected_private)
+            file(APPEND "${catalog_c}" "${cp}u,")
+        endforeach()
+        file(APPEND "${catalog_c}" "};\n")
+        list(LENGTH selected_private private_count)
+        set(private_pointer "private_${face_index}")
+    else()
+        set(private_count 0)
+        set(private_pointer "0")
+    endif()
+
     string(APPEND catalog_rows
-        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${unicode_pointer}, ${unicode_count}u},\n")
+        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${unicode_pointer}, ${unicode_count}u, ${private_pointer}, ${private_count}u},\n")
     math(EXPR face_index "${face_index} + 1")
 endforeach()
 
