@@ -28,12 +28,15 @@ Applications use fixed virtual addresses and ordinary non-PIC code. There is no 
             free writable pages
             stack grows down from the top
 
+0x01200000  bootstrap/runtime-private code-window prefix
 0x01220000  executable image
             text / rodata
             load image for initialized writable data
 ```
 
 The virtual addresses are common across calculator families. The platform launcher chooses the physical pages that back them.
+
+`0x01200000..0x0121FFFF` is the otherwise-unused prefix of the same coarse code-table section whose public application image begins at `0x01220000`. Bootstrap/platform code may use this prefix for short private mappings needed by runtime services; it is **not application storage and not an application-visible mapping contract**. HP39gs/40gs currently use the first two 4 KiB pages of this prefix for read-only native-font NOR access. Applications must not address or depend on that implementation detail.
 
 ## Boot record
 
@@ -46,7 +49,7 @@ struct hpclang_boot_info {
 };
 ```
 
-`platform_cookie` is opaque to applications.
+`platform_cookie` is opaque to applications. A launcher/runtime pair may use it for a private platform token, including the base of a launcher-private mapping, but application code must not infer a pointer type, address range, or stable meaning from it.
 
 ## HPC1 image
 
@@ -70,6 +73,8 @@ This is intentional: the same logical application image can be wrapped and launc
 The platform launcher maps the code and writable arena, writes the boot record, provides an 8-byte-aligned stack, and enters the HPC1 entry point.
 
 The common runtime initializes language state, calls `main()`, tears down the runtime, restores temporary mappings and privileged state, and returns through the platform launcher.
+
+Bootstrap-private mappings do not extend the application ABI: they exist only to implement platform/runtime services below the HPC1 boundary and are removed with the rest of the temporary launch state.
 
 ## Stable model IDs
 
