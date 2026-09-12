@@ -1,0 +1,142 @@
+name: E2E / Font Gallery HP48 Stock
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/e2e-font-gallery-hp48-stock.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build compact Stock Gallery
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build compact Stock Gallery payload
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh font-gallery-stock "$GITHUB_WORKSPACE/build/e2e-font-gallery-stock"
+
+      - name: Upload compact Stock Gallery build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-build
+          retention-days: 1
+          path: |
+            build/e2e-font-gallery-stock/e2e.hpc
+            build/e2e-font-gallery-stock/e2e.elf
+            build/e2e-font-gallery-stock/e2e.result-address
+            build/e2e-font-gallery-stock/launchers/*.bin
+            build/e2e-font-gallery-stock/launchers/*.hp
+          if-no-files-found: error
+
+  x50ng:
+    name: Prepare universal x50ng
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore or build universal x50ng
+        uses: ./.github/actions/setup-x50ng
+
+      - name: Pack universal x50ng
+        run: tar -C build/x50ng -czf build/x50ng-universal.tar.gz dist
+
+      - name: Upload universal x50ng
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-universal
+          retention-days: 1
+          path: build/x50ng-universal.tar.gz
+          if-no-files-found: error
+
+  stock-gallery-hp48gii:
+    name: Stock Gallery / hp48gii
+    needs: [build, x50ng]
+    runs-on: home-docker
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download compact Stock Gallery build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-font-gallery-stock-build
+          path: build/e2e
+
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+
+      - name: Restore HPGCC39 asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install asset preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare ARMToolbox48 library
+        run: |
+          bash tools/bootstrap-hp39-aplet.sh >/dev/null
+          mkdir -p build/assets
+          cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/assets/L275_48
+          sha256sum build/assets/L275_48
+
+      - name: Prepare Stock platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock hp48
+
+      - name: Launch Gallery through stock HP48gII ARMToolbox48
+        run: bash tests/e2e/harness/run-stock-gallery-hp48gii.sh build/e2e build/assets
+
+      - name: Upload HP48 Stock Font Gallery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp48gii-stock-font-gallery-e2e
+          retention-days: 14
+          path: |
+            build/hp48gii-before.pgm
+            build/hp48gii-before.pgm.png
+            build/hp48gii-pass.pgm
+            build/hp48gii-pass.pgm.png
+            build/hp48gii-return.pgm
+            build/hp48gii-return.pgm.png
+            build/hp48gii-e2e.json
+            build/hp48gii-font-gallery.pgm
+            build/hp48gii-font-gallery.pgm.png
+            build/hp48gii-stock-gallery-*.pgm
+            build/hp48gii-stock-gallery-*.pgm.png
+            build/hp48gii-stock-gallery*.json
+            build/hp48gii-stock-gallery-kermit*
+            build/hp48gii-stock-gallery-socat.log
+            build/e2e/e2e.hpc
+            build/e2e/e2e.elf
+          if-no-files-found: warn
