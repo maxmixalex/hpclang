@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/font-package.h>
@@ -92,18 +93,18 @@ int main(void)
         hpclang_font_advance(big) != 6u)
         fail("HP39 system font metrics");
 
-    /* A missing, unaligned, or out-of-window private alias must never be
-     * dereferenced. The native mini-font reader fails closed to its nominal
-     * advance when the launcher/runtime cookie contract is invalid. */
+    /* A missing or stale private-window cookie must never be dereferenced.
+     * The native mini-font reader fails closed to its nominal advance. The
+     * exact valid VA is deliberately not dereferenced in this host unit test. */
     fake_boot.platform_cookie = 0u;
     if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 missing alias cookie");
-    fake_boot.platform_cookie = 0x0a000123u;
+        fail("HP39 missing font-window cookie");
+    fake_boot.platform_cookie = HPCLANG_CODE_WINDOW_BASE + HPCLANG_PAGE_SIZE;
     if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 unaligned alias cookie");
-    fake_boot.platform_cookie = 0x09900000u;
+        fail("HP39 shifted font-window cookie");
+    fake_boot.platform_cookie = 0x0a000000u;
     if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 out-of-window alias cookie");
+        fail("HP39 retired section-alias cookie");
     fake_boot.platform_cookie = 0u;
 
     if (hpclang_font_height(&test_font) != 6u ||
