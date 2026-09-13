@@ -61,9 +61,10 @@ jobs:
               condensed_name = 'fonts/galmuri/Galmuri11-Condensed.bdf'
               assert bold_name not in names and condensed_name not in names
 
+              # 2.40.3 is the current published npm/unpkg distribution with these BDFs.
               sources = {
-                  bold_name: 'https://unpkg.com/galmuri@2.40.4/dist/Galmuri11-Bold.bdf',
-                  condensed_name: 'https://unpkg.com/galmuri@2.40.4/dist/Galmuri11-Condensed.bdf',
+                  bold_name: 'https://unpkg.com/galmuri@2.40.3/dist/Galmuri11-Bold.bdf',
+                  condensed_name: 'https://unpkg.com/galmuri@2.40.3/dist/Galmuri11-Condensed.bdf',
               }
               downloaded = {}
               for name, url in sources.items():
