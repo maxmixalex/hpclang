@@ -249,11 +249,23 @@ jobs:
             build/e2e/e2e.size.txt
           if-no-files-found: warn
 
-  stock-gallery-hp50g:
-    name: Stock Gallery / hp50g
+  stock:
+    name: Stock / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: hp48
+            target: hp48gii
+          - family: hp4950
+            target: hp50g
+    env:
+      FAMILY: ${{ matrix.family }}
+      TARGET: ${{ matrix.target }}
+
     steps:
       - uses: actions/checkout@v7
 
@@ -275,95 +287,21 @@ jobs:
           tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
 
       - name: Restore hpcalc asset cache
+        if: matrix.family == 'hp4950'
         uses: actions/cache@v6
         with:
           path: .cache/hpcalc
           key: hpclang-hpcalc-static-v1
 
-      - name: Prepare Stock platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh stock hp4950
-
-      - name: Launch Gallery through stock HP50g ARMToolbox
-        run: bash tests/e2e/harness/run-stock-gallery-hp50g.sh build/e2e
-
-      - name: Generate and publish Stock Font Gallery evidence
-        if: always()
-        continue-on-error: true
-        env:
-          TARGET: hp50g
-        run: |
-          [[ -f build/hp50g-font-gallery.pgm ]] || exit 0
-          python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
-            --image-out build/hp50g-stock-font-gallery-summary.png \
-            --image-only
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            chmod +x tools/publish-ci-image.sh
-            tools/publish-ci-image.sh \
-              build/hp50g-stock-font-gallery-summary.png \
-              "stock-font-gallery/$GITHUB_RUN_ID/hp50g.png"
-          fi
-          args=(tests/e2e/specs/font-gallery.json)
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/hp50g.png?raw=1")
-          fi
-          python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload Stock Font Gallery evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: hp50g-stock-font-gallery-e2e
-          retention-days: 14
-          path: |
-            build/hp50g-before.pgm
-            build/hp50g-before.pgm.png
-            build/hp50g-pass.pgm
-            build/hp50g-pass.pgm.png
-            build/hp50g-return.pgm
-            build/hp50g-return.pgm.png
-            build/hp50g-e2e.json
-            build/hp50g-font-gallery.pgm
-            build/hp50g-font-gallery.pgm.png
-            build/hp50g-stock-font-gallery-summary.png
-            build/hp50g-stock-gallery-*.pgm
-            build/hp50g-stock-gallery-*.pgm.png
-            build/hp50g-stock-gallery*.json
-            build/e2e/e2e.hpc
-            build/e2e/e2e.size.txt
-          if-no-files-found: warn
-
-  stock-native-evidence-hp48gii:
-    name: Stock native-font evidence / hp48gii
-    needs: [build, x50ng]
-    runs-on: home-docker
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Download compact Stock Gallery build
-        uses: actions/download-artifact@v7
-        with:
-          name: e2e-font-gallery-stock-build
-          path: build/e2e
-
-      - name: Download universal x50ng
-        uses: actions/download-artifact@v7
-        with:
-          name: x50ng-universal
-          path: build
-
-      - name: Unpack universal x50ng
-        run: |
-          mkdir -p build/x50ng
-          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
-
       - name: Restore HPGCC39 asset cache
+        if: matrix.family == 'hp48'
         uses: actions/cache@v6
         with:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
 
-      - name: Install asset preparation dependency on cache miss
+      - name: Install HP48 asset preparation dependency on cache miss
+        if: matrix.family == 'hp48'
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
@@ -372,6 +310,7 @@ jobs:
           fi
 
       - name: Prepare ARMToolbox48 library
+        if: matrix.family == 'hp48'
         run: |
           bash tools/bootstrap-hp39-aplet.sh >/dev/null
           mkdir -p build/assets
@@ -379,14 +318,20 @@ jobs:
           sha256sum build/assets/L275_48
 
       - name: Prepare Stock platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh stock hp48
+        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
+
+      - name: Launch Gallery through stock HP50g ARMToolbox
+        if: matrix.family == 'hp4950'
+        run: bash tests/e2e/harness/run-stock-gallery-hp50g.sh build/e2e
 
       - name: Launch Gallery through stock HP48gII ARMToolbox48
+        if: matrix.family == 'hp48'
         id: hp48_launch
         continue-on-error: true
         run: bash tests/e2e/harness/run-stock-gallery-hp48gii.sh build/e2e build/assets
 
-      - name: Validate live native-font evidence
+      - name: Validate HP48 live native-font evidence
+        if: matrix.family == 'hp48'
         run: |
           python3 - <<'PY'
           import hashlib
@@ -453,27 +398,48 @@ jobs:
             echo '- Launch-step outcome: `${{ steps.hp48_launch.outcome }}`.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload HP48 Stock native-font evidence
+      - name: Generate and publish HP50g Stock Font Gallery evidence
+        if: always() && matrix.family == 'hp4950'
+        continue-on-error: true
+        run: |
+          [[ -f build/hp50g-font-gallery.pgm ]] || exit 0
+          python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
+            --image-out build/hp50g-stock-font-gallery-summary.png \
+            --image-only
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            chmod +x tools/publish-ci-image.sh
+            tools/publish-ci-image.sh \
+              build/hp50g-stock-font-gallery-summary.png \
+              "stock-font-gallery/$GITHUB_RUN_ID/hp50g.png"
+          fi
+          args=(tests/e2e/specs/font-gallery.json)
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/hp50g.png?raw=1")
+          fi
+          python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Stock Font Gallery evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp48gii-stock-native-font-evidence
+          name: ${{ matrix.family }}-stock-font-gallery-e2e
           retention-days: 14
           path: |
-            build/hp48gii-before.pgm
-            build/hp48gii-before.pgm.png
-            build/hp48gii-pass.pgm
-            build/hp48gii-pass.pgm.png
-            build/hp48gii-return.pgm
-            build/hp48gii-return.pgm.png
-            build/hp48gii-e2e.json
-            build/hp48gii-font-gallery.pgm
-            build/hp48gii-font-gallery.pgm.png
-            build/hp48gii-stock-gallery-*.pgm
-            build/hp48gii-stock-gallery-*.pgm.png
-            build/hp48gii-stock-gallery*.json
-            build/hp48gii-stock-gallery-kermit*
-            build/hp48gii-stock-gallery-socat.log
+            build/${{ matrix.target }}-before.pgm
+            build/${{ matrix.target }}-before.pgm.png
+            build/${{ matrix.target }}-pass.pgm
+            build/${{ matrix.target }}-pass.pgm.png
+            build/${{ matrix.target }}-return.pgm
+            build/${{ matrix.target }}-return.pgm.png
+            build/${{ matrix.target }}-e2e.json
+            build/${{ matrix.target }}-font-gallery.pgm
+            build/${{ matrix.target }}-font-gallery.pgm.png
+            build/${{ matrix.target }}-stock-font-gallery-summary.png
+            build/${{ matrix.target }}-stock-gallery-*.pgm
+            build/${{ matrix.target }}-stock-gallery-*.pgm.png
+            build/${{ matrix.target }}-stock-gallery*.json
+            build/${{ matrix.target }}-stock-gallery-kermit*
+            build/${{ matrix.target }}-stock-gallery-socat.log
             build/e2e/e2e.hpc
             build/e2e/e2e.size.txt
           if-no-files-found: warn
