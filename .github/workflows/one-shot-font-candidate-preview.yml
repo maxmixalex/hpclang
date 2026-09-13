@@ -32,8 +32,13 @@ jobs:
               https://archive.ubuntu.com/ubuntu/pool/universe/o/otf2bdf/otf2bdf_3.1-4.1_amd64.deb \
               -o build/otf2bdf-pkg/otf2bdf.deb
             dpkg-deb -x build/otf2bdf-pkg/otf2bdf.deb build/otf2bdf-pkg/root
+            OTF2BDF="$PWD/build/otf2bdf-pkg/root/usr/bin/otf2bdf"
+            test -x "$OTF2BDF"
+            if ldd "$OTF2BDF" | tee build/otf2bdf-pkg/ldd.txt | grep -q 'not found'; then
+              cat build/otf2bdf-pkg/ldd.txt >&2
+              exit 1
+            fi
             echo "$PWD/build/otf2bdf-pkg/root/usr/bin" >> "$GITHUB_PATH"
-            build/otf2bdf-pkg/root/usr/bin/otf2bdf -h >/dev/null
           fi
           python3 -m venv build/font-candidate-venv
           build/font-candidate-venv/bin/python -m pip install --disable-pip-version-check Pillow
