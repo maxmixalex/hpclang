@@ -36,12 +36,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
-            tests/e2e/font-gallery/CMakeLists.txt \
             tests/e2e/harness/run-gallery.sh \
-            tests/e2e/harness/run-gallery-family.sh \
             tests/e2e/harness/run-gallery-shards.sh \
-            tools/build-e2e.sh \
-            tools/hpclang-pack.py
+            tools/build-e2e.sh
           git diff --cached --check
-          git commit -m "test: shard exhaustive font Gallery payload"
+          git commit -m "test: bundle Gallery shards for Direct E2E"
           git push origin HEAD:m7-fonts-gallery
