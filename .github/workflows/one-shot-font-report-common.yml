@@ -1,0 +1,100 @@
+name: Maintenance / One-shot common Ark samples
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-font-report-common.yml"
+
+jobs:
+  report:
+    runs-on: home-docker
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Restrict Ark locale comparison to genuinely common characters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("tools/render-font-audit-cn.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''def common_diff_sample(changed, limit=42):\n    changed_set = set(changed)\n    priority = []\n    for ch in COMMON_DIFF_TEXT:\n        cp = ord(ch)\n        if cp in changed_set and cp not in priority:\n            priority.append(cp)\n    if len(priority) < limit:\n        common_ranges = [\n            (0x3000, 0x303F),\n            (0x3040, 0x30FF),\n            (0x4E00, 0x9FFF),\n            (0xAC00, 0xD7AF),\n        ]\n        remainder = [\n            cp for cp in changed\n            if cp not in priority and any(lo <= cp <= hi for lo, hi in common_ranges)\n        ]\n        for cp in spread(remainder, limit - len(priority)):\n            if cp not in priority:\n                priority.append(cp)\n    return priority[:limit]\n'''
+          new = '''def common_diff_sample(changed, limit=42):\n    # Do not pad this list with arbitrary CJK just to fill a grid. The point of\n    # the Ark locale panel is to show differences a human reader is likely to\n    # recognize. If a size has only a handful of common-character differences,\n    # show only those and say so.\n    changed_set = set(changed)\n    priority = []\n    for ch in COMMON_DIFF_TEXT:\n        cp = ord(ch)\n        if cp in changed_set and cp not in priority:\n            priority.append(cp)\n    return priority[:limit]\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+          text = text.replace(
+              "本页优先展示 {len(common)} 个较常用字符",
+              "本页只展示常用字符表实际命中的 {len(common)} 个差异字符",
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
+          python3 -m py_compile tools/render-font-audit-cn.py
+
+      - name: Generate final human review report
+        run: |
+          python3 -m venv build/font-venv
+          build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow fonttools
+          PY=build/font-venv/bin/python
+          mkdir -p build/font-audit
+          "$PY" tools/audit-font-assets.py \
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --json build/font-audit/all-fonts.json \
+            | tee build/font-audit/all-fonts.txt
+          "$PY" tools/render-font-audit-cn.py \
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --audit-json build/font-audit/all-fonts.json \
+            --html build/font-audit/font-review-cn.html
+          "$PY" - <<'PY'
+          import html
+          import json
+          import re
+          from pathlib import Path
+          report = json.loads(Path("build/font-audit/all-fonts.json").read_text(encoding="utf-8"))
+          assert report["face_count"] == 275
+          assert report["generated_parity"] == {"passed": 275, "failed": 0}
+          assert report["visual_summary"]["quick_overflow"] == 0
+          assert report["visual_summary"]["powerline_variant"] == 0
+          text = Path("build/font-audit/font-review-cn.html").read_text(encoding="utf-8")
+          samples = [html.unescape(x) for x in re.findall(r"本组对比字符：([^<]*)</div>", text)]
+          assert len(samples) == 6, len(samples)
+          namespace = {}
+          exec(Path("tools/render-font-audit-cn.py").read_text(encoding="utf-8"), namespace)
+          allowed = set(namespace["COMMON_DIFF_TEXT"])
+          for sample in samples:
+              assert set(sample) <= allowed, sample
+          print("Ark common-only samples:")
+          for sample in samples:
+              print(" ", sample)
+          PY
+
+      - name: Upload final Chinese review report
+        uses: actions/upload-artifact@v7
+        with:
+          name: font-review-cn-final
+          path: |
+            build/font-audit/font-review-cn.html
+            build/font-audit/all-fonts.json
+            build/font-audit/all-fonts.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit report policy and remove one-shot workflow
+        run: |
+          rm .github/workflows/one-shot-font-report-common.yml
+          git add -A tools/render-font-audit-cn.py .github/workflows/one-shot-font-report-common.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "audit: keep Ark locale samples common-character only"
+          git fetch origin m7-fonts-gallery
+          git rebase origin/m7-fonts-gallery
+          git push origin HEAD:m7-fonts-gallery
