@@ -19,13 +19,17 @@ jobs:
         with:
           lfs: true
 
+      - name: Prepare probe Python environment
+        run: |
+          python3 -m venv build/ttf-probe-venv
+          build/ttf-probe-venv/bin/pip install --disable-pip-version-check Pillow fonttools
+
       - name: Probe TTF metrics and raster sizes
         run: |
-          python3 - <<'PY'
+          build/ttf-probe-venv/bin/python - <<'PY'
           import base64
           import io
           import json
-          import re
           import zipfile
           from pathlib import Path
 
