@@ -18,6 +18,7 @@ on:
       - "tests/e2e/harness/**"
       - "tests/e2e/sequences/**"
       - "tests/e2e/specs/font-gallery.json"
+      - "tests/e2e/specs/font-gallery-stock.json"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
@@ -47,6 +48,7 @@ on:
       - "tests/e2e/harness/**"
       - "tests/e2e/sequences/**"
       - "tests/e2e/specs/font-gallery.json"
+      - "tests/e2e/specs/font-gallery-stock.json"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
       - "tools/hpclang-pack.py"
@@ -207,22 +209,31 @@ jobs:
         run: |
           targets_file="build/gallery-$FAMILY-targets.txt"
           [[ -f "$targets_file" ]] || exit 0
+
           while IFS= read -r TARGET; do
             [[ -n "$TARGET" ]] || continue
             export TARGET
             python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
               --image-out "build/$TARGET-font-gallery-summary.png" \
               --image-only
+          done < "$targets_file"
+
+          chmod +x tools/publish-ci-image.sh
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            image_url=""
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              chmod +x tools/publish-ci-image.sh
-              tools/publish-ci-image.sh \
-                "build/$TARGET-font-gallery-summary.png" \
-                "font-gallery/$GITHUB_RUN_ID/$TARGET.png"
+              if tools/publish-ci-image.sh \
+                  "build/$TARGET-font-gallery-summary.png" \
+                  "font-gallery/$GITHUB_RUN_ID/$TARGET.png"; then
+                image_url="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1"
+              else
+                echo "::warning::failed to publish ci-evidence image for $TARGET; keeping local summary"
+              fi
             fi
             args=(tests/e2e/specs/font-gallery.json)
-            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1")
-            fi
+            [[ -z "$image_url" ]] || args+=(--image-url "$image_url")
             python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
 
@@ -373,49 +384,30 @@ jobs:
           print(f'visible-return status remains separate: {status}')
           PY
 
-          frames=(
-            build/hp48gii-stock-gallery-native-mini.pgm
-            build/hp48gii-stock-gallery-native-main.pgm
-            build/hp48gii-stock-gallery-generated-control.pgm
-          )
-          python3 tools/merge-pgm-grid.py build/hp48gii-font-gallery.pgm "${frames[@]}"
-          python3 tools/pgm-to-png.py build/hp48gii-font-gallery.pgm build/hp48gii-font-gallery.pgm.png
 
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            chmod +x tools/publish-ci-image.sh
-            tools/publish-ci-image.sh \
-              build/hp48gii-font-gallery.pgm.png \
-              "stock-font-gallery/$GITHUB_RUN_ID/hp48gii-native.png"
-          fi
-
-          {
-            echo '## HP48gII Stock native-font evidence'
-            echo
-            echo '- Original Stock UI + Serial Kermit + ARMToolbox48 reached HPC1 PASS.'
-            echo '- Calculator minifont, calculator main font, and generated control captures are present, nonblank, and distinct.'
-            echo '- This gate owns live Saturn `Read[]` native-font evidence only.'
-            echo '- Stock visible-return settling remains a separate gate; `return-unsettled` here does not count as a visible-return PASS.'
-            echo '- Launch-step outcome: `${{ steps.hp48_launch.outcome }}`.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Generate and publish HP50g Stock Font Gallery evidence
-        if: always() && matrix.family == 'hp4950'
+      - name: Generate and publish Stock Font Gallery evidence
+        if: always()
         continue-on-error: true
         run: |
-          [[ -f build/hp50g-font-gallery.pgm ]] || exit 0
-          python3 tests/e2e/report.py tests/e2e/specs/font-gallery.json \
-            --image-out build/hp50g-stock-font-gallery-summary.png \
+          [[ -f "build/$TARGET-font-gallery.pgm" ]] || exit 0
+          python3 tests/e2e/report.py tests/e2e/specs/font-gallery-stock.json \
+            --image-out "build/$TARGET-stock-font-gallery-summary.png" \
             --image-only
+
+          image_url=""
           if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
             chmod +x tools/publish-ci-image.sh
-            tools/publish-ci-image.sh \
-              build/hp50g-stock-font-gallery-summary.png \
-              "stock-font-gallery/$GITHUB_RUN_ID/hp50g.png"
+            if tools/publish-ci-image.sh \
+                "build/$TARGET-stock-font-gallery-summary.png" \
+                "stock-font-gallery/$GITHUB_RUN_ID/$TARGET.png"; then
+              image_url="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1"
+            else
+              echo "::warning::failed to publish Stock ci-evidence image for $TARGET"
+            fi
           fi
-          args=(tests/e2e/specs/font-gallery.json)
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/hp50g.png?raw=1")
-          fi
+
+          args=(tests/e2e/specs/font-gallery-stock.json)
+          [[ -z "$image_url" ]] || args+=(--image-url "$image_url")
           python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Stock Font Gallery evidence

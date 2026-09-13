@@ -10,7 +10,6 @@ on:
       - m7-fonts-gallery
     paths:
       - "runtime/fonts/fonts.zip"
-      - "runtime/fonts/ttf-raster.json"
       - "tools/hpclang-font.py"
       - "tools/regenerate-font-assets.py"
       - "tools/audit-font-assets.py"
@@ -36,12 +35,11 @@ jobs:
       - name: Prepare font maintenance environment
         run: |
           python3 -m venv build/font-venv
-          build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow fonttools
+          build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow
 
-      # Regeneration is the canonical check for source-parser/rasterizer changes too,
-      # not only for changes to the raw source bundle. The curated built-in package
-      # currently prefers native bitmap sources; TTF importer support remains tested
-      # as a capability rather than requiring TTF assets in the canonical bundle.
+      # Regeneration is the canonical check for bitmap source-parser changes too.
+      # The built-in package accepts native bitmap sources only: BDF, FON strikes,
+      # and newRPL BMP+mapping assets. Outline-font rasterization is intentionally absent.
       - name: Regenerate checked-in assembly assets
         run: |
           PY=build/font-venv/bin/python

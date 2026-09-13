@@ -45,36 +45,6 @@ def _num(s: str) -> int:
     return int(s, 0)
 
 
-def load_ttf_raster_policy(path) -> dict[str, int]:
-    path = Path(path)
-    if not path.exists():
-        return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if raw.get("schema") != "hpclang-ttf-raster-v1":
-        raise ValueError(f"{path}: unsupported TTF raster policy schema")
-    faces = raw.get("faces")
-    if not isinstance(faces, dict):
-        raise ValueError(f"{path}: faces must be an object")
-    result: dict[str, int] = {}
-    for source, entry in faces.items():
-        if not isinstance(source, str) or not isinstance(entry, dict):
-            raise ValueError(f"{path}: invalid TTF raster policy entry")
-        ppem = entry.get("ppem")
-        if not isinstance(ppem, int) or not 1 <= ppem <= 128:
-            raise ValueError(f"{path}: {source}: ppem must be an integer in 1..128")
-        result[source] = ppem
-    return result
-
-
-def ttf_raster_size(pkg, source: str) -> int:
-    policy = getattr(pkg, "ttf_raster_policy", {})
-    try:
-        return int(policy[source])
-    except KeyError as exc:
-        raise ValueError(
-            f"{source}: no explicit TTF raster PPEM; add it to runtime/fonts/ttf-raster.json"
-        ) from exc
-
 
 class Package:
     """Read either the canonical raw fonts/ ZIP or an older manifest package."""
@@ -104,7 +74,7 @@ class Package:
                 sibling_txt = str(Path(logical).with_suffix(".txt")).replace(
                     "\\", "/"
                 )
-                is_font = ext in {".bdf", ".ttf", ".fon"} or (
+                is_font = ext in {".bdf", ".fon"} or (
                     ext == ".bmp" and self.root + sibling_txt in self._name_set
                 )
                 info = self.z.getinfo(name)
@@ -125,9 +95,6 @@ class Package:
             }
 
         self.files = {entry["path"]: entry for entry in self.manifest["files"]}
-        self.ttf_raster_policy = load_ttf_raster_policy(
-            self.path.with_name("ttf-raster.json")
-        )
 
     def data(self, path):
         return self.z.read(self.root + path)
@@ -351,16 +318,6 @@ def _pil_font(data: bytes, size: int, index: int = 0):
     return ImageFont.truetype(io.BytesIO(data), size=size, index=index)
 
 
-def _ttf_codepoints(data: bytes):
-    from fontTools.ttLib import TTFont
-
-    tt = TTFont(io.BytesIO(data), fontNumber=0, lazy=True)
-    cps = set()
-    for table in tt["cmap"].tables:
-        if table.isUnicode():
-            cps.update(table.cmap.keys())
-    return sorted(cp for cp in cps if 0 <= cp <= 0x10FFFF)
-
 
 def raster_pil(
     data: bytes,
@@ -374,7 +331,7 @@ def raster_pil(
     font = _pil_font(data, size, index)
     asc, desc = font.getmetrics()
     if codepoints is None:
-        codepoints = _ttf_codepoints(data) if fmt == "ttf" else range(256)
+        codepoints = range(256)
     glyphs = {}
     for cp in codepoints:
         ch = chr(cp)
@@ -481,17 +438,6 @@ def load_selected(
             nominal,
             full.format,
             full.face,
-        )
-
-    if ext == ".ttf":
-        cps = _ttf_codepoints(data)
-        chosen = cps if mode == "FULL" else [cp for cp in cps if cp in (requested or set())]
-        return raster_pil(
-            data,
-            path,
-            size=ttf_raster_size(pkg, path),
-            codepoints=chosen,
-            fmt="ttf",
         )
 
     if ext == ".fon":
@@ -666,16 +612,6 @@ def main():
                     faces += 1
                     if not font.glyphs:
                         raise ValueError("no glyphs")
-                elif ext == ".ttf":
-                    cps = _ttf_codepoints(data)
-                    if not cps:
-                        raise ValueError("empty Unicode cmap")
-                    cpset = set(cps)
-                    sample = [cp for cp in (0x20, 0x3F, 0x41, 0x61) if cp in cpset] or cps[:1]
-                    font = raster_pil(data, path, size=12, codepoints=sample, fmt="ttf")
-                    faces += 1
-                    if not font.glyphs:
-                        raise ValueError("no sample glyphs")
                 elif ext == ".fon":
                     for idx, size, label in FON_FACE_SIZES:
                         font = raster_pil(
