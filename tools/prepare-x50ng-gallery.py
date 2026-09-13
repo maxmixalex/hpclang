@@ -2,6 +2,8 @@
 """Add the focused Font Gallery frontend to an already prepared x50ng tree."""
 
 # Changes to generated font rasters intentionally retrigger this focused Gallery gate.
+# Catalog cardinality is derived from generated assets; source curation must not
+# require a hard-coded face count in this x50ng frontend.
 from __future__ import annotations
 
 import argparse
