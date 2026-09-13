@@ -27,22 +27,33 @@ ARK_RE = re.compile(
     r"ark-pixel-(?P<size>10|12|16)px-(?P<mode>monospaced|proportional)-"
     r"(?P<locale>latin|zh_cn|zh_hk|zh_tw|zh_tr|ja|ko)\.bdf$"
 )
+COMMON_HAN_TEXT = (
+    "中文字体體天地山水日月人心大小上下左右东西東西南北你好世界国家國家"
+    "汉漢台臺灣门門书書学學风風云雲龙龍马馬开開关關电電話話时间時間"
+)
+JAPANESE_TEXT = (
+    "あいうえおかきくけこさしすせそたちつてとなにぬねの"
+    "アイウエオカキクケコサシスセソタチツテトナニヌネノ日本語"
+)
+KOREAN_TEXT = "가나다라마바사아자차카타파하 한국어 한글"
+CJK_PUNCT_TEXT = "、。「」『』，！？：；（）【】《》〈〉·—…～〜ー"
 COMMON_DIFF_TEXT = (
     "一二三十人口大小天地日月年月上下左右前后东西南北中中国國日本語韩国韓國"
     "你我他她它的是不了在有这這中来來个個们們到说說和地也子时時道出而要于於"
     "就下得可年生自会會那后後能对對着著事其里裡所去行过過家用发發天方然作成"
     "开開面无無小心前本见見经經头頭樣样只种種学學书書文文字体體门門国國臺台"
     "湾灣汉漢龙龍马馬风風云雲广廣东東乐樂长長"
-    "。、，！？：；（）「」『』【】《》〈〉·—…～〜ー￥¥₩"
-    "あいうえおかきくけこさしすせそたちつてとなにぬねの"
-    "アイウエオカキクケコサシスセソタチツテトナニヌネノ"
-    "가나다라마바사아자차카타파하한글"
+    + CJK_PUNCT_TEXT
+    + JAPANESE_TEXT
+    + KOREAN_TEXT
 )
 ACCENT_TEXT = "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœ"
 SYMBOL_TEXT = "←↑→↓↔ ±×÷≠≤≥≈∞√ ∑∏∆Ωαβπλ μ°©®€£¥"
 PANGRAMS = (
-    "Il1| 0OQ 2Z5S 6G8B rn m w MW AV To",
-    "aegxy 0123456789 {}[]() <> /\\ _-+= *#@&%",
+    "Il1| 0OQ 2Z5S6G8B AV To rn m w MW",
+    "Hamburgefonts Sphinx quartz",
+    "Sphinx of black quartz, judge my vow!",
+    "Pack my box with five dozen liquor jugs.",
 )
 ASCII_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 ASCII_LOWER = "abcdefghijklmnopqrstuvwxyz"
@@ -151,19 +162,37 @@ def spread(values, limit):
     return result
 
 
+def priority_sample(values, preferred_text, limit, *, fallback_limit=24):
+    value_set = set(values)
+    result = []
+    for ch in preferred_text:
+        cp = ord(ch)
+        if cp in value_set and cp not in result:
+            result.append(cp)
+            if len(result) >= limit:
+                return result
+    if result:
+        return result
+    return spread(values, min(limit, fallback_limit))
+
+
 def feature_groups(font):
     cps = sorted(font.glyphs)
     groups = [
-        ("拉丁扩展", [cp for cp in cps if 0x80 <= cp <= 0x024F], 72),
-        ("希腊 / 西里尔", [cp for cp in cps if 0x0370 <= cp <= 0x052F], 72),
-        ("箭头 / 数学", [cp for cp in cps if 0x2190 <= cp <= 0x22FF], 72),
-        ("方框 / 图形符号", [cp for cp in cps if 0x2500 <= cp <= 0x27BF], 72),
-        ("日文假名", [cp for cp in cps if 0x3040 <= cp <= 0x30FF], 72),
-        ("汉字字符集抽样", [cp for cp in cps if 0x3400 <= cp <= 0x9FFF], 96),
-        ("韩文", [cp for cp in cps if 0xAC00 <= cp <= 0xD7AF], 72),
-        ("私用区 / 图标", [cp for cp in cps if 0xE000 <= cp <= 0xF8FF], 96),
+        ("拉丁扩展", [cp for cp in cps if 0x80 <= cp <= 0x024F], ACCENT_TEXT, 72),
+        ("希腊 / 西里尔", [cp for cp in cps if 0x0370 <= cp <= 0x052F], "ΑΒΓΔΩαβγδπλμ ЖДЯждя", 72),
+        ("箭头 / 数学", [cp for cp in cps if 0x2190 <= cp <= 0x22FF], SYMBOL_TEXT, 72),
+        ("方框 / 图形符号", [cp for cp in cps if 0x2500 <= cp <= 0x27BF], "─│┌┐└┘├┤┬┴┼■□◆◇●○", 72),
+        ("日文假名", [cp for cp in cps if 0x3040 <= cp <= 0x30FF], JAPANESE_TEXT, 72),
+        ("汉字字符集抽样", [cp for cp in cps if 0x3400 <= cp <= 0x9FFF], COMMON_HAN_TEXT, 96),
+        ("韩文", [cp for cp in cps if 0xAC00 <= cp <= 0xD7AF], KOREAN_TEXT, 72),
+        ("私用区 / 图标", [cp for cp in cps if 0xE000 <= cp <= 0xF8FF], "", 24),
     ]
-    return [(label, spread(values, limit), len(values)) for label, values, limit in groups if values]
+    return [
+        (label, priority_sample(values, preferred, limit), len(values))
+        for label, values, preferred, limit in groups
+        if values
+    ]
 
 
 def face_title(row):
@@ -197,10 +226,6 @@ def changed_codepoints(group):
 
 
 def common_diff_sample(changed, limit=42):
-    # Do not pad this list with arbitrary CJK just to fill a grid. The point of
-    # the Ark locale panel is to show differences a human reader is likely to
-    # recognize. If a size has only a handful of common-character differences,
-    # show only those and say so.
     changed_set = set(changed)
     priority = []
     for ch in COMMON_DIFF_TEXT:
@@ -214,6 +239,19 @@ def img_tag(uri, alt):
     if not uri:
         return "<div class='empty'>这一组没有可显示字符</div>"
     return f"<img class='shot' src='{uri}' alt='{html.escape(alt)}'>"
+
+
+def render_text_sample(font, title, text, *, wide=True):
+    cps = available_text_cps(font, text)
+    if not cps:
+        return ""
+    klass = "sample wide" if wide else "sample"
+    visible = "".join(chr(cp) for cp in cps)
+    return (
+        f"<div class='{klass}'><b>{html.escape(title)}</b>"
+        f"{img_tag(render_cps(font, cps, scale=3), title)}"
+        f"<div class='chars'>{html.escape(visible)}</div></div>"
+    )
 
 
 def render_specimens(font):
@@ -231,16 +269,21 @@ def render_specimens(font):
             f"<div class='chars'>{html.escape(''.join(chr(cp) for cp in cps)) or '—'}</div></div>"
         )
     for text in PANGRAMS:
-        cps = available_text_cps(font, text)
-        parts.append(
-            f"<div class='sample wide'><b>正文节奏</b>{img_tag(render_cps(font, cps, scale=3), text)}"
-            f"<div class='chars'>{html.escape(text)}</div></div>"
-        )
+        parts.append(render_text_sample(font, "正文节奏", text))
+    for title, text in [
+        ("常用汉字与 CJK 标点", COMMON_HAN_TEXT + CJK_PUNCT_TEXT),
+        ("常用假名", JAPANESE_TEXT),
+        ("常用韩文", KOREAN_TEXT),
+    ]:
+        parts.append(render_text_sample(font, title, text))
+
     feature_html = []
     for label, cps, total in feature_groups(font):
+        chars = "".join(chr(cp) for cp in cps)
         feature_html.append(
-            f"<div class='sample'><b>{html.escape(label)} <span class='muted'>({total} 个，本图抽样)</span></b>"
+            f"<div class='sample'><b>{html.escape(label)} <span class='muted'>({total} 个，常用字符优先抽样)</span></b>"
             f"{img_tag(render_cps(font, cps, scale=3, cell_mode=True), label)}"
+            f"<div class='chars'>{html.escape(chars)}</div>"
             f"<div class='chars mono'>{html.escape(' '.join(f'U+{cp:04X}' for cp in cps[:24]))}"
             f"{' …' if len(cps) > 24 else ''}</div></div>"
         )
@@ -302,8 +345,9 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
     out.append(
         "<p class='lead'>这份报告只解决一个问题：<b>这些字体实际长什么样，哪些值得留下。</b>"
         "机器校验数字不再放在正文中心。每个需要人工判断的位图 face 都给出大小写、数字标点、正文、"
-        "变音拉丁字母、数学符号，以及它真实拥有的其他 Unicode 字符抽样。Ark Pixel 则单独比较"
-        "同一尺寸/宽度模式下各地区版本真正不同的字形。</p>"
+        "变音拉丁字母、数学符号，以及它真实拥有的其他 Unicode 字符抽样。CJK 不再按 Unicode 区间"
+        "均匀抽生僻字，而是优先展示常用汉字、标点、假名和韩文。Ark Pixel 则单独比较同一尺寸/宽度"
+        "模式下各地区版本真正不同的常用字形。</p>"
     )
     out.append("<div class='cards'>")
     out.append(f"<div class='card'><strong>{face_count}</strong><br>当前 face 总数</div>")
@@ -351,9 +395,9 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
     out.append("<h2>2. 其他位图字体：逐个 face 看完整得多的样子</h2>")
     out.append(
         "<p class='lead'>这里不再只给一行 AaBbCc。每个位图 face 都至少检查基本拉丁、数字标点、"
-        "两句正文、变音拉丁字符、常见数学符号；字体如果还包含 CJK、假名、韩文、图标或其他大字符集，"
-        "下面继续给整块抽样。这样 Boutique Bitmap、JapanYoshi、PixelDroid、HasanKazan 等可以按"
-        "实际视觉效果决定去留。</p>"
+        "诊断字符、两句自然正文、变音拉丁字符和常见数学符号；字体如果还包含 CJK、假名、韩文、"
+        "图标或其他大字符集，先用常用字符展示，再补字符集抽样。这样 Boutique Bitmap、JapanYoshi、"
+        "PixelDroid、HasanKazan 等可以按实际视觉效果决定去留。</p>"
     )
     for family in sorted(review_families):
         faces = sorted(review_families[family], key=lambda item: item[0]["selector"])
