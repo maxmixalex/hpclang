@@ -93,6 +93,8 @@ This distinction is implementation-only. Applications receive the same opaque fo
 
 Generated fonts use the checked-in bitmap-font catalog produced from the canonical source bundle. Normal application builds do not parse source font files or require Python/fontTools/Pillow.
 
+The **canonical bundled asset set is bitmap-source only**. TTF is no longer part of the canonical font package, and the TTF importer is scheduled for removal rather than retained as a supported project feature. Candidate additions should prefer upstream BDF/PCF or another directly auditable bitmap source.
+
 `hpclang_target_font()` supports exactly three repertoire modes:
 
 - `STATIC_AUTO`: collect only code points from explicit `HPCLANG_UI_TEXT("...")` markers in the target's sources;
@@ -109,7 +111,9 @@ The canonical renderer accepts code points and UTF-8. Invalid UTF-8 becomes U+FF
 
 The design vocabulary `mini` / `text` / `edit-large` describes semantic UI roles, not exactly three physical font formats. Dedicated public selectors for those roles are not frozen merely because the terms are useful in Font Gallery and UI research.
 
-Font Gallery is deliberately a **separate HPC1 E2E application**. It should exercise native fonts, generated aliases/arbitrary faces, metrics, representative repertoire, and both 64- and 80-line layouts without expanding the canonical runtime/keyboard/storage payload.
+Font Gallery is deliberately a **separate HPC1 E2E application**. It should exercise native fonts, generated aliases/arbitrary faces, metrics, representative repertoire, and both 64- and 80-line layouts without expanding the canonical runtime/keyboard/storage payload. Its specimen text is part of the visual test contract: the next Gallery revision must use face-sensitive samples that expose width, punctuation, accented Latin, digits, CJK where available, and distinctive glyph construction instead of repeating a weak generic phrase across every family.
+
+The Gallery evidence UI is also part of the test surface. Direct and Stock summaries must use the same structure, HP39 Direct must publish its own summary, and compact Stock summaries must not collapse to native-font-only content when the job also owns generated-control and launch/return evidence.
 
 ### HPG compatibility consequence
 
@@ -180,4 +184,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-The font/gallery clean-core architecture is closed; immediate font work is human curation of the retained generated assets, while the next new SDK service is the typed calculator object-store design. HPGCC compatibility adapters remain downstream of stable clean-core services.
+The font core architecture is closed, but the M7 font slice is still in evidence/asset-polish before merge: remove the now-unwanted TTF importer, normalize Gallery summaries, add the missing HP39 Direct summary, strengthen specimen text, and evaluate additional upstream bitmap CJK assets. The next new SDK service remains the typed calculator object-store design. HPGCC compatibility adapters remain downstream of stable clean-core services.
