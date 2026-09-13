@@ -1,0 +1,103 @@
+name: Maintenance / One-shot font docs sync
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-font-doc-sync.yml"
+
+jobs:
+  sync:
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Synchronize curated Font Gallery documentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          catalog = json.loads(Path('runtime/fonts/generated/catalog.json').read_text(encoding='utf-8'))
+          faces = catalog['faces']
+          assert len(faces) == 275, len(faces)
+          assert sum(int(f['glyph_count']) for f in faces) == 1772082
+
+          files = [
+              Path('docs/development/validation.md'),
+              Path('docs/development/e2e.md'),
+              Path('docs/development/api-reference.md'),
+              Path('docs/development/roadmap.md'),
+              Path('docs/development/hpgcc-compat.md'),
+              Path('docs/development/sdk-design.md'),
+          ]
+
+          for path in files:
+              text = path.read_text(encoding='utf-8')
+              text = text.replace('1,779,042', '1,772,082')
+              text = text.replace('308 generated faces', '275 generated faces')
+              text = text.replace('308 generated', '275 generated')
+              text = text.replace('308 faces', '275 faces')
+              text = text.replace(' / 3,797 assembly sources', '')
+              text = text.replace('310 entries', '277 entries')
+              text = text.replace('620 captures', '554 captures')
+              text = text.replace('310 × 2 = 620', '277 × 2 = 554')
+              text = text.replace('310 entries (275 generated + 2 native)', '277 entries (275 generated + 2 native)')
+              text = text.replace('310 entries (275 generated faces plus two native entries)', '277 entries (275 generated faces plus two native entries)')
+              text = text.replace('34698825657 / #42', '34743437279 / #47 (attempt 2)')
+              text = text.replace('34710471059 / #45', '34743437279 / #47 (attempt 2)')
+              text = text.replace('run 34698825657 / #42', 'run 34743437279 / #47 (attempt 2)')
+              text = text.replace('run 34710471059 / #45', 'run 34743437279 / #47 (attempt 2)')
+
+              text = text.replace(
+                  'a compact HP48gII Stock Gallery remains the final 64-line live-native evidence item.',
+                  'compact HP48gII Stock Gallery now closes the 64-line live-native evidence item, including nonblank/distinct native probes and a visible stock return.',
+              )
+              text = text.replace(
+                  '- [ ] add compact HP48gII Stock Gallery evidence so the 64-line live Saturn `Read[]` native-font path is validated independently of the synthetic Direct fixture;',
+                  '- [x] compact HP48gII Stock Gallery validates the 64-line live Saturn `Read[]` native-font path independently of the synthetic Direct fixture, including nonblank/distinct native probes and visible stock return;',
+              )
+              text = text.replace(
+                  '- [ ] add compact HP48gII Stock Gallery evidence so the 64-line live Saturn `Read[]` native-font path is independently validated;',
+                  '- [x] compact HP48gII Stock Gallery validates the 64-line live Saturn `Read[]` native-font path independently, including nonblank/distinct native probes and visible stock return;',
+              )
+
+              if '### Curated font package evidence (2026-09-13)' not in text and path.name in {'validation.md','e2e.md','roadmap.md','api-reference.md','hpgcc-compat.md'}:
+                  text += '''\n\n### Curated font package evidence (2026-09-13)\n\nThe canonical package was curated after visual and semantic audit: six Dina OEM faces, 21 Powerline-specific faces, and six faces whose `Quick` specimen exceeded the 131-pixel LCD were removed at the source-package level and the generated catalog was rebuilt. The current catalog contains **275 generated faces / 1,772,082 mapped glyphs**. Semantic source-to-generated parity is **275/275**; exact duplicate, `quick-overflow`, `glyph-collapse`, `blank-heavy`, and Powerline signals are all zero. Six retained faces still have source/cmap-level printable-ASCII gaps and 13 have loose-spacing diagnostics; neither is treated as an automatic defect.\n\nThe TTF rasterizer now uses Pillow mask geometry rather than incorrectly assuming `getbbox()` dimensions match `getmask2()` storage, which eliminated the importer-created blank-heavy glyphs. Ark Pixel Gallery labels expose size, monospaced/proportional mode, and locale explicitly. The human review report contains 423 embedded specimens; Ark locale panels show only differing characters from the curated common-character list and never pad the panel with obscure CJK. Retained TTF families still require the final human curation decision before the font slice is merged.\n\nThe curated exhaustive Direct Gallery is **277 entries (275 generated + 2 native) × 2 pages = 554 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g, all PASS. `E2E / Font Gallery` run **34743437279 / #47, attempt 2** is fully green, including `Stock / hp48` and `Stock / hp4950`. The first HP50g Stock attempt timed out before HPC1 PASS; the rerun reached the same ARMToolbox path, HPC1 PASS, nonblank native mini/main/generated control captures, and final PASS, so the first result is retained as a Stock-harness timing fluctuation rather than hidden.\n'''
+
+              if path.name == 'sdk-design.md':
+                  text = re.sub(
+                      r'(?im)^.*next architectural work.*font gallery.*$',
+                      'The font/gallery clean-core architecture is closed; immediate font work is human curation of the retained generated assets, while the next new SDK service is the typed calculator object-store design. HPGCC compatibility adapters remain downstream of stable clean-core services.',
+                      text,
+                  )
+
+              path.write_text(text, encoding='utf-8')
+
+          # No stale pre-curation catalog counts may remain in the durable docs.
+          joined = '\n'.join(path.read_text(encoding='utf-8') for path in files)
+          for stale in ('1,779,042', '310 entries', '620 captures', '308 generated faces'):
+              assert stale not in joined, stale
+          print('documentation synchronized for 275 generated / 277 gallery / 554 captures')
+          PY
+          git diff --check
+          git diff --stat
+
+      - name: Commit synchronized documentation and remove one-shot workflow
+        run: |
+          rm .github/workflows/one-shot-font-doc-sync.yml
+          git add -A docs/development .github/workflows/one-shot-font-doc-sync.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: synchronize curated font gallery evidence"
+          git fetch origin m7-fonts-gallery
+          git rebase origin/m7-fonts-gallery
+          git push origin HEAD:m7-fonts-gallery
