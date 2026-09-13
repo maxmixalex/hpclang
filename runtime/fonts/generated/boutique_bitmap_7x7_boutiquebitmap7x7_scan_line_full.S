@@ -7482,7 +7482,7 @@ hpclang_font_boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_full_data:
 .word hpclang_font_boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_full_glyphs
 .word 7470
 .word 63
-.hword 10,3,13,12
+.hword 7,2,9,8
 
 .section .rodata.hpclang.font.boutique_bitmap_7x7_boutiquebitmap7x7_scan_line.full.font,"a",%progbits
 .balign 4

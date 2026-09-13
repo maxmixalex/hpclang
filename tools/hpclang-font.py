@@ -45,6 +45,37 @@ def _num(s: str) -> int:
     return int(s, 0)
 
 
+def load_ttf_raster_policy(path) -> dict[str, int]:
+    path = Path(path)
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if raw.get("schema") != "hpclang-ttf-raster-v1":
+        raise ValueError(f"{path}: unsupported TTF raster policy schema")
+    faces = raw.get("faces")
+    if not isinstance(faces, dict):
+        raise ValueError(f"{path}: faces must be an object")
+    result: dict[str, int] = {}
+    for source, entry in faces.items():
+        if not isinstance(source, str) or not isinstance(entry, dict):
+            raise ValueError(f"{path}: invalid TTF raster policy entry")
+        ppem = entry.get("ppem")
+        if not isinstance(ppem, int) or not 1 <= ppem <= 128:
+            raise ValueError(f"{path}: {source}: ppem must be an integer in 1..128")
+        result[source] = ppem
+    return result
+
+
+def ttf_raster_size(pkg, source: str) -> int:
+    policy = getattr(pkg, "ttf_raster_policy", {})
+    try:
+        return int(policy[source])
+    except KeyError as exc:
+        raise ValueError(
+            f"{source}: no explicit TTF raster PPEM; add it to runtime/fonts/ttf-raster.json"
+        ) from exc
+
+
 class Package:
     """Read either the canonical raw fonts/ ZIP or an older manifest package."""
 
@@ -94,6 +125,9 @@ class Package:
             }
 
         self.files = {entry["path"]: entry for entry in self.manifest["files"]}
+        self.ttf_raster_policy = load_ttf_raster_policy(
+            self.path.with_name("ttf-raster.json")
+        )
 
     def data(self, path):
         return self.z.read(self.root + path)
@@ -345,7 +379,10 @@ def raster_pil(
     for cp in codepoints:
         ch = chr(cp)
         try:
-            mask, (x0, y0) = font.getmask2(ch, mode="1")
+            # Use an explicit left-baseline anchor.  Pillow's historical default
+            # horizontal anchor is left-ascender; spelling the baseline out here
+            # makes the conversion to BDF-style y_offset direct and testable.
+            mask, (x0, y0) = font.getmask2(ch, mode="1", anchor="ls")
             adv = round(font.getlength(ch))
         except Exception:
             continue
@@ -368,7 +405,7 @@ def raster_pil(
             gh,
             max(0, adv),
             x0,
-            asc - (y0 + gh),
+            -(y0 + gh),
             bytes(bits),
             stride,
         )
@@ -449,7 +486,13 @@ def load_selected(
     if ext == ".ttf":
         cps = _ttf_codepoints(data)
         chosen = cps if mode == "FULL" else [cp for cp in cps if cp in (requested or set())]
-        return raster_pil(data, path, size=12, codepoints=chosen, fmt="ttf")
+        return raster_pil(
+            data,
+            path,
+            size=ttf_raster_size(pkg, path),
+            codepoints=chosen,
+            fmt="ttf",
+        )
 
     if ext == ".fon":
         if face is None:

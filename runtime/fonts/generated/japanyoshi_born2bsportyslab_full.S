@@ -1661,7 +1661,7 @@ hpclang_font_japanyoshi_born2bsportyslab_full_data:
 .word hpclang_font_japanyoshi_born2bsportyslab_full_glyphs
 .word 1649
 .word 63
-.hword 9,3,12,7
+.hword 12,4,16,9
 
 .section .rodata.hpclang.font.japanyoshi_born2bsportyslab.full.font,"a",%progbits
 .balign 4

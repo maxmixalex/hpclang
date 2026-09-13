@@ -13169,7 +13169,7 @@ hpclang_font_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_full_data:
 .word hpclang_font_boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_full_glyphs
 .word 13157
 .word 63
-.hword 10,4,14,13
+.hword 8,3,11,11
 
 .section .rodata.hpclang.font.boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2.full.font,"a",%progbits
 .balign 4
