@@ -1,0 +1,47 @@
+name: Maintenance / One-shot Gallery sharding
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-gallery-sharding.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Apply Gallery sharding source patch
+        run: python3 .github/scripts/one-shot-gallery-sharding.py
+
+      - name: Validate patched sources
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/hpclang-pack.py
+          bash -n tools/build-e2e.sh
+          bash -n tests/e2e/harness/run-gallery.sh
+          bash -n tests/e2e/harness/run-gallery-family.sh
+          bash -n tests/e2e/harness/run-gallery-shards.sh
+          git diff --check
+
+      - name: Commit source patch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tests/e2e/font-gallery/CMakeLists.txt \
+            tests/e2e/harness/run-gallery.sh \
+            tests/e2e/harness/run-gallery-family.sh \
+            tests/e2e/harness/run-gallery-shards.sh \
+            tools/build-e2e.sh \
+            tools/hpclang-pack.py
+          git diff --cached --check
+          git commit -m "test: shard exhaustive font Gallery payload"
+          git push origin HEAD:m7-fonts-gallery
