@@ -135,8 +135,8 @@ jobs:
           galmuri = sorted(face['selector'] for face in faces if face.get('family') == 'galmuri')
           assert galmuri == ['galmuri/Galmuri11-Bold.bdf', 'galmuri/Galmuri11-Condensed.bdf'], galmuri
           assert audit['face_count'] == 242, audit['face_count']
-          assert len(audit['generated_parity']['passed']) == 242
-          assert not audit['generated_parity']['failed']
+          assert audit['generated_parity']['passed'] == 242, audit['generated_parity']
+          assert audit['generated_parity']['failed'] == 0, audit['generated_parity']
           for key in ('quick_overflow', 'glyph_collapse', 'blank_heavy', 'powerline_variant'):
               assert audit['visual_summary'][key] == 0, (key, audit['visual_summary'][key])
           print('PASS: 242 bitmap-source faces; 242/242 parity; no overflow/collapse/blank-heavy/powerline')
