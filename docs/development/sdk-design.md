@@ -180,4 +180,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-These foundations are implemented. The next architectural work is focused Font Gallery/UI-role evidence and typed calculator objects/Saturn integration. HPGCC compatibility headers should continue to be built on top of those clean services rather than define them.
+The font/gallery clean-core architecture is closed; immediate font work is human curation of the retained generated assets, while the next new SDK service is the typed calculator object-store design. HPGCC compatibility adapters remain downstream of stable clean-core services.
