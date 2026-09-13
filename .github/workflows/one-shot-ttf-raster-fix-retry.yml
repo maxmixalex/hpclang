@@ -1,0 +1,80 @@
+name: Maintenance / One-shot TTF raster fix retry
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-ttf-raster-fix-retry.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: home-docker
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Apply the already-reviewed TTF patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/one-shot-ttf-raster-fix.yml').read_text(encoding='utf-8')
+          start = workflow.index("          python3 - <<'PY'\n") + len("          python3 - <<'PY'\n")
+          end = workflow.index("\n          PY\n\n      - name: Regenerate and validate font assets", start)
+          exec(textwrap.dedent(workflow[start:end]), {})
+          PY
+
+      - name: Regenerate and validate font assets
+        run: |
+          python3 -m venv build/font-fix-venv
+          build/font-fix-venv/bin/pip install --disable-pip-version-check Pillow fonttools
+          build/font-fix-venv/bin/python tools/regenerate-font-assets.py --package runtime/fonts/fonts.zip
+          set -o pipefail
+          build/font-fix-venv/bin/python tools/audit-font-assets.py \
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --json build/font-fix-audit.json \
+            --html build/font-fix-audit.html \
+            | tee build/font-fix-audit.txt
+          build/font-fix-venv/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          catalog = json.loads(Path('runtime/fonts/generated/catalog.json').read_text(encoding='utf-8'))
+          policy = json.loads(Path('runtime/fonts/ttf-raster.json').read_text(encoding='utf-8'))['faces']
+          ttf = [face for face in catalog['faces'] if face.get('format') == 'ttf']
+          assert len(ttf) == len(policy) == 35, (len(ttf), len(policy))
+          for face in ttf:
+              assert face['raster_ppem'] == policy[face['path']]['ppem'], face['path']
+          assert len(catalog['faces']) == 275
+          print('PASS: 35 TTF faces use explicit PPEM; total faces=275')
+          PY
+          git diff --check
+
+      - name: Upload corrected visual audit
+        uses: actions/upload-artifact@v7
+        with:
+          name: ttf-raster-fix-audit
+          retention-days: 7
+          path: |
+            build/font-fix-audit.json
+            build/font-fix-audit.txt
+            build/font-fix-audit.html
+
+      - name: Commit fix and regenerated catalog
+        run: |
+          rm .github/workflows/one-shot-ttf-raster-fix.yml
+          rm .github/workflows/one-shot-ttf-raster-fix-retry.yml
+          git add -A tools/hpclang-font.py tools/regenerate-font-assets.py runtime/fonts/generated .github/workflows/one-shot-ttf-raster-fix.yml .github/workflows/one-shot-ttf-raster-fix-retry.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: rasterize TTF fonts at declared pixel sizes"
+          git fetch origin m7-fonts-gallery
+          git rebase origin/m7-fonts-gallery
+          git push origin HEAD:m7-fonts-gallery
