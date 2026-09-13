@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Add the focused Font Gallery frontend to an already prepared x50ng tree."""
 
+# Changes to generated font rasters intentionally retrigger this focused Gallery gate.
 from __future__ import annotations
 
 import argparse
