@@ -345,32 +345,30 @@ def raster_pil(
     for cp in codepoints:
         ch = chr(cp)
         try:
-            mask, _ = font.getmask2(ch, mode="1")
-            bbox = font.getbbox(ch)
+            mask, (x0, y0) = font.getmask2(ch, mode="1")
             adv = round(font.getlength(ch))
         except Exception:
             continue
-        if bbox is None:
-            glyphs[cp] = Glyph(cp, 0, 0, max(0, adv), 0, 0, b"", 0)
-            continue
-        x0, y0, x1, y1 = bbox
-        gw = max(0, x1 - x0)
-        gh = max(0, y1 - y0)
+        gw, gh = mask.size
         stride = (gw + 7) // 8
         raw = bytes(mask)
+        if len(raw) != gw * gh:
+            raise ValueError(
+                f"{source}: U+{cp:04X}: Pillow mask bytes {len(raw)} "
+                f"!= geometry {gw}x{gh}"
+            )
         bits = bytearray(stride * gh)
-        if gw and gh and len(raw) >= gw * gh:
-            for y in range(gh):
-                for x in range(gw):
-                    if raw[y * gw + x]:
-                        bits[y * stride + (x >> 3)] |= 0x80 >> (x & 7)
+        for y in range(gh):
+            for x in range(gw):
+                if raw[y * gw + x]:
+                    bits[y * stride + (x >> 3)] |= 0x80 >> (x & 7)
         glyphs[cp] = Glyph(
             cp,
             gw,
             gh,
             max(0, adv),
             x0,
-            asc - y1,
+            asc - (y0 + gh),
             bytes(bits),
             stride,
         )
