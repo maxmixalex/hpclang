@@ -197,26 +197,16 @@ def changed_codepoints(group):
 
 
 def common_diff_sample(changed, limit=42):
+    # Do not pad this list with arbitrary CJK just to fill a grid. The point of
+    # the Ark locale panel is to show differences a human reader is likely to
+    # recognize. If a size has only a handful of common-character differences,
+    # show only those and say so.
     changed_set = set(changed)
     priority = []
     for ch in COMMON_DIFF_TEXT:
         cp = ord(ch)
         if cp in changed_set and cp not in priority:
             priority.append(cp)
-    if len(priority) < limit:
-        common_ranges = [
-            (0x3000, 0x303F),
-            (0x3040, 0x30FF),
-            (0x4E00, 0x9FFF),
-            (0xAC00, 0xD7AF),
-        ]
-        remainder = [
-            cp for cp in changed
-            if cp not in priority and any(lo <= cp <= hi for lo, hi in common_ranges)
-        ]
-        for cp in spread(remainder, limit - len(priority)):
-            if cp not in priority:
-                priority.append(cp)
     return priority[:limit]
 
 
@@ -345,7 +335,7 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
         out.append("<details open>")
         out.append(
             f"<summary>Ark Pixel {first_meta['size']}px · {mode_cn} — "
-            f"共 {len(changed)} 个字符存在地区差异，本页优先展示 {len(common)} 个较常用字符</summary>"
+            f"共 {len(changed)} 个字符存在地区差异，本页只展示常用字符表实际命中的 {len(common)} 个差异字符</summary>"
         )
         if common:
             out.append(f"<div class='chars' style='font-size:16px;margin:10px 0'>本组对比字符：{html.escape(common_chars)}</div>")
