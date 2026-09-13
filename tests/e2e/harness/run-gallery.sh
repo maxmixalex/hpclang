@@ -27,6 +27,16 @@ X50="$ROOT/build/x50ng/dist/x50ng"
 STATE="$ROOT/build/$TARGET-state"
 FRAMES="$ROOT/build/$TARGET-font-gallery-frames"
 rm -rf "$STATE" "$FRAMES"
+rm -f \
+    "$ROOT/build/$TARGET-before.pgm" \
+    "$ROOT/build/$TARGET-before.pgm.png" \
+    "$ROOT/build/$TARGET-pass.pgm" \
+    "$ROOT/build/$TARGET-pass.pgm.png" \
+    "$ROOT/build/$TARGET-return.pgm" \
+    "$ROOT/build/$TARGET-return.pgm.png" \
+    "$ROOT/build/$TARGET-e2e.json" \
+    "$ROOT/build/$TARGET-font-gallery.pgm" \
+    "$ROOT/build/$TARGET-font-gallery.pgm.png"
 mkdir -p "$STATE" "$FRAMES"
 
 X50_ARGS=(
@@ -87,7 +97,7 @@ case "$HPCLANG_E2E_FAMILY" in
         ;;
 esac
 
-export HPCLANG_X50NG_STAGE0="$APP_DIR/launchers/$TARGET.bin"
+export HPCLANG_X50NG_STAGE0="${HPCLANG_GALLERY_STAGE0:-$APP_DIR/launchers/$TARGET.bin}"
 export HPCLANG_X50NG_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
