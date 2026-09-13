@@ -40,7 +40,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           KEEP_RUNS_PER_WORKFLOW: "10"
-          KEEP_INACTIVE_RUNS: "0"
+          KEEP_INACTIVE_RUNS: "2"
         run: python3 tools/prune-ci-runs.py
 
       - name: Checkout CI evidence
