@@ -8,9 +8,7 @@
     "build/${TARGET}-return.pgm"
   ],
   "captures": [
-    "build/${TARGET}-before.pgm",
     "build/${TARGET}-font-gallery.pgm",
-    "build/${TARGET}-pass.pgm",
     "build/${TARGET}-return.pgm"
   ],
   "json": [
