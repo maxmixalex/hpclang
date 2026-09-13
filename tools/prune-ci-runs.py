@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,7 +19,7 @@ keep = int(os.environ.get("KEEP_RUNS_PER_WORKFLOW", "20"))
 inactive_keep = int(os.environ.get("KEEP_INACTIVE_RUNS", "2"))
 
 
-def request(url: str, method: str = "GET") -> dict | None:
+def request(url: str, method: str = "GET") -> dict | list | None:
     req = urllib.request.Request(
         url,
         method=method,
@@ -37,19 +38,44 @@ def request(url: str, method: str = "GET") -> dict | None:
 runs: list[dict] = []
 for page in range(1, 101):
     data = request(f"{api}/repos/{repo}/actions/runs?per_page=100&page={page}")
+    assert isinstance(data, dict)
     batch = data["workflow_runs"]
     runs.extend(batch)
     if len(batch) < 100:
         break
 
-workflow_entries = request(
-    f"{api}/repos/{repo}/contents/.github/workflows?ref=main"
+# A workflow is current if its YAML still exists on any live repository branch,
+# not only on main. Feature-branch workflows are real workflows too: treating
+# them as retired made branch-only evidence disappear from the Actions UI.
+branch_names: list[str] = []
+for page in range(1, 101):
+    data = request(f"{api}/repos/{repo}/branches?per_page=100&page={page}")
+    assert isinstance(data, list)
+    branch_names.extend(item["name"] for item in data)
+    if len(data) < 100:
+        break
+
+current_paths: set[str] = set()
+for branch in branch_names:
+    ref = urllib.parse.quote(branch, safe="")
+    try:
+        entries = request(
+            f"{api}/repos/{repo}/contents/.github/workflows?ref={ref}"
+        )
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            continue
+        raise
+    if not isinstance(entries, list):
+        continue
+    current_paths.update(
+        item["path"] for item in entries if item.get("type") == "file"
+    )
+
+print(
+    f"found {len(current_paths)} workflow path(s) across "
+    f"{len(branch_names)} live branch(es)"
 )
-current_paths = {
-    item["path"]
-    for item in workflow_entries
-    if item.get("type") == "file"
-}
 
 by_workflow: dict[int, list[dict]] = defaultdict(list)
 for run in runs:
