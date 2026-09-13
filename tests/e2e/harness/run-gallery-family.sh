@@ -45,7 +45,7 @@ printf 'Gallery %s targets: %s\n' "$FAMILY" "${TARGETS[*]}"
 
 declare -a PIDS=()
 for target in "${TARGETS[@]}"; do
-    bash "$ROOT/tests/e2e/harness/run-gallery.sh" "$target" "$APP_DIR" &
+    bash "$ROOT/tests/e2e/harness/run-gallery-shards.sh" "$target" "$APP_DIR" &
     PIDS+=("$!")
 done
 
