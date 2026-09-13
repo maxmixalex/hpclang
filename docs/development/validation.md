@@ -63,8 +63,8 @@ The production reader no longer borrows any stock high L1 slot. HP39gs/40gs map 
 
 Validation is closed for that mapping and for the automated live-Saturn native-font paths:
 
-- HP39gs and HP40gs each complete the targeted exhaustive Gallery at **277 entries / 554 captures** with PASS and settled return;
-- production `E2E / Font Gallery` run **34743437279 / #47 (attempt 2)** is fully green: Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock Gallery / hp50g`, and `Stock native-font evidence / hp48gii` all succeed;
+- HP39gs and HP40gs each complete the targeted exhaustive Gallery at **244 entries / 488 captures** with PASS and settled return;
+- production `E2E / Font Gallery` run **34748303030 / #49** is fully green: Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock / hp4950`, and `Stock / hp48` all succeed;
 - corrected HP50g Stock evidence independently shows the live `Read[]` calculator minifont and main font plus a generated control face, with PASS and settled stock return;
 - compact HP48gII Stock evidence independently shows the live `Read[]` calculator minifont and main font plus a generated control face through the stock Serial Kermit/ARMToolbox48/HPC1 path;
 - the HP48 font-specific gate requires `saw_pass: true` and valid distinct native-mini/native-main/generated captures, while allowing only the already-classified post-PASS `return-unsettled` outcome; this does **not** satisfy the separate visible Stock-return gate;
@@ -159,13 +159,13 @@ The merged progression contact sheet is supplementary and should be published se
 
 ## Font Gallery validation
 
-Font Gallery is a separate HPC1 E2E application rather than additional pages in the canonical runtime payload. The exhaustive Direct payload traverses **277 entries** — 275 generated faces plus two calculator-native entries — and renders both SAMPLE and TEXT pages, for **554 captures per target**. The production family jobs cover HP39gs, HP40gs, HP48gII, HP49g+, and HP50g across the 64/80-line layouts. Direct does not fabricate a live Saturn map, so the compact Stock controls provide authoritative HP48/49/50 native-font pixels: HP50g covers hp4950 and HP48gII covers the independent 64-line hp48 path.
+Font Gallery is a separate HPC1 E2E application rather than additional pages in the canonical runtime payload. The exhaustive Direct payload traverses **244 entries** — 242 generated faces plus two calculator-native entries — and renders both SAMPLE and TEXT pages, for **488 captures per target**. The production family jobs cover HP39gs, HP40gs, HP48gII, HP49g+, and HP50g across the 64/80-line layouts. Direct does not fabricate a live Saturn map, so the compact Stock controls provide authoritative HP48/49/50 native-font pixels: HP50g covers hp4950 and HP48gII covers the independent 64-line hp48 path.
 
 The HP48 compact gate is intentionally concern-specific. It requires valid distinct native-mini/native-main/generated captures and `saw_pass: true`; the known first post-return repaint may still report `return-unsettled`. That outcome is accepted only by the font-evidence gate and must never be reported as a visible Stock-return PASS.
 
 The public font core remains direct rather than semantic-role based: applications choose native `hpclang_font_default()/mini()/big()` or generated `hpclang_target_font()` products explicitly. Any future `mini` / `text` / `edit-large` theme vocabulary belongs above this layer in a UI toolkit.
 
-Production run **34743437279 / #47 (attempt 2)** is the current formal Gallery closure and is green across Build, universal x50ng, all three Direct families, HP50g Stock, and HP48gII Stock native-font evidence. Font Gallery evidence remains separate from canonical runtime/keyboard/storage evidence so visual font regressions cannot silently change those gates.
+Production run **34748303030 / #49** is the current formal Gallery closure and is green across Build, universal x50ng, all three Direct families, HP50g Stock, and HP48gII Stock native-font evidence. Font Gallery evidence remains separate from canonical runtime/keyboard/storage evidence so visual font regressions cannot silently change those gates.
 
 ## Evidence retention
 
@@ -177,11 +177,10 @@ Weekly maintenance keeps the newest 20 evidence run directories per family. Curr
 
 See [E2E internals](e2e.md) for target profiles, sequence syntax, x50ng integration and focused E2E-app boundaries, and [Fixture provenance](fixtures.md) for the external firmware/full-NOR inputs used by these gates.
 
+### Current bitmap-only font closure status (2026-09-13)
 
-### Curated font package evidence (2026-09-13)
+Canonical bundled assets are bitmap-source only. The generated catalog is **242 faces / 1,597,680 mapped glyphs / 3,386 assembly sources** with **242/242** source-to-generated parity; `CI / Font Assets` run **34748326228 / #20** is green and regeneration produces no drift.
 
-The canonical package was curated after visual and semantic audit: six Dina OEM faces, 21 Powerline-specific faces, and six faces whose `Quick` specimen exceeded the 131-pixel LCD were removed at the source-package level and the generated catalog was rebuilt. The current catalog contains **275 generated faces / 1,772,082 mapped glyphs**. Semantic source-to-generated parity is **275/275**; exact duplicate, `quick-overflow`, `glyph-collapse`, `blank-heavy`, and Powerline signals are all zero. Six retained faces still have source/cmap-level printable-ASCII gaps and 13 have loose-spacing diagnostics; neither is treated as an automatic defect.
+`E2E / Font Gallery` run **34748303030 / #49** is green. Direct traverses **244 entries (242 generated + 2 native) × 2 pages = 488 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP48 Stock reaches HPC1 PASS with distinct nonblank native-mini/native-main/generated-control captures, while visible return remains `return-unsettled`.
 
-The TTF rasterizer now uses Pillow mask geometry rather than incorrectly assuming `getbbox()` dimensions match `getmask2()` storage, which eliminated the importer-created blank-heavy glyphs. Ark Pixel Gallery labels expose size, monospaced/proportional mode, and locale explicitly. The human review report contains 423 embedded specimens; Ark locale panels show only differing characters from the curated common-character list and never pad the panel with obscure CJK. Retained TTF families still require the final human curation decision before the font slice is merged.
-
-The curated exhaustive Direct Gallery is **277 entries (275 generated + 2 native) × 2 pages = 554 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g, all PASS. `E2E / Font Gallery` run **34743437279 / #47, attempt 2** is fully green, including `Stock / hp48` and `Stock / hp4950`. The first HP50g Stock attempt timed out before HPC1 PASS; the rerun reached the same ARMToolbox path, HPC1 PASS, nonblank native mini/main/generated control captures, and final PASS, so the first result is retained as a Stock-harness timing fluctuation rather than hidden.
+Before merge: remove the TTF importer; normalize hp48/hp4950 Stock summaries and add the missing HP39 Direct summary; replace weak generic Gallery specimen text with repertoire/design-sensitive samples; evaluate Cubic-11, Fusion Pixel Font, ChillBitmap, and May7/QuanPixel; rerun Font Assets and Gallery after asset/rendering changes.
