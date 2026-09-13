@@ -14,6 +14,60 @@ CC="$ATFE/bin/clang"
 LD="$ATFE/bin/ld.lld"
 NM="$ATFE/bin/llvm-nm"
 
+# The exhaustive Gallery exceeds the v1 code window when linked monolithically.
+# If no explicit shard index is supplied, build a deterministic bundle of
+# shards and collect their raw target launchers into the ordinary artifact.
+# An explicit HPCLANG_GALLERY_SHARD_INDEX selects the inner single-shard path.
+if [[ "$MODE" == font-gallery && -z "${HPCLANG_GALLERY_SHARD_INDEX+x}" ]]; then
+    GALLERY_BUNDLE_COUNT="${HPCLANG_GALLERY_SHARD_COUNT:-20}"
+    if [[ ! "$GALLERY_BUNDLE_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+        echo "HPCLANG_GALLERY_SHARD_COUNT must be a positive integer" >&2
+        exit 2
+    fi
+
+    rm -rf "$OUT"
+    mkdir -p "$OUT/launchers"
+    representative_size=-1
+    expected_result=""
+
+    for (( shard_index = 0; shard_index < GALLERY_BUNDLE_COUNT; ++shard_index )); do
+        printf -v shard_tag '%02d' "$shard_index"
+        shard_out="$OUT/.shard-$shard_tag"
+        echo "=== Direct Gallery shard $shard_index/$GALLERY_BUNDLE_COUNT ==="
+        HPCLANG_GALLERY_SHARD_INDEX="$shard_index" \
+        HPCLANG_GALLERY_SHARD_COUNT="$GALLERY_BUNDLE_COUNT" \
+            "$0" font-gallery "$shard_out"
+
+        shard_result="$(cat "$shard_out/e2e.result-address")"
+        if [[ -z "$expected_result" ]]; then
+            expected_result="$shard_result"
+        elif [[ "$shard_result" != "$expected_result" ]]; then
+            echo "Gallery shard result address changed: $shard_result != $expected_result" >&2
+            exit 1
+        fi
+
+        for launcher in "$shard_out"/launchers/*.bin; do
+            base="$(basename "$launcher" .bin)"
+            cp "$launcher" "$OUT/launchers/$base-shard-$shard_tag.bin"
+        done
+
+        shard_size="$(stat -c '%s' "$shard_out/e2e.hpc")"
+        if (( shard_size > representative_size )); then
+            representative_size="$shard_size"
+            cp "$shard_out/e2e.elf" "$OUT/e2e.elf"
+            cp "$shard_out/e2e.hpc" "$OUT/e2e.hpc"
+            cp "$shard_out/e2e.result-address" "$OUT/e2e.result-address"
+        fi
+        printf '%s %s %s\n' "$shard_tag" "$shard_size" "$shard_result" \
+            >> "$OUT/e2e.gallery-shards.txt"
+        rm -rf "$shard_out"
+    done
+
+    printf 'PASS: font-gallery bundle built with %s shards; largest HPC1 container %s bytes.\n' \
+        "$GALLERY_BUNDLE_COUNT" "$representative_size"
+    exit 0
+fi
+
 E2E_SOURCE="$ROOT/tests/e2e"
 E2E_TARGET="hpclang_e2e"
 E2E_ELF="hpclang-e2e.elf"
