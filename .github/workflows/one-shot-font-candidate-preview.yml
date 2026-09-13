@@ -1,0 +1,162 @@
+name: Maintenance / Font candidate preview
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-font-candidate-preview.yml"
+  workflow_dispatch:
+
+jobs:
+  preview:
+    name: Preview Cubic, ChillBitmap, and QuanPixel
+    runs-on: home-docker
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Prepare candidate tooling
+        run: |
+          set -euxo pipefail
+          if ! command -v otf2bdf >/dev/null 2>&1; then
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends otf2bdf
+          fi
+          python3 -m venv build/font-candidate-venv
+          build/font-candidate-venv/bin/python -m pip install --disable-pip-version-check Pillow
+
+      - name: Fetch pinned candidate sources
+        run: |
+          set -euxo pipefail
+          mkdir -p build/font-candidates/src build/font-candidates/out
+
+          # Cubic 11 v1.500, upstream commit 4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d.
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/ACh-K/Cubic-11/4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d/fonts/ttf/Cubic_11.ttf \
+            -o build/font-candidates/src/Cubic_11.ttf
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/ACh-K/Cubic-11/4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d/OFL.txt \
+            -o build/font-candidates/src/Cubic-11-OFL.txt
+
+          # ChillBitmap 7px v2.500, upstream commit f9e3b2f988a2c4107f866aa43c3d61a2b27254d5.
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/Warren2060/ChillBitmap/f9e3b2f988a2c4107f866aa43c3d61a2b27254d5/ChillBitmap7x_v2.500.zip \
+            -o build/font-candidates/src/ChillBitmap7x_v2.500.zip
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/Warren2060/ChillBitmap/f9e3b2f988a2c4107f866aa43c3d61a2b27254d5/LICENSE.md \
+            -o build/font-candidates/src/ChillBitmap-LICENSE.md
+          mkdir -p build/font-candidates/src/chill
+          unzip -q build/font-candidates/src/ChillBitmap7x_v2.500.zip -d build/font-candidates/src/chill
+          CHILL_TTF="$(find build/font-candidates/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
+          test -n "$CHILL_TTF"
+
+          # User-provided May7.zip contains quan.bdf with this exact SHA-256.
+          # Use a public source copy only if it is byte-identical to that reviewed asset.
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/PSP-Arkfive/ARK-150/a67a32a13bf2f1cfc52261a239ccf96882f9a9ed/Extras/Language/quan.bdf \
+            -o build/font-candidates/src/quan.bdf
+          echo 'd23113cababf9ecceb1c1a3005c89e5b8f00abdaf2e2be3115c5f4f9dcfe92c7  build/font-candidates/src/quan.bdf' | sha256sum -c -
+
+          sha256sum \
+            build/font-candidates/src/Cubic_11.ttf \
+            build/font-candidates/src/ChillBitmap7x_v2.500.zip \
+            build/font-candidates/src/quan.bdf \
+            | tee build/font-candidates/source-sha256.txt
+
+      - name: Derive bitmap-only previews
+        run: |
+          set -euxo pipefail
+          CHILL_TTF="$(find build/font-candidates/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
+
+          # These point sizes follow existing embedded-font conversions that preserve
+          # the intended pixel grids. They are preview derivations, not canonical input yet.
+          otf2bdf build/font-candidates/src/Cubic_11.ttf -p 9 \
+            -o build/font-candidates/out/Cubic11-derived-9pt.bdf
+          otf2bdf "$CHILL_TTF" -p 6 \
+            -o build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf
+          cp build/font-candidates/src/quan.bdf build/font-candidates/out/QuanPixel-May7.bdf
+
+          for font in build/font-candidates/out/*.bdf; do
+            echo "### $font"
+            grep -E '^(STARTFONT|FONT |SIZE |FONTBOUNDINGBOX|CHARS |COPYRIGHT|NOTICE)' "$font" | head -20 || true
+            sha256sum "$font"
+          done | tee build/font-candidates/candidate-metrics.txt
+
+      - name: Build temporary candidate package
+        run: |
+          set -euxo pipefail
+          build/font-candidate-venv/bin/python - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          source = Path('runtime/fonts/fonts.zip')
+          target = Path('build/font-candidates/fonts-with-candidates.zip')
+          additions = {
+              'fonts/cubic-11-preview/Cubic11-derived-9pt.bdf': Path('build/font-candidates/out/Cubic11-derived-9pt.bdf'),
+              'fonts/chill-bitmap-preview/ChillBitmap7x-derived-6pt.bdf': Path('build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf'),
+              'fonts/quan-pixel/QuanPixel-May7.bdf': Path('build/font-candidates/out/QuanPixel-May7.bdf'),
+              'fonts/cubic-11-preview/OFL.txt': Path('build/font-candidates/src/Cubic-11-OFL.txt'),
+              'fonts/chill-bitmap-preview/LICENSE.md': Path('build/font-candidates/src/ChillBitmap-LICENSE.md'),
+          }
+          with zipfile.ZipFile(source, 'r') as zin, zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zout:
+              for info in zin.infolist():
+                  zout.writestr(info, zin.read(info.filename))
+              names = set(zin.namelist())
+              for name, path in additions.items():
+                  if name in names:
+                      raise SystemExit(f'candidate path already exists: {name}')
+                  zout.write(path, name)
+          print(target, target.stat().st_size)
+          PY
+
+      - name: Regenerate and audit temporary candidate catalog
+        run: |
+          set -euxo pipefail
+          PY=build/font-candidate-venv/bin/python
+          mkdir -p build/font-candidate-audit build/font-candidate-generated
+          "$PY" tools/regenerate-font-assets.py \
+            --package build/font-candidates/fonts-with-candidates.zip \
+            --output-dir build/font-candidate-generated \
+            --chunk-glyphs 512
+          set -o pipefail
+          "$PY" tools/audit-font-assets.py \
+            --package build/font-candidates/fonts-with-candidates.zip \
+            --generated-dir build/font-candidate-generated \
+            --json build/font-candidate-audit/all-fonts.json \
+            --html build/font-candidate-audit/visual-report.html \
+            | tee build/font-candidate-audit/all-fonts.txt
+          "$PY" tools/render-font-audit-cn.py \
+            --package build/font-candidates/fonts-with-candidates.zip \
+            --generated-dir build/font-candidate-generated \
+            --audit-json build/font-candidate-audit/all-fonts.json \
+            --html build/font-candidate-audit/font-review-cn.html
+          cp build/font-candidates/source-sha256.txt build/font-candidate-audit/
+          cp build/font-candidates/candidate-metrics.txt build/font-candidate-audit/
+          cp build/font-candidates/out/*.bdf build/font-candidate-audit/
+
+          "$PY" - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('build/font-candidate-audit/all-fonts.json').read_text(encoding='utf-8'))
+          print('faces:', report['face_count'])
+          print('generated parity:', report['generated_parity'])
+          print('visual summary:', report['visual_summary'])
+          assert report['generated_parity']['failed'] == 0
+          PY
+
+      - name: Upload candidate audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: font-candidate-preview
+          path: build/font-candidate-audit/
+          if-no-files-found: warn
+          retention-days: 14
