@@ -39,7 +39,9 @@ jobs:
           build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow fonttools
 
       # Regeneration is the canonical check for source-parser/rasterizer changes too,
-      # not only for changes to the raw source bundle.
+      # not only for changes to the raw source bundle. The curated built-in package
+      # currently prefers native bitmap sources; TTF importer support remains tested
+      # as a capability rather than requiring TTF assets in the canonical bundle.
       - name: Regenerate checked-in assembly assets
         run: |
           PY=build/font-venv/bin/python
