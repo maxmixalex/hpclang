@@ -13155,7 +13155,7 @@ hpclang_font_galmuri_galmuri11_condensed_full_data:
 .word hpclang_font_galmuri_galmuri11_condensed_full_glyphs
 .word 13143
 .word 63
-.hword 12,2,14,8
+.hword 14,2,16,8
 
 .section .rodata.hpclang.font.galmuri_galmuri11_condensed.full.font,"a",%progbits
 .balign 4

@@ -1658,576 +1658,6 @@
       ]
     },
     {
-      "ascent": 6,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-7x7",
-      "format": "ttf",
-      "glyph_count": 16634,
-      "id": "boutique_bitmap_7x7_boutiquebitmap7x7_1_71",
-      "line_height": 8,
-      "nominal_advance": 8,
-      "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_1.71.ttf",
-      "raster_ppem": 8,
-      "selector": "boutique-bitmap-7x7/BoutiqueBitmap7x7_1.71.ttf",
-      "sources": [
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0000.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0001.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0002.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0003.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0004.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0005.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0006.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0007.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0008.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0009.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0010.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0011.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0012.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0013.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0014.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0015.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0016.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0017.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0018.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0019.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0020.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0021.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0022.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0023.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0024.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0025.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0026.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0027.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0028.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0029.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0030.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0031.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_0032.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_1_71_full.S"
-      ]
-    },
-    {
-      "ascent": 7,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-7x7",
-      "format": "ttf",
-      "glyph_count": 7470,
-      "id": "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot",
-      "line_height": 9,
-      "nominal_advance": 8,
-      "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Circle_Dot.ttf",
-      "raster_ppem": 8,
-      "selector": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Circle_Dot.ttf",
-      "sources": [
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0000.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0001.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0002.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0003.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0004.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0005.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0006.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0007.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0008.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0009.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0010.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0011.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0012.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0013.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_0014.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_circle_dot_full.S"
-      ]
-    },
-    {
-      "ascent": 7,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-7x7",
-      "format": "ttf",
-      "glyph_count": 7470,
-      "id": "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line",
-      "line_height": 9,
-      "nominal_advance": 8,
-      "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Scan_Line.ttf",
-      "raster_ppem": 8,
-      "selector": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Scan_Line.ttf",
-      "sources": [
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0000.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0001.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0002.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0003.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0004.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0005.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0006.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0007.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0008.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0009.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0010.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0011.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0012.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0013.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_0014.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_scan_line_full.S"
-      ]
-    },
-    {
-      "ascent": 7,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-7x7",
-      "format": "ttf",
-      "glyph_count": 7470,
-      "id": "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot",
-      "line_height": 9,
-      "nominal_advance": 8,
-      "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Square_Dot.ttf",
-      "raster_ppem": 8,
-      "selector": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Square_Dot.ttf",
-      "sources": [
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0000.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0001.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0002.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0003.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0004.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0005.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0006.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0007.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0008.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0009.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0010.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0011.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0012.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0013.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_0014.S",
-        "boutique_bitmap_7x7_boutiquebitmap7x7_square_dot_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 13157,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_1_93",
-      "line_height": 11,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/BoutiqueBitmap9x9_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_1_93_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 7297,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_3d",
-      "line_height": 12,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_3D.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_3D.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_3d_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 7297,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_blur",
-      "line_height": 12,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Blur.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Blur.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_blur_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 13157,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93",
-      "line_height": 11,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9_Bold_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/BoutiqueBitmap9x9_Bold_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 13157,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2",
-      "line_height": 11,
-      "nominal_advance": 11,
-      "path": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9_Bold_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9_Bold_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_bold_1_93_2_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 7297,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot",
-      "line_height": 12,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Circle_Dot.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Circle_Dot.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 7297,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_gradient",
-      "line_height": 12,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Gradient.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Gradient.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_gradient_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 2,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 7297,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot",
-      "line_height": 12,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Square_Dot.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Square_Dot.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9_square_dot_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 14290,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93",
-      "line_height": 11,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0026.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_0027.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_1_93_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 14290,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93",
-      "line_height": 11,
-      "nominal_advance": 10,
-      "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_Bold_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_Bold_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0026.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_0027.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_full.S"
-      ]
-    },
-    {
-      "ascent": 8,
-      "descent": 3,
-      "face": null,
-      "family": "boutique-bitmap-9x9",
-      "format": "ttf",
-      "glyph_count": 14290,
-      "id": "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2",
-      "line_height": 11,
-      "nominal_advance": 11,
-      "path": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9HK_Bold_1.93.ttf",
-      "raster_ppem": 10,
-      "selector": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9HK_Bold_1.93.ttf",
-      "sources": [
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0000.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0001.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0002.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0003.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0004.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0005.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0006.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0007.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0008.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0009.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0010.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0011.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0012.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0013.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0014.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0015.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0016.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0017.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0018.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0019.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0020.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0021.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0022.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0023.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0024.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0025.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0026.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_0027.S",
-        "boutique_bitmap_9x9_boutiquebitmap9x9hk_bold_1_93_2_full.S"
-      ]
-    },
-    {
       "ascent": 8,
       "descent": 2,
       "face": null,
@@ -2465,64 +1895,6 @@
         "cozette_cozettecrossedseven_hidpi_0010.S",
         "cozette_cozettecrossedseven_hidpi_0011.S",
         "cozette_cozettecrossedseven_hidpi_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 3,
-      "face": null,
-      "family": "cozette",
-      "format": "ttf",
-      "glyph_count": 6046,
-      "id": "cozette_cozettecrossedsevenvectorbold",
-      "line_height": 13,
-      "nominal_advance": 8,
-      "path": "cozette/CozetteCrossedSevenVectorBold.ttf",
-      "raster_ppem": 13,
-      "selector": "cozette/CozetteCrossedSevenVectorBold.ttf",
-      "sources": [
-        "cozette_cozettecrossedsevenvectorbold_0000.S",
-        "cozette_cozettecrossedsevenvectorbold_0001.S",
-        "cozette_cozettecrossedsevenvectorbold_0002.S",
-        "cozette_cozettecrossedsevenvectorbold_0003.S",
-        "cozette_cozettecrossedsevenvectorbold_0004.S",
-        "cozette_cozettecrossedsevenvectorbold_0005.S",
-        "cozette_cozettecrossedsevenvectorbold_0006.S",
-        "cozette_cozettecrossedsevenvectorbold_0007.S",
-        "cozette_cozettecrossedsevenvectorbold_0008.S",
-        "cozette_cozettecrossedsevenvectorbold_0009.S",
-        "cozette_cozettecrossedsevenvectorbold_0010.S",
-        "cozette_cozettecrossedsevenvectorbold_0011.S",
-        "cozette_cozettecrossedsevenvectorbold_full.S"
-      ]
-    },
-    {
-      "ascent": 10,
-      "descent": 3,
-      "face": null,
-      "family": "cozette",
-      "format": "ttf",
-      "glyph_count": 6046,
-      "id": "cozette_cozettevectorbold",
-      "line_height": 13,
-      "nominal_advance": 8,
-      "path": "cozette/CozetteVectorBold.ttf",
-      "raster_ppem": 13,
-      "selector": "cozette/CozetteVectorBold.ttf",
-      "sources": [
-        "cozette_cozettevectorbold_0000.S",
-        "cozette_cozettevectorbold_0001.S",
-        "cozette_cozettevectorbold_0002.S",
-        "cozette_cozettevectorbold_0003.S",
-        "cozette_cozettevectorbold_0004.S",
-        "cozette_cozettevectorbold_0005.S",
-        "cozette_cozettevectorbold_0006.S",
-        "cozette_cozettevectorbold_0007.S",
-        "cozette_cozettevectorbold_0008.S",
-        "cozette_cozettevectorbold_0009.S",
-        "cozette_cozettevectorbold_0010.S",
-        "cozette_cozettevectorbold_0011.S",
-        "cozette_cozettevectorbold_full.S"
       ]
     },
     {
@@ -5481,18 +4853,17 @@
       ]
     },
     {
-      "ascent": 12,
+      "ascent": 14,
       "descent": 2,
       "face": null,
       "family": "galmuri",
-      "format": "ttf",
+      "format": "bdf",
       "glyph_count": 12695,
       "id": "galmuri_galmuri11_bold",
-      "line_height": 14,
+      "line_height": 16,
       "nominal_advance": 12,
-      "path": "galmuri/Galmuri11-Bold.ttf",
-      "raster_ppem": 12,
-      "selector": "galmuri/Galmuri11-Bold.ttf",
+      "path": "galmuri/Galmuri11-Bold.bdf",
+      "selector": "galmuri/Galmuri11-Bold.bdf",
       "sources": [
         "galmuri_galmuri11_bold_0000.S",
         "galmuri_galmuri11_bold_0001.S",
@@ -5523,18 +4894,17 @@
       ]
     },
     {
-      "ascent": 12,
+      "ascent": 14,
       "descent": 2,
       "face": null,
       "family": "galmuri",
-      "format": "ttf",
+      "format": "bdf",
       "glyph_count": 13143,
       "id": "galmuri_galmuri11_condensed",
-      "line_height": 14,
+      "line_height": 16,
       "nominal_advance": 8,
-      "path": "galmuri/Galmuri11-Condensed.ttf",
-      "raster_ppem": 12,
-      "selector": "galmuri/Galmuri11-Condensed.ttf",
+      "path": "galmuri/Galmuri11-Condensed.bdf",
+      "selector": "galmuri/Galmuri11-Condensed.bdf",
       "sources": [
         "galmuri_galmuri11_condensed_0000.S",
         "galmuri_galmuri11_condensed_0001.S",
@@ -5703,214 +5073,6 @@
         "gohufont_gohufont_uni_14b_0000.S",
         "gohufont_gohufont_uni_14b_0001.S",
         "gohufont_gohufont_uni_14b_full.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 3,
-      "face": null,
-      "family": "hasankazan",
-      "format": "ttf",
-      "glyph_count": 104,
-      "id": "hasankazan_12x6led",
-      "line_height": 15,
-      "nominal_advance": 7,
-      "path": "hasankazan/12x6LED.ttf",
-      "raster_ppem": 16,
-      "selector": "hasankazan/12x6LED.ttf",
-      "sources": [
-        "hasankazan_12x6led.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 1,
-      "face": null,
-      "family": "hasankazan",
-      "format": "ttf",
-      "glyph_count": 165,
-      "id": "hasankazan_9x6led",
-      "line_height": 13,
-      "nominal_advance": 6,
-      "path": "hasankazan/9x6LED.ttf",
-      "raster_ppem": 16,
-      "selector": "hasankazan/9x6LED.ttf",
-      "sources": [
-        "hasankazan_9x6led.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 2,
-      "face": null,
-      "family": "hasankazan",
-      "format": "ttf",
-      "glyph_count": 181,
-      "id": "hasankazan_nokialargebold",
-      "line_height": 13,
-      "nominal_advance": 7,
-      "path": "hasankazan/NokiaLargeBold.ttf",
-      "raster_ppem": 16,
-      "selector": "hasankazan/NokiaLargeBold.ttf",
-      "sources": [
-        "hasankazan_nokialargebold.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 1,
-      "face": null,
-      "family": "hasankazan",
-      "format": "ttf",
-      "glyph_count": 246,
-      "id": "hasankazan_nokiasmallbold",
-      "line_height": 12,
-      "nominal_advance": 6,
-      "path": "hasankazan/NokiaSmallBold.ttf",
-      "raster_ppem": 16,
-      "selector": "hasankazan/NokiaSmallBold.ttf",
-      "sources": [
-        "hasankazan_nokiasmallbold.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 1,
-      "face": null,
-      "family": "hasankazan",
-      "format": "ttf",
-      "glyph_count": 246,
-      "id": "hasankazan_nokiasmallplain",
-      "line_height": 12,
-      "nominal_advance": 5,
-      "path": "hasankazan/NokiaSmallPlain.ttf",
-      "raster_ppem": 16,
-      "selector": "hasankazan/NokiaSmallPlain.ttf",
-      "sources": [
-        "hasankazan_nokiasmallplain.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 4,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 448,
-      "id": "japanyoshi_bbsesque",
-      "line_height": 16,
-      "nominal_advance": 7,
-      "path": "japanyoshi/BBSesque.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/BBSesque.ttf",
-      "sources": [
-        "japanyoshi_bbsesque.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 4,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 1649,
-      "id": "japanyoshi_born2bsportyslab",
-      "line_height": 16,
-      "nominal_advance": 9,
-      "path": "japanyoshi/Born2bSportySlab.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/Born2bSportySlab.ttf",
-      "sources": [
-        "japanyoshi_born2bsportyslab_0000.S",
-        "japanyoshi_born2bsportyslab_0001.S",
-        "japanyoshi_born2bsportyslab_0002.S",
-        "japanyoshi_born2bsportyslab_0003.S",
-        "japanyoshi_born2bsportyslab_full.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 4,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 499,
-      "id": "japanyoshi_born2bsportyv2",
-      "line_height": 16,
-      "nominal_advance": 7,
-      "path": "japanyoshi/Born2bSportyV2.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/Born2bSportyV2.ttf",
-      "sources": [
-        "japanyoshi_born2bsportyv2.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 4,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 96,
-      "id": "japanyoshi_cursivepixel",
-      "line_height": 16,
-      "nominal_advance": 7,
-      "path": "japanyoshi/CursivePixel.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/CursivePixel.ttf",
-      "sources": [
-        "japanyoshi_cursivepixel.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 3,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 128,
-      "id": "japanyoshi_engrish",
-      "line_height": 14,
-      "nominal_advance": 7,
-      "path": "japanyoshi/Engrish.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/Engrish.ttf",
-      "sources": [
-        "japanyoshi_engrish.S"
-      ]
-    },
-    {
-      "ascent": 12,
-      "descent": 3,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 96,
-      "id": "japanyoshi_impactbits",
-      "line_height": 15,
-      "nominal_advance": 7,
-      "path": "japanyoshi/ImpactBits.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/ImpactBits.ttf",
-      "sources": [
-        "japanyoshi_impactbits.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 2,
-      "face": null,
-      "family": "japanyoshi",
-      "format": "ttf",
-      "glyph_count": 118,
-      "id": "japanyoshi_pixeltheatre",
-      "line_height": 13,
-      "nominal_advance": 4,
-      "path": "japanyoshi/PixelTheatre.ttf",
-      "raster_ppem": 16,
-      "selector": "japanyoshi/PixelTheatre.ttf",
-      "sources": [
-        "japanyoshi_pixeltheatre.S"
       ]
     },
     {
@@ -6103,74 +5265,6 @@
       "selector": "newrpl/bitmap-masters/Notification.bmp",
       "sources": [
         "newrpl_notification.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 3,
-      "face": null,
-      "family": "pixeldroid",
-      "format": "ttf",
-      "glyph_count": 116,
-      "id": "pixeldroid_pixeldroidboticregular",
-      "line_height": 14,
-      "nominal_advance": 8,
-      "path": "pixeldroid/botic/pixeldroidBoticRegular.ttf",
-      "raster_ppem": 16,
-      "selector": "pixeldroid/botic/pixeldroidBoticRegular.ttf",
-      "sources": [
-        "pixeldroid_pixeldroidboticregular.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 2,
-      "face": null,
-      "family": "pixeldroid",
-      "format": "ttf",
-      "glyph_count": 116,
-      "id": "pixeldroid_pixeldroidconsoleregular",
-      "line_height": 13,
-      "nominal_advance": 5,
-      "path": "pixeldroid/console/pixeldroidConsoleRegular.ttf",
-      "raster_ppem": 16,
-      "selector": "pixeldroid/console/pixeldroidConsoleRegular.ttf",
-      "sources": [
-        "pixeldroid_pixeldroidconsoleregular.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 2,
-      "face": null,
-      "family": "pixeldroid",
-      "format": "ttf",
-      "glyph_count": 116,
-      "id": "pixeldroid_pixeldroidconsoleregularmono",
-      "line_height": 13,
-      "nominal_advance": 7,
-      "path": "pixeldroid/console/pixeldroidConsoleRegularMono.ttf",
-      "raster_ppem": 16,
-      "selector": "pixeldroid/console/pixeldroidConsoleRegularMono.ttf",
-      "sources": [
-        "pixeldroid_pixeldroidconsoleregularmono.S"
-      ]
-    },
-    {
-      "ascent": 11,
-      "descent": 2,
-      "face": null,
-      "family": "pixeldroid",
-      "format": "ttf",
-      "glyph_count": 116,
-      "id": "pixeldroid_pixeldroidmenuregular",
-      "line_height": 13,
-      "nominal_advance": 7,
-      "path": "pixeldroid/menu/pixeldroidMenuRegular.ttf",
-      "raster_ppem": 16,
-      "selector": "pixeldroid/menu/pixeldroidMenuRegular.ttf",
-      "sources": [
-        "pixeldroid_pixeldroidmenuregular.S"
       ]
     },
     {
@@ -8382,34 +7476,6 @@
         "path": "bitocra/SOURCE.md"
       },
       {
-        "bytes": 2496388,
-        "family": "boutique-bitmap-7x7",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_1.71.ttf"
-      },
-      {
-        "bytes": 4145404,
-        "family": "boutique-bitmap-7x7",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Circle_Dot.ttf"
-      },
-      {
-        "bytes": 1555988,
-        "family": "boutique-bitmap-7x7",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Scan_Line.ttf"
-      },
-      {
-        "bytes": 2658040,
-        "family": "boutique-bitmap-7x7",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-7x7/BoutiqueBitmap7x7_Square_Dot.ttf"
-      },
-      {
         "bytes": 5572,
         "family": "boutique-bitmap-7x7",
         "format": "txt",
@@ -8443,69 +7509,6 @@
         "format": "md",
         "is_font": false,
         "path": "boutique-bitmap-7x7/upstream-tag/README.md"
-      },
-      {
-        "bytes": 2247480,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_1.93.ttf"
-      },
-      {
-        "bytes": 2220068,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9HK_Bold_1.93.ttf"
-      },
-      {
-        "bytes": 2226904,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9_1.93.ttf"
-      },
-      {
-        "bytes": 2199504,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/BoutiqueBitmap9x9_Bold_1.93.ttf"
-      },
-      {
-        "bytes": 2234716,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_3D.ttf"
-      },
-      {
-        "bytes": 8271120,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Blur.ttf"
-      },
-      {
-        "bytes": 5790936,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Circle_Dot.ttf"
-      },
-      {
-        "bytes": 5749584,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Gradient.ttf"
-      },
-      {
-        "bytes": 3651316,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/FUN/BoutiqueBitmap9x9_Square_Dot.ttf"
       },
       {
         "bytes": 6688,
@@ -8548,20 +7551,6 @@
         "format": "txt",
         "is_font": false,
         "path": "boutique-bitmap-9x9/版本說明.txt"
-      },
-      {
-        "bytes": 2220068,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9HK_Bold_1.93.ttf"
-      },
-      {
-        "bytes": 2199504,
-        "family": "boutique-bitmap-9x9",
-        "format": "ttf",
-        "is_font": true,
-        "path": "boutique-bitmap-9x9/粗體加１格字間版本/BoutiqueBitmap9x9_Bold_1.93.ttf"
       },
       {
         "bytes": 123,
@@ -8662,25 +7651,11 @@
         "path": "cozette/cozettecrossedseven.bdf"
       },
       {
-        "bytes": 568364,
-        "family": "cozette",
-        "format": "ttf",
-        "is_font": true,
-        "path": "cozette/CozetteCrossedSevenVectorBold.ttf"
-      },
-      {
         "bytes": 1105915,
         "family": "cozette",
         "format": "bdf",
         "is_font": true,
         "path": "cozette/cozettecrossedseven_hidpi.bdf"
-      },
-      {
-        "bytes": 567916,
-        "family": "cozette",
-        "format": "ttf",
-        "is_font": true,
-        "path": "cozette/CozetteVectorBold.ttf"
       },
       {
         "bytes": 1105879,
@@ -9530,20 +8505,6 @@
         "path": "fusion-pixel/upstream-licenses/miseki-bitmap/LICENSE.txt"
       },
       {
-        "bytes": 2613660,
-        "family": "galmuri",
-        "format": "ttf",
-        "is_font": true,
-        "path": "galmuri/Galmuri11-Bold.ttf"
-      },
-      {
-        "bytes": 2668536,
-        "family": "galmuri",
-        "format": "ttf",
-        "is_font": true,
-        "path": "galmuri/Galmuri11-Condensed.ttf"
-      },
-      {
         "bytes": 4360,
         "family": "galmuri",
         "format": "txt",
@@ -9642,41 +8603,6 @@
         "path": "gohufont/SOURCE.md"
       },
       {
-        "bytes": 11588,
-        "family": "hasankazan",
-        "format": "ttf",
-        "is_font": true,
-        "path": "hasankazan/12x6LED.ttf"
-      },
-      {
-        "bytes": 17464,
-        "family": "hasankazan",
-        "format": "ttf",
-        "is_font": true,
-        "path": "hasankazan/9x6LED.ttf"
-      },
-      {
-        "bytes": 21924,
-        "family": "hasankazan",
-        "format": "ttf",
-        "is_font": true,
-        "path": "hasankazan/NokiaLargeBold.ttf"
-      },
-      {
-        "bytes": 23496,
-        "family": "hasankazan",
-        "format": "ttf",
-        "is_font": true,
-        "path": "hasankazan/NokiaSmallBold.ttf"
-      },
-      {
-        "bytes": 24080,
-        "family": "hasankazan",
-        "format": "ttf",
-        "is_font": true,
-        "path": "hasankazan/NokiaSmallPlain.ttf"
-      },
-      {
         "bytes": 816,
         "family": "hasankazan",
         "format": "pre",
@@ -9689,55 +8615,6 @@
         "format": "md",
         "is_font": false,
         "path": "hasankazan/SOURCE.md"
-      },
-      {
-        "bytes": 46556,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/BBSesque.ttf"
-      },
-      {
-        "bytes": 216508,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/Born2bSportySlab.ttf"
-      },
-      {
-        "bytes": 55532,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/Born2bSportyV2.ttf"
-      },
-      {
-        "bytes": 13676,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/CursivePixel.ttf"
-      },
-      {
-        "bytes": 13432,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/Engrish.ttf"
-      },
-      {
-        "bytes": 10716,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/ImpactBits.ttf"
-      },
-      {
-        "bytes": 9540,
-        "family": "japanyoshi",
-        "format": "ttf",
-        "is_font": true,
-        "path": "japanyoshi/PixelTheatre.ttf"
       },
       {
         "bytes": 1192,
@@ -9950,13 +8827,6 @@
         "path": "pixeldroid/botic/OFL.txt"
       },
       {
-        "bytes": 26200,
-        "family": "pixeldroid",
-        "format": "ttf",
-        "is_font": true,
-        "path": "pixeldroid/botic/pixeldroidBoticRegular.ttf"
-      },
-      {
         "bytes": 907,
         "family": "pixeldroid",
         "format": "md",
@@ -9971,20 +8841,6 @@
         "path": "pixeldroid/console/OFL.txt"
       },
       {
-        "bytes": 24420,
-        "family": "pixeldroid",
-        "format": "ttf",
-        "is_font": true,
-        "path": "pixeldroid/console/pixeldroidConsoleRegular.ttf"
-      },
-      {
-        "bytes": 24264,
-        "family": "pixeldroid",
-        "format": "ttf",
-        "is_font": true,
-        "path": "pixeldroid/console/pixeldroidConsoleRegularMono.ttf"
-      },
-      {
         "bytes": 1415,
         "family": "pixeldroid",
         "format": "md",
@@ -9997,13 +8853,6 @@
         "format": "txt",
         "is_font": false,
         "path": "pixeldroid/menu/OFL.txt"
-      },
-      {
-        "bytes": 12304,
-        "family": "pixeldroid",
-        "format": "ttf",
-        "is_font": true,
-        "path": "pixeldroid/menu/pixeldroidMenuRegular.ttf"
       },
       {
         "bytes": 901,
@@ -11026,6 +9875,20 @@
         "format": "md",
         "is_font": false,
         "path": "x11-micro/SOURCE.md"
+      },
+      {
+        "bytes": 1765971,
+        "family": "galmuri",
+        "format": "bdf",
+        "is_font": true,
+        "path": "galmuri/Galmuri11-Bold.bdf"
+      },
+      {
+        "bytes": 1533524,
+        "family": "galmuri",
+        "format": "bdf",
+        "is_font": true,
+        "path": "galmuri/Galmuri11-Condensed.bdf"
       }
     ],
     "schema": "hpclang-font-package-index-v1"

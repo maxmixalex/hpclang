@@ -12707,7 +12707,7 @@ hpclang_font_galmuri_galmuri11_bold_full_data:
 .word hpclang_font_galmuri_galmuri11_bold_full_glyphs
 .word 12695
 .word 63
-.hword 12,2,14,12
+.hword 14,2,16,12
 
 .section .rodata.hpclang.font.galmuri_galmuri11_bold.full.font,"a",%progbits
 .balign 4
