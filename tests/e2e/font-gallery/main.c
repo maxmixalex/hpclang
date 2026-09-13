@@ -411,28 +411,82 @@ static void append_unicode_range(
     }
 }
 
+static int view_has_unicode(
+    const struct gallery_view *view,
+    uint32_t cp)
+{
+    for (uint32_t i = 0u; i < view->unicode_count; ++i) {
+        if (view->unicode_codepoints[i] == cp)
+            return 1;
+    }
+    return 0;
+}
+
+static void append_preferred_unicode(
+    const struct gallery_view *view,
+    uint32_t *out,
+    uint32_t *count,
+    uint32_t capacity,
+    const uint32_t *preferred,
+    uint32_t preferred_count,
+    uint32_t limit)
+{
+    uint32_t added = 0u;
+    for (uint32_t i = 0u;
+         i < preferred_count && *count < capacity && added < limit; ++i) {
+        if (!view_has_unicode(view, preferred[i]))
+            continue;
+        uint32_t before = *count;
+        append_unique(out, count, capacity, preferred[i]);
+        if (*count != before)
+            ++added;
+    }
+}
+
 static uint32_t build_feature_probe(
     const struct gallery_view *view,
     uint32_t *out,
     uint32_t capacity)
 {
+    static const uint32_t kana[] = {
+        12354u, 12356u, 12358u, 12360u, 12362u,
+        12450u, 12452u, 12454u, 12456u, 12458u,
+    };
+    static const uint32_t hangul[] = {
+        44032u, 45208u, 45796u, 54620u, 44544u,
+    };
+    static const uint32_t han[] = {
+        22825u, 22320u, 20154u, 20013u, 25991u, 23383u,
+        20307u, 39636u, 38376u, 38272u, 39118u, 39080u,
+        40857u, 40845u, 35821u, 35486u, 35328u,
+        22269u, 22283u, 21488u, 33274u, 28286u, 28771u,
+    };
+    static const uint32_t greek[] = { 937u, 945u, 946u, 955u, 960u };
+    static const uint32_t math_arrow[] = {
+        8592u, 8593u, 8594u, 8595u, 8596u,
+        8730u, 8734u, 8776u, 8800u, 8804u, 8805u,
+    };
+    static const uint32_t box[] = {
+        9484u, 9472u, 9488u, 9474u, 9492u, 9496u,
+    };
     uint32_t count = 0u;
 
-    /* Private-use repertoire is where controller and Powerline-style glyphs
-       live. Show it first when a face has any. */
     for (uint32_t i = 0u; i < view->private_count && count < capacity && i < 6u; ++i)
         append_unique(out, &count, capacity, view->private_codepoints[i]);
 
-    /* Script-first ordering makes locale-specific faces visibly different in
-       a 131px viewport instead of spending the whole row on Latin symbols. */
-    append_unicode_range(view, out, &count, capacity, 0x3040u, 0x30ffu, 4u); /* Kana */
-    append_unicode_range(view, out, &count, capacity, 0xac00u, 0xd7afu, 2u); /* Hangul */
-    append_unicode_range(view, out, &count, capacity, 0x3400u, 0x9fffu, 4u); /* Han */
-    append_unicode_range(view, out, &count, capacity, 0x0370u, 0x03ffu, 3u); /* Greek */
-    append_unicode_range(view, out, &count, capacity, 0x2190u, 0x22ffu, 4u); /* arrows/math */
+    append_preferred_unicode(view, out, &count, capacity, kana,
+        (uint32_t)(sizeof(kana) / sizeof(kana[0])), 5u);
+    append_preferred_unicode(view, out, &count, capacity, hangul,
+        (uint32_t)(sizeof(hangul) / sizeof(hangul[0])), 3u);
+    append_preferred_unicode(view, out, &count, capacity, han,
+        (uint32_t)(sizeof(han) / sizeof(han[0])), 8u);
+    append_preferred_unicode(view, out, &count, capacity, greek,
+        (uint32_t)(sizeof(greek) / sizeof(greek[0])), 4u);
+    append_preferred_unicode(view, out, &count, capacity, math_arrow,
+        (uint32_t)(sizeof(math_arrow) / sizeof(math_arrow[0])), 6u);
+    append_preferred_unicode(view, out, &count, capacity, box,
+        (uint32_t)(sizeof(box) / sizeof(box[0])), 6u);
 
-    /* Finally fill from the remaining curated repertoire (Latin accents,
-       currency and other symbols). */
     for (uint32_t i = 0u; i < view->unicode_count && count < capacity; ++i)
         append_unique(out, &count, capacity, view->unicode_codepoints[i]);
     return count;
@@ -573,26 +627,26 @@ static void draw_basic_page(
     if (line_height >= 18u) {
         int32_t centered_y = CONTENT_TOP +
             (bottom - CONTENT_TOP - (int32_t)line_height) / 2;
-        draw_centered_ascii(surface, font, centered_y, "Quick");
+        draw_centered_ascii(surface, font, centered_y, "Il1 0OQ");
         return;
     }
 
-    if (y + (int32_t)line_height <= bottom) {
-        draw_centered_ascii(surface, font, y,
-            line_height >= 12u ? "AaBbCc" : "AaBbCc XxYyZz");
-        y += (int32_t)line_height;
-    }
-    if (y + (int32_t)line_height <= bottom) {
-        draw_centered_ascii(surface, font, y, "0123456789");
+    const char *rows[] = {
+        "Il1| 0OQ",
+        "2Z5S6G8B",
+        "aegxy rnMW",
+        "0123456789",
+        "{}[]() /\\",
+    };
+    for (uint32_t i = 0u;
+         i < (uint32_t)(sizeof(rows) / sizeof(rows[0])) &&
+         y + (int32_t)line_height <= bottom; ++i) {
+        draw_centered_ascii(surface, font, y, rows[i]);
         y += (int32_t)line_height;
     }
 
-    uint32_t feature_count = view->unicode_count + view->private_count;
-    if (feature_count != 0u && y < bottom) {
+    if ((view->unicode_count != 0u || view->private_count != 0u) && y < bottom)
         (void)draw_features(surface, view, y, bottom, 16u);
-    } else if (line_height < 12u && y + (int32_t)line_height <= bottom) {
-        draw_centered_ascii(surface, font, y, "!?%&@# +-=/*");
-    }
 }
 
 static void draw_paragraph_page(
@@ -614,19 +668,22 @@ static void draw_paragraph_page(
     }
 
     if (line_height >= 15u) {
-        draw_centered_ascii(surface, font, CONTENT_TOP, "Quick");
-        if (CONTENT_TOP + (int32_t)line_height * 2 <= bottom)
-            draw_centered_ascii(
-                surface, font, CONTENT_TOP + (int32_t)line_height, "012345");
-        return;
+        draw_centered_ascii(surface, font, CONTENT_TOP, "Il1 0OQ");
+        y = CONTENT_TOP + (int32_t)line_height;
+        if (y + (int32_t)line_height <= bottom) {
+            draw_centered_ascii(surface, font, y, "aeg 258");
+            y += (int32_t)line_height;
+        }
+    } else {
+        y = draw_words(
+            surface,
+            font,
+            CONTENT_TOP,
+            bottom,
+            "Il1| 0OQ 2Z5S 6G8B rn m w MW AV To aegxy "
+            "0123456789 {}[]() <> /\\ _-+= *#@&%");
     }
 
-    y = draw_words(
-        surface,
-        font,
-        CONTENT_TOP,
-        bottom,
-        "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. 0123456789.");
     if (y < bottom && (view->unicode_count != 0u || view->private_count != 0u))
         (void)draw_features(surface, view, y, bottom, 12u);
 }

@@ -42,34 +42,34 @@ elseif(NOT HPCLANG_GALLERY_PROFILE STREQUAL "full")
         "HPCLANG_GALLERY_PROFILE must be full or stock-smoke")
 endif()
 
-# Keep exactly the printable ASCII characters that the visible Gallery pages
-# can draw. The specimen intentionally stays compact; retaining every printable
-# ASCII glyph in every generated face would inflate the exhaustive payload
-# without increasing visual coverage.
+# Keep full printable ASCII so the Gallery can use diagnostic type-specimen
+# strings (Il1|, 0OQ, rn/m/w, punctuation) without silently falling back.
 set(GALLERY_CODEPOINTS
-    32 33 35 36 37 38 42 43 44 45 46 47
-    48 49 50 51 52 53 54 55 56 57
-    60 61 62 63 64 65 66 67 77 80 81 83 84 88 89 90
-    97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113
-    114 115 116 117 118 119 120 121 122
+    32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
+    48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
+    64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79
+    80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95
+    96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111
+    112 113 114 115 116 117 118 119 120 121 122 123 124 125 126
 )
 
-# Typography-oriented Unicode probe. The runtime Gallery groups these into a
-# script-first feature row (Kana/Hangul/Han before generic symbols) so locale
-# variants remain distinguishable on the 131-pixel LCD.
+# Common, visually diagnostic Unicode probes. Prefer recognizable characters
+# over arbitrary early codepoints from a script block.
 set(GALLERY_UNICODE_CODEPOINTS
-    # Accented Latin.
+    # Accented Latin and common currency/symbols.
     192 193 196 199 201 209 214 220 223 230 248 339
     163 165 169 176 177 181 215 247 8364
-    # Japanese kana, Han samples (你好世界 / 日本語), then Hangul (한글).
-    12354 12356 12358 12360 12362
-    12450 12452 12454 12456 12458
-    20320 22909 19990 30028 26085 26412 35486
-    54620 44544
-    # Greek / mathematics and directional arrows.
-    916 931 937 945 946 955 960
-    8730 8734 8776 8800 8804 8805
-    8592 8593 8594 8595 8596
+    # Kana and Hangul.
+    12354 12356 12358 12360 12362 12450 12452 12454 12456 12458
+    44032 45208 45796 54620 44544
+    # Common Han, including simplified/traditional shape contrasts.
+    22825 22320 20154 20013 25991 23383 20307 39636
+    38376 38272 39118 39080 40857 40845 35821 35486 35328
+    22269 22283 21488 33274 28286 28771
+    # Greek, mathematics, arrows, and box drawing.
+    937 945 946 955 960
+    8730 8734 8776 8800 8804 8805 8592 8593 8594 8595 8596
+    9472 9474 9484 9488 9492 9496
 )
 list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
 

@@ -125,4 +125,4 @@ MERGED="$ROOT/build/$TARGET-font-gallery.pgm"
 python3 "$ROOT/tools/merge-pgm-grid.py" "$MERGED" "${FRAMES[@]}"
 python3 "$ROOT/tools/pgm-to-png.py" "$MERGED" "$MERGED.png"
 
-python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/font-gallery.json"
+python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/font-gallery-stock.json"

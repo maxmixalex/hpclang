@@ -41,8 +41,8 @@ COMMON_DIFF_TEXT = (
 ACCENT_TEXT = "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœ"
 SYMBOL_TEXT = "←↑→↓↔ ±×÷≠≤≥≈∞√ ∑∏∆Ωαβπλ μ°©®€£¥"
 PANGRAMS = (
-    "The quick brown fox jumps over the lazy dog.",
-    "Sphinx of black quartz, judge my vow.",
+    "Il1| 0OQ 2Z5S 6G8B rn m w MW AV To",
+    "aegxy 0123456789 {}[]() <> /\\ _-+= *#@&%",
 )
 ASCII_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 ASCII_LOWER = "abcdefghijklmnopqrstuvwxyz"
@@ -159,7 +159,7 @@ def feature_groups(font):
         ("箭头 / 数学", [cp for cp in cps if 0x2190 <= cp <= 0x22FF], 72),
         ("方框 / 图形符号", [cp for cp in cps if 0x2500 <= cp <= 0x27BF], 72),
         ("日文假名", [cp for cp in cps if 0x3040 <= cp <= 0x30FF], 72),
-        ("常用汉字抽样", [cp for cp in cps if 0x3400 <= cp <= 0x9FFF], 96),
+        ("汉字字符集抽样", [cp for cp in cps if 0x3400 <= cp <= 0x9FFF], 96),
         ("韩文", [cp for cp in cps if 0xAC00 <= cp <= 0xD7AF], 72),
         ("私用区 / 图标", [cp for cp in cps if 0xE000 <= cp <= 0xF8FF], 96),
     ]
@@ -264,17 +264,16 @@ def main():
     rows = catalog["faces"]
     loaded = []
     for row in rows:
-        if row.get("family") == "ark-pixel" or row.get("format") == "ttf":
-            loaded.append((row, hf.load_selected(package, row["selector"], "FULL")))
+        loaded.append((row, hf.load_selected(package, row["selector"], "FULL")))
 
     ark_groups = defaultdict(list)
-    ttf_families = defaultdict(list)
+    review_families = defaultdict(list)
     for row, font in loaded:
         meta = ark_meta(row)
         if meta:
             ark_groups[meta["group"]].append((row, font, meta))
-        if row.get("format") == "ttf":
-            ttf_families[row.get("family") or "未分类"].append((row, font))
+        if not meta:
+            review_families[row.get("family") or "未分类"].append((row, font))
 
     summary = audit.get("visual_summary", {})
     face_count = len(rows)
@@ -302,7 +301,7 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
     out.append("<h1>hpclang 字体人工审阅报告</h1>")
     out.append(
         "<p class='lead'>这份报告只解决一个问题：<b>这些字体实际长什么样，哪些值得留下。</b>"
-        "机器校验数字不再放在正文中心。每个需要人工判断的 TTF face 都给出大小写、数字标点、正文、"
+        "机器校验数字不再放在正文中心。每个需要人工判断的位图 face 都给出大小写、数字标点、正文、"
         "变音拉丁字母、数学符号，以及它真实拥有的其他 Unicode 字符抽样。Ark Pixel 则单独比较"
         "同一尺寸/宽度模式下各地区版本真正不同的字形。</p>"
     )
@@ -349,15 +348,15 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
             out.append(f"<div class='source'>{html.escape(row['selector'])}</div></div>")
         out.append("</div></details>")
 
-    out.append("<h2>2. 所有 TTF：逐个 face 看完整得多的样子</h2>")
+    out.append("<h2>2. 其他位图字体：逐个 face 看完整得多的样子</h2>")
     out.append(
-        "<p class='lead'>这里不再只给一行 AaBbCc。每个 TTF face 都至少检查基本拉丁、数字标点、"
+        "<p class='lead'>这里不再只给一行 AaBbCc。每个位图 face 都至少检查基本拉丁、数字标点、"
         "两句正文、变音拉丁字符、常见数学符号；字体如果还包含 CJK、假名、韩文、图标或其他大字符集，"
         "下面继续给整块抽样。这样 Boutique Bitmap、JapanYoshi、PixelDroid、HasanKazan 等可以按"
         "实际视觉效果决定去留。</p>"
     )
-    for family in sorted(ttf_families):
-        faces = sorted(ttf_families[family], key=lambda item: item[0]["selector"])
+    for family in sorted(review_families):
+        faces = sorted(review_families[family], key=lambda item: item[0]["selector"])
         out.append(f"<details open><summary>{html.escape(family)} — {len(faces)} 个 face</summary><div class='grid'>")
         for row, font in faces:
             basic, extras = render_specimens(font)
