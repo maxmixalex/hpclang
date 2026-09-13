@@ -312,23 +312,24 @@ def parse_newrpl_bmp(pkg: Package, path: str) -> Font:
     return Font(path, glyphs, h, 0, h, nominal, "bmp")
 
 
-def _pil_font(data: bytes, size: int, index: int = 0):
+def _pillow_font(data: bytes, size: int, index: int = 0):
     from PIL import ImageFont
 
     return ImageFont.truetype(io.BytesIO(data), size=size, index=index)
 
 
 
-def raster_pil(
+def raster_pillow_bitmap(
     data: bytes,
     source: str,
+    *,
     size: int = 12,
     index: int = 0,
     codepoints=None,
-    fmt: str = "ttf",
+    fmt: str,
     face: str = "",
 ) -> Font:
-    font = _pil_font(data, size, index)
+    font = _pillow_font(data, size, index)
     asc, desc = font.getmetrics()
     if codepoints is None:
         codepoints = range(256)
@@ -336,7 +337,7 @@ def raster_pil(
     for cp in codepoints:
         ch = chr(cp)
         try:
-            # Use an explicit left-baseline anchor.  Pillow's historical default
+            # Use an explicit left-baseline anchor. Pillow's historical default
             # horizontal anchor is left-ascender; spelling the baseline out here
             # makes the conversion to BDF-style y_offset direct and testable.
             mask, (x0, y0) = font.getmask2(ch, mode="1", anchor="ls")
@@ -375,7 +376,7 @@ def raster_pil(
 
 def fon_faces(data: bytes, source: str):
     return [
-        raster_pil(
+        raster_pillow_bitmap(
             data,
             source,
             size=size,
@@ -460,7 +461,7 @@ def load_selected(
             if mode == "FULL"
             else sorted(cp for cp in (requested or set()) if 0 <= cp <= 255)
         )
-        return raster_pil(
+        return raster_pillow_bitmap(
             data,
             path,
             size=size,
@@ -614,7 +615,7 @@ def main():
                         raise ValueError("no glyphs")
                 elif ext == ".fon":
                     for idx, size, label in FON_FACE_SIZES:
-                        font = raster_pil(
+                        font = raster_pillow_bitmap(
                             data,
                             path,
                             size=size,
