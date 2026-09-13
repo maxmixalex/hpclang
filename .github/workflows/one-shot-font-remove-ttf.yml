@@ -157,9 +157,7 @@ jobs:
       - name: Commit curated canonical package
         run: |
           rm .github/workflows/one-shot-font-remove-ttf.yml
-          rm -f .github/workflows/one-shot-ttf-raster-fix.yml
-          git add -A runtime/fonts/fonts.zip runtime/fonts/ttf-raster.json runtime/fonts/generated \
-            .github/workflows/one-shot-font-remove-ttf.yml .github/workflows/one-shot-ttf-raster-fix.yml
+          git add -A runtime/fonts .github/workflows/one-shot-font-remove-ttf.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fonts: prefer native bitmap sources over TTF assets"
