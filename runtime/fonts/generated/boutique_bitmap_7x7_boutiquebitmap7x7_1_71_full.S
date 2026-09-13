@@ -16646,7 +16646,7 @@ hpclang_font_boutique_bitmap_7x7_boutiquebitmap7x7_1_71_full_data:
 .word hpclang_font_boutique_bitmap_7x7_boutiquebitmap7x7_1_71_full_glyphs
 .word 16634
 .word 63
-.hword 9,3,12,12
+.hword 6,2,8,8
 
 .section .rodata.hpclang.font.boutique_bitmap_7x7_boutiquebitmap7x7_1_71.full.font,"a",%progbits
 .balign 4

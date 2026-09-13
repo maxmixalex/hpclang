@@ -57,6 +57,9 @@ class PackageView:
             )
         self.manifest = {"schema": "hpclang-font-package-index-v1", "files": entries}
         self.files = {entry["path"]: entry for entry in entries}
+        self.ttf_raster_policy = hf.load_ttf_raster_policy(
+            self.path.with_name("ttf-raster.json")
+        )
 
     def data(self, path):
         return self.z.read(self.root + path)
@@ -258,6 +261,22 @@ def main() -> int:
         parser.error("--chunk-glyphs must be positive")
 
     package = PackageView(args.package)
+    ttf_paths = {
+        entry["path"]
+        for entry in package.fonts()
+        if str(entry.get("format", "")).lower() == "ttf"
+    }
+    policy_paths = set(package.ttf_raster_policy)
+    missing_policy = sorted(ttf_paths - policy_paths)
+    stale_policy = sorted(policy_paths - ttf_paths)
+    if missing_policy or stale_policy:
+        details = []
+        if missing_policy:
+            details.append("missing TTF PPEM: " + ", ".join(missing_policy))
+        if stale_policy:
+            details.append("stale TTF PPEM: " + ", ".join(stale_policy))
+        raise SystemExit("; ".join(details))
+
     rows = hf.catalog(package)
     if args.selector:
         wanted = set(args.selector)
@@ -300,6 +319,8 @@ def main() -> int:
             "nominal_advance": font.nominal_advance,
             "sources": sources,
         }
+        if row.get("format") == "ttf":
+            record["raster_ppem"] = hf.ttf_raster_size(package, row["path"])
         records.append(record)
         total_glyphs += len(codepoints)
         total_sources += len(sources)

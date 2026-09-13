@@ -7309,7 +7309,7 @@ hpclang_font_boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_full_data:
 .word hpclang_font_boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot_full_glyphs
 .word 7297
 .word 63
-.hword 12,2,14,12
+.hword 10,2,12,10
 
 .section .rodata.hpclang.font.boutique_bitmap_9x9_boutiquebitmap9x9_circle_dot.full.font,"a",%progbits
 .balign 4

@@ -6058,7 +6058,7 @@ hpclang_font_cozette_cozettecrossedsevenvectorbold_full_data:
 .word hpclang_font_cozette_cozettecrossedsevenvectorbold_full_glyphs
 .word 6046
 .word 63
-.hword 10,3,13,7
+.hword 10,3,13,8
 
 .section .rodata.hpclang.font.cozette_cozettecrossedsevenvectorbold.full.font,"a",%progbits
 .balign 4
