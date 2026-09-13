@@ -67,7 +67,10 @@ jobs:
           text = Path("build/font-audit/font-review-cn.html").read_text(encoding="utf-8")
           samples = [html.unescape(x) for x in re.findall(r"本组对比字符：([^<]*)</div>", text)]
           assert len(samples) == 6, len(samples)
-          namespace = {}
+          namespace = {
+              "__file__": "tools/render-font-audit-cn.py",
+              "__name__": "font_audit_cn_check",
+          }
           exec(Path("tools/render-font-audit-cn.py").read_text(encoding="utf-8"), namespace)
           allowed = set(namespace["COMMON_DIFF_TEXT"])
           for sample in samples:
