@@ -160,11 +160,11 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 | keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | HP39 current family run flaky after payload entry; not used to override Direct correctness |
 | display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
 | native font/text | ✅ | ✅ | HP39 targeted exhaustive 310/620 each; production Gallery Direct families green | HP40gs visual Stock evidence plus HP50g live-native compact Stock Gallery; HP48 compact live-native Gallery still open |
-| generated font selection | ✅ configure | ✅ | production Gallery #42 exhaustively traverses 308 generated faces on all five automated targets | HP50g compact Stock control green |
+| generated font selection | ✅ configure | ✅ | production Gallery #42 exhaustively traverses 275 generated faces on all five automated targets | HP50g compact Stock control green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
-Formal `E2E / Font Gallery` run **34698825657 / #42** is green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
+Formal `E2E / Font Gallery` run **34743437279 / #47 (attempt 2)** is green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists. This is a fixture blocker, not a separate API architecture.
 
 ## Historical public-surface size
 
@@ -299,3 +299,12 @@ This preserves the dependency direction: historical HPGCC APIs are implemented o
 ### Keyboard action boundary
 
 The public keyboard service stops at physical key identity plus modifier state. Model/user-interface actions such as HP39 `Shift+VARS -> CHARS` are not folded back into `enum hpclang_key`. Shortcut-to-command mappings belong to a higher application or compatibility layer.
+
+
+### Curated font package evidence (2026-09-13)
+
+The canonical package was curated after visual and semantic audit: six Dina OEM faces, 21 Powerline-specific faces, and six faces whose `Quick` specimen exceeded the 131-pixel LCD were removed at the source-package level and the generated catalog was rebuilt. The current catalog contains **275 generated faces / 1,772,082 mapped glyphs**. Semantic source-to-generated parity is **275/275**; exact duplicate, `quick-overflow`, `glyph-collapse`, `blank-heavy`, and Powerline signals are all zero. Six retained faces still have source/cmap-level printable-ASCII gaps and 13 have loose-spacing diagnostics; neither is treated as an automatic defect.
+
+The TTF rasterizer now uses Pillow mask geometry rather than incorrectly assuming `getbbox()` dimensions match `getmask2()` storage, which eliminated the importer-created blank-heavy glyphs. Ark Pixel Gallery labels expose size, monospaced/proportional mode, and locale explicitly. The human review report contains 423 embedded specimens; Ark locale panels show only differing characters from the curated common-character list and never pad the panel with obscure CJK. Retained TTF families still require the final human curation decision before the font slice is merged.
+
+The curated exhaustive Direct Gallery is **277 entries (275 generated + 2 native) × 2 pages = 554 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g, all PASS. `E2E / Font Gallery` run **34743437279 / #47, attempt 2** is fully green, including `Stock / hp48` and `Stock / hp4950`. The first HP50g Stock attempt timed out before HPC1 PASS; the rerun reached the same ARMToolbox path, HPC1 PASS, nonblank native mini/main/generated control captures, and final PASS, so the first result is retained as a Stock-harness timing fluctuation rather than hidden.

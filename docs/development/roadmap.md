@@ -191,17 +191,17 @@ Current evidence:
 
 - [x] Git LFS materialization of the canonical source bundle in CI;
 - [x] BDF, TTF, FON, and newRPL BMP+TXT source parsing;
-- [x] complete batch generation of **308 faces / 1,779,042 glyph mappings / 3,797 assembly sources**;
+- [x] complete batch generation of **275 faces / 1,772,082 glyph mappings**;
 - [x] large faces split into bounded assembly chunks;
 - [x] individual glyph/bitmap ELF sections remain independently eligible for linker garbage collection;
 - [x] generated catalog is checked into `m7-fonts-gallery`;
 - [x] HP39 mini/main physical-ROM reader validated on HP39gs/40gs Direct screenshots and HP40gs Stock screenshot;
 - [x] long-lived HP39 high-L1 alias failure root cause proven: framebuffer bytes overlapped the active L1 descriptor storage; production code uses the owned two-page L2 window instead;
 - [x] Core font-selection/window/MMU tests, ARM hardware-validation build, and HP39 package build pass after the mapping change;
-- [x] targeted HP39 exhaustive Gallery traverses **310 entries / 620 captures** on both HP39gs and HP40gs with PASS and settled return;
-- [x] exhaustive Direct Font Gallery traverses **310 entries (308 generated faces plus two native entries) and both SAMPLE/TEXT pages, 620 captures per target**, on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g; all five reach PASS and settled return;
+- [x] targeted HP39 exhaustive Gallery traverses **277 entries / 554 captures** on both HP39gs and HP40gs with PASS and settled return;
+- [x] exhaustive Direct Font Gallery traverses **277 entries (275 generated faces plus two native entries) and both SAMPLE/TEXT pages, 554 captures per target**, on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g; all five reach PASS and settled return;
 - [x] compact HP50g Stock Gallery validates live Saturn `Read[]` native mini/main fonts, a representative generated face, the original UI/ARMToolbox launch path, PASS, and settled stock return;
-- [x] formal production `E2E / Font Gallery` run **34698825657 / #42** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`.
+- [x] formal production `E2E / Font Gallery` run **34743437279 / #47 (attempt 2)** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and `Stock Gallery / hp50g`.
 
 The import contract has **three distinct modes**:
 
@@ -215,7 +215,7 @@ Generated-font convenience aliases are currently `@mini = newrpl_6a`, `@normal =
 
 There is deliberately **no public semantic font-role layer** in the font core. Application developers select calculator-native or generated fonts directly through the font APIs. Names such as `mini`, `text`, or `edit-large` may be useful to a future UI toolkit/theme layer, but they do not belong in the core font ABI.
 
-Direct Gallery's synthetic launcher fixture intentionally does not fabricate a live Saturn `Read[]` map. Therefore generated-font exhaustive rendering is valid there on all five models, HP39/40 native fonts are also valid because they use verified physical ROM rasters, and HP48/49/50 native-font evidence must come from a real Stock Saturn mapping. HP50g Stock closes the hp4950 native path; a compact HP48gII Stock Gallery remains the final 64-line live-native evidence item.
+Direct Gallery's synthetic launcher fixture intentionally does not fabricate a live Saturn `Read[]` map. Therefore generated-font exhaustive rendering is valid there on all five models, HP39/40 native fonts are also valid because they use verified physical ROM rasters, and HP48/49/50 native-font evidence must come from a real Stock Saturn mapping. HP50g Stock closes the hp4950 native path; compact HP48gII Stock Gallery now closes the 64-line live-native evidence item, including nonblank/distinct native probes and a visible stock return.
 
 The experimental launcher-private `HPZ1`/LZ4 staging format is rejected. It could compress the exhaustive Gallery below the legacy wrapper's object-size limit, but it did not solve the real Stock memory constraint and it regressed hp4950 stage1 launch. Standard HPC1 remains the sole application payload contract; exhaustive Gallery and compact Stock Gallery instead test the concerns they actually own.
 
@@ -227,7 +227,7 @@ M7.1 font closure now requires:
 - [x] validate `STATIC_EXPLICIT` subset retention and `FULL` complete-face retention in Core CI;
 - [x] separate calculator-native assets from generated custom/font-package assets;
 - [x] validate the corrected HP39 physical-ROM native reader through the owned two-page L2 window;
-- [x] build Font Gallery as a separate HPC1 E2E application and exhaustively render all 308 generated faces across the five automated models and both 64/80-line layouts;
+- [x] build Font Gallery as a separate HPC1 E2E application and exhaustively render all 275 generated faces across the five automated models and both 64/80-line layouts;
 - [x] keep the developer-facing font API direct; do not add public `mini` / `text` / `edit-large` semantic role selectors;
 - [x] validate the compact standard-HPC1 Stock Gallery on HP50g with live native fonts and one generated control face;
 - [x] close the formal production Gallery matrix after the HP39 mapping fix (`E2E / Font Gallery` #42);
@@ -315,3 +315,12 @@ Font Gallery intentionally separates exhaustive asset/rendering coverage from St
 Target profiles, stock UI sequences, x50ng frontends, and common reporting remain shared harness data. A focused E2E app should reuse that infrastructure rather than create a parallel emulator framework.
 
 The CI implementation remains family-oriented where practical: build an HPC1 application once, then run one job per platform family (`hp39`, `hp48`, or `hp4950`). Each family job prepares x50ng and runtime dependencies once and executes its automated sibling targets. HP 39g+ is explicitly excluded by target-profile metadata until its real stock fixture exists. Behavioral expectations remain in E2E specs/app code and harness code rather than GitHub Actions YAML.
+
+
+### Curated font package evidence (2026-09-13)
+
+The canonical package was curated after visual and semantic audit: six Dina OEM faces, 21 Powerline-specific faces, and six faces whose `Quick` specimen exceeded the 131-pixel LCD were removed at the source-package level and the generated catalog was rebuilt. The current catalog contains **275 generated faces / 1,772,082 mapped glyphs**. Semantic source-to-generated parity is **275/275**; exact duplicate, `quick-overflow`, `glyph-collapse`, `blank-heavy`, and Powerline signals are all zero. Six retained faces still have source/cmap-level printable-ASCII gaps and 13 have loose-spacing diagnostics; neither is treated as an automatic defect.
+
+The TTF rasterizer now uses Pillow mask geometry rather than incorrectly assuming `getbbox()` dimensions match `getmask2()` storage, which eliminated the importer-created blank-heavy glyphs. Ark Pixel Gallery labels expose size, monospaced/proportional mode, and locale explicitly. The human review report contains 423 embedded specimens; Ark locale panels show only differing characters from the curated common-character list and never pad the panel with obscure CJK. Retained TTF families still require the final human curation decision before the font slice is merged.
+
+The curated exhaustive Direct Gallery is **277 entries (275 generated + 2 native) × 2 pages = 554 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g, all PASS. `E2E / Font Gallery` run **34743437279 / #47, attempt 2** is fully green, including `Stock / hp48` and `Stock / hp4950`. The first HP50g Stock attempt timed out before HPC1 PASS; the rerun reached the same ARMToolbox path, HPC1 PASS, nonblank native mini/main/generated control captures, and final PASS, so the first result is retained as a Stock-harness timing fluctuation rather than hidden.
