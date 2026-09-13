@@ -61,14 +61,16 @@ jobs:
           git diff --check
           git status --short runtime/fonts/generated
 
-      - name: Audit complete font catalog semantic parity and duplicates
+      - name: Audit complete font catalog semantic parity and visual candidates
         run: |
+          set -o pipefail
           PY=build/font-venv/bin/python
           mkdir -p build/font-audit
           "$PY" tools/audit-font-assets.py \
             --package runtime/fonts/fonts.zip \
             --generated-dir runtime/fonts/generated \
             --json build/font-audit/all-fonts.json \
+            --html build/font-audit/visual-report.html \
             | tee build/font-audit/all-fonts.txt
           {
             echo '### Complete font asset audit'
