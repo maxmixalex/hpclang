@@ -91,12 +91,6 @@ set(HPCLANG_FONT_IDS
     dina_dina_r700_10
     dina_dina_r700_8
     dina_dina_r700_9
-    dina_dinat437_6x10
-    dina_dinat437_7x13
-    dina_dinat437_8x16
-    dina_dinat850_6x10
-    dina_dinat850_7x13
-    dina_dinat850_8x16
     dylex_10x20
     dylex_10x20b
     dylex_10x20bo
@@ -117,10 +111,6 @@ set(HPCLANG_FONT_IDS
     dylex_20x40b
     dylex_20x40bo
     dylex_20x40o
-    dylex_28x28
-    dylex_28x28b
-    dylex_28x28bo
-    dylex_28x28o
     dylex_6x10
     dylex_6x10b
     dylex_6x10bo
@@ -214,8 +204,6 @@ set(HPCLANG_FONT_IDS
     spleen_spleen_12x24
     spleen_spleen_16x32
     spleen_spleen_16x32_ibm_437
-    spleen_spleen_32x64
-    spleen_spleen_32x64_ibm_437
     spleen_spleen_5x8
     spleen_spleen_6x12
     spleen_spleen_8x16
@@ -225,13 +213,6 @@ set(HPCLANG_FONT_IDS
     squeezed_u8g2_squeezed_bold_7
     squeezed_u8g2_squeezed_regular_6
     squeezed_u8g2_squeezed_regular_7
-    tamzen_powerline10x20
-    tamzen_powerline5x9
-    tamzen_powerline6x12
-    tamzen_powerline7x13
-    tamzen_powerline7x14
-    tamzen_powerline8x15
-    tamzen_powerline8x16
     tamzen_tamzen10x20b
     tamzen_tamzen10x20r
     tamzen_tamzen5x9b
@@ -246,20 +227,6 @@ set(HPCLANG_FONT_IDS
     tamzen_tamzen8x15r
     tamzen_tamzen8x16b
     tamzen_tamzen8x16r
-    tamzen_tamzenforpowerline10x20b
-    tamzen_tamzenforpowerline10x20r
-    tamzen_tamzenforpowerline5x9b
-    tamzen_tamzenforpowerline5x9r
-    tamzen_tamzenforpowerline6x12b
-    tamzen_tamzenforpowerline6x12r
-    tamzen_tamzenforpowerline7x13b
-    tamzen_tamzenforpowerline7x13r
-    tamzen_tamzenforpowerline7x14b
-    tamzen_tamzenforpowerline7x14r
-    tamzen_tamzenforpowerline8x15b
-    tamzen_tamzenforpowerline8x15r
-    tamzen_tamzenforpowerline8x16b
-    tamzen_tamzenforpowerline8x16r
     terminus_ter_u12b
     terminus_ter_u12n
     terminus_ter_u14b
@@ -2487,66 +2454,6 @@ set(HPCLANG_FONT_dina_dina_r700_9_LINE_HEIGHT 15)
 set(HPCLANG_FONT_dina_dina_r700_9_NOMINAL_ADVANCE 7)
 set(HPCLANG_FONT_dina_dina_r700_9_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dina_r700_9.codepoints.cmake")
 
-set(HPCLANG_FONT_dina_dinat437_6x10_SELECTOR "dina/OEM/DinaT437.fon#0")
-set(HPCLANG_FONT_dina_dinat437_6x10_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_6x10.S"
-)
-set(HPCLANG_FONT_dina_dinat437_6x10_ASCENT 8)
-set(HPCLANG_FONT_dina_dinat437_6x10_DESCENT 2)
-set(HPCLANG_FONT_dina_dinat437_6x10_LINE_HEIGHT 10)
-set(HPCLANG_FONT_dina_dinat437_6x10_NOMINAL_ADVANCE 6)
-set(HPCLANG_FONT_dina_dinat437_6x10_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_6x10.codepoints.cmake")
-
-set(HPCLANG_FONT_dina_dinat437_7x13_SELECTOR "dina/OEM/DinaT437.fon#1")
-set(HPCLANG_FONT_dina_dinat437_7x13_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_7x13.S"
-)
-set(HPCLANG_FONT_dina_dinat437_7x13_ASCENT 10)
-set(HPCLANG_FONT_dina_dinat437_7x13_DESCENT 3)
-set(HPCLANG_FONT_dina_dinat437_7x13_LINE_HEIGHT 13)
-set(HPCLANG_FONT_dina_dinat437_7x13_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_dina_dinat437_7x13_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_7x13.codepoints.cmake")
-
-set(HPCLANG_FONT_dina_dinat437_8x16_SELECTOR "dina/OEM/DinaT437.fon#2")
-set(HPCLANG_FONT_dina_dinat437_8x16_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_8x16.S"
-)
-set(HPCLANG_FONT_dina_dinat437_8x16_ASCENT 12)
-set(HPCLANG_FONT_dina_dinat437_8x16_DESCENT 4)
-set(HPCLANG_FONT_dina_dinat437_8x16_LINE_HEIGHT 16)
-set(HPCLANG_FONT_dina_dinat437_8x16_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_dina_dinat437_8x16_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat437_8x16.codepoints.cmake")
-
-set(HPCLANG_FONT_dina_dinat850_6x10_SELECTOR "dina/OEM/DinaT850.fon#0")
-set(HPCLANG_FONT_dina_dinat850_6x10_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_6x10.S"
-)
-set(HPCLANG_FONT_dina_dinat850_6x10_ASCENT 8)
-set(HPCLANG_FONT_dina_dinat850_6x10_DESCENT 2)
-set(HPCLANG_FONT_dina_dinat850_6x10_LINE_HEIGHT 10)
-set(HPCLANG_FONT_dina_dinat850_6x10_NOMINAL_ADVANCE 6)
-set(HPCLANG_FONT_dina_dinat850_6x10_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_6x10.codepoints.cmake")
-
-set(HPCLANG_FONT_dina_dinat850_7x13_SELECTOR "dina/OEM/DinaT850.fon#1")
-set(HPCLANG_FONT_dina_dinat850_7x13_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_7x13.S"
-)
-set(HPCLANG_FONT_dina_dinat850_7x13_ASCENT 10)
-set(HPCLANG_FONT_dina_dinat850_7x13_DESCENT 3)
-set(HPCLANG_FONT_dina_dinat850_7x13_LINE_HEIGHT 13)
-set(HPCLANG_FONT_dina_dinat850_7x13_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_dina_dinat850_7x13_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_7x13.codepoints.cmake")
-
-set(HPCLANG_FONT_dina_dinat850_8x16_SELECTOR "dina/OEM/DinaT850.fon#2")
-set(HPCLANG_FONT_dina_dinat850_8x16_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_8x16.S"
-)
-set(HPCLANG_FONT_dina_dinat850_8x16_ASCENT 12)
-set(HPCLANG_FONT_dina_dinat850_8x16_DESCENT 4)
-set(HPCLANG_FONT_dina_dinat850_8x16_LINE_HEIGHT 16)
-set(HPCLANG_FONT_dina_dinat850_8x16_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_dina_dinat850_8x16_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dina_dinat850_8x16.codepoints.cmake")
-
 set(HPCLANG_FONT_dylex_10x20_SELECTOR "dylex/10x20.bdf")
 set(HPCLANG_FONT_dylex_10x20_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/dylex_10x20_0000.S"
@@ -2784,46 +2691,6 @@ set(HPCLANG_FONT_dylex_20x40o_DESCENT 8)
 set(HPCLANG_FONT_dylex_20x40o_LINE_HEIGHT 40)
 set(HPCLANG_FONT_dylex_20x40o_NOMINAL_ADVANCE 20)
 set(HPCLANG_FONT_dylex_20x40o_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dylex_20x40o.codepoints.cmake")
-
-set(HPCLANG_FONT_dylex_28x28_SELECTOR "dylex/28x28.bdf")
-set(HPCLANG_FONT_dylex_28x28_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28.S"
-)
-set(HPCLANG_FONT_dylex_28x28_ASCENT 22)
-set(HPCLANG_FONT_dylex_28x28_DESCENT 6)
-set(HPCLANG_FONT_dylex_28x28_LINE_HEIGHT 28)
-set(HPCLANG_FONT_dylex_28x28_NOMINAL_ADVANCE 28)
-set(HPCLANG_FONT_dylex_28x28_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28.codepoints.cmake")
-
-set(HPCLANG_FONT_dylex_28x28b_SELECTOR "dylex/28x28B.bdf")
-set(HPCLANG_FONT_dylex_28x28b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28b.S"
-)
-set(HPCLANG_FONT_dylex_28x28b_ASCENT 22)
-set(HPCLANG_FONT_dylex_28x28b_DESCENT 6)
-set(HPCLANG_FONT_dylex_28x28b_LINE_HEIGHT 28)
-set(HPCLANG_FONT_dylex_28x28b_NOMINAL_ADVANCE 28)
-set(HPCLANG_FONT_dylex_28x28b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28b.codepoints.cmake")
-
-set(HPCLANG_FONT_dylex_28x28bo_SELECTOR "dylex/28x28BO.bdf")
-set(HPCLANG_FONT_dylex_28x28bo_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28bo.S"
-)
-set(HPCLANG_FONT_dylex_28x28bo_ASCENT 22)
-set(HPCLANG_FONT_dylex_28x28bo_DESCENT 6)
-set(HPCLANG_FONT_dylex_28x28bo_LINE_HEIGHT 28)
-set(HPCLANG_FONT_dylex_28x28bo_NOMINAL_ADVANCE 28)
-set(HPCLANG_FONT_dylex_28x28bo_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28bo.codepoints.cmake")
-
-set(HPCLANG_FONT_dylex_28x28o_SELECTOR "dylex/28x28O.bdf")
-set(HPCLANG_FONT_dylex_28x28o_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28o.S"
-)
-set(HPCLANG_FONT_dylex_28x28o_ASCENT 22)
-set(HPCLANG_FONT_dylex_28x28o_DESCENT 6)
-set(HPCLANG_FONT_dylex_28x28o_LINE_HEIGHT 28)
-set(HPCLANG_FONT_dylex_28x28o_NOMINAL_ADVANCE 28)
-set(HPCLANG_FONT_dylex_28x28o_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/dylex_28x28o.codepoints.cmake")
 
 set(HPCLANG_FONT_dylex_6x10_SELECTOR "dylex/6x10.bdf")
 set(HPCLANG_FONT_dylex_6x10_SOURCES
@@ -5607,28 +5474,6 @@ set(HPCLANG_FONT_spleen_spleen_16x32_ibm_437_LINE_HEIGHT 32)
 set(HPCLANG_FONT_spleen_spleen_16x32_ibm_437_NOMINAL_ADVANCE 16)
 set(HPCLANG_FONT_spleen_spleen_16x32_ibm_437_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_16x32_ibm_437.codepoints.cmake")
 
-set(HPCLANG_FONT_spleen_spleen_32x64_SELECTOR "spleen/spleen-32x64.bdf")
-set(HPCLANG_FONT_spleen_spleen_32x64_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64_0000.S"
-    "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64_0001.S"
-    "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64_full.S"
-)
-set(HPCLANG_FONT_spleen_spleen_32x64_ASCENT 52)
-set(HPCLANG_FONT_spleen_spleen_32x64_DESCENT 12)
-set(HPCLANG_FONT_spleen_spleen_32x64_LINE_HEIGHT 64)
-set(HPCLANG_FONT_spleen_spleen_32x64_NOMINAL_ADVANCE 32)
-set(HPCLANG_FONT_spleen_spleen_32x64_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64.codepoints.cmake")
-
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_SELECTOR "spleen/cp437/spleen-32x64-ibm-437.bdf")
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64_ibm_437.S"
-)
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_ASCENT 52)
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_DESCENT 12)
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_LINE_HEIGHT 64)
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_NOMINAL_ADVANCE 32)
-set(HPCLANG_FONT_spleen_spleen_32x64_ibm_437_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_32x64_ibm_437.codepoints.cmake")
-
 set(HPCLANG_FONT_spleen_spleen_5x8_SELECTOR "spleen/spleen-5x8.bdf")
 set(HPCLANG_FONT_spleen_spleen_5x8_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/spleen_spleen_5x8.S"
@@ -5722,76 +5567,6 @@ set(HPCLANG_FONT_squeezed_u8g2_squeezed_regular_7_DESCENT 1)
 set(HPCLANG_FONT_squeezed_u8g2_squeezed_regular_7_LINE_HEIGHT 8)
 set(HPCLANG_FONT_squeezed_u8g2_squeezed_regular_7_NOMINAL_ADVANCE 4)
 set(HPCLANG_FONT_squeezed_u8g2_squeezed_regular_7_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/squeezed_u8g2_squeezed_regular_7.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline10x20_SELECTOR "tamzen/bdf/Powerline10x20.bdf")
-set(HPCLANG_FONT_tamzen_powerline10x20_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline10x20.S"
-)
-set(HPCLANG_FONT_tamzen_powerline10x20_ASCENT 14)
-set(HPCLANG_FONT_tamzen_powerline10x20_DESCENT 6)
-set(HPCLANG_FONT_tamzen_powerline10x20_LINE_HEIGHT 20)
-set(HPCLANG_FONT_tamzen_powerline10x20_NOMINAL_ADVANCE 10)
-set(HPCLANG_FONT_tamzen_powerline10x20_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline10x20.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline5x9_SELECTOR "tamzen/bdf/Powerline5x9.bdf")
-set(HPCLANG_FONT_tamzen_powerline5x9_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline5x9.S"
-)
-set(HPCLANG_FONT_tamzen_powerline5x9_ASCENT 7)
-set(HPCLANG_FONT_tamzen_powerline5x9_DESCENT 2)
-set(HPCLANG_FONT_tamzen_powerline5x9_LINE_HEIGHT 9)
-set(HPCLANG_FONT_tamzen_powerline5x9_NOMINAL_ADVANCE 5)
-set(HPCLANG_FONT_tamzen_powerline5x9_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline5x9.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline6x12_SELECTOR "tamzen/bdf/Powerline6x12.bdf")
-set(HPCLANG_FONT_tamzen_powerline6x12_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline6x12.S"
-)
-set(HPCLANG_FONT_tamzen_powerline6x12_ASCENT 10)
-set(HPCLANG_FONT_tamzen_powerline6x12_DESCENT 2)
-set(HPCLANG_FONT_tamzen_powerline6x12_LINE_HEIGHT 12)
-set(HPCLANG_FONT_tamzen_powerline6x12_NOMINAL_ADVANCE 6)
-set(HPCLANG_FONT_tamzen_powerline6x12_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline6x12.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline7x13_SELECTOR "tamzen/bdf/Powerline7x13.bdf")
-set(HPCLANG_FONT_tamzen_powerline7x13_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline7x13.S"
-)
-set(HPCLANG_FONT_tamzen_powerline7x13_ASCENT 11)
-set(HPCLANG_FONT_tamzen_powerline7x13_DESCENT 2)
-set(HPCLANG_FONT_tamzen_powerline7x13_LINE_HEIGHT 13)
-set(HPCLANG_FONT_tamzen_powerline7x13_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_powerline7x13_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline7x13.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline7x14_SELECTOR "tamzen/bdf/Powerline7x14.bdf")
-set(HPCLANG_FONT_tamzen_powerline7x14_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline7x14.S"
-)
-set(HPCLANG_FONT_tamzen_powerline7x14_ASCENT 11)
-set(HPCLANG_FONT_tamzen_powerline7x14_DESCENT 3)
-set(HPCLANG_FONT_tamzen_powerline7x14_LINE_HEIGHT 14)
-set(HPCLANG_FONT_tamzen_powerline7x14_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_powerline7x14_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline7x14.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline8x15_SELECTOR "tamzen/bdf/Powerline8x15.bdf")
-set(HPCLANG_FONT_tamzen_powerline8x15_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline8x15.S"
-)
-set(HPCLANG_FONT_tamzen_powerline8x15_ASCENT 12)
-set(HPCLANG_FONT_tamzen_powerline8x15_DESCENT 3)
-set(HPCLANG_FONT_tamzen_powerline8x15_LINE_HEIGHT 15)
-set(HPCLANG_FONT_tamzen_powerline8x15_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_powerline8x15_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline8x15.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_powerline8x16_SELECTOR "tamzen/bdf/Powerline8x16.bdf")
-set(HPCLANG_FONT_tamzen_powerline8x16_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline8x16.S"
-)
-set(HPCLANG_FONT_tamzen_powerline8x16_ASCENT 12)
-set(HPCLANG_FONT_tamzen_powerline8x16_DESCENT 4)
-set(HPCLANG_FONT_tamzen_powerline8x16_LINE_HEIGHT 16)
-set(HPCLANG_FONT_tamzen_powerline8x16_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_powerline8x16_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_powerline8x16.codepoints.cmake")
 
 set(HPCLANG_FONT_tamzen_tamzen10x20b_SELECTOR "tamzen/bdf/Tamzen10x20b.bdf")
 set(HPCLANG_FONT_tamzen_tamzen10x20b_SOURCES
@@ -5932,146 +5707,6 @@ set(HPCLANG_FONT_tamzen_tamzen8x16r_DESCENT 4)
 set(HPCLANG_FONT_tamzen_tamzen8x16r_LINE_HEIGHT 16)
 set(HPCLANG_FONT_tamzen_tamzen8x16r_NOMINAL_ADVANCE 8)
 set(HPCLANG_FONT_tamzen_tamzen8x16r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzen8x16r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_SELECTOR "tamzen/bdf/TamzenForPowerline10x20b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline10x20b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_ASCENT 14)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_DESCENT 6)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_LINE_HEIGHT 20)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_NOMINAL_ADVANCE 10)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline10x20b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_SELECTOR "tamzen/bdf/TamzenForPowerline10x20r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline10x20r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_ASCENT 14)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_DESCENT 6)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_LINE_HEIGHT 20)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_NOMINAL_ADVANCE 10)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline10x20r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline10x20r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_SELECTOR "tamzen/bdf/TamzenForPowerline5x9b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline5x9b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_ASCENT 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_LINE_HEIGHT 9)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_NOMINAL_ADVANCE 5)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline5x9b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_SELECTOR "tamzen/bdf/TamzenForPowerline5x9r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline5x9r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_ASCENT 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_LINE_HEIGHT 9)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_NOMINAL_ADVANCE 5)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline5x9r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline5x9r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_SELECTOR "tamzen/bdf/TamzenForPowerline6x12b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline6x12b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_ASCENT 10)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_LINE_HEIGHT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_NOMINAL_ADVANCE 6)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline6x12b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_SELECTOR "tamzen/bdf/TamzenForPowerline6x12r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline6x12r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_ASCENT 10)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_LINE_HEIGHT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_NOMINAL_ADVANCE 6)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline6x12r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline6x12r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_SELECTOR "tamzen/bdf/TamzenForPowerline7x13b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x13b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_ASCENT 11)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_LINE_HEIGHT 13)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x13b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_SELECTOR "tamzen/bdf/TamzenForPowerline7x13r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x13r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_ASCENT 11)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_DESCENT 2)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_LINE_HEIGHT 13)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x13r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x13r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_SELECTOR "tamzen/bdf/TamzenForPowerline7x14b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x14b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_ASCENT 11)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_DESCENT 3)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_LINE_HEIGHT 14)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x14b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_SELECTOR "tamzen/bdf/TamzenForPowerline7x14r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x14r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_ASCENT 11)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_DESCENT 3)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_LINE_HEIGHT 14)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_NOMINAL_ADVANCE 7)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline7x14r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline7x14r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_SELECTOR "tamzen/bdf/TamzenForPowerline8x15b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x15b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_ASCENT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_DESCENT 3)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_LINE_HEIGHT 15)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x15b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_SELECTOR "tamzen/bdf/TamzenForPowerline8x15r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x15r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_ASCENT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_DESCENT 3)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_LINE_HEIGHT 15)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x15r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x15r.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_SELECTOR "tamzen/bdf/TamzenForPowerline8x16b.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x16b.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_ASCENT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_DESCENT 4)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_LINE_HEIGHT 16)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16b_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x16b.codepoints.cmake")
-
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_SELECTOR "tamzen/bdf/TamzenForPowerline8x16r.bdf")
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_SOURCES
-    "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x16r.S"
-)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_ASCENT 12)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_DESCENT 4)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_LINE_HEIGHT 16)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_NOMINAL_ADVANCE 8)
-set(HPCLANG_FONT_tamzen_tamzenforpowerline8x16r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/tamzen_tamzenforpowerline8x16r.codepoints.cmake")
 
 set(HPCLANG_FONT_terminus_ter_u12b_SELECTOR "terminus/ter-u12b.bdf")
 set(HPCLANG_FONT_terminus_ter_u12b_SOURCES
