@@ -448,18 +448,30 @@ static uint32_t build_feature_probe(
     uint32_t *out,
     uint32_t capacity)
 {
-    static const uint32_t kana[] = {
-        12354u, 12356u, 12358u, 12360u, 12362u,
-        12450u, 12452u, 12454u, 12456u, 12458u,
-    };
-    static const uint32_t hangul[] = {
-        44032u, 45208u, 45796u, 54620u, 44544u,
+    /* Prefer ordinary reading characters first. The gallery is a visual
+       specimen, not a Unicode rarity contest; diagnostic symbols are fallback
+       material for faces that do not cover CJK. */
+    static const uint32_t cjk_punct[] = {
+        0x3001u, 0x3002u, 0x300Cu, 0x300Du,
+        0xFF0Cu, 0xFF01u, 0xFF1Fu,
     };
     static const uint32_t han[] = {
-        22825u, 22320u, 20154u, 20013u, 25991u, 23383u,
-        20307u, 39636u, 38376u, 38272u, 39118u, 39080u,
-        40857u, 40845u, 35821u, 35486u, 35328u,
-        22269u, 22283u, 21488u, 33274u, 28286u, 28771u,
+        0x4E2Du, 0x6587u, 0x5B57u, 0x4F53u, 0x9AD4u,
+        0x5929u, 0x5730u, 0x5C71u, 0x6C34u, 0x65E5u, 0x6708u,
+        0x4EBAu, 0x5FC3u, 0x5927u, 0x5C0Fu, 0x4E0Au, 0x4E0Bu,
+        0x5DE6u, 0x53F3u, 0x4E1Cu, 0x6771u, 0x897Fu, 0x5357u, 0x5317u,
+        0x4F60u, 0x597Du, 0x4E16u, 0x754Cu, 0x56FDu, 0x570Bu,
+    };
+    static const uint32_t kana[] = {
+        0x3042u, 0x3044u, 0x3046u, 0x3048u, 0x304Au,
+        0x304Bu, 0x304Du, 0x304Fu, 0x3051u, 0x3053u,
+        0x30A2u, 0x30A4u, 0x30A6u, 0x30A8u, 0x30AAu,
+        0x30ABu, 0x30ADu, 0x30AFu, 0x30B1u, 0x30B3u,
+    };
+    static const uint32_t hangul[] = {
+        0xAC00u, 0xB098u, 0xB2E4u, 0xB77Cu, 0xB9C8u, 0xBC14u, 0xC0ACu,
+        0xC544u, 0xC790u, 0xCC28u, 0xCE74u, 0xD0C0u, 0xD30Cu, 0xD558u,
+        0xD55Cu, 0xAD6Du, 0xC5B4u,
     };
     static const uint32_t greek[] = { 937u, 945u, 946u, 955u, 960u };
     static const uint32_t math_arrow[] = {
@@ -471,15 +483,17 @@ static uint32_t build_feature_probe(
     };
     uint32_t count = 0u;
 
-    for (uint32_t i = 0u; i < view->private_count && count < capacity && i < 6u; ++i)
+    for (uint32_t i = 0u; i < view->private_count && count < capacity && i < 4u; ++i)
         append_unique(out, &count, capacity, view->private_codepoints[i]);
 
+    append_preferred_unicode(view, out, &count, capacity, cjk_punct,
+        (uint32_t)(sizeof(cjk_punct) / sizeof(cjk_punct[0])), 4u);
+    append_preferred_unicode(view, out, &count, capacity, han,
+        (uint32_t)(sizeof(han) / sizeof(han[0])), 10u);
     append_preferred_unicode(view, out, &count, capacity, kana,
         (uint32_t)(sizeof(kana) / sizeof(kana[0])), 5u);
     append_preferred_unicode(view, out, &count, capacity, hangul,
-        (uint32_t)(sizeof(hangul) / sizeof(hangul[0])), 3u);
-    append_preferred_unicode(view, out, &count, capacity, han,
-        (uint32_t)(sizeof(han) / sizeof(han[0])), 8u);
+        (uint32_t)(sizeof(hangul) / sizeof(hangul[0])), 5u);
     append_preferred_unicode(view, out, &count, capacity, greek,
         (uint32_t)(sizeof(greek) / sizeof(greek[0])), 4u);
     append_preferred_unicode(view, out, &count, capacity, math_arrow,
@@ -627,16 +641,16 @@ static void draw_basic_page(
     if (line_height >= 18u) {
         int32_t centered_y = CONTENT_TOP +
             (bottom - CONTENT_TOP - (int32_t)line_height) / 2;
-        draw_centered_ascii(surface, font, centered_y, "Il1 0OQ");
+        draw_centered_ascii(surface, font, centered_y, "Hamburge");
         return;
     }
 
     const char *rows[] = {
         "Il1| 0OQ",
         "2Z5S6G8B",
-        "aegxy rnMW",
+        "Hamburgefonts",
+        "Sphinx quartz",
         "0123456789",
-        "{}[]() /\\",
     };
     for (uint32_t i = 0u;
          i < (uint32_t)(sizeof(rows) / sizeof(rows[0])) &&
@@ -668,10 +682,10 @@ static void draw_paragraph_page(
     }
 
     if (line_height >= 15u) {
-        draw_centered_ascii(surface, font, CONTENT_TOP, "Il1 0OQ");
+        draw_centered_ascii(surface, font, CONTENT_TOP, "Sphinx");
         y = CONTENT_TOP + (int32_t)line_height;
         if (y + (int32_t)line_height <= bottom) {
-            draw_centered_ascii(surface, font, y, "aeg 258");
+            draw_centered_ascii(surface, font, y, "Il1 0OQ");
             y += (int32_t)line_height;
         }
     } else {
@@ -680,8 +694,9 @@ static void draw_paragraph_page(
             font,
             CONTENT_TOP,
             bottom,
-            "Il1| 0OQ 2Z5S 6G8B rn m w MW AV To aegxy "
-            "0123456789 {}[]() <> /\\ _-+= *#@&%");
+            "Sphinx of black quartz, judge my vow! "
+            "Pack my box with five dozen liquor jugs. "
+            "AV To rn m w MW 0123456789 @&%#?.,:; []{}<> /\\ _-+=*");
     }
 
     if (y < bottom && (view->unicode_count != 0u || view->private_count != 0u))
