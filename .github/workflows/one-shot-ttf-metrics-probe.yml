@@ -1,0 +1,137 @@
+name: Maintenance / TTF metrics probe
+
+on:
+  push:
+    branches:
+      - m7-fonts-gallery
+    paths:
+      - ".github/workflows/one-shot-ttf-metrics-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: home-docker
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Probe TTF metrics and raster sizes
+        run: |
+          python3 - <<'PY'
+          import base64
+          import io
+          import json
+          import re
+          import zipfile
+          from pathlib import Path
+
+          from PIL import Image, ImageDraw, ImageFont
+          from fontTools.ttLib import TTFont
+
+          ZIP = Path('runtime/fonts/fonts.zip')
+          OUT = Path('build/ttf-probe')
+          OUT.mkdir(parents=True, exist_ok=True)
+          sizes = [6, 7, 8, 9, 10, 11, 12, 13, 14, 16]
+          sample = 'AaBbCc HxgypQ 012345'
+
+          def name(tt, nid):
+              for rec in tt['name'].names:
+                  if rec.nameID == nid:
+                      try:
+                          return rec.toUnicode()
+                      except Exception:
+                          pass
+              return ''
+
+          rows = []
+          html = ['<!doctype html><meta charset="utf-8"><title>TTF PPEM probe</title>',
+                  '<style>body{font:14px system-ui;margin:20px;background:#f4f4f4}article{background:white;margin:16px 0;padding:14px;border-radius:8px}pre{white-space:pre-wrap}.strip{max-width:100%;image-rendering:pixelated;border:1px solid #bbb}.meta{color:#555}</style>',
+                  '<h1>TTF PPEM / baseline probe</h1>',
+                  '<p>Each strip renders the same text at 6,7,8,9,10,11,12,13,14,16 px. Grey horizontal line is the baseline. Rasterization uses explicit baseline anchor <code>ls</code>.</p>']
+
+          with zipfile.ZipFile(ZIP) as z:
+              paths = sorted(n for n in z.namelist() if n.lower().endswith('.ttf'))
+              for path in paths:
+                  data = z.read(path)
+                  tt = TTFont(io.BytesIO(data), lazy=False)
+                  head = tt['head']
+                  hhea = tt['hhea']
+                  os2 = tt.get('OS/2')
+                  tables = set(tt.keys())
+                  embedded = sorted(t for t in tables if t in {'EBLC','EBDT','CBLC','CBDT','sbix','bloc','bdat'})
+                  rec = {
+                      'path': path,
+                      'family': name(tt, 1),
+                      'subfamily': name(tt, 2),
+                      'full_name': name(tt, 4),
+                      'units_per_em': head.unitsPerEm,
+                      'lowest_rec_ppem': head.lowestRecPPEM,
+                      'hhea_ascent': hhea.ascent,
+                      'hhea_descent': hhea.descent,
+                      'hhea_line_gap': hhea.lineGap,
+                      'os2_typo_ascender': getattr(os2, 'sTypoAscender', None),
+                      'os2_typo_descender': getattr(os2, 'sTypoDescender', None),
+                      'os2_typo_line_gap': getattr(os2, 'sTypoLineGap', None),
+                      'os2_win_ascent': getattr(os2, 'usWinAscent', None),
+                      'os2_win_descent': getattr(os2, 'usWinDescent', None),
+                      'embedded_bitmap_tables': embedded,
+                      'sizes': {},
+                  }
+
+                  panels = []
+                  for size in sizes:
+                      font = ImageFont.truetype(io.BytesIO(data), size=size)
+                      asc, desc = font.getmetrics()
+                      bbox_ls = font.getbbox(sample, anchor='ls')
+                      bbox_default = font.getbbox(sample)
+                      glyphs = {}
+                      for ch in 'AHxagpqy09':
+                          mask, off = font.getmask2(ch, mode='1', anchor='ls')
+                          glyphs[ch] = {'offset_ls': list(off), 'mask': list(mask.size), 'advance': round(font.getlength(ch), 3)}
+                      rec['sizes'][str(size)] = {
+                          'ascent': asc,
+                          'descent': desc,
+                          'bbox_ls': list(bbox_ls),
+                          'bbox_default': list(bbox_default),
+                          'glyphs': glyphs,
+                      }
+
+                      w, h = 250, 40
+                      baseline = 25
+                      im = Image.new('L', (w, h), 255)
+                      d = ImageDraw.Draw(im)
+                      d.line((0, baseline, w-1, baseline), fill=205)
+                      d.text((2, baseline), sample, font=font, fill=0, anchor='ls')
+                      d.text((190, 3), f'{size}px', font=ImageFont.load_default(), fill=80)
+                      panels.append(im)
+
+                  strip = Image.new('L', (250, 40 * len(panels)), 255)
+                  for i, panel in enumerate(panels):
+                      strip.paste(panel, (0, i * 40))
+                  buf = io.BytesIO()
+                  strip.save(buf, format='PNG')
+                  b64 = base64.b64encode(buf.getvalue()).decode()
+
+                  rows.append(rec)
+                  print(json.dumps({k:v for k,v in rec.items() if k != 'sizes'}, ensure_ascii=False))
+                  html.append('<article>')
+                  html.append(f"<h2>{rec['family']} — {rec['full_name']}</h2>")
+                  html.append(f"<div class='meta'>{path}<br>UPM {head.unitsPerEm}; lowestRecPPEM {head.lowestRecPPEM}; embedded bitmap tables: {embedded or 'none'}<br>hhea {hhea.ascent}/{hhea.descent}/{hhea.lineGap}; OS/2 typo {rec['os2_typo_ascender']}/{rec['os2_typo_descender']}/{rec['os2_typo_line_gap']}</div>")
+                  html.append(f"<img class='strip' src='data:image/png;base64,{b64}'>")
+                  html.append('</article>')
+
+          (OUT/'ttf-metrics.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding='utf-8')
+          (OUT/'ttf-ppem-probe.html').write_text('\n'.join(html), encoding='utf-8')
+          print(f'TTF count: {len(rows)}')
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ttf-metrics-probe
+          retention-days: 3
+          path: build/ttf-probe/
+          if-no-files-found: error
