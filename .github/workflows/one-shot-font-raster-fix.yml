@@ -41,7 +41,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/hpclang-font.py .github/workflows/one-shot-font-raster-fix.yml
+          git add -A
           git commit -m "fix: use Pillow mask geometry for font rasterization"
           git pull --rebase origin m7-fonts-gallery
           git push origin HEAD:m7-fonts-gallery
