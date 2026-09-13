@@ -36,6 +36,8 @@ jobs:
           python3 -m venv build/font-venv
           build/font-venv/bin/python -m pip install --disable-pip-version-check Pillow fonttools
 
+      # Regeneration is the canonical check for source-parser/rasterizer changes too,
+      # not only for changes to the raw source bundle.
       - name: Regenerate checked-in assembly assets
         run: |
           PY=build/font-venv/bin/python
