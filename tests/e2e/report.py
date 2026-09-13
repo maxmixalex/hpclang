@@ -29,6 +29,12 @@ def main() -> int:
         expand(spec.get("heading", "Calculator E2E")),
     ]
 
+    summary = spec.get("summary", {})
+    if "scale" in summary:
+        command += ["--scale", str(summary["scale"])]
+    if "columns" in summary:
+        command += ["--columns", str(summary["columns"])]
+
     if args.image_out:
         command += ["--image-out", args.image_out]
     if args.image_url:

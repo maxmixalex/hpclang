@@ -1,5 +1,8 @@
 {
   "heading": "${TARGET} hpclang Font Gallery",
+  "summary": {
+    "scale": 1
+  },
   "required_files": [
     "build/${TARGET}-e2e.json",
     "build/${TARGET}-before.pgm",
@@ -8,8 +11,7 @@
     "build/${TARGET}-font-gallery.pgm"
   ],
   "captures": [
-    "build/${TARGET}-font-gallery.pgm",
-    "build/${TARGET}-return.pgm"
+    "build/${TARGET}-font-gallery.pgm"
   ],
   "json": [
     "build/${TARGET}-e2e.json"
