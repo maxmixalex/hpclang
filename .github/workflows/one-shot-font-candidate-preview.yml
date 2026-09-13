@@ -27,8 +27,13 @@ jobs:
         run: |
           set -euxo pipefail
           if ! command -v otf2bdf >/dev/null 2>&1; then
-            apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends otf2bdf
+            mkdir -p build/otf2bdf-pkg
+            curl --fail --location --retry 3 \
+              https://archive.ubuntu.com/ubuntu/pool/universe/o/otf2bdf/otf2bdf_3.1-4.1_amd64.deb \
+              -o build/otf2bdf-pkg/otf2bdf.deb
+            dpkg-deb -x build/otf2bdf-pkg/otf2bdf.deb build/otf2bdf-pkg/root
+            echo "$PWD/build/otf2bdf-pkg/root/usr/bin" >> "$GITHUB_PATH"
+            build/otf2bdf-pkg/root/usr/bin/otf2bdf -h >/dev/null
           fi
           python3 -m venv build/font-candidate-venv
           build/font-candidate-venv/bin/python -m pip install --disable-pip-version-check Pillow
