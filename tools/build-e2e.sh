@@ -33,7 +33,13 @@ case "$MODE" in
         E2E_SOURCE="$ROOT/tests/e2e/font-gallery"
         E2E_TARGET="hpclang_font_gallery"
         E2E_ELF="hpclang-font-gallery.elf"
-        E2E_CMAKE_ARGS=(-DHPCLANG_GALLERY_PROFILE=full)
+        GALLERY_SHARD_INDEX="${HPCLANG_GALLERY_SHARD_INDEX:-0}"
+        GALLERY_SHARD_COUNT="${HPCLANG_GALLERY_SHARD_COUNT:-1}"
+        E2E_CMAKE_ARGS=(
+            -DHPCLANG_GALLERY_PROFILE=full
+            -DHPCLANG_GALLERY_SHARD_INDEX="$GALLERY_SHARD_INDEX"
+            -DHPCLANG_GALLERY_SHARD_COUNT="$GALLERY_SHARD_COUNT"
+        )
         WRAP_LAUNCHERS=0
         ;;
     font-gallery-stock)
@@ -176,6 +182,22 @@ for path in sorted(Path(sys.argv[1]).glob("*.json")):
     print(data["target"], data["model"])
 PY
 )
+
+if [[ "$MODE" == font-gallery ]]; then
+    # prepare-x50ng-gallery.py expands the synthetic injection mapping to 224
+    # pages. The frontend reserves three of them around the stage0 image.
+    gallery_launcher_limit=$(( (224 - 3) * 4096 ))
+    for launcher in "$OUT"/launchers/*.bin; do
+        launcher_size="$(stat -c '%s' "$launcher")"
+        if (( launcher_size > gallery_launcher_limit )); then
+            echo "Direct Gallery launcher $(basename "$launcher") is ${launcher_size} bytes; limit is ${gallery_launcher_limit}" >&2
+            exit 1
+        fi
+    done
+    printf 'index=%s\ncount=%s\n' \
+        "$GALLERY_SHARD_INDEX" "$GALLERY_SHARD_COUNT" \
+        > "$OUT/e2e.gallery-shard"
+fi
 
 if (( WRAP_LAUNCHERS )); then
     printf 'PASS: %s E2E application and wrapped target launchers built.\n' "$MODE"

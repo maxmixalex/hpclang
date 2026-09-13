@@ -36,12 +36,14 @@ X50_ARGS=(
 
 case "$HPCLANG_E2E_FAMILY" in
     hp39)
-        curl -fL --retry 3 \
-            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
-            -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
-        unzip -p \
-            "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
-            "$HPCLANG_E2E_MEMBER" \
+        archive="$ROOT/build/$TARGET-$HPCLANG_E2E_ARCHIVE"
+        if [[ ! -s "$archive" ]]; then
+            curl -fL --retry 3 \
+                "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+                -o "$archive.tmp"
+            mv "$archive.tmp" "$archive"
+        fi
+        unzip -p "$archive" "$HPCLANG_E2E_MEMBER" \
             > "$ROOT/build/$TARGET-firmware.bin"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-40g.css"
@@ -51,15 +53,18 @@ case "$HPCLANG_E2E_FAMILY" in
         )
         ;;
     hp48)
-        curl -fL --retry 3 \
-            https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin \
-            -o "$ROOT/build/hp48gii-nor.bin"
+        nor="$ROOT/build/$TARGET-nor.bin"
+        if [[ ! -s "$nor" ]]; then
+            curl -fL --retry 3 \
+                https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin \
+                -o "$nor.tmp"
+            mv "$nor.tmp" "$nor"
+        fi
         printf '%s  %s\n' \
             4899102743d3420dc517ae1b489fe2405229be616dbdb1b9f00cc1d0aeae1937 \
-            "$ROOT/build/hp48gii-nor.bin" |
+            "$nor" |
             sha256sum -c -
-        python3 "$ROOT/tools/prepare-hp48gii-nor.py" \
-            "$ROOT/build/hp48gii-nor.bin" "$STATE"
+        python3 "$ROOT/tools/prepare-hp48gii-nor.py" "$nor" "$STATE"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-40g.css"
         )

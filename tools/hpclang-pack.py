@@ -10,6 +10,8 @@ from pathlib import Path
 PT_LOAD = 1
 PF_W = 2
 CODE_BASE = 0x01220000
+CODE_WINDOW_END = 0x01300000
+CODE_CAPACITY = CODE_WINDOW_END - CODE_BASE
 DATA_BASE = 0x01101000
 
 
@@ -69,7 +71,13 @@ def pack(src: Path, dst: Path) -> None:
         raise ValueError("ELF has no initialized PT_LOAD payload")
 
     image_end = max(s.paddr + s.filesz for s in initialized)
-    image = bytearray(image_end - CODE_BASE)
+    image_size = image_end - CODE_BASE
+    if image_size > CODE_CAPACITY:
+        raise ValueError(
+            f"HPC1 initialized image is {image_size} bytes, exceeding the "
+            f"{CODE_CAPACITY}-byte code window"
+        )
+    image = bytearray(image_size)
 
     for s in initialized:
         start = s.paddr - CODE_BASE

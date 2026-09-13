@@ -34,10 +34,43 @@ set_property(CACHE HPCLANG_GALLERY_PROFILE PROPERTY STRINGS full stock-smoke)
 
 set(GALLERY_FONT_IDS ${HPCLANG_FONT_IDS})
 list(SORT GALLERY_FONT_IDS)
+set(HPCLANG_GALLERY_SHARD_INDEX "0" CACHE STRING
+    "Zero-based exhaustive Gallery shard index")
+set(HPCLANG_GALLERY_SHARD_COUNT "1" CACHE STRING
+    "Number of exhaustive Gallery shards")
+
 if(HPCLANG_GALLERY_PROFILE STREQUAL "stock-smoke")
     list(GET GALLERY_FONT_IDS 0 GALLERY_STOCK_FACE)
     set(GALLERY_FONT_IDS "${GALLERY_STOCK_FACE}")
-elseif(NOT HPCLANG_GALLERY_PROFILE STREQUAL "full")
+elseif(HPCLANG_GALLERY_PROFILE STREQUAL "full")
+    if(NOT HPCLANG_GALLERY_SHARD_INDEX MATCHES "^[0-9]+$" OR
+       NOT HPCLANG_GALLERY_SHARD_COUNT MATCHES "^[1-9][0-9]*$")
+        message(FATAL_ERROR
+            "Gallery shard index/count must be non-negative/positive integers")
+    endif()
+    if(HPCLANG_GALLERY_SHARD_INDEX GREATER_EQUAL HPCLANG_GALLERY_SHARD_COUNT)
+        message(FATAL_ERROR
+            "Gallery shard index must be smaller than shard count")
+    endif()
+
+    if(HPCLANG_GALLERY_SHARD_COUNT GREATER 1)
+        set(GALLERY_SHARD_FONT_IDS)
+        set(gallery_catalog_index 0)
+        foreach(font_id IN LISTS GALLERY_FONT_IDS)
+            math(EXPR gallery_owner
+                "${gallery_catalog_index} % ${HPCLANG_GALLERY_SHARD_COUNT}")
+            if(gallery_owner EQUAL HPCLANG_GALLERY_SHARD_INDEX)
+                list(APPEND GALLERY_SHARD_FONT_IDS "${font_id}")
+            endif()
+            math(EXPR gallery_catalog_index "${gallery_catalog_index} + 1")
+        endforeach()
+        if(NOT GALLERY_SHARD_FONT_IDS)
+            message(FATAL_ERROR
+                "Gallery shard ${HPCLANG_GALLERY_SHARD_INDEX}/${HPCLANG_GALLERY_SHARD_COUNT} is empty")
+        endif()
+        set(GALLERY_FONT_IDS ${GALLERY_SHARD_FONT_IDS})
+    endif()
+else()
     message(FATAL_ERROR
         "HPCLANG_GALLERY_PROFILE must be full or stock-smoke")
 endif()
@@ -312,7 +345,7 @@ file(APPEND "${catalog_c}"
 target_sources(hpclang_font_gallery PRIVATE "${catalog_c}")
 
 message(STATUS
-    "Font Gallery (${HPCLANG_GALLERY_PROFILE}): ${face_index} generated faces from ${family_count} families + 2 native faces")
+    "Font Gallery (${HPCLANG_GALLERY_PROFILE}, shard ${HPCLANG_GALLERY_SHARD_INDEX}/${HPCLANG_GALLERY_SHARD_COUNT}): ${face_index} generated faces from ${family_count} families + 2 native faces")
 
 # Generated font assets are immutable lookup data and the Gallery never relies
 # on glyph/bitmap object address identity. Allow lld to fold equal read-only
