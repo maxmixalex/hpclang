@@ -57,10 +57,12 @@ set(HPCLANG_FONT_IDS
     cherry_cherry_12_r
     cherry_cherry_13_b
     cherry_cherry_13_r
+    chill_bitmap_chillbitmap7x_otf2bdf_6pt
     cozette_cozette
     cozette_cozette_hidpi
     cozette_cozettecrossedseven
     cozette_cozettecrossedseven_hidpi
+    cubic_11_cubic11_otf2bdf_9pt
     dina_dina_i400_10
     dina_dina_i400_8
     dina_dina_i400_9
@@ -162,6 +164,7 @@ set(HPCLANG_FONT_IDS
     profont_profont22
     profont_profont29
     progsole_progsole_10
+    quan_pixel_quanpixel_may7
     retro_pixel_retro_pixel_arcade
     retro_pixel_retro_pixel_cute_mono
     retro_pixel_retro_pixel_cute_prop
@@ -1694,6 +1697,43 @@ set(HPCLANG_FONT_cherry_cherry_13_r_LINE_HEIGHT 13)
 set(HPCLANG_FONT_cherry_cherry_13_r_NOMINAL_ADVANCE 7)
 set(HPCLANG_FONT_cherry_cherry_13_r_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/cherry_cherry_13_r.codepoints.cmake")
 
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_SELECTOR "chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf")
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0000.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0001.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0002.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0003.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0004.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0005.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0006.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0007.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0008.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0009.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0010.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0011.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0012.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0013.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0014.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0015.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0016.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0017.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0018.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0019.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0020.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0021.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0022.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0023.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0024.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0025.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_0026.S"
+    "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt_full.S"
+)
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_ASCENT 6)
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_DESCENT 2)
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_LINE_HEIGHT 8)
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_NOMINAL_ADVANCE 8)
+set(HPCLANG_FONT_chill_bitmap_chillbitmap7x_otf2bdf_6pt_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/chill_bitmap_chillbitmap7x_otf2bdf_6pt.codepoints.cmake")
+
 set(HPCLANG_FONT_cozette_cozette_SELECTOR "cozette/cozette.bdf")
 set(HPCLANG_FONT_cozette_cozette_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/cozette_cozette_0000.S"
@@ -1781,6 +1821,36 @@ set(HPCLANG_FONT_cozette_cozettecrossedseven_hidpi_DESCENT 6)
 set(HPCLANG_FONT_cozette_cozettecrossedseven_hidpi_LINE_HEIGHT 26)
 set(HPCLANG_FONT_cozette_cozettecrossedseven_hidpi_NOMINAL_ADVANCE 14)
 set(HPCLANG_FONT_cozette_cozettecrossedseven_hidpi_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/cozette_cozettecrossedseven_hidpi.codepoints.cmake")
+
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_SELECTOR "cubic-11/Cubic11-otf2bdf-9pt.bdf")
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0000.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0001.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0002.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0003.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0004.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0005.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0006.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0007.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0008.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0009.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0010.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0011.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0012.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0013.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0014.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0015.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0016.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0017.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0018.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_0019.S"
+    "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt_full.S"
+)
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_ASCENT 10)
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_DESCENT 4)
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_LINE_HEIGHT 14)
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_NOMINAL_ADVANCE 14)
+set(HPCLANG_FONT_cubic_11_cubic11_otf2bdf_9pt_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/cubic_11_cubic11_otf2bdf_9pt.codepoints.cmake")
 
 set(HPCLANG_FONT_dina_dina_i400_10_SELECTOR "dina/BDF/Dina_i400-10.bdf")
 set(HPCLANG_FONT_dina_dina_i400_10_SOURCES
@@ -4673,6 +4743,52 @@ set(HPCLANG_FONT_progsole_progsole_10_DESCENT 2)
 set(HPCLANG_FONT_progsole_progsole_10_LINE_HEIGHT 10)
 set(HPCLANG_FONT_progsole_progsole_10_NOMINAL_ADVANCE 6)
 set(HPCLANG_FONT_progsole_progsole_10_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/progsole_progsole_10.codepoints.cmake")
+
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_SELECTOR "quan-pixel/QuanPixel-May7.bdf")
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0000.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0001.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0002.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0003.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0004.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0005.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0006.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0007.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0008.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0009.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0010.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0011.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0012.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0013.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0014.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0015.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0016.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0017.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0018.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0019.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0020.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0021.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0022.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0023.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0024.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0025.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0026.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0027.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0028.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0029.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0030.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0031.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0032.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0033.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0034.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_0035.S"
+    "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7_full.S"
+)
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_ASCENT 6)
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_DESCENT 2)
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_LINE_HEIGHT 8)
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_NOMINAL_ADVANCE 8)
+set(HPCLANG_FONT_quan_pixel_quanpixel_may7_CODEPOINTS_FILE "${CMAKE_CURRENT_LIST_DIR}/quan_pixel_quanpixel_may7.codepoints.cmake")
 
 set(HPCLANG_FONT_retro_pixel_retro_pixel_arcade_SELECTOR "retro-pixel/arcade/retro-pixel-arcade.bdf")
 set(HPCLANG_FONT_retro_pixel_retro_pixel_arcade_SOURCES
