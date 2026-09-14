@@ -22,15 +22,17 @@ They are not vendored into the normal source tree unless their redistribution te
 
 ## Font assets
 
-The old provisional Basic-Latin tables are no longer the long-term custom-font source. `runtime/fonts/fonts.zip` is the reviewed source bundle used to regenerate the checked-in font catalog. It contains upstream font families together with their source distributions/license material; redistribution decisions are made per included family rather than inferred from historical HPGCC code.
+The old provisional Basic-Latin tables are no longer the long-term custom-font source. `runtime/fonts/fonts.zip` is the reviewed source bundle used to regenerate the checked-in font catalog. It contains upstream font families together with source/provenance and license material; redistribution decisions are made per included family rather than inferred from historical HPGCC code.
 
-Repository-maintenance tooling parses the selected BDF, FON, and newRPL bitmap sources and emits independent hpclang assembly assets. TTF is deliberately not a canonical importer format: bitmap candidates that only ship an outline/container font must first provide a reviewable bitmap-source or deterministic asset-preparation path rather than silently entering the SDK through a generic TTF rasterizer. Normal application builds consume only the generated assets and do not execute source-font tooling.
+The final M7 bundle is bitmap-source only. Repository-maintenance tooling parses the selected BDF, FON, and newRPL bitmap sources and emits independent hpclang assembly assets. The generic TTF importer has been removed. Where a reviewed upstream candidate required a one-time deterministic bitmap derivation before inclusion, that derivation is part of the curated source-package provenance rather than a normal SDK import path. The final Cubic 11, ChillBitmap 7px, and QuanPixel/May7 additions follow that rule.
+
+Normal application builds consume only the checked-in generated assets and do not execute source-font tooling. Font Assets CI independently regenerates the canonical package and checks source→generated parity so generated `.S` files cannot silently drift away from the reviewed source bundle.
 
 The stock-ROM fonts exposed by `hpclang_font_mini()`, `hpclang_font_big()`, and `hpclang_font_default()` are a separate case: hpclang reads the calculator's own active ROM data at runtime and does not copy those ROM bitmap tables into the repository.
 
 Historical HPG font tables remain compatibility evidence only. They must not be copied into hpclang merely to reproduce the old 256-entry HPG character namespace.
 
-The custom-font build contract has three repertoire modes—`STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`—but those modes do not change licensing. A generated application must still use a face whose upstream terms permit the intended redistribution/use. The source bundle and its accompanying license material are therefore the provenance reference; generated `.S` files are derived build assets, not a substitute for upstream license notices.
+The custom-font build contract has three repertoire modes—`STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`—but those modes do not change licensing. A generated application must still use a face whose upstream terms permit the intended redistribution/use. The source bundle and its accompanying provenance/license material are therefore the reference; generated `.S` files are derived build assets, not a substitute for upstream notices.
 
 ## Implementation discipline
 
