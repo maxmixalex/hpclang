@@ -86,12 +86,29 @@ jobs:
           set -euxo pipefail
           CHILL_TTF="$(find build/font-candidates/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
 
+          convert_bdf() {
+            local input="$1"
+            local point_size="$2"
+            local output="$3"
+            local status=0
+
+            # otf2bdf 3.1 returns fprintf("ENDFONT\\n")'s positive byte count
+            # from main on success. Judge conversion by a structurally complete BDF
+            # rather than requiring the program's non-POSIX success status to be zero.
+            otf2bdf -p "$point_size" -o "$output" "$input" || status=$?
+            echo "otf2bdf status=$status input=$input output=$output"
+            test -s "$output"
+            grep -q '^STARTFONT ' "$output"
+            grep -Eq '^CHARS [1-9][0-9]*$' "$output"
+            grep -q '^ENDFONT$' "$output"
+          }
+
           # These point sizes follow existing embedded-font conversions that preserve
           # the intended pixel grids. They are preview derivations, not canonical input yet.
-          otf2bdf build/font-candidates/src/Cubic_11.ttf -p 9 \
-            -o build/font-candidates/out/Cubic11-derived-9pt.bdf
-          otf2bdf "$CHILL_TTF" -p 6 \
-            -o build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf
+          convert_bdf build/font-candidates/src/Cubic_11.ttf 9 \
+            build/font-candidates/out/Cubic11-derived-9pt.bdf
+          convert_bdf "$CHILL_TTF" 6 \
+            build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf
           cp build/font-candidates/src/quan.bdf build/font-candidates/out/QuanPixel-May7.bdf
 
           for font in build/font-candidates/out/*.bdf; do
@@ -167,6 +184,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: font-candidate-preview
-          path: build/font-candidate-audit/
+          path: |
+            build/font-candidate-audit/
+            build/font-candidates/source-sha256.txt
+            build/font-candidates/candidate-metrics.txt
+            build/font-candidates/out/*.bdf
           if-no-files-found: warn
           retention-days: 14
