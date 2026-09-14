@@ -68,9 +68,11 @@ HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs
 
 ## Common platform services
 
-Display, keyboard, timers, storage, and calculator-object/stack integration are planned behind common APIs. They should be added only after a real application needs them and after the affected families have a stable execution path.
+The application-facing clean core now includes device information, stock-preserving monotonic time, raw/debounced keyboard events with five-model physical key identity, opaque display/software surfaces, clipped geometry and blit, calculator-native/generated fonts, UTF-8 text, and hp4950 byte-stream stdio through picolibc.
 
-The project does not copy the historical HPGCC API surface wholesale. Historical names or services are kept only when they describe an external calculator interface that hpclang must actually interoperate with.
+These services keep platform representation and ownership below common APIs. Calculator-object/stack integration is the next major service boundary: HP39 typed objects and HP48/49/50 Saturn/RPL objects must not be flattened into byte-stream files or exposed as raw stock addresses.
+
+The project does not copy the historical HPGCC API surface wholesale. Historical names or services become adapters only when they describe useful source-level behavior over an already coherent hpclang core.
 
 ## Non-ROM policy
 
