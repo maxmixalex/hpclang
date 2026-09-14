@@ -40,6 +40,7 @@ jobs:
       # Regeneration is the canonical check for bitmap source-parser changes too.
       # The built-in package accepts native bitmap sources only: BDF, FON strikes,
       # and newRPL BMP+mapping assets. Outline-font rasterization is intentionally absent.
+      # License/provenance sidecars inside fonts.zip are retained metadata, not font faces.
       - name: Regenerate checked-in assembly assets
         run: |
           PY=build/font-venv/bin/python
