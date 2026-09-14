@@ -14,12 +14,16 @@
 #define FONT_KIND_HP4950_MINI 0x1003u
 #define FONT_KIND_HP4950_BIG  0x1004u
 
-/* x50ng's HP39gs/40gs KINPO loader places the 16-byte update header at NOR
- * +0x4000 and the 1 MiB Saturn ROM body immediately after it. The native main
- * and mini font tables lie wholly inside physical NOR pages 0x42 and 0x43,
- * which the bootstrap exposes at HPCLANG_CODE_WINDOW_BASE. */
-#define HP39_UPDATE_ROM_OFFSET      0x00004010u
-#define HP39_FONT_NOR_PHYS_BASE     0x00042000u
+/*
+ * Stock HP39gs/40gs 2.22 maps Saturn font page 0x7c through physical NOR
+ * page 0x9e and Saturn font page 0x7e through physical NOR page 0x9f.
+ * Bootstrap exposes those two 4 KiB ARM pages consecutively at the private
+ * code-window base. Runtime offsets are therefore derived from Saturn page
+ * addresses, not from the on-disk KINPO update-container layout.
+ */
+#define HP39_MAIN_SATURN_PAGE       0x0007c000u
+#define HP39_MINI_SATURN_PAGE       0x0007e000u
+#define HP39_FONT_WINDOW_PAGE_BYTES 0x00001000u
 #define HP39_FONT_WINDOW_BYTES      0x00002000u
 
 #define HP39_MAIN_FIRST_NIBBLE      0x0007c651u
@@ -28,21 +32,20 @@
 #define HP39_MINI_LAST_NIBBLE       (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
 
 _Static_assert(
-    HP39_UPDATE_ROM_OFFSET + (HP39_MAIN_FIRST_NIBBLE >> 1) >=
-        HP39_FONT_NOR_PHYS_BASE,
-    "HP39 main font must start inside private NOR window");
+    HP39_MAIN_FIRST_NIBBLE >= HP39_MAIN_SATURN_PAGE,
+    "HP39 main font must start inside mapped Saturn page");
 _Static_assert(
-    HP39_UPDATE_ROM_OFFSET + (HP39_MAIN_LAST_NIBBLE >> 1) <
-        HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES,
-    "HP39 main font must fit inside private NOR window");
+    ((HP39_MAIN_LAST_NIBBLE - HP39_MAIN_SATURN_PAGE) >> 1) <
+        HP39_FONT_WINDOW_PAGE_BYTES,
+    "HP39 main font must fit inside first private window page");
 _Static_assert(
-    HP39_UPDATE_ROM_OFFSET + (HP39_MINI_FIRST_NIBBLE >> 1) >=
-        HP39_FONT_NOR_PHYS_BASE,
-    "HP39 mini font must start inside private NOR window");
+    HP39_MINI_FIRST_NIBBLE >= HP39_MINI_SATURN_PAGE,
+    "HP39 mini font must start inside mapped Saturn page");
 _Static_assert(
-    HP39_UPDATE_ROM_OFFSET + (HP39_MINI_LAST_NIBBLE >> 1) <
-        HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES,
-    "HP39 mini font must fit inside private NOR window");
+    HP39_FONT_WINDOW_PAGE_BYTES +
+        ((HP39_MINI_LAST_NIBBLE - HP39_MINI_SATURN_PAGE) >> 1) <
+        HP39_FONT_WINDOW_BYTES,
+    "HP39 mini font must fit inside second private window page");
 
 static const struct hpclang_font hp39_mini = {
     HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
@@ -180,31 +183,34 @@ static uint8_t hp39_physical_nibble(uint32_t address)
     uint32_t model = active_model();
 
     /* HP39g+ still lacks a trustworthy stock full-flash fixture. Do not infer
-       the gs/40gs update-image layout for it; retain the live Saturn mapping
-       until its own NOR layout is evidenced on real hardware. */
+       the gs/40gs bank-2 layout for it; retain the live Saturn mapping until
+       its own NOR layout is evidenced on real hardware. */
     if (model == HPCLANG_MODEL_HP39GPLUS)
         return saturn_nibble(address);
 
     if (model != HPCLANG_MODEL_HP39GS && model != HPCLANG_MODEL_HP40GS)
         return 0u;
 
-    /*
-     * HP39gs/40gs stock mini/main raster tables are specified in Saturn ROM
-     * nibble addresses. Their KINPO firmware body is packed at physical NOR
-     * +0x4010. Bootstrap maps only the two physical NOR pages that contain the
-     * font tables into the private prefix of hpclang's own code coarse table.
-     * Validate the opaque cookie and the physical offset before dereferencing
-     * that window so a stale launcher/runtime contract fails closed.
-     */
     uintptr_t window_base = hp39_font_window_base();
-    uint32_t byte_offset = HP39_UPDATE_ROM_OFFSET + (address >> 1);
-    if (window_base == 0u ||
-        byte_offset < HP39_FONT_NOR_PHYS_BASE ||
-        byte_offset >= HP39_FONT_NOR_PHYS_BASE + HP39_FONT_WINDOW_BYTES)
+    uintptr_t window_offset;
+
+    if (address >= HP39_MAIN_FIRST_NIBBLE &&
+        address <= HP39_MAIN_LAST_NIBBLE) {
+        window_offset =
+            (uintptr_t)((address - HP39_MAIN_SATURN_PAGE) >> 1);
+    } else if (address >= HP39_MINI_FIRST_NIBBLE &&
+               address <= HP39_MINI_LAST_NIBBLE) {
+        window_offset = HP39_FONT_WINDOW_PAGE_BYTES +
+            (uintptr_t)((address - HP39_MINI_SATURN_PAGE) >> 1);
+    } else {
+        return 0u;
+    }
+
+    if (window_base == 0u || window_offset >= HP39_FONT_WINDOW_BYTES)
         return 0u;
 
-    const volatile uint8_t *p = (const volatile uint8_t *)(
-        window_base + (byte_offset - HP39_FONT_NOR_PHYS_BASE));
+    const volatile uint8_t *p =
+        (const volatile uint8_t *)(window_base + window_offset);
     uint8_t value = *p;
     return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
                                   (uint8_t)(value & 0x0fu);
