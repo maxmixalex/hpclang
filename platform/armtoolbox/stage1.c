@@ -29,13 +29,15 @@
      2u * (9u + HP4950_BIG_MAX_NAME_BYTES) + 255u * 16u + 15u)
 
 /*
- * HP39gs/40gs native mini/main font records live entirely in these two NOR
- * pages. Keep this launcher-private: the runtime sees only the virtual window
- * base through platform_cookie.
+ * Stock HP39gs/40gs 2.22 maps the Saturn font pages through bank 2:
+ * Read[0x7c] -> 0x0009e000 and Read[0x7e] -> 0x0009f000. Host-side semantic
+ * probes verified P/A/S/5/1 byte-for-byte against those live mappings on both
+ * models. Keep the physical pages launcher-private; runtime sees only the
+ * stable virtual window base through platform_cookie.
  */
 static const uint32_t hp39_font_nor_pages[] = {
-    0x00042000u,
-    0x00043000u,
+    0x0009e000u,
+    0x0009f000u,
 };
 
 _Static_assert(
@@ -208,15 +210,11 @@ int hpclang_armtoolbox_stage1(
     launch.mmu.code_window_page_count = 0u;
 
     /*
-     * HP39gs/40gs 2.22 use the KINPO update-image layout exercised by the
-     * stock and Direct fixtures. Their native mini/main rasters occupy only
-     * physical NOR pages 0x42 and 0x43. Expose those pages in the unused prefix
-     * of hpclang's own L1[0x12] coarse table instead of borrowing a stock L1
-     * descriptor: the stock LCD framebuffer itself occupies bytes inside the
-     * otherwise-empty L1 table, so a long-lived high-section alias is unsafe.
-     *
-     * HP39g+ intentionally remains excluded until a trustworthy real-hardware
-     * full-flash fixture establishes its own physical layout.
+     * Stock HP39gs/40gs 2.22 exposes native mini/main font rasters through
+     * bank-2 NOR pages 0x9e and 0x9f. Map only those pages into the unused
+     * prefix of hpclang's own L1[0x12] coarse table instead of borrowing a
+     * stock L1 descriptor. HP39g+ remains excluded until a trustworthy
+     * real-hardware full-flash fixture establishes its layout.
      */
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
         launch.mmu.code_window_pages = hp39_font_nor_pages;
