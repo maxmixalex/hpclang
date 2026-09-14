@@ -1,0 +1,29 @@
+# HP40gs Stock Font Gallery through the original APLET UI and serial disk.
+# HP40gs boots through the CAS front end, then follows the same lazy HPGCC
+# transfer path. Keep Gallery navigation out of the transfer retry window.
+2000 tap f6
+4000 tap f6
+13000 tap home
+15000 tap aplet
+16000 capture aplet-library
+17000 tap f5
+18000 capture receive-menu
+18500 tap down
+19200 tap down
+19900 tap down
+20200 capture receive-serial-disk
+20600 tap enter
+40000 capture remote-aplet
+41500 tap enter
+43000 capture lazy-fetch
+
+# Historical Stock E2E has completed the slow lazy-fetch chain around 371 s.
+# One late launch ENTER avoids corrupting Gallery state with retry keystrokes.
+43500 monitor 450000
+410000 tap enter
+425000 capture native-mini
+428000 tap down
+431000 capture native-main
+434000 tap right
+437000 capture generated-control
+440000 tap on
