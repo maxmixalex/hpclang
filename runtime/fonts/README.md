@@ -1,22 +1,34 @@
 # Font source package
 
-`fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the upstream/source archive rather than being repacked into a build-specific format.
+`fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the auditable source archive rather than being repacked into a build-specific format.
 
-The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it to inspect source fonts or regenerate checked-in assets. SDK users compiling C/C++ applications do not need Python, Pillow, fontTools, or anything from `tools/`.
+The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it to inspect bitmap sources or regenerate checked-in assets. SDK users compiling C/C++ applications do not need Python, Pillow, fontTools, or anything from `tools/`.
 
 The pipeline is:
 
-1. `runtime/fonts/fonts.zip` — canonical raw `fonts/…` source tree stored with Git LFS.
-2. `tools/hpclang-font.py` — source-format parsers plus direct raw-package inspection/explicit compilation tooling.
-3. `tools/regenerate-font-assets.py` — indexes the raw bundle and batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`. Large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor.
+1. `runtime/fonts/fonts.zip` — canonical `fonts/…` source tree stored with Git LFS;
+2. `tools/hpclang-font.py` — bitmap source-format parsers plus raw-package inspection/explicit compilation tooling;
+3. `tools/regenerate-font-assets.py` — indexes the raw bundle and batch-generates section-GC-friendly `.S` files plus the CMake catalog under `runtime/fonts/generated/`; large Unicode faces are split into bounded assembly chunks while keeping one logical font descriptor;
 4. normal C/C++ build — consumes only the checked-in generated assets through CMake/clang/lld; no source-font parser runs here.
 
-The current generated catalog contains **308 faces / 1,779,042 glyph mappings / 3,797 assembly sources**.
+The current generated catalog contains **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**. `Maintenance / Font assets` run **34792808485 / #24** regenerates the same catalog with **245/245 source-to-generated semantic parity** and no generated drift.
+
+## Bitmap-only source contract
+
+The maintained canonical package accepts bitmap sources only: BDF, FON strikes, and newRPL BMP+mapping assets. There is no production TTF/OTF importer or outline rasterizer.
+
+Three reviewed CJK additions whose upstream projects did not all publish suitable BDFs were curated once and then frozen as bitmap assets in the canonical package:
+
+- `cubic-11/Cubic11-otf2bdf-9pt.bdf` — Cubic 11 v1.500, derived once from the pinned upstream TTF with `otf2bdf 3.1-4.1 -p 9`;
+- `chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf` — ChillBitmap 7px v2.500, derived once from the pinned release face with `otf2bdf 3.1-4.1 -p 6`;
+- `quan-pixel/QuanPixel-May7.bdf` — native BDF from the reviewed May7 package, byte-identical to the pinned public copy used for reproducibility.
+
+Each family carries a `PROVENANCE.txt` sidecar and the relevant upstream license text. These sidecars are retained metadata, not catalog faces. Future regeneration consumes the frozen BDFs directly and never re-rasterizes outline fonts.
 
 Two font sources must not be conflated:
 
-- `hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` expose the calculator's active **native stock-ROM fonts** at runtime; they do not embed a gallery font in the application.
-- `hpclang_target_font()` selects a **custom/generated font** from the checked-in gallery assets.
+- `hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` expose the calculator's active **native stock-ROM fonts** at runtime; they do not embed a Gallery font in the application;
+- `hpclang_target_font()` selects a **custom/generated font** from the checked-in catalog.
 
 For custom fonts, the convenience aliases are fixed as:
 
@@ -86,7 +98,7 @@ python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip catalog
 python3 tools/hpclang-font.py --package runtime/fonts/fonts.zip inspect @normal
 ```
 
-Regenerate the checked-in catalog only when the source bundle or source-format generator changes:
+Regenerate the checked-in catalog only when the source bundle or bitmap-source generator changes:
 
 ```bash
 python3 tools/regenerate-font-assets.py \
@@ -95,6 +107,4 @@ python3 tools/regenerate-font-assets.py \
   --chunk-glyphs 512
 ```
 
-The `Maintenance / Font assets` workflow checks out the Git LFS source bundle, regenerates the catalog, applies repository-size/diff checks, and commits changed generated assets on `m7-fonts-gallery`.
-
-The checked-in generated catalog is derived build material; `fonts.zip` remains the single source bundle and license/provenance reference.
+The `Maintenance / Font assets` workflow checks out the Git LFS source bundle, regenerates the catalog, applies repository-size/diff checks, audits semantic parity and visual signals, and commits generated changes if any. The checked-in catalog is derived build material; `fonts.zip` remains the single source bundle and license/provenance reference.
