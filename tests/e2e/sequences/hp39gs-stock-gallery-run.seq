@@ -1,0 +1,32 @@
+# HP39gs Stock Font Gallery through the original APLET UI and serial disk.
+# Start the lazy HPGCC/APLET transfer early, then wait for the evidence-based
+# worst-case Kermit envelope before issuing exactly one final launch ENTER.
+# Unlike canonical runtime E2E, do not keep retrying ENTER after launch: ENTER
+# is a Gallery page toggle once the payload is running.
+2000 tap f6
+4000 tap f6
+7000 tap aplet
+8000 capture aplet-library
+9000 tap f5
+10000 capture receive-menu
+10500 tap down
+11200 tap down
+11900 tap down
+12600 tap down
+12900 capture receive-serial-disk
+13300 tap enter
+31000 capture remote-aplet
+32500 tap enter
+34000 capture lazy-fetch
+
+# Monitor the result word throughout transfer and Gallery execution. HP39gs
+# has previously made valid Kermit progress close to 400 s, so keep the same
+# bounded envelope but launch only after it has had ample time to finish.
+34500 monitor 450000
+410000 tap enter
+425000 capture native-mini
+428000 tap down
+431000 capture native-main
+434000 tap right
+437000 capture generated-control
+440000 tap on
