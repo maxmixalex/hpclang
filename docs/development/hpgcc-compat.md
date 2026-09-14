@@ -137,7 +137,7 @@ Compatibility consequence:
 - neither physical ROM addresses, private code-window VAs, `platform_cookie` meaning nor `Read[]` pointers belong in the public font ABI;
 - historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
 
-The production Font Gallery gate now covers this boundary directly: targeted HP39 exhaustive validation completes 244 entries / 488 captures on both HP39gs and HP40gs, and formal `E2E / Font Gallery` run `34748303030` / #49 is green across all Direct families plus the HP50g Stock live-native control.
+The production Font Gallery gate covers this boundary directly. Final run **34792822393 / #55** is fully green across all Direct families plus HP48gII and HP50g Stock live-native controls. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS; HP48 Stock reaches HPC1 PASS/control-flow return with valid live-native pixels while its separate visible repaint remains `return-unsettled`.
 
 ## Font/text compatibility boundary
 
@@ -234,10 +234,12 @@ HPGCC compatibility adapters
 
 In particular, the verified HP39-vs-HP48/49/50 native-font difference belongs below the public font interface and should never leak into source-compatible application code.
 
-### Current bitmap-only font closure status (2026-09-13)
+### Current bitmap-only font closure status (2026-09-14)
 
-Canonical bundled assets are bitmap-source only. The generated catalog is **242 faces / 1,597,680 mapped glyphs / 3,386 assembly sources** with **242/242** source-to-generated parity; `CI / Font Assets` run **34748326228 / #20** is green and regeneration produces no drift.
+Canonical bundled assets are bitmap-source only. The generated catalog is **245 faces / 1,639,485 mapped glyphs / 3,472 assembly sources** with **245/245** source-to-generated parity. Font Assets **#24** is green with no regeneration drift; the general TTF importer is removed.
 
-`E2E / Font Gallery` run **34748303030 / #49** is green. Direct traverses **244 entries (242 generated + 2 native) × 2 pages = 488 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP48 Stock reaches HPC1 PASS with distinct nonblank native-mini/native-main/generated-control captures, while visible return remains `return-unsettled`.
+Final curation includes Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained. Gallery labels/specimens have been strengthened for Ark Pixel regional variants, width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-Before merge: remove the TTF importer; normalize hp48/hp4950 Stock summaries and add the missing HP39 Direct summary; replace weak generic Gallery specimen text with repertoire/design-sensitive samples; evaluate Cubic-11, Fusion Pixel Font, ChillBitmap, and May7/QuanPixel; rerun Font Assets and Gallery after asset/rendering changes.
+`E2E / Font Gallery` **34792822393 / #55** is the formal final gate. It is fully green across Build, universal x50ng, all three Direct families, HP48gII Stock, and HP50g Stock. Direct traverses **247 entries × 2 pages = 494 captures per target**. The HP48/HP50 compact summaries were visually checked and consistently show native mini, native main, and generated control.
+
+The font implementation/evidence slice is closed. Remaining repository integration and the independent HP48 visible-return repaint issue are not HPGCC/font compatibility blockers.
