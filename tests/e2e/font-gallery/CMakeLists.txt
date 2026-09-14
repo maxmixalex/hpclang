@@ -23,11 +23,9 @@ target_compile_options(hpclang_font_gallery PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 
-# Full Gallery is the exhaustive font-validation payload used by Direct E2E.
-# Stock E2E validates the real calculator UI -> ARMToolbox -> HPC1 launch path,
-# so it uses one generated face in addition to the two native faces. Keeping
-# those responsibilities separate avoids making the stock launcher carry
-# hundreds of font assets that do not add launcher coverage.
+# Direct Gallery is exhaustive. Stock Gallery is deliberately a compact launch
+# smoke test: two native faces plus one explicit generated control face. Do not
+# let list ordering silently change the control face.
 set(HPCLANG_GALLERY_PROFILE "full" CACHE STRING
     "Font Gallery profile: full or stock-smoke")
 set_property(CACHE HPCLANG_GALLERY_PROFILE PROPERTY STRINGS full stock-smoke)
@@ -40,7 +38,12 @@ set(HPCLANG_GALLERY_SHARD_COUNT "1" CACHE STRING
     "Number of exhaustive Gallery shards")
 
 if(HPCLANG_GALLERY_PROFILE STREQUAL "stock-smoke")
-    list(GET GALLERY_FONT_IDS 0 GALLERY_STOCK_FACE)
+    set(GALLERY_STOCK_FACE "newrpl_8c")
+    list(FIND GALLERY_FONT_IDS "${GALLERY_STOCK_FACE}" gallery_stock_index)
+    if(gallery_stock_index EQUAL -1)
+        message(FATAL_ERROR
+            "Stock Gallery control face is missing: ${GALLERY_STOCK_FACE}")
+    endif()
     set(GALLERY_FONT_IDS "${GALLERY_STOCK_FACE}")
 elseif(HPCLANG_GALLERY_PROFILE STREQUAL "full")
     if(NOT HPCLANG_GALLERY_SHARD_INDEX MATCHES "^[0-9]+$" OR
@@ -75,49 +78,74 @@ else()
         "HPCLANG_GALLERY_PROFILE must be full or stock-smoke")
 endif()
 
-# Keep full printable ASCII so the Gallery can use diagnostic type-specimen
-# strings (Il1|, 0OQ, rn/m/w, punctuation) without silently falling back.
-set(GALLERY_CODEPOINTS
+# Core diagnostic text. Every face only receives codepoints that its real cmap
+# actually contains.
+set(GALLERY_ASCII_CODEPOINTS
     32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
     48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
     64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79
     80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95
     96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111
-    112 113 114 115 116 117 118 119 120 121 122 123 124 125 126
-)
+    112 113 114 115 116 117 118 119 120 121 122 123 124 125 126)
 
-# Common, visually diagnostic Unicode probes. Prefer recognizable characters
-# over arbitrary early codepoints from a script block.
-set(GALLERY_UNICODE_CODEPOINTS
-    # Accented Latin and common currency/symbols.
+# Locale-specific specimens come first so regional CJK faces do not all show
+# the same generic Han row. The shared same-codepoint tail (骨/直/令/返/道)
+# makes regional glyph-shape differences visible without relying only on
+# simplified-vs-traditional codepoint differences.
+set(GALLERY_SPECIMEN_JA
+    26085 26412 35486 26481 20140 12354 12356 12450 12452
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_KO
+    54620 44544 44397 50612 44032 45208 45796
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_ZH_CN
+    31616 20307 20013 25991 22269 38376 39118 40857 35821
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_ZH_HK
+    39321 28207 20013 25991 22283 38272 39080 40845 35486
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_ZH_TR
+    32321 39636 20013 25991 22283 38272 39080 40845 35486
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_ZH_TW
+    32321 39636 20013 25991 33274 28771 22283 38272 39080 40845
+    39592 30452 20196 36820 36947)
+set(GALLERY_SPECIMEN_CJK_GENERIC
+    20013 25991 23383 20307 39636 26085 26412 20154 23665 27700
+    39592 30452 20196)
+
+# Common repertoire probes. Range sampling below supplements these when a face
+# has useful symbols outside this preferred list.
+set(GALLERY_SPECIMEN_FEATURES
     192 193 196 199 201 209 214 220 223 230 248 339
     163 165 169 176 177 181 215 247 8364
-    # Kana and Hangul.
-    12354 12356 12358 12360 12362 12450 12452 12454 12456 12458
-    44032 45208 45796 54620 44544
-    # Common Han, including simplified/traditional shape contrasts.
-    22825 22320 20154 20013 25991 23383 20307 39636
-    38376 38272 39118 39080 40857 40845 35821 35486 35328
-    22269 22283 21488 33274 28286 28771
-    # Greek, mathematics, arrows, and box drawing.
     937 945 946 955 960
-    8730 8734 8776 8800 8804 8805 8592 8593 8594 8595 8596
+    8592 8593 8594 8595 8596 8730 8734 8776 8800 8804 8805
     9472 9474 9484 9488 9492 9496
-)
-list(APPEND GALLERY_CODEPOINTS ${GALLERY_UNICODE_CODEPOINTS})
+    9632 9633 9650 9660 9670 9675
+    9733 9734 9745 9824 9829 9830 9831)
 
-# Keep the historically useful Powerline sample globally. Controller glyphs
-# are sampled only from BoutiqueBitmap9x9, whose ordinary mapping uses the
-# E8xx/E9xx/EAxx PUA pages and whose HK remap uses EFxx/F0xx/F1xx. PUA glyphs
-# remain secondary feature repertoire for text-capable faces instead of
-# replacing their typography specimen.
-set(GALLERY_FIXED_PRIVATE_CODEPOINTS
-    57504 57520 57521 57522 57523
-)
-set(GALLERY_CONTROLLER_PUA_PAGES
-    232 233 234 239 240 241
-)
-set(GALLERY_PRIVATE_MAX 12)
+set(GALLERY_SPECIMEN_MAX 28)
+
+macro(gallery_append_present list_name cp_value)
+    list(FIND available "${cp_value}" _gallery_found)
+    if(NOT _gallery_found EQUAL -1)
+        list(APPEND ${list_name} "${cp_value}")
+    endif()
+endmacro()
+
+macro(gallery_append_range list_name lo hi limit)
+    set(_gallery_added 0)
+    foreach(_gallery_cp IN LISTS available)
+        if(_gallery_added GREATER_EQUAL ${limit})
+            break()
+        endif()
+        if(_gallery_cp GREATER_EQUAL ${lo} AND _gallery_cp LESS_EQUAL ${hi})
+            list(APPEND ${list_name} "${_gallery_cp}")
+            math(EXPR _gallery_added "${_gallery_added} + 1")
+        endif()
+    endforeach()
+endmacro()
 
 set(catalog_h "${CMAKE_CURRENT_BINARY_DIR}/font-gallery-catalog.h")
 set(catalog_c "${CMAKE_CURRENT_BINARY_DIR}/font-gallery-catalog.c")
@@ -130,11 +158,10 @@ file(WRITE "${catalog_h}"
 "    const char *family;\n"
 "    const char *face;\n"
 "    const struct hpclang_font *font;\n"
-"    const uint32_t *unicode_codepoints;\n"
-"    uint32_t unicode_count;\n"
-"    const uint32_t *private_codepoints;\n"
-"    uint32_t private_count;\n"
+"    const uint32_t *specimen_codepoints;\n"
+"    uint32_t specimen_count;\n"
 "    uint32_t text_capable;\n"
+"    uint32_t specimen_profile;\n"
 "};\n"
 "extern const struct hpclang_gallery_face hpclang_gallery_faces[];\n"
 "extern const uint32_t hpclang_gallery_face_count;\n"
@@ -158,10 +185,6 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     include("${${codepoints_file_var}}")
     set(available "${${codepoints_var}}")
 
-    # A face is typography-capable when its real cmap has whitespace, a digit,
-    # and at least two alphabetic positions. This deliberately uses repertoire
-    # rather than family names: text fonts that also ship Powerline/controller
-    # PUA glyphs must still behave like text fonts in the Gallery.
     list(FIND available "32" text_space)
     list(FIND available "48" text_zero)
     list(FIND available "65" text_upper_a)
@@ -176,61 +199,79 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         endif()
     endif()
 
+    set(specimen_profile 0)
+    set(locale_specimen)
+    if(font_id MATCHES "_(ja|jp)$")
+        set(specimen_profile 1)
+        set(locale_specimen ${GALLERY_SPECIMEN_JA})
+    elseif(font_id MATCHES "_ko$")
+        set(specimen_profile 2)
+        set(locale_specimen ${GALLERY_SPECIMEN_KO})
+    elseif(font_id MATCHES "_(zh_cn|zh_hans)$")
+        set(specimen_profile 3)
+        set(locale_specimen ${GALLERY_SPECIMEN_ZH_CN})
+    elseif(font_id MATCHES "_zh_hk$")
+        set(specimen_profile 4)
+        set(locale_specimen ${GALLERY_SPECIMEN_ZH_HK})
+    elseif(font_id MATCHES "_(zh_tr|zh_hant)$")
+        set(specimen_profile 5)
+        set(locale_specimen ${GALLERY_SPECIMEN_ZH_TR})
+    elseif(font_id MATCHES "_zh_tw$")
+        set(specimen_profile 6)
+        set(locale_specimen ${GALLERY_SPECIMEN_ZH_TW})
+    endif()
+
     set(selected)
-    set(selected_unicode)
-    foreach(cp IN LISTS GALLERY_CODEPOINTS)
-        list(FIND available "${cp}" found)
-        if(NOT found EQUAL -1)
-            list(APPEND selected "${cp}")
-            list(FIND GALLERY_UNICODE_CODEPOINTS "${cp}" unicode_found)
-            if(NOT unicode_found EQUAL -1)
-                list(APPEND selected_unicode "${cp}")
-            endif()
-        endif()
+    foreach(cp IN LISTS GALLERY_ASCII_CODEPOINTS)
+        gallery_append_present(selected "${cp}")
     endforeach()
 
-    set(selected_private)
-
-    # Retain real PUA mappings in the linked face. Unlike the old catalog, keep
-    # those codepoints visible to the Gallery even when the same face is also a
-    # usable text font: controller and patched-icon repertoires are precisely
-    # the features the Gallery is meant to expose.
-    foreach(cp IN LISTS GALLERY_FIXED_PRIVATE_CODEPOINTS)
-        list(FIND available "${cp}" private_found)
-        if(NOT private_found EQUAL -1)
-            list(APPEND selected "${cp}")
-            list(APPEND selected_private "${cp}")
-        endif()
-    endforeach()
-
-    # Controller/button repertoires are not Unicode emoji. BoutiqueBitmap9x9
-    # is the font family that defines them, so only its faces probe these PUA
-    # pages. Take one actual mapped glyph per page instead of hard-coding a
-    # particular button codepoint such as E866/E966/EA66.
-    if(font_id MATCHES "^boutique_bitmap_9x9_")
-        foreach(wanted_page IN LISTS GALLERY_CONTROLLER_PUA_PAGES)
-            foreach(cp IN LISTS available)
-                if(cp GREATER_EQUAL 57344 AND cp LESS_EQUAL 63743)
-                    math(EXPR private_page "${cp} / 256")
-                    if(private_page EQUAL wanted_page)
-                        list(FIND selected_private "${cp}" private_found)
-                        if(private_found EQUAL -1)
-                            list(APPEND selected "${cp}")
-                            list(APPEND selected_private "${cp}")
-                        endif()
-                        break()
-                    endif()
-                endif()
+    set(specimen)
+    if(text_capable)
+        if(NOT "${locale_specimen}" STREQUAL "")
+            foreach(cp IN LISTS locale_specimen)
+                gallery_append_present(specimen "${cp}")
             endforeach()
+        else()
+            foreach(cp IN LISTS GALLERY_SPECIMEN_CJK_GENERIC)
+                gallery_append_present(specimen "${cp}")
+            endforeach()
+        endif()
+
+        foreach(cp IN LISTS GALLERY_SPECIMEN_FEATURES)
+            gallery_append_present(specimen "${cp}")
         endforeach()
+
+        gallery_append_range(specimen 8592 8703 2)
+        gallery_append_range(specimen 8704 8959 2)
+        gallery_append_range(specimen 8960 9215 2)
+        gallery_append_range(specimen 9472 9599 2)
+        gallery_append_range(specimen 9600 9631 2)
+        gallery_append_range(specimen 9632 9727 2)
+        gallery_append_range(specimen 9728 9983 2)
+        gallery_append_range(specimen 9984 10175 2)
+        gallery_append_range(specimen 57344 63743 4)
+    else()
+        # Icon/status faces such as newRPL Notification often use ordinary
+        # ASCII codepoints for pictograms. Sample the face's real cmap instead
+        # of asking only for Unicode/PUA feature ranges.
+        foreach(cp IN LISTS available)
+            if(cp GREATER_EQUAL 32)
+                list(APPEND specimen "${cp}")
+            endif()
+        endforeach()
+        if("${specimen}" STREQUAL "")
+            set(specimen ${available})
+        endif()
     endif()
 
-    list(REMOVE_DUPLICATES selected)
-    list(REMOVE_DUPLICATES selected_private)
-    list(LENGTH selected_private private_count)
-    if(private_count GREATER GALLERY_PRIVATE_MAX)
-        list(SUBLIST selected_private 0 ${GALLERY_PRIVATE_MAX} selected_private)
+    list(REMOVE_DUPLICATES specimen)
+    list(LENGTH specimen specimen_count)
+    if(specimen_count GREATER GALLERY_SPECIMEN_MAX)
+        list(SUBLIST specimen 0 ${GALLERY_SPECIMEN_MAX} specimen)
     endif()
+    list(APPEND selected ${specimen})
+    list(REMOVE_DUPLICATES selected)
 
     if(NOT selected)
         message(FATAL_ERROR "Font Gallery face has no display repertoire: ${font_id}")
@@ -252,9 +293,6 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
     string(REPLACE "-" " " face_label "${face_label}")
     string(REPLACE "_" " " face_label "${face_label}")
 
-    # Avoid spending the entire second chrome row repeating the family name.
-    # This is particularly important for Ark Pixel where the distinguishing
-    # locale suffix used to be clipped off-screen.
     set(face_prefix "${family_label} ")
     string(LENGTH "${face_prefix}" face_prefix_len)
     string(SUBSTRING "${face_label}" 0 ${face_prefix_len} face_prefix_actual)
@@ -262,9 +300,6 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
         string(SUBSTRING "${face_label}" ${face_prefix_len} -1 face_label)
     endif()
 
-    # Ark Pixel ships seven locale-specific glyph designs at every size/mode.
-    # Keep the runtime strings ASCII-only for the calculator chrome, but make
-    # size, width mode, and region visible before the label can be clipped.
     if(font_id MATCHES "^ark_pixel_ark_pixel_(10|12|16)px_(monospaced|proportional)_(ja|ko|latin|zh_cn|zh_hk|zh_tr|zh_tw)$")
         set(ark_size "${CMAKE_MATCH_1}")
         set(ark_mode "${CMAKE_MATCH_2}")
@@ -300,36 +335,22 @@ foreach(font_id IN LISTS GALLERY_FONT_IDS)
 
     file(APPEND "${catalog_c}"
         "extern const struct hpclang_font ${symbol};\n")
-    if(selected_unicode)
+    if(NOT "${specimen}" STREQUAL "")
         file(APPEND "${catalog_c}"
-            "static const uint32_t unicode_${face_index}[] = {")
-        foreach(cp IN LISTS selected_unicode)
+            "static const uint32_t specimen_${face_index}[] = {")
+        foreach(cp IN LISTS specimen)
             file(APPEND "${catalog_c}" "${cp}u,")
         endforeach()
         file(APPEND "${catalog_c}" "};\n")
-        list(LENGTH selected_unicode unicode_count)
-        set(unicode_pointer "unicode_${face_index}")
+        list(LENGTH specimen specimen_count)
+        set(specimen_pointer "specimen_${face_index}")
     else()
-        set(unicode_count 0)
-        set(unicode_pointer "0")
-    endif()
-
-    if(selected_private)
-        file(APPEND "${catalog_c}"
-            "static const uint32_t private_${face_index}[] = {")
-        foreach(cp IN LISTS selected_private)
-            file(APPEND "${catalog_c}" "${cp}u,")
-        endforeach()
-        file(APPEND "${catalog_c}" "};\n")
-        list(LENGTH selected_private private_count)
-        set(private_pointer "private_${face_index}")
-    else()
-        set(private_count 0)
-        set(private_pointer "0")
+        set(specimen_count 0)
+        set(specimen_pointer "0")
     endif()
 
     string(APPEND catalog_rows
-        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${unicode_pointer}, ${unicode_count}u, ${private_pointer}, ${private_count}u, ${text_capable}u},\n")
+        "    {\"${family_label_c}\", \"${face_label_c}\", &${symbol}, ${specimen_pointer}, ${specimen_count}u, ${text_capable}u, ${specimen_profile}u},\n")
     math(EXPR face_index "${face_index} + 1")
 endforeach()
 
@@ -347,11 +368,6 @@ target_sources(hpclang_font_gallery PRIVATE "${catalog_c}")
 message(STATUS
     "Font Gallery (${HPCLANG_GALLERY_PROFILE}, shard ${HPCLANG_GALLERY_SHARD_INDEX}/${HPCLANG_GALLERY_SHARD_COUNT}): ${face_index} generated faces from ${family_count} families + 2 native faces")
 
-# Generated font assets are immutable lookup data and the Gallery never relies
-# on glyph/bitmap object address identity. Allow lld to fold equal read-only
-# sections here so repeated language/style variants share identical glyphs and
-# bitmaps. Keep this Gallery-only: normal SDK applications retain ordinary C
-# address-identity semantics.
 target_link_options(hpclang_font_gallery PRIVATE
     -nostartfiles
     -Wl,--gc-sections
