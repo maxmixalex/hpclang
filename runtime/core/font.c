@@ -15,37 +15,52 @@
 #define FONT_KIND_HP4950_BIG  0x1004u
 
 /*
- * Stock HP39gs/40gs 2.22 maps Saturn font page 0x7c through physical NOR
- * page 0x9e and Saturn font page 0x7e through physical NOR page 0x9f.
- * Bootstrap exposes those two 4 KiB ARM pages consecutively at the private
- * code-window base. Runtime offsets are therefore derived from Saturn page
- * addresses, not from the on-disk KINPO update-container layout.
+ * The HP39/40G atlas establishes the record format and character ordering, but
+ * HP39gs/40gs 2.22 relocates those exact raster tables inside bank-1 NOR pages
+ * 0x7e and 0x7f. Host-side scans of the official update images establish the
+ * model-specific nibble bases below. Bootstrap maps the two physical pages
+ * consecutively at HPCLANG_CODE_WINDOW_BASE; runtime translates legacy atlas
+ * coordinates to the evidenced model-specific window coordinates.
  */
-#define HP39_MAIN_SATURN_PAGE       0x0007c000u
-#define HP39_MINI_SATURN_PAGE       0x0007e000u
-#define HP39_FONT_WINDOW_PAGE_BYTES 0x00001000u
-#define HP39_FONT_WINDOW_BYTES      0x00002000u
+#define HP39_FONT_WINDOW_PAGE_BYTES   0x00001000u
+#define HP39_FONT_WINDOW_PAGE_NIBBLES (HP39_FONT_WINDOW_PAGE_BYTES * 2u)
+#define HP39_FONT_WINDOW_BYTES        0x00002000u
+#define HP39_FONT_WINDOW_NIBBLES      (HP39_FONT_WINDOW_BYTES * 2u)
 
 #define HP39_MAIN_FIRST_NIBBLE      0x0007c651u
 #define HP39_MAIN_LAST_NIBBLE       (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
 #define HP39_MINI_FIRST_NIBBLE      0x0007e695u
 #define HP39_MINI_LAST_NIBBLE       (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
 
+/* HP39gs 2.22: main @ NOR 0x7e574 high nibble, mini @ 0x7f596 high. */
+#define HP39GS_MAIN_WINDOW_FIRST_NIBBLE 0x00000ae9u
+#define HP39GS_MINI_WINDOW_FIRST_NIBBLE \
+    (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000b2du)
+
+/* HP40gs 2.22: main @ NOR 0x7e64e low nibble, mini @ 0x7f670 low. */
+#define HP40GS_MAIN_WINDOW_FIRST_NIBBLE 0x00000c9cu
+#define HP40GS_MINI_WINDOW_FIRST_NIBBLE \
+    (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000ce0u)
+
+#define HP39_MAIN_SPAN_NIBBLES (HP39_MAIN_LAST_NIBBLE - HP39_MAIN_FIRST_NIBBLE)
+#define HP39_MINI_SPAN_NIBBLES (HP39_MINI_LAST_NIBBLE - HP39_MINI_FIRST_NIBBLE)
+
 _Static_assert(
-    HP39_MAIN_FIRST_NIBBLE >= HP39_MAIN_SATURN_PAGE,
-    "HP39 main font must start inside mapped Saturn page");
+    HP39GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
+        HP39_FONT_WINDOW_PAGE_NIBBLES,
+    "HP39gs main font must fit inside first private window page");
 _Static_assert(
-    ((HP39_MAIN_LAST_NIBBLE - HP39_MAIN_SATURN_PAGE) >> 1) <
-        HP39_FONT_WINDOW_PAGE_BYTES,
-    "HP39 main font must fit inside first private window page");
+    HP40GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
+        HP39_FONT_WINDOW_PAGE_NIBBLES,
+    "HP40gs main font must fit inside first private window page");
 _Static_assert(
-    HP39_MINI_FIRST_NIBBLE >= HP39_MINI_SATURN_PAGE,
-    "HP39 mini font must start inside mapped Saturn page");
+    HP39GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES <
+        HP39_FONT_WINDOW_NIBBLES,
+    "HP39gs mini font must fit inside second private window page");
 _Static_assert(
-    HP39_FONT_WINDOW_PAGE_BYTES +
-        ((HP39_MINI_LAST_NIBBLE - HP39_MINI_SATURN_PAGE) >> 1) <
-        HP39_FONT_WINDOW_BYTES,
-    "HP39 mini font must fit inside second private window page");
+    HP40GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES <
+        HP39_FONT_WINDOW_NIBBLES,
+    "HP40gs mini font must fit inside second private window page");
 
 static const struct hpclang_font hp39_mini = {
     HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
@@ -178,13 +193,26 @@ static uintptr_t hp39_font_window_base(void)
         : 0u;
 }
 
+static uint32_t hp39_window_font_first_nibble(
+    uint32_t model,
+    int mini)
+{
+    if (model == HPCLANG_MODEL_HP39GS)
+        return mini ? HP39GS_MINI_WINDOW_FIRST_NIBBLE
+                    : HP39GS_MAIN_WINDOW_FIRST_NIBBLE;
+    if (model == HPCLANG_MODEL_HP40GS)
+        return mini ? HP40GS_MINI_WINDOW_FIRST_NIBBLE
+                    : HP40GS_MAIN_WINDOW_FIRST_NIBBLE;
+    return UINT32_MAX;
+}
+
 static uint8_t hp39_physical_nibble(uint32_t address)
 {
     uint32_t model = active_model();
 
-    /* HP39g+ still lacks a trustworthy stock full-flash fixture. Do not infer
-       the gs/40gs bank-2 layout for it; retain the live Saturn mapping until
-       its own NOR layout is evidenced on real hardware. */
+    /* HP39g+ still lacks a trustworthy stock full-flash fixture. Preserve the
+       legacy logical Saturn lookup until its own NOR layout is evidenced on
+       real hardware. */
     if (model == HPCLANG_MODEL_HP39GPLUS)
         return saturn_nibble(address);
 
@@ -192,28 +220,30 @@ static uint8_t hp39_physical_nibble(uint32_t address)
         return 0u;
 
     uintptr_t window_base = hp39_font_window_base();
-    uintptr_t window_offset;
+    uint32_t logical_first;
+    uint32_t window_first;
 
     if (address >= HP39_MAIN_FIRST_NIBBLE &&
         address <= HP39_MAIN_LAST_NIBBLE) {
-        window_offset =
-            (uintptr_t)((address - HP39_MAIN_SATURN_PAGE) >> 1);
+        logical_first = HP39_MAIN_FIRST_NIBBLE;
+        window_first = hp39_window_font_first_nibble(model, 0);
     } else if (address >= HP39_MINI_FIRST_NIBBLE &&
                address <= HP39_MINI_LAST_NIBBLE) {
-        window_offset = HP39_FONT_WINDOW_PAGE_BYTES +
-            (uintptr_t)((address - HP39_MINI_SATURN_PAGE) >> 1);
+        logical_first = HP39_MINI_FIRST_NIBBLE;
+        window_first = hp39_window_font_first_nibble(model, 1);
     } else {
         return 0u;
     }
 
-    if (window_base == 0u || window_offset >= HP39_FONT_WINDOW_BYTES)
+    uint32_t window_nibble = window_first + (address - logical_first);
+    if (window_base == 0u || window_nibble >= HP39_FONT_WINDOW_NIBBLES)
         return 0u;
 
-    const volatile uint8_t *p =
-        (const volatile uint8_t *)(window_base + window_offset);
+    const volatile uint8_t *p = (const volatile uint8_t *)(
+        window_base + (uintptr_t)(window_nibble >> 1));
     uint8_t value = *p;
-    return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
-                                  (uint8_t)(value & 0x0fu);
+    return (window_nibble & 1u) != 0u ? (uint8_t)(value >> 4) :
+                                        (uint8_t)(value & 0x0fu);
 }
 
 static uint8_t hp39_physical_byte(uint32_t address)
@@ -239,15 +269,17 @@ static uint32_t hp39_mini_codepoint(uint32_t codepoint)
 
 static uint32_t hp39_mini_advance(uint32_t codepoint)
 {
-    /* 0x07E695 is the physical Saturn-ROM start of 256 records, each
-     * 1 advance nibble + 10 bitmap nibbles. */
+    /* The reviewed mini atlas uses 256 records of 1 advance nibble followed
+     * by 10 bitmap nibbles. HP39gs/40gs translate this legacy coordinate to
+     * their evidenced 2.22 table base in hp39_physical_nibble(). */
     uint32_t index = hp39_mini_codepoint(codepoint);
-    uint32_t advance = hp39_physical_nibble(0x07e695u + index * 11u);
+    uint32_t advance =
+        hp39_physical_nibble(HP39_MINI_FIRST_NIBBLE + index * 11u);
     return advance != 0u ? advance : 4u;
 }
 
 static const struct hpclang_bitmap_glyph *bitmap_glyph(
-    const struct hpclang_bitmap_font_data *font,
+    const struct hpclang_font *font,
     uint32_t codepoint)
 {
     if (font == NULL || font->glyphs == NULL || font->glyph_count == 0u)
@@ -309,7 +341,7 @@ static void draw_hp39_mini(
     uint8_t intensity)
 {
     uint32_t index = hp39_mini_codepoint(codepoint);
-    uint32_t record = 0x07e695u + index * 11u;
+    uint32_t record = HP39_MINI_FIRST_NIBBLE + index * 11u;
     for (uint32_t yy = 0u; yy < 5u; ++yy) {
         uint8_t row = hp39_physical_byte(record + 1u + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
@@ -328,7 +360,7 @@ static void draw_hp39_main(
     uint8_t intensity)
 {
     uint32_t index = native_byte_codepoint(codepoint);
-    uint32_t record = 0x07c651u + index * 16u;
+    uint32_t record = HP39_MAIN_FIRST_NIBBLE + index * 16u;
     for (uint32_t yy = 0u; yy < 8u; ++yy) {
         uint8_t row = hp39_physical_byte(record + yy * 2u);
         for (uint32_t xx = 0u; xx < 5u; ++xx) {
