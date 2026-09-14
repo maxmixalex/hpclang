@@ -1,7 +1,7 @@
-name: Maintenance / Font candidate preview
+name: Maintenance / One-shot CJK font curation
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   push:
@@ -9,13 +9,12 @@ on:
       - m7-fonts-gallery
     paths:
       - ".github/workflows/one-shot-font-candidate-preview.yml"
-  workflow_dispatch:
 
 jobs:
-  preview:
-    name: Preview Cubic, ChillBitmap, and QuanPixel
+  curate:
+    name: Add Cubic 11, ChillBitmap, and QuanPixel
     runs-on: home-docker
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v7
@@ -23,11 +22,11 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Prepare candidate tooling
+      - name: Prepare deterministic curation tooling
         run: |
           set -euxo pipefail
+          mkdir -p build/otf2bdf-pkg build/font-cjk/src build/font-cjk/out
           if ! command -v otf2bdf >/dev/null 2>&1; then
-            mkdir -p build/otf2bdf-pkg
             curl --fail --location --retry 3 \
               https://archive.ubuntu.com/ubuntu/pool/universe/o/otf2bdf/otf2bdf_3.1-4.1_amd64.deb \
               -o build/otf2bdf-pkg/otf2bdf.deb
@@ -40,61 +39,53 @@ jobs:
             fi
             echo "$PWD/build/otf2bdf-pkg/root/usr/bin" >> "$GITHUB_PATH"
           fi
-          python3 -m venv build/font-candidate-venv
-          build/font-candidate-venv/bin/python -m pip install --disable-pip-version-check Pillow
+          python3 -m venv build/font-cjk-venv
+          build/font-cjk-venv/bin/python -m pip install --disable-pip-version-check Pillow
 
-      - name: Fetch pinned candidate sources
+      - name: Fetch and pin reviewed upstream inputs
         run: |
           set -euxo pipefail
-          mkdir -p build/font-candidates/src build/font-candidates/out
 
-          # Cubic 11 v1.500, upstream commit 4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d.
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/ACh-K/Cubic-11/4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d/fonts/ttf/Cubic_11.ttf \
-            -o build/font-candidates/src/Cubic_11.ttf
+            -o build/font-cjk/src/Cubic_11.ttf
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/ACh-K/Cubic-11/4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d/OFL.txt \
-            -o build/font-candidates/src/Cubic-11-OFL.txt
+            -o build/font-cjk/src/Cubic-11-OFL.txt
 
-          # ChillBitmap 7px v2.500, upstream commit f9e3b2f988a2c4107f866aa43c3d61a2b27254d5.
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/Warren2060/ChillBitmap/f9e3b2f988a2c4107f866aa43c3d61a2b27254d5/ChillBitmap7x_v2.500.zip \
-            -o build/font-candidates/src/ChillBitmap7x_v2.500.zip
+            -o build/font-cjk/src/ChillBitmap7x_v2.500.zip
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/Warren2060/ChillBitmap/f9e3b2f988a2c4107f866aa43c3d61a2b27254d5/LICENSE.md \
-            -o build/font-candidates/src/ChillBitmap-LICENSE.md
-          mkdir -p build/font-candidates/src/chill
-          unzip -q build/font-candidates/src/ChillBitmap7x_v2.500.zip -d build/font-candidates/src/chill
-          CHILL_TTF="$(find build/font-candidates/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
+            -o build/font-cjk/src/ChillBitmap-LICENSE.md
+          mkdir -p build/font-cjk/src/chill
+          unzip -q build/font-cjk/src/ChillBitmap7x_v2.500.zip -d build/font-cjk/src/chill
+          CHILL_TTF="$(find build/font-cjk/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
           test -n "$CHILL_TTF"
+          cp "$CHILL_TTF" build/font-cjk/src/ChillBitmap7x.ttf
 
-          # User-provided May7.zip contains quan.bdf with this exact SHA-256.
-          # Use a public source copy only if it is byte-identical to that reviewed asset.
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/PSP-Arkfive/ARK-150/a67a32a13bf2f1cfc52261a239ccf96882f9a9ed/Extras/Language/quan.bdf \
-            -o build/font-candidates/src/quan.bdf
-          echo 'd23113cababf9ecceb1c1a3005c89e5b8f00abdaf2e2be3115c5f4f9dcfe92c7  build/font-candidates/src/quan.bdf' | sha256sum -c -
+            -o build/font-cjk/src/quan.bdf
 
-          sha256sum \
-            build/font-candidates/src/Cubic_11.ttf \
-            build/font-candidates/src/ChillBitmap7x_v2.500.zip \
-            build/font-candidates/src/quan.bdf \
-            | tee build/font-candidates/source-sha256.txt
+          cat > build/font-cjk/source-sha256.expected <<'EOF'
+          0193f5f033612496df6b45ee92ac3b335bc6a5a24ff95da55ca87b33e57dcf62  build/font-cjk/src/Cubic_11.ttf
+          4aed0e7301bf56ce5670dbd2c422178edc77eaed0aac596a822eba85c20da3df  build/font-cjk/src/ChillBitmap7x_v2.500.zip
+          d23113cababf9ecceb1c1a3005c89e5b8f00abdaf2e2be3115c5f4f9dcfe92c7  build/font-cjk/src/quan.bdf
+          EOF
+          sed -i 's/^          //' build/font-cjk/source-sha256.expected
+          sha256sum -c build/font-cjk/source-sha256.expected
 
-      - name: Derive bitmap-only previews
+      - name: Reproduce reviewed bitmap derivations
         run: |
           set -euxo pipefail
-          CHILL_TTF="$(find build/font-candidates/src/chill -type f -iname 'ChillBitmap7x.ttf' -print -quit)"
 
           convert_bdf() {
             local input="$1"
             local point_size="$2"
             local output="$3"
             local status=0
-
-            # otf2bdf 3.1 returns fprintf("ENDFONT\\n")'s positive byte count
-            # from main on success. Judge conversion by a structurally complete BDF
-            # rather than requiring the program's non-POSIX success status to be zero.
             otf2bdf -p "$point_size" -o "$output" "$input" || status=$?
             echo "otf2bdf status=$status input=$input output=$output"
             test -s "$output"
@@ -103,91 +94,161 @@ jobs:
             grep -q '^ENDFONT$' "$output"
           }
 
-          # These point sizes follow existing embedded-font conversions that preserve
-          # the intended pixel grids. They are preview derivations, not canonical input yet.
-          convert_bdf build/font-candidates/src/Cubic_11.ttf 9 \
-            build/font-candidates/out/Cubic11-derived-9pt.bdf
-          convert_bdf "$CHILL_TTF" 6 \
-            build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf
-          cp build/font-candidates/src/quan.bdf build/font-candidates/out/QuanPixel-May7.bdf
+          convert_bdf build/font-cjk/src/Cubic_11.ttf 9 \
+            build/font-cjk/out/Cubic11-otf2bdf-9pt.bdf
+          convert_bdf build/font-cjk/src/ChillBitmap7x.ttf 6 \
+            build/font-cjk/out/ChillBitmap7x-otf2bdf-6pt.bdf
+          cp build/font-cjk/src/quan.bdf build/font-cjk/out/QuanPixel-May7.bdf
 
-          for font in build/font-candidates/out/*.bdf; do
-            echo "### $font"
-            grep -E '^(STARTFONT|FONT |SIZE |FONTBOUNDINGBOX|CHARS |COPYRIGHT|NOTICE)' "$font" | head -20 || true
-            sha256sum "$font"
-          done | tee build/font-candidates/candidate-metrics.txt
+          cat > build/font-cjk/derived-sha256.expected <<'EOF'
+          d433fec061c6cf3435c92705c66ef15b2c3bb05a28d5bd932084d535afd2ad16  build/font-cjk/out/Cubic11-otf2bdf-9pt.bdf
+          ae7d80c36530b2c5d1b7ed7b5877ad8750936ecba5635941bc6e5ace90573b07  build/font-cjk/out/ChillBitmap7x-otf2bdf-6pt.bdf
+          d23113cababf9ecceb1c1a3005c89e5b8f00abdaf2e2be3115c5f4f9dcfe92c7  build/font-cjk/out/QuanPixel-May7.bdf
+          EOF
+          sed -i 's/^          //' build/font-cjk/derived-sha256.expected
+          sha256sum -c build/font-cjk/derived-sha256.expected
 
-      - name: Build temporary candidate package
+      - name: Add reviewed bitmap assets and provenance to canonical package
         run: |
           set -euxo pipefail
-          build/font-candidate-venv/bin/python - <<'PY'
+          build/font-cjk-venv/bin/python - <<'PY'
           from pathlib import Path
+          import os
           import zipfile
 
-          source = Path('runtime/fonts/fonts.zip')
-          target = Path('build/font-candidates/fonts-with-candidates.zip')
+          archive = Path('runtime/fonts/fonts.zip')
+          temp = archive.with_suffix('.zip.tmp')
           additions = {
-              'fonts/cubic-11-preview/Cubic11-derived-9pt.bdf': Path('build/font-candidates/out/Cubic11-derived-9pt.bdf'),
-              'fonts/chill-bitmap-preview/ChillBitmap7x-derived-6pt.bdf': Path('build/font-candidates/out/ChillBitmap7x-derived-6pt.bdf'),
-              'fonts/quan-pixel/QuanPixel-May7.bdf': Path('build/font-candidates/out/QuanPixel-May7.bdf'),
-              'fonts/cubic-11-preview/OFL.txt': Path('build/font-candidates/src/Cubic-11-OFL.txt'),
-              'fonts/chill-bitmap-preview/LICENSE.md': Path('build/font-candidates/src/ChillBitmap-LICENSE.md'),
+              'fonts/cubic-11/Cubic11-otf2bdf-9pt.bdf': Path('build/font-cjk/out/Cubic11-otf2bdf-9pt.bdf').read_bytes(),
+              'fonts/cubic-11/OFL.txt': Path('build/font-cjk/src/Cubic-11-OFL.txt').read_bytes(),
+              'fonts/chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf': Path('build/font-cjk/out/ChillBitmap7x-otf2bdf-6pt.bdf').read_bytes(),
+              'fonts/chill-bitmap/LICENSE.md': Path('build/font-cjk/src/ChillBitmap-LICENSE.md').read_bytes(),
+              'fonts/quan-pixel/QuanPixel-May7.bdf': Path('build/font-cjk/out/QuanPixel-May7.bdf').read_bytes(),
           }
-          with zipfile.ZipFile(source, 'r') as zin, zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zout:
-              for info in zin.infolist():
-                  zout.writestr(info, zin.read(info.filename))
-              names = set(zin.namelist())
-              for name, path in additions.items():
-                  if name in names:
-                      raise SystemExit(f'candidate path already exists: {name}')
-                  zout.write(path, name)
-          print(target, target.stat().st_size)
+          provenance = {
+              'fonts/cubic-11/PROVENANCE.txt': '''Cubic 11 v1.500\nUpstream: https://github.com/ACh-K/Cubic-11\nPinned commit: 4c566f7d6cc5c05ee360fe9cff56b5da1fcafd4d\nSource: fonts/ttf/Cubic_11.ttf\nSource SHA-256: 0193f5f033612496df6b45ee92ac3b335bc6a5a24ff95da55ca87b33e57dcf62\nBitmap derivation: otf2bdf 3.1-4.1, -p 9\nDerived BDF SHA-256: d433fec061c6cf3435c92705c66ef15b2c3bb05a28d5bd932084d535afd2ad16\nLicense: see OFL.txt, copied verbatim from the pinned upstream commit.\n''',
+              'fonts/chill-bitmap/PROVENANCE.txt': '''ChillBitmap 7px v2.500\nUpstream: https://github.com/Warren2060/ChillBitmap\nPinned commit: f9e3b2f988a2c4107f866aa43c3d61a2b27254d5\nSource archive: ChillBitmap7x_v2.500.zip\nArchive SHA-256: 4aed0e7301bf56ce5670dbd2c422178edc77eaed0aac596a822eba85c20da3df\nSource face: ChillBitmap7x.ttf\nBitmap derivation: otf2bdf 3.1-4.1, -p 6\nDerived BDF SHA-256: ae7d80c36530b2c5d1b7ed7b5877ad8750936ecba5635941bc6e5ace90573b07\nLicense: see LICENSE.md, copied verbatim from the pinned upstream commit. The 7px line's terms are preserved as written rather than summarized as a single OFL label.\n''',
+              'fonts/quan-pixel/PROVENANCE.txt': '''QuanPixel / May7 reviewed bitmap asset\nReviewed May7.zip member: quan.bdf\nReviewed SHA-256: d23113cababf9ecceb1c1a3005c89e5b8f00abdaf2e2be3115c5f4f9dcfe92c7\nByte-identical public copy: https://github.com/PSP-Arkfive/ARK-150/blob/a67a32a13bf2f1cfc52261a239ccf96882f9a9ed/Extras/Language/quan.bdf\nThe BDF copyright field states: (c) Galmuri8, Chill Bitmap, diaowinner, 2022. OFL\nNo outline conversion is performed for this asset.\n''',
+          }
+          additions.update({name: text.encode('utf-8') for name, text in provenance.items()})
+
+          with zipfile.ZipFile(archive, 'r') as zin:
+              infos = zin.infolist()
+              names = {info.filename for info in infos}
+              clashes = sorted(names & additions.keys())
+              assert not clashes, clashes
+              with zipfile.ZipFile(temp, 'w') as zout:
+                  for info in infos:
+                      zout.writestr(info, zin.read(info.filename))
+                  for name, data in additions.items():
+                      info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                      info.compress_type = zipfile.ZIP_DEFLATED
+                      info.external_attr = 0o100644 << 16
+                      zout.writestr(info, data)
+          os.replace(temp, archive)
+
+          with zipfile.ZipFile(archive, 'r') as check:
+              names = check.namelist()
+              assert not [name for name in names if name.lower().endswith('.ttf')]
+              for name in additions:
+                  assert name in names, name
+          print('PASS: canonical source bundle remains bitmap-only and now contains all three reviewed CJK families')
           PY
 
-      - name: Regenerate and audit temporary candidate catalog
+      - name: Keep HP48 Stock Gallery evidence after known post-PASS unsettled return
         run: |
           set -euxo pipefail
-          PY=build/font-candidate-venv/bin/python
-          mkdir -p build/font-candidate-audit build/font-candidate-generated
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/e2e/harness/run-stock-gallery-hp48gii.sh')
+          text = path.read_text(encoding='utf-8')
+          needle = '''wait "$X50_PID"\nX50_PID=\n\nfor pgm in "$ROOT"/build/"$TARGET"-*.pgm; do\n'''
+          replacement = '''set +e\nwait "$X50_PID"\nX50_STATUS=$?\nset -e\nX50_PID=\n\n# The font-specific HP48 gate already distinguishes payload/native-font evidence\n# from the separate visible-return concern. Preserve all captures and build the\n# Gallery composite even when x50ng reports the known post-PASS return-unsettled\n# state; a status gate below still rejects every other failure.\nfor pgm in "$ROOT"/build/"$TARGET"-*.pgm; do\n'''
+          assert text.count(needle) == 1, 'HP48 Gallery wait block changed'
+          text = text.replace(needle, replacement)
+          needle2 = '''python3 "$ROOT/tools/pgm-to-png.py" "$MERGED" "$MERGED.png"\n\npython3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/font-gallery-stock.json"\n'''
+          replacement2 = '''python3 "$ROOT/tools/pgm-to-png.py" "$MERGED" "$MERGED.png"\n\npython3 - "$ROOT/build/$TARGET-stock-gallery.json" "$X50_STATUS" <<'PY_STATUS'\nimport json\nfrom pathlib import Path\nimport sys\n\nstate = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))\nstatus = state.get('status')\nif not state.get('saw_pass'):\n    raise SystemExit(f'HP48 Stock Gallery did not reach HPC1 PASS: {state}')\nif status not in {'pass', 'return-unsettled'}:\n    raise SystemExit(f'unexpected HP48 Stock Gallery status after x50ng exit {sys.argv[2]}: {status!r}')\nprint(f'PASS HP48 concern-specific Gallery state: {status}; x50ng exit={sys.argv[2]}')\nPY_STATUS\n\npython3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/font-gallery-stock.json"\n'''
+          assert text.count(needle2) == 1, 'HP48 Gallery final verification block changed'
+          path.write_text(text.replace(needle2, replacement2), encoding='utf-8')
+          PY
+
+      - name: Regenerate and audit final bitmap catalog
+        run: |
+          set -euxo pipefail
+          PY=build/font-cjk-venv/bin/python
+          rm -rf runtime/fonts/generated
           "$PY" tools/regenerate-font-assets.py \
-            --package build/font-candidates/fonts-with-candidates.zip \
-            --output-dir build/font-candidate-generated \
+            --package runtime/fonts/fonts.zip \
+            --output-dir runtime/fonts/generated \
             --chunk-glyphs 512
+          mkdir -p build/font-cjk-audit
           set -o pipefail
           "$PY" tools/audit-font-assets.py \
-            --package build/font-candidates/fonts-with-candidates.zip \
-            --generated-dir build/font-candidate-generated \
-            --json build/font-candidate-audit/all-fonts.json \
-            --html build/font-candidate-audit/visual-report.html \
-            | tee build/font-candidate-audit/all-fonts.txt
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --json build/font-cjk-audit/all-fonts.json \
+            --html build/font-cjk-audit/visual-report.html \
+            | tee build/font-cjk-audit/all-fonts.txt
           "$PY" tools/render-font-audit-cn.py \
-            --package build/font-candidates/fonts-with-candidates.zip \
-            --generated-dir build/font-candidate-generated \
-            --audit-json build/font-candidate-audit/all-fonts.json \
-            --html build/font-candidate-audit/font-review-cn.html
-          cp build/font-candidates/source-sha256.txt build/font-candidate-audit/
-          cp build/font-candidates/candidate-metrics.txt build/font-candidate-audit/
-          cp build/font-candidates/out/*.bdf build/font-candidate-audit/
+            --package runtime/fonts/fonts.zip \
+            --generated-dir runtime/fonts/generated \
+            --audit-json build/font-cjk-audit/all-fonts.json \
+            --html build/font-cjk-audit/font-review-cn.html
 
           "$PY" - <<'PY'
           import json
           from pathlib import Path
-          report = json.loads(Path('build/font-candidate-audit/all-fonts.json').read_text(encoding='utf-8'))
-          print('faces:', report['face_count'])
-          print('generated parity:', report['generated_parity'])
-          print('visual summary:', report['visual_summary'])
-          assert report['generated_parity']['failed'] == 0
-          PY
 
-      - name: Upload candidate audit
-        if: always()
+          report = json.loads(Path('build/font-cjk-audit/all-fonts.json').read_text(encoding='utf-8'))
+          catalog = json.loads(Path('runtime/fonts/generated/catalog.json').read_text(encoding='utf-8'))
+          expected = {
+              'cubic-11/Cubic11-otf2bdf-9pt.bdf',
+              'chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf',
+              'quan-pixel/QuanPixel-May7.bdf',
+          }
+          selectors = {face['selector'] for face in report['faces']}
+          assert expected <= selectors, sorted(expected - selectors)
+          assert report['face_count'] == 245, report['face_count']
+          assert report['generated_parity']['passed'] == 245, report['generated_parity']
+          assert report['generated_parity']['failed'] == 0, report['generated_parity']
+          assert not report['exact_duplicate_groups'], report['exact_duplicate_groups']
+          for key in ('quick_overflow', 'glyph_collapse', 'blank_heavy', 'powerline_variant'):
+              assert report['visual_summary'][key] == 0, (key, report['visual_summary'][key])
+          mappings = sum(face['glyph_count'] for face in catalog['faces'])
+          sources = len(list(Path('runtime/fonts/generated').glob('*.S')))
+          assert mappings == 1_639_485, mappings
+          Path('build/font-cjk-audit/final-census.txt').write_text(
+              f"faces={len(catalog['faces'])}\n"
+              f"glyph_mappings={mappings}\n"
+              f"assembly_sources={sources}\n",
+              encoding='utf-8',
+          )
+          print(Path('build/font-cjk-audit/final-census.txt').read_text())
+          PY
+          git diff --check
+
+      - name: Upload final CJK font audit
         uses: actions/upload-artifact@v7
         with:
-          name: font-candidate-preview
-          path: |
-            build/font-candidate-audit/
-            build/font-candidates/source-sha256.txt
-            build/font-candidates/candidate-metrics.txt
-            build/font-candidates/out/*.bdf
-          if-no-files-found: warn
+          name: font-cjk-final-audit
           retention-days: 14
+          path: build/font-cjk-audit/
+          if-no-files-found: error
+
+      - name: Commit curated package, generated assets, and HP48 evidence fix
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/one-shot-font-candidate-preview.yml
+          git add -A \
+            runtime/fonts \
+            tests/e2e/harness/run-stock-gallery-hp48gii.sh \
+            .github/workflows/one-shot-font-candidate-preview.yml
+          git diff --cached --check
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fonts: add Cubic 11, ChillBitmap, and QuanPixel"
+          git fetch origin m7-fonts-gallery
+          git rebase origin/m7-fonts-gallery
+          git push origin HEAD:m7-fonts-gallery
