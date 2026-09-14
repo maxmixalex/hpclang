@@ -29,15 +29,16 @@
      2u * (9u + HP4950_BIG_MAX_NAME_BYTES) + 255u * 16u + 15u)
 
 /*
- * Stock HP39gs/40gs 2.22 maps the Saturn font pages through bank 2:
- * Read[0x7c] -> 0x0009e000 and Read[0x7e] -> 0x0009f000. Host-side semantic
- * probes verified P/A/S/5/1 byte-for-byte against those live mappings on both
- * models. Keep the physical pages launcher-private; runtime sees only the
- * stable virtual window base through platform_cookie.
+ * The official HP39gs/40gs 2.22 update images both contain the exact reviewed
+ * 256-record main and mini raster tables in physical NOR pages 0x7e and 0x7f.
+ * Host-side scans match P/A/S/5/1 against the known HP39/40G atlas; the two
+ * models differ only in the table's nibble offset within those pages. Keep the
+ * physical pages launcher-private: runtime selects the model-specific table
+ * bases and sees only the stable virtual window through platform_cookie.
  */
 static const uint32_t hp39_font_nor_pages[] = {
-    0x0009e000u,
-    0x0009f000u,
+    0x0007e000u,
+    0x0007f000u,
 };
 
 _Static_assert(
@@ -210,10 +211,10 @@ int hpclang_armtoolbox_stage1(
     launch.mmu.code_window_page_count = 0u;
 
     /*
-     * Stock HP39gs/40gs 2.22 exposes native mini/main font rasters through
-     * bank-2 NOR pages 0x9e and 0x9f. Map only those pages into the unused
-     * prefix of hpclang's own L1[0x12] coarse table instead of borrowing a
-     * stock L1 descriptor. HP39g+ remains excluded until a trustworthy
+     * Stock HP39gs/40gs 2.22 carries the reviewed native main/mini raster
+     * tables in NOR pages 0x7e and 0x7f. Expose only those pages in the unused
+     * prefix of hpclang's own L1[0x12] coarse table; runtime handles each
+     * model's exact nibble offset. HP39g+ remains excluded until a trustworthy
      * real-hardware full-flash fixture establishes its layout.
      */
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
