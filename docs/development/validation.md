@@ -1,41 +1,38 @@
 # Validation
 
-hpclang separates common-runtime correctness from calculator UI/package automation so a menu, transfer, or launcher failure cannot be mistaken for an ABI/runtime regression.
+hpclang separates common-runtime correctness from calculator UI/package automation so a menu, transfer, launcher, or final repaint failure cannot be mistaken for an ABI/runtime regression.
 
 ## Continuous gates
 
 | Gate | Purpose |
 | --- | --- |
 | `CI / Core runtime` | host/link/runtime invariants for the LLVM-native core |
-| `CI / Font Assets` | deterministic generated-font catalog/repertoire assertions |
+| `CI / Font Assets` | deterministic generated-font catalog, source parity, and repertoire assertions |
 | `CI / HP39 package` | build HP39g+/HP39gs/HP40gs hardware-validation packages |
-| `E2E / Runtime — Direct` | boot target-appropriate firmware, execute HPC1 through stage0/stage1/common bootstrap, observe PASS, and validate machine-state restoration |
-| `E2E / Runtime — Stock` | drive the original transfer/UI/ARMToolbox launch path and require the same canonical runtime PASS artifact; Stock-specific transfer/install captures remain supplementary |
-| `E2E / Font Gallery` | exhaustively traverse generated/native font entries in Direct, plus compact live-native Stock controls on HP50g and HP48gII |
-| `Maintenance / CI` | trim Actions history and CI evidence |
+| `E2E / Runtime` Direct families | boot target-appropriate firmware, execute canonical HPC1 through stage0/stage1/common bootstrap, observe PASS, and validate machine-state restoration |
+| `E2E / Runtime` Stock families | drive original transfer/UI/ARMToolbox launch paths and require the same canonical runtime PASS artifact |
+| `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
+| `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime passes on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g. HP 39g+ is intentionally blocked until a trustworthy real-machine stock flash fixture exists.
+Direct runtime passes on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains blocked until a trustworthy real-machine stock flash fixture exists.
 
-Stock launch status must be reported from the latest run rather than inferred from an older all-green checkpoint. For the physical-font fix, hp48 and hp4950 Stock families are green. HP39gs and HP40gs have each independently completed the full Stock serial/APLET/ARMToolbox path in recent runs, and HP40gs produced a visually correct `FONT OK` PASS frame with the new physical-ROM reader. The bounded rerun of the family job brought both HP39gs and HP40gs into the payload, then both failed the keyboard transition with `0x46410010`. Because the five-model Direct 51-key gate remains green, this is tracked as a Stock harness/input-synchronization flake rather than a font/runtime regression.
+Current canonical runtime run **34792822400 / #78** is green for Build, all three Direct families, Stock hp39, and Stock hp4950. HP48 Stock reaches the payload PASS and control-flow return but fails only the final visible Stock repaint with `return-unsettled`. That outcome is a Stock harness/UI-restoration concern, not a common-runtime or font regression.
 
 ## Runtime PASS contract
 
 The canonical runtime test validates:
 
 - initialized globals and zeroed BSS;
-- static TLS;
-- constructors;
-- 32-bit and 64-bit division;
-- ARMv4T-safe software floating point;
-- libc memory/string operations;
+- static TLS and constructors;
+- ARMv4T-safe integer and soft-float helpers;
+- libc memory/string/formatting behavior;
 - heap allocation;
-- `snprintf`;
 - public display/font rendering used by visible result and keyboard screens;
 - the complete 51-key physical keyboard/event path;
 - hp4950 stream-storage behavior where supported;
 - machine-readable `0x50415353` plus visible runtime evidence.
 
-The Direct emulator gate additionally verifies that temporary mappings and the SWI vector are restored before the stock calculator resumes. It snapshots stable S3C2410 LCD controller configuration (`LCDCON1..5`, `LCDSADDR1..3`, LUT/dither/TPAL, interrupt mask and LPCSEL) before HPC1 and requires an exact match at the return sentinel. Dynamic interrupt pending/source registers are excluded. This comparison occurs before harness restoration, so display-state damage cannot be hidden by host cleanup.
+The Direct emulator gate also verifies that temporary mappings and the SWI vector are restored before the stock calculator resumes. Stable S3C2410 LCD-controller state is compared before harness cleanup so display-state damage cannot be hidden by host-side restoration.
 
 ## PASS, control-flow return, and visible return
 
@@ -43,144 +40,81 @@ These are separate claims and must remain separately observable:
 
 1. **HPC1 PASS** proves the payload completed its assertions.
 2. **Control-flow/state return** proves temporary hpclang mappings/state were removed and execution returned to the stock environment.
-3. **Visible Stock return** proves the stock OS can actually process a normal UI action and redraw the LCD after return.
+3. **Visible Stock return** proves the stock OS can process a normal UI action and redraw the LCD after return.
 
-A nonblank `return.pgm` that still contains hpclang's last frame is insufficient for item 3. The harness must not manufacture success by copying the pre-launch framebuffer back. Each family should issue a harmless native UI action after control-flow restoration and then require a visibly stock-owned frame. HP39 real-hardware guidance already uses **APLET** for this purpose.
+A nonblank `return.pgm` that still contains hpclang's last frame is insufficient for item 3. The harness must not manufacture success by copying the pre-launch framebuffer back. HP39 real-hardware validation uses **APLET** as the harmless post-return stock action.
 
 ## Native-font validation and provenance
 
-Calculator-native font bitmaps are borrowed stock assets and are never redistributed by hpclang. The public font API hides two platform-specific lookup mechanisms that historical code and ROM evidence show are genuinely different.
+Calculator-native font bitmaps are borrowed stock assets and are never redistributed by hpclang. The common API deliberately hides two different platform mechanisms.
 
-For HP48gII/49g+/50g, historical HPGCC's calculator-native helpers use the live logical Saturn map: `hplib/stdio/get_minifont.c` resolves `0x812c8` through `sat_map_s2a()`, `get_bigfont.c` resolves `0x84d82` the same way, and `sat_map_s2a()` is exactly `_saturn_cpu->Read[sat_addr >> 12] + offset`. hpclang therefore keeps native HP48/49/50 lookup on the launch-provided `SAT_CPU->Read[]` view.
+### HP48gII / HP49g+ / HP50g
 
-HP39/40 is a separate stock-ROM path. HPGCC's HP39 Aplet/Library 275 support binds the HP39 ROM text entries `Put3x5` and `Put5x7` rather than reusing the HP48/49/50 RAM-font locator. Independent HP39 ROM reverse engineering then closes the raster tables themselves: mini-font physical Saturn base `0x07E695`, 11 nibbles per record with one advance nibble plus five bitmap rows, and main-font base `0x07C651`, 16 nibbles per record. These exact physical table addresses come from HP39 stock-ROM analysis, not from an HPGCC C constant.
+Historical HPGCC calculator-native helpers resolve the minifont and bigfont through `sat_map_s2a()` and the live logical Saturn `Read[]` mapping. hpclang therefore keeps HP48/49/50 native lookup on the launch-preserved `SAT_CPU->Read[]` view.
 
-A diagnostic HP39gs 2.22 run proved why the first hpclang reader produced stable corruption: logical `SAT_CPU->Read[]` pointed Saturn page `0x7e` at ARM `0x0009f000`, a different physical bank from the fixed raster asset at physical `0x07E695` / ARM byte `0x0003f34a`.
+### HP39gs / HP40gs
 
-The first physical-NOR implementation then exposed another hardware-integration trap. It borrowed an apparently empty high L1 section descriptor for a long-lived 1 MiB NOR alias. On the HP39 fixtures, the active LCD framebuffer itself occupies bytes inside the physical 16 KiB L1-table region: the selected HP39gs `L1[0xBE]` descriptor at `0x07F002F8` and HP40gs `L1[0xA0]` descriptor at `0x07F00280` both fall inside the framebuffer interval around `0x07F0026C..0x07F0076C`. Gallery drawing therefore overwrote the MMU descriptor as pixels and produced the observed Data Abort. An empty descriptor value is not sufficient evidence that its backing word is safe persistent storage.
+HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock `Put3x5` / `Put5x7` ROM entries, while independent ROM analysis establishes the raster tables themselves: mini-font physical Saturn base `0x07E695` and main-font base `0x07C651`.
 
-The production reader no longer borrows any stock high L1 slot. HP39gs/40gs map only physical NOR pages `0x00042000` and `0x00043000`, which contain the complete main and mini raster tables, as uncached 4 KiB small pages in the otherwise-unused prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. `platform_cookie` carries the exact private-window base as an opaque launcher/runtime token. Applications do not gain a physical-ROM or private-window ABI contract, and ordinary Saturn RAM/object access continues to use `Read[]`.
+The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x00042000` and `0x00043000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. `platform_cookie` carries the private-window base only as an opaque launcher/runtime token.
 
-Validation is closed for that mapping and for the automated live-Saturn native-font paths:
+HP39g+ is deliberately excluded from that physical layout until a real-hardware full-flash fixture establishes its own identity.
 
-- HP39gs and HP40gs each complete the targeted exhaustive Gallery at **244 entries / 488 captures** with PASS and settled return;
-- production `E2E / Font Gallery` run **34748303030 / #49** is fully green: Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock / hp4950`, and `Stock / hp48` all succeed;
-- corrected HP50g Stock evidence independently shows the live `Read[]` calculator minifont and main font plus a generated control face, with PASS and settled stock return;
-- compact HP48gII Stock evidence independently shows the live `Read[]` calculator minifont and main font plus a generated control face through the stock Serial Kermit/ARMToolbox48/HPC1 path;
-- the HP48 font-specific gate requires `saw_pass: true` and valid distinct native-mini/native-main/generated captures, while allowing only the already-classified post-PASS `return-unsettled` outcome; this does **not** satisfy the separate visible Stock-return gate;
-- HP40gs Stock/ARMToolbox has independent visually correct native-font evidence;
-- Core font-window/MMU tests, font-selection modes, ARM hardware-validation builds, and HP39 packages pass;
-- temporary alias, Data-Abort, framebuffer, compact-window, and exhaustive-window diagnostics/workflows are removed.
+## Final font validation closure
 
-The compact Stock Gallery sequence must move **DOWN** between calculator minifont and calculator main font because they are two faces of the same `Native` family, then move **RIGHT** to the generated control family. Earlier HP48/HP50 evidence moved RIGHT between native captures and therefore mislabeled an Ark Pixel frame as native main; both sequences were corrected and revalidated before run #45 became the formal closure.
+The current canonical source bundle is bitmap-only. The generated catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources** with **245/245** source→generated parity. Font Assets **#24** regenerates the package without drift and reports zero exact duplicates, overflow, glyph-collapse, blank-heavy, or Powerline regressions.
 
-HP39g+ remains deliberately excluded from the gs/40gs physical-NOR layout until a trustworthy real-hardware full-flash fixture establishes its own identity. The retained HP39g+ NOR dumper is evidence for the historical transient alias mechanism, not evidence that HP39g+ shares the gs/40gs firmware layout.
+The final exhaustive Gallery contains **247 entries: 245 generated + 2 native**. Direct renders both SAMPLE and TEXT pages for **494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g.
 
-The remaining Stock/hp39 keyboard flake and HP48 visible-return settling issue are downstream of this font proof and are not blockers for the native-font mapping/evidence closure.
+Formal production `E2E / Font Gallery` run **34792822393 / #55** is fully green:
 
-## HP 39gs real-hardware gate
+- Build Font Gallery;
+- universal x50ng;
+- `Gallery / hp39`;
+- `Gallery / hp48`;
+- `Gallery / hp4950`;
+- `Stock / hp48`;
+- `Stock / hp4950`.
 
-Use the target-specific hardware-validation artifact from `CI / HP39 package`. The HP39 transfer names are intentionally preserved:
+The Stock evidence was visually checked from the run artifacts. Both HP48gII and HP50g summaries use the same compact three-panel structure: calculator minifont, calculator main font, then an Ark Pixel generated control face. HP50g reaches settled PASS. HP48gII has `saw_pass=true`, control-flow return, and valid distinct nonblank native/generated captures, while the final visible repaint remains `return-unsettled`. The font-specific gate accepts that already-classified post-PASS state only for its concern; it does **not** satisfy the separate visible-return gate.
+
+The Gallery also validates the production HP39 private two-page mapping, generated aliases/arbitrary face selection, arbitrary metrics/spacing, strengthened repertoire-sensitive specimens, and deterministic pagination. Earlier 242-face / 244-entry / 488-capture runs remain historical evidence but are no longer the production closure numbers.
+
+## HP39 real-hardware gate
+
+Use the target-specific hardware-validation artifact from `CI / HP39 package`. The transfer names are intentionally preserved:
 
 - `HPGCC000.000`;
 - `LIB275L.000`;
 - `HP39DIR.000`;
 - `HP39DIR.CUR`.
 
-Transfer library 275 and the test aplet with Conn3x/HP Connectivity Kit, launch `HPCLANG HPC1 TEST`, and expect runtime PASS.
+Transfer library 275 and the test aplet with Conn3x/HP Connectivity Kit, launch `HPCLANG HPC1 TEST`, and expect runtime PASS. After return, press APLET. A valid return opens/redraws the normal APLET library. A stale LCD page before that stock repaint is acceptable; a frozen keyboard, reset, ADDRESS ERROR, or persistent calculator-state damage is not.
 
-After return, press APLET. A valid return opens/redraws the normal APLET library. A stale LCD page before that stock repaint is acceptable; a frozen keyboard, reset, ADDRESS ERROR, or persistent calculator-state damage is not.
+The real HP39gs run has passed the complete canonical runtime and returned cleanly to the stock OS. The HP39g+ model-1 hardware package is not equivalent to native HP39g+ E2E validation.
 
-The real HP 39gs run has passed the complete canonical runtime and returned cleanly to the stock OS.
+## HP39gs/40gs Stock emulator gate
 
-The HP 39g+ model-1 hardware package is built by the same workflow, but that is not equivalent to native HP39g+ E2E validation.
+`Stock / hp39` boots each official 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original serial-disk path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result.
 
-## HP 39gs/40gs stock emulator gate
+Closed-loop `KBRD -> KACK(n)` key synchronization is now implemented. Runtime #78 completes Stock hp39 successfully. The remaining requested follow-up is to mirror Direct's 52-frame keyboard progression evidence in Stock, not to rewrite the common keyboard service.
 
-The `Stock / hp39` family job boots each official 2.22 ROM and uses the calculator's original serial-disk path to request `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000`.
+## HP48gII Direct and Stock gates
 
-It then launches the installed hpclang aplet through ARMToolbox39 and requires the same machine-readable HPC1 PASS result. Visible-return automation should mirror the real-hardware APLET check after control-flow restoration.
+Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 display and validates the same target-independent HPC1 image.
 
-HP 40gs uses its own stock UI sequence because it must leave the CAS front end before APLET and its RECEIVE FROM menu has no IrDA entry.
+Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
-### Current Stock keyboard flake and repair boundary
+HP48 Stock currently reaches HPC1 PASS and control-flow restoration. The unresolved gate is only the first native visible repaint after return. This must remain reported as `return-unsettled` until a genuinely stock-owned post-return frame is observed.
 
-The current Stock launcher waits for the guest's `PHASE_KEYBOARD_READY` marker and then schedules all 51 key down/up pairs on x50ng's realtime timer. Direct uses the same 50 ms hold and 120 ms step values and passes on all five automated models. The guest keyboard test is intentionally strict: after resetting its event baseline, any event other than the expected next DOWN/UP pair fails immediately with `0x10` (`0x46410010` in the shared result word).
+## HP49g+/50g stream-storage and Stock gate
 
-That makes the first repair attempt a **small, harness-local synchronization change**, not a keyboard-runtime rewrite. Preferred order:
+M7.2 validates storage through standard picolibc stdio rather than a public KOS API. HP49g+/HP50g Stock tests cover read, create/truncate, write/flush, seek/ftell, reread, close/reopen, remove and `ENOENT`. HP39/40 and HP48 must reject unsupported byte-stream operations cleanly with `ENOSYS`.
 
-1. make Stock key progression closed-loop or explicitly acknowledge guest progress instead of pre-scheduling all 51 pairs;
-2. publish the same 52-frame keyboard progression evidence already available in Direct so the first divergent key is visible;
-3. if needed, add an explicit release-all/quiescent baseline handshake after Stock UI/ARMToolbox launch and before the first injected key.
-
-Only if those bounded changes still reproduce a failure should investigation move into x50ng GPIO/IRQ behavior. That escalation is deliberately not part of the current font-gallery critical path; a short real-hardware keyboard run is preferable to an open-ended emulator-internals investigation.
-
-## HP 48gII Direct emulator gate
-
-The HP48gII Direct gate boots a verified 2 MiB full-NOR image, including its native HP48gII ARM bootloader, with 256 KiB physical RAM and a 131×64 display.
-
-The fixture is pinned by SHA-256 before being installed as persistent x50ng flash state. The same model-independent HPC1 image then produces machine-readable PASS and returns to the stock execution environment.
-
-## HP 48gII stock emulator gate
-
-The `Stock / hp48` family job boots the verified 2 MiB full-NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, and starts the calculator's Kermit server.
-
-The host transfers historical ARMToolbox48 library 275 as `L275` plus the generated `HPCLANG.HP` object as `HPCLANG`. The calculator installs library 275 into Port 0, warmstarts, recalls `HPCLANG`, enters `ARMTo` / `PrRUN`, and must produce the same machine-readable HPC1 PASS word.
-
-The host Kermit process begins after 35 seconds and is allowed up to 70 seconds to complete. Calculator-side post-transfer automation therefore does not resume before 110 seconds. The former 95-second resume point could race a valid slow transfer that completed around 97 seconds and produce a misleading `Too Few Arguments` UI failure even though serial transfer itself succeeded.
-
-## HP49g+/50g stream-storage gate
-
-M7.2 validates storage through **standard picolibc stdio**, not a public KOS API. The Stock SD fixture contains a known read file and a longer pre-existing output file. The calculator payload must:
-
-1. `fopen/fread/fclose` the known input;
-2. open the output as `w+b` and prove create/truncate semantics;
-3. `fwrite` + `fflush`;
-4. seek to a nonzero offset, verify `ftell`, read back through the same stream, and verify the resulting position;
-5. close, reopen read-only, and prove the old tail was truncated;
-6. `remove` the output and require the next `fopen` to fail with `ENOENT`;
-7. on HP39/40 and HP48, require the same stream `fopen` path to fail cleanly with `ENOSYS` without issuing a KOS filesystem call.
-
-The runtime backend underneath those calls is hp4950-only `open/close/read/write/lseek/unlink` over the stock KOS filesystem table. HP39/40 calculator objects are deliberately excluded from this byte-stream gate.
-
-## HP 49g+/50g stock emulator gate
-
-The `Stock / hp4950` family job uses each model's native ARM bootloader with the shared official 2.15 OS image.
-
-It installs the same ARMToolbox/library 275 package from the emulated SD card, copies the generated `HPCLANG.HP` object through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires the machine-readable HPC1 PASS result.
-
-HP 49g+ and HP 50g intentionally share the same install and launch sequences. Their separate bootloader files are target metadata; no model-specific hpclang runtime path is involved.
-
-## Keyboard progression evidence
-
-The machine-readable keyboard assertions remain the gate. For visual diagnosis, Direct captures an initial hollow physical-keyboard diagram and one frame after each of the 51 accepted key releases, for 52 progression frames total. Stock should mirror the same capture schedule.
-
-The merged progression contact sheet is supplementary and should be published separately from the canonical `before / pass / return` summary. A progression image must not replace the underlying key/event assertions.
-
-## Font Gallery validation
-
-Font Gallery is a separate HPC1 E2E application rather than additional pages in the canonical runtime payload. The exhaustive Direct payload traverses **244 entries** — 242 generated faces plus two calculator-native entries — and renders both SAMPLE and TEXT pages, for **488 captures per target**. The production family jobs cover HP39gs, HP40gs, HP48gII, HP49g+, and HP50g across the 64/80-line layouts. Direct does not fabricate a live Saturn map, so the compact Stock controls provide authoritative HP48/49/50 native-font pixels: HP50g covers hp4950 and HP48gII covers the independent 64-line hp48 path.
-
-The HP48 compact gate is intentionally concern-specific. It requires valid distinct native-mini/native-main/generated captures and `saw_pass: true`; the known first post-return repaint may still report `return-unsettled`. That outcome is accepted only by the font-evidence gate and must never be reported as a visible Stock-return PASS.
-
-The public font core remains direct rather than semantic-role based: applications choose native `hpclang_font_default()/mini()/big()` or generated `hpclang_target_font()` products explicitly. Any future `mini` / `text` / `edit-large` theme vocabulary belongs above this layer in a UI toolkit.
-
-Production run **34748303030 / #49** is the current formal Gallery closure and is green across Build, universal x50ng, all three Direct families, HP50g Stock, and HP48gII Stock native-font evidence. Font Gallery evidence remains separate from canonical runtime/keyboard/storage evidence so visual font regressions cannot silently change those gates.
+The hp4950 Stock family uses each model's native ARM bootloader with the shared official 2.15 OS image, installs ARMToolbox/library 275 from emulated SD, copies `HPCLANG.HP` through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires the canonical PASS result.
 
 ## Evidence retention
 
-Canonical LCD summaries are written to the dedicated `ci-evidence` orphan branch and tracked with Git LFS. The branch contains only images plus `.gitattributes`.
+Machine-readable assertions remain the gate. Images are review/debug evidence rather than substitutes for assertions.
 
-Keyboard progression and Font Gallery contact sheets are supplementary evidence and should use their own paths/names instead of being merged into the canonical three-frame runtime summary.
-
-Weekly maintenance keeps the newest 20 evidence run directories per family. Current workflows retain up to 20 completed Actions runs; transient E2E artifacts use short retention windows.
-
-See [E2E internals](e2e.md) for target profiles, sequence syntax, x50ng integration and focused E2E-app boundaries, and [Fixture provenance](fixtures.md) for the external firmware/full-NOR inputs used by these gates.
-
-### Current bitmap-only font closure status (2026-09-13)
-
-Canonical bundled assets are bitmap-source only. The generated catalog is **242 faces / 1,597,680 mapped glyphs / 3,386 assembly sources** with **242/242** source-to-generated parity; `CI / Font Assets` run **34748326228 / #20** is green and regeneration produces no drift.
-
-`E2E / Font Gallery` run **34748303030 / #49** is green. Direct traverses **244 entries (242 generated + 2 native) × 2 pages = 488 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP48 Stock reaches HPC1 PASS with distinct nonblank native-mini/native-main/generated-control captures, while visible return remains `return-unsettled`.
-
-Before merge: remove the TTF importer; normalize hp48/hp4950 Stock summaries and add the missing HP39 Direct summary; replace weak generic Gallery specimen text with repertoire/design-sensitive samples; evaluate Cubic-11, Fusion Pixel Font, ChillBitmap, and May7/QuanPixel; rerun Font Assets and Gallery after asset/rendering changes.
+Canonical summaries are published to `ci-evidence` and standard Actions artifacts retain per-run evidence. Keyboard progression and Font Gallery contact sheets/summaries use separate paths. Concurrent `ci-evidence` publication still needs a race-safe update strategy; an evidence-branch push conflict does not invalidate an already-uploaded Actions artifact or a passed calculator assertion.
