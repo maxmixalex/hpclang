@@ -261,14 +261,18 @@ jobs:
           if-no-files-found: warn
 
   stock:
-    name: Stock / ${{ matrix.family }}
+    name: Stock / ${{ matrix.target }}
     needs: [build, x50ng]
     runs-on: home-docker
-    timeout-minutes: 8
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
         include:
+          - family: hp39
+            target: hp39gs
+          - family: hp39
+            target: hp40gs
           - family: hp48
             target: hp48gii
           - family: hp4950
@@ -305,14 +309,14 @@ jobs:
           key: hpclang-hpcalc-static-v1
 
       - name: Restore HPGCC39 asset cache
-        if: matrix.family == 'hp48'
+        if: matrix.family == 'hp39' || matrix.family == 'hp48'
         uses: actions/cache@v6
         with:
           path: .cache/hp39-aplet
           key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
 
-      - name: Install HP48 asset preparation dependency on cache miss
-        if: matrix.family == 'hp48'
+      - name: Install HPGCC39 asset preparation dependency on cache miss
+        if: matrix.family == 'hp39' || matrix.family == 'hp48'
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
@@ -330,6 +334,10 @@ jobs:
 
       - name: Prepare Stock platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
+
+      - name: Launch Gallery through stock HP39/40 APLET path
+        if: matrix.family == 'hp39'
+        run: bash tests/e2e/harness/run-stock-gallery-hp39.sh "$TARGET" build/e2e
 
       - name: Launch Gallery through stock HP50g ARMToolbox
         if: matrix.family == 'hp4950'
@@ -384,7 +392,6 @@ jobs:
           print(f'visible-return status remains separate: {status}')
           PY
 
-
       - name: Generate and publish Stock Font Gallery evidence
         if: always()
         continue-on-error: true
@@ -414,7 +421,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-stock-font-gallery-e2e
+          name: ${{ matrix.target }}-stock-font-gallery-e2e
           retention-days: 14
           path: |
             build/${{ matrix.target }}-before.pgm
