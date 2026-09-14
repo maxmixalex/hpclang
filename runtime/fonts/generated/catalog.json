@@ -1786,6 +1786,49 @@
       ]
     },
     {
+      "ascent": 6,
+      "descent": 2,
+      "face": null,
+      "family": "chill-bitmap",
+      "format": "bdf",
+      "glyph_count": 13507,
+      "id": "chill_bitmap_chillbitmap7x_otf2bdf_6pt",
+      "line_height": 8,
+      "nominal_advance": 8,
+      "path": "chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf",
+      "selector": "chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf",
+      "sources": [
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0000.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0001.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0002.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0003.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0004.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0005.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0006.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0007.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0008.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0009.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0010.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0011.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0012.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0013.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0014.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0015.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0016.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0017.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0018.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0019.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0020.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0021.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0022.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0023.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0024.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0025.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_0026.S",
+        "chill_bitmap_chillbitmap7x_otf2bdf_6pt_full.S"
+      ]
+    },
+    {
       "ascent": 10,
       "descent": 3,
       "face": null,
@@ -1895,6 +1938,42 @@
         "cozette_cozettecrossedseven_hidpi_0010.S",
         "cozette_cozettecrossedseven_hidpi_0011.S",
         "cozette_cozettecrossedseven_hidpi_full.S"
+      ]
+    },
+    {
+      "ascent": 10,
+      "descent": 4,
+      "face": null,
+      "family": "cubic-11",
+      "format": "bdf",
+      "glyph_count": 10216,
+      "id": "cubic_11_cubic11_otf2bdf_9pt",
+      "line_height": 14,
+      "nominal_advance": 14,
+      "path": "cubic-11/Cubic11-otf2bdf-9pt.bdf",
+      "selector": "cubic-11/Cubic11-otf2bdf-9pt.bdf",
+      "sources": [
+        "cubic_11_cubic11_otf2bdf_9pt_0000.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0001.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0002.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0003.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0004.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0005.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0006.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0007.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0008.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0009.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0010.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0011.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0012.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0013.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0014.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0015.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0016.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0017.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0018.S",
+        "cubic_11_cubic11_otf2bdf_9pt_0019.S",
+        "cubic_11_cubic11_otf2bdf_9pt_full.S"
       ]
     },
     {
@@ -5393,6 +5472,58 @@
       "selector": "progsole/progsole-10.bdf",
       "sources": [
         "progsole_progsole_10.S"
+      ]
+    },
+    {
+      "ascent": 6,
+      "descent": 2,
+      "face": null,
+      "family": "quan-pixel",
+      "format": "bdf",
+      "glyph_count": 18082,
+      "id": "quan_pixel_quanpixel_may7",
+      "line_height": 8,
+      "nominal_advance": 8,
+      "path": "quan-pixel/QuanPixel-May7.bdf",
+      "selector": "quan-pixel/QuanPixel-May7.bdf",
+      "sources": [
+        "quan_pixel_quanpixel_may7_0000.S",
+        "quan_pixel_quanpixel_may7_0001.S",
+        "quan_pixel_quanpixel_may7_0002.S",
+        "quan_pixel_quanpixel_may7_0003.S",
+        "quan_pixel_quanpixel_may7_0004.S",
+        "quan_pixel_quanpixel_may7_0005.S",
+        "quan_pixel_quanpixel_may7_0006.S",
+        "quan_pixel_quanpixel_may7_0007.S",
+        "quan_pixel_quanpixel_may7_0008.S",
+        "quan_pixel_quanpixel_may7_0009.S",
+        "quan_pixel_quanpixel_may7_0010.S",
+        "quan_pixel_quanpixel_may7_0011.S",
+        "quan_pixel_quanpixel_may7_0012.S",
+        "quan_pixel_quanpixel_may7_0013.S",
+        "quan_pixel_quanpixel_may7_0014.S",
+        "quan_pixel_quanpixel_may7_0015.S",
+        "quan_pixel_quanpixel_may7_0016.S",
+        "quan_pixel_quanpixel_may7_0017.S",
+        "quan_pixel_quanpixel_may7_0018.S",
+        "quan_pixel_quanpixel_may7_0019.S",
+        "quan_pixel_quanpixel_may7_0020.S",
+        "quan_pixel_quanpixel_may7_0021.S",
+        "quan_pixel_quanpixel_may7_0022.S",
+        "quan_pixel_quanpixel_may7_0023.S",
+        "quan_pixel_quanpixel_may7_0024.S",
+        "quan_pixel_quanpixel_may7_0025.S",
+        "quan_pixel_quanpixel_may7_0026.S",
+        "quan_pixel_quanpixel_may7_0027.S",
+        "quan_pixel_quanpixel_may7_0028.S",
+        "quan_pixel_quanpixel_may7_0029.S",
+        "quan_pixel_quanpixel_may7_0030.S",
+        "quan_pixel_quanpixel_may7_0031.S",
+        "quan_pixel_quanpixel_may7_0032.S",
+        "quan_pixel_quanpixel_may7_0033.S",
+        "quan_pixel_quanpixel_may7_0034.S",
+        "quan_pixel_quanpixel_may7_0035.S",
+        "quan_pixel_quanpixel_may7_full.S"
       ]
     },
     {
@@ -9889,6 +10020,62 @@
         "format": "bdf",
         "is_font": true,
         "path": "galmuri/Galmuri11-Condensed.bdf"
+      },
+      {
+        "bytes": 1417030,
+        "family": "cubic-11",
+        "format": "bdf",
+        "is_font": true,
+        "path": "cubic-11/Cubic11-otf2bdf-9pt.bdf"
+      },
+      {
+        "bytes": 5364,
+        "family": "cubic-11",
+        "format": "txt",
+        "is_font": false,
+        "path": "cubic-11/OFL.txt"
+      },
+      {
+        "bytes": 1383970,
+        "family": "chill-bitmap",
+        "format": "bdf",
+        "is_font": true,
+        "path": "chill-bitmap/ChillBitmap7x-otf2bdf-6pt.bdf"
+      },
+      {
+        "bytes": 25792,
+        "family": "chill-bitmap",
+        "format": "md",
+        "is_font": false,
+        "path": "chill-bitmap/LICENSE.md"
+      },
+      {
+        "bytes": 2142471,
+        "family": "quan-pixel",
+        "format": "bdf",
+        "is_font": true,
+        "path": "quan-pixel/QuanPixel-May7.bdf"
+      },
+      {
+        "bytes": 426,
+        "family": "cubic-11",
+        "format": "txt",
+        "is_font": false,
+        "path": "cubic-11/PROVENANCE.txt"
+      },
+      {
+        "bytes": 578,
+        "family": "chill-bitmap",
+        "format": "txt",
+        "is_font": false,
+        "path": "chill-bitmap/PROVENANCE.txt"
+      },
+      {
+        "bytes": 428,
+        "family": "quan-pixel",
+        "format": "txt",
+        "is_font": false,
+        "path": "quan-pixel/PROVENANCE.txt"
       }
     ],
     "schema": "hpclang-font-package-index-v1"
