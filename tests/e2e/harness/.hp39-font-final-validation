@@ -1,1 +1,2 @@
 Temporary trigger for final HP39gs/HP40gs native-font regression after the 2.22 NOR mapping fix.
+Retry after restoring bitmap_glyph()'s hpclang_bitmap_font_data parameter type.
