@@ -279,7 +279,7 @@ static uint32_t hp39_mini_advance(uint32_t codepoint)
 }
 
 static const struct hpclang_bitmap_glyph *bitmap_glyph(
-    const struct hpclang_font *font,
+    const struct hpclang_bitmap_font_data *font,
     uint32_t codepoint)
 {
     if (font == NULL || font->glyphs == NULL || font->glyph_count == 0u)
