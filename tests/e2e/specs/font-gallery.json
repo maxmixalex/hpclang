@@ -15,5 +15,16 @@
   ],
   "json": [
     "build/${TARGET}-e2e.json"
-  ]
+  ],
+  "hp39_native_font_oracle": {
+    "nor": "build/${TARGET}-state/flash",
+    "mini": [
+      "build/${TARGET}-font-gallery-frames/0000-sample.pgm",
+      "build/${TARGET}-font-gallery-frames/0000-text.pgm"
+    ],
+    "main": [
+      "build/${TARGET}-font-gallery-frames/0001-sample.pgm",
+      "build/${TARGET}-font-gallery-frames/0001-text.pgm"
+    ]
+  }
 }
