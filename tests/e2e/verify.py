@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 from pathlib import Path
 
 
@@ -33,9 +34,7 @@ def main() -> int:
             size = path.stat().st_size
             expected = int(entry["size"])
             if size != expected:
-                failures.append(
-                    f"{path}: size {size}, expected {expected}"
-                )
+                failures.append(f"{path}: size {size}, expected {expected}")
 
     for entry in spec.get("logs", []):
         path = Path(expand(entry["path"]))
@@ -47,6 +46,19 @@ def main() -> int:
             expected = expand(str(expected))
             if expected not in text:
                 failures.append(f"{path}: missing text: {expected}")
+
+    oracle = spec.get("hp39_native_font_oracle")
+    target = os.environ.get("TARGET", "")
+    if oracle and target in {"hp39gs", "hp40gs"}:
+        script = Path(__file__).parent / "harness" / "verify-hp39-native-font.py"
+        command = [
+            "python3", str(script), target, expand(oracle["nor"]),
+            "--mini", *[expand(v) for v in oracle["mini"]],
+            "--main", *[expand(v) for v in oracle["main"]],
+        ]
+        result = subprocess.run(command, check=False)
+        if result.returncode != 0:
+            failures.append("HP39 native font ROM pixel oracle failed")
 
     if failures:
         for failure in failures:
