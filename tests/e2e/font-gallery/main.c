@@ -340,16 +340,18 @@ static void draw_chrome(
 static int native_raster_available(const struct hpclang_device_info *device)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    (void)device;
+    if (boot == NULL || device == NULL)
+        return 0;
 
-    /* Native Gallery evidence is only meaningful when the launcher carries a
-       verified live stock Saturn Read[] map. HP39gs/40gs Direct launchers do
-       map their fixed NOR raster pages for runtime implementation purposes,
-       but their synthetic ARMSYS deliberately has no live Read[] map; treating
-       that synthetic window as Stock font evidence caused the old garbage
-       captures. Stock launches advertise both the real Read[] map and the
-       model-specific backend window, so this gate cleanly separates them. */
-    return boot != NULL && boot->saturn_state != 0u;
+    /* HP39gs/40gs use the reviewed physical-ROM font window in both Direct
+       and Stock launches. Mirror runtime/core/font.c's backend ownership check
+       rather than requiring a live Saturn Read[] map that this backend does
+       not use. Other native font families still require the logical map. */
+    if (device->model == HPCLANG_DEVICE_HP39GS ||
+        device->model == HPCLANG_DEVICE_HP40GS)
+        return boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
+
+    return boot->saturn_state != 0u;
 }
 
 static uint32_t content_rows(const struct hpclang_font *font, uint32_t height)

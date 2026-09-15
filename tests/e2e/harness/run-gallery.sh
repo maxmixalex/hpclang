@@ -108,6 +108,18 @@ export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
 timeout 330s "$X50" "${X50_ARGS[@]}"
 
+if [[ "$TARGET" == hp39gs || "$TARGET" == hp40gs ]]; then
+    FLASH="$STATE/flash"
+    [[ -s "$FLASH" ]] || {
+        echo "missing x50ng Gallery flash backing: $FLASH" >&2
+        exit 1
+    }
+    python3 "$ROOT/tests/e2e/harness/verify-hp39-native-font.py" \
+        "$TARGET" "$FLASH" \
+        --mini "$FRAMES/0000-sample.pgm" "$FRAMES/0000-text.pgm" \
+        --main "$FRAMES/0001-sample.pgm" "$FRAMES/0001-text.pgm"
+fi
+
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm "$FRAMES"/*.pgm; do
     [[ -f "$pgm" ]] || continue
     python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
