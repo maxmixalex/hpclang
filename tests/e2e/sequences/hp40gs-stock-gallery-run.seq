@@ -21,12 +21,18 @@
 # HPGCC aplet launch screen after transfer has completed, but does not yet enter
 # HPC1. Confirm the launch with a second ENTER. On a faster run that is already
 # inside Gallery, the extra ENTER merely toggles sample/text and is harmless.
+# Capture both page states for each native face so the ROM-pixel oracle is
+# independent of that launch/toggle race.
 43500 monitor 450000
 410000 tap enter
 416000 tap enter
 428000 capture native-mini
-431000 tap down
-434000 capture native-main
-437000 tap right
-440000 capture generated-control
-443000 tap on
+431000 tap enter
+434000 capture native-mini-other
+437000 tap down
+440000 capture native-main
+443000 tap enter
+446000 capture native-main-other
+449000 tap right
+452000 capture generated-control
+455000 tap on

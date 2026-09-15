@@ -22,12 +22,18 @@
 # screen; the captured failure from the previous run proved that this screen
 # then requires one more ENTER to enter HPC1. If a faster stock path has already
 # entered Gallery, that second ENTER is only the harmless sample/text toggle.
+# Capture both page states for each native face so the ROM-pixel oracle is
+# independent of that launch/toggle race.
 34500 monitor 450000
 410000 tap enter
 416000 tap enter
 428000 capture native-mini
-431000 tap down
-434000 capture native-main
-437000 tap right
-440000 capture generated-control
-443000 tap on
+431000 tap enter
+434000 capture native-mini-other
+437000 tap down
+440000 capture native-main
+443000 tap enter
+446000 capture native-main-other
+449000 tap right
+452000 capture generated-control
+455000 tap on
