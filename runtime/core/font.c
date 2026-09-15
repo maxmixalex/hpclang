@@ -30,7 +30,14 @@
 #define HP39_MAIN_FIRST_NIBBLE      0x0007c651u
 #define HP39_MAIN_LAST_NIBBLE       (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
 #define HP39_MINI_FIRST_NIBBLE      0x0007e695u
-#define HP39_MINI_LAST_NIBBLE       (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
+#define HP39_MINI_GLYPH_COUNT       155u
+#define HP39_MINI_RECORD_NIBBLES    11u
+#define HP39_MINI_MAP_FIRST_CODE    0xa0u
+#define HP39_MINI_MAP_COUNT         96u
+#define HP39_MINI_MAP_FIRST_NIBBLE  \
+    (HP39_MINI_FIRST_NIBBLE + HP39_MINI_GLYPH_COUNT * HP39_MINI_RECORD_NIBBLES)
+#define HP39_MINI_LAST_NIBBLE       \
+    (HP39_MINI_MAP_FIRST_NIBBLE + HP39_MINI_MAP_COUNT * 2u - 1u)
 
 /* HP39gs 2.22: main @ NOR 0x7e574 high nibble, mini @ 0x7f596 high. */
 #define HP39GS_MAIN_WINDOW_FIRST_NIBBLE 0x00000ae9u
@@ -257,24 +264,31 @@ static uint32_t native_byte_codepoint(uint32_t codepoint)
     return codepoint <= 0xffu ? codepoint : (uint32_t)'?';
 }
 
-static uint32_t hp39_mini_codepoint(uint32_t codepoint)
+static uint32_t hp39_mini_index(uint32_t codepoint)
 {
     codepoint = native_byte_codepoint(codepoint);
-    /* The stock HP39 small-font path case-folds ASCII lower-case before the
-     * ROM lookup. Preserve that observable native behavior. */
+
+    /* The stock small-font atlas has 155 11-nibble glyph records. ASCII
+     * lower-case is folded to upper-case, freeing atlas slots 0x61..0x7a.
+     * HP character codes 0x7b..0x9f are packed continuously into 0x61..0x85.
+     * Codes 0xa0..0xff use the 96-byte ROM map immediately after the atlas. */
     if (codepoint >= (uint32_t)'a' && codepoint <= (uint32_t)'z')
-        codepoint -= (uint32_t)('a' - 'A');
+        return codepoint - (uint32_t)('a' - 'A');
+    if (codepoint >= HP39_MINI_MAP_FIRST_CODE) {
+        uint32_t offset = codepoint - HP39_MINI_MAP_FIRST_CODE;
+        return hp39_physical_byte(
+            HP39_MINI_MAP_FIRST_NIBBLE + offset * 2u);
+    }
+    if (codepoint >= 0x7bu)
+        return codepoint - 0x1au;
     return codepoint;
 }
 
 static uint32_t hp39_mini_advance(uint32_t codepoint)
 {
-    /* The reviewed mini atlas uses 256 records of 1 advance nibble followed
-     * by 10 bitmap nibbles. HP39gs/40gs translate this legacy coordinate to
-     * their evidenced 2.22 table base in hp39_physical_nibble(). */
-    uint32_t index = hp39_mini_codepoint(codepoint);
-    uint32_t advance =
-        hp39_physical_nibble(HP39_MINI_FIRST_NIBBLE + index * 11u);
+    uint32_t index = hp39_mini_index(codepoint);
+    uint32_t advance = hp39_physical_nibble(
+        HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES);
     return advance != 0u ? advance : 4u;
 }
 
@@ -340,8 +354,9 @@ static void draw_hp39_mini(
     uint32_t codepoint,
     uint8_t intensity)
 {
-    uint32_t index = hp39_mini_codepoint(codepoint);
-    uint32_t record = HP39_MINI_FIRST_NIBBLE + index * 11u;
+    uint32_t index = hp39_mini_index(codepoint);
+    uint32_t record =
+        HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES;
     for (uint32_t yy = 0u; yy < 5u; ++yy) {
         uint8_t row = hp39_physical_byte(record + 1u + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
