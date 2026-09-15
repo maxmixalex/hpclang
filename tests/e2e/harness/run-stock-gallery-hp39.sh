@@ -104,7 +104,15 @@ FLASH="$STATE/flash"
     echo "missing x50ng Stock flash backing: $FLASH" >&2
     exit 1
 }
-python3 "$ROOT/tests/e2e/harness/probe-hp39-live-nor.py" "$FLASH"
+
+python3 "$ROOT/tests/e2e/harness/verify-hp39-native-font.py" \
+    "$TARGET" "$FLASH" \
+    --mini \
+        "$ROOT/build/$TARGET-stock-gallery-native-mini.pgm" \
+        "$ROOT/build/$TARGET-stock-gallery-native-mini-other.pgm" \
+    --main \
+        "$ROOT/build/$TARGET-stock-gallery-native-main.pgm" \
+        "$ROOT/build/$TARGET-stock-gallery-native-main-other.pgm"
 
 kill "$KERMIT_PID" 2>/dev/null || true
 wait "$KERMIT_PID" 2>/dev/null || true
