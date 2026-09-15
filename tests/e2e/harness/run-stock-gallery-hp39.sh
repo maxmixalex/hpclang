@@ -99,6 +99,13 @@ timeout 510s "$ROOT/build/x50ng/dist/x50ng" \
     --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin" \
     --firmware="$FIRMWARE"
 
+FLASH="$STATE/flash"
+[[ -s "$FLASH" ]] || {
+    echo "missing x50ng Stock flash backing: $FLASH" >&2
+    exit 1
+}
+python3 "$ROOT/tests/e2e/harness/probe-hp39-live-nor.py" "$FLASH"
+
 kill "$KERMIT_PID" 2>/dev/null || true
 wait "$KERMIT_PID" 2>/dev/null || true
 KERMIT_PID=
