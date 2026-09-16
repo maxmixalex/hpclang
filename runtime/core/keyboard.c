@@ -9,6 +9,8 @@
 #define GPGDAT REG32(0x07a00064u)
 
 #define MATRIX_ROWS_MASK 0x7fu
+#define GPG_SCAN_LOW_CONFIG UINT32_C(0x0000aaa9)
+
 static void settle(void)
 {
     for (volatile unsigned n = 100u; n != 0u; --n)
@@ -23,10 +25,13 @@ void hpclang_keyboard_read(struct hpclang_keyboard_state *state)
     for (unsigned column = 0u; column < HPCLANG_KEYBOARD_COLUMNS; ++column) {
         /*
          * GPG[8..15] are the eight matrix columns. Select one column as an
-         * output while the row pins keep the stock keyboard input setup.
+         * output while the other columns remain inputs. The row-side GPIO
+         * configuration is established explicitly instead of inheriting a
+         * transient stock-OS GPG0..7 state; the complete original GPGCON is
+         * restored after the scan.
          */
         GPGCON =
-            (saved_gpgcon & UINT32_C(0x0000ffff)) |
+            GPG_SCAN_LOW_CONFIG |
             (UINT32_C(1) << ((column + 8u) * 2u));
         settle();
 
