@@ -7,6 +7,7 @@ on:
       - stock-keyboard-event-witness
     paths:
       - "tools/instrument-stock-keyboard-witness.py"
+      - "tools/instrument-stock-sequence-guard.py"
       - ".github/workflows/diagnose-stock-keyboard.yml"
 
 concurrency:
@@ -24,6 +25,9 @@ jobs:
 
       - name: Instrument keyboard failure witness
         run: python3 tools/instrument-stock-keyboard-witness.py
+
+      - name: Instrument Stock sequence retry guard
+        run: python3 tools/instrument-stock-sequence-guard.py
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
