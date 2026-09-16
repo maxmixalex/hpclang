@@ -1,0 +1,97 @@
+name: Diagnose / HP39 Stock Keyboard
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - stock-keyboard-event-witness
+    paths:
+      - "tools/instrument-stock-keyboard-witness.py"
+      - ".github/workflows/diagnose-stock-keyboard.yml"
+
+concurrency:
+  group: hp39-stock-keyboard-witness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  witness:
+    name: HP39 Stock expected-vs-actual witness
+    runs-on: home-docker
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Instrument keyboard failure witness
+        run: python3 tools/instrument-stock-keyboard-witness.py
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Build instrumented canonical runtime
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh runtime "$GITHUB_WORKSPACE/build/e2e"
+
+      - name: Restore or build universal x50ng
+        uses: ./.github/actions/setup-x50ng
+
+      - name: Restore HPGCC39 asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install HPGCC39 preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare HP39 Stock assets only
+        run: |
+          bash tools/bootstrap-hp39-aplet.sh >/dev/null
+          mkdir -p \
+            build/assets/hp39gs-stock-transfer \
+            build/assets/hp40gs-stock-transfer
+          for target in hp39gs hp40gs; do
+            bash tools/package-hp39-aplet.sh \
+              "build/e2e/launchers/$target.hp" \
+              "build/assets/$target-stock-transfer" \
+              "$target"
+          done
+
+      - name: Prepare Stock hp39 runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock hp39
+
+      - name: Run instrumented Stock hp39 family
+        id: stock
+        continue-on-error: true
+        run: bash tests/e2e/harness/run-family.sh stock hp39 build/e2e build/assets
+
+      - name: Upload HP39 keyboard witness evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp39-stock-keyboard-witness
+          retention-days: 14
+          path: |
+            build/hp39gs-*.pgm
+            build/hp39gs-*.pgm.png
+            build/hp39gs-*.json
+            build/hp39gs-kermit*
+            build/hp39gs-socat.log
+            build/hp40gs-*.pgm
+            build/hp40gs-*.pgm.png
+            build/hp40gs-*.json
+            build/hp40gs-kermit*
+            build/hp40gs-socat.log
+            build/e2e/e2e.hpc
+            build/e2e/e2e.result-address
+          if-no-files-found: warn
+
+      - name: Preserve diagnostic failure status
+        if: steps.stock.outcome != 'success'
+        run: exit 1
