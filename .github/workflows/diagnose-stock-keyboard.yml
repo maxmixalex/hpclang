@@ -6,6 +6,7 @@ on:
     branches:
       - stock-keyboard-event-witness
     paths:
+      - "runtime/core/keyboard.c"
       - "tools/instrument-stock-keyboard-witness.py"
       - "tools/instrument-stock-sequence-guard.py"
       - ".github/workflows/diagnose-stock-keyboard.yml"
