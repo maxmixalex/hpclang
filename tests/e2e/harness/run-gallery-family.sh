@@ -43,19 +43,18 @@ mkdir -p "$ROOT/build"
 printf '%s\n' "${TARGETS[@]}" > "$TARGETS_FILE"
 printf 'Gallery %s targets: %s\n' "$FAMILY" "${TARGETS[*]}"
 
-declare -a PIDS=()
-for target in "${TARGETS[@]}"; do
-    bash "$ROOT/tests/e2e/harness/run-gallery-shards.sh" "$target" "$APP_DIR" &
-    PIDS+=("$!")
-done
-
+# A family job is already one Actions execution slot. Do not fan its model
+# targets out into additional x50ng processes: that hidden nested concurrency
+# bypasses the runner-level cap and makes the realtime UI harness race guest
+# boot under host CPU pressure. Preserve per-target failure collection, but run
+# the emulators one at a time inside this job.
 status=0
-for i in "${!PIDS[@]}"; do
-    if wait "${PIDS[$i]}"; then
-        printf 'PASS %s\n' "${TARGETS[$i]}"
+for target in "${TARGETS[@]}"; do
+    if bash "$ROOT/tests/e2e/harness/run-gallery-shards.sh" "$target" "$APP_DIR"; then
+        printf 'PASS %s\n' "$target"
     else
         rc=$?
-        printf 'FAIL %s (exit %d)\n' "${TARGETS[$i]}" "$rc" >&2
+        printf 'FAIL %s (exit %d)\n' "$target" "$rc" >&2
         status=1
     fi
 done
