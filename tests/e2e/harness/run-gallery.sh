@@ -120,6 +120,8 @@ if [[ "$TARGET" == hp39gs || "$TARGET" == hp40gs ]]; then
         --main "$FRAMES/0001-sample.pgm" "$FRAMES/0001-text.pgm"
 fi
 
+python3 "$ROOT/tests/e2e/harness/verify-gallery-content.py" "$FRAMES"
+
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm "$FRAMES"/*.pgm; do
     [[ -f "$pgm" ]] || continue
     python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
