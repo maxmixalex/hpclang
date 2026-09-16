@@ -31,7 +31,7 @@ on:
       - "tools/merge-pgm-grid.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
-      - "tools/publish-ci-image.sh"
+      - "tools/publish-ci-evidence.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -61,6 +61,7 @@ on:
       - "tools/merge-pgm-grid.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-evidence.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
@@ -203,7 +204,7 @@ jobs:
       - name: Browse and capture every Font Gallery family
         run: bash tests/e2e/harness/run-gallery-family.sh "$FAMILY" build/e2e
 
-      - name: Generate and publish Font Gallery evidence
+      - name: Generate Font Gallery evidence
         if: always()
         continue-on-error: true
         run: |
@@ -218,22 +219,13 @@ jobs:
               --image-only
           done < "$targets_file"
 
-          chmod +x tools/publish-ci-image.sh
           while IFS= read -r TARGET; do
             [[ -n "$TARGET" ]] || continue
             export TARGET
-            image_url=""
-            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              if tools/publish-ci-image.sh \
-                  "build/$TARGET-font-gallery-summary.png" \
-                  "font-gallery/$GITHUB_RUN_ID/$TARGET.png"; then
-                image_url="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1"
-              else
-                echo "::warning::failed to publish ci-evidence image for $TARGET; keeping local summary"
-              fi
-            fi
             args=(tests/e2e/specs/font-gallery.json)
-            [[ -z "$image_url" ]] || args+=(--image-url "$image_url")
+            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+            fi
             python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
 
@@ -392,7 +384,7 @@ jobs:
           print(f'visible-return status remains separate: {status}')
           PY
 
-      - name: Generate and publish Stock Font Gallery evidence
+      - name: Generate Stock Font Gallery evidence
         if: always()
         continue-on-error: true
         run: |
@@ -401,20 +393,10 @@ jobs:
             --image-out "build/$TARGET-stock-font-gallery-summary.png" \
             --image-only
 
-          image_url=""
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            chmod +x tools/publish-ci-image.sh
-            if tools/publish-ci-image.sh \
-                "build/$TARGET-stock-font-gallery-summary.png" \
-                "stock-font-gallery/$GITHUB_RUN_ID/$TARGET.png"; then
-              image_url="https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1"
-            else
-              echo "::warning::failed to publish Stock ci-evidence image for $TARGET"
-            fi
-          fi
-
           args=(tests/e2e/specs/font-gallery-stock.json)
-          [[ -z "$image_url" ]] || args+=(--image-url "$image_url")
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+          fi
           python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Stock Font Gallery evidence
@@ -442,3 +424,54 @@ jobs:
             build/e2e/e2e.hpc
             build/e2e/e2e.size.txt
           if-no-files-found: warn
+
+  publish-evidence:
+    name: Publish ci-evidence
+    if: always() && github.event_name != 'pull_request'
+    needs: [gallery, stock]
+    runs-on: home-docker
+    concurrency:
+      group: ci-evidence-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Gallery evidence artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: "*-font-gallery-e2e"
+          path: build/publish
+
+      - name: Stage Gallery ci-evidence tree
+        run: |
+          set -euo pipefail
+          mkdir -p build/publish
+          direct_out="build/ci-evidence/font-gallery/$GITHUB_RUN_ID"
+          stock_out="build/ci-evidence/stock-font-gallery/$GITHUB_RUN_ID"
+          mkdir -p "$direct_out" "$stock_out"
+
+          find build/publish -type f -name '*-font-gallery-summary.png' -print0 \
+            | while IFS= read -r -d '' image; do
+                base="$(basename "$image")"
+                case "$base" in
+                  *-stock-font-gallery-summary.png) continue ;;
+                esac
+                target="${base%-font-gallery-summary.png}"
+                cp "$image" "$direct_out/$target.png"
+              done
+
+          find build/publish -type f -name '*-stock-font-gallery-summary.png' -print0 \
+            | while IFS= read -r -d '' image; do
+                base="$(basename "$image")"
+                target="${base%-stock-font-gallery-summary.png}"
+                cp "$image" "$stock_out/$target.png"
+              done
+
+      - name: Publish Gallery ci-evidence in one commit
+        continue-on-error: true
+        run: |
+          chmod +x tools/publish-ci-evidence.sh
+          tools/publish-ci-evidence.sh build/ci-evidence
