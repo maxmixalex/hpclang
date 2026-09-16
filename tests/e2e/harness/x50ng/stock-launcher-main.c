@@ -15,7 +15,7 @@
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
 #define PAYLOAD_KEY_HOLD_US 50000LL
-#define PAYLOAD_KEY_FIRST_DELAY_US 70000LL
+#define PAYLOAD_KEY_FIRST_DELAY_US 20000LL
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define PHASE_KEYBOARD_READY 0x4b425244u
@@ -193,6 +193,70 @@ static void key_cb(void *arg)
     const struct key_action *a = arg;
     if (a->down) press_key(a->key);
     else release_key(a->key);
+}
+
+/*
+ * Stock sequence files pre-schedule sparse ENTER retries so slow serial-disk
+ * transfers can still launch ARMToolbox. Once the HPC1 payload publishes KBRD,
+ * those launcher retries must no longer inject key-down edges into the strict
+ * 51-key payload test. Always allow key-up so a key already pressed before
+ * KBRD can still be released.
+ */
+struct sequence_key_event {
+    struct state *state;
+    const struct key_action *action;
+};
+
+static void sequence_key_cb(void *arg)
+{
+    struct sequence_key_event *event = arg;
+    const struct key_action *action = event->action;
+    struct state *s = event->state;
+
+    if (!action->down || !s->payload_keyboard_scheduled)
+        key_cb((void *)action);
+    free(event);
+}
+
+static int sequence_key(
+    struct state *s,
+    const struct key_action *action,
+    int64_t us)
+{
+    struct sequence_key_event *event = calloc(1, sizeof(*event));
+    if (!event)
+        return 0;
+    event->state = s;
+    event->action = action;
+    if (!later(sequence_key_cb, event, us)) {
+        free(event);
+        return 0;
+    }
+    return 1;
+}
+
+static int sequence_tap(
+    struct state *s,
+    const struct key_action *down,
+    const struct key_action *up_action,
+    int64_t us)
+{
+    return sequence_key(s, down, us) &&
+           sequence_key(s, up_action, us + KEY_HOLD_US);
+}
+
+static int sequence_chord(
+    struct state *s,
+    const struct key_action *mod_down,
+    const struct key_action *key_down,
+    const struct key_action *key_up,
+    const struct key_action *mod_up,
+    int64_t us)
+{
+    return sequence_key(s, mod_down, us) &&
+           sequence_key(s, key_down, us + 30000) &&
+           sequence_key(s, key_up, us + 130000) &&
+           sequence_key(s, mod_up, us + 160000);
 }
 
 static int tap(
@@ -639,13 +703,13 @@ static int schedule_sequence(struct state *s, const char *path)
 
         if (strcmp(op, "tap") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);
-            if (!key || !tap(key->down, key->up, us))
+            if (!key || !sequence_tap(s, key->down, key->up, us))
                 goto invalid_action;
         } else if (strcmp(op, "chord") == 0 && fields == 4) {
             const struct key_pair_ref *mod = find_key_pair(first);
             const struct key_pair_ref *key = find_key_pair(second);
-            if (!mod || !key || !chord(
-                    mod->down, key->down, key->up, mod->up, us))
+            if (!mod || !key || !sequence_chord(
+                    s, mod->down, key->down, key->up, mod->up, us))
                 goto invalid_action;
         } else if (strcmp(op, "capture") == 0 && fields == 3) {
             struct seq_named_event *event = seq_named_event_new(s, first);
