@@ -29,7 +29,7 @@ on:
       - "tools/prepare-hp39-aplet.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
-      - "tools/publish-ci-image.sh"
+      - "tools/publish-ci-evidence.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-runtime.yml"
@@ -57,6 +57,7 @@ on:
       - "tools/prepare-hp39-aplet.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
+      - "tools/publish-ci-evidence.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-runtime.yml"
@@ -195,7 +196,7 @@ jobs:
       - name: Execute Direct family
         run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
 
-      - name: Generate and publish canonical LCD evidence
+      - name: Generate canonical LCD evidence
         if: always()
         continue-on-error: true
         run: |
@@ -207,12 +208,6 @@ jobs:
             python3 tests/e2e/report.py tests/e2e/specs/runtime.json \
               --image-out "build/$TARGET-summary.png" \
               --image-only
-            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              chmod +x tools/publish-ci-image.sh
-              tools/publish-ci-image.sh \
-                "build/$TARGET-summary.png" \
-                "direct-runtime/$GITHUB_RUN_ID/$TARGET.png"
-            fi
             args=(tests/e2e/specs/runtime.json)
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
               args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
@@ -279,7 +274,7 @@ jobs:
       - name: Execute Stock family
         run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
 
-      - name: Generate and publish canonical LCD evidence
+      - name: Generate canonical LCD evidence
         if: always()
         continue-on-error: true
         run: |
@@ -291,12 +286,6 @@ jobs:
             python3 tests/e2e/report.py tests/e2e/specs/runtime.json \
               --image-out "build/$TARGET-summary.png" \
               --image-only
-            if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              chmod +x tools/publish-ci-image.sh
-              tools/publish-ci-image.sh \
-                "build/$TARGET-summary.png" \
-                "stock-runtime/$GITHUB_RUN_ID/$TARGET.png"
-            fi
             args=(tests/e2e/specs/runtime.json)
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
               args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
@@ -322,3 +311,58 @@ jobs:
             build/stock-${{ matrix.family }}-targets.txt
             build/e2e/e2e.hpc
           if-no-files-found: warn
+
+  publish-evidence:
+    name: Publish ci-evidence
+    if: always() && github.event_name != 'pull_request'
+    needs: [direct, stock]
+    runs-on: home-docker
+    concurrency:
+      group: ci-evidence-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Direct evidence artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: "*-direct-runtime-e2e"
+          path: build/publish/direct
+
+      - name: Download Stock evidence artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: "*-stock-runtime-e2e"
+          path: build/publish/stock
+
+      - name: Stage Runtime ci-evidence tree
+        run: |
+          set -euo pipefail
+          mkdir -p build/publish/direct build/publish/stock
+          direct_out="build/ci-evidence/direct-runtime/$GITHUB_RUN_ID"
+          stock_out="build/ci-evidence/stock-runtime/$GITHUB_RUN_ID"
+          mkdir -p "$direct_out" "$stock_out"
+
+          find build/publish/direct -type f -name '*-summary.png' -print0 \
+            | while IFS= read -r -d '' image; do
+                base="$(basename "$image")"
+                target="${base%-summary.png}"
+                cp "$image" "$direct_out/$target.png"
+              done
+
+          find build/publish/stock -type f -name '*-summary.png' -print0 \
+            | while IFS= read -r -d '' image; do
+                base="$(basename "$image")"
+                target="${base%-summary.png}"
+                cp "$image" "$stock_out/$target.png"
+              done
+
+      - name: Publish Runtime ci-evidence in one commit
+        continue-on-error: true
+        run: |
+          chmod +x tools/publish-ci-evidence.sh
+          tools/publish-ci-evidence.sh build/ci-evidence
