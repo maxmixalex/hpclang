@@ -347,8 +347,8 @@ static int native_raster_available(const struct hpclang_device_info *device)
        and Stock launches. Mirror runtime/core/font.c's backend ownership check
        rather than requiring a live Saturn Read[] map that this backend does
        not use. Other native font families still require the logical map. */
-    if (device->model == HPCLANG_DEVICE_HP39GS ||
-        device->model == HPCLANG_DEVICE_HP40GS)
+    if (device->model == HPCLANG_MODEL_HP39GS ||
+        device->model == HPCLANG_MODEL_HP40GS)
         return boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
 
     return boot->saturn_state != 0u;
