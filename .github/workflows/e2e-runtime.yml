@@ -25,7 +25,7 @@ on:
       - "tools/run-hp39-kermit-server.sh"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/package-hp39-aplet.sh"
-      - "tools/bootstrap-hp39-applet.sh"
+      - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
       - "tools/pgm-to-png.py"
       - "tools/pgm-to-summary.py"
