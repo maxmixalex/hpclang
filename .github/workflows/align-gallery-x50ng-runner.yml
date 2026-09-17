@@ -1,0 +1,48 @@
+name: Align Gallery x50ng runner
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - stock-keyboard-event-witness
+    paths:
+      - .github/workflows/align-gallery-x50ng-runner.yml
+
+jobs:
+  apply:
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: stock-keyboard-event-witness
+          fetch-depth: 0
+
+      - name: Align Gallery x50ng runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/e2e-font-gallery.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '''  x50ng:\n    name: Prepare universal x50ng\n    runs-on: ubuntu-24.04\n'''
+          new = '''  x50ng:\n    name: Prepare universal x50ng\n    runs-on: home-docker\n'''
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one Gallery x50ng runner block, got {count}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+          git diff -- .github/workflows/e2e-font-gallery.yml
+
+      - name: Commit runner alignment
+        shell: bash
+        run: |
+          git config user.name 'Max Alex'
+          git config user.email '1124982772@qq.com'
+          git rm .github/workflows/align-gallery-x50ng-runner.yml
+          git add .github/workflows/e2e-font-gallery.yml
+          git commit -m 'ci: align Gallery x50ng runner'
+          git push origin HEAD:stock-keyboard-event-witness
