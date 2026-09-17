@@ -66,17 +66,17 @@ printf 'E2E %s/%s targets: %s\n' "$MODE" "$FAMILY" "${TARGETS[*]}"
 declare -a PIDS=()
 declare -a KEYBOARD_FRAME_DIRS=()
 for target in "${TARGETS[@]}"; do
+    frames="$ROOT/build/$target-keyboard-frames"
+    rm -rf "$frames"
+    mkdir -p "$frames"
     if [[ "$MODE" == direct ]]; then
-        frames="$ROOT/build/$target-keyboard-frames"
-        rm -rf "$frames"
-        mkdir -p "$frames"
         HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
             bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
-        KEYBOARD_FRAME_DIRS+=("$frames")
     else
-        bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
-        KEYBOARD_FRAME_DIRS+=("")
+        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+            bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
     fi
+    KEYBOARD_FRAME_DIRS+=("$frames")
     PIDS+=("$!")
 done
 
@@ -95,7 +95,11 @@ for i in "${!PIDS[@]}"; do
         shopt -s nullglob
         keyboard_frames=("$frame_dir"/*.pgm)
         shopt -u nullglob
-        if (( ${#keyboard_frames[@]} )); then
+        if (( ${#keyboard_frames[@]} != 52 )); then
+            printf 'FAIL %s keyboard progression: expected 52 frames, got %d\n' \
+                "${TARGETS[$i]}" "${#keyboard_frames[@]}" >&2
+            status=1
+        else
             merged="$ROOT/build/${TARGETS[$i]}-keyboard-progress.pgm"
             python3 "$ROOT/tools/merge-pgm-grid.py" \
                 "$merged" "${keyboard_frames[@]}"
