@@ -10,6 +10,7 @@
 #include "timer.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
+#include "stock-return-phase.h"
 #include "s3c2410/s3c2410_lcd.h"
 
 #define LCD_W 131
@@ -49,11 +50,15 @@ struct state {
     int saw_pass;
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
+    int return_mapping_restored;
+    int hp48_stage_alias_seen;
+    int hp48_stage_alias_cleared;
     int return_repaint_scheduled;
     int returned;
     int failed;
     int lcd_height;
     int64_t deadline;
+    int64_t return_teardown_deadline;
     int64_t return_deadline;
 };
 
@@ -180,6 +185,12 @@ static const struct key_pair_ref *find_key_pair(const char *name)
     return NULL;
 }
 
+static int is_hp48_target(void)
+{
+    const char *target = getenv("TARGET");
+    return target != NULL && strcmp(target, "hp48gii") == 0;
+}
+
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
     hdw_timer_t *t = timer_new(HDW_TIMER_REALTIME, fn, arg);
@@ -303,11 +314,9 @@ static int schedule_return_repaint(struct state *s)
         up_action = &var_up;
         name = "VAR";
         /*
-         * HP48gII has already restored the stock Saturn address space when
-         * the result word disappears, but the stock UI scheduler is not yet
-         * guaranteed to consume a key 20 ms later. The same VAR action is
-         * proven by the stock install/run sequence; defer only this target's
-         * repaint so the returned Saturn loop can become responsive first.
+         * HP48gII waits for the stage0 L1 alias to be removed before this
+         * function is reached. Keep a small post-teardown delay so the
+         * optional KOS release and final launcher stack pop can complete.
          */
         if (target != NULL && strcmp(target, "hp48gii") == 0)
             delay = HP48_RETURN_REPAINT_DELAY_US;
@@ -318,8 +327,7 @@ static int schedule_return_repaint(struct state *s)
 
     s->return_repaint_scheduled = 1;
     fprintf(stderr,
-            "stock launcher: control returned; scheduled native %s repaint "
-            "after %lld us\n",
+            "stock launcher: scheduled native %s repaint after %lld us\n",
             name, (long long)delay);
     return 1;
 }
@@ -530,6 +538,35 @@ static void finish_return(void *arg)
         fail(s, "return-timer");
 }
 
+static int hp48_wait_for_stage_teardown(struct state *s)
+{
+    uint32_t stage_slot = 0;
+    int readable = guest_read32(
+        s->hdw, HPCLANG_STOCK_STAGE_L1_SLOT, &stage_slot);
+
+    if (readable && stage_slot != 0u) {
+        if (!s->hp48_stage_alias_seen) {
+            s->hp48_stage_alias_seen = 1;
+            fprintf(stderr,
+                    "stock launcher: HP48 stage alias active: 0x%08x\n",
+                    stage_slot);
+        }
+        return 0;
+    }
+
+    if (readable && stage_slot == 0u) {
+        if (!s->hp48_stage_alias_cleared) {
+            s->hp48_stage_alias_cleared = 1;
+            fprintf(stderr,
+                    "stock launcher: HP48 stage alias cleared; "
+                    "stage0 teardown reached return tail\n");
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
 static void monitor(void *arg)
 {
     struct state *s = arg;
@@ -591,6 +628,8 @@ static void monitor(void *arg)
                 &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
             write_runtime_json(s, "pass-observed");
+            if (is_hp48_target())
+                (void)hp48_wait_for_stage_teardown(s);
         } else if ((value & 0xffff0000u) == FAIL_PREFIX) {
             fprintf(stderr, "stock runtime failure 0x%08x\n", value);
             fail(s, "runtime-fail");
@@ -599,14 +638,40 @@ static void monitor(void *arg)
     }
 
     /*
-     * The payload never changes hpclang_e2e_result after PASS. A different
-     * value (or an unmapped address) therefore means stage0 has left HPC1 and
-     * restored the stock address space. Prove visible return independently by
-     * issuing one harmless native UI action, then require the framebuffer to
-     * change from the PASS baseline and settle. HP39 uses the established
-     * APLET redraw check; HP48/49/50 use VAR.
+     * hpclang_e2e_result lives in hpclang's temporary runtime mapping. After
+     * PASS, disappearance/change of that word proves only that the common
+     * bootstrap restored the stock MMU. HP48gII still has to return through
+     * stage1 and stage0; injecting a key during that teardown can trip the
+     * stock launcher. Its stage0 L1[0x90] alias at 0x07f00240 is a stronger
+     * read-only witness: stage0 clears it after stage1 returns and immediately
+     * before its final KOS-release / stock-launcher return tail.
+     *
+     * Other stock targets preserve the established behavior: once the result
+     * word leaves PASS, issue APLET/VAR and require a changed, settled native
+     * framebuffer.
      */
     if (s->saw_pass && (!readable || value != PASS_WORD)) {
+        if (is_hp48_target()) {
+            if (!s->return_mapping_restored) {
+                s->return_mapping_restored = 1;
+                s->return_teardown_deadline = timer_get_clock() +
+                    HPCLANG_STOCK_TEARDOWN_DEADLINE_US;
+                fprintf(stderr,
+                        "stock launcher: hpclang mapping restored; "
+                        "waiting for HP48 stage0 teardown\n");
+            }
+
+            if (!hp48_wait_for_stage_teardown(s)) {
+                if (timer_get_clock() >= s->return_teardown_deadline) {
+                    fail(s, "return-teardown");
+                    return;
+                }
+                if (!later(monitor, s, POLL_US))
+                    fail(s, "monitor-timer");
+                return;
+            }
+        }
+
         if (!schedule_return_repaint(s)) {
             fail(s, "return-repaint-timer");
             return;
