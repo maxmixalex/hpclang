@@ -50,6 +50,7 @@ struct state {
     int saw_pass;
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
+    size_t payload_keyboard_captured;
     int return_mapping_restored;
     int hp48_stage_alias_seen;
     uint32_t hp48_stage_alias_descriptor;
@@ -406,6 +407,24 @@ static void capture_named(struct state *s, const char *name)
         fprintf(stderr, "stock launcher: blank capture %s\n", name);
 }
 
+static int capture_keyboard_progress(struct state *s, size_t index)
+{
+    const char *dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
+    char path[512];
+
+    if (dir == NULL || *dir == '\0')
+        return 1;
+
+    snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, index);
+    if (!capture(s->hdw, path, s->lcd_height)) {
+        fprintf(stderr,
+                "stock launcher: blank keyboard progress capture %zu\n",
+                index);
+        return 0;
+    }
+    return 1;
+}
+
 static int guest_read32(hdw_t *h, uint32_t address, uint32_t *value)
 {
     uint8_t b[4];
@@ -603,6 +622,10 @@ static void monitor(void *arg)
 
     if (!s->payload_keyboard_scheduled && readable &&
         value == PHASE_KEYBOARD_READY) {
+        if (!capture_keyboard_progress(s, 0u)) {
+            fail(s, "keyboard-capture");
+            return;
+        }
         if (!schedule_payload_keyboard(s)) {
             fail(s, "keyboard-schedule");
             return;
@@ -616,6 +639,13 @@ static void monitor(void *arg)
             fail(s, "keyboard-ack");
             return;
         }
+        if (ack > s->payload_keyboard_captured) {
+            if (!capture_keyboard_progress(s, ack)) {
+                fail(s, "keyboard-capture");
+                return;
+            }
+            s->payload_keyboard_captured = ack;
+        }
         if (ack == s->payload_keyboard_sent && ack < count) {
             if (!schedule_payload_keyboard_key(s, ack)) {
                 fail(s, "keyboard-schedule");
@@ -626,7 +656,22 @@ static void monitor(void *arg)
 
     if (readable) {
         if (!s->saw_pass && value == PASS_WORD) {
+            size_t keyboard_count = sizeof(payload_keyboard_codes) /
+                                    sizeof(payload_keyboard_codes[0]);
             s->saw_pass = 1;
+            /*
+             * KACK(51) can be replaced by PASS between monitor polls. In that
+             * case PASS itself is the authoritative fully accepted keyboard
+             * frame, so use it to complete the 0..51 progression sequence.
+             */
+            if (s->payload_keyboard_scheduled &&
+                s->payload_keyboard_captured < keyboard_count) {
+                if (!capture_keyboard_progress(s, keyboard_count)) {
+                    fail(s, "keyboard-capture");
+                    return;
+                }
+                s->payload_keyboard_captured = keyboard_count;
+            }
             if (!capture(s->hdw, s->pass_pgm, s->lcd_height)) {
                 fail(s, "pass-capture");
                 return;
