@@ -314,7 +314,7 @@ jobs:
 
   publish-evidence:
     name: Publish ci-evidence
-    if: always() && github.event_name != 'pull_request'
+    if: always() && !cancelled() && github.event_name != 'pull_request'
     needs: [direct, stock]
     runs-on: home-docker
     concurrency:
