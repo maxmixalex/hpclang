@@ -1,0 +1,103 @@
+name: Apply Stock keyboard progression patch
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - stock-keyboard-event-witness
+    paths:
+      - .github/workflows/apply-stock-progression.yml
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: stock-keyboard-event-witness
+          fetch-depth: 0
+
+      - name: Apply bounded harness patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, got {count}")
+              return text.replace(old, new, 1)
+
+          stock_path = Path('tests/e2e/harness/x50ng/stock-launcher-main.c')
+          text = stock_path.read_text(encoding='utf-8')
+
+          text = replace_once(
+              text,
+              '''    int payload_keyboard_scheduled;\n    size_t payload_keyboard_sent;\n    int return_mapping_restored;\n''',
+              '''    int payload_keyboard_scheduled;\n    size_t payload_keyboard_sent;\n    size_t payload_keyboard_captured;\n    int return_mapping_restored;\n''',
+              'state progression counter',
+          )
+
+          text = replace_once(
+              text,
+              '''static void capture_named(struct state *s, const char *name)\n{\n    char path[512];\n    snprintf(path, sizeof(path), "%s-%s.pgm", s->prefix, name);\n    if (!capture(s->hdw, path, s->lcd_height))\n        fprintf(stderr, "stock launcher: blank capture %s\\n", name);\n}\n''',
+              '''static void capture_named(struct state *s, const char *name)\n{\n    char path[512];\n    snprintf(path, sizeof(path), "%s-%s.pgm", s->prefix, name);\n    if (!capture(s->hdw, path, s->lcd_height))\n        fprintf(stderr, "stock launcher: blank capture %s\\n", name);\n}\n\nstatic int capture_keyboard_progress(struct state *s, size_t index)\n{\n    const char *dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");\n    char path[512];\n\n    if (dir == NULL || *dir == '\\0')\n        return 1;\n\n    snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, index);\n    if (!capture(s->hdw, path, s->lcd_height)) {\n        fprintf(stderr,\n                "stock launcher: blank keyboard progress capture %zu\\n",\n                index);\n        return 0;\n    }\n    return 1;\n}\n''',
+              'progress capture helper',
+          )
+
+          text = replace_once(
+              text,
+              '''    if (!s->payload_keyboard_scheduled && readable &&\n        value == PHASE_KEYBOARD_READY) {\n        if (!schedule_payload_keyboard(s)) {\n            fail(s, "keyboard-schedule");\n            return;\n        }\n''',
+              '''    if (!s->payload_keyboard_scheduled && readable &&\n        value == PHASE_KEYBOARD_READY) {\n        if (!capture_keyboard_progress(s, 0u)) {\n            fail(s, "keyboard-capture");\n            return;\n        }\n        if (!schedule_payload_keyboard(s)) {\n            fail(s, "keyboard-schedule");\n            return;\n        }\n''',
+              'KBRD initial capture',
+          )
+
+          text = replace_once(
+              text,
+              '''        if (ack == 0u || ack > count || ack > s->payload_keyboard_sent) {\n            fail(s, "keyboard-ack");\n            return;\n        }\n        if (ack == s->payload_keyboard_sent && ack < count) {\n''',
+              '''        if (ack == 0u || ack > count || ack > s->payload_keyboard_sent) {\n            fail(s, "keyboard-ack");\n            return;\n        }\n        if (ack > s->payload_keyboard_captured) {\n            if (!capture_keyboard_progress(s, ack)) {\n                fail(s, "keyboard-capture");\n                return;\n            }\n            s->payload_keyboard_captured = ack;\n        }\n        if (ack == s->payload_keyboard_sent && ack < count) {\n''',
+              'KACK capture',
+          )
+
+          text = replace_once(
+              text,
+              '''        if (!s->saw_pass && value == PASS_WORD) {\n            s->saw_pass = 1;\n            if (!capture(s->hdw, s->pass_pgm, s->lcd_height)) {\n''',
+              '''        if (!s->saw_pass && value == PASS_WORD) {\n            size_t keyboard_count = sizeof(payload_keyboard_codes) /\n                                    sizeof(payload_keyboard_codes[0]);\n            s->saw_pass = 1;\n            /*\n             * KACK(51) can be replaced by PASS between monitor polls. In that\n             * case PASS itself is the authoritative fully accepted keyboard\n             * frame, so use it to complete the 0..51 progression sequence.\n             */\n            if (s->payload_keyboard_scheduled &&\n                s->payload_keyboard_captured < keyboard_count) {\n                if (!capture_keyboard_progress(s, keyboard_count)) {\n                    fail(s, "keyboard-capture");\n                    return;\n                }\n                s->payload_keyboard_captured = keyboard_count;\n            }\n            if (!capture(s->hdw, s->pass_pgm, s->lcd_height)) {\n''',
+              'PASS final capture fallback',
+          )
+
+          stock_path.write_text(text, encoding='utf-8')
+
+          family_path = Path('tests/e2e/harness/run-family.sh')
+          text = family_path.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '''declare -a PIDS=()\ndeclare -a KEYBOARD_FRAME_DIRS=()\nfor target in "${TARGETS[@]}"; do\n    if [[ "$MODE" == direct ]]; then\n        frames="$ROOT/build/$target-keyboard-frames"\n        rm -rf "$frames"\n        mkdir -p "$frames"\n        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \\\n            bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &\n        KEYBOARD_FRAME_DIRS+=("$frames")\n    else\n        bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &\n        KEYBOARD_FRAME_DIRS+=("")\n    fi\n    PIDS+=("$!")\ndone\n''',
+              '''declare -a PIDS=()\ndeclare -a KEYBOARD_FRAME_DIRS=()\nfor target in "${TARGETS[@]}"; do\n    frames="$ROOT/build/$target-keyboard-frames"\n    rm -rf "$frames"\n    mkdir -p "$frames"\n    if [[ "$MODE" == direct ]]; then\n        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \\\n            bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &\n    else\n        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \\\n            bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &\n    fi\n    KEYBOARD_FRAME_DIRS+=("$frames")\n    PIDS+=("$!")\ndone\n''',
+              'family Stock frame directory',
+          )
+
+          text = replace_once(
+              text,
+              '''        if (( ${#keyboard_frames[@]} )); then\n            merged="$ROOT/build/${TARGETS[$i]}-keyboard-progress.pgm"\n            python3 "$ROOT/tools/merge-pgm-grid.py" \\\n                "$merged" "${keyboard_frames[@]}"\n            python3 "$ROOT/tools/pgm-to-png.py" "$merged" "$merged.png"\n        fi\n''',
+              '''        if (( ${#keyboard_frames[@]} != 52 )); then\n            printf 'FAIL %s keyboard progression: expected 52 frames, got %d\\n' \\\n                "${TARGETS[$i]}" "${#keyboard_frames[@]}" >&2\n            status=1\n        else\n            merged="$ROOT/build/${TARGETS[$i]}-keyboard-progress.pgm"\n            python3 "$ROOT/tools/merge-pgm-grid.py" \\\n                "$merged" "${keyboard_frames[@]}"\n            python3 "$ROOT/tools/pgm-to-png.py" "$merged" "$merged.png"\n        fi\n''',
+              'family 52-frame gate',
+          )
+          family_path.write_text(text, encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- tests/e2e/harness/run-family.sh tests/e2e/harness/x50ng/stock-launcher-main.c
+
+      - name: Commit bounded harness patch
+        shell: bash
+        run: |
+          git config user.name 'Max Alex'
+          git config user.email '1124982772@qq.com'
+          git rm .github/workflows/apply-stock-progression.yml
+          git add tests/e2e/harness/run-family.sh tests/e2e/harness/x50ng/stock-launcher-main.c
+          git commit -m 'test: capture Stock keyboard progression'
+          git push origin HEAD:stock-keyboard-event-witness
