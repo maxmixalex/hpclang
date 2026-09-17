@@ -337,8 +337,6 @@ jobs:
 
       - name: Launch Gallery through stock HP48gII ARMToolbox48
         if: matrix.family == 'hp48'
-        id: hp48_launch
-        continue-on-error: true
         run: bash tests/e2e/harness/run-stock-gallery-hp48gii.sh build/e2e build/assets
 
       - name: Validate HP48 live native-font evidence
@@ -377,11 +375,11 @@ jobs:
           state = json.loads((build / 'hp48gii-stock-gallery.json').read_text())
           if not state.get('saw_pass'):
               raise SystemExit(f'HP48 Stock Gallery did not reach HPC1 PASS: {state}')
-          status = state.get('status')
-          if status not in {'pass', 'return-unsettled'}:
-              raise SystemExit(f'unexpected HP48 Stock Gallery status: {status!r}')
-          print('PASS HP48 live-native evidence: mini/main/control distinct; HPC1 PASS observed')
-          print(f'visible-return status remains separate: {status}')
+          if state.get('status') != 'pass':
+              raise SystemExit(f'HP48 Stock Gallery did not reach settled PASS: {state}')
+          if not state.get('returned') or not state.get('return_settled'):
+              raise SystemExit(f'HP48 Stock Gallery did not settle after return: {state}')
+          print('PASS HP48 live-native evidence: mini/main/control distinct; settled Stock return observed')
           PY
 
       - name: Generate Stock Font Gallery evidence
@@ -427,7 +425,7 @@ jobs:
 
   publish-evidence:
     name: Publish ci-evidence
-    if: always() && github.event_name != 'pull_request'
+    if: always() && !cancelled() && github.event_name != 'pull_request'
     needs: [gallery, stock]
     runs-on: home-docker
     concurrency:

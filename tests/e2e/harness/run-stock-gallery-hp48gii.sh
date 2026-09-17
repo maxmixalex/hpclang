@@ -91,10 +91,9 @@ X50_STATUS=$?
 set -e
 X50_PID=
 
-# The font-specific HP48 gate already distinguishes payload/native-font evidence
-# from the separate visible-return concern. Preserve all captures and build the
-# Gallery composite even when x50ng reports the known post-PASS return-unsettled
-# state; a status gate below still rejects every other failure.
+# Preserve all captures before applying the strict return gate so a regression
+# still leaves useful diagnostics. HP48 Gallery now requires the same settled
+# Stock return contract as canonical Runtime E2E; return-unsettled is a failure.
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue
     python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
@@ -138,12 +137,16 @@ from pathlib import Path
 import sys
 
 state = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-status = state.get('status')
+x50_status = int(sys.argv[2])
+if x50_status != 0:
+    raise SystemExit(f'HP48 Stock Gallery x50ng exited with {x50_status}: {state}')
 if not state.get('saw_pass'):
     raise SystemExit(f'HP48 Stock Gallery did not reach HPC1 PASS: {state}')
-if status not in {'pass', 'return-unsettled'}:
-    raise SystemExit(f'unexpected HP48 Stock Gallery status after x50ng exit {sys.argv[2]}: {status!r}')
-print(f'PASS HP48 concern-specific Gallery state: {status}; x50ng exit={sys.argv[2]}')
+if state.get('status') != 'pass':
+    raise SystemExit(f'HP48 Stock Gallery did not reach settled PASS: {state}')
+if not state.get('returned') or not state.get('return_settled'):
+    raise SystemExit(f'HP48 Stock Gallery did not settle after return: {state}')
+print('PASS HP48 Stock Gallery: HPC1 PASS, settled Stock return, x50ng exit=0')
 PY_STATUS
 
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/font-gallery-stock.json"
