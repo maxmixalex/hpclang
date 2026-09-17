@@ -26,7 +26,6 @@
 #define RETURN_DEADLINE_US 2000000LL
 #define RETURN_REPAINT_DELAY_US 20000LL
 #define HP48_RETURN_REPAINT_DELAY_US 250000LL
-#define HP48_RETURN_REPAINT_RETRY_US 400000LL
 #define RETURN_REPAINT_SETTLE_US 180000LL
 #define RETURN_STABLE_OBSERVATIONS 4u
 
@@ -51,8 +50,6 @@ struct state {
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
     int return_repaint_scheduled;
-    unsigned return_repaint_attempts;
-    int64_t return_repaint_last_us;
     int returned;
     int failed;
     int lcd_height;
@@ -320,36 +317,10 @@ static int schedule_return_repaint(struct state *s)
         return 0;
 
     s->return_repaint_scheduled = 1;
-    s->return_repaint_attempts = 1u;
-    s->return_repaint_last_us = timer_get_clock() + delay;
     fprintf(stderr,
             "stock launcher: control returned; scheduled native %s repaint "
             "after %lld us\n",
             name, (long long)delay);
-    return 1;
-}
-
-static int maybe_retry_hp48_return_repaint(struct state *s)
-{
-    const char *target = getenv("TARGET");
-    int64_t now;
-
-    if (target == NULL || strcmp(target, "hp48gii") != 0 ||
-        s->return_quiescence.changed_from_baseline)
-        return 1;
-
-    now = timer_get_clock();
-    if (now < s->return_repaint_last_us + HP48_RETURN_REPAINT_RETRY_US)
-        return 1;
-
-    if (!tap(&var_down, &var_up, 0))
-        return 0;
-
-    s->return_repaint_last_us = now;
-    ++s->return_repaint_attempts;
-    fprintf(stderr,
-            "stock launcher: native VAR repaint retry %u after unchanged LCD\n",
-            s->return_repaint_attempts);
     return 1;
 }
 
@@ -548,11 +519,6 @@ static void finish_return(void *arg)
         write_runtime_json(s, "pass");
         write_json(s, "pass");
         hdw_stop(s->hdw);
-        return;
-    }
-
-    if (!maybe_retry_hp48_return_repaint(s)) {
-        fail(s, "return-repaint-timer");
         return;
     }
 
