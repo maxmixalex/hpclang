@@ -269,6 +269,10 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     copy_frontend(args.stock_frontend, root / "src" / "hpclang_stock.c", "hpclang_stock_main")
     shutil.copy2(args.selector, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
+    shutil.copy2(
+        args.stock_frontend.parent / "stock-return-phase.h",
+        root / "src" / "stock-return-phase.h",
+    )
 
     makefile = root / "Makefile"
     lines = makefile.read_text().splitlines(keepends=True)
