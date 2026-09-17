@@ -19,6 +19,23 @@ hpclang_armtoolbox_stage0:
     mov     r10, r1                  /* ARMSYS/Saturn state */
     adr     r8, hpclang_armtoolbox_stage0
 
+    /*
+     * The temporary 0x09000000 mapping and stage stack belong to this stage0
+     * invocation. Keep stock IRQ/FIQ masked for their entire lifetime. The
+     * common bootstrap has its own nested save/disable/restore pair; because
+     * it now observes this already-masked CPSR, its restore leaves interrupts
+     * masked until stage0 has removed the temporary alias below.
+     *
+     * HP48gII in particular can otherwise take a stock interrupt immediately
+     * after the common bootstrap restores L1[0x11]/L1[0x12]. That stock path
+     * reuses L1[0x90], replacing this launcher's coarse table while stage1 is
+     * still executing from 0x09000000. Preserve the original caller CPSR in
+     * callee-saved r9; stage1 already follows AAPCS and stage0 relies on the
+     * same rule for r8/r10.
+     */
+    bl      .Lirq_save_disable
+    mov     r9, r0
+
     /* Install the stock launcher-provided coarse table at 0x09000000. */
     ldr     r0, [r10, #0x920]
     orr     r0, r0, #0x11
@@ -76,11 +93,19 @@ hpclang_armtoolbox_stage0:
     /* Restore the original stock-launcher stack. */
     ldr     sp, [sp]
 
-    /* Remove only our temporary 0x09000000 alias. */
+    /* Remove only our temporary 0x09000000 alias while IRQ/FIQ stay masked. */
     mov     r0, #0
     ldr     r2, =STAGE_L1_SLOT
     str     r0, [r2]
     bl      .Lpublish_stage_map
+
+    /*
+     * The stage window and temporary stack are gone. Restore the exact caller
+     * CPSR before invoking any further stock service so pending interrupts see
+     * only the original stock address-space state.
+     */
+    mov     r0, r9
+    bl      .Lirq_restore
 
     /* Release the optional KOS block allocated by the stock launcher. */
     ldr     r1, [r10, #0x918]
@@ -93,6 +118,50 @@ hpclang_armtoolbox_stage0:
 3:
     ldmfd   sp!, {r0-r12, pc}
 .size hpclang_armtoolbox_stage0, .-hpclang_armtoolbox_stage0
+
+
+/*
+ * Save the caller CPSR and return to the same mode with IRQ/FIQ masked.
+ * stage0 can be entered from an unprivileged stock context, so use the same
+ * one-shot SWI supervisor mechanism as the common bootstrap helpers.
+ */
+.type .Lirq_save_disable,%function
+.Lirq_save_disable:
+    stmfd   sp!, {r1-r5, lr}
+    ldr     r2, =SWI_VECTOR
+    adr     r3, .Lirq_disable_supervisor
+    swp     r4, r3, [r2]
+    swi     0
+    ldmfd   sp!, {r1-r5, pc}
+
+.align 2
+.Lirq_disable_supervisor:
+    /* Restore the stock SWI vector before exception-return changes IRQ state. */
+    str     r4, [r2]
+    mrs     r0, spsr
+    orr     r1, r0, #0xc0
+    msr     spsr_c, r1
+    movs    pc, lr
+
+
+/* Restore the exact CPSR returned by .Lirq_save_disable. */
+.type .Lirq_restore,%function
+.Lirq_restore:
+    stmfd   sp!, {r1-r5, lr}
+    mov     r5, r0
+    ldr     r2, =SWI_VECTOR
+    adr     r3, .Lirq_restore_supervisor
+    swp     r4, r3, [r2]
+    mov     r0, r5
+    swi     0
+    ldmfd   sp!, {r1-r5, pc}
+
+.align 2
+.Lirq_restore_supervisor:
+    /* A pending IRQ/FIQ may fire on movs. Restore the stock vector first. */
+    str     r4, [r2]
+    msr     spsr_cxsf, r0
+    movs    pc, lr
 
 
 /*
