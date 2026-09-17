@@ -78,8 +78,23 @@ timeout 110s "$ROOT/tools/run-hp48-kermit-send.sh" \
     L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 
+set +e
 wait "$X50_PID"
+X50_STATUS=$?
+set -e
 X50_PID=
+
+# x50ng serializes its final ARM/module state to config.lua during shutdown.
+# Retain that text alongside the existing Kermit diagnostics so a failed stock
+# return can be distinguished from an LCD-only settling failure without adding
+# any live instrumentation to the emulator or payload.
+if [[ -f "$STATE/config.lua" ]]; then
+    cp "$STATE/config.lua" "$ROOT/build/$TARGET-kermit-state.log"
+fi
+
+if (( X50_STATUS != 0 )); then
+    exit "$X50_STATUS"
+fi
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue
