@@ -52,6 +52,7 @@ struct state {
     size_t payload_keyboard_sent;
     int return_mapping_restored;
     int hp48_stage_alias_seen;
+    uint32_t hp48_stage_alias_descriptor;
     int hp48_stage_alias_cleared;
     int return_repaint_scheduled;
     int returned;
@@ -314,9 +315,10 @@ static int schedule_return_repaint(struct state *s)
         up_action = &var_up;
         name = "VAR";
         /*
-         * HP48gII waits for the stage0 L1 alias to be removed before this
-         * function is reached. Keep a small post-teardown delay so the
-         * optional KOS release and final launcher stack pop can complete.
+         * HP48gII waits until the stage0-owned L1 alias descriptor is no
+         * longer present before this function is reached. Keep a small
+         * post-teardown delay so the optional KOS release and final launcher
+         * stack pop can complete.
          */
         if (target != NULL && strcmp(target, "hp48gii") == 0)
             delay = HP48_RETURN_REPAINT_DELAY_US;
@@ -544,27 +546,32 @@ static int hp48_wait_for_stage_teardown(struct state *s)
     int readable = guest_read32(
         s->hdw, HPCLANG_STOCK_STAGE_L1_SLOT, &stage_slot);
 
-    if (readable && stage_slot != 0u) {
-        if (!s->hp48_stage_alias_seen) {
-            s->hp48_stage_alias_seen = 1;
-            fprintf(stderr,
-                    "stock launcher: HP48 stage alias active: 0x%08x\n",
-                    stage_slot);
-        }
+    if (!readable)
+        return 0;
+
+    if (!s->hp48_stage_alias_seen) {
+        if ((stage_slot & 3u) != 1u)
+            return 0;
+
+        s->hp48_stage_alias_seen = 1;
+        s->hp48_stage_alias_descriptor = stage_slot;
+        fprintf(stderr,
+                "stock launcher: HP48 stage alias active: 0x%08x\n",
+                stage_slot);
         return 0;
     }
 
-    if (readable && stage_slot == 0u) {
-        if (!s->hp48_stage_alias_cleared) {
-            s->hp48_stage_alias_cleared = 1;
-            fprintf(stderr,
-                    "stock launcher: HP48 stage alias cleared; "
-                    "stage0 teardown reached return tail\n");
-        }
-        return 1;
-    }
+    if (stage_slot == s->hp48_stage_alias_descriptor)
+        return 0;
 
-    return 0;
+    if (!s->hp48_stage_alias_cleared) {
+        s->hp48_stage_alias_cleared = 1;
+        fprintf(stderr,
+                "stock launcher: HP48 stage alias released: "
+                "0x%08x -> 0x%08x; continuing with Stock UI witness\n",
+                s->hp48_stage_alias_descriptor, stage_slot);
+    }
+    return 1;
 }
 
 static void monitor(void *arg)
@@ -642,9 +649,11 @@ static void monitor(void *arg)
      * PASS, disappearance/change of that word proves only that the common
      * bootstrap restored the stock MMU. HP48gII still has to return through
      * stage1 and stage0; injecting a key during that teardown can trip the
-     * stock launcher. Its stage0 L1[0x90] alias at 0x07f00240 is a stronger
-     * read-only witness: stage0 clears it after stage1 returns and immediately
-     * before its final KOS-release / stock-launcher return tail.
+     * stock launcher. Record the exact L1[0x90] descriptor installed by this
+     * stage0 invocation and wait until that descriptor no longer occupies the
+     * observed slot. The slot may be immediately reused or remapped by Stock,
+     * so a transient literal zero is not required. Visible native framebuffer
+     * change and quiescence remain the final return-to-Stock criterion.
      *
      * Other stock targets preserve the established behavior: once the result
      * word leaves PASS, issue APLET/VAR and require a changed, settled native
