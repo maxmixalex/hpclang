@@ -37,8 +37,14 @@ runs:
             grep -q 'ok installed' || missing+=("$package")
         done
         if (( ${#missing[@]} )); then
-          sudo -E apt-get update -qq
-          sudo -E apt-get install -y --no-install-recommends "${missing[@]}"
+          apt=(
+            sudo -E apt-get
+            -o Acquire::Retries=4
+            -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20
+          )
+          "${apt[@]}" update -qq
+          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
         fi
 
     - name: Fetch and adapt pinned x50ng
@@ -79,8 +85,14 @@ runs:
             grep -q 'ok installed' || missing+=("$package")
         done
         if (( ${#missing[@]} )); then
-          sudo -E apt-get update -qq
-          sudo -E apt-get install -y --no-install-recommends "${missing[@]}"
+          apt=(
+            sudo -E apt-get
+            -o Acquire::Retries=4
+            -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20
+          )
+          "${apt[@]}" update -qq
+          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
         fi
 
     - name: Make x50ng bundle self-contained for E2E runners
