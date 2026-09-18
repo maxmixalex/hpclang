@@ -53,6 +53,11 @@ cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
 printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
 printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
+if [[ "$STORAGE_WITNESS" == 1 ]]; then
+    export TZ=UTC
+    touch -d '2024-01-02 03:04:06 UTC' "$SD/HPCLANG.TST"
+fi
+
 # x50ng's VVFAT backend indexes --sd-dir when the run-phase emulator opens
 # the card. Create the named-directory witness only after ARMToolbox install
 # has completed, but before this second x50ng process starts. The storage-only
