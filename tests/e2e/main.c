@@ -364,9 +364,13 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x5bu;
 
     /*
-     * Return-path isolation: media/root queries are temporarily omitted here.
-     * File metadata and ordinary stream I/O remain active.
+     * Return-path isolation: exercise only the synthetic root query here.
+     * This reaches KOS CHECKINSERT (func 17) but not CHECKPROTECT (func 18).
      */
+    struct hpclang_stream_path_info root_info;
+    if (hpclang_stream_path_query("/", &root_info) != 0 ||
+        root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        return 0x5cu;
 
     /*
      * Return-path isolation: keep ZZHPDIR in the Stock/VVFAT namespace but do
