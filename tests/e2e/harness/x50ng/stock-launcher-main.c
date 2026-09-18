@@ -193,6 +193,19 @@ static int is_hp48_target(void)
     return target != NULL && strcmp(target, "hp48gii") == 0;
 }
 
+static int is_hp4950_target(void)
+{
+    const char *target = getenv("TARGET");
+    return target != NULL &&
+           (strcmp(target, "hp49gplus") == 0 ||
+            strcmp(target, "hp50g") == 0);
+}
+
+static int uses_armtoolbox_stage_alias(void)
+{
+    return is_hp48_target() || is_hp4950_target();
+}
+
 static int later(timer_callback_t fn, void *arg, int64_t us)
 {
     hdw_timer_t *t = timer_new(HDW_TIMER_REALTIME, fn, arg);
@@ -316,12 +329,12 @@ static int schedule_return_repaint(struct state *s)
         up_action = &var_up;
         name = "VAR";
         /*
-         * HP48gII waits until the stage0-owned L1 alias descriptor is no
-         * longer present before this function is reached. Keep a small
+         * HP48gII/49g+/50g wait until the stage0-owned L1 alias descriptor is
+         * no longer present before this function is reached. Keep a small
          * post-teardown delay so the optional KOS release and final launcher
          * stack pop can complete.
          */
-        if (target != NULL && strcmp(target, "hp48gii") == 0)
+        if (uses_armtoolbox_stage_alias())
             delay = HP48_RETURN_REPAINT_DELAY_US;
     }
 
@@ -559,7 +572,7 @@ static void finish_return(void *arg)
         fail(s, "return-timer");
 }
 
-static int hp48_wait_for_stage_teardown(struct state *s)
+static int armtoolbox_wait_for_stage_teardown(struct state *s)
 {
     uint32_t stage_slot = 0;
     int readable = guest_read32(
@@ -575,7 +588,7 @@ static int hp48_wait_for_stage_teardown(struct state *s)
         s->hp48_stage_alias_seen = 1;
         s->hp48_stage_alias_descriptor = stage_slot;
         fprintf(stderr,
-                "stock launcher: HP48 stage alias active: 0x%08x\n",
+                "stock launcher: ARMToolbox stage alias active: 0x%08x\n",
                 stage_slot);
         return 0;
     }
@@ -586,7 +599,7 @@ static int hp48_wait_for_stage_teardown(struct state *s)
     if (!s->hp48_stage_alias_cleared) {
         s->hp48_stage_alias_cleared = 1;
         fprintf(stderr,
-                "stock launcher: HP48 stage alias released: "
+                "stock launcher: ARMToolbox stage alias released: "
                 "0x%08x -> 0x%08x; continuing with Stock UI witness\n",
                 s->hp48_stage_alias_descriptor, stage_slot);
     }
@@ -680,8 +693,8 @@ static void monitor(void *arg)
                 &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
             write_runtime_json(s, "pass-observed");
-            if (is_hp48_target())
-                (void)hp48_wait_for_stage_teardown(s);
+            if (uses_armtoolbox_stage_alias())
+                (void)armtoolbox_wait_for_stage_teardown(s);
         } else if ((value & 0xffff0000u) == FAIL_PREFIX) {
             fprintf(stderr, "stock runtime failure 0x%08x\n", value);
             fail(s, "runtime-fail");
@@ -692,19 +705,29 @@ static void monitor(void *arg)
     /*
      * hpclang_e2e_result lives in hpclang's temporary runtime mapping. After
      * PASS, disappearance/change of that word proves only that the common
-     * bootstrap restored the stock MMU. HP48gII still has to return through
-     * stage1 and stage0; injecting a key during that teardown can trip the
-     * stock launcher. Record the exact L1[0x90] descriptor installed by this
-     * stage0 invocation and wait until that descriptor no longer occupies the
-     * observed slot. The slot may be immediately reused or remapped by Stock,
-     * so a transient literal zero is not required. Visible native framebuffer
-     * change and quiescence remain the final return-to-Stock criterion.
+     * bootstrap restored the stock MMU. HP48gII, HP49g+ and HP50g still have
+     * to return through stage1 and stage0; injecting a key during that teardown
+     * can trip the stock launcher. Record the exact L1[0x90] descriptor
+     * installed by this stage0 invocation and wait until that descriptor no
+     * longer occupies the observed slot. The slot may be immediately reused
+     * or remapped by Stock, so a transient literal zero is not required.
      *
-     * Other stock targets preserve the established behavior: once the result
-     * word leaves PASS, issue APLET/VAR and require a changed, settled native
-     * framebuffer.
+     * On hp4950 the restored Stock address space can leave the old result
+     * virtual address readable with the same PASS word. The stage0 ownership
+     * transition is therefore the authoritative control-flow-return witness;
+     * result-word disappearance is not required there. HP39 keeps its existing
+     * result-word gate. Visible framebuffer change and quiescence remain the
+     * final return-to-Stock criterion for every family.
      */
-    if (s->saw_pass && (!readable || value != PASS_WORD)) {
+    int result_mapping_left_pass =
+        s->saw_pass && (!readable || value != PASS_WORD);
+    int hp4950_stage_released =
+        s->saw_pass && is_hp4950_target() &&
+        armtoolbox_wait_for_stage_teardown(s);
+
+    if (s->saw_pass &&
+        ((is_hp4950_target() && hp4950_stage_released) ||
+         (!is_hp4950_target() && result_mapping_left_pass))) {
         if (is_hp48_target()) {
             if (!s->return_mapping_restored) {
                 s->return_mapping_restored = 1;
@@ -715,7 +738,7 @@ static void monitor(void *arg)
                         "waiting for HP48 stage0 teardown\n");
             }
 
-            if (!hp48_wait_for_stage_teardown(s)) {
+            if (!armtoolbox_wait_for_stage_teardown(s)) {
                 if (timer_get_clock() >= s->return_teardown_deadline) {
                     fail(s, "return-teardown");
                     return;
