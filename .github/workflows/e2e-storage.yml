@@ -1,0 +1,261 @@
+name: E2E / Storage
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "runtime/libc/storage.c"
+      - "include/hpclang/storage.h"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "cmake/**"
+      - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/main.c"
+      - "tests/e2e/cpp.cpp"
+      - "tests/e2e/harness/run-family.sh"
+      - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp4950.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/x50ng/**"
+      - "tests/e2e/sequences/hp50g-stock-*.seq"
+      - "tests/e2e/specs/runtime.json"
+      - "tests/e2e/specs/stock-hp4950.json"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-storage.yml"
+  pull_request:
+    paths:
+      - "runtime/libc/storage.c"
+      - "include/hpclang/storage.h"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "cmake/**"
+      - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/main.c"
+      - "tests/e2e/cpp.cpp"
+      - "tests/e2e/harness/run-family.sh"
+      - "tests/e2e/harness/run-direct.sh"
+      - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp4950.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/x50ng/**"
+      - "tests/e2e/sequences/hp50g-stock-*.seq"
+      - "tests/e2e/specs/runtime.json"
+      - "tests/e2e/specs/stock-hp4950.json"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - "tools/e2e-target-env.py"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - ".github/actions/setup-atfe/**"
+      - ".github/actions/setup-x50ng/**"
+      - ".github/workflows/e2e-storage.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build storage E2E
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+      - name: Build storage payload and launchers
+        run: |
+          chmod +x tools/build-e2e.sh
+          tools/build-e2e.sh storage "$GITHUB_WORKSPACE/build/e2e-storage"
+      - name: Upload storage build
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-storage-build
+          retention-days: 1
+          path: |
+            build/e2e-storage/e2e.hpc
+            build/e2e-storage/e2e.result-address
+            build/e2e-storage/launchers/*.bin
+            build/e2e-storage/launchers/*.hp
+          if-no-files-found: error
+
+  x50ng:
+    name: Prepare universal x50ng
+    runs-on: home-docker
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Restore or build universal x50ng
+        uses: ./.github/actions/setup-x50ng
+      - name: Pack universal x50ng
+        run: tar -C build/x50ng -czf build/x50ng-universal.tar.gz dist
+      - name: Upload universal x50ng
+        uses: actions/upload-artifact@v7
+        with:
+          name: x50ng-universal
+          retention-days: 1
+          path: build/x50ng-universal.tar.gz
+          if-no-files-found: error
+
+  stock-assets:
+    name: Prepare HP49/50 Stock assets
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+      - name: Restore hpcalc asset cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hpcalc
+          key: hpclang-hpcalc-static-v1
+      - name: Prepare ARMToolbox setup object
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/hpcalc build/assets/hp4950
+          if [[ ! -f .cache/hpcalc/mlreg.zip ]]; then
+            curl -fL --retry 3 --retry-delay 2 \
+              https://www.hpcalc.org/hp49/math/statistic/mlreg.zip \
+              -o .cache/hpcalc/mlreg.zip
+          fi
+          unzip -p .cache/hpcalc/mlreg.zip SETUP.BIN \
+            > build/assets/hp4950/SETUP.BIN
+          sha256sum build/assets/hp4950/SETUP.BIN
+      - name: Upload HP49/50 Stock assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-storage-stock-assets
+          retention-days: 1
+          path: build/assets/
+          if-no-files-found: error
+
+  direct:
+    name: Direct storage / ${{ matrix.family }}
+    needs: [build, x50ng]
+    runs-on: home-docker
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [hp39, hp48, hp4950]
+    env:
+      FAMILY: ${{ matrix.family }}
+      HPCLANG_E2E_REQUIRE_KEYBOARD: 0
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download storage build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-storage-build
+          path: build/e2e
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+      - name: Prepare platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
+      - name: Execute Direct storage family
+        run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
+      - name: Generate LCD evidence
+        if: always()
+        continue-on-error: true
+        run: |
+          targets_file="build/direct-$FAMILY-targets.txt"
+          [[ -f "$targets_file" ]] || exit 0
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            python3 tests/e2e/report.py tests/e2e/specs/runtime.json \
+              --image-out "build/$TARGET-storage-summary.png" \
+              --image-only
+          done < "$targets_file"
+      - name: Upload Direct storage evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.family }}-direct-storage-e2e
+          retention-days: 14
+          path: |
+            build/*-*.pgm
+            build/*-*.pgm.png
+            build/*-e2e.json
+            build/*-storage-summary.png
+            build/direct-${{ matrix.family }}-targets.txt
+            build/e2e/e2e.hpc
+          if-no-files-found: warn
+
+  stock:
+    name: Stock storage / hp4950
+    needs: [build, x50ng, stock-assets]
+    runs-on: home-docker
+    timeout-minutes: 20
+    env:
+      FAMILY: hp4950
+      HPCLANG_E2E_REQUIRE_KEYBOARD: 0
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download storage build
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-storage-build
+          path: build/e2e
+      - name: Download universal x50ng
+        uses: actions/download-artifact@v7
+        with:
+          name: x50ng-universal
+          path: build
+      - name: Unpack universal x50ng
+        run: |
+          mkdir -p build/x50ng
+          tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
+      - name: Download HP49/50 Stock assets
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-storage-stock-assets
+          path: build/assets
+      - name: Prepare platform runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
+      - name: Execute Stock storage family
+        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
+      - name: Generate LCD evidence
+        if: always()
+        continue-on-error: true
+        run: |
+          targets_file="build/stock-$FAMILY-targets.txt"
+          [[ -f "$targets_file" ]] || exit 0
+          while IFS= read -r TARGET; do
+            [[ -n "$TARGET" ]] || continue
+            export TARGET
+            python3 tests/e2e/report.py tests/e2e/specs/runtime.json \
+              --image-out "build/$TARGET-storage-summary.png" \
+              --image-only
+          done < "$targets_file"
+      - name: Upload Stock storage evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp4950-stock-storage-e2e
+          retention-days: 14
+          path: |
+            build/*-*.pgm
+            build/*-*.pgm.png
+            build/*-*.json
+            build/*-setup.bin
+            build/*-storage-summary.png
+            build/stock-hp4950-targets.txt
+            build/e2e/e2e.hpc
+          if-no-files-found: warn
