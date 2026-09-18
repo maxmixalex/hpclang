@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <runtime|hardware|font-gallery|font-gallery-stock> [out-dir]" >&2
+    echo "usage: $0 <runtime|storage|hardware|font-gallery|font-gallery-stock> [out-dir]" >&2
     exit 2
 fi
 
@@ -77,6 +77,10 @@ case "$MODE" in
     runtime)
         E2E_CMAKE_ARGS=(
             -DHPCLANG_E2E_KEYBOARD=ON
+        )
+        ;;
+    storage)
+        E2E_CMAKE_ARGS=(
             -DHPCLANG_E2E_STORAGE=ON
         )
         ;;
