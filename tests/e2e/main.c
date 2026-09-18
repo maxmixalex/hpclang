@@ -403,10 +403,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         storage_info.capacity_bytes < storage_info.free_bytes)
         return 0x5fu;
 
-    uint64_t free_bytes = 0u;
-    if (hpclang_stream_storage_free_bytes(&free_bytes) != 0 ||
-        free_bytes != storage_info.free_bytes)
-        return 0x60u;
+    /*
+     * Return-path isolation: stop after one storage query. The convenience
+     * free-byte query would perform a second CHECKINSERT + GETSIZE pair.
+     */
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)

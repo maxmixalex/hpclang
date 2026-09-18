@@ -488,6 +488,21 @@ static void write_json(struct state *s, const char *status)
     fclose(f);
 }
 
+static void log_cpu_state(struct state *s, const char *tag)
+{
+    CPUARMState *cpu = s->hdw->cpu;
+    fprintf(stderr,
+            "stock launcher CPU %s: pc=0x%08x cpsr=0x%08x "
+            "sp=0x%08x lr=0x%08x r4=0x%08x spsr=0x%08x\n",
+            tag,
+            cpu->regs[15],
+            cpsr_read(cpu),
+            cpu->regs[13],
+            cpu->regs[14],
+            cpu->regs[4],
+            cpu->spsr);
+}
+
 static void write_runtime_json(struct state *s, const char *status)
 {
     FILE *f = fopen(s->runtime_json, "w");
@@ -517,6 +532,7 @@ static void fail(struct state *s, const char *why)
 {
     s->failed = 1;
     fprintf(stderr, "stock launcher FAIL: %s\n", why);
+    log_cpu_state(s, "failure");
     capture_named(s, "failure");
     write_json(s, why);
     if (s->mode == MODE_RUN)
@@ -692,6 +708,7 @@ static void monitor(void *arg)
             hpclang_lcd_quiescence_seed(
                 &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
             fprintf(stderr, "stock ARMToolbox path reached HPC1 PASS\n");
+            log_cpu_state(s, "pass");
             write_runtime_json(s, "pass-observed");
             if (uses_armtoolbox_stage_alias())
                 (void)armtoolbox_wait_for_stage_teardown(s);
