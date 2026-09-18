@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - m7-fonts-gallery
     paths:
       - ".github/workflows/ci-maintenance.yml"
       - "tools/prune-ci-runs.py"
