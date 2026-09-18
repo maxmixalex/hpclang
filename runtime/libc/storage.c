@@ -49,6 +49,7 @@ uint32_t hpclang_kos_swi3(
     uint32_t arg1,
     uint32_t arg2,
     uint32_t arg3);
+uint32_t hpclang_kos_call0(uint32_t address);
 
 typedef uint32_t (*kos_fn0)(void);
 typedef uint32_t (*kos_fn1)(uint32_t);
@@ -619,7 +620,7 @@ static int stream_media_present(void)
         return -1;
     }
 
-    int32_t result = (int32_t)((kos_fn0)addr)();
+    int32_t result = (int32_t)hpclang_kos_call0((uint32_t)addr);
     if (result < 0) {
         set_kos_errno(result);
         return -1;
@@ -798,13 +799,15 @@ int hpclang_stream_storage_query(
 
     info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
 
-    int32_t protected = (int32_t)((kos_fn0)protect_addr)();
+    int32_t protected =
+        (int32_t)hpclang_kos_call0((uint32_t)protect_addr);
     if (protected < 0)
         return set_kos_errno(protected);
     if (protected != 0)
         info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_READ_ONLY;
 
-    int32_t free_bytes = (int32_t)((kos_fn0)size_addr)();
+    int32_t free_bytes =
+        (int32_t)hpclang_kos_call0((uint32_t)size_addr);
     if (free_bytes < 0)
         return set_kos_errno(free_bytes);
 

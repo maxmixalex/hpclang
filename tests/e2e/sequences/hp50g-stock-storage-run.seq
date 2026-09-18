@@ -27,9 +27,9 @@
 16000 capture filer-halt-menu
 16400 tap f1
 17700 capture payload-recalled
-18200 chord rshift two
-19450 capture lib
-19800 tap f1
-21100 capture armtoolbox
-21500 tap f1
-21800 monitor 20000
+19000 chord rshift two
+20300 capture lib
+20700 tap f1
+22000 capture armtoolbox
+22400 tap f1
+22700 monitor 20000
