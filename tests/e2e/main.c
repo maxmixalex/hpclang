@@ -273,8 +273,6 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
-int32_t hpclang_e2e_kos_getsize_raw(void);
-
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -366,19 +364,19 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x5bu;
 
     /*
-     * Return-path isolation: exercise only the synthetic root query here.
-     * This reaches KOS CHECKINSERT (func 17) but not CHECKPROTECT (func 18).
+     * "/" is synthetic volume-root metadata because KOS GetSpecialFileInfo
+     * only addresses real directory entries. Exercise that contract separately
+     * from the real named-directory witness below.
      */
     struct hpclang_stream_path_info root_info;
     if (hpclang_stream_path_query("/", &root_info) != 0 ||
         root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return 0x5cu;
 
-    /*
-     * Return-path isolation: keep ZZHPDIR in the Stock/VVFAT namespace but do
-     * not query that directory entry in this diagnostic revision. Root/media
-     * metadata remains active below.
-     */
+    struct hpclang_stream_path_info directory_info;
+    if (hpclang_stream_path_query("ZZHPDIR", &directory_info) != 0 ||
+        directory_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        return 0x68u;
 
     /*
      * x50ng's host-directory SD fixture currently exposes the ordinary FAT
@@ -390,14 +388,25 @@ static uint32_t stock_stream_storage_test(uint32_t model)
          HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
         return 0x67u;
 
-    /*
-     * Return-path isolation: root above already performed one CHECKINSERT.
-     * Call GETSIZE directly here so this revision contains exactly one
-     * CHECKINSERT followed by exactly one GETSIZE, with no second media probe.
-     */
-    int32_t raw_free_bytes = hpclang_e2e_kos_getsize_raw();
-    if (raw_free_bytes <= 0)
+    struct hpclang_stream_storage_info storage_info;
+    if (hpclang_stream_storage_query(&storage_info) != 0)
         return 0x5du;
+    if (storage_info.version != HPCLANG_STREAM_STORAGE_INFO_VERSION ||
+        storage_info.size < sizeof(storage_info) ||
+        (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
+        (storage_info.flags &
+         HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
+        storage_info.free_bytes == 0u)
+        return 0x5eu;
+    if ((storage_info.flags &
+         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) != 0u &&
+        storage_info.capacity_bytes < storage_info.free_bytes)
+        return 0x5fu;
+
+    uint64_t free_bytes = 0u;
+    if (hpclang_stream_storage_free_bytes(&free_bytes) != 0 ||
+        free_bytes != storage_info.free_bytes)
+        return 0x60u;
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)

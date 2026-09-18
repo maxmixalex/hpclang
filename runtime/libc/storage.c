@@ -49,12 +49,11 @@ uint32_t hpclang_kos_swi3(
     uint32_t arg1,
     uint32_t arg2,
     uint32_t arg3);
-uint32_t hpclang_kos_call0(uint32_t address);
-uint32_t hpclang_kos_call1(uint32_t address, uint32_t arg0);
-uint32_t hpclang_kos_call2(
-    uint32_t address, uint32_t arg0, uint32_t arg1);
-uint32_t hpclang_kos_call3(
-    uint32_t address, uint32_t arg0, uint32_t arg1, uint32_t arg2);
+
+typedef uint32_t (*kos_fn0)(void);
+typedef uint32_t (*kos_fn1)(uint32_t);
+typedef uint32_t (*kos_fn2)(uint32_t, uint32_t);
+typedef uint32_t (*kos_fn3)(uint32_t, uint32_t, uint32_t);
 
 enum {
     KOS_ATTR_READONLY = 1u << 0,
@@ -309,8 +308,7 @@ int open(const char *path, int flags, ...)
         (access == O_RDONLY && wants_create);
 
     if (need_probe) {
-        int32_t probe = (int32_t)hpclang_kos_call2(
-            (uint32_t)open_addr,
+        int32_t probe = (int32_t)((kos_fn2)open_addr)(
             (uint32_t)(uintptr_t)path,
             KOS_FILE_READONLY);
         exists_known = 1;
@@ -319,8 +317,8 @@ int open(const char *path, int flags, ...)
             exists = 1;
             if (close_addr == 0u)
                 return unsupported();
-            int32_t closed = (int32_t)hpclang_kos_call1(
-                (uint32_t)close_addr, (uint32_t)probe);
+            int32_t closed = (int32_t)((kos_fn1)close_addr)(
+                (uint32_t)probe);
             if (closed < 0)
                 return set_kos_errno(closed);
         } else if (!kos_open_error_is_missing(probe)) {
@@ -338,8 +336,8 @@ int open(const char *path, int flags, ...)
         if (delete_addr == 0u)
             return unsupported();
 
-        int32_t deleted = (int32_t)hpclang_kos_call1(
-            (uint32_t)delete_addr, (uint32_t)(uintptr_t)path);
+        int32_t deleted = (int32_t)((kos_fn1)delete_addr)(
+            (uint32_t)(uintptr_t)path);
         if (deleted < 0) {
             if (!(wants_create && kos_open_error_is_missing(deleted)))
                 return set_kos_errno(deleted);
@@ -356,8 +354,7 @@ int open(const char *path, int flags, ...)
      * subsequent writes retain genuine append semantics.
      */
     if (wants_append && exists_known && !exists && wants_create) {
-        int32_t created = (int32_t)hpclang_kos_call2(
-            (uint32_t)open_addr,
+        int32_t created = (int32_t)((kos_fn2)open_addr)(
             (uint32_t)(uintptr_t)path,
             KOS_FILE_READWRITE);
         if (created < 0)
@@ -365,8 +362,8 @@ int open(const char *path, int flags, ...)
 
         if (close_addr == 0u)
             return unsupported();
-        int32_t closed = (int32_t)hpclang_kos_call1(
-            (uint32_t)close_addr, (uint32_t)created);
+        int32_t closed = (int32_t)((kos_fn1)close_addr)(
+            (uint32_t)created);
         if (closed < 0)
             return set_kos_errno(closed);
 
@@ -380,8 +377,7 @@ int open(const char *path, int flags, ...)
      */
     if (access == O_RDONLY && wants_create &&
         exists_known && !exists) {
-        int32_t created = (int32_t)hpclang_kos_call2(
-            (uint32_t)open_addr,
+        int32_t created = (int32_t)((kos_fn2)open_addr)(
             (uint32_t)(uintptr_t)path,
             KOS_FILE_READWRITE);
         if (created < 0)
@@ -389,8 +385,8 @@ int open(const char *path, int flags, ...)
 
         if (close_addr == 0u)
             return unsupported();
-        int32_t closed = (int32_t)hpclang_kos_call1(
-            (uint32_t)close_addr, (uint32_t)created);
+        int32_t closed = (int32_t)((kos_fn1)close_addr)(
+            (uint32_t)created);
         if (closed < 0)
             return set_kos_errno(closed);
 
@@ -407,8 +403,7 @@ int open(const char *path, int flags, ...)
         kos_mode = KOS_FILE_READWRITE;
     }
 
-    int32_t handle = (int32_t)hpclang_kos_call2(
-        (uint32_t)open_addr,
+    int32_t handle = (int32_t)((kos_fn2)open_addr)(
         (uint32_t)(uintptr_t)path,
         kos_mode);
     if (handle < 0)
@@ -430,8 +425,7 @@ int open(const char *path, int flags, ...)
             created_empty);
     if (state == NULL) {
         if (close_addr != 0u)
-            (void)hpclang_kos_call1(
-                (uint32_t)close_addr, (uint32_t)handle);
+            (void)((kos_fn1)close_addr)((uint32_t)handle);
         errno = EMFILE;
         return -1;
     }
@@ -451,8 +445,7 @@ int close(int fd)
     if (addr == 0u)
         return unsupported();
 
-    int32_t result =
-        (int32_t)hpclang_kos_call1((uint32_t)addr, (uint32_t)fd);
+    int32_t result = (int32_t)((kos_fn1)addr)((uint32_t)fd);
     if (result < 0)
         return set_kos_errno(result);
 
@@ -471,8 +464,7 @@ ssize_t read(int fd, void *buffer, size_t count)
     if (addr == 0u)
         return unsupported();
 
-    uint32_t raw = hpclang_kos_call3(
-        (uint32_t)addr,
+    uint32_t raw = ((kos_fn3)addr)(
         (uint32_t)fd,
         (uint32_t)(uintptr_t)buffer,
         (uint32_t)count);
@@ -505,8 +497,7 @@ ssize_t write(int fd, const void *buffer, size_t count)
     if (addr == 0u)
         return unsupported();
 
-    uint32_t raw = hpclang_kos_call3(
-        (uint32_t)addr,
+    uint32_t raw = ((kos_fn3)addr)(
         (uint32_t)fd,
         (uint32_t)(uintptr_t)buffer,
         (uint32_t)count);
@@ -578,8 +569,7 @@ off_t lseek(int fd, off_t offset, int whence)
      * success/error status rather than the POSIX absolute offset required by
      * lseek().
      */
-    int32_t result = (int32_t)hpclang_kos_call3(
-        (uint32_t)addr,
+    int32_t result = (int32_t)((kos_fn3)addr)(
         (uint32_t)fd,
         (uint32_t)(int32_t)target,
         KOS_SEEK_SET);
@@ -599,8 +589,8 @@ int unlink(const char *path)
     if (addr == 0u)
         return unsupported();
 
-    int32_t result = (int32_t)hpclang_kos_call1(
-        (uint32_t)addr, (uint32_t)(uintptr_t)path);
+    int32_t result = (int32_t)((kos_fn1)addr)(
+        (uint32_t)(uintptr_t)path);
     if (result < 0) {
         /*
          * Stock KOS uses the same undocumented -200 sentinel for a missing
@@ -616,6 +606,22 @@ int unlink(const char *path)
     return 0;
 }
 
+enum stream_media_presence_state {
+    STREAM_MEDIA_PRESENCE_UNKNOWN = 0,
+    STREAM_MEDIA_PRESENCE_ABSENT = 1,
+    STREAM_MEDIA_PRESENCE_PRESENT = 2
+};
+
+/*
+ * Stock CHECKINSERT is not return-safe when invoked repeatedly during one
+ * native launch on the HP49g+ Stock path. Treat physical media identity as a
+ * process-lifetime snapshot: sample insertion lazily once, then reuse it.
+ * Hot-plug detection therefore begins with the next native launch.
+ */
+static uint8_t stream_media_presence;
+static uint8_t stream_media_protect_known;
+static uint8_t stream_media_protected;
+
 static int stream_media_present(void)
 {
     if (!stream_storage_available()) {
@@ -623,18 +629,55 @@ static int stream_media_present(void)
         return -1;
     }
 
+    if (stream_media_presence == STREAM_MEDIA_PRESENCE_PRESENT)
+        return 1;
+    if (stream_media_presence == STREAM_MEDIA_PRESENCE_ABSENT)
+        return 0;
+
     uintptr_t addr = kos_entry(KOS_FUNC_CHECKINSERT);
     if (addr == 0u) {
         unsupported();
         return -1;
     }
 
-    int32_t result = (int32_t)hpclang_kos_call0((uint32_t)addr);
+    int32_t result = (int32_t)((kos_fn0)addr)();
     if (result < 0) {
         set_kos_errno(result);
         return -1;
     }
+
+    stream_media_presence =
+        result != 0
+            ? STREAM_MEDIA_PRESENCE_PRESENT
+            : STREAM_MEDIA_PRESENCE_ABSENT;
     return result != 0;
+}
+
+static int stream_media_read_only(void)
+{
+    if (!stream_storage_available()) {
+        unsupported();
+        return -1;
+    }
+
+    if (stream_media_protect_known)
+        return stream_media_protected != 0u;
+
+    uintptr_t addr = kos_entry(KOS_FUNC_CHECKPROTECT);
+    if (addr == 0u) {
+        unsupported();
+        return -1;
+    }
+
+    int32_t result = (int32_t)((kos_fn0)addr)();
+    if (result < 0) {
+        set_kos_errno(result);
+        return -1;
+    }
+
+    stream_media_protect_known = 1u;
+    stream_media_protected = result != 0;
+    return stream_media_protected != 0u;
 }
 
 static int read_kos_path_info(
@@ -654,8 +697,7 @@ static int read_kos_path_info(
         return unsupported();
 
     memset(raw, 0, sizeof(*raw));
-    int32_t result = (int32_t)hpclang_kos_call2(
-        (uint32_t)addr,
+    int32_t result = (int32_t)((kos_fn2)addr)(
         (uint32_t)(uintptr_t)path,
         (uint32_t)(uintptr_t)raw);
     if (result < 0) {
@@ -781,16 +823,6 @@ int rename(const char *old_path, const char *new_path)
     return -1;
 }
 
-#ifdef HPCLANG_E2E_STORAGE
-int32_t hpclang_e2e_kos_getsize_raw(void)
-{
-    uintptr_t addr = kos_entry(KOS_FUNC_GETSIZE);
-    if (addr == 0u)
-        return INT32_MIN;
-    return (int32_t)hpclang_kos_call0((uint32_t)addr);
-}
-#endif
-
 int hpclang_stream_storage_query(
     struct hpclang_stream_storage_info *info)
 {
@@ -818,13 +850,13 @@ int hpclang_stream_storage_query(
 
     info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
 
-    /*
-     * Return-path isolation: intentionally omit Stock CHECKPROTECT (func 18)
-     * while retaining CHECKINSERT + GETSIZE. This diagnostic revision does
-     * not claim write-protect state.
-     */
-    int32_t free_bytes =
-        (int32_t)hpclang_kos_call0((uint32_t)size_addr);
+    int protected = stream_media_read_only();
+    if (protected < 0)
+        return -1;
+    if (protected)
+        info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_READ_ONLY;
+
+    int32_t free_bytes = (int32_t)((kos_fn0)size_addr)();
     if (free_bytes < 0)
         return set_kos_errno(free_bytes);
 

@@ -52,6 +52,11 @@ enum hpclang_stream_storage_flag {
  * Validity bits are explicit because the Stock KOS filesystem exposes free
  * bytes and media state but no safe total-capacity query. capacity_bytes is
  * zero unless HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID is set.
+ *
+ * On the Stock HP49g+/HP50g backend, insertion and write-protect state are
+ * sampled lazily and remain fixed for one native launch. Re-enter the native
+ * application to resample physical SD hot-plug/protect changes. Free space is
+ * queried on each call.
  */
 struct hpclang_stream_storage_info {
     uint32_t size;
