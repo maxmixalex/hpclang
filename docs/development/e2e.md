@@ -138,11 +138,11 @@ The canonical runtime E2E injects every physical key position on each automated 
 
 The final LCD screen renders the physical keyboard rather than the electrical scan matrix: six menu keys, two three-key control rows beside the cursor cluster, and seven five-key main rows. Passed positions are filled, and a failing position is left open and marked. The screen labels use the public font/text API, so calculator E2E exercises the same rasterization path instead of carrying a test-only glyph table. The machine-readable result remains the actual gate; the LCD diagram is a visual summary of the same checks.
 
-Direct currently captures an initial hollow keyboard plus one frame after every accepted key release: **52 progression frames** for the 51-key test. Stock should mirror the same capture schedule. The merged progression contact sheet is supplementary evidence and should be published separately from the canonical `before / pass / return` summary rather than being squeezed into that three-frame layout.
+Direct and Stock both capture an initial hollow keyboard plus one frame after every accepted key release: **52 progression frames** for the 51-key test. Stock frames are phase-gated by `KACK(n)`: a new frame is accepted only after the preceding DOWN→UP cycle has returned, the payload has updated its passed-bit state, and the display has been redrawn. Runtime #122 is the canonical fully-green witness. The merged progression contact sheet remains supplementary evidence beside the canonical `before / pass / return` summary.
 
 ## Font Gallery application
 
-Font Gallery is a focused visual/sample E2E application, not part of the canonical runtime test. The public font core itself has no semantic theme-role layer: the Gallery selects calculator-native `hpclang_font_mini()` / `hpclang_font_big()` entries and generated font products directly.
+Font Gallery is a focused visual/sample E2E application, not part of the canonical runtime test. The public font core itself has no semantic theme-role layer: the Gallery has exactly two calculator-native entries, `hpclang_font_mini()` and `hpclang_font_default()` (the latter currently aliases `hpclang_font_big()`), followed by generated font products. This is a role-oriented API test, not enumeration of every font-like object present in Stock ROM; a separate ROM object such as an edit-line face will not appear unless hpclang exposes it explicitly.
 
 The final exhaustive Direct Gallery traverses **247 entries** — 245 generated faces plus two native entries — and renders both SAMPLE and TEXT pages, producing **494 captures per target**. The production matrix runs one family job for `hp39`, `hp48`, and `hp4950`, covering HP39gs, HP40gs, HP48gII, HP49g+, and HP50g and therefore both 64- and 80-line display layouts. It validates generated aliases/arbitrary face selection, metrics/spacing, repertoire-sensitive specimens, deterministic pagination, PASS and settled Direct return.
 
@@ -152,7 +152,7 @@ The compact Stock navigation has an evidence-specific invariant: `Native / Calcu
 
 HP39gs/40gs are different: their fixed native raster tables are physical stock-ROM assets. Production bootstrap maps only the two required physical NOR pages (`0x00042000` and `0x00043000`) as uncached small pages in the private prefix of hpclang's own code L2 table. This design was chosen after diagnostics proved that a long-lived high-L1 NOR section alias could have its descriptor word overwritten by the active LCD framebuffer itself. Font Gallery therefore also serves as the regression gate for this bootstrap-private mapping.
 
-Formal production run **34792822393 / #55** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock / hp4950`, and `Stock / hp48`. The earlier 244-entry targeted runs remain useful historical evidence, but #55 is the current closure gate.
+Formal production run **35255868206 / #99** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and Stock hp39gs/hp40gs/hp48gii/hp50g. Gallery #102 later exercised the new strict HP48 settled-return gate successfully; its overall workflow was cancelled only because the separate Stock hp40gs job was cancelled. The earlier 244-entry targeted runs remain useful historical evidence, but #99 is the current fully-green closure gate.
 
 Keeping Gallery separate prevents font exploration from inflating the runtime ABI/keyboard/storage test and lets its visual evidence evolve independently of canonical runtime PASS evidence.
 
@@ -162,6 +162,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 The general TTF importer has been removed. Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained in the source package. Gallery labels/specimens were strengthened for Ark Pixel regional variants, width-sensitive Latin, digits/punctuation, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **34792822393 / #55** is the formal final gate. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on all five automated calculators. HP50 Stock reaches settled PASS. HP48 Stock reaches HPC1 PASS and control-flow return with distinct nonblank native-mini/native-main/generated-control evidence; its final visible Stock repaint remains the separately classified `return-unsettled` gate and is not promoted to a visible-return PASS.
+`E2E / Font Gallery` **35255868206 / #99** is the current fully-green closure gate. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on all five automated calculators. HP50 Stock reaches settled PASS. HP48 Stock reaches HPC1 PASS and control-flow return with distinct nonblank native-mini/native-main/generated-control evidence and a settled Stock repaint; the strict post-cleanup gate also passes in Gallery #102.
 
-The font implementation/evidence slice is therefore closed. Remaining work is repository integration plus independent Stock-harness follow-up, not additional font-core or Gallery implementation.
+The font implementation/evidence slice is therefore closed. Remaining work is repository integration and bounded Stock-harness closeout, not additional font-core or Gallery implementation.

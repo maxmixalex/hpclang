@@ -154,17 +154,17 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 
 | Service | Host | ARMv4T link | Direct runtime | Stock evidence |
 | --- | --- | --- | --- | --- |
-| HPC1/runtime | ✅ | ✅ | 5/5 PASS | all five stock paths have PASS evidence; runtime #78 is green for Stock hp39/hp4950, while HP48 visible repaint remains separately `return-unsettled` |
+| HPC1/runtime | ✅ | ✅ | 5/5 PASS | Runtime #122 is fully green across all Stock families, including settled HP48 return |
 | device info | — | ✅ | 5/5 PASS | covered by common payload |
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
-| keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | acknowledged Stock injection now passes hp39 in runtime #78; Stock progression contact sheet remains follow-up |
+| keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | Direct and Stock both require the exact 52-frame progression; Runtime #122 is green |
 | display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
-| native font/text | ✅ | ✅ | production Gallery #55 covers all Direct families; HP39 native pixels are valid through the physical-ROM path | HP50g and HP48gII compact live-native controls green; HP48 visible Stock return remains `return-unsettled` |
-| generated font selection | ✅ configure | ✅ | Gallery #55 exhaustively traverses all **245 generated faces** on all five automated targets | HP50g and HP48gII generated controls green |
+| native font/text | ✅ | ✅ | production Gallery #99 covers all Direct families; HP39 native pixels are valid through the physical-ROM path | HP50g and HP48gII compact live-native controls green with settled return |
+| generated font selection | ✅ configure | ✅ | Gallery #99 exhaustively traverses all **245 generated faces** on all five automated targets | HP50g and HP48gII generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
-Formal `E2E / Font Gallery` run **34792822393 / #55** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock / hp48`, and `Stock / hp4950`. It traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target**. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
+Formal `E2E / Font Gallery` run **35255868206 / #99** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. It traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target**. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
 ## Historical public-surface size
 
@@ -306,6 +306,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with source provenance retained. Ark Pixel labels/specimens now expose useful locale differences, and Gallery text covers width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **34792822393 / #55** is fully green. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS. HP48 Stock has HPC1 PASS/control-flow return and distinct nonblank live-native/generated evidence; visible Stock repaint remains separately `return-unsettled`.
+`E2E / Font Gallery` **35255868206 / #99** is fully green. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS. HP48 Stock has HPC1 PASS/control-flow return, distinct nonblank live-native/generated evidence, and a settled Stock repaint; Gallery #102 independently passes the new strict HP48 return gate.
 
-The font slice therefore has no remaining API or evidence blocker. Repository integration and independent Stock visible-return work remain outside the font-core closure.
+The font slice therefore has no remaining API or evidence blocker. Repository integration and bounded Stock-harness closeout remain outside the font-core closure.

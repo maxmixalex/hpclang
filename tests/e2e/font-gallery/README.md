@@ -40,10 +40,14 @@ The source bundle carries license/provenance sidecars for these additions. Those
 
 The review page deliberately uses repertoire/design-sensitive specimens instead of one generic phrase: uppercase/lowercase Latin, digits and punctuation, ambiguous-width strings such as `Il1| / 0OQ / rn / AV / To`, diacritics, mathematical/symbol characters, pangrams, kana/CJK/Hangul where present, and common locale-sensitive Han characters. Ark Pixel and Fusion Pixel locale variants are therefore judged from real glyph differences rather than their family names alone.
 
+Some faces intentionally make non-alphanumeric repertoires very visible. Spleen, for example, contains box-drawing and Braille codepoints; Gallery renders those real glyphs as repertoire probes. They are not TAB control characters and should not be treated as mojibake. Locale specimen rows are glyph bags rather than prose and should avoid accidental geopolitical or other semantic phrasing.
+
+The two native Gallery entries are deliberately role-based, not a ROM-font census: `hpclang_font_mini()` plus `hpclang_font_default()` (currently the same native selection as `hpclang_font_big()`). Other stock ROM font-like objects, including edit-line-specific faces, are outside the Gallery unless a public hpclang native-font role is added for them.
+
 ## Current Gallery census
 
 With 245 generated faces, exhaustive Direct now traverses **247 entries** — 245 generated plus two native — and renders both SAMPLE and TEXT pages, for **494 captures per target**. The production family matrix covers HP39gs, HP40gs, HP48gII, HP49g+, and HP50g.
 
-The compact Stock Gallery remains concern-specific. HP50g supplies authoritative hp4950 live-Saturn native-font evidence. HP48gII supplies the independent 64-line hp48 live-native path. On HP48, a known post-PASS `return-unsettled` state is not a visible-return PASS; the Gallery harness preserves and merges native-mini/native-main/generated-control evidence before applying that concern-specific status classification.
+The compact Stock Gallery remains concern-specific. HP50g supplies authoritative hp4950 live-Saturn native-font evidence. HP48gII supplies the independent 64-line hp48 live-native path. HP48 now requires the same strict settled-return result as the canonical Runtime gate: HPC1 PASS, `status=pass`, control-flow return, `return_settled=true`, and x50ng exit 0. Gallery #99 is fully green, and Gallery #102 independently passes this strict HP48 gate.
 
 Before merge, the current 245-face census must have a green `CI / Font Assets` regeneration/audit and a green formal `E2E / Font Gallery` run. Broader canonical Runtime Stock-return/keyboard harness issues remain separate gates and must not be silently reclassified as font correctness.

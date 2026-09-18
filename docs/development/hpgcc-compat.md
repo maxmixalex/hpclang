@@ -137,7 +137,7 @@ Compatibility consequence:
 - neither physical ROM addresses, private code-window VAs, `platform_cookie` meaning nor `Read[]` pointers belong in the public font ABI;
 - historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
 
-The production Font Gallery gate covers this boundary directly. Final run **34792822393 / #55** is fully green across all Direct families plus HP48gII and HP50g Stock live-native controls. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS; HP48 Stock reaches HPC1 PASS/control-flow return with valid live-native pixels while its separate visible repaint remains `return-unsettled`.
+The production Font Gallery gate covers this boundary directly. Final fully-green run **35255868206 / #99** covers all Direct families plus HP39gs, HP40gs, HP48gII, and HP50g Stock controls. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS; HP48 Stock reaches HPC1 PASS/control-flow return with valid live-native pixels and a settled Stock repaint.
 
 ## Font/text compatibility boundary
 
@@ -240,6 +240,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final curation includes Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained. Gallery labels/specimens have been strengthened for Ark Pixel regional variants, width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **34792822393 / #55** is the formal final gate. It is fully green across Build, universal x50ng, all three Direct families, HP48gII Stock, and HP50g Stock. Direct traverses **247 entries × 2 pages = 494 captures per target**. The HP48/HP50 compact summaries were visually checked and consistently show native mini, native main, and generated control.
+`E2E / Font Gallery` **35255868206 / #99** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. Direct traverses **247 entries × 2 pages = 494 captures per target**. The HP48/HP50 compact summaries were visually checked and consistently show native mini, native main, and generated control, with settled return.
 
-The font implementation/evidence slice is closed. Remaining repository integration and the independent HP48 visible-return repaint issue are not HPGCC/font compatibility blockers.
+The font implementation/evidence slice is closed. Remaining repository integration and bounded Stock-harness closeout are not HPGCC/font compatibility blockers.
