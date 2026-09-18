@@ -31,7 +31,6 @@ enum {
     KOS_FUNC_FSEEK = 4u,
     KOS_FUNC_FDELETE = 5u,
     KOS_FUNC_GETFILEINFO = 8u,
-    KOS_FUNC_FATTR = 15u,
     KOS_FUNC_GETSIZE = 16u,
     KOS_FUNC_CHECKINSERT = 17u,
     KOS_FUNC_CHECKPROTECT = 18u,
@@ -719,63 +718,6 @@ int hpclang_stream_path_query(
      * labels part of their layout as uncertain; M7.2 will only publish time
      * fields after independent Stock verification.
      */
-    return 0;
-}
-
-int hpclang_stream_path_set_attributes(
-    const char *path,
-    uint32_t attributes)
-{
-    const uint32_t supported =
-        HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY |
-        HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
-        HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM |
-        HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
-
-    if (!stream_storage_available())
-        return unsupported();
-
-    if (path == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
-    if ((attributes & ~supported) != 0u) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (strcmp(path, "/") == 0) {
-        errno = ENOTSUP;
-        return -1;
-    }
-
-    struct kos_file_info raw;
-    if (read_kos_path_info(path, &raw) != 0)
-        return -1;
-
-    uint32_t attr = raw.attribute & (KOS_ATTR_VOLUME | KOS_ATTR_DIRECTORY);
-    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY) != 0u)
-        attr |= KOS_ATTR_READONLY;
-    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN) != 0u)
-        attr |= KOS_ATTR_HIDDEN;
-    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM) != 0u)
-        attr |= KOS_ATTR_SYSTEM;
-    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) != 0u)
-        attr |= KOS_ATTR_ARCHIVE;
-
-    uintptr_t addr = kos_entry(KOS_FUNC_FATTR);
-    if (addr == 0u)
-        return unsupported();
-
-    int32_t result = (int32_t)((kos_fn2)addr)(
-        (uint32_t)(uintptr_t)path,
-        attr);
-    if (result < 0) {
-        if (kos_open_error_is_missing(result)) {
-            errno = ENOENT;
-            return -1;
-        }
-        return set_kos_errno(result);
-    }
     return 0;
 }
 
