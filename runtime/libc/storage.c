@@ -796,9 +796,8 @@ int hpclang_stream_storage_query(
     info->size = sizeof(*info);
     info->version = HPCLANG_STREAM_STORAGE_INFO_VERSION;
 
-    uintptr_t protect_addr = kos_entry(KOS_FUNC_CHECKPROTECT);
     uintptr_t size_addr = kos_entry(KOS_FUNC_GETSIZE);
-    if (protect_addr == 0u || size_addr == 0u)
+    if (size_addr == 0u)
         return unsupported();
 
     int present = stream_media_present();
@@ -809,13 +808,11 @@ int hpclang_stream_storage_query(
 
     info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
 
-    int32_t protected =
-        (int32_t)hpclang_kos_call0((uint32_t)protect_addr);
-    if (protected < 0)
-        return set_kos_errno(protected);
-    if (protected != 0)
-        info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_READ_ONLY;
-
+    /*
+     * Return-path isolation: intentionally omit Stock CHECKPROTECT (func 18)
+     * while retaining CHECKINSERT + GETSIZE. This diagnostic revision does
+     * not claim write-protect state.
+     */
     int32_t free_bytes =
         (int32_t)hpclang_kos_call0((uint32_t)size_addr);
     if (free_bytes < 0)

@@ -388,6 +388,26 @@ static uint32_t stock_stream_storage_test(uint32_t model)
          HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
         return 0x67u;
 
+    struct hpclang_stream_storage_info storage_info;
+    if (hpclang_stream_storage_query(&storage_info) != 0)
+        return 0x5du;
+    if (storage_info.version != HPCLANG_STREAM_STORAGE_INFO_VERSION ||
+        storage_info.size < sizeof(storage_info) ||
+        (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
+        (storage_info.flags &
+         HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
+        storage_info.free_bytes == 0u)
+        return 0x5eu;
+    if ((storage_info.flags &
+         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) != 0u &&
+        storage_info.capacity_bytes < storage_info.free_bytes)
+        return 0x5fu;
+
+    uint64_t free_bytes = 0u;
+    if (hpclang_stream_storage_free_bytes(&free_bytes) != 0 ||
+        free_bytes != storage_info.free_bytes)
+        return 0x60u;
+
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)
         return 0x33u;
