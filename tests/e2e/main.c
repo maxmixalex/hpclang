@@ -270,6 +270,12 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             errno != ENOSYS)
             return 0x54u;
 
+        errno = 0;
+        if (hpclang_stream_path_set_attributes(
+                "HPCLANG.TST", HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN) == 0 ||
+            errno != ENOSYS)
+            return 0x67u;
+
         struct hpclang_stream_storage_info unavailable_storage;
         errno = 0;
         if (hpclang_stream_storage_query(&unavailable_storage) == 0 ||
@@ -337,6 +343,37 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (hpclang_stream_path_query("/", &root_info) != 0 ||
         root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return 0x5cu;
+
+    struct hpclang_stream_path_info directory_info;
+    if (hpclang_stream_path_query("HPCLANG.DIR", &directory_info) != 0 ||
+        directory_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        return 0x68u;
+
+    /*
+     * Manufacture a known attribute state through the same Stock KOS service,
+     * read it back through the clean query, then restore before deletion.
+     */
+    FILE *attribute_file = fopen("HPCLANG.ATR", "w+b");
+    if (attribute_file == NULL || fclose(attribute_file) != 0)
+        return 0x69u;
+    uint32_t known_attributes =
+        HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY |
+        HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN;
+    if (hpclang_stream_path_set_attributes(
+            "HPCLANG.ATR", known_attributes) != 0)
+        return 0x6au;
+    struct hpclang_stream_path_info attribute_info;
+    if (hpclang_stream_path_query("HPCLANG.ATR", &attribute_info) != 0 ||
+        attribute_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+        attribute_info.attributes != known_attributes)
+        return 0x6bu;
+    if (hpclang_stream_path_set_attributes("HPCLANG.ATR", 0u) != 0)
+        return 0x6cu;
+    if (hpclang_stream_path_query("HPCLANG.ATR", &attribute_info) != 0 ||
+        attribute_info.attributes != 0u)
+        return 0x6du;
+    if (remove("HPCLANG.ATR") != 0)
+        return 0x6eu;
 
     struct hpclang_stream_storage_info storage_info;
     if (hpclang_stream_storage_query(&storage_info) != 0)

@@ -66,7 +66,7 @@ case "$HPCLANG_E2E_FAMILY" in
     hp4950)
         SD="$ROOT/build/$TARGET-sd"
         rm -rf "$SD"
-        mkdir -p "$SD"
+        mkdir -p "$SD/HPCLANG.DIR"
         printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
         printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
         X50_ARGS+=(
