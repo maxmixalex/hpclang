@@ -71,13 +71,6 @@ int hpclang_stream_path_query(
     const char *path,
     struct hpclang_stream_path_info *info);
 
-/*
- * Replace the portable FAT-style attribute subset while preserving the
- * entry's type bits. Unsupported attribute bits return EINVAL.
- */
-int hpclang_stream_path_set_attributes(
-    const char *path,
-    uint32_t attributes);
 
 int hpclang_stream_storage_query(
     struct hpclang_stream_storage_info *info);
