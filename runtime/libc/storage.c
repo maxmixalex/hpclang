@@ -22,6 +22,7 @@
  */
 
 enum {
+    KOS_SYSCALL_RESET_SD = 19u,
     KOS_SYSCALL_GET_FUNC_ENTRY = 218u,
     KOS_MODULE_FILESYSTEM = 1u,
     KOS_FUNC_FOPEN = 0u,
@@ -621,6 +622,24 @@ enum stream_media_presence_state {
 static uint8_t stream_media_presence;
 static uint8_t stream_media_protect_known;
 static uint8_t stream_media_protected;
+
+#ifdef HPCLANG_E2E_STORAGE
+void hpclang_e2e_kos_reset_sd(void)
+{
+    /*
+     * Historical KOS syscall 19 reinitializes the Stock SD filesystem after a
+     * direct-filesystem user releases the controller. Keep this witness test-
+     * only until an independent namespace backend owns the acquire/release
+     * lifecycle.
+     */
+    (void)hpclang_kos_swi3(KOS_SYSCALL_RESET_SD, 0u, 0u, 0u);
+
+    /* A Stock reinitialization invalidates the per-native-launch media sample. */
+    stream_media_presence = STREAM_MEDIA_PRESENCE_UNKNOWN;
+    stream_media_protect_known = 0u;
+    stream_media_protected = 0u;
+}
+#endif
 
 static int stream_media_present(void)
 {

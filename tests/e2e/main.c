@@ -273,6 +273,8 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+void hpclang_e2e_kos_reset_sd(void);
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -587,6 +589,32 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x51u;
     if (errno != ENOENT)
         return 0x52u;
+
+    /*
+     * M7.2c lifecycle witness: after all KOS-backed stream handles are closed,
+     * exercise the documented Stock filesystem reinitialization boundary.
+     * The direct namespace backend is not implemented yet; this establishes
+     * that syscall 19 itself is return-safe and leaves ordinary KOS file access
+     * usable on both hp4950 Stock targets.
+     */
+    hpclang_e2e_kos_reset_sd();
+
+    struct hpclang_stream_path_info reset_path_info;
+    if (hpclang_stream_path_query("HPCLANG.TST", &reset_path_info) != 0 ||
+        reset_path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+        reset_path_info.byte_size != sizeof(input_expected) - 1u)
+        return 0x6cu;
+
+    FILE *reset_input = fopen("HPCLANG.TST", "rb");
+    if (reset_input == NULL)
+        return 0x6du;
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(input_expected) - 1u, reset_input);
+    input_close = fclose(reset_input);
+    if (got != sizeof(input_expected) - 1u ||
+        input_close != 0 ||
+        memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
+        return 0x6eu;
 
     return 0u;
 }
