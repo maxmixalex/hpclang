@@ -273,6 +273,8 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+int32_t hpclang_e2e_kos_getsize_raw(void);
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -388,25 +390,14 @@ static uint32_t stock_stream_storage_test(uint32_t model)
          HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
         return 0x67u;
 
-    struct hpclang_stream_storage_info storage_info;
-    if (hpclang_stream_storage_query(&storage_info) != 0)
-        return 0x5du;
-    if (storage_info.version != HPCLANG_STREAM_STORAGE_INFO_VERSION ||
-        storage_info.size < sizeof(storage_info) ||
-        (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
-        (storage_info.flags &
-         HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
-        storage_info.free_bytes == 0u)
-        return 0x5eu;
-    if ((storage_info.flags &
-         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) != 0u &&
-        storage_info.capacity_bytes < storage_info.free_bytes)
-        return 0x5fu;
-
     /*
-     * Return-path isolation: stop after one storage query. The convenience
-     * free-byte query would perform a second CHECKINSERT + GETSIZE pair.
+     * Return-path isolation: root above already performed one CHECKINSERT.
+     * Call GETSIZE directly here so this revision contains exactly one
+     * CHECKINSERT followed by exactly one GETSIZE, with no second media probe.
      */
+    int32_t raw_free_bytes = hpclang_e2e_kos_getsize_raw();
+    if (raw_free_bytes <= 0)
+        return 0x5du;
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)

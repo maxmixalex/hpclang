@@ -781,6 +781,16 @@ int rename(const char *old_path, const char *new_path)
     return -1;
 }
 
+#ifdef HPCLANG_E2E_STORAGE
+int32_t hpclang_e2e_kos_getsize_raw(void)
+{
+    uintptr_t addr = kos_entry(KOS_FUNC_GETSIZE);
+    if (addr == 0u)
+        return INT32_MIN;
+    return (int32_t)hpclang_kos_call0((uint32_t)addr);
+}
+#endif
+
 int hpclang_stream_storage_query(
     struct hpclang_stream_storage_info *info)
 {
