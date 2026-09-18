@@ -64,17 +64,17 @@ HP39g+ is deliberately excluded from that physical layout until a real-hardware 
 
 Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. A new `hpclang_font_editline()` accessor is reserved for the independently established HP39gs/40gs 6×10 EditLine table and is unavailable on the HP48/49/50 family and on HP39g+ until its flash layout is verified.
 
-Before implementation is accepted, the 2.22 HP39gs/40gs EditLine relocation must be independently gated against stock NOR data rather than accepted solely from address arithmetic. The intended evidence is a table fingerprint plus the same ROM-derived pixel oracle used by the existing HP39 native Gallery checks.
+The 2.22 HP39gs/40gs EditLine relocation is independently gated against stock NOR data rather than accepted from address arithmetic alone. HP39gs physical nibble `0x0FD882` and HP40gs `0x0FDA35` both match the legacy EditLine-table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`; the Direct and Stock Gallery paths also pass the independent ROM-derived 6×10 pixel oracle.
 
-Gallery **#103** on commit `0821c822` is a fully-green pre-change baseline. The native-census implementation that follows this documentation change requires a fresh formal Gallery run because HP39 Direct/Stock evidence will gain one additional concrete ROM font while HP48/49/50 retain their existing native census.
+Gallery **#103** on commit `0821c822` is the fully-green pre-change baseline. Gallery **#111** (`35295358487`) is the fully-green post-change gate: HP39gs/40gs gain one additional concrete EditLine ROM font, while HP48/49/50 retain their two-font native census.
 
 ## Final font validation closure
 
 The current canonical source bundle is bitmap-only. The generated catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources** with **245/245** source→generated parity. Font Assets **#24** regenerates the package without drift and reports zero exact duplicates, overflow, glyph-collapse, blank-heavy, or Powerline regressions.
 
-The final exhaustive Gallery contains **247 entries: 245 generated + 2 native**. Direct renders both SAMPLE and TEXT pages for **494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g.
+The exhaustive Gallery is now family-dependent. HP39gs/40gs contain **248 entries: 245 generated + mini + main/default + EditLine**, rendering **496 captures**. HP48gII/49g+/50g contain **247 entries: 245 generated + minifont + bigfont/default**, rendering **494 captures**.
 
-Formal production `E2E / Font Gallery` run **35255868206 / #99** is fully green:
+Formal production `E2E / Font Gallery` run **35295358487 / #111** is fully green:
 
 - Build Font Gallery;
 - universal x50ng;
@@ -84,7 +84,7 @@ Formal production `E2E / Font Gallery` run **35255868206 / #99** is fully green:
 - `Stock / hp48`;
 - `Stock / hp4950`.
 
-The Stock evidence was visually checked from the run artifacts. Both HP48gII and HP50g summaries use the same compact three-panel structure: calculator minifont, calculator main font, then an Ark Pixel generated control face. HP50g reaches settled PASS. HP48gII now also has `saw_pass=true`, `status=pass`, `returned=true`, `return_settled=true`, and distinct nonblank native/generated captures. Gallery #102 (`35258971906`) exercised the post-cleanup strict HP48 gate successfully as well; its overall workflow was cancelled because the separate Stock hp40gs job was cancelled, not because HP48 regressed.
+The Stock evidence was visually checked from the run artifacts. HP39gs/40gs now use four panels: calculator minifont, calculator main font, calculator EditLine font, then the generated control; both models pass the EditLine fingerprint and 6×10 pixel oracle. HP48gII/HP50g retain three panels: minifont, bigfont/default, generated control, and both reach settled PASS.
 
 The Gallery also validates the production HP39 private two-page mapping, generated aliases/arbitrary face selection, arbitrary metrics/spacing, strengthened repertoire-sensitive specimens, and deterministic pagination. Earlier 242-face / 244-entry / 488-capture runs remain historical evidence but are no longer the production closure numbers.
 

@@ -117,7 +117,7 @@ So for this family, using the launch-preserved `SAT_CPU->Read[]` logical mapping
 
 ### HP39/40 path
 
-HPGCC's HP39 support is not wired through those same native-font locator helpers. The HP39 Aplet/Library 275 support carries an HP39-specific ROM entry map; `SUPROM39.A` defines `Put3x5` at `#3F20A` and `Put5x7` at `#38C7E`, and the HP39 library code invokes those stock text routines.
+HPGCC's HP39 support is not wired through those same native-font locator helpers. The HP39 Aplet/Library 275 support carries an HP39-specific ROM entry map; `SUPROM39.A` defines `Put3x5` at `#3F20A` and `Put5x7` at `#38C7E`, and the HP39 library code invokes those stock text routines. Independent HP39 UI reverse engineering additionally identifies the dedicated EditLine 6×10 table, so hpclang exposes it by its own concrete name rather than pretending HP39 has the HP48-compatible bigfont.
 
 This is strong historical evidence that HP39's text environment is a separate stock-ROM path rather than merely “the 48/49/50 font helper with another model ID.”
 
@@ -137,7 +137,7 @@ Compatibility consequence:
 - neither physical ROM addresses, private code-window VAs, `platform_cookie` meaning nor `Read[]` pointers belong in the public font ABI;
 - historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
 
-The production Font Gallery gate covers this boundary directly. Final fully-green run **35255868206 / #99** covers all Direct families plus HP39gs, HP40gs, HP48gII, and HP50g Stock controls. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS; HP48 Stock reaches HPC1 PASS/control-flow return with valid live-native pixels and a settled Stock repaint.
+The production Font Gallery gate covers this boundary directly. Fully-green run **35295358487 / #111** covers all Direct families plus HP39gs, HP40gs, HP48gII, and HP50g Stock controls. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/50g remain **247 / 494**. Both HP39 Stock targets pass the independent EditLine fingerprint and pixel oracle.
 
 ## Font/text compatibility boundary
 
@@ -240,6 +240,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final curation includes Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained. Gallery labels/specimens have been strengthened for Ark Pixel regional variants, width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35255868206 / #99** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. Direct traverses **247 entries × 2 pages = 494 captures per target**. The HP48/HP50 compact summaries were visually checked and consistently show native mini, native main, and generated control, with settled return.
+`E2E / Font Gallery` **35295358487 / #111** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. HP39 summaries now show minifont, main, EditLine, and generated control; HP48/HP50 remain minifont, bigfont/default, and generated control.
 
 The font implementation/evidence slice is closed. Remaining repository integration and bounded Stock-harness closeout are not HPGCC/font compatibility blockers.

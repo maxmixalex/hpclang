@@ -2,8 +2,8 @@
 
 Font Gallery is the calculator-side visual regression gate for hpclang fonts.
 
-- The **full** profile covers every generated face in `runtime/fonts/generated` plus the two calculator-native faces and is exercised by Direct E2E on the hp39, hp48, and hp4950 families.
-- The **stock-smoke** profile links one generated face plus the two native faces and validates the real calculator UI → ARMToolbox → HPC1 launch path on HP48gII and HP50g.
+- The **full** profile covers every generated face in `runtime/fonts/generated` plus the concrete ROM fonts exposed by the active target and is exercised by Direct E2E on the hp39, hp48, and hp4950 families.
+- The **stock-smoke** profile links one generated face plus the target's concrete ROM fonts and validates the real calculator UI → ARMToolbox → HPC1 launch path on HP39gs, HP40gs, HP48gII, and HP50g.
 - HP48/49/50 native-font correctness is intentionally a Stock concern because the Direct synthetic launcher does not fabricate a live Saturn `Read[]` mapping. HP39/40 native fonts use the independently verified physical-ROM path and can therefore be validated in Direct.
 - Catalog size is derived from the generated font index at configure time. Do not hard-code historical face or capture counts in the test implementation; source-package curation is expected to change them.
 
@@ -20,7 +20,7 @@ Two independent size limits are therefore enforced instead of weakening the spec
 
 By default `tools/build-e2e.sh font-gallery` builds **20 deterministic round-robin shards**. The shard count is configurable with `HPCLANG_GALLERY_SHARD_COUNT`; it is a packaging parameter, not a repertoire parameter. Every generated face still receives the same repertoire-sensitive specimen it would receive in an unsharded build. CMake assigns a sorted catalog entry to shard `index % shard_count`, so catalog growth does not require a hard-coded face count.
 
-The build exports all shard-specific raw launchers through the existing `launchers/*.bin` artifact interface. `run-gallery-shards.sh` executes every shard for a target and continues collecting diagnostics after an individual shard failure. Native mini/main remain the first two Gallery entries in every shard so each launch validates the same runtime contract; aggregate evidence counts those duplicate native entries only once.
+The build exports all shard-specific raw launchers through the existing `launchers/*.bin` artifact interface. `run-gallery-shards.sh` executes every shard for a target and continues collecting diagnostics after an individual shard failure. The target's concrete native prefix is repeated in every shard so each launch validates the same runtime contract: three entries (mini/main/EditLine) on HP39gs/40gs and two (minifont/bigfont) on HP48/49/50. Aggregate evidence counts that repeated prefix only once.
 
 A formal Direct result is successful only when every expected shard completes with PASS, returns to the calculator, and settles. The aggregate JSON and merged Gallery image represent unique catalog entries across all shards. The sharded path has already been exercised successfully across the automated families; any canonical font-census change still requires a fresh formal Gallery regression.
 
@@ -42,12 +42,12 @@ The review page deliberately uses repertoire/design-sensitive specimens instead 
 
 Some faces intentionally make non-alphanumeric repertoires very visible. Spleen, for example, contains box-drawing and Braille codepoints; Gallery renders those real glyphs as repertoire probes. They are not TAB control characters and should not be treated as mojibake. Locale specimen rows are glyph bags rather than prose and should avoid accidental geopolitical or other semantic phrasing.
 
-The Gallery native section is a census of the concrete ROM fonts hpclang exposes, not a semantic role test. The current pre-change baseline has two entries (`hpclang_font_mini()` plus `hpclang_font_default()`), but the API contract now removes the false HP39 `big()` alias and adds the independently established HP39gs/40gs 6×10 EditLine font as its own named ROM-font accessor. After implementation, HP39gs/40gs should therefore show mini, main/default, and EditLine; HP48gII/49g+/50g should continue to show minifont and bigfont/default. HP39g+ remains excluded from the EditLine census until its flash layout is verified.
+The Gallery native section is a census of the concrete ROM fonts hpclang exposes, not a semantic role test. HP39gs/40gs show mini, main/default, and the independently established fixed 6×10 EditLine font. HP48gII/49g+/50g show minifont and bigfont/default. HP39g+ remains excluded from the EditLine census until its flash layout is verified.
 
 ## Current Gallery census
 
-With 245 generated faces, the fully-green pre-change baseline (#103 on `0821c822`) still traverses **247 entries** — 245 generated plus two native — and renders both SAMPLE and TEXT pages, for **494 captures per target**. The next Gallery census is intentionally family-dependent: HP39gs/40gs gain the concrete EditLine ROM font (248 entries / 496 captures), while HP48gII/49g+/50g remain at 247 / 494. A fresh formal Gallery run is required after that implementation.
+With 245 generated faces, fully-green Gallery **#111** (`35295358487`) proves the family-dependent census: HP39gs/40gs traverse **248 entries / 496 captures**, while HP48gII/49g+/50g remain **247 / 494**. The HP39 Direct and Stock paths both verify the EditLine table fingerprint and 6×10 pixels against the official 2.22 NOR images.
 
-The compact Stock Gallery remains concern-specific. HP50g supplies authoritative hp4950 live-Saturn native-font evidence. HP48gII supplies the independent 64-line hp48 live-native path. HP48 now requires the same strict settled-return result as the canonical Runtime gate: HPC1 PASS, `status=pass`, control-flow return, `return_settled=true`, and x50ng exit 0. Gallery #99 is fully green, and Gallery #102 independently passes this strict HP48 gate.
+The compact Stock Gallery remains concern-specific. HP50g supplies authoritative hp4950 live-Saturn native-font evidence. HP48gII supplies the independent 64-line hp48 live-native path. HP48 now requires the same strict settled-return result as the canonical Runtime gate: HPC1 PASS, `status=pass`, control-flow return, `return_settled=true`, and x50ng exit 0. Gallery #111 is fully green across all four Stock targets and retains the strict settled-return gate.
 
 Before merge, the current 245-face census must have a green `CI / Font Assets` regeneration/audit and a green formal `E2E / Font Gallery` run. Broader canonical Runtime Stock-return/keyboard harness issues remain separate gates and must not be silently reclassified as font correctness.

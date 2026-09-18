@@ -28,7 +28,7 @@ The final M7 bundle is bitmap-source only. Repository-maintenance tooling parses
 
 Normal application builds consume only the checked-in generated assets and do not execute source-font tooling. Font Assets CI independently regenerates the canonical package and checks source→generated parity so generated `.S` files cannot silently drift away from the reviewed source bundle.
 
-The stock-ROM fonts exposed by `hpclang_font_mini()`, `hpclang_font_big()`, and `hpclang_font_default()` are a separate case: hpclang reads the calculator's own active ROM data at runtime and does not copy those ROM bitmap tables into the repository.
+The stock-ROM fonts exposed by `hpclang_font_mini()`, `hpclang_font_big()`, `hpclang_font_editline()`, and `hpclang_font_default()` are a separate case: hpclang reads the calculator's own active ROM data at runtime and does not copy those ROM bitmap tables into the repository.
 
 Historical HPG font tables remain compatibility evidence only. They must not be copied into hpclang merely to reproduce the old 256-entry HPG character namespace.
 

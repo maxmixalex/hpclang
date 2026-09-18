@@ -132,7 +132,7 @@ The display clean-core boundary remains explicit: representation-independent cir
 
 The font system has two intentionally separate sources:
 
-- **calculator-native fonts** are borrowed stock assets exposed by `hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()`; no HP glyph bitmap is redistributed;
+- **calculator-native fonts** are borrowed stock assets exposed by concrete accessors: `hpclang_font_mini()`, HP48/49/50-only `hpclang_font_big()`, HP39gs/40gs-only `hpclang_font_editline()`, plus the convenience `hpclang_font_default()`; no HP glyph bitmap is redistributed;
 - **generated custom fonts** come from the canonical source bundle and checked-in generated catalog and are selected per target with `hpclang_target_font()`.
 
 HP39/40 uses fixed physical stock-ROM raster tables exposed through two uncached 4 KiB mappings in hpclang's bootstrap-private code-L2 prefix. HP48gII/49g+/50g resolves stock native font objects through the live logical Saturn `Read[]` mapping. These platform details remain below the common font API.
@@ -146,7 +146,7 @@ Final evidence:
 - [x] large faces remain split into bounded assembly chunks and glyph/bitmap sections remain individually garbage-collectable;
 - [x] Ark Pixel labels/specimens expose size, Mono/Prop, locale, and common regional differences instead of obscure-only samples;
 - [x] Gallery specimens cover width-sensitive Latin, digits/punctuation, accents, symbols, and supported CJK/Japanese/Korean repertoires;
-- [x] exhaustive Direct Gallery traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g;
+- [x] exhaustive Direct Gallery is family-dependent: HP39gs/40gs traverse **248 entries / 496 captures** (245 generated + minifont + main/default + EditLine); HP48gII/49g+/50g remain **247 / 494** (245 generated + minifont + bigfont/default);
 - [x] formal production `E2E / Font Gallery` run **35255868206 / #99** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g;
 - [x] HP50g Stock validates live native minifont/main font plus generated control and reaches settled PASS;
 - [x] HP48gII Stock validates distinct nonblank live native minifont/main font plus generated control and reaches HPC1 PASS, control-flow return, and settled Stock repaint; Gallery #102 also passes the post-cleanup strict HP48 gate;
@@ -159,7 +159,7 @@ The import contract remains exactly three modes:
 - `STATIC_EXPLICIT` — retain caller-supplied codepoints plus configured fallback;
 - `FULL` — retain the complete selected face.
 
-Generated aliases remain `@mini = newrpl_6a`, `@normal = newrpl_8c`, and `@large = newrpl_10a`. There is deliberately no public semantic font-role layer in the core.
+Generated aliases remain `@mini = newrpl_6a`, `@normal = newrpl_8c`, and `@large = newrpl_10a`. There is deliberately no public semantic font-role layer in the core; `mini`, `big`, and `editline` in native accessor names are historical concrete ROM-font names, not UI roles.
 
 Direct Gallery intentionally does not fabricate a live Saturn `Read[]` map. Generated-font exhaustive rendering is valid there on all five models; HP39/40 native fonts are also valid through verified physical-ROM rasters; HP48/49/50 native-font evidence comes from Stock launch where the live Saturn mapping exists.
 
@@ -172,7 +172,7 @@ M7.1 font closure checklist:
 - [x] separate calculator-native assets from generated package assets;
 - [x] validate the HP39 physical-ROM native reader through the owned two-page L2 window;
 - [x] exhaustively render all 245 generated faces on all five automated targets and both 64/80-line layouts;
-- [x] validate compact Stock live-native evidence on HP50g and HP48gII;
+- [x] validate compact Stock native evidence on HP39gs/HP40gs/HP48gII/HP50g, including the HP39 EditLine fingerprint and 6×10 pixel oracle;
 - [x] remove obsolete TTF importing, normalize summaries, strengthen specimens, and complete additional bitmap-CJK curation;
 - [x] close the production Gallery matrix (`E2E / Font Gallery` #99) and retire the obsolete HP48 post-PASS exception;
 - [ ] integrate the completed font slice to `main` after repository-level review.
