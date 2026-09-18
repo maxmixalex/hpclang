@@ -216,19 +216,20 @@ Historical baseline:
 
 #### M7.2b — namespace mutation and metadata
 
-- [ ] add and Stock-validate standard `rename()` using the stock filesystem rename primitive;
-- [ ] expose file metadata needed by ordinary applications—at minimum size/type/attributes—without publishing KOS structs;
-- [ ] expose filesystem free/capacity information through a stable query rather than raw KOS calls;
+- [x] resolve Stock rename semantics: KOS filesystem function 6 reproduces the historical `-200` failure on both HP49g+ and HP50g, so hpclang must not claim a working POSIX rename or fake atomicity with copy+delete; the canonical standard name remains explicitly unsupported until an ownership-safe namespace backend exists;
+- [ ] expose file metadata needed by ordinary applications—at minimum size/type/portable attributes—without publishing KOS structs, and Stock-validate those semantics rather than only the historical layout;
+- [ ] expose media state and free space through a stable query rather than raw KOS calls; total capacity must be validity-gated because safe Stock KOS exposes free bytes but no equivalent of FSystem's raw-FAT volume-size calculation;
 - [ ] decide and document timestamp conversion once stock metadata has been verified rather than copying uncertain historical struct fields blindly;
 - [ ] preserve explicit unsupported/error behavior on non-stream families.
 
 #### M7.2c — directories and path semantics
 
-- [ ] provide directory enumeration with owned iterator state and stable names/types;
-- [ ] provide directory creation/removal where stock behavior is reliable;
-- [ ] support path-based traversal without leaking or permanently changing the calculator OS's global current-directory state;
-- [ ] add `chdir/getcwd` only if their stock-global side effects can be contained/restored; otherwise prefer explicit-directory handles and document the migration;
-- [ ] validate long-name/case behavior actually provided by the stock filesystem instead of promising the broader HPGCC3 FSystem semantics by assumption.
+- [ ] provide directory enumeration with genuinely owned iterator state and stable names/types; KOS `GetFirst/Next*Info` uses a system current-file-ID cursor and must not merely be hidden behind an iterator-shaped struct;
+- [ ] provide directory creation/removal where behavior can be made ownership-safe; public KOS has no mkdir/rmdir primitive, while historical FSystem obtains those capabilities by directly owning the SD/FAT layer;
+- [ ] support path-based traversal without leaking or permanently changing the calculator OS's global current-directory state; KOS enumeration is current-directory based and exposes no matching `getcwd` for lossless restoration;
+- [ ] add `chdir/getcwd` only if their Stock-global side effects can be contained/restored; otherwise prefer explicit-directory handles backed by an independent namespace implementation and document the migration;
+- [ ] decide whether the missing namespace operations justify an ownership-safe FAT backend/lease rather than copying HPGCC's direct-controller assumptions into the common API;
+- [ ] validate long-name/case behavior actually provided by each backend instead of promising the broader HPGCC FSystem semantics by assumption.
 
 #### M7.2d — HPGCC parity adapter boundary
 
