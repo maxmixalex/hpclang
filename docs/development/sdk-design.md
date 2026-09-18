@@ -163,6 +163,23 @@ Saturn addresses and RPL objects should never be ordinary C pointers. Use explic
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
 
+## Declarative UI core (planned)
+
+hpclang should include a small **renderer-agnostic declarative UI engine**, not a fixed calculator theme or widget skin. The intended application model is:
+
+```text
+View = f(Model)
+event -> update(Model) -> declare View again -> reconcile by stable key
+```
+
+The clean core may own stable node identity, keyed reconciliation, deterministic row/column layout, focus and keyboard navigation, event/action routing, controlled-input state, explicit async state/effect hooks, dirty-region tracking, and a bounded custom-canvas node. Ordinary C functions remain sufficient for component composition; the implementation should remain compatible with fixed-capacity pools and predictable ARM920T memory/time budgets rather than requiring a desktop-style heap-retained object graph.
+
+The core must **not** freeze visual policy. Style identifiers are renderer/theme inputs rather than pixel definitions. Widget chrome, fonts/colors, native calculator appearance, and final rasterization belong to a backend above the layout/logic engine. A downstream project such as 39gsX can therefore implement a renderer/theme matching the independently reverse-engineered HP39 native UI while another environment can render the same declarative tree differently.
+
+A canvas/custom-paint escape hatch is part of the boundary: declarative layout owns the node and its bounds, while application/backend code performs specialized drawing only when the node revision changes or its region is damaged. Historical HPGCC `win*` compatibility may later target this engine where useful, but the legacy widget model does not define the canonical UI API.
+
+Public C names, node storage limits, layout units, focus traversal rules, and renderer ABI remain deliberately unfrozen until a focused design/fixture slice begins.
+
 ## Modern C++ profile
 
 hpclang uses Clang/LLVM, libc++, libc++abi, compiler-rt, and picolibc with `-fno-exceptions` and `-fno-rtti`. This is a modern embedded C++ profile, not unrestricted hosted C++.
@@ -184,4 +201,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. The HP48 visible Stock-return repaint is closed as part of the canonical runtime gate. The next new SDK service remains the typed calculator object-store design; HPGCC compatibility adapters remain downstream of stable clean-core services.
+M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. The HP48 visible Stock-return repaint is closed as part of the canonical runtime gate. M7.2 now completes the HP49g+/HP50g byte-stream namespace/metadata/directory surface before M7.3 begins the typed calculator-object/Saturn-RPL bridge. Broad HPGCC adapters and the planned declarative UI engine remain downstream of stable clean-core services.

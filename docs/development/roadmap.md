@@ -300,6 +300,9 @@ M8 goals:
 - establish stable public hpclang headers, examples, packaging/build UX and a fresh LLVM-only developer workflow;
 - validate non-trivial applications on each platform family rather than only isolated API probes;
 - provide migration tooling/guidance that distinguishes safe source adapters from intentionally retired raw KOS/Saturn/MMU idioms;
-- **surpass HPGCC** with cross-family capability discovery, modern C++ wrappers, UTF-8/font selection, stronger ownership/errors, deterministic assets/tests, and new services that are practical on the hardware even when no historical API existed;
+- add a renderer-agnostic declarative UI core: keyed identity/reconciliation, deterministic row/column layout, focus/navigation and event/action routing, controlled inputs, explicit async state/effect integration, dirty-region invalidation, and a canvas escape hatch for custom drawing;
+- keep visual style, widget chrome, concrete rasterization, and calculator-native look-and-feel outside that UI core behind renderer/theme backends; downstream environments such as 39gsX may provide a renderer that reproduces the independently reverse-engineered native HP39 UI without making that style an hpclang ABI;
+- use the clean declarative UI engine as a possible substrate for useful historical `win*` source adapters where semantics fit, rather than allowing the historical widget implementation to define the core;
+- **surpass HPGCC** with cross-family capability discovery, modern C++ wrappers, UTF-8/font selection, stronger ownership/errors, deterministic assets/tests, declarative UI composition, and new services that are practical on the hardware even when no historical API existed;
 - consider replacing the remaining ARMToolbox/library-275 stock-launch boundary with a minimal independent launcher if it materially improves packaging or portability;
 - separate public application documentation from this internal Development reference.
