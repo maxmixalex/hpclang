@@ -40,6 +40,8 @@ timeout 45s "$ROOT/build/x50ng/dist/x50ng" \
 mv "$SD/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
 printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
+mkdir -p "$SD/HPCLDIR"
+printf 'DIR-WITNESS\n' > "$SD/HPCLDIR/CHILD.TST"
 printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"

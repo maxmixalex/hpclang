@@ -339,9 +339,13 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
         return 0x5bu;
 
-    struct hpclang_stream_path_info root_info;
-    if (hpclang_stream_path_query("/", &root_info) != 0 ||
-        root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+    /*
+     * KOS GetSpecialFileInfo does not treat "/" as a normal directory entry,
+     * so validate directory metadata using a real named directory fixture.
+     */
+    struct hpclang_stream_path_info dir_info;
+    if (hpclang_stream_path_query("HPCLDIR", &dir_info) != 0 ||
+        dir_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return 0x5cu;
 
     struct hpclang_stream_path_info directory_info;
