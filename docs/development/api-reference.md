@@ -298,8 +298,9 @@ Based on historical stability, current implementation, and remaining dependencie
 3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
-6. design Saturn/RPL and HP39 typed-object handles;
-7. only then begin broad HPG/keyboard/object compatibility headers.
+6. complete M7.2 HP49g+/HP50g namespace, metadata, media-state and directory semantics without leaking KOS globals;
+7. design M7.3 Saturn/RPL and HP39 typed-object handles;
+8. only after the corresponding clean services are stable, begin broad HPG/keyboard/filesystem/object compatibility headers and the renderer-agnostic declarative UI layer.
 
 This preserves the dependency direction: historical HPGCC APIs are implemented on top of a coherent hpclang core, not used to define that core.
 
