@@ -740,15 +740,6 @@ static int kos_time_valid(const struct kos_time *time)
            time->seconds <= 59u;
 }
 
-static void export_civil_date(
-    struct hpclang_stream_civil_date *dst,
-    const struct kos_date *src)
-{
-    dst->year = src->year;
-    dst->month = src->month;
-    dst->day = src->day;
-}
-
 static void export_civil_datetime(
     struct hpclang_stream_civil_datetime *dst,
     const struct kos_datetime *src)
@@ -819,18 +810,15 @@ int hpclang_stream_path_query(
         info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
 
     /*
-     * Preserve FAT/KOS civil fields directly; do not invent a timezone or
-     * convert them into POSIX epoch time. The undocumented KTIME tail and KOS
-     * creation timestamp remain private.
+     * Preserve the independently verified FAT/KOS last-modified civil fields
+     * directly; do not invent a timezone or convert them into POSIX epoch
+     * time. Creation/access timestamps and the undocumented KTIME tail remain
+     * private.
      */
     if (kos_date_valid(&raw.last_modifier.date) &&
         kos_time_valid(&raw.last_modifier.time)) {
         export_civil_datetime(&info->last_modified, &raw.last_modifier);
         info->time_validity |= HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID;
-    }
-    if (kos_date_valid(&raw.last_access_date)) {
-        export_civil_date(&info->last_access_date, &raw.last_access_date);
-        info->time_validity |= HPCLANG_STREAM_PATH_LAST_ACCESS_DATE_VALID;
     }
     return 0;
 }
