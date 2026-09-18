@@ -31,6 +31,7 @@ enum {
     KOS_FUNC_FSEEK = 4u,
     KOS_FUNC_FDELETE = 5u,
     KOS_FUNC_GETFILEINFO = 8u,
+    KOS_FUNC_FATTR = 15u,
     KOS_FUNC_GETSIZE = 16u,
     KOS_FUNC_CHECKINSERT = 17u,
     KOS_FUNC_CHECKPROTECT = 18u,
@@ -606,6 +607,27 @@ int unlink(const char *path)
     return 0;
 }
 
+static int stream_media_present(void)
+{
+    if (!stream_storage_available()) {
+        unsupported();
+        return -1;
+    }
+
+    uintptr_t addr = kos_entry(KOS_FUNC_CHECKINSERT);
+    if (addr == 0u) {
+        unsupported();
+        return -1;
+    }
+
+    int32_t result = (int32_t)((kos_fn0)addr)();
+    if (result < 0) {
+        set_kos_errno(result);
+        return -1;
+    }
+    return result != 0;
+}
+
 static int read_kos_path_info(
     const char *path,
     struct kos_file_info *raw)
@@ -640,18 +662,39 @@ int hpclang_stream_path_query(
     const char *path,
     struct hpclang_stream_path_info *info)
 {
-    if (info == NULL) {
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (path == NULL || info == NULL) {
         errno = EFAULT;
         return -1;
+    }
+
+    memset(info, 0, sizeof(*info));
+    info->size = sizeof(*info);
+    info->version = HPCLANG_STREAM_PATH_INFO_VERSION;
+
+    /*
+     * KOS GetSpecialFileInfo addresses directory entries. The volume root is
+     * not itself such an entry, so define "/" explicitly as the stream-volume
+     * root after verifying that media is present.
+     */
+    if (strcmp(path, "/") == 0) {
+        int present = stream_media_present();
+        if (present < 0)
+            return -1;
+        if (!present) {
+            errno = ENODEV;
+            return -1;
+        }
+        info->type = HPCLANG_STREAM_PATH_TYPE_DIRECTORY;
+        return 0;
     }
 
     struct kos_file_info raw;
     if (read_kos_path_info(path, &raw) != 0)
         return -1;
 
-    memset(info, 0, sizeof(*info));
-    info->size = sizeof(*info);
-    info->version = HPCLANG_STREAM_PATH_INFO_VERSION;
     info->byte_size = (uint64_t)raw.size;
 
     if ((raw.attribute & KOS_ATTR_DIRECTORY) != 0u) {
@@ -676,6 +719,63 @@ int hpclang_stream_path_query(
      * labels part of their layout as uncertain; M7.2 will only publish time
      * fields after independent Stock verification.
      */
+    return 0;
+}
+
+int hpclang_stream_path_set_attributes(
+    const char *path,
+    uint32_t attributes)
+{
+    const uint32_t supported =
+        HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY |
+        HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
+        HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM |
+        HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
+
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (path == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if ((attributes & ~supported) != 0u) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (strcmp(path, "/") == 0) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    struct kos_file_info raw;
+    if (read_kos_path_info(path, &raw) != 0)
+        return -1;
+
+    uint32_t attr = raw.attribute & (KOS_ATTR_VOLUME | KOS_ATTR_DIRECTORY);
+    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY) != 0u)
+        attr |= KOS_ATTR_READONLY;
+    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN) != 0u)
+        attr |= KOS_ATTR_HIDDEN;
+    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM) != 0u)
+        attr |= KOS_ATTR_SYSTEM;
+    if ((attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) != 0u)
+        attr |= KOS_ATTR_ARCHIVE;
+
+    uintptr_t addr = kos_entry(KOS_FUNC_FATTR);
+    if (addr == 0u)
+        return unsupported();
+
+    int32_t result = (int32_t)((kos_fn2)addr)(
+        (uint32_t)(uintptr_t)path,
+        attr);
+    if (result < 0) {
+        if (kos_open_error_is_missing(result)) {
+            errno = ENOENT;
+            return -1;
+        }
+        return set_kos_errno(result);
+    }
     return 0;
 }
 
@@ -743,16 +843,15 @@ int hpclang_stream_storage_query(
     info->size = sizeof(*info);
     info->version = HPCLANG_STREAM_STORAGE_INFO_VERSION;
 
-    uintptr_t insert_addr = kos_entry(KOS_FUNC_CHECKINSERT);
     uintptr_t protect_addr = kos_entry(KOS_FUNC_CHECKPROTECT);
     uintptr_t size_addr = kos_entry(KOS_FUNC_GETSIZE);
-    if (insert_addr == 0u || protect_addr == 0u || size_addr == 0u)
+    if (protect_addr == 0u || size_addr == 0u)
         return unsupported();
 
-    int32_t inserted = (int32_t)((kos_fn0)insert_addr)();
-    if (inserted < 0)
-        return set_kos_errno(inserted);
-    if (inserted == 0)
+    int present = stream_media_present();
+    if (present < 0)
+        return -1;
+    if (!present)
         return 0;
 
     info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
