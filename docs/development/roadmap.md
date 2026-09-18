@@ -229,6 +229,10 @@ Historical baseline:
 - [ ] support path-based traversal without leaking or permanently changing the calculator OS's global current-directory state; KOS enumeration is current-directory based and exposes no matching `getcwd` for lossless restoration;
 - [ ] add `chdir/getcwd` only if their Stock-global side effects can be contained/restored; otherwise prefer explicit-directory handles backed by an independent namespace implementation and document the migration;
 - [ ] decide whether the missing namespace operations justify an ownership-safe FAT backend/lease rather than copying HPGCC's direct-controller assumptions into the common API;
+  - if an independent backend is adopted, treat it as a **whole-process stream-namespace lease**: do not keep Stock-KOS file handles live while another backend mutates FAT state; mount/use one namespace implementation consistently, unmount/release it before return, then explicitly reinitialize the Stock filesystem;
+  - historical HPGCC documents syscall 19 (`kos_ResetSD`) as the Stock-filesystem reinitialization step after FSystem use. Any direct-SD backend must validate this acquire/release contract in Stock E2E rather than assuming process exit repairs controller/cache state;
+  - HPGCC3 FSystem is behavior evidence only and cannot be copied into hpclang under its redistribution-restricted license. A direct backend must be independently implemented from hardware/protocol documentation and suitably licensed components;
+  - current clean-room candidate: a pinned, patched FatFs release for the FAT namespace plus an hpclang-owned S3C2410 SDIO block driver. Prefer one volume, FAT12/16/32, UTF-8 LFN, explicit paths (`FF_FS_RPATH=0`), no exFAT/mkfs initially, and fixed/predictable memory. This is a candidate architecture, not yet an accepted dependency;
 - [ ] validate long-name/case behavior actually provided by each backend instead of promising the broader HPGCC FSystem semantics by assumption.
 
 #### M7.2d — HPGCC parity adapter boundary

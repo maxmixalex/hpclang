@@ -10,9 +10,11 @@ The default implementation policy is therefore independent reimplementation from
 
 ## HPGCC3
 
-HPGCC3 uses a separate license with redistribution restrictions. hpclang must not vendor its runtime/library implementation.
+HPGCC3 uses a separate 2011 license with redistribution restrictions. The license explicitly prohibits redistribution of the Software in whole or in part except for narrow cases, and its source-use exception is limited to files distributed in the INCLUDE and EXAMPLES subdirectories. hpclang must therefore not vendor or derive implementation code from HPGCC3 runtime/library directories such as `fsystem/common` or its SD driver.
 
-It may be used to understand public behavior, identify architectural ideas, and design independently implemented compatible APIs.
+HPGCC3 may be used to understand documented/public behavior, identify architectural ideas, and design independently implemented compatible APIs. In particular, FSystem is evidence that full directory/rename/LFN functionality was historically possible and `kos_ResetSD` documents an OS-filesystem reset boundary after FSystem use; neither fact grants permission to copy the implementation.
+
+If hpclang later adopts an independent FAT implementation, its license and exact vendored version/patch level must be recorded separately. A permissively redistributable implementation such as FatFs can be evaluated, but the hpclang device/ownership layer must remain a fresh implementation rather than a transcription of HPGCC3's SD/FAT code.
 
 ## HP tools and binary assets
 
