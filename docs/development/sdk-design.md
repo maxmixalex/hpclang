@@ -113,7 +113,7 @@ The core does not define semantic UI font roles. Historical native accessor name
 
 Font Gallery is deliberately a **separate HPC1 E2E application**. It exercises native fonts, generated aliases/arbitrary faces, metrics, representative repertoire, and both 64- and 80-line layouts without expanding the canonical runtime/keyboard/storage payload. Its specimen text is part of the visual test contract and now includes face-sensitive width, punctuation, accented Latin, digits/symbols, and supported CJK/Japanese/Korean samples rather than one weak generic phrase.
 
-The Gallery evidence UI is also part of the test surface. Formal closure is `E2E / Font Gallery` **35295358487 / #111**. HP39gs/40gs Direct expose 245 generated faces + mini/main/EditLine for **248 entries / 496 captures**; HP48gII/49g+/50g retain 245 generated + minifont/bigfont for **247 / 494**. Stock hp39gs/hp40gs additionally verify the EditLine ROM fingerprint/pixels, while HP48gII/HP50g retain live-Saturn native evidence.
+The Gallery evidence UI is also part of the test surface. Final M7.1 closure is `E2E / Font Gallery` **35298949457 / #112**. HP39gs/40gs Direct expose 245 generated faces + mini/main/EditLine for **248 entries / 496 captures**; HP48gII/49g+/50g retain 245 generated + minifont/bigfont for **247 / 494**. Stock hp39gs/hp40gs additionally verify the EditLine ROM fingerprint/pixels, while HP48gII/HP50g retain live-Saturn native evidence.
 
 ### HPG compatibility consequence
 
@@ -184,4 +184,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-The font architecture, asset curation, and validation evidence are closed on `m7-fonts-gallery`: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, and Gallery #55 is fully green. Repository integration and the independent HP48 visible Stock-return repaint issue remain separate follow-ups. The next new SDK service remains the typed calculator object-store design. HPGCC compatibility adapters remain downstream of stable clean-core services.
+M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. The HP48 visible Stock-return repaint is closed as part of the canonical runtime gate. The next new SDK service remains the typed calculator object-store design; HPGCC compatibility adapters remain downstream of stable clean-core services.
