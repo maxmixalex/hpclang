@@ -345,7 +345,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x5cu;
 
     struct hpclang_stream_path_info directory_info;
-    if (hpclang_stream_path_query("HPCLANG.DIR", &directory_info) != 0 ||
+    if (hpclang_stream_path_query("ZZHPDIR", &directory_info) != 0 ||
         directory_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return 0x68u;
 
