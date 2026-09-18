@@ -112,7 +112,10 @@ python3 "$ROOT/tests/e2e/harness/verify-hp39-native-font.py" \
         "$ROOT/build/$TARGET-stock-gallery-native-mini-other.pgm" \
     --main \
         "$ROOT/build/$TARGET-stock-gallery-native-main.pgm" \
-        "$ROOT/build/$TARGET-stock-gallery-native-main-other.pgm"
+        "$ROOT/build/$TARGET-stock-gallery-native-main-other.pgm" \
+    --editline \
+        "$ROOT/build/$TARGET-stock-gallery-native-editline.pgm" \
+        "$ROOT/build/$TARGET-stock-gallery-native-editline-other.pgm"
 
 kill "$KERMIT_PID" 2>/dev/null || true
 wait "$KERMIT_PID" 2>/dev/null || true
@@ -126,6 +129,7 @@ done
 FRAMES=(
     "$ROOT/build/$TARGET-stock-gallery-native-mini.pgm"
     "$ROOT/build/$TARGET-stock-gallery-native-main.pgm"
+    "$ROOT/build/$TARGET-stock-gallery-native-editline.pgm"
     "$ROOT/build/$TARGET-stock-gallery-generated-control.pgm"
 )
 
@@ -154,7 +158,7 @@ for raw in sys.argv[1:]:
     print(f"PASS nonblank HP39 Stock Gallery capture: {path.name}")
 
 if len(set(digests)) != len(digests):
-    raise SystemExit("HP39 Stock Gallery mini/main/control captures are not distinct")
+    raise SystemExit("HP39 Stock Gallery mini/main/editline/control captures are not distinct")
 PY
 
 MERGED="$ROOT/build/$TARGET-font-gallery.pgm"

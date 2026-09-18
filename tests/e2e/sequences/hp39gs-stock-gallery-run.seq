@@ -34,6 +34,10 @@
 440000 capture native-main
 443000 tap enter
 446000 capture native-main-other
-449000 tap right
-452000 capture generated-control
-455000 tap on
+449000 tap down
+452000 capture native-editline
+455000 tap enter
+458000 capture native-editline-other
+461000 tap right
+464000 capture generated-control
+467000 tap on
