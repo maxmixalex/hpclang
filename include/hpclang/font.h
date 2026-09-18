@@ -24,23 +24,29 @@ struct hpclang_surface;
 struct hpclang_font;
 
 /*
- * Calculator-native fonts. No calculator glyph bitmap is embedded in the
+ * Calculator-native ROM fonts. No calculator glyph bitmap is embedded in the
  * application and hpclang does not redistribute stock-ROM font data.
  *
- * The platform lookup is intentionally private. HP39/40 native raster tables
- * are fixed physical stock-flash assets and are read through the physical ARM
- * flash view. HP48gII/49g+/50g native fonts are stock Saturn objects resolved
- * through the launch-provided logical Read[] mapping. Both mechanisms expose
- * the same borrowed hpclang_font interface to applications.
+ * These accessors name concrete historical calculator fonts; they are not a
+ * semantic UI-role layer. Applications remain free to use any native or
+ * generated font for any purpose.
  *
- * default is the calculator's normal/main text font. mini and big expose the
- * two native text sizes used by the stock environments; on HP39-family
- * calculators big is the 5x8 main font and mini is the proportional small
- * font. On HP48gII/49g+/50g they map to the stock minifont and bigfont.
+ * default is a convenience selection for the calculator's normal text:
+ * HP39-family main 5x8, HP48gII/49g+/50g bigfont.
+ *
+ * mini exposes the stock minifont on every currently supported family.
+ *
+ * big exposes only the historical HP48gII/49g+/50g bigfont (8 raster rows,
+ * nominal advance 6). It returns NULL on the HP39 family.
+ *
+ * editline exposes the dedicated HP39gs/40gs fixed 6x10 EditLine ROM font.
+ * It returns NULL on HP48gII/49g+/50g and on HP39g+ until that model has a
+ * trustworthy full-flash fixture.
  */
 const struct hpclang_font *hpclang_font_default(void);
 const struct hpclang_font *hpclang_font_mini(void);
 const struct hpclang_font *hpclang_font_big(void);
+const struct hpclang_font *hpclang_font_editline(void);
 
 /* Line metrics. advance is the nominal/fixed advance; proportional bitmap
  * fonts should use hpclang_font_codepoint_advance() when laying out text. */

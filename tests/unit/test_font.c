@@ -76,22 +76,37 @@ int main(void)
 {
     const struct hpclang_font *mini = hpclang_font_mini();
     const struct hpclang_font *big = hpclang_font_big();
+    const struct hpclang_font *editline = hpclang_font_editline();
     if (hpclang_font_default() != big ||
+        editline != NULL ||
         hpclang_font_height(mini) != 6u ||
         hpclang_font_advance(mini) != 4u ||
         hpclang_font_height(big) != 8u ||
         hpclang_font_advance(big) != 6u)
-        fail("HP50 system font metrics");
+        fail("HP50 native font metrics");
 
     fake_boot.model = HPCLANG_MODEL_HP39GS;
     mini = hpclang_font_mini();
     big = hpclang_font_big();
-    if (hpclang_font_default() != big ||
+    editline = hpclang_font_editline();
+    const struct hpclang_font *main_font = hpclang_font_default();
+    if (big != NULL ||
+        editline == NULL ||
+        main_font == NULL ||
         hpclang_font_height(mini) != 5u ||
         hpclang_font_advance(mini) != 4u ||
-        hpclang_font_height(big) != 8u ||
-        hpclang_font_advance(big) != 6u)
-        fail("HP39 system font metrics");
+        hpclang_font_height(main_font) != 8u ||
+        hpclang_font_advance(main_font) != 6u ||
+        hpclang_font_height(editline) != 10u ||
+        hpclang_font_advance(editline) != 6u)
+        fail("HP39 native font metrics");
+
+    fake_boot.model = HPCLANG_MODEL_HP39GPLUS;
+    if (hpclang_font_big() != NULL ||
+        hpclang_font_editline() != NULL ||
+        hpclang_font_default() == NULL)
+        fail("HP39g+ native font availability");
+    fake_boot.model = HPCLANG_MODEL_HP39GS;
 
     /* A missing or stale private-window cookie must never be dereferenced.
      * The native mini-font reader fails closed to its nominal advance. The
@@ -144,6 +159,6 @@ int main(void)
     expect_pixel(surface, 1, 1, 255u);
 
     hpclang_surface_destroy(surface);
-    puts("PASS: native-font roles, packaged bitmap metrics, UTF-8 and fallback.");
+    puts("PASS: native ROM fonts, packaged bitmap metrics, UTF-8 and fallback.");
     return EXIT_SUCCESS;
 }
