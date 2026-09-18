@@ -23,6 +23,8 @@
 #define FAIL_PREFIX 0x46410000u
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define PHASE_KEYBOARD_ACK 0x4b410000u
+#define PHASE_STORAGE_DIRECTORY_READY 0x53445244u /* SDRD */
+#define STORAGE_DIRECTORY_WITNESS "ZZHPDIR"
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
@@ -51,6 +53,7 @@ struct state {
     int saw_before;
     int saw_pass;
     int payload_keyboard_scheduled;
+    int storage_directory_injected;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
     int return_mapping_restored;
@@ -595,6 +598,27 @@ static int hp48_wait_for_stage_teardown(struct state *s)
     return 1;
 }
 
+static int inject_storage_directory_witness(void)
+{
+    const char *root = getenv("HPCLANG_X50NG_SD_DIR");
+    char path[512];
+
+    if (root == NULL || *root == '\0')
+        return 0;
+    if (snprintf(
+            path, sizeof(path), "%s/%s",
+            root, STORAGE_DIRECTORY_WITNESS) >= (int)sizeof(path))
+        return 0;
+
+    if (mkdir(path, 0777) != 0 && errno != EEXIST)
+        return 0;
+
+    fprintf(stderr,
+            "stock launcher: SDRD observed; injected host SD directory %s\n",
+            path);
+    return 1;
+}
+
 static void monitor(void *arg)
 {
     struct state *s = arg;
@@ -621,6 +645,15 @@ static void monitor(void *arg)
     }
 
     readable = guest_read32(s->hdw, s->result_addr, &value);
+
+    if (!s->storage_directory_injected && readable &&
+        value == PHASE_STORAGE_DIRECTORY_READY) {
+        if (!inject_storage_directory_witness()) {
+            fail(s, "storage-directory-injection");
+            return;
+        }
+        s->storage_directory_injected = 1;
+    }
 
     if (!s->payload_keyboard_scheduled && readable &&
         value == PHASE_KEYBOARD_READY) {
@@ -764,40 +797,6 @@ static void seq_capture(void *arg)
     free(event);
 }
 
-static void seq_host_mkdir(void *arg)
-{
-    struct seq_named_event *event = arg;
-    struct state *s = event->state;
-    const char *root = getenv("HPCLANG_X50NG_SD_DIR");
-    char path[512];
-
-    if (root == NULL || *root == '\0' ||
-        event->text[0] == '\0' ||
-        strchr(event->text, '/') != NULL ||
-        strchr(event->text, '\\') != NULL ||
-        strstr(event->text, "..") != NULL) {
-        free(event);
-        fail(s, "host-mkdir-path");
-        return;
-    }
-
-    if (snprintf(path, sizeof(path), "%s/%s", root, event->text) >=
-        (int)sizeof(path)) {
-        free(event);
-        fail(s, "host-mkdir-path");
-        return;
-    }
-
-    if (mkdir(path, 0777) != 0 && errno != EEXIST) {
-        free(event);
-        fail(s, "host-mkdir");
-        return;
-    }
-
-    fprintf(stderr, "stock launcher: injected host SD directory %s\n", path);
-    free(event);
-}
-
 static void seq_fail(void *arg)
 {
     struct seq_named_event *event = arg;
@@ -869,12 +868,6 @@ static int schedule_sequence(struct state *s, const char *path)
         } else if (strcmp(op, "capture") == 0 && fields == 3) {
             struct seq_named_event *event = seq_named_event_new(s, first);
             if (!event || !later(seq_capture, event, us)) {
-                free(event);
-                goto invalid_action;
-            }
-        } else if (strcmp(op, "host-mkdir") == 0 && fields == 3) {
-            struct seq_named_event *event = seq_named_event_new(s, first);
-            if (!event || !later(seq_host_mkdir, event, us)) {
                 free(event);
                 goto invalid_action;
             }
