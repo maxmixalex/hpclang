@@ -22,14 +22,14 @@
 12100 capture copy-result
 12600 tap f4
 13900 capture recalled-in-filer
-14300 tap nxt
-14700 tap nxt
-15500 capture filer-halt-menu
-15900 tap f1
-17200 capture payload-recalled
-17700 chord rshift two
-18950 capture lib
-19300 tap f1
-20600 capture armtoolbox
-21000 tap f1
-21300 monitor
+14400 tap nxt
+15100 tap nxt
+16000 capture filer-halt-menu
+16400 tap f1
+17700 capture payload-recalled
+18200 chord rshift two
+19450 capture lib
+19800 tap f1
+21100 capture armtoolbox
+21500 tap f1
+21800 monitor 20000
