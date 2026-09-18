@@ -117,9 +117,13 @@ HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage tear
 
 ## HP49g+/50g stream-storage and Stock gate
 
-M7.2 validates storage through standard picolibc stdio rather than a public KOS API. HP49g+/HP50g Stock tests cover read, create/truncate, write/flush, seek/ftell, reread, close/reopen, remove and `ENOENT`. HP39/40 and HP48 must reject unsupported byte-stream operations cleanly with `ENOSYS`.
+M7.2 keeps standard byte-stream I/O in picolibc and exposes only typed metadata/media queries above the private KOS backend. HP49g+/HP50g Stock tests cover read, create/truncate, write/flush, seek/ftell, reread, close/reopen, append/create, remove and `ENOENT`; path size/type/portable attributes; synthetic root plus a real named-directory entry; media-present/read-only state; free bytes; and a fixed last-modified FAT/KOS civil datetime. HP39/40 and HP48 reject unsupported byte-stream and stream metadata/media operations cleanly with `ENOSYS`.
 
-The hp4950 Stock family uses each model's native ARM bootloader with the shared official 2.15 OS image, installs ARMToolbox/library 275 from emulated SD, copies `HPCLANG.HP` through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires the canonical PASS result.
+Stock diagnostics established an important backend rule: repeated KOS `CHECKINSERT` during one HP49g+ native launch can corrupt the return path, while one insertion probe followed by `GETSIZE` is return-safe. The production backend therefore samples insertion and write-protect state lazily once per native launch and reuses that snapshot; free bytes are queried per call. This is a deliberate host-preservation contract, not a generic hot-plug monitor.
+
+Storage #22 (`35378151818`) is fully green across Build, Direct hp39/hp48/hp4950, and Stock hp4950. Both HP49g+ and HP50g reach HPC1 PASS, release the ARMToolbox stage alias, accept a Stock-owned repaint, and finish PASS. The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06 UTC`; only the resulting last-modified civil fields are public. Creation/access timestamp semantics remain private because validity alone is not enough to establish their application meaning.
+
+The hp4950 Stock family uses each model's native ARM bootloader with the shared official 2.15 OS image, installs ARMToolbox/library 275 from emulated SD, copies `HPCLANG.HP` through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires payload PASS plus stage teardown and visible Stock return.
 
 ## Evidence retention
 

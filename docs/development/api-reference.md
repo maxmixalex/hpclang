@@ -35,6 +35,7 @@ The application-facing surface currently includes:
 - `<hpclang/display.h>` and `<hpclang/display.hpp>`
 - `<hpclang/font.h>`
 - `<hpclang/font-package.h>` for generated bitmap-font descriptors/build products
+- `<hpclang/storage.h>` for HP49g+/HP50g byte-stream metadata/media queries
 
 ## Execution and device identity
 
@@ -155,6 +156,18 @@ hpclang distinguishes byte streams from typed calculator objects.
 | calculator object store | HP39gs/40gs format/protocol known; API not implemented | typed/named object API; do not flatten into `FILE *` |
 | RPL/Saturn objects | HP48/49/50 historical platform capability; API not implemented | M7.3 typed object/stack bridge |
 
+The byte-stream metadata layer is also public and typed rather than exposing KOS structures:
+
+| API | Status | Contract |
+| --- | --- | --- |
+| `hpclang_stream_path_query()` | ✅ | Versioned size/type/portable-attribute metadata plus validity-gated last-modified civil datetime. `/` is the synthetic stream-volume root; real named-directory entries are independently Stock-validated. |
+| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID` | ✅ | The civil timestamp is usable only when this bit is set. FAT/KOS local civil fields are preserved directly; no timezone or epoch is invented. |
+| `hpclang_stream_storage_query()` | ✅ | Media-present/read-only flags and validity-gated free bytes. Stock insertion/protect state is sampled once per native launch; re-enter the native app to resample hot-plug/protect changes. |
+| `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query; total capacity remains unavailable unless a future backend can establish it safely. |
+| `rename()` | ◐ | Explicit `ENOTSUP` on the Stock backend because KOS function 6 returns the historical `-200`; hpclang does not fake atomic rename with copy+delete. |
+
+Creation/access timestamps, KOS extended attributes, raw handles/module IDs, and total-capacity internals remain private or unsupported rather than being inferred from uncertain historical behavior.
+
 The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current directory. These names describe the stock object-store protocol, not a general POSIX filesystem.
 
 ## Validation by service
@@ -169,7 +182,7 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 | native font/text | ✅ | ✅ | Gallery #112 (`35298949457`) covers all Direct families; HP39 mini/main/EditLine pixels are validated through the physical-ROM path | Stock hp39gs/hp40gs/hp48gII/hp50g all green with settled return |
 | generated font selection | ✅ configure | ✅ | Gallery #112 exhaustively traverses all **245 generated faces** on all five automated targets | HP39gs/40gs/HP48gII/HP50g Stock generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
-| hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
+| hp4950 stream storage | — | ✅ | non-stream families reject unsupported stream/metadata/media access cleanly | ✅ Storage #22: HP49g+/HP50g stdio, size/type/attributes, named directory, media/free-space snapshot semantics, fixed last-modified civil timestamp, stage teardown and Stock repaint |
 
 Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
@@ -257,6 +270,11 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | heap-backed libc/C++ containers | ✅ |
 | HP49g+/HP50g file open/read/write/seek/close | ✅ through picolibc |
 | create/truncate/append/remove/ENOENT | ✅ Stock E2E |
+| size/type/portable path attributes | ✅ versioned typed query; file/root/named-directory Stock evidence |
+| media present/read-only + free bytes | ✅ typed query; physical media state snapshotted once per native launch |
+| last-modified timestamp | ✅ validity-gated FAT/KOS civil datetime; no timezone/epoch claim |
+| total capacity | ◐ explicitly unavailable on the Stock KOS backend |
+| rename | ◐ explicit `ENOTSUP`; native KOS primitive measured broken |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | directory iteration | ⬜ |
 | HPGCC2/3 `FS*` adapter | ⬜ |
