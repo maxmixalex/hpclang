@@ -11,6 +11,11 @@ TARGET="$1"
 APP_DIR="$(realpath "$2")"
 export TARGET
 
+case "$TARGET" in
+    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    *) NATIVE_FACE_COUNT=2 ;;
+esac
+
 while IFS= read -r line; do
     export "$line"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
@@ -117,10 +122,12 @@ if [[ "$TARGET" == hp39gs || "$TARGET" == hp40gs ]]; then
     python3 "$ROOT/tests/e2e/harness/verify-hp39-native-font.py" \
         "$TARGET" "$FLASH" \
         --mini "$FRAMES/0000-sample.pgm" "$FRAMES/0000-text.pgm" \
-        --main "$FRAMES/0001-sample.pgm" "$FRAMES/0001-text.pgm"
+        --main "$FRAMES/0001-sample.pgm" "$FRAMES/0001-text.pgm" \
+        --editline "$FRAMES/0002-sample.pgm" "$FRAMES/0002-text.pgm"
 fi
 
-python3 "$ROOT/tests/e2e/harness/verify-gallery-content.py" "$FRAMES"
+python3 "$ROOT/tests/e2e/harness/verify-gallery-content.py" \
+    "$FRAMES" --native-face-count "$NATIVE_FACE_COUNT"
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm "$FRAMES"/*.pgm; do
     [[ -f "$pgm" ]] || continue
