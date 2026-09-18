@@ -69,9 +69,14 @@ static int fail(int code)
     return code;
 }
 
+static uint32_t native_face_count(void)
+{
+    return hpclang_font_editline() != NULL ? 3u : 2u;
+}
+
 static uint32_t gallery_count(void)
 {
-    return hpclang_gallery_face_count + 2u;
+    return hpclang_gallery_face_count + native_face_count();
 }
 
 static struct gallery_view gallery_at(uint32_t index)
@@ -86,8 +91,12 @@ static struct gallery_view gallery_at(uint32_t index)
         return view;
     }
     if (index == 1u) {
+        const struct hpclang_font *font = hpclang_font_default();
+        const char *name = hpclang_font_big() == font
+            ? "calculator bigfont"
+            : "calculator main font";
         const struct gallery_view view = {
-            "Native", "calculator main font", hpclang_font_default(),
+            "Native", name, font,
             native_specimen,
             (uint32_t)(sizeof(native_specimen) / sizeof(native_specimen[0])),
             1u, SPECIMEN_GENERIC, 1u,
@@ -95,7 +104,20 @@ static struct gallery_view gallery_at(uint32_t index)
         return view;
     }
 
-    const struct hpclang_gallery_face *face = &hpclang_gallery_faces[index - 2u];
+    const struct hpclang_font *editline = hpclang_font_editline();
+    if (index == 2u && editline != NULL) {
+        const struct gallery_view view = {
+            "Native", "calculator EditLine font", editline,
+            native_specimen,
+            (uint32_t)(sizeof(native_specimen) / sizeof(native_specimen[0])),
+            1u, SPECIMEN_GENERIC, 1u,
+        };
+        return view;
+    }
+
+    uint32_t native_count = editline != NULL ? 3u : 2u;
+    const struct hpclang_gallery_face *face =
+        &hpclang_gallery_faces[index - native_count];
     const struct gallery_view view = {
         face->family,
         face->face,

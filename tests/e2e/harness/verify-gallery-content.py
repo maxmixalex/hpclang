@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 
 FRAME_RE = re.compile(r"^(\d+)-(sample|text)\.pgm$")
-NATIVE_FACE_COUNT = 2
 LCD_WIDTH = 131
 CONTENT_LEFT = 13
 CONTENT_RIGHT = 118
@@ -51,7 +50,11 @@ def main() -> None:
         description="Verify generated Font Gallery pages paint the content rectangle"
     )
     parser.add_argument("frames", type=Path)
+    parser.add_argument("--native-face-count", type=int, default=2)
     args = parser.parse_args()
+
+    if args.native_face_count < 0:
+        raise SystemExit("--native-face-count must be non-negative")
 
     if not args.frames.is_dir():
         raise SystemExit(f"Gallery frame directory not found: {args.frames}")
@@ -62,7 +65,7 @@ def main() -> None:
         if not match:
             continue
         index = int(match.group(1))
-        if index < NATIVE_FACE_COUNT:
+        if index < args.native_face_count:
             continue
         pages.setdefault(index, {})[match.group(2)] = path
 
