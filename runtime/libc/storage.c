@@ -32,6 +32,8 @@ enum {
     KOS_FUNC_FDELETE = 5u,
     KOS_FUNC_GETFILEINFO = 8u,
     KOS_FUNC_GETSIZE = 16u,
+    KOS_FUNC_CHECKINSERT = 17u,
+    KOS_FUNC_CHECKPROTECT = 18u,
 
     KOS_FILE_READONLY = 1u,
     KOS_FILE_READWRITE = 2u,
@@ -55,7 +57,11 @@ typedef uint32_t (*kos_fn3)(uint32_t, uint32_t, uint32_t);
 
 enum {
     KOS_ATTR_READONLY = 1u << 0,
-    KOS_ATTR_DIRECTORY = 1u << 4
+    KOS_ATTR_HIDDEN = 1u << 1,
+    KOS_ATTR_SYSTEM = 1u << 2,
+    KOS_ATTR_VOLUME = 1u << 3,
+    KOS_ATTR_DIRECTORY = 1u << 4,
+    KOS_ATTR_ARCHIVE = 1u << 5
 };
 
 struct kos_date {
@@ -600,12 +606,14 @@ int unlink(const char *path)
     return 0;
 }
 
-int stat(const char *path, struct stat *info)
+static int read_kos_path_info(
+    const char *path,
+    struct kos_file_info *raw)
 {
     if (!stream_storage_available())
         return unsupported();
 
-    if (path == NULL || info == NULL) {
+    if (path == NULL || raw == NULL) {
         errno = EFAULT;
         return -1;
     }
@@ -614,11 +622,10 @@ int stat(const char *path, struct stat *info)
     if (addr == 0u)
         return unsupported();
 
-    struct kos_file_info raw;
-    memset(&raw, 0, sizeof(raw));
+    memset(raw, 0, sizeof(*raw));
     int32_t result = (int32_t)((kos_fn2)addr)(
         (uint32_t)(uintptr_t)path,
-        (uint32_t)(uintptr_t)&raw);
+        (uint32_t)(uintptr_t)raw);
     if (result < 0) {
         if (kos_open_error_is_missing(result)) {
             errno = ENOENT;
@@ -626,42 +633,172 @@ int stat(const char *path, struct stat *info)
         }
         return set_kos_errno(result);
     }
+    return 0;
+}
+
+int hpclang_stream_path_query(
+    const char *path,
+    struct hpclang_stream_path_info *info)
+{
+    if (info == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    struct kos_file_info raw;
+    if (read_kos_path_info(path, &raw) != 0)
+        return -1;
 
     memset(info, 0, sizeof(*info));
-    info->st_mode =
-        (raw.attribute & KOS_ATTR_DIRECTORY) != 0u ? S_IFDIR : S_IFREG;
-    info->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
-    if ((raw.attribute & KOS_ATTR_READONLY) == 0u)
-        info->st_mode |= S_IWUSR;
-    info->st_nlink = 1;
-    info->st_size = (off_t)raw.size;
+    info->size = sizeof(*info);
+    info->version = HPCLANG_STREAM_PATH_INFO_VERSION;
+    info->byte_size = (uint64_t)raw.size;
+
+    if ((raw.attribute & KOS_ATTR_DIRECTORY) != 0u) {
+        info->type = HPCLANG_STREAM_PATH_TYPE_DIRECTORY;
+    } else if ((raw.attribute & KOS_ATTR_VOLUME) != 0u) {
+        info->type = HPCLANG_STREAM_PATH_TYPE_VOLUME_LABEL;
+    } else {
+        info->type = HPCLANG_STREAM_PATH_TYPE_FILE;
+    }
+
+    if ((raw.attribute & KOS_ATTR_READONLY) != 0u)
+        info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY;
+    if ((raw.attribute & KOS_ATTR_HIDDEN) != 0u)
+        info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN;
+    if ((raw.attribute & KOS_ATTR_SYSTEM) != 0u)
+        info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM;
+    if ((raw.attribute & KOS_ATTR_ARCHIVE) != 0u)
+        info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
 
     /*
-     * Do not publish KOS timestamp fields yet. Historical HPGCC labels parts
-     * of this structure as uncertain; M7.2 will verify date/time encoding
-     * independently before translating it into POSIX time_t.
+     * KOS timestamp fields remain intentionally private. Historical HPGCC
+     * labels part of their layout as uncertain; M7.2 will only publish time
+     * fields after independent Stock verification.
+     */
+    return 0;
+}
+
+int stat(const char *path, struct stat *info)
+{
+    if (info == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    struct hpclang_stream_path_info path_info;
+    if (hpclang_stream_path_query(path, &path_info) != 0)
+        return -1;
+
+    memset(info, 0, sizeof(*info));
+    if (path_info.type == HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        info->st_mode = S_IFDIR;
+    else
+        info->st_mode = S_IFREG;
+
+    info->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
+    if ((path_info.attributes &
+         HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY) == 0u)
+        info->st_mode |= S_IWUSR;
+
+    info->st_nlink = 1;
+    info->st_size = (off_t)path_info.byte_size;
+    return 0;
+}
+
+int rename(const char *old_path, const char *new_path)
+{
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (old_path == NULL || new_path == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    /*
+     * Stock 2.15 on both HP49g+ and HP50g reproduces the historical HPGCC
+     * warning for KOS filesystem function 6: the native rename primitive
+     * fails with the undocumented -200 result. Do not fake POSIX rename with
+     * copy+delete: that would not be atomic and would lose metadata/object
+     * identity. Keep the standard API deterministic until a safe Stock
+     * primitive or ownership-safe filesystem backend exists.
+     */
+    errno = ENOTSUP;
+    return -1;
+}
+
+int hpclang_stream_storage_query(
+    struct hpclang_stream_storage_info *info)
+{
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (info == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    memset(info, 0, sizeof(*info));
+    info->size = sizeof(*info);
+    info->version = HPCLANG_STREAM_STORAGE_INFO_VERSION;
+
+    uintptr_t insert_addr = kos_entry(KOS_FUNC_CHECKINSERT);
+    uintptr_t protect_addr = kos_entry(KOS_FUNC_CHECKPROTECT);
+    uintptr_t size_addr = kos_entry(KOS_FUNC_GETSIZE);
+    if (insert_addr == 0u || protect_addr == 0u || size_addr == 0u)
+        return unsupported();
+
+    int32_t inserted = (int32_t)((kos_fn0)insert_addr)();
+    if (inserted < 0)
+        return set_kos_errno(inserted);
+    if (inserted == 0)
+        return 0;
+
+    info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
+
+    int32_t protected = (int32_t)((kos_fn0)protect_addr)();
+    if (protected < 0)
+        return set_kos_errno(protected);
+    if (protected != 0)
+        info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_READ_ONLY;
+
+    int32_t free_bytes = (int32_t)((kos_fn0)size_addr)();
+    if (free_bytes < 0)
+        return set_kos_errno(free_bytes);
+
+    info->free_bytes = (uint64_t)(uint32_t)free_bytes;
+    info->flags |= HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID;
+
+    /*
+     * HPGCC FSystem computes total capacity from raw FAT/SD metadata after
+     * taking direct SD-controller ownership. Stock KOS exposes no equivalent
+     * safe total-capacity query. Leave capacity explicitly unavailable rather
+     * than touching the controller behind the Stock OS.
      */
     return 0;
 }
 
 int hpclang_stream_storage_free_bytes(uint64_t *bytes)
 {
-    if (!stream_storage_available())
-        return unsupported();
-
     if (bytes == NULL) {
         errno = EFAULT;
         return -1;
     }
 
-    uintptr_t addr = kos_entry(KOS_FUNC_GETSIZE);
-    if (addr == 0u)
-        return unsupported();
+    struct hpclang_stream_storage_info info;
+    if (hpclang_stream_storage_query(&info) != 0)
+        return -1;
 
-    int32_t result = (int32_t)((kos_fn0)addr)();
-    if (result < 0)
-        return set_kos_errno(result);
+    if ((info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u) {
+        errno = ENODEV;
+        return -1;
+    }
+    if ((info.flags & HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u) {
+        errno = ENOTSUP;
+        return -1;
+    }
 
-    *bytes = (uint64_t)(uint32_t)result;
+    *bytes = info.free_bytes;
     return 0;
 }

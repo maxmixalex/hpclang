@@ -257,17 +257,35 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         if (errno != ENOSYS)
             return 0x32u;
 
-        struct stat unavailable_info;
+        struct stat unavailable_stat;
         errno = 0;
-        if (stat("HPCLANG.TST", &unavailable_info) == 0 ||
+        if (stat("HPCLANG.TST", &unavailable_stat) == 0 ||
             errno != ENOSYS)
             return 0x53u;
+
+        struct hpclang_stream_path_info unavailable_path;
+        errno = 0;
+        if (hpclang_stream_path_query(
+                "HPCLANG.TST", &unavailable_path) == 0 ||
+            errno != ENOSYS)
+            return 0x54u;
+
+        struct hpclang_stream_storage_info unavailable_storage;
+        errno = 0;
+        if (hpclang_stream_storage_query(&unavailable_storage) == 0 ||
+            errno != ENOSYS)
+            return 0x55u;
 
         uint64_t unavailable_free = 0u;
         errno = 0;
         if (hpclang_stream_storage_free_bytes(&unavailable_free) == 0 ||
             errno != ENOSYS)
-            return 0x54u;
+            return 0x56u;
+
+        errno = 0;
+        if (rename("HPCLANG.A", "HPCLANG.B") == 0 ||
+            errno != ENOSYS)
+            return 0x57u;
 
         return 0u;
     }
@@ -299,17 +317,46 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (errno != ENOENT)
         return 0x43u;
 
+    struct hpclang_stream_path_info path_info;
+    if (hpclang_stream_path_query("HPCLANG.TST", &path_info) != 0)
+        return 0x58u;
+    if (path_info.version != HPCLANG_STREAM_PATH_INFO_VERSION ||
+        path_info.size < sizeof(path_info) ||
+        path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+        path_info.byte_size != sizeof(input_expected) - 1u)
+        return 0x59u;
+
     struct stat input_info;
     if (stat("HPCLANG.TST", &input_info) != 0)
-        return 0x55u;
+        return 0x5au;
     if (!S_ISREG(input_info.st_mode) ||
         input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
-        return 0x56u;
+        return 0x5bu;
+
+    struct hpclang_stream_path_info root_info;
+    if (hpclang_stream_path_query("/", &root_info) != 0 ||
+        root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        return 0x5cu;
+
+    struct hpclang_stream_storage_info storage_info;
+    if (hpclang_stream_storage_query(&storage_info) != 0)
+        return 0x5du;
+    if (storage_info.version != HPCLANG_STREAM_STORAGE_INFO_VERSION ||
+        storage_info.size < sizeof(storage_info) ||
+        (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
+        (storage_info.flags &
+         HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
+        storage_info.free_bytes == 0u)
+        return 0x5eu;
+    if ((storage_info.flags &
+         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) != 0u &&
+        storage_info.capacity_bytes < storage_info.free_bytes)
+        return 0x5fu;
 
     uint64_t free_bytes = 0u;
     if (hpclang_stream_storage_free_bytes(&free_bytes) != 0 ||
-        free_bytes == 0u)
-        return 0x57u;
+        free_bytes != storage_info.free_bytes)
+        return 0x60u;
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)
@@ -412,6 +459,33 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
         return 0x48u;
+
+    /*
+     * Stock 2.15 KOS FRENAME is measured broken on HP49g+ and HP50g.
+     * The public standard name therefore fails explicitly rather than doing
+     * a non-atomic copy+delete that would pretend to be POSIX rename.
+     */
+    errno = 0;
+    if (rename("HPCLANG.NEW", "HPCLANG.REN") == 0)
+        return 0x61u;
+    if (errno != ENOTSUP)
+        return 0x62u;
+
+    output = fopen("HPCLANG.NEW", "rb");
+    if (output == NULL)
+        return 0x63u;
+    if (fclose(output) != 0)
+        return 0x64u;
+
+    errno = 0;
+    output = fopen("HPCLANG.REN", "rb");
+    if (output != NULL) {
+        fclose(output);
+        return 0x65u;
+    }
+    if (errno != ENOENT)
+        return 0x66u;
+
     if (remove("HPCLANG.NEW") != 0)
         return 0x49u;
 
@@ -455,8 +529,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x52u;
 
     return 0u;
-}
-#endif
+}#endif
 
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
 static int enter_pressed(void)
