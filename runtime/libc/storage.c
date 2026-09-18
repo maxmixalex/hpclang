@@ -27,6 +27,7 @@ enum {
     KOS_FUNC_FCLOSE = 3u,
     KOS_FUNC_FSEEK = 4u,
     KOS_FUNC_FDELETE = 5u,
+    KOS_FUNC_FRENAME = 6u,
 
     KOS_FILE_READONLY = 1u,
     KOS_FILE_READWRITE = 2u,
@@ -542,6 +543,40 @@ int unlink(const char *path)
          */
         if (kos_open_error_is_missing(result)) {
             errno = ENOENT;
+            return -1;
+        }
+        return set_kos_errno(result);
+    }
+    return 0;
+}
+
+int rename(const char *old_path, const char *new_path)
+{
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (old_path == NULL || new_path == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    uintptr_t addr = kos_entry(KOS_FUNC_FRENAME);
+    if (addr == 0u)
+        return unsupported();
+
+    int32_t result = (int32_t)((kos_fn2)addr)(
+        (uint32_t)(uintptr_t)old_path,
+        (uint32_t)(uintptr_t)new_path);
+    if (result < 0) {
+        /*
+         * Historical HPGCC 1.1 explicitly warns that kos_frename() appeared
+         * to return -200 unconditionally on the firmware tested at the time.
+         * Do not reinterpret that undocumented value as ENOENT here: the
+         * Stock E2E probe must first establish whether the 2.15 HP49g+/50g
+         * implementation actually performs a rename.
+         */
+        if (result == -200) {
+            errno = EIO;
             return -1;
         }
         return set_kos_errno(result);
