@@ -175,7 +175,9 @@ The stable historical standard-C names should remain standard C where semantics 
 
 HP49g+/HP50g now use private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Stock E2E validates ordinary `FILE *` read, create/truncate, write/flush, seek/ftell, reopen, append/create, remove and `ENOENT` behavior.
 
-HP39/40 and HP48 return clean `ENOSYS` for unsupported byte-stream operations rather than pretending their calculator-object stores are SD files.
+The clean M7.2b layer now also covers size/type/portable path attributes, synthetic-root and real named-directory metadata, media-present/read-only state, free bytes, and a validity-gated FAT/KOS last-modified civil datetime. Raw KOS structs/module IDs remain private. Repeated Stock `CHECKINSERT` is not return-safe on HP49g+, so insertion/protect state is sampled once per native launch while free space remains a live query. Safe Stock KOS does not expose total capacity, and the broken native rename primitive remains explicit `ENOTSUP` rather than a non-atomic copy+delete emulation.
+
+HP39/40 and HP48 return clean `ENOSYS` for unsupported byte-stream and stream-metadata/media operations rather than pretending their calculator-object stores are SD files.
 
 `fdelete` is naturally an Adapter/Migration candidate to standard `remove()`.
 

@@ -196,7 +196,7 @@ M7.1 font closure checklist:
 
 ### M7.2 — Byte-stream filesystem and standard I/O
 
-**In progress. Basic stream I/O is complete; HPGCC-class filesystem breadth is not.**
+**In progress. M7.2a stream I/O and M7.2b metadata/media semantics are complete; directory/path semantics remain.**
 
 M7.2 covers the HP49g+/HP50g SD-card namespace and byte-stream semantics only. Calculator objects and Saturn/RPL storage are **not** part of this slice; they begin at M7.3.
 
@@ -217,10 +217,10 @@ Historical baseline:
 #### M7.2b — namespace mutation and metadata
 
 - [x] resolve Stock rename semantics: KOS filesystem function 6 reproduces the historical `-200` failure on both HP49g+ and HP50g, so hpclang must not claim a working POSIX rename or fake atomicity with copy+delete; the canonical standard name remains explicitly unsupported until an ownership-safe namespace backend exists;
-- [ ] expose file metadata needed by ordinary applications—at minimum size/type/portable attributes—without publishing KOS structs, and Stock-validate those semantics rather than only the historical layout;
-- [ ] expose media state and free space through a stable query rather than raw KOS calls; total capacity must be validity-gated because safe Stock KOS exposes free bytes but no equivalent of FSystem's raw-FAT volume-size calculation;
-- [ ] decide and document timestamp conversion once stock metadata has been verified rather than copying uncertain historical struct fields blindly;
-- [ ] preserve explicit unsupported/error behavior on non-stream families.
+- [x] expose file metadata through versioned `hpclang_stream_path_info`: byte size, file/directory/volume-label type, and the portable read-only/hidden/system/archive attribute subset are Stock-validated on HP49g+/HP50g without exposing KOS structs; both synthetic root and a real named-directory entry are covered;
+- [x] expose media state and free space through `hpclang_stream_storage_query()` / `hpclang_stream_storage_free_bytes()`; insertion and write-protect state are sampled lazily once per native launch because repeated Stock `CHECKINSERT` is not return-safe on HP49g+, while free space is queried per call; total capacity remains explicitly invalid because safe Stock KOS exposes no equivalent of FSystem's raw-FAT volume-size calculation;
+- [x] publish only the independently verified FAT/KOS last-modified civil datetime, with an explicit validity bit and no invented timezone/epoch conversion; creation/access timestamps and undocumented KTIME fields remain private pending independent semantics;
+- [x] preserve explicit unsupported/error behavior on non-stream families: HP39/40 and HP48 return deterministic `ENOSYS` for the stream metadata/media APIs.
 
 #### M7.2c — directories and path semantics
 

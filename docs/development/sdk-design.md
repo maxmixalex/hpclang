@@ -141,11 +141,15 @@ Storage is split by **semantics**, not by media.
 
 ### Byte-stream files
 
-HP49g+/HP50g now provide private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Public code uses ordinary `FILE *` APIs. Stock E2E covers read, create/truncate, write/flush, nonzero seek/ftell, reopen, append/create, remove and `ENOENT`.
+HP49g+/HP50g provide private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Public code uses ordinary `FILE *` APIs. Stock E2E covers read, create/truncate, write/flush, nonzero seek/ftell, reopen, append/create, remove and `ENOENT`.
 
-HP39/40 and HP48 do not pretend to expose that SD byte-stream service; unsupported stream operations fail cleanly with `ENOSYS`.
+The clean metadata/media boundary is `<hpclang/storage.h>`, not KOS. `hpclang_stream_path_query()` returns versioned byte size, path type, a portable FAT-style attribute subset, and an explicitly validity-gated last-modified civil datetime. The civil value is not a POSIX epoch: Stock FAT/KOS supplies local civil fields and hpclang does not invent a timezone. Creation/access timestamps remain private until their semantics are independently established.
 
-Raw KOS module/function IDs remain runtime-private.
+`hpclang_stream_storage_query()` reports media presence/read-only state and free bytes with validity flags. On Stock HP49g+/HP50g, physical insertion/protect state is a **native-launch snapshot**: it is sampled lazily once because repeated `CHECKINSERT` is not return-safe on HP49g+, then reused until the application returns. Free space remains live. Re-entering the native application is the resampling boundary for hot-plug/protect changes. Total capacity stays unavailable rather than borrowing HPGCC FSystem's direct-FAT/controller ownership behind the Stock OS.
+
+HP39/40 and HP48 do not pretend to expose that SD byte-stream service; unsupported stream and stream-metadata/media operations fail cleanly with `ENOSYS`.
+
+Raw KOS module/function IDs, FILE_INFO layout, creation/access timestamps, and stock global-directory cursor state remain runtime-private.
 
 ### Calculator objects
 

@@ -128,6 +128,10 @@ A focused application such as Font Gallery gets its own build artifact,
 specification and evidence path while reusing the common target/harness
 infrastructure.
 
+The same rule applies to the focused **Storage** gate. `E2E / Storage` builds the storage-enabled payload separately from the canonical keyboard/runtime payload so storage timing and fixtures do not perturb the canonical Runtime gate. Its hp4950 Stock path creates the named-directory VVFAT fixture after ARMToolbox installation but before the run-phase emulator opens the card, arms result monitoring before `PrRUN`, and requires payload PASS, ARMToolbox stage ownership release, and settled Stock repaint on both HP49g+ and HP50g.
+
+Storage #22 (`35378151818`) is the current fully-green M7.2b evidence: all three Direct families pass, HP49g+ and HP50g Stock pass, and the payload covers stdio, path metadata, named-directory type, media/free-space snapshot semantics, and the fixed UTC-host-fixture → FAT/KOS last-modified civil-time witness.
+
 HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
