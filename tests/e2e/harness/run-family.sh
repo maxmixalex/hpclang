@@ -11,6 +11,15 @@ FAMILY="$2"
 APP_DIR="$3"
 ASSETS_DIR="${4:-}"
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REQUIRE_KEYBOARD="${HPCLANG_E2E_REQUIRE_KEYBOARD:-1}"
+
+case "$REQUIRE_KEYBOARD" in
+    0|1) ;;
+    *)
+        echo "HPCLANG_E2E_REQUIRE_KEYBOARD must be 0 or 1" >&2
+        exit 2
+        ;;
+esac
 
 case "$MODE" in
     direct)
@@ -66,15 +75,27 @@ printf 'E2E %s/%s targets: %s\n' "$MODE" "$FAMILY" "${TARGETS[*]}"
 declare -a PIDS=()
 declare -a KEYBOARD_FRAME_DIRS=()
 for target in "${TARGETS[@]}"; do
-    frames="$ROOT/build/$target-keyboard-frames"
-    rm -rf "$frames"
-    mkdir -p "$frames"
+    frames=""
+    if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
+        frames="$ROOT/build/$target-keyboard-frames"
+        rm -rf "$frames"
+        mkdir -p "$frames"
+    fi
+
     if [[ "$MODE" == direct ]]; then
-        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+        if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
+            HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+                bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
+        else
             bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
+        fi
     else
-        HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+        if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
+            HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
+                bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
+        else
             bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
+        fi
     fi
     KEYBOARD_FRAME_DIRS+=("$frames")
     PIDS+=("$!")
