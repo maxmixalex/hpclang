@@ -6,9 +6,17 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete five-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, and hp4950 stream stdio through picolibc. Calculator-object/RPL storage and higher-level UI remain application-facing SDK work.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete five-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, and hp4950 stream stdio through picolibc. Storage namespace/metadata, calculator-object/RPL integration, several system services, and higher-level compatibility remain active SDK work.
 
-hpclang is also not intended to be binary-compatible with historical HPGCC executables or to reproduce HPGCC3's custom-ROM/ROMLIB environment.
+The project target is stronger than "substantial calculator-facing functionality":
+
+> **First reach practical HPGCC capability parity for ordinary calculator applications, then exceed it.**
+
+"Parity" here means that the major application-facing jobs supported by the mature HPGCC 1.1/2.0 ecosystem have a reliable hpclang equivalent on hardware where the capability genuinely exists: graphics/text, keyboard/input, time/system services, byte-stream storage, calculator objects/RPL/stack integration, and the helper functionality needed by real applications. It does **not** require exposing historical raw MMU addresses, KOS module numbers, stock syscall calling conventions, or binary compatibility as canonical hpclang APIs. Those low-level historical interfaces may be adapters or documented migrations when a clean service is safer.
+
+"Exceed" means keeping those application capabilities while adding things HPGCC did not provide consistently: one LLVM-native toolchain and application ABI across all supported families, explicit capabilities and ownership, modern C/C++ wrappers, UTF-8/large bitmap-font support, cross-family semantics, stronger error handling, deterministic generated assets, and automated Direct + original-Stock validation.
+
+HPGCC 1.1-p1 with 39G support is the historical HP39-family application reference; HPGCC 2.0 SP2 is the principal HP48/49/50 parity reference. HPGCC3 remains an additional API/design reference, not a ROMLIB ABI or custom-ROM target.
 
 ## Principles
 
@@ -106,7 +114,17 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 **M7.1 complete; later M7 slices remain in progress.**
 
-M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment.
+M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
+
+M7 deliberately separates capability parity from historical spelling. A service belongs in M7 when a real application needs the capability even if the eventual HPGCC-compatible function name lives in M8. By the end of M7, the clean core should be sufficient to implement the broad HPGCC adapters without reaching back into raw KOS/Saturn/MMU internals.
+
+Planned dependency order after M7.1:
+
+1. **M7.2 — byte-stream filesystem and stdio parity:** complete namespace, metadata, directory, capacity, and standard-C file behavior on HP49g+/HP50g; unsupported families remain explicit.
+2. **M7.3 — calculator objects, Saturn/RPL and stack:** typed object handles, copy/convert/ownership rules, named object stores, and stack exchange without treating calculator objects as files.
+3. **M7.4 — remaining common system services:** RTC/wall clock, sound/beep and other broadly useful HPGCC-era system facilities that can be exposed without leaking raw hardware ownership.
+4. **M7.5 — display/runtime capability gaps needed by real HPGCC-class applications:** resolve physical grayscale/page-flip/annunciator or equivalent application needs behind an ownership-safe broker where worthwhile; leave raw MMU/cache/IRQ controls as migration-only unless a genuine clean use case appears.
+5. **M7 parity audit:** mechanically re-run the historical API inventory against implemented clean services and identify every remaining common application pattern as Direct, Adapter, Migration, or intentionally Unsupported before M8 broad source adapters begin.
 
 ### M7.0 — API inventory and compatibility design
 
@@ -176,42 +194,112 @@ M7.1 font closure checklist:
 - [x] remove obsolete TTF importing, normalize summaries, strengthen specimens, and complete additional bitmap-CJK curation;
 - [x] close the production Gallery matrix (`E2E / Font Gallery` #112) and retire the obsolete HP48 post-PASS exception;
 
-### M7.2 — Storage and standard I/O
+### M7.2 — Byte-stream filesystem and standard I/O
 
-**hp4950 byte-stream stdio complete and merged to `main`.**
+**In progress. Basic stream I/O is complete; HPGCC-class filesystem breadth is not.**
 
-Storage is split by **semantics**, not by a misleading yes/no "filesystem" capability.
+M7.2 covers the HP49g+/HP50g SD-card namespace and byte-stream semantics only. Calculator objects and Saturn/RPL storage are **not** part of this slice; they begin at M7.3.
 
-- [x] **Byte-stream filesystem:** HP49g+/HP50g use private KOS-backed `open`, `close`, `read`, `write`, `lseek`, and `unlink` hooks below picolibc. Public consumers use normal `FILE *` APIs. Stock validation covers read, create/truncate, write/flush, nonzero seek/ftell, reread, close/reopen, remove/ENOENT, and clean ENOSYS on non-stream families.
-- [ ] **Calculator object store:** HP39gs/40gs stock storage contains named directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related object types, with `HP39DIR.000` as the root object-store file and `HP39DIR.CUR` as the current-directory pointer. This is not POSIX byte-stream storage and must not be forced through `FILE *`.
-- [ ] **RPL/Saturn objects:** HP48/49/50 expose calculator-object namespaces whose typed object/stack integration remains separate from byte-stream stdio.
+Historical baseline:
 
-### M7.3 — Calculator objects and stack integration
+- HPGCC 1.1 already exposed KOS file open/read/write/seek/close/delete plus rename, current-directory operations, file/directory metadata enumeration, attributes, free-space and media-state helpers.
+- HPGCC 2.0/HPGCC3 added the higher-level `fsystem.h` surface with directory traversal, mkdir/rmdir/chdir, file metadata, capacity/free-space queries, rename/delete, attributes, timestamps and handle helpers.
+- hpclang should prefer standard C/POSIX names where they express the same semantics, and use small clean hpclang capability APIs only where the historical operation has no safe portable equivalent.
+
+#### M7.2a — standard stream core
+
+- [x] HP49g+/HP50g private KOS-backed `open`, `close`, `read`, `write`, `lseek`, and `unlink` feed picolibc.
+- [x] Normal `FILE *` use covers `fopen/fread/fwrite/fseek/ftell/fflush/fclose/remove`.
+- [x] Correct create/truncate/append behavior, including the historical broken-KOS append-create case.
+- [x] Missing-file/ENOENT behavior and clean `ENOSYS` on HP39/40 and HP48.
+- [x] Stock E2E on both HP49g+ and HP50g.
+
+#### M7.2b — namespace mutation and metadata
+
+- [ ] add and Stock-validate standard `rename()` using the stock filesystem rename primitive;
+- [ ] expose file metadata needed by ordinary applications—at minimum size/type/attributes—without publishing KOS structs;
+- [ ] expose filesystem free/capacity information through a stable query rather than raw KOS calls;
+- [ ] decide and document timestamp conversion once stock metadata has been verified rather than copying uncertain historical struct fields blindly;
+- [ ] preserve explicit unsupported/error behavior on non-stream families.
+
+#### M7.2c — directories and path semantics
+
+- [ ] provide directory enumeration with owned iterator state and stable names/types;
+- [ ] provide directory creation/removal where stock behavior is reliable;
+- [ ] support path-based traversal without leaking or permanently changing the calculator OS's global current-directory state;
+- [ ] add `chdir/getcwd` only if their stock-global side effects can be contained/restored; otherwise prefer explicit-directory handles and document the migration;
+- [ ] validate long-name/case behavior actually provided by the stock filesystem instead of promising the broader HPGCC3 FSystem semantics by assumption.
+
+#### M7.2d — HPGCC parity adapter boundary
+
+- [ ] map ordinary historical `hpstdio.h` use to standard libc directly;
+- [ ] cover the useful `fsystem.h`/KOS filesystem subset on top of the clean namespace/metadata/directory services;
+- [ ] classify raw handle/module helpers that add no application value as Adapter/Migration rather than canonical core APIs;
+- [ ] compile representative historical filesystem examples against the adapter and run non-trivial read/write/rename/enumeration flows in Stock E2E.
+
+#### M7.2 completion criterion
+
+M7.2 is complete when a typical HPGCC HP49g+/HP50g program that uses files and directories can be ported without losing application functionality, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. The hpclang surface should also improve on HPGCC by making unsupported-family behavior, ownership, name buffers, iterator lifetime, and errors explicit.
+
+### M7.3 — Calculator objects, Saturn/RPL and stack integration
+
+**Planned after the M7.2 filesystem namespace/metadata core is stable.**
+
+- [ ] define opaque Saturn address/object references; never expose Saturn addresses as ordinary ARM pointers;
+- [ ] design copy/borrow/ownership/error rules for calculator objects before freezing public handles;
+- [ ] implement the HP39 typed object-store path for named Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records;
+- [ ] implement HP48/49/50 RPL object exchange against the stock object namespace without flattening objects into byte-stream files;
+- [ ] add stack read/push/pop/replace operations where the platform meaning is real and safely restorable;
+- [ ] support common HPGCC `saturn.h` / `satdir.h` application patterns through adapters above the clean object service;
+- [ ] validate round trips against the original Stock environment, including malformed-object/error cases and return-state preservation.
+
+Completion criterion: typical HPGCC programs that exchange RPL/calculator objects or use the stack can migrate without raw Saturn pointers or private OS calling conventions.
+
+### M7.4 — Common system services
 
 **Planned.**
 
-- [ ] design the HP39 typed object-store API around native object semantics;
-- [ ] design HP48/49/50 Saturn/RPL object exchange without pretending objects are files;
-- [ ] add stack integration where applicable;
-- [ ] keep platform-specific representation below a coherent common capability/API boundary.
+Prioritize application capabilities that appear repeatedly in HPGCC programs and have a coherent stock-hosted implementation:
 
-### Historical HPGCC parity is not complete
+- [ ] wall-clock/RTC date-time query and conversion;
+- [ ] tone/beep with explicit frequency/duration and safe host restoration;
+- [ ] useful battery/power/contrast/status queries where semantics are stable across families;
+- [ ] capability discovery for services that are genuinely model-specific;
+- [ ] classify clock-rate control, raw interrupt/timer programming, cache/MMU manipulation and physical allocation as low-level Migration/Unsupported unless an ownership-safe application use case justifies a typed service.
 
-The old HPGCC SDKs included substantial calculator-facing functionality beyond merely entering C code: screen/graphics, keyboard, file I/O, Saturn/RPL integration, OS/syscall access, and higher-level helper libraries. hpclang has not yet reimplemented that breadth. M0–M7 service progress therefore must not be reported as "HPGCC feature complete".
+### M7.5 — Remaining display/runtime parity needs
 
-## M8 — Practical SDK and porting layer
+**Planned; driven by real application requirements, not by copying every HPGCC primitive.**
 
-**Planned.**
+- [ ] determine whether physical gray4/gray16 and page flipping need an on-demand contiguous/DMA resource broker;
+- [ ] cover annunciator/status-plane needs through a stock-safe abstraction if representative applications require them;
+- [ ] retain clip/style/pattern/XPM compatibility state in the future HPG adapter unless independent hpclang applications demonstrate a cleaner core need;
+- [ ] validate any temporary LCD ownership against the existing before/PASS/return state-restoration gates.
 
-HPG source compatibility is an explicit M8 goal, not an accidental side effect. The common 59-function `hpgraphics.h` surface is signature-stable across HPGCC 1.1, HPGCC 2.0 and HPGCC3, so hpclang should provide a broad source-compatible HPG adapter once its clean display/text primitives are stable. This does **not** make HPGCC binary compatibility a goal.
+### M7 parity closure
 
-After the common services exist:
+Before calling M7 complete:
 
-- establish stable application-facing headers;
-- provide examples that exercise graphics, input, timers, storage, and calculator-object integration;
-- validate non-trivial applications on each platform family;
-- document source-porting guidance from common HPGCC 1.x/2.x APIs where useful;
-- decide which compatibility wrappers are worth maintaining;
-- establish a stable packaging/build UX from a fresh LLVM-only checkout;
+- [ ] every major ordinary HPGCC application capability is implemented in the clean core or explicitly classified as Adapter/Migration/Unsupported with a reason;
+- [ ] representative historical applications cover graphics/text, keyboard, time/system, filesystem, and calculator-object/stack flows;
+- [ ] all supported hardware families expose coherent capability queries and deterministic failure for absent services;
+- [ ] Stock E2E proves host-state restoration for every service that temporarily touches calculator-owned state.
+
+M7 completion therefore means **practical HPGCC capability parity**, not binary compatibility and not literal reproduction of every unsafe low-level API.
+
+## M8 — HPGCC source compatibility, SDK UX, and post-HPGCC extensions
+
+**Planned, with adapters allowed to begin incrementally once each M7 clean service is stable.**
+
+M8 turns M7's capability parity into broad source-level compatibility and then moves beyond the historical SDK. The common 59-function `hpgraphics.h` surface is signature-stable across HPGCC 1.1, HPGCC 2.0 and HPGCC3, and the historical keyboard/stdio/filesystem/object inventories give similarly concrete adapter targets. Binary compatibility remains out of scope.
+
+M8 goals:
+
+- provide maintained compatibility headers/adapters for high-value HPGCC 1.1/2.0 source surfaces on top of the clean core;
+- compile representative historical HPGCC applications with minimal mechanical changes and document unavoidable migrations;
+- establish stable public hpclang headers, examples, packaging/build UX and a fresh LLVM-only developer workflow;
+- validate non-trivial applications on each platform family rather than only isolated API probes;
+- provide migration tooling/guidance that distinguishes safe source adapters from intentionally retired raw KOS/Saturn/MMU idioms;
+- **surpass HPGCC** with cross-family capability discovery, modern C++ wrappers, UTF-8/font selection, stronger ownership/errors, deterministic assets/tests, and new services that are practical on the hardware even when no historical API existed;
 - consider replacing the remaining ARMToolbox/library-275 stock-launch boundary with a minimal independent launcher if it materially improves packaging or portability;
 - separate public application documentation from this internal Development reference.
