@@ -27,7 +27,7 @@ Each family carries a `PROVENANCE.txt` sidecar and the relevant upstream license
 
 Two font sources must not be conflated:
 
-- `hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` expose the calculator's active **native stock-ROM fonts** at runtime; they do not embed a Gallery font in the application;
+- `hpclang_font_default()`, `hpclang_font_mini()`, HP48/49/50-only `hpclang_font_big()`, and HP39gs/40gs-only `hpclang_font_editline()` expose active **native stock-ROM fonts** at runtime; they do not embed a Gallery font in the application;
 - `hpclang_target_font()` selects a **custom/generated font** from the checked-in catalog.
 
 For custom fonts, the convenience aliases are fixed as:

@@ -76,11 +76,11 @@ The font design has **two independent source classes** and a common rendering AP
 
 ### Calculator-native fonts
 
-`hpclang_font_default()`, `hpclang_font_mini()`, and `hpclang_font_big()` return borrowed descriptors over calculator-owned font assets. hpclang does not embed or redistribute HP ROM glyph bitmaps.
+`hpclang_font_mini()`, HP48/49/50-only `hpclang_font_big()`, HP39gs/40gs-only `hpclang_font_editline()`, and the convenience `hpclang_font_default()` return borrowed descriptors over calculator-owned font assets. hpclang does not embed or redistribute HP ROM glyph bitmaps.
 
 The implementation deliberately differs by platform family:
 
-- **HP39/40:** native mini/main rasters are fixed physical stock-ROM assets. They are read through the physical ARM flash view, not the current logical Saturn bank mapping. The mini table is proportional; per-codepoint advance is exposed by `hpclang_font_codepoint_advance()`.
+- **HP39/40:** native mini/main/EditLine rasters are fixed physical stock-ROM assets. They are read through the physical ARM flash view, not the current logical Saturn bank mapping. The mini table is proportional; main is 5×8/advance 6; EditLine is fixed 6×10/advance 6. HP39 does not expose the HP48-compatible `bigfont`.
 - **HP48gII/49g+/50g:** native minifont/bigfont are stock Saturn objects resolved through the launch-provided logical `SAT_CPU->Read[]` map.
 
 This difference is not an hpclang invention. Historical HPGCC's calculator-native helper path explicitly resolves the HP48-compatible minifont at Saturn `0x812c8` and bigfont object at `0x84d82` through `sat_map_s2a()`, whose implementation indexes `_saturn_cpu->Read[]`. The HPGCC HP39 Aplet/Library 275 support instead binds HP39 stock ROM text entries such as `Put3x5` and `Put5x7`.
@@ -105,15 +105,15 @@ The **canonical bundled asset set is bitmap-source only**. The generic TTF impor
 
 Generated glyph/bitmap sections remain individually garbage-collectable. The wrapper ABI supports arbitrary metrics and faces; convenience aliases `@mini`, `@normal`, and `@large` are policy, not a restriction on the format.
 
-### Text API and UI roles
+### Text API and UI policy
 
 The canonical renderer accepts code points and UTF-8. Invalid UTF-8 becomes U+FFFD and then the selected font's fallback when necessary. `hpclang_surface_draw_char()` remains a direct byte/U+0000..U+00FF compatibility entry point.
 
-The design vocabulary `mini` / `text` / `edit-large` describes semantic UI roles, not exactly three physical font formats. Dedicated public selectors for those roles are not frozen merely because the terms are useful in Font Gallery and UI research.
+The core does not define semantic UI font roles. Historical native accessor names such as `mini`, `big`, and `editline` identify concrete ROM fonts only; a future UI toolkit may assign its own `text`, `caption`, `editor`, or other theme roles above them.
 
 Font Gallery is deliberately a **separate HPC1 E2E application**. It exercises native fonts, generated aliases/arbitrary faces, metrics, representative repertoire, and both 64- and 80-line layouts without expanding the canonical runtime/keyboard/storage payload. Its specimen text is part of the visual test contract and now includes face-sensitive width, punctuation, accented Latin, digits/symbols, and supported CJK/Japanese/Korean samples rather than one weak generic phrase.
 
-The Gallery evidence UI is also part of the test surface. Direct and Stock summaries use a coherent compact structure; HP39 Direct publishes its own summary; HP48/HP50 Stock summaries retain native mini/native main/generated-control evidence rather than collapsing to native-only content. Formal closure is `E2E / Font Gallery` **34792822393 / #55**, covering **245 generated faces + 2 native entries × 2 pages = 494 captures per Direct target** plus both live-native Stock controls.
+The Gallery evidence UI is also part of the test surface. Formal closure is `E2E / Font Gallery` **35295358487 / #111**. HP39gs/40gs Direct expose 245 generated faces + mini/main/EditLine for **248 entries / 496 captures**; HP48gII/49g+/50g retain 245 generated + minifont/bigfont for **247 / 494**. Stock hp39gs/hp40gs additionally verify the EditLine ROM fingerprint/pixels, while HP48gII/HP50g retain live-Saturn native evidence.
 
 ### HPG compatibility consequence
 

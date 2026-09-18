@@ -100,8 +100,8 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 | --- | --- | --- |
 | `hpclang_font_default()` | ✅ | Borrow the calculator's normal default native selection. On HP39gs/40gs this is the stock 5×8 main raster; on HP48gII/49g+/50g it is the stock bigfont. This convenience alias is not a semantic role. |
 | `hpclang_font_mini()` | ✅ | Borrow the stock minifont. HP39/40 uses its proportional five-row small font; HP48/49/50 uses the historical six-row minifont. |
-| `hpclang_font_big()` | ✅/🧪 | Expose the historical HP48/49/50 bigfont only: eight raster rows with nominal advance 6. HP39-family calculators do not have this HPGCC bigfont and must return `NULL` rather than aliasing the 5×8 main font. The contract is frozen here before the implementation change. |
-| `hpclang_font_editline()` | 🧪 | Expose the dedicated HP39gs/40gs fixed 6×10 EditLine ROM font. It is unavailable on HP48gII/49g+/50g, and remains unavailable on HP39g+ until a trustworthy full-flash fixture establishes its layout. The contract is frozen here before the implementation change. |
+| `hpclang_font_big()` | ✅ | Expose the historical HP48/49/50 bigfont only: eight raster rows with nominal advance 6. HP39-family calculators return `NULL` rather than aliasing the 5×8 main font. |
+| `hpclang_font_editline()` | ✅ | Expose the dedicated HP39gs/40gs fixed 6×10 EditLine ROM font. It is unavailable on HP48gII/49g+/50g, and remains unavailable on HP39g+ until a trustworthy full-flash fixture establishes its layout. |
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
@@ -110,7 +110,7 @@ No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/big
 
 HP39gs/40gs fixed native rasters are physical stock-ROM assets. The launcher maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime accepts that mapping only when the opaque `platform_cookie` matches the expected private-window base. The established 5×8 main and proportional mini tables already live in this window.
 
-Independent HP39 UI reverse engineering also establishes a third, dedicated EditLine table: fixed 6×10 cells, 20 Saturn nibbles per character, with the legacy lookup `0x07D3EA + 20 * characterCode`. The 2.22 HP39gs/40gs candidate locations obtained from the independently verified main/mini relocation deltas remain implementation evidence until the new ROM hash/pixel oracle confirms them. No glyph payload from that table is redistributed by hpclang.
+Independent HP39 UI reverse engineering also establishes a third, dedicated EditLine table: fixed 6×10 cells, 20 Saturn nibbles per character, with the legacy lookup `0x07D3EA + 20 * characterCode`. The official 2.22 images place the same table at physical nibble `0x0FD882` on HP39gs and `0x0FDA35` on HP40gs. Both locations independently match the legacy table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`, and Direct/Stock Gallery both pass a ROM-derived 6×10 pixel oracle. No glyph payload from that table is redistributed by hpclang.
 
 The HP39 two-page window replaced an experimental long-lived high-L1 NOR section alias. Runtime diagnostics proved the alias descriptor words could themselves lie inside the active LCD framebuffer's physical interval and be overwritten by ordinary drawing. The fix is therefore an MMU-ownership correction below the font API, not an application ABI change.
 
@@ -166,12 +166,12 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
 | keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | Direct and Stock both require the exact 52-frame progression; Runtime #122 is green |
 | display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
-| native font/text | ✅ | ✅ | production Gallery #99 covers all Direct families; HP39 native pixels are valid through the physical-ROM path | HP50g and HP48gII compact live-native controls green with settled return |
+| native font/text | ✅ | ✅ | Gallery #111 covers all Direct families; HP39 mini/main/EditLine pixels are validated through the physical-ROM path | Stock hp39gs/hp40gs/hp48gII/hp50g all green with settled return |
 | generated font selection | ✅ configure | ✅ | Gallery #99 exhaustively traverses all **245 generated faces** on all five automated targets | HP50g and HP48gII generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
-Formal `E2E / Font Gallery` run **35255868206 / #99** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. It traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target**. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
+Formal `E2E / Font Gallery` run **35295358487 / #111** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
 ## Historical public-surface size
 
@@ -313,6 +313,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with source provenance retained. Ark Pixel labels/specimens now expose useful locale differences, and Gallery text covers width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35255868206 / #99** is fully green. Direct traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP50 Stock reaches settled PASS. HP48 Stock has HPC1 PASS/control-flow return, distinct nonblank live-native/generated evidence, and a settled Stock repaint; Gallery #102 independently passes the new strict HP48 return gate.
+`E2E / Font Gallery` **35295358487 / #111** is fully green. HP39gs/40gs Direct traverse **248 entries / 496 captures** including the dedicated EditLine ROM font; HP48gII/49g+/50g remain **247 / 494**. Stock hp39gs/hp40gs additionally validate mini/main/EditLine/generated-control captures and the independent ROM fingerprint/pixel oracle, while HP48gII and HP50g retain their settled live-Saturn native controls.
 
 The font slice therefore has no remaining API or evidence blocker. Repository integration and bounded Stock-harness closeout remain outside the font-core closure.
