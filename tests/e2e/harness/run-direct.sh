@@ -68,8 +68,6 @@ case "$HPCLANG_E2E_FAMILY" in
         rm -rf "$SD"
         mkdir -p "$SD/HPCLANG.DIR"
         printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
-        mkdir -p "$SD/HPCLDIR"
-        printf 'DIR-WITNESS\n' > "$SD/HPCLDIR/CHILD.TST"
         printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-50g.css"
