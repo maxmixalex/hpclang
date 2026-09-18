@@ -10,7 +10,16 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET="$1"
 APP_DIR="$(realpath "$2")"
 ASSETS_DIR="$(realpath "$3")"
+STORAGE_WITNESS="${HPCLANG_E2E_STORAGE_WITNESS:-0}"
 export TARGET
+
+case "$STORAGE_WITNESS" in
+    0|1) ;;
+    *)
+        echo "HPCLANG_E2E_STORAGE_WITNESS must be 0 or 1" >&2
+        exit 2
+        ;;
+esac
 
 STATE="$ROOT/build/$TARGET-state"
 SD="$ROOT/build/$TARGET-sd"
@@ -44,12 +53,25 @@ cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
 printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
 printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
+# x50ng's VVFAT backend indexes --sd-dir when the run-phase emulator opens
+# the card. Create the named-directory witness only after ARMToolbox install
+# has completed, but before this second x50ng process starts. The storage-only
+# sequence below accounts for the extra root entry while the canonical Runtime
+# launch choreography remains unchanged.
+if [[ "$STORAGE_WITNESS" == 1 ]]; then
+    mkdir -p "$SD/ZZHPDIR"
+fi
+
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_STOCK_MODE=run
-export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"
+if [[ "$STORAGE_WITNESS" == 1 ]]; then
+    export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-storage-run.seq"
+else
+    export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"
+fi
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-run"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
