@@ -11,6 +11,12 @@ TARGET="$1"
 APP_ROOT="$(realpath "$2")"
 export TARGET
 
+case "$TARGET" in
+    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    *) NATIVE_FACE_COUNT=2 ;;
+esac
+export NATIVE_FACE_COUNT
+
 mapfile -t SHARD_LAUNCHERS < <(
     find "$APP_ROOT/launchers" -maxdepth 1 -type f \
         -name "$TARGET-shard-*.bin" | sort
@@ -60,10 +66,10 @@ for launcher in "${SHARD_LAUNCHERS[@]}"; do
         while IFS= read -r frame; do
             base="$(basename "$frame")"
             face_index="${base%%-*}"
-            # The runtime contract puts native mini/main at local face 0/1 in
-            # every shard. Execute them every time, but retain them only once
-            # in aggregate evidence so counts represent unique Gallery entries.
-            if (( shard_index > 0 && 10#$face_index < 2 )); then
+            # Every shard repeats the target's concrete native ROM-font
+            # prefix. Execute it every time, but retain it only once in
+            # aggregate evidence so counts represent unique Gallery entries.
+            if (( shard_index > 0 && 10#$face_index < NATIVE_FACE_COUNT )); then
                 continue
             fi
             cp "$frame" "$AGG_FRAMES/${shard_name}-${base}"
@@ -108,7 +114,7 @@ if not records:
 
 unique_faces = 0
 unique_frames = 0
-native_face_count = 3 if os.environ.get("TARGET") in {"hp39gs", "hp40gs"} else 2
+native_face_count = int(os.environ["NATIVE_FACE_COUNT"])
 for name, record in records:
     shard_index = int(name.rsplit("-", 1)[1])
     duplicate_native = 0 if shard_index == 0 else native_face_count
