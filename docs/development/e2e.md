@@ -138,7 +138,7 @@ The canonical runtime E2E injects every physical key position on each automated 
 
 The final LCD screen renders the physical keyboard rather than the electrical scan matrix: six menu keys, two three-key control rows beside the cursor cluster, and seven five-key main rows. Passed positions are filled, and a failing position is left open and marked. The screen labels use the public font/text API, so calculator E2E exercises the same rasterization path instead of carrying a test-only glyph table. The machine-readable result remains the actual gate; the LCD diagram is a visual summary of the same checks.
 
-Direct and Stock both capture an initial hollow keyboard plus one frame after every accepted key release: **52 progression frames** for the 51-key test. Stock frames are phase-gated by `KACK(n)`: a new frame is accepted only after the preceding DOWN→UP cycle has returned, the payload has updated its passed-bit state, and the display has been redrawn. Runtime #122 is the canonical fully-green witness. The merged progression contact sheet remains supplementary evidence beside the canonical `before / pass / return` summary.
+Direct and Stock both capture an initial hollow keyboard plus one frame after every accepted key release: **52 progression frames** for the 51-key test. Stock frames are phase-gated by `KACK(n)`: a new frame is accepted only after the preceding DOWN→UP cycle has returned, the payload has updated its passed-bit state, and the display has been redrawn. Runtime #135 (`35298949365`) is the current canonical fully-green witness; #122 remains the first run that closed the same 52-frame contract. The merged progression contact sheet remains supplementary evidence beside the canonical `before / pass / return` summary.
 
 ## Font Gallery application
 
@@ -148,11 +148,11 @@ The exhaustive Direct Gallery is family-dependent: HP39gs/40gs traverse **248 en
 
 Native-font evidence is intentionally family-aware. The synthetic Direct launcher does not fabricate a live Saturn `Read[]` map, so exhaustive generated-font rendering is authoritative on all five targets, while HP48/49/50 native-font pixels require a real Stock logical map. Compact Stock Gallery controls close both automated live-native families: HP50g validates the hp4950 path and HP48gII independently validates the 64-line hp48 path through the original UI/ARMToolbox launch.
 
-The compact Stock navigation remains family-aware. HP39gs/40gs use **DOWN** across minifont → main/default → EditLine, then **RIGHT** to the generated control. HP48gII/HP50g use **DOWN** across minifont → bigfont/default, then **RIGHT** to the generated control. The #111 artifacts visibly retain those distinct concrete ROM-font pages.
+The compact Stock navigation remains family-aware. HP39gs/40gs use **DOWN** across minifont → main/default → EditLine, then **RIGHT** to the generated control. HP48gII/HP50g use **DOWN** across minifont → bigfont/default, then **RIGHT** to the generated control. The #112 artifacts visibly retain those distinct concrete ROM-font pages.
 
 HP39gs/40gs are different: their fixed native raster tables are physical stock-ROM assets. Production bootstrap maps only the two required physical NOR pages (`0x0007e000` and `0x0007f000`) as uncached small pages in the private prefix of hpclang's own code L2 table. This design was chosen after diagnostics proved that a long-lived high-L1 NOR section alias could have its descriptor word overwritten by the active LCD framebuffer itself. Font Gallery therefore also serves as the regression gate for this bootstrap-private mapping.
 
-Formal production run **35255868206 / #99** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, and Stock hp39gs/hp40gs/hp48gii/hp50g. Gallery #102 later exercised the new strict HP48 settled-return gate successfully; its overall workflow was cancelled only because the separate Stock hp40gs job was cancelled. The earlier 244-entry targeted runs remain useful historical evidence, but #99 is the current fully-green closure gate.
+Gallery #99 was the first fully-green production closure across Build, universal x50ng, all three Direct families, and the four Stock Gallery targets; #102 later exercised the strict HP48 settled-return gate. The final M7.1 head is now covered by **35298949457 / #112**, which repeats the full matrix after the HP39 EditLine/native-font census correction and documentation sync.
 
 Keeping Gallery separate prevents font exploration from inflating the runtime ABI/keyboard/storage test and lets its visual evidence evolve independently of canonical runtime PASS evidence.
 
@@ -162,6 +162,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 The general TTF importer has been removed. Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained in the source package. Gallery labels/specimens were strengthened for Ark Pixel regional variants, width-sensitive Latin, digits/punctuation, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35295358487 / #111** is the current fully-green closure gate. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence.
+`E2E / Font Gallery` **35298949457 / #112** is the current fully-green closure gate. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence.
 
 The font implementation/evidence slice is therefore closed. Remaining work is repository integration and bounded Stock-harness closeout, not additional font-core or Gallery implementation.

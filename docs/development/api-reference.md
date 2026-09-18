@@ -161,17 +161,17 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 
 | Service | Host | ARMv4T link | Direct runtime | Stock evidence |
 | --- | --- | --- | --- | --- |
-| HPC1/runtime | ✅ | ✅ | 5/5 PASS | Runtime #122 is fully green across all Stock families, including settled HP48 return |
+| HPC1/runtime | ✅ | ✅ | 5/5 PASS | Runtime #135 (`35298949365`) is fully green on the final M7.1 head, including settled HP48 return |
 | device info | — | ✅ | 5/5 PASS | covered by common payload |
 | monotonic time/delay | ✅ math | ✅ | 5/5 PASS | covered by common payload |
-| keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | Direct and Stock both require the exact 52-frame progression; Runtime #122 is green |
+| keyboard events + identity | ✅ | ✅ | 5/5 full 51-key PASS | Direct and Stock both require the exact 52-frame progression; Runtime #135 is green |
 | display/surfaces | ✅ | ✅ | 5/5 PASS | all stock paths have historical/current PASS evidence |
-| native font/text | ✅ | ✅ | Gallery #111 covers all Direct families; HP39 mini/main/EditLine pixels are validated through the physical-ROM path | Stock hp39gs/hp40gs/hp48gII/hp50g all green with settled return |
-| generated font selection | ✅ configure | ✅ | Gallery #99 exhaustively traverses all **245 generated faces** on all five automated targets | HP50g and HP48gII generated controls green |
+| native font/text | ✅ | ✅ | Gallery #112 (`35298949457`) covers all Direct families; HP39 mini/main/EditLine pixels are validated through the physical-ROM path | Stock hp39gs/hp40gs/hp48gII/hp50g all green with settled return |
+| generated font selection | ✅ configure | ✅ | Gallery #112 exhaustively traverses all **245 generated faces** on all five automated targets | HP39gs/40gs/HP48gII/HP50g Stock generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream stdio | — | ✅ | non-stream families reject unsupported stream access cleanly | ✅ HP49g+/HP50g read/create/truncate/write/flush/seek/reopen/remove/ENOENT |
 
-Formal `E2E / Font Gallery` run **35295358487 / #111** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
+Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
 ## Historical public-surface size
 
@@ -313,6 +313,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with source provenance retained. Ark Pixel labels/specimens now expose useful locale differences, and Gallery text covers width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35295358487 / #111** is fully green. HP39gs/40gs Direct traverse **248 entries / 496 captures** including the dedicated EditLine ROM font; HP48gII/49g+/50g remain **247 / 494**. Stock hp39gs/hp40gs additionally validate mini/main/EditLine/generated-control captures and the independent ROM fingerprint/pixel oracle, while HP48gII and HP50g retain their settled live-Saturn native controls.
+`E2E / Font Gallery` **35298949457 / #112** is fully green. HP39gs/40gs Direct traverse **248 entries / 496 captures** including the dedicated EditLine ROM font; HP48gII/49g+/50g remain **247 / 494**. Stock hp39gs/hp40gs additionally validate mini/main/EditLine/generated-control captures and the independent ROM fingerprint/pixel oracle, while HP48gII and HP50g retain their settled live-Saturn native controls.
 
 The font slice therefore has no remaining API or evidence blocker. Repository integration and bounded Stock-harness closeout remain outside the font-core closure.

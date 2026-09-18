@@ -93,7 +93,7 @@ HP 49g+ and HP 50g share the `hp4950` platform, official 2.15 OS image, stock Fi
 
 **Complete for five models; HP 39g+ blocked.**
 
-Durable Direct and Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime `35248256215 / #122` is fully green across all Direct and Stock families and closes HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Post-cleanup Runtime #125 preserves the strict HP48 PASS but has an independent HP49g+ Stock timeout, so #122 remains the latest fully-green canonical Runtime evidence.
+Durable Direct and Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime **35298949365 / #135** is the final M7.1 fully-green canonical Runtime evidence across all Direct and Stock families, including HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Runtime #122 remains the first run that closed that full contract.
 
 Blocked:
 
@@ -104,7 +104,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**In progress.**
+**M7.1 complete; later M7 slices remain in progress.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment.
 
@@ -128,7 +128,7 @@ The display clean-core boundary remains explicit: representation-independent cir
 
 #### Font package/gallery closure
 
-**Implementation and evidence closure complete on `m7-fonts-gallery`; integration to `main` remains a separate repository step.**
+**Complete.** The common-services/display/keyboard/font slice has implementation, Direct/Stock evidence, and repository-level integration closure.
 
 The font system has two intentionally separate sources:
 
@@ -147,10 +147,10 @@ Final evidence:
 - [x] Ark Pixel labels/specimens expose size, Mono/Prop, locale, and common regional differences instead of obscure-only samples;
 - [x] Gallery specimens cover width-sensitive Latin, digits/punctuation, accents, symbols, and supported CJK/Japanese/Korean repertoires;
 - [x] exhaustive Direct Gallery is family-dependent: HP39gs/40gs traverse **248 entries / 496 captures** (245 generated + minifont + main/default + EditLine); HP48gII/49g+/50g remain **247 / 494** (245 generated + minifont + bigfont/default);
-- [x] formal production `E2E / Font Gallery` run **35255868206 / #99** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g;
+- [x] final production `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g;
 - [x] HP50g Stock validates live native minifont/main font plus generated control and reaches settled PASS;
-- [x] HP48gII Stock validates distinct nonblank live native minifont/main font plus generated control and reaches HPC1 PASS, control-flow return, and settled Stock repaint; Gallery #102 also passes the post-cleanup strict HP48 gate;
-- [x] HP48 and HP50 Stock summaries use the same compact three-panel structure and were visually checked from the #99 artifacts;
+- [x] HP48gII Stock validates distinct nonblank live minifont/bigfont plus generated control and reaches HPC1 PASS, control-flow return, and settled Stock repaint; Gallery #112 repeats the strict HP48 gate on the final M7.1 head;
+- [x] HP48 and HP50 Stock summaries use the same compact three-panel structure, while HP39gs/40gs add the independently verified EditLine panel; the final #112 artifacts cover both layouts;
 - [x] HP39 Direct summary exists and is published with the exhaustive evidence.
 
 The import contract remains exactly three modes:
@@ -174,8 +174,7 @@ M7.1 font closure checklist:
 - [x] exhaustively render all 245 generated faces on all five automated targets and both 64/80-line layouts;
 - [x] validate compact Stock native evidence on HP39gs/HP40gs/HP48gII/HP50g, including the HP39 EditLine fingerprint and 6×10 pixel oracle;
 - [x] remove obsolete TTF importing, normalize summaries, strengthen specimens, and complete additional bitmap-CJK curation;
-- [x] close the production Gallery matrix (`E2E / Font Gallery` #99) and retire the obsolete HP48 post-PASS exception;
-- [ ] integrate the completed font slice to `main` after repository-level review.
+- [x] close the production Gallery matrix (`E2E / Font Gallery` #112) and retire the obsolete HP48 post-PASS exception;
 
 ### M7.2 — Storage and standard I/O
 
