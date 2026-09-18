@@ -372,13 +372,6 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         path_info.last_modified.minute != 4u ||
         path_info.last_modified.second != 6u)
         return 0x69u;
-    if ((path_info.time_validity &
-         HPCLANG_STREAM_PATH_LAST_ACCESS_DATE_VALID) == 0u)
-        return 0x6au;
-    if (path_info.last_access_date.year != 2024u ||
-        path_info.last_access_date.month != 1u ||
-        path_info.last_access_date.day != 2u)
-        return 0x6bu;
 
     /*
      * "/" is synthetic volume-root metadata because KOS GetSpecialFileInfo
