@@ -50,15 +50,23 @@ Calculator-native font bitmaps are borrowed stock assets and are never redistrib
 
 ### HP48gII / HP49g+ / HP50g
 
-Historical HPGCC calculator-native helpers resolve the minifont and bigfont through `sat_map_s2a()` and the live logical Saturn `Read[]` mapping. hpclang therefore keeps HP48/49/50 native lookup on the launch-preserved `SAT_CPU->Read[]` view.
+Historical HPGCC calculator-native helpers resolve the minifont and bigfont through `sat_map_s2a()` and the live logical Saturn `Read[]` mapping. hpclang therefore keeps HP48/49/50 native lookup on the launch-preserved `SAT_CPU->Read[]` view. HPGCC3 explicitly defines bigfont as an eight-row raster with nominal advance 6; hpclang treats it as a concrete HP48/49/50 stock font, not a generic “large text” role.
 
 ### HP39gs / HP40gs
 
-HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock `Put3x5` / `Put5x7` ROM entries, while independent ROM analysis establishes the raster tables themselves: mini-font physical Saturn base `0x07E695` and main-font base `0x07C651`.
+HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock `Put3x5` / `Put5x7` ROM entries, while independent ROM analysis establishes the raster tables themselves: mini-font physical Saturn base `0x07E695` and main-font base `0x07C651`. The HP39 UI reverse-engineering workspace independently establishes a third fixed 6×10 EditLine table at legacy base `0x07D3EA`, with 20 Saturn nibbles per character. This is a distinct ROM font, not the HP48/49/50 HPGCC bigfont.
 
-The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x00042000` and `0x00043000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. `platform_cookie` carries the private-window base only as an opaque launcher/runtime token.
+The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. `platform_cookie` carries the private-window base only as an opaque launcher/runtime token.
 
 HP39g+ is deliberately excluded from that physical layout until a real-hardware full-flash fixture establishes its own identity.
+
+## Native ROM-font API contract
+
+Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. A new `hpclang_font_editline()` accessor is reserved for the independently established HP39gs/40gs 6×10 EditLine table and is unavailable on the HP48/49/50 family and on HP39g+ until its flash layout is verified.
+
+Before implementation is accepted, the 2.22 HP39gs/40gs EditLine relocation must be independently gated against stock NOR data rather than accepted solely from address arithmetic. The intended evidence is a table fingerprint plus the same ROM-derived pixel oracle used by the existing HP39 native Gallery checks.
+
+Gallery **#103** on commit `0821c822` is a fully-green pre-change baseline. The native-census implementation that follows this documentation change requires a fresh formal Gallery run because HP39 Direct/Stock evidence will gain one additional concrete ROM font while HP48/49/50 retain their existing native census.
 
 ## Final font validation closure
 

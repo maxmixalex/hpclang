@@ -94,22 +94,29 @@ hpclang deliberately separates **calculator-native fonts** from **generated cust
 
 ### Calculator-native fonts
 
+The public core does **not** define a semantic font-role taxonomy. These accessors expose concrete calculator-native/ROM fonts by their historical names, plus one convenience default selection. Function names such as `mini`, `big`, and `editline` therefore identify a stock font source; they do not mean “small text”, “large text”, or “editor role” for application UI policy.
+
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_font_default()` | ✅ | Borrow the calculator's normal/main native font; currently the same native selection as `hpclang_font_big()`. |
-| `hpclang_font_mini()` | ✅ | Borrow the native compact font. HP39/40 uses its stock proportional small font; HP48/49/50 uses the stock 6-pixel minifont. |
-| `hpclang_font_big()` | ✅ | Borrow the native main/big font. HP39/40 uses the stock 5×8 main raster; HP48/49/50 uses the stock 8-pixel bigfont. |
-| `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage. |
-| `hpclang_font_advance()` | ✅ | Nominal/fixed advance. |
+| `hpclang_font_default()` | ✅ | Borrow the calculator's normal default native selection. On HP39gs/40gs this is the stock 5×8 main raster; on HP48gII/49g+/50g it is the stock bigfont. This convenience alias is not a semantic role. |
+| `hpclang_font_mini()` | ✅ | Borrow the stock minifont. HP39/40 uses its proportional five-row small font; HP48/49/50 uses the historical six-row minifont. |
+| `hpclang_font_big()` | ✅/🧪 | Expose the historical HP48/49/50 bigfont only: eight raster rows with nominal advance 6. HP39-family calculators do not have this HPGCC bigfont and must return `NULL` rather than aliasing the 5×8 main font. The contract is frozen here before the implementation change. |
+| `hpclang_font_editline()` | 🧪 | Expose the dedicated HP39gs/40gs fixed 6×10 EditLine ROM font. It is unavailable on HP48gII/49g+/50g, and remains unavailable on HP39g+ until a trustworthy full-flash fixture establishes its layout. The contract is frozen here before the implementation change. |
+| `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
+| `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
 
-No HP glyph bitmap is linked into the application. HP48gII/49g+/50g native font objects are resolved through the live Saturn logical mapping supplied by the launcher. HP39gs/40gs fixed native rasters are physical stock-ROM assets; the launcher maps only physical NOR pages `0x00042000` and `0x00043000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime accepts that mapping only when the opaque `platform_cookie` matches the expected private-window base. None of those addresses or tokens are public font API.
+No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/bigfont objects are resolved through the live Saturn logical mapping supplied by the launcher. HPGCC3 documents bigfont as an 8-row raster with normal advance 6; its raw record is eight bytes per character, so “8×8” describes storage/raster capacity rather than a fixed 8-pixel text advance.
+
+HP39gs/40gs fixed native rasters are physical stock-ROM assets. The launcher maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime accepts that mapping only when the opaque `platform_cookie` matches the expected private-window base. The established 5×8 main and proportional mini tables already live in this window.
+
+Independent HP39 UI reverse engineering also establishes a third, dedicated EditLine table: fixed 6×10 cells, 20 Saturn nibbles per character, with the legacy lookup `0x07D3EA + 20 * characterCode`. The 2.22 HP39gs/40gs candidate locations obtained from the independently verified main/mini relocation deltas remain implementation evidence until the new ROM hash/pixel oracle confirms them. No glyph payload from that table is redistributed by hpclang.
 
 The HP39 two-page window replaced an experimental long-lived high-L1 NOR section alias. Runtime diagnostics proved the alias descriptor words could themselves lie inside the active LCD framebuffer's physical interval and be overwritten by ordinary drawing. The fix is therefore an MMU-ownership correction below the font API, not an application ABI change.
 
-HP39 mini is five bitmap rows with a per-glyph advance (nominal 4); ASCII lowercase follows the stock small-font case-folding behavior. HP39 main is the stock 5×8 raster with nominal advance 6. HP48/49/50 mini/big retain the historical 6/4 and 8/6 line-height/advance conventions.
+HP39 mini is five bitmap rows with a per-glyph advance (nominal 4); ASCII lowercase follows the stock small-font case-folding behavior. HP39 main is the stock 5×8 raster with nominal advance 6. HP39 EditLine is a separate fixed 6×10 raster with advance 6. HP48/49/50 mini/big retain the historical 6/4 and 8/6 line-height/advance conventions.
 
-HP39g+ is intentionally not inferred from its siblings. It retains the non-physical fallback path until a trustworthy real-hardware full-flash fixture establishes its own native layout.
+HP39g+ is intentionally not inferred from its siblings. It retains the non-physical fallback path for already established fonts, and the EditLine accessor remains unavailable until a trustworthy real-hardware full-flash fixture establishes its own native layout.
 
 ### Generated custom fonts
 
@@ -136,7 +143,7 @@ Generated convenience aliases are currently `@mini = newrpl_6a`, `@normal = newr
 | `hpclang_surface_draw_utf8()` | ✅ | Decode UTF-8; invalid sequences become U+FFFD then the selected font's fallback if needed. |
 | `hpclang_surface_draw_text()` | ✅ | Canonical UTF-8 text API; same semantics as `draw_utf8()`. |
 
-There is deliberately no public core semantic-role API such as `mini` / `text` / `edit-large`. Applications select native or generated fonts directly; a future UI toolkit/theme layer may define its own role vocabulary above this API.
+There is deliberately no public core semantic-role API such as `text`, `caption`, or `edit-large`. The historical names `mini`, `big`, and `editline` are concrete ROM-font accessors, not theme roles. Applications select native or generated fonts directly; a future UI toolkit/theme layer may define its own role vocabulary above this API.
 
 ## Storage model
 

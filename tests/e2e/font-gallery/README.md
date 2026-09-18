@@ -42,11 +42,11 @@ The review page deliberately uses repertoire/design-sensitive specimens instead 
 
 Some faces intentionally make non-alphanumeric repertoires very visible. Spleen, for example, contains box-drawing and Braille codepoints; Gallery renders those real glyphs as repertoire probes. They are not TAB control characters and should not be treated as mojibake. Locale specimen rows are glyph bags rather than prose and should avoid accidental geopolitical or other semantic phrasing.
 
-The two native Gallery entries are deliberately role-based, not a ROM-font census: `hpclang_font_mini()` plus `hpclang_font_default()` (currently the same native selection as `hpclang_font_big()`). Other stock ROM font-like objects, including edit-line-specific faces, are outside the Gallery unless a public hpclang native-font role is added for them.
+The Gallery native section is a census of the concrete ROM fonts hpclang exposes, not a semantic role test. The current pre-change baseline has two entries (`hpclang_font_mini()` plus `hpclang_font_default()`), but the API contract now removes the false HP39 `big()` alias and adds the independently established HP39gs/40gs 6×10 EditLine font as its own named ROM-font accessor. After implementation, HP39gs/40gs should therefore show mini, main/default, and EditLine; HP48gII/49g+/50g should continue to show minifont and bigfont/default. HP39g+ remains excluded from the EditLine census until its flash layout is verified.
 
 ## Current Gallery census
 
-With 245 generated faces, exhaustive Direct now traverses **247 entries** — 245 generated plus two native — and renders both SAMPLE and TEXT pages, for **494 captures per target**. The production family matrix covers HP39gs, HP40gs, HP48gII, HP49g+, and HP50g.
+With 245 generated faces, the fully-green pre-change baseline (#103 on `0821c822`) still traverses **247 entries** — 245 generated plus two native — and renders both SAMPLE and TEXT pages, for **494 captures per target**. The next Gallery census is intentionally family-dependent: HP39gs/40gs gain the concrete EditLine ROM font (248 entries / 496 captures), while HP48gII/49g+/50g remain at 247 / 494. A fresh formal Gallery run is required after that implementation.
 
 The compact Stock Gallery remains concern-specific. HP50g supplies authoritative hp4950 live-Saturn native-font evidence. HP48gII supplies the independent 64-line hp48 live-native path. HP48 now requires the same strict settled-return result as the canonical Runtime gate: HPC1 PASS, `status=pass`, control-flow return, `return_settled=true`, and x50ng exit 0. Gallery #99 is fully green, and Gallery #102 independently passes this strict HP48 gate.
 
