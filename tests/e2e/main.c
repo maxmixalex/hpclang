@@ -20,6 +20,10 @@ int hpclang_e2e_cpp_test(void);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
+static const char hpclang_e2e_pass_label[] = HPCLANG_UI_TEXT("RUNTIME PASS");
+static const char hpclang_e2e_fail_label[] = HPCLANG_UI_TEXT("RUNTIME FAIL");
+static const char hpclang_e2e_code_label[] = HPCLANG_UI_TEXT("CODE");
+static const char hpclang_e2e_hex_digits[] = HPCLANG_UI_TEXT("0123456789ABCDEF");
 
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_initialized_probe = 0x13579bdfu;
@@ -74,6 +78,31 @@ static void hex2(
     hpclang_surface_draw_char(
         surface, font, x + (int)hpclang_font_advance(font), y,
         (uint8_t)digits[value & 15u], 255u);
+}
+
+static void result_text(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    const char *s)
+{
+    hpclang_surface_draw_text(
+        surface, &hpclang_e2e_ui_font, x, y, s, 255u);
+}
+
+static void result_hex2(
+    struct hpclang_surface *surface,
+    int x,
+    int y,
+    uint32_t value)
+{
+    const struct hpclang_font *font = &hpclang_e2e_ui_font;
+    hpclang_surface_draw_char(
+        surface, font, x, y,
+        (uint8_t)hpclang_e2e_hex_digits[(value >> 4) & 15u], 255u);
+    hpclang_surface_draw_char(
+        surface, font, x + (int)hpclang_font_advance(font), y,
+        (uint8_t)hpclang_e2e_hex_digits[value & 15u], 255u);
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
@@ -601,7 +630,7 @@ static int finish(uint32_t failure, uint32_t model)
 #ifdef HPCLANG_E2E_KEYBOARD
         draw_keyboard_result(surface, 1);
 #else
-        text(surface, 38, 28, "RUNTIME PASS");
+        result_text(surface, 30, 28, hpclang_e2e_pass_label);
 #endif
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
         text(surface, 39, 40, "ENTER TO EXIT");
@@ -617,9 +646,9 @@ static int finish(uint32_t failure, uint32_t model)
     } else
 #endif
     {
-        text(surface, 30, 24, "RUNTIME FAIL");
-        text(surface, 55, 36, "CODE");
-        hex2(surface, 75, 36, failure);
+        result_text(surface, 24, 24, hpclang_e2e_fail_label);
+        result_text(surface, 48, 36, hpclang_e2e_code_label);
+        result_hex2(surface, 72, 36, failure);
     }
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
     text(surface, 39, 48, "ENTER TO EXIT");

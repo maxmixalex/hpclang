@@ -15,9 +15,11 @@ export TARGET
 STATE="$ROOT/build/$TARGET-state"
 SD="$ROOT/build/$TARGET-sd"
 rm -rf "$STATE" "$SD"
-mkdir -p "$STATE" "$SD" "$SD/ZZHPDIR"
+mkdir -p "$STATE" "$SD"
 
 cp "$ASSETS_DIR/hp4950/SETUP.BIN" "$SD/SETUP.BIN"
+
+export HPCLANG_X50NG_SD_DIR="$SD"
 
 COMMON_ARGS=(
     --datadir="$STATE"
