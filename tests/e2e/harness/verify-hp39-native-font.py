@@ -9,6 +9,7 @@ check merely by producing non-empty pixels.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -19,6 +20,9 @@ CONTENT_BOTTOM_MARGIN = 3
 MINI_GLYPH_COUNT = 155
 MINI_RECORD_NIBBLES = 11
 MINI_MAP_FIRST_CODE = 0xA0
+EDITLINE_RECORD_NIBBLES = 20
+EDITLINE_TABLE_NIBBLES = 256 * EDITLINE_RECORD_NIBBLES
+EDITLINE_REFERENCE_SHA256 = "f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53"
 SPECIMEN = (0xA3, 0xA5, 0xA9, 0xB0, 0xB1, 0xB5, 0xD7, 0xF7)
 
 
@@ -26,12 +30,13 @@ SPECIMEN = (0xA3, 0xA5, 0xA9, 0xB0, 0xB1, 0xB5, 0xD7, 0xF7)
 class FontBases:
     main: int
     mini: int
+    editline: int
 
 
 BASES = {
     # Physical nibble addresses inside the official packed 2.22 NOR.
-    "hp39gs": FontBases(main=0x000FCAE9, mini=0x000FEB2D),
-    "hp40gs": FontBases(main=0x000FCC9C, mini=0x000FECE0),
+    "hp39gs": FontBases(main=0x000FCAE9, mini=0x000FEB2D, editline=0x000FD882),
+    "hp40gs": FontBases(main=0x000FCC9C, mini=0x000FECE0, editline=0x000FDA35),
 }
 
 
@@ -100,6 +105,23 @@ def saturn_byte(nor: bytes, address: int) -> int:
     return nibble(nor, address) | (nibble(nor, address + 1) << 4)
 
 
+def verify_editline_fingerprint(nor: bytes, bases: FontBases, target: str) -> None:
+    payload = bytes(
+        nibble(nor, bases.editline + offset)
+        for offset in range(EDITLINE_TABLE_NIBBLES)
+    )
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != EDITLINE_REFERENCE_SHA256:
+        raise SystemExit(
+            f"{target}: HP39 EditLine ROM fingerprint mismatch at "
+            f"0x{bases.editline:x}: {digest} != {EDITLINE_REFERENCE_SHA256}"
+        )
+    print(
+        f"PASS HP39 EditLine ROM fingerprint: {target} "
+        f"base=0x{bases.editline:x} sha256={digest}"
+    )
+
+
 def mini_index(nor: bytes, base: int, codepoint: int) -> int:
     cp = codepoint if 0 <= codepoint <= 0xFF else ord("?")
     if ord("a") <= cp <= ord("z"):
@@ -138,6 +160,16 @@ def render_specimen(nor: bytes, bases: FontBases, kind: str) -> tuple[int, int, 
             for yy in range(height):
                 row = saturn_byte(nor, record + yy * 2)
                 for xx in range(5):
+                    if row & (1 << xx):
+                        points.add((pen_x + xx, yy))
+            pen_x += 6
+    elif kind == "editline":
+        height = 10
+        for cp in SPECIMEN:
+            record = bases.editline + cp * EDITLINE_RECORD_NIBBLES
+            for yy in range(height):
+                row = saturn_byte(nor, record + yy * 2)
+                for xx in range(6):
                     if row & (1 << xx):
                         points.add((pen_x + xx, yy))
             pen_x += 6
@@ -212,6 +244,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("nor", type=Path)
     parser.add_argument("--mini", type=Path, nargs="+", required=True)
     parser.add_argument("--main", type=Path, nargs="+", required=True)
+    parser.add_argument("--editline", type=Path, nargs="+", required=True)
     return parser.parse_args()
 
 
@@ -219,8 +252,10 @@ def main() -> None:
     args = parse_args()
     nor = args.nor.read_bytes()
     bases = BASES[args.target]
+    verify_editline_fingerprint(nor, bases, args.target)
     verify_kind(nor, bases, "mini", args.mini)
     verify_kind(nor, bases, "main", args.main)
+    verify_kind(nor, bases, "editline", args.editline)
 
 
 if __name__ == "__main__":
