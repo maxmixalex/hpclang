@@ -383,8 +383,38 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
         return 0x48u;
-    if (remove("HPCLANG.NEW") != 0)
-        return 0x49u;
+    /*
+     * Historical HPGCC 1.1 marked KOS rename as apparently broken (-200 on
+     * every call). Probe the actual Stock 2.15 implementation on both HP49g+
+     * and HP50g before accepting rename() as a supported M7.2 service.
+     */
+    if (remove("HPCLANG.REN") != 0 && errno != ENOENT)
+        return 0x53u;
+    errno = 0;
+    if (rename("HPCLANG.NEW", "HPCLANG.REN") != 0)
+        return 0x54u;
+
+    errno = 0;
+    output = fopen("HPCLANG.NEW", "rb");
+    if (output != NULL) {
+        fclose(output);
+        return 0x55u;
+    }
+    if (errno != ENOENT)
+        return 0x56u;
+
+    output = fopen("HPCLANG.REN", "rb");
+    if (output == NULL)
+        return 0x57u;
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    output_close = fclose(output);
+    if (output_close != 0 ||
+        got != sizeof(create_expected) - 1u ||
+        memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
+        return 0x58u;
+    if (remove("HPCLANG.REN") != 0)
+        return 0x59u;
 
     /*
      * HPGCC 2.0 documents a stock KOS bug where FILE_APPEND does not create a
