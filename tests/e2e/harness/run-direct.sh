@@ -69,6 +69,10 @@ case "$HPCLANG_E2E_FAMILY" in
         mkdir -p "$SD/ZZHPDIR"
         printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
         printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
+        if [[ "${HPCLANG_E2E_STORAGE_WITNESS:-0}" == 1 ]]; then
+            export TZ=UTC
+            touch -d '2024-01-02 03:04:06 UTC' "$SD/HPCLANG.TST"
+        fi
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-50g.css"
             --sd-dir="$SD"

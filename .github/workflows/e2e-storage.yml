@@ -150,6 +150,7 @@ jobs:
     env:
       FAMILY: ${{ matrix.family }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
+      HPCLANG_E2E_STORAGE_WITNESS: 1
     steps:
       - uses: actions/checkout@v7
       - name: Download storage build

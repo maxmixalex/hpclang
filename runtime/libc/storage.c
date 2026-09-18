@@ -710,6 +710,74 @@ static int read_kos_path_info(
     return 0;
 }
 
+#ifdef HPCLANG_E2E_STORAGE
+static int e2e_kos_date_valid(const struct kos_date *date)
+{
+    static const uint8_t month_days[12] = {
+        31u, 28u, 31u, 30u, 31u, 30u,
+        31u, 31u, 30u, 31u, 30u, 31u
+    };
+
+    if (date->year < 1980u || date->year > 2107u ||
+        date->month < 1u || date->month > 12u ||
+        date->day < 1u)
+        return 0;
+
+    uint8_t limit = month_days[date->month - 1u];
+    if (date->month == 2u) {
+        uint16_t year = date->year;
+        int leap = (year % 4u) == 0u &&
+                   ((year % 100u) != 0u || (year % 400u) == 0u);
+        if (leap)
+            limit = 29u;
+    }
+    return date->day <= limit;
+}
+
+static int e2e_kos_time_valid(const struct kos_time *time)
+{
+    return time->hours <= 23u &&
+           time->minutes <= 59u &&
+           time->seconds <= 59u;
+}
+
+int hpclang_e2e_kos_timestamp_witness(
+    const char *path,
+    uint64_t *modified_stamp,
+    uint32_t *validity)
+{
+    if (modified_stamp == NULL || validity == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    struct kos_file_info raw;
+    if (read_kos_path_info(path, &raw) != 0)
+        return -1;
+
+    *modified_stamp =
+        (uint64_t)raw.last_modifier.date.year * UINT64_C(10000000000) +
+        (uint64_t)raw.last_modifier.date.month * UINT64_C(100000000) +
+        (uint64_t)raw.last_modifier.date.day * UINT64_C(1000000) +
+        (uint64_t)raw.last_modifier.time.hours * UINT64_C(10000) +
+        (uint64_t)raw.last_modifier.time.minutes * UINT64_C(100) +
+        (uint64_t)raw.last_modifier.time.seconds;
+
+    uint32_t flags = 0u;
+    if (e2e_kos_date_valid(&raw.last_modifier.date) &&
+        e2e_kos_time_valid(&raw.last_modifier.time))
+        flags |= 1u;
+    if (e2e_kos_date_valid(&raw.create_date.date) &&
+        e2e_kos_time_valid(&raw.create_date.time))
+        flags |= 2u;
+    if (e2e_kos_date_valid(&raw.last_access_date))
+        flags |= 4u;
+
+    *validity = flags;
+    return 0;
+}
+#endif
+
 int hpclang_stream_path_query(
     const char *path,
     struct hpclang_stream_path_info *info)

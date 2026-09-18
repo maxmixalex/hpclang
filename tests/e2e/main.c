@@ -273,6 +273,11 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+int hpclang_e2e_kos_timestamp_witness(
+    const char *path,
+    uint64_t *modified_stamp,
+    uint32_t *validity);
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -362,6 +367,18 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (!S_ISREG(input_info.st_mode) ||
         input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
         return 0x5bu;
+
+    uint64_t modified_stamp = 0u;
+    uint32_t timestamp_validity = 0u;
+    if (hpclang_e2e_kos_timestamp_witness(
+            "HPCLANG.TST",
+            &modified_stamp,
+            &timestamp_validity) != 0)
+        return 0x69u;
+    if (modified_stamp != UINT64_C(20240102030406))
+        return 0x6au;
+    if ((timestamp_validity & 0x7u) != 0x7u)
+        return 0x6bu;
 
     /*
      * "/" is synthetic volume-root metadata because KOS GetSpecialFileInfo
