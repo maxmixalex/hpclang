@@ -16,7 +16,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 
 Direct runtime passes on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains blocked until a trustworthy real-machine stock flash fixture exists.
 
-Current fully-green canonical runtime evidence is **35248256215 / #122**: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and the exact 52-frame keyboard progression all pass. The HP48 Stock path reaches payload PASS, restores control flow, tears down the temporary stage mapping, and reaches a settled stock-owned repaint. Post-cleanup Runtime **35258971838 / #125** also passes the strict HP48 gate; that run is not globally green because HP49g+ independently timed out before keyboard progression while HP50g passed, so #122 remains the latest fully-green canonical Runtime run.
+Current fully-green canonical runtime evidence is **35298949365 / #135** on the final M7.1 head: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and the exact 52-frame keyboard progression all pass. The HP48 Stock path reaches payload PASS, restores control flow, tears down the temporary stage mapping, and reaches a settled stock-owned repaint. Runtime #122 remains the first run that closed this same contract; later intermediate runs are historical diagnostics rather than the current gate.
 
 ## Runtime PASS contract
 
@@ -66,7 +66,7 @@ Native access is intentionally a small census of concrete stock fonts, not a sem
 
 The 2.22 HP39gs/40gs EditLine relocation is independently gated against stock NOR data rather than accepted from address arithmetic alone. HP39gs physical nibble `0x0FD882` and HP40gs `0x0FDA35` both match the legacy EditLine-table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`; the Direct and Stock Gallery paths also pass the independent ROM-derived 6×10 pixel oracle.
 
-Gallery **#103** on commit `0821c822` is the fully-green pre-change baseline. Gallery **#111** (`35295358487`) is the fully-green post-change gate: HP39gs/40gs gain one additional concrete EditLine ROM font, while HP48/49/50 retain their two-font native census.
+Gallery **#103** on commit `0821c822` is the pre-change baseline, #111 is the first fully-green post-EditLine gate, and Gallery **#112** (`35298949457`) is the final M7.1 head gate after documentation consistency cleanup. HP39gs/40gs carry the additional concrete EditLine ROM font while HP48/49/50 retain their two-font native census.
 
 ## Final font validation closure
 
@@ -74,7 +74,7 @@ The current canonical source bundle is bitmap-only. The generated catalog is **2
 
 The exhaustive Gallery is now family-dependent. HP39gs/40gs contain **248 entries: 245 generated + mini + main/default + EditLine**, rendering **496 captures**. HP48gII/49g+/50g contain **247 entries: 245 generated + minifont + bigfont/default**, rendering **494 captures**.
 
-Formal production `E2E / Font Gallery` run **35295358487 / #111** is fully green:
+Formal production `E2E / Font Gallery` run **35298949457 / #112** is fully green:
 
 - Build Font Gallery;
 - universal x50ng;
@@ -105,7 +105,7 @@ The real HP39gs run has passed the complete canonical runtime and returned clean
 
 `Stock / hp39` boots each official 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original serial-disk path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result.
 
-Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #122 proves the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family.
+Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 proves the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family.
 
 ## HP48gII Direct and Stock gates
 
@@ -113,7 +113,7 @@ Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 di
 
 Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
-HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the canonical fully-green witness; Gallery #99 independently validates the same settled return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
+HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #135 is the current canonical fully-green witness; Gallery #112 independently validates the same settled return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
 
 ## HP49g+/50g stream-storage and Stock gate
 

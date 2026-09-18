@@ -123,7 +123,7 @@ This is strong historical evidence that HP39's text environment is a separate st
 
 However, evidence must not be overstated: HPGCC does **not** provide the hpclang physical raster constants `0x07E695` and `0x07C651`. Those exact HP39 mini/main table bases, record layouts, and the need to bypass the live logical bank for fixed raster assets were established independently by stock-ROM reverse engineering and emulator pixel validation.
 
-The production HP39gs/40gs implementation now exposes only the two required physical NOR pages, `0x00042000` and `0x00043000`, as uncached 4 KiB small pages inside the bootstrap-private prefix of hpclang's own code coarse table. Runtime receives the exact private window base only through the opaque `platform_cookie`; no physical ROM address or private mapping becomes public font ABI.
+The production HP39gs/40gs implementation now exposes only the two required physical NOR pages, `0x0007e000` and `0x0007f000`, as uncached 4 KiB small pages inside the bootstrap-private prefix of hpclang's own code coarse table. Runtime receives the exact private window base only through the opaque `platform_cookie`; no physical ROM address or private mapping becomes public font ABI.
 
 This replaced an experimental long-lived high-L1 section alias. The alias mechanism itself was valid — the retained HP39g+ NOR dumper remains useful evidence for a transient `L1[A0]`/section mapping — but it was not safe as persistent runtime storage on HP39gs/40gs. Diagnostics proved that the active LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite a descriptor word during ordinary drawing. A descriptor that reads zero is therefore not necessarily a safe long-lived slot.
 
@@ -137,7 +137,7 @@ Compatibility consequence:
 - neither physical ROM addresses, private code-window VAs, `platform_cookie` meaning nor `Read[]` pointers belong in the public font ABI;
 - historical HPG bundled bitmap tables are not silently redistributed as hpclang assets.
 
-The production Font Gallery gate covers this boundary directly. Fully-green run **35295358487 / #111** covers all Direct families plus HP39gs, HP40gs, HP48gII, and HP50g Stock controls. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/50g remain **247 / 494**. Both HP39 Stock targets pass the independent EditLine fingerprint and pixel oracle.
+The production Font Gallery gate covers this boundary directly. Fully-green run **35298949457 / #112** covers all Direct families plus HP39gs, HP40gs, HP48gII, and HP50g Stock controls. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/50g remain **247 / 494**. Both HP39 Stock targets pass the independent EditLine fingerprint and pixel oracle.
 
 ## Font/text compatibility boundary
 
@@ -240,6 +240,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final curation includes Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained. Gallery labels/specimens have been strengthened for Ark Pixel regional variants, width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35295358487 / #111** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. HP39 summaries now show minifont, main, EditLine, and generated control; HP48/HP50 remain minifont, bigfont/default, and generated control.
+`E2E / Font Gallery` **35298949457 / #112** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. HP39 summaries now show minifont, main, EditLine, and generated control; HP48/HP50 remain minifont, bigfont/default, and generated control.
 
 The font implementation/evidence slice is closed. Remaining repository integration and bounded Stock-harness closeout are not HPGCC/font compatibility blockers.
