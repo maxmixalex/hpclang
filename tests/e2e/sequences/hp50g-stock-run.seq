@@ -26,6 +26,5 @@
 18450 capture lib
 18800 tap f1
 20100 capture armtoolbox
-20200 host-mkdir ZZHPDIR
 20500 tap f1
 20800 monitor

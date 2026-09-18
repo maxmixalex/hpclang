@@ -273,6 +273,39 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+#define HPCLANG_E2E_PHASE_STORAGE_DIRECTORY_READY UINT32_C(0x53445244) /* SDRD */
+#define HPCLANG_E2E_STORAGE_DIRECTORY_TIMEOUT_US UINT64_C(2000000)
+#define HPCLANG_E2E_STORAGE_DIRECTORY_POLL_US 10000u
+
+static int wait_for_storage_directory_witness(
+    struct hpclang_stream_path_info *info)
+{
+    /*
+     * Direct E2E pre-seeds ZZHPDIR. Stock E2E deliberately does not: once the
+     * payload has entered HPC1 and completed the earlier metadata probes it
+     * publishes SDRD through the existing machine-readable result word. The
+     * Stock harness creates the host-side directory only after observing that
+     * phase. Polling here then tells us whether the running Stock filesystem
+     * can observe a namespace change without letting the witness participate
+     * in File Manager/RCL/ARMToolbox launch choreography.
+     */
+    hpclang_e2e_result = HPCLANG_E2E_PHASE_STORAGE_DIRECTORY_READY;
+
+    uint64_t deadline = hpclang_time_monotonic_us() +
+        HPCLANG_E2E_STORAGE_DIRECTORY_TIMEOUT_US;
+    do {
+        errno = 0;
+        if (hpclang_stream_path_query("ZZHPDIR", info) == 0)
+            return info->type == HPCLANG_STREAM_PATH_TYPE_DIRECTORY ? 0 : -1;
+        if (errno != ENOENT)
+            return -1;
+        hpclang_delay_us(HPCLANG_E2E_STORAGE_DIRECTORY_POLL_US);
+    } while (hpclang_time_monotonic_us() < deadline);
+
+    errno = ETIMEDOUT;
+    return -1;
+}
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -374,8 +407,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x5cu;
 
     struct hpclang_stream_path_info directory_info;
-    if (hpclang_stream_path_query("ZZHPDIR", &directory_info) != 0 ||
-        directory_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+    if (wait_for_storage_directory_witness(&directory_info) != 0)
         return 0x68u;
 
     /*
