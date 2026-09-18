@@ -12,24 +12,24 @@
 6500 capture sd
 6900 tap enter
 7200 tap down
-7350 tap down
 7500 tap down
-7750 capture sd-payload
-8000 tap f2
-9200 capture copy-destination
-9500 tap down
-9800 tap f6
-11600 capture copy-result
-12100 tap f4
-13400 capture recalled-in-filer
-13800 tap nxt
-14200 tap nxt
-15000 capture filer-halt-menu
-15400 tap f1
-16700 capture payload-recalled
-17200 chord rshift two
-18450 capture lib
-18800 tap f1
-20100 capture armtoolbox
-20500 tap f1
-20800 monitor
+7800 tap down
+8200 capture sd-payload
+8500 tap f2
+9700 capture copy-destination
+10000 tap down
+10300 tap f6
+12100 capture copy-result
+12600 tap f4
+13900 capture recalled-in-filer
+14300 tap nxt
+14700 tap nxt
+15500 capture filer-halt-menu
+15900 tap f1
+17200 capture payload-recalled
+17700 chord rshift two
+18950 capture lib
+19300 tap f1
+20600 capture armtoolbox
+21000 tap f1
+21300 monitor
