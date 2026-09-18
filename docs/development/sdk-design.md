@@ -151,6 +151,16 @@ HP39/40 and HP48 do not pretend to expose that SD byte-stream service; unsupport
 
 Raw KOS module/function IDs, FILE_INFO layout, creation/access timestamps, and stock global-directory cursor state remain runtime-private.
 
+### Namespace ownership
+
+Stock KOS is not a suitable implementation for the complete directory/path API. Its directory enumeration advances a Stock-global current-file-ID cursor, and its `chdir` has no lossless matching `getcwd`. Wrapping those operations in an iterator-shaped hpclang struct would create false ownership semantics and could leave the calculator OS in a different directory.
+
+M7.2c therefore uses a **whole-process stream-namespace lease** for directory/path work. Once the independent FAT backend is acquired, no Stock-KOS stream handle may remain live and all byte-stream namespace activity must use the leased backend until it is unmounted/released. Only after release is the Stock filesystem reinitialized. These are two separate lifecycle steps: direct-backend release returns the SD controller/media to a neutral state; Stock reinitialization makes the calculator OS rebuild its own filesystem state.
+
+The Stock side of that lifecycle is already measured. Storage #23 calls KOS syscall 19 after all KOS-backed handles are closed, then successfully performs ordinary metadata and reopen/read operations and returns cleanly on both HP49g+ and HP50g. The direct-backend release half remains unclaimed until the SDIO/FAT implementation exists.
+
+The selected FAT-layer baseline is upstream FatFs R0.16 with its official patch-1 and 2026-07-10 patch-2 applied. The initial profile is intentionally narrower than FatFs as a whole: one volume, FAT12/16/32, UTF-8 LFN, `FF_FS_RPATH=0`, no exFAT, no mkfs, and bounded memory. Media I/O is supplied by an independently implemented hpclang S3C2410 SDIO driver; historical HPGCC FSystem/SD-driver code is behavioral evidence, not source material.
+
 ### Calculator objects
 
 HP39gs/40gs have a real typed object store: directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related records, rooted at `HP39DIR.000` with `HP39DIR.CUR` tracking the current directory. These are not POSIX files and need a typed/named object service.
