@@ -199,7 +199,7 @@ static uintptr_t saturn_page_base(uint32_t saturn_nibble_address)
     /* HPGCC's SAT_CPU starts with Read[257]. The launch ABI deliberately
      * preserves that Saturn-state pointer for logical Saturn RAM/object
      * access. Fixed HP39gs/40gs ROM raster assets intentionally do not use
-     * this live bank view; see hp39_physical_nibble(). */
+     * this live bank view; see hp39_font_nibble(). */
     const uint32_t *read_map =
         (const uint32_t *)(uintptr_t)boot->saturn_state;
     return (uintptr_t)read_map[saturn_nibble_address >> 12];
@@ -260,13 +260,19 @@ static uint32_t hp39_window_font_first_nibble(
     return UINT32_MAX;
 }
 
-static uint8_t hp39_physical_nibble(uint32_t address)
+statstatic uint8_t hp39_font_nibble(
+    uint32_t logical_first,
+    uint32_t address)
 {
     uint32_t model = active_model();
 
-    /* HP39g+ still lacks a trustworthy stock full-flash fixture. Preserve the
-       legacy logical Saturn lookup until its own NOR layout is evidenced on
-       real hardware. */
+    /* The legacy HP39 font tables overlap slightly in logical Saturn address
+       space. The caller therefore names the concrete ROM font; never infer
+       table identity from the address alone. HP39g+ retains its historical
+       logical Saturn lookup until a real full-flash fixture establishes a
+       physical layout. */
+    if (address < logical_first)
+        return 0u;
     if (model == HPCLANG_MODEL_HP39GPLUS)
         return saturn_nibble(address);
 
@@ -274,28 +280,13 @@ static uint8_t hp39_physical_nibble(uint32_t address)
         return 0u;
 
     uintptr_t window_base = hp39_font_window_base();
-    uint32_t logical_first;
-    uint32_t window_first;
-
-    if (address >= HP39_MAIN_FIRST_NIBBLE &&
-        address <= HP39_MAIN_LAST_NIBBLE) {
-        logical_first = HP39_MAIN_FIRST_NIBBLE;
-    } else if (address >= HP39_EDITLINE_FIRST_NIBBLE &&
-               address <= HP39_EDITLINE_LAST_NIBBLE) {
-        logical_first = HP39_EDITLINE_FIRST_NIBBLE;
-    } else if (address >= HP39_MINI_FIRST_NIBBLE &&
-               address <= HP39_MINI_LAST_NIBBLE) {
-        logical_first = HP39_MINI_FIRST_NIBBLE;
-    } else {
-        return 0u;
-    }
-
-    window_first = hp39_window_font_first_nibble(model, logical_first);
-    if (window_first == UINT32_MAX)
+    uint32_t window_first =
+        hp39_window_font_first_nibble(model, logical_first);
+    if (window_base == 0u || window_first == UINT32_MAX)
         return 0u;
 
     uint32_t window_nibble = window_first + (address - logical_first);
-    if (window_base == 0u || window_nibble >= HP39_FONT_WINDOW_NIBBLES)
+    if (window_nibble >= HP39_FONT_WINDOW_NIBBLES)
         return 0u;
 
     const volatile uint8_t *p = (const volatile uint8_t *)(
@@ -305,13 +296,16 @@ static uint8_t hp39_physical_nibble(uint32_t address)
                                         (uint8_t)(value & 0x0fu);
 }
 
-static uint8_t hp39_physical_byte(uint32_t address)
+static uint8_t hp39_font_byte(
+    uint32_t logical_first,
+    uint32_t address)
 {
-    return (uint8_t)(hp39_physical_nibble(address) |
-                     (uint8_t)(hp39_physical_nibble(address + 1u) << 4));
+    return (uint8_t)(hp39_font_nibble(logical_first, address) |
+                     (uint8_t)(
+                         hp39_font_nibble(logical_first, address + 1u) << 4));
 }
 
-static uint32_t native_byte_codepoint(uint32_t codepoint)
+ic uint32_t native_byte_codepoint(uint32_t codepoint)
 {
     return codepoint <= 0xffu ? codepoint : (uint32_t)'?';
 }
@@ -328,7 +322,8 @@ static uint32_t hp39_mini_index(uint32_t codepoint)
         return codepoint - (uint32_t)('a' - 'A');
     if (codepoint >= HP39_MINI_MAP_FIRST_CODE) {
         uint32_t offset = codepoint - HP39_MINI_MAP_FIRST_CODE;
-        return hp39_physical_byte(
+        return hp39_font_byte(
+            HP39_MINI_FIRST_NIBBLE,
             HP39_MINI_MAP_FIRST_NIBBLE + offset * 2u);
     }
     if (codepoint >= 0x7bu)
@@ -339,7 +334,8 @@ static uint32_t hp39_mini_index(uint32_t codepoint)
 static uint32_t hp39_mini_advance(uint32_t codepoint)
 {
     uint32_t index = hp39_mini_index(codepoint);
-    uint32_t advance = hp39_physical_nibble(
+    uint32_t advance = hp39_font_nibble(
+        HP39_MINI_FIRST_NIBBLE,
         HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES);
     return advance != 0u ? advance : 4u;
 }
@@ -410,7 +406,8 @@ static void draw_hp39_mini(
     uint32_t record =
         HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES;
     for (uint32_t yy = 0u; yy < 5u; ++yy) {
-        uint8_t row = hp39_physical_byte(record + 1u + yy * 2u);
+        uint8_t row =
+            hp39_font_byte(HP39_MINI_FIRST_NIBBLE, record + 1u + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
                 hpclang_surface_set_pixel(
@@ -429,7 +426,8 @@ static void draw_hp39_main(
     uint32_t index = native_byte_codepoint(codepoint);
     uint32_t record = HP39_MAIN_FIRST_NIBBLE + index * 16u;
     for (uint32_t yy = 0u; yy < 8u; ++yy) {
-        uint8_t row = hp39_physical_byte(record + yy * 2u);
+        uint8_t row =
+            hp39_font_byte(HP39_MAIN_FIRST_NIBBLE, record + yy * 2u);
         for (uint32_t xx = 0u; xx < 5u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
                 hpclang_surface_set_pixel(
@@ -449,7 +447,8 @@ static void draw_hp39_editline(
     uint32_t record =
         HP39_EDITLINE_FIRST_NIBBLE + index * HP39_EDITLINE_RECORD_NIBBLES;
     for (uint32_t yy = 0u; yy < 10u; ++yy) {
-        uint8_t row = hp39_physical_byte(record + yy * 2u);
+        uint8_t row =
+            hp39_font_byte(HP39_EDITLINE_FIRST_NIBBLE, record + yy * 2u);
         for (uint32_t xx = 0u; xx < 6u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
                 hpclang_surface_set_pixel(
