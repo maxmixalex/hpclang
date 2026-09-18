@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <hpclang/abi.h>
@@ -11,6 +12,7 @@
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
+#include <hpclang/storage.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
 
@@ -252,7 +254,22 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             fclose(unavailable);
             return 0x31u;
         }
-        return errno == ENOSYS ? 0u : 0x32u;
+        if (errno != ENOSYS)
+            return 0x32u;
+
+        struct stat unavailable_info;
+        errno = 0;
+        if (stat("HPCLANG.TST", &unavailable_info) == 0 ||
+            errno != ENOSYS)
+            return 0x53u;
+
+        uint64_t unavailable_free = 0u;
+        errno = 0;
+        if (hpclang_stream_storage_free_bytes(&unavailable_free) == 0 ||
+            errno != ENOSYS)
+            return 0x54u;
+
+        return 0u;
     }
 
     static const char input_expected[] = "HPCLANG-STORAGE\n";
@@ -281,6 +298,18 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     }
     if (errno != ENOENT)
         return 0x43u;
+
+    struct stat input_info;
+    if (stat("HPCLANG.TST", &input_info) != 0)
+        return 0x55u;
+    if (!S_ISREG(input_info.st_mode) ||
+        input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
+        return 0x56u;
+
+    uint64_t free_bytes = 0u;
+    if (hpclang_stream_storage_free_bytes(&free_bytes) != 0 ||
+        free_bytes == 0u)
+        return 0x57u;
 
     FILE *input = fopen("HPCLANG.TST", "rb");
     if (input == NULL)
@@ -383,38 +412,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
         return 0x48u;
-    /*
-     * Historical HPGCC 1.1 marked KOS rename as apparently broken (-200 on
-     * every call). Probe the actual Stock 2.15 implementation on both HP49g+
-     * and HP50g before accepting rename() as a supported M7.2 service.
-     */
-    if (remove("HPCLANG.REN") != 0 && errno != ENOENT)
-        return 0x53u;
-    errno = 0;
-    if (rename("HPCLANG.NEW", "HPCLANG.REN") != 0)
-        return 0x54u;
-
-    errno = 0;
-    output = fopen("HPCLANG.NEW", "rb");
-    if (output != NULL) {
-        fclose(output);
-        return 0x55u;
-    }
-    if (errno != ENOENT)
-        return 0x56u;
-
-    output = fopen("HPCLANG.REN", "rb");
-    if (output == NULL)
-        return 0x57u;
-    memset(buffer, 0, sizeof(buffer));
-    got = fread(buffer, 1u, sizeof(buffer), output);
-    output_close = fclose(output);
-    if (output_close != 0 ||
-        got != sizeof(create_expected) - 1u ||
-        memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
-        return 0x58u;
-    if (remove("HPCLANG.REN") != 0)
-        return 0x59u;
+    if (remove("HPCLANG.NEW") != 0)
+        return 0x49u;
 
     /*
      * HPGCC 2.0 documents a stock KOS bug where FILE_APPEND does not create a

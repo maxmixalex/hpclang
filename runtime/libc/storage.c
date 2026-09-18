@@ -5,10 +5,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <hpclang/device.h>
+#include <hpclang/storage.h>
 #include <hpclang/target.h>
 
 /*
@@ -27,7 +30,8 @@ enum {
     KOS_FUNC_FCLOSE = 3u,
     KOS_FUNC_FSEEK = 4u,
     KOS_FUNC_FDELETE = 5u,
-    KOS_FUNC_FRENAME = 6u,
+    KOS_FUNC_GETFILEINFO = 8u,
+    KOS_FUNC_GETSIZE = 16u,
 
     KOS_FILE_READONLY = 1u,
     KOS_FILE_READWRITE = 2u,
@@ -44,9 +48,55 @@ uint32_t hpclang_kos_swi3(
     uint32_t arg2,
     uint32_t arg3);
 
+typedef uint32_t (*kos_fn0)(void);
 typedef uint32_t (*kos_fn1)(uint32_t);
 typedef uint32_t (*kos_fn2)(uint32_t, uint32_t);
 typedef uint32_t (*kos_fn3)(uint32_t, uint32_t, uint32_t);
+
+enum {
+    KOS_ATTR_READONLY = 1u << 0,
+    KOS_ATTR_DIRECTORY = 1u << 4
+};
+
+struct kos_date {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+};
+
+struct kos_time {
+    uint8_t hours;
+    uint8_t minutes;
+    uint8_t seconds;
+    uint8_t unknown1;
+    uint32_t unknown2;
+};
+
+struct kos_datetime {
+    struct kos_date date;
+    struct kos_time time;
+};
+
+struct kos_file_info {
+    struct kos_datetime last_modifier;
+    struct kos_datetime create_date;
+    struct kos_date last_access_date;
+    char file_name[13];
+    uint8_t attribute;
+    uint16_t ext_attr;
+    uint32_t size;
+};
+
+_Static_assert(sizeof(struct kos_date) == 4u, "KOS date ABI");
+_Static_assert(sizeof(struct kos_time) == 8u, "KOS time ABI");
+_Static_assert(sizeof(struct kos_datetime) == 12u, "KOS datetime ABI");
+_Static_assert(offsetof(struct kos_file_info, attribute) == 41u,
+    "KOS FILE_INFO attribute offset");
+_Static_assert(offsetof(struct kos_file_info, ext_attr) == 42u,
+    "KOS FILE_INFO ext_attr offset");
+_Static_assert(offsetof(struct kos_file_info, size) == 44u,
+    "KOS FILE_INFO size offset");
+_Static_assert(sizeof(struct kos_file_info) == 48u, "KOS FILE_INFO ABI");
 
 enum {
     HPCLANG_STREAM_FD_SLOTS = 8u
@@ -550,36 +600,68 @@ int unlink(const char *path)
     return 0;
 }
 
-int rename(const char *old_path, const char *new_path)
+int stat(const char *path, struct stat *info)
 {
     if (!stream_storage_available())
         return unsupported();
 
-    if (old_path == NULL || new_path == NULL) {
+    if (path == NULL || info == NULL) {
         errno = EFAULT;
         return -1;
     }
 
-    uintptr_t addr = kos_entry(KOS_FUNC_FRENAME);
+    uintptr_t addr = kos_entry(KOS_FUNC_GETFILEINFO);
     if (addr == 0u)
         return unsupported();
 
+    struct kos_file_info raw;
+    memset(&raw, 0, sizeof(raw));
     int32_t result = (int32_t)((kos_fn2)addr)(
-        (uint32_t)(uintptr_t)old_path,
-        (uint32_t)(uintptr_t)new_path);
+        (uint32_t)(uintptr_t)path,
+        (uint32_t)(uintptr_t)&raw);
     if (result < 0) {
-        /*
-         * Historical HPGCC 1.1 explicitly warns that kos_frename() appeared
-         * to return -200 unconditionally on the firmware tested at the time.
-         * Do not reinterpret that undocumented value as ENOENT here: the
-         * Stock E2E probe must first establish whether the 2.15 HP49g+/50g
-         * implementation actually performs a rename.
-         */
-        if (result == -200) {
-            errno = EIO;
+        if (kos_open_error_is_missing(result)) {
+            errno = ENOENT;
             return -1;
         }
         return set_kos_errno(result);
     }
+
+    memset(info, 0, sizeof(*info));
+    info->st_mode =
+        (raw.attribute & KOS_ATTR_DIRECTORY) != 0u ? S_IFDIR : S_IFREG;
+    info->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
+    if ((raw.attribute & KOS_ATTR_READONLY) == 0u)
+        info->st_mode |= S_IWUSR;
+    info->st_nlink = 1;
+    info->st_size = (off_t)raw.size;
+
+    /*
+     * Do not publish KOS timestamp fields yet. Historical HPGCC labels parts
+     * of this structure as uncertain; M7.2 will verify date/time encoding
+     * independently before translating it into POSIX time_t.
+     */
+    return 0;
+}
+
+int hpclang_stream_storage_free_bytes(uint64_t *bytes)
+{
+    if (!stream_storage_available())
+        return unsupported();
+
+    if (bytes == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    uintptr_t addr = kos_entry(KOS_FUNC_GETSIZE);
+    if (addr == 0u)
+        return unsupported();
+
+    int32_t result = (int32_t)((kos_fn0)addr)();
+    if (result < 0)
+        return set_kos_errno(result);
+
+    *bytes = (uint64_t)(uint32_t)result;
     return 0;
 }
