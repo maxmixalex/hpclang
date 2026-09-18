@@ -340,12 +340,13 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x5bu;
 
     /*
-     * KOS GetSpecialFileInfo does not treat "/" as a normal directory entry,
-     * so validate directory metadata using a real named directory fixture.
+     * "/" is synthetic volume-root metadata because KOS GetSpecialFileInfo
+     * only addresses real directory entries. Exercise that contract separately
+     * from the real named-directory witness below.
      */
-    struct hpclang_stream_path_info dir_info;
-    if (hpclang_stream_path_query("HPCLDIR", &dir_info) != 0 ||
-        dir_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+    struct hpclang_stream_path_info root_info;
+    if (hpclang_stream_path_query("/", &root_info) != 0 ||
+        root_info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return 0x5cu;
 
     struct hpclang_stream_path_info directory_info;
