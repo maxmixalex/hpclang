@@ -1,7 +1,9 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "emulator_api.h"
 #include "hdw.h"
@@ -762,6 +764,40 @@ static void seq_capture(void *arg)
     free(event);
 }
 
+static void seq_host_mkdir(void *arg)
+{
+    struct seq_named_event *event = arg;
+    struct state *s = event->state;
+    const char *root = getenv("HPCLANG_X50NG_SD_DIR");
+    char path[512];
+
+    if (root == NULL || *root == '\0' ||
+        event->text[0] == '\0' ||
+        strchr(event->text, '/') != NULL ||
+        strchr(event->text, '\\') != NULL ||
+        strstr(event->text, "..") != NULL) {
+        free(event);
+        fail(s, "host-mkdir-path");
+        return;
+    }
+
+    if (snprintf(path, sizeof(path), "%s/%s", root, event->text) >=
+        (int)sizeof(path)) {
+        free(event);
+        fail(s, "host-mkdir-path");
+        return;
+    }
+
+    if (mkdir(path, 0777) != 0 && errno != EEXIST) {
+        free(event);
+        fail(s, "host-mkdir");
+        return;
+    }
+
+    fprintf(stderr, "stock launcher: injected host SD directory %s\n", path);
+    free(event);
+}
+
 static void seq_fail(void *arg)
 {
     struct seq_named_event *event = arg;
@@ -833,6 +869,12 @@ static int schedule_sequence(struct state *s, const char *path)
         } else if (strcmp(op, "capture") == 0 && fields == 3) {
             struct seq_named_event *event = seq_named_event_new(s, first);
             if (!event || !later(seq_capture, event, us)) {
+                free(event);
+                goto invalid_action;
+            }
+        } else if (strcmp(op, "host-mkdir") == 0 && fields == 3) {
+            struct seq_named_event *event = seq_named_event_new(s, first);
+            if (!event || !later(seq_host_mkdir, event, us)) {
                 free(event);
                 goto invalid_action;
             }
