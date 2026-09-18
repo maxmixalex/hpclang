@@ -273,11 +273,6 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
-int hpclang_e2e_kos_timestamp_witness(
-    const char *path,
-    uint64_t *modified_stamp,
-    uint32_t *validity);
-
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -368,16 +363,21 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
         return 0x5bu;
 
-    uint64_t modified_stamp = 0u;
-    uint32_t timestamp_validity = 0u;
-    if (hpclang_e2e_kos_timestamp_witness(
-            "HPCLANG.TST",
-            &modified_stamp,
-            &timestamp_validity) != 0)
+    if ((path_info.time_validity &
+         HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID) == 0u ||
+        path_info.last_modified.year != 2024u ||
+        path_info.last_modified.month != 1u ||
+        path_info.last_modified.day != 2u ||
+        path_info.last_modified.hour != 3u ||
+        path_info.last_modified.minute != 4u ||
+        path_info.last_modified.second != 6u)
         return 0x69u;
-    if (modified_stamp != UINT64_C(20240102030406))
+    if ((path_info.time_validity &
+         HPCLANG_STREAM_PATH_LAST_ACCESS_DATE_VALID) == 0u)
         return 0x6au;
-    if ((timestamp_validity & 0x7u) != 0x7u)
+    if (path_info.last_access_date.year != 2024u ||
+        path_info.last_access_date.month != 1u ||
+        path_info.last_access_date.day != 2u)
         return 0x6bu;
 
     /*

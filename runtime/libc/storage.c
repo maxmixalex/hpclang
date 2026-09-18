@@ -710,8 +710,7 @@ static int read_kos_path_info(
     return 0;
 }
 
-#ifdef HPCLANG_E2E_STORAGE
-static int e2e_kos_date_valid(const struct kos_date *date)
+static int kos_date_valid(const struct kos_date *date)
 {
     static const uint8_t month_days[12] = {
         31u, 28u, 31u, 30u, 31u, 30u,
@@ -734,49 +733,34 @@ static int e2e_kos_date_valid(const struct kos_date *date)
     return date->day <= limit;
 }
 
-static int e2e_kos_time_valid(const struct kos_time *time)
+static int kos_time_valid(const struct kos_time *time)
 {
     return time->hours <= 23u &&
            time->minutes <= 59u &&
            time->seconds <= 59u;
 }
 
-int hpclang_e2e_kos_timestamp_witness(
-    const char *path,
-    uint64_t *modified_stamp,
-    uint32_t *validity)
+static void export_civil_date(
+    struct hpclang_stream_civil_date *dst,
+    const struct kos_date *src)
 {
-    if (modified_stamp == NULL || validity == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
-
-    struct kos_file_info raw;
-    if (read_kos_path_info(path, &raw) != 0)
-        return -1;
-
-    *modified_stamp =
-        (uint64_t)raw.last_modifier.date.year * UINT64_C(10000000000) +
-        (uint64_t)raw.last_modifier.date.month * UINT64_C(100000000) +
-        (uint64_t)raw.last_modifier.date.day * UINT64_C(1000000) +
-        (uint64_t)raw.last_modifier.time.hours * UINT64_C(10000) +
-        (uint64_t)raw.last_modifier.time.minutes * UINT64_C(100) +
-        (uint64_t)raw.last_modifier.time.seconds;
-
-    uint32_t flags = 0u;
-    if (e2e_kos_date_valid(&raw.last_modifier.date) &&
-        e2e_kos_time_valid(&raw.last_modifier.time))
-        flags |= 1u;
-    if (e2e_kos_date_valid(&raw.create_date.date) &&
-        e2e_kos_time_valid(&raw.create_date.time))
-        flags |= 2u;
-    if (e2e_kos_date_valid(&raw.last_access_date))
-        flags |= 4u;
-
-    *validity = flags;
-    return 0;
+    dst->year = src->year;
+    dst->month = src->month;
+    dst->day = src->day;
 }
-#endif
+
+static void export_civil_datetime(
+    struct hpclang_stream_civil_datetime *dst,
+    const struct kos_datetime *src)
+{
+    dst->year = src->date.year;
+    dst->month = src->date.month;
+    dst->day = src->date.day;
+    dst->hour = src->time.hours;
+    dst->minute = src->time.minutes;
+    dst->second = src->time.seconds;
+    dst->reserved = 0u;
+}
 
 int hpclang_stream_path_query(
     const char *path,
@@ -835,10 +819,19 @@ int hpclang_stream_path_query(
         info->attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
 
     /*
-     * KOS timestamp fields remain intentionally private. Historical HPGCC
-     * labels part of their layout as uncertain; M7.2 will only publish time
-     * fields after independent Stock verification.
+     * Preserve FAT/KOS civil fields directly; do not invent a timezone or
+     * convert them into POSIX epoch time. The undocumented KTIME tail and KOS
+     * creation timestamp remain private.
      */
+    if (kos_date_valid(&raw.last_modifier.date) &&
+        kos_time_valid(&raw.last_modifier.time)) {
+        export_civil_datetime(&info->last_modified, &raw.last_modifier);
+        info->time_validity |= HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID;
+    }
+    if (kos_date_valid(&raw.last_access_date)) {
+        export_civil_date(&info->last_access_date, &raw.last_access_date);
+        info->time_validity |= HPCLANG_STREAM_PATH_LAST_ACCESS_DATE_VALID;
+    }
     return 0;
 }
 
