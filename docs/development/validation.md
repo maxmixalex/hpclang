@@ -123,6 +123,8 @@ Stock diagnostics established an important backend rule: repeated KOS `CHECKINSE
 
 Storage #22 (`35378151818`) is fully green across Build, Direct hp39/hp48/hp4950, and Stock hp4950. Both HP49g+ and HP50g reach HPC1 PASS, release the ARMToolbox stage alias, accept a Stock-owned repaint, and finish PASS. The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06 UTC`; only the resulting last-modified civil fields are public. Creation/access timestamp semantics remain private because validity alone is not enough to establish their application meaning.
 
+M7.2c additionally has a Stock-filesystem reinitialization witness. Storage #23 issues KOS syscall 19 only after every KOS-backed stream handle is closed, invalidates the runtime's cached media sample, then verifies that `HPCLANG.TST` metadata plus reopen/read work again. The Stock hp4950 job passes on both HP49g+ and HP50g with HPC1 PASS, ARMToolbox stage release, and visible Stock return. This proves the **Stock reinit** half of the future direct-FAT lease lifecycle; it does not yet prove direct SDIO/FAT unmount/release because that backend is not implemented.
+
 The hp4950 Stock family uses each model's native ARM bootloader with the shared official 2.15 OS image, installs ARMToolbox/library 275 from emulated SD, copies `HPCLANG.HP` through the stock File Manager, enters `ARMTo` / `PrRUN`, and requires payload PASS plus stage teardown and visible Stock return.
 
 ## Evidence retention
