@@ -93,7 +93,7 @@ HP 49g+ and HP 50g share the `hp4950` platform, official 2.15 OS image, stock Fi
 
 **Complete for five models; HP 39g+ blocked.**
 
-Durable Direct and Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. This does not mean every harness orchestration attempt is identical: control-flow return and visible stock-UI repaint are deliberately separate gates. Current runtime run `34792822400 / #78` is green for all Direct families, Stock hp39, and Stock hp4950; HP48 reaches HPC1 PASS and control-flow return but remains `return-unsettled` at the final visible repaint gate.
+Durable Direct and Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime `35248256215 / #122` is fully green across all Direct and Stock families and closes HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Post-cleanup Runtime #125 preserves the strict HP48 PASS but has an independent HP49g+ Stock timeout, so #122 remains the latest fully-green canonical Runtime evidence.
 
 Blocked:
 
@@ -147,10 +147,10 @@ Final evidence:
 - [x] Ark Pixel labels/specimens expose size, Mono/Prop, locale, and common regional differences instead of obscure-only samples;
 - [x] Gallery specimens cover width-sensitive Latin, digits/punctuation, accents, symbols, and supported CJK/Japanese/Korean repertoires;
 - [x] exhaustive Direct Gallery traverses **247 entries (245 generated + 2 native) × 2 pages = 494 captures per target** on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g;
-- [x] formal production `E2E / Font Gallery` run **34792822393 / #55** is fully green across Build, universal x50ng, `Gallery / hp39`, `Gallery / hp48`, `Gallery / hp4950`, `Stock / hp48`, and `Stock / hp4950`;
+- [x] formal production `E2E / Font Gallery` run **35255868206 / #99** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g;
 - [x] HP50g Stock validates live native minifont/main font plus generated control and reaches settled PASS;
-- [x] HP48gII Stock validates distinct nonblank live native minifont/main font plus generated control and reaches HPC1 PASS/control-flow return; visible repaint remains the separate known `return-unsettled` gate;
-- [x] HP48 and HP50 Stock summaries use the same compact three-panel structure and were visually checked from the #55 artifacts;
+- [x] HP48gII Stock validates distinct nonblank live native minifont/main font plus generated control and reaches HPC1 PASS, control-flow return, and settled Stock repaint; Gallery #102 also passes the post-cleanup strict HP48 gate;
+- [x] HP48 and HP50 Stock summaries use the same compact three-panel structure and were visually checked from the #99 artifacts;
 - [x] HP39 Direct summary exists and is published with the exhaustive evidence.
 
 The import contract remains exactly three modes:
@@ -174,7 +174,7 @@ M7.1 font closure checklist:
 - [x] exhaustively render all 245 generated faces on all five automated targets and both 64/80-line layouts;
 - [x] validate compact Stock live-native evidence on HP50g and HP48gII;
 - [x] remove obsolete TTF importing, normalize summaries, strengthen specimens, and complete additional bitmap-CJK curation;
-- [x] close the final production Gallery matrix (`E2E / Font Gallery` #55);
+- [x] close the production Gallery matrix (`E2E / Font Gallery` #99) and retire the obsolete HP48 post-PASS exception;
 - [ ] integrate the completed font slice to `main` after repository-level review.
 
 ### M7.2 — Storage and standard I/O

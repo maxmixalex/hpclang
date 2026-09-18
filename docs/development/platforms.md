@@ -9,7 +9,7 @@ hpclang supports six ARM calculator model profiles through three platform famili
 | HP 39g+ | 1 | `hp39` | package builds; real stock fixture blocked | blocked on real stock fixture |
 | HP 39gs | 2 | `hp39` | real hardware PASS; emulator PASS | real hardware return PASS; stock emulator PASS |
 | HP 40gs | 3 | `hp39` | official-ROM emulator PASS | stock emulator PASS |
-| HP 48gII | 4 | `hp48` | verified full-NOR emulator PASS | ARMToolbox48/PrRUN reaches HPC1 PASS and control-flow return; automated visible repaint currently `return-unsettled` |
+| HP 48gII | 4 | `hp48` | verified full-NOR emulator PASS | ARMToolbox48/PrRUN E2E PASS; payload, control-flow return, and settled Stock UI repaint are all witnessed |
 | HP 49g+ | 5 | `hp4950` | native-bootloader emulator PASS | ARMToolbox/PrRUN E2E PASS |
 | HP 50g | 6 | `hp4950` | native-bootloader emulator PASS | ARMToolbox/PrRUN E2E PASS |
 
@@ -31,9 +31,9 @@ Historical HPGCC 1.x contains a dedicated ARMToolbox48 path. Important differenc
 
 The `hp48` platform feeds the same common bootstrap and HPC1 image on a genuine HP48gII full-NOR fixture. Direct runtime passes and returns cleanly.
 
-The full Stock gate transfers ARMToolbox48 and `HPCLANG.HP` through the calculator's original Serial Kermit path, installs library 275 into Port 0, warmstarts, launches `ARMTo` / `PrRUN`, and reaches the same HPC1 PASS result. Current automated runs also observe control-flow restoration; the first visibly stock-owned post-return repaint remains a separate harness gate and is presently classified `return-unsettled`.
+The full Stock gate transfers ARMToolbox48 and `HPCLANG.HP` through the calculator's original Serial Kermit path, installs library 275 into Port 0, warmstarts, launches `ARMTo` / `PrRUN`, and reaches the same HPC1 PASS result. Runtime #122 (`35248256215`) closes the full return path: payload PASS, control-flow restoration, stage-window teardown, and a settled stock-owned repaint all pass. Gallery #99 (`35255868206`) independently shows the same settled HP48 return after its live native-font capture path. Post-cleanup Runtime #125 and Gallery #102 also exercised the strict HP48 return gate successfully, even though those workflow runs were not globally green for unrelated matrix reasons.
 
-The architecture criterion is met: HP48gII executes the same HPC1 image and common bootstrap without a distinct application ABI. This statement is intentionally separate from the still-open automated visible-repaint gate.
+The architecture criterion is met: HP48gII executes the same HPC1 image and common bootstrap without a distinct application ABI. Payload correctness, control-flow restoration, and visible Stock UI restoration remain separate evidence dimensions, but all three now have passing automated witnesses.
 
 ## HP 49g+ and HP 50g
 
