@@ -91,6 +91,7 @@ python3 "$ROOT/tools/pgm-to-png.py" \
 
 python3 - "$ARCHIVE_ROOT" "$ROOT/build/$TARGET-e2e.json" "${#SHARD_LAUNCHERS[@]}" <<'PY'
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -107,9 +108,10 @@ if not records:
 
 unique_faces = 0
 unique_frames = 0
+native_face_count = 3 if os.environ.get("TARGET") in {"hp39gs", "hp40gs"} else 2
 for name, record in records:
     shard_index = int(name.rsplit("-", 1)[1])
-    duplicate_native = 0 if shard_index == 0 else 2
+    duplicate_native = 0 if shard_index == 0 else native_face_count
     unique_faces += int(record.get("gallery_count", 0)) - duplicate_native
     unique_frames += int(record.get("gallery_frames", 0)) - 2 * duplicate_native
 

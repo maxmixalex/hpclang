@@ -24,7 +24,7 @@ target_compile_options(hpclang_font_gallery PRIVATE
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
 
 # Direct Gallery is exhaustive. Stock Gallery is deliberately a compact launch
-# smoke test: two native faces plus one explicit generated control face. Do not
+# smoke test: target-native ROM faces plus one explicit generated control face. Do not
 # let list ordering silently change the control face.
 set(HPCLANG_GALLERY_PROFILE "full" CACHE STRING
     "Font Gallery profile: full or stock-smoke")
@@ -368,7 +368,7 @@ file(APPEND "${catalog_c}"
 target_sources(hpclang_font_gallery PRIVATE "${catalog_c}")
 
 message(STATUS
-    "Font Gallery (${HPCLANG_GALLERY_PROFILE}, shard ${HPCLANG_GALLERY_SHARD_INDEX}/${HPCLANG_GALLERY_SHARD_COUNT}): ${face_index} generated faces from ${family_count} families + 2 native faces")
+    "Font Gallery (${HPCLANG_GALLERY_PROFILE}, shard ${HPCLANG_GALLERY_SHARD_INDEX}/${HPCLANG_GALLERY_SHARD_COUNT}): ${face_index} generated faces from ${family_count} families + target-native ROM faces")
 
 target_link_options(hpclang_font_gallery PRIVATE
     -nostartfiles
