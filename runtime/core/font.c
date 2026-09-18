@@ -260,7 +260,7 @@ static uint32_t hp39_window_font_first_nibble(
     return UINT32_MAX;
 }
 
-statstatic uint8_t hp39_font_nibble(
+static uint8_t hp39_font_nibble(
     uint32_t logical_first,
     uint32_t address)
 {
@@ -305,7 +305,7 @@ static uint8_t hp39_font_byte(
                          hp39_font_nibble(logical_first, address + 1u) << 4));
 }
 
-ic uint32_t native_byte_codepoint(uint32_t codepoint)
+static uint32_t native_byte_codepoint(uint32_t codepoint)
 {
     return codepoint <= 0xffu ? codepoint : (uint32_t)'?';
 }
