@@ -369,9 +369,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x6au;
     struct hpclang_stream_path_info attribute_info;
     if (hpclang_stream_path_query("HPCLANG.ATR", &attribute_info) != 0 ||
-        attribute_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
-        attribute_info.attributes != known_attributes)
+        attribute_info.type != HPCLANG_STREAM_PATH_TYPE_FILE)
         return 0x6bu;
+    if (attribute_info.attributes != known_attributes)
+        return 0x80u | (attribute_info.attributes & 0x0fu);
     if (hpclang_stream_path_set_attributes("HPCLANG.ATR", 0u) != 0)
         return 0x6cu;
     if (hpclang_stream_path_query("HPCLANG.ATR", &attribute_info) != 0 ||
