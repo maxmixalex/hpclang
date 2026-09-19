@@ -1,0 +1,70 @@
+#ifndef HPCLANG_RUNTIME_RPL_MUTATION_H
+#define HPCLANG_RUNTIME_RPL_MUTATION_H
+
+#include <stdint.h>
+
+#include "object-snapshot.h"
+#include "rpl-object-span.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef int (*hpclang_rpl_write_nibble_fn)(
+    void *context,
+    uint32_t nibble_address,
+    uint8_t value);
+
+struct hpclang_rpl_mutation_io {
+    hpclang_rpl_read_nibble_fn read_nibble;
+    hpclang_rpl_write_nibble_fn write_nibble;
+    void *context;
+
+    /*
+     * Static fences computed by the launcher from hpclang-owned native pages.
+     * TEMPOB/RSKTOP may grow only below temp_limit. DSKTOP may grow downward
+     * only above user_limit.
+     */
+    uint32_t temp_limit;
+    uint32_t user_limit;
+};
+
+enum hpclang_rpl_mutation_result {
+    HPCLANG_RPL_MUTATION_OK = 0,
+    HPCLANG_RPL_MUTATION_UNAVAILABLE = -1,
+    HPCLANG_RPL_MUTATION_MALFORMED = -2,
+    HPCLANG_RPL_MUTATION_NOSPACE = -3,
+    HPCLANG_RPL_MUTATION_LEVEL = -4,
+    HPCLANG_RPL_MUTATION_IO = -5
+};
+
+/*
+ * Copy an owned ARM-side snapshot into a new Stock TEMPOB block and push its
+ * pointer onto level 1. All expected logical failures are checked before the
+ * first mutation. The snapshot is the source of truth across allocation; no
+ * borrowed Saturn object address survives the allocation step.
+ */
+int hpclang_rpl_mutation_push_snapshot(
+    const struct hpclang_rpl_mutation_io *io,
+    const struct hpclang_object *object);
+
+/* Drop count objects after validating the complete request. */
+int hpclang_rpl_mutation_drop(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t count);
+
+/*
+ * Allocate/copy first, then replace one existing pointer cell. A failure before
+ * pointer commit leaves the visible stack unchanged; an unreferenced TEMPOB
+ * block may remain for Stock garbage collection after an unexpected I/O fault.
+ */
+int hpclang_rpl_mutation_replace(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t level,
+    const struct hpclang_object *object);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

@@ -72,6 +72,16 @@ target_include_directories(test_object PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_mutation
+    test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_mutation PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
 
