@@ -1579,17 +1579,26 @@ static uint32_t object_store_read_only_test(uint32_t model)
         return 0u;
     }
 
-    /*
-     * The hp4950 Stock harness exposes the launcher on FAT as HPCLANG.HP,
-     * but File Manager COPY strips that transfer-file extension when it
-     * materializes the object in HOME. The RPL global name is HPCLANG on
-     * HP48gII, HP49g+ and HP50g alike.
-     */
-    static const uint8_t hpclang_name[] = {
+    static const uint8_t hp48_witness_name[] = {
         'H', 'P', 'C', 'L', 'A', 'N', 'G'
     };
-    const uint32_t hpclang_name_length =
-        (uint32_t)sizeof(hpclang_name);
+    /*
+     * x50ng's Stock VVFAT setup exposes a stable empty DOCSTR named
+     * X50NG-VV.FAT in USEROB before the payload starts. HPCLANG.HP is the
+     * FAT transfer/launcher file and is not a HOME variable, so it is not a
+     * valid named-object-store witness on HP49g+/50g.
+     */
+    static const uint8_t hp4950_witness_name[] = {
+        'X', '5', '0', 'N', 'G', '-', 'V', 'V', '.', 'F', 'A', 'T'
+    };
+    const uint8_t *witness_name =
+        model == HPCLANG_MODEL_HP48GII
+            ? hp48_witness_name
+            : hp4950_witness_name;
+    const uint32_t witness_name_length =
+        model == HPCLANG_MODEL_HP48GII
+            ? (uint32_t)sizeof(hp48_witness_name)
+            : (uint32_t)sizeof(hp4950_witness_name);
 
     static const uint8_t missing_name[] = {
         '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
@@ -1605,6 +1614,7 @@ static uint32_t object_store_read_only_test(uint32_t model)
     struct hpclang_object_store_iterator *first = NULL;
     struct hpclang_object_store_iterator *second = NULL;
     struct hpclang_object_store_iterator *current_iterator = NULL;
+    struct hpclang_object *witness = NULL;
 
     if (home == NULL) {
         failure = 0xc2u;
@@ -1644,10 +1654,10 @@ static uint32_t object_store_read_only_test(uint32_t model)
     struct hpclang_object_store_entry entry2;
     object_store_phase(9u); /* before first independent lookup */
     int found1 = object_store_find_named(
-        first, hpclang_name, hpclang_name_length, &entry1);
+        first, witness_name, witness_name_length, &entry1);
     object_store_phase(10u);
     int found2 = object_store_find_named(
-        second, hpclang_name, hpclang_name_length, &entry2);
+        second, witness_name, witness_name_length, &entry2);
     object_store_phase(11u);
     if (found1 != 1 || found2 != 1) {
         failure = 0xc5u;
@@ -1662,16 +1672,32 @@ static uint32_t object_store_read_only_test(uint32_t model)
         goto done;
     }
 
-    object_store_phase(12u); /* before ENOTDIR child-open check */
+    object_store_phase(12u); /* before successful named-object snapshot */
+    size_t witness_string_size = 0u;
+    errno = 0;
+    if (hpclang_object_store_get(
+            home,
+            witness_name,
+            witness_name_length,
+            &witness) != 0 ||
+        witness == NULL ||
+        hpclang_object_kind(witness) != HPCLANG_OBJECT_STRING ||
+        hpclang_object_string_size(witness, &witness_string_size) != 0 ||
+        (model != HPCLANG_MODEL_HP48GII && witness_string_size != 0u)) {
+        failure = 0xc9u;
+        goto done;
+    }
+
+    object_store_phase(13u); /* before ENOTDIR child-open check */
     errno = 0;
     child = hpclang_object_store_open_child(
-        home, hpclang_name, hpclang_name_length);
+        home, witness_name, witness_name_length);
     if (child != NULL || errno != ENOTDIR) {
         failure = 0xc7u;
         goto done;
     }
 
-    object_store_phase(13u); /* before missing-object lookup */
+    object_store_phase(14u); /* before missing-object lookup */
     struct hpclang_object *missing = NULL;
     errno = 0;
     if (hpclang_object_store_get(
@@ -1686,9 +1712,10 @@ static uint32_t object_store_read_only_test(uint32_t model)
         goto done;
     }
 
-    object_store_phase(14u); /* read-only object-store witness complete */
+    object_store_phase(15u); /* read-only object-store witness complete */
 
 done:
+    hpclang_object_release(witness);
     hpclang_object_store_iterator_close(current_iterator);
     hpclang_object_store_iterator_close(second);
     hpclang_object_store_iterator_close(first);
