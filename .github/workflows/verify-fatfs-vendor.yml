@@ -39,11 +39,13 @@ jobs:
             build/fatfs-official-verify/run.log
             build/fatfs-official-verify/verification.txt
             build/fatfs-official-verify/download/**
-            build/fatfs-official-verify/patched/**
+            build/fatfs-official-verify/canonical/**
+            build/fatfs-official-verify/vendor-normalized/**
+            build/fatfs-official-verify/diff/**
             build/fatfs-official-verify/unpacked/source/ff.c
             build/fatfs-official-verify/unpacked/source/ff.h
             build/fatfs-official-verify/unpacked/source/diskio.h
-            build/fatfs-official-verify/unpacked/source/ffunicode.c
+            build/fatfs-official-verify/unicode/**
 
       - name: Enforce official byte match
         if: always()
