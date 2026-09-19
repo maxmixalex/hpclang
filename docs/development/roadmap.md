@@ -196,7 +196,7 @@ M7.1 font closure checklist:
 
 ### M7.2 — Byte-stream filesystem and standard I/O
 
-**Core storage implementation complete on the M7.2 branch; HPGCC parity adapters remain.**
+**Complete.**
 
 M7.2 covers the HP49g+/HP50g **SD-card FAT namespace** and byte-stream semantics only. HOME/Port 0, Port 1 and Port 2 are calculator-object stores, not FAT volumes; they remain M7.3 work.
 
@@ -244,11 +244,11 @@ The pinned namespace backend is independently implemented. Historical HPGCC3 FSy
 - [x] map ordinary historical `hpstdio.h` use to standard libc directly; `fdelete()` remains a thin source adapter;
 - [x] cover the useful `fsystem.h` filesystem subset on top of the clean namespace/metadata/directory services, including adapter-local cwd rather than Stock-global cwd;
 - [x] classify raw KOS filesystem calls, raw handles/module helpers, controller sleep/wakeup and multi-volume global state that add no clean application value as Migration/Internal rather than canonical APIs;
-- [ ] close the representative historical-style filesystem flow in the final Storage E2E: standard/HP-style paths, read/write/seek/truncate, rename, mkdir/rmdir, adapter-local cwd, LFN enumeration, metadata and cleanup.
+- [x] close the representative historical-style filesystem flow in the final Storage E2E: standard/HP-style paths, read/write/seek/truncate, rename, mkdir/rmdir, adapter-local cwd, LFN enumeration, metadata and cleanup.
 
 #### M7.2 completion criterion
 
-M7.2 is complete when a typical HPGCC HP49g+/HP50g program that uses files and directories can be ported without losing application functionality, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. The remaining work after the clean storage core is therefore **adapter/source-compatibility closure**, not another filesystem backend.
+M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and directories can be ported without losing application functionality, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. Final focused evidence is **E2E / Storage #53 (`35428824540`)**, fully green across Build, Direct hp39/hp48/hp4950 and Stock hp4950 on `c4b827fe`; **CI / Core runtime #254 (`35428824495`)** is also green on the same head. The representative HPGCC adapter flow includes HP-style/standard paths, read/write/seek/truncate, local cwd, LFN enumeration, metadata, volume size/free queries and cleanup. POSIX `ftruncate()` extension is explicitly zero-filled and regression-tested.
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
