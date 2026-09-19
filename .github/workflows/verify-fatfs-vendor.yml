@@ -1,0 +1,38 @@
+name: CI / FatFs vendor
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "third_party/fatfs/**"
+      - "tools/verify-fatfs-vendor.sh"
+      - ".github/workflows/verify-fatfs-vendor.yml"
+      - "docs/development/licensing.md"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify official FatFs bytes
+        run: tools/verify-fatfs-vendor.sh build/fatfs-official-verify
+
+      - name: Upload official verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fatfs-official-verification
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            build/fatfs-official-verify/verification.txt
+            build/fatfs-official-verify/download/ff16p1.diff
+            build/fatfs-official-verify/download/ff16p2.diff
+            build/fatfs-official-verify/patched/ff.c
+            build/fatfs-official-verify/unpacked/source/ff.h
+            build/fatfs-official-verify/unpacked/source/diskio.h
+            build/fatfs-official-verify/unpacked/source/ffunicode.c
