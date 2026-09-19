@@ -21,6 +21,18 @@ emulator happens to execute them.
 
 The two tiers are deliberately separate. Direct runtime owns common-bootstrap execution and restoration correctness. Stock launch owns calculator-side package, transfer, menu, and launcher integration. A Stock job may additionally probe the post-return UI, but that visible-return evidence is not interchangeable with reaching HPC1 PASS.
 
+## Calculator-object read-only witness
+
+The canonical runtime payload now includes the first M7.3 object-service witness. It does not prepare or mutate a test stack.
+
+- Direct/non-Stock environments and HP39-family targets must reject the Stock-only RPL stack service cleanly with `ENOSYS`.
+- Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive stack depth, and may snapshot level 1 only when the object's native extent is provable.
+- A recognized but not-yet-frozen native object format returns `ENOTSUP` rather than being copied heuristically.
+- The witness re-reads depth after peek and requires it to be unchanged; it also verifies the first invalid level returns `EINVAL`.
+- No raw Saturn address or mapped ARM pointer is exposed to the E2E application.
+
+On `ff9a09b4`, **CI / Core runtime #285 (`35431683458`)** is fully green. **E2E / Runtime #232 (`35431683496`)** has green Stock hp48, Stock hp4950, Stock hp39, Direct hp48 and Direct hp39 jobs. Direct hp4950 fails later in the pre-existing keyboard transition with signature `0x46410010`; the object witness has already completed before that phase and the job is not used as object-service PASS evidence.
+
 ## Return evidence
 
 Return validation has three distinct observations:
