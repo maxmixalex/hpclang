@@ -425,9 +425,10 @@ int hpclang_rpl_mutation_replace(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    uint32_t offset = (level - 1u) * 5u;
-    if ((level - 1u) > UINT32_MAX / 5u)
+    uint32_t zero_based = level - 1u;
+    if (zero_based > UINT32_MAX / 5u)
         return HPCLANG_RPL_MUTATION_LEVEL;
+    uint32_t offset = zero_based * 5u;
     uint32_t slot = 0u;
     if (!checked_add(dstk, offset, &slot) ||
         slot > RPL_MAIN_END - 5u)
