@@ -32,7 +32,7 @@ enum hpclang_stream_path_time_validity {
 
 /*
  * Filesystem civil date/time values. They deliberately carry no timezone or
- * epoch interpretation: FAT/KOS stores local civil fields. Last-modified has
+ * epoch interpretation: FAT stores local civil fields. Last-modified has
  * FAT's two-second resolution.
  */
 
