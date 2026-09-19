@@ -40,9 +40,11 @@
 #define FF_FS_TINY       1
 #define FF_FS_EXFAT      0
 
-/* Compile/unit-only until the direct backend has a real clock provider.
- * Revisit before direct-backend writes become application-visible. */
-#define FF_FS_NORTC      1
+/*
+ * Real writes use the calculator RTC through get_fattime(). FAT timestamps
+ * remain local civil time; hpclang does not invent a timezone conversion.
+ */
+#define FF_FS_NORTC      0
 #define FF_NORTC_MON     1
 #define FF_NORTC_MDAY    1
 #define FF_NORTC_YEAR    2026
