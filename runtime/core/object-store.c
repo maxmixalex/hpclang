@@ -92,13 +92,13 @@ static struct hpclang_object_store *alloc_store(
     uint32_t encoded_size,
     uint32_t component_count)
 {
-    if (encoded_size > SIZE_MAX - sizeof(struct hpclang_object_store)) {
-        errno = ENOMEM;
+    if (encoded_size > HPCLANG_RPL_STORE_PATH_CAPACITY) {
+        errno = ENAMETOOLONG;
         return NULL;
     }
 
     struct hpclang_object_store *store =
-        malloc(sizeof(*store) + encoded_size);
+        malloc(sizeof(*store) + (size_t)encoded_size);
     if (store == NULL) {
         errno = ENOMEM;
         return NULL;
@@ -378,14 +378,12 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
         return NULL;
     }
 
+    /*
+     * The private cursor rejects more than RPL_DIRECTORY_ENTRY_LIMIT (4096)
+     * entries before this point, so this fixed-size metadata snapshot is
+     * bounded independently of host size_t width.
+     */
     size_t entry_size = sizeof(struct object_store_iterator_entry);
-    if ((size_t)count >
-        (SIZE_MAX - sizeof(struct hpclang_object_store_iterator)) /
-            entry_size) {
-        errno = ENOMEM;
-        return NULL;
-    }
-
     struct hpclang_object_store_iterator *iterator =
         malloc(sizeof(*iterator) + (size_t)count * entry_size);
     if (iterator == NULL) {
