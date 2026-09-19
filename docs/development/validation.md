@@ -30,6 +30,7 @@ The canonical runtime test validates:
 - public display/font rendering used by visible result and keyboard screens;
 - the complete 51-key physical keyboard/event path;
 - hp4950 stream-storage behavior where supported;
+- read-only calculator-object capability discovery: unsupported families/direct launchers reject the Stock-only stack view cleanly, while Stock HP48/HP4950 can observe depth and owned level-1 snapshots without changing stack depth;
 - machine-readable `0x50415353` plus visible runtime evidence.
 
 The Direct emulator gate also verifies that temporary mappings and the SWI vector are restored before the stock calculator resumes. Stable S3C2410 LCD-controller state is compared before harness cleanup so display-state damage cannot be hidden by host-side restoration.
@@ -43,6 +44,19 @@ These are separate claims and must remain separately observable:
 3. **Visible Stock return** proves the stock OS can process a normal UI action and redraw the LCD after return.
 
 A nonblank `return.pgm` that still contains hpclang's last frame is insufficient for item 3. The harness must not manufacture success by copying the pre-launch framebuffer back. HP39 real-hardware validation uses **APLET** as the harmless post-return stock action.
+
+## M7.3 read-only object evidence
+
+The first calculator-object vertical slice is intentionally non-mutating. Public applications see only opaque owned `struct hpclang_object` snapshots plus `hpclang_stack_depth()` / `hpclang_stack_peek()`; Saturn nibble addresses and the launch-preserved `SAT_CPU->Read[]` mapping remain runtime-private.
+
+Host/runtime evidence on `ff9a09b4`:
+
+- **CI / Core runtime #285 (`35431683458`)** is fully green, including the new RPL object-span, stack-view, snapshot and public-object unit tests plus the HP39 package build;
+- **E2E / Runtime #232 (`35431683496`)** has green Stock hp48, Stock hp4950 and Stock hp39 jobs, and green Direct hp48/hp39 jobs;
+- Stock hp48 and Stock hp4950 therefore independently validate live `DSKTOP`/D1 + `EDITLINE` depth observation, level-pointer resolution, conservative object-boundary parsing, owned snapshot allocation/release and unchanged stack depth across the witness;
+- Runtime #232 is not a globally green canonical Runtime replacement: Direct hp4950 fails later in the existing keyboard-transition phase with the known `0x46410010` signature after the object witness has already completed. That unrelated job failure is not recorded as object-service evidence.
+
+The object parser is deliberately fail-closed. It only snapshots formats whose extent can be proven from verified fixed size, self-relative length, SEMI-terminated composite structure, tag+embedded-object structure, or another documented boundary rule. Unknown or recognized-but-unfrozen prologues return an error rather than scanning into adjacent calculator state.
 
 ## Native-font validation and provenance
 
