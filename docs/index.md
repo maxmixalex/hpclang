@@ -27,6 +27,7 @@ HP 39g+ support builds and the read-only flash-dump mechanism has been verified,
 - [E2E internals](development/e2e.md) — target profiles, sequence files, x50ng integration, and stock transfer mechanisms.
 - [Fixture provenance](development/fixtures.md) — where firmware/full-NOR inputs come from and how they are verified.
 - [Roadmap](development/roadmap.md) — M0–M8 milestones and remaining work.
+- [Calculator object service](development/object-service.md) — M7.3 owned-object, Saturn/RPL stack, and named-store ownership contract.
 - [History](development/history.md) — HPGCC lineage and compatibility facts retained by hpclang.
 - [Licensing](development/licensing.md) — historical source, firmware, and independent-reimplementation rules.
 - [Retired experiments](development/experiments.md) — conclusions preserved from removed bring-up and compiler experiments.
