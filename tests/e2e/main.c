@@ -1579,20 +1579,17 @@ static uint32_t object_store_read_only_test(uint32_t model)
         return 0u;
     }
 
-    static const uint8_t hp48_hpclang_name[] = {
+    /*
+     * The hp4950 Stock harness exposes the launcher on FAT as HPCLANG.HP,
+     * but File Manager COPY strips that transfer-file extension when it
+     * materializes the object in HOME. The RPL global name is HPCLANG on
+     * HP48gII, HP49g+ and HP50g alike.
+     */
+    static const uint8_t hpclang_name[] = {
         'H', 'P', 'C', 'L', 'A', 'N', 'G'
     };
-    static const uint8_t hp4950_hpclang_name[] = {
-        'H', 'P', 'C', 'L', 'A', 'N', 'G', '.', 'H', 'P'
-    };
-    const uint8_t *hpclang_name =
-        model == HPCLANG_MODEL_HP48GII
-            ? hp48_hpclang_name
-            : hp4950_hpclang_name;
-    uint32_t hpclang_name_length =
-        model == HPCLANG_MODEL_HP48GII
-            ? (uint32_t)sizeof(hp48_hpclang_name)
-            : (uint32_t)sizeof(hp4950_hpclang_name);
+    const uint32_t hpclang_name_length =
+        (uint32_t)sizeof(hpclang_name);
 
     static const uint8_t missing_name[] = {
         '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
