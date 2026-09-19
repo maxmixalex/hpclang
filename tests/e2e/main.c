@@ -700,6 +700,41 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x52u;
 
     /*
+     * POSIX ftruncate must zero-fill an extended range and must not move the
+     * logical file offset. FatFs does not provide the zero-fill guarantee by
+     * itself, so keep this as a direct regression for the syscall shim.
+     */
+    int trunc_fd = open(
+        "HPCLANG.TRN", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (trunc_fd < 0 ||
+        write(trunc_fd, "abc", 3u) != 3 ||
+        ftruncate(trunc_fd, 8) != 0 ||
+        lseek(trunc_fd, 0, SEEK_CUR) != 3)
+        return 0x93u;
+
+    if (lseek(trunc_fd, 0, SEEK_SET) != 0)
+        return 0x94u;
+    memset(buffer, 0xff, sizeof(buffer));
+    if (read(trunc_fd, buffer, 8u) != 8 ||
+        memcmp(buffer, "abc", 3u) != 0 ||
+        buffer[3] != 0 || buffer[4] != 0 || buffer[5] != 0 ||
+        buffer[6] != 0 || buffer[7] != 0)
+        return 0x95u;
+
+    if (ftruncate(trunc_fd, 2) != 0 ||
+        lseek(trunc_fd, 0, SEEK_CUR) != 8 ||
+        lseek(trunc_fd, 0, SEEK_SET) != 0) {
+        (void)close(trunc_fd);
+        return 0x96u;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    if (read(trunc_fd, buffer, sizeof(buffer)) != 2 ||
+        memcmp(buffer, "ab", 2u) != 0 ||
+        close(trunc_fd) != 0 ||
+        remove("HPCLANG.TRN") != 0)
+        return 0x97u;
+
+    /*
      * Representative HPGCC fsystem source-adapter flow. This intentionally
      * uses the historical names/FS_FILE fields while all actual I/O remains
      * on the same hpclang-owned FatFs namespace.
