@@ -54,6 +54,24 @@ hpclang_unit(rpl_stack_view
 target_include_directories(test_rpl_stack_view PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(object_snapshot
+    test_object_snapshot.c
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_snapshot PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(object
+    test_object.c
+    "${HPCLANG_ROOT}/runtime/core/object.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c")
+target_include_directories(test_object PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
 
