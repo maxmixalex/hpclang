@@ -241,10 +241,10 @@ The pinned namespace backend is independently implemented. Historical HPGCC3 FSy
 
 #### M7.2d — HPGCC parity adapter boundary
 
-- [ ] map ordinary historical `hpstdio.h` use to standard libc directly;
-- [ ] cover the useful `fsystem.h`/KOS filesystem subset on top of the clean namespace/metadata/directory services;
-- [ ] classify raw handle/module helpers that add no application value as Adapter/Migration rather than canonical core APIs;
-- [ ] compile representative historical filesystem examples against the adapter and run non-trivial read/write/rename/enumeration flows in Stock E2E.
+- [x] map ordinary historical `hpstdio.h` use to standard libc directly; `fdelete()` remains a thin source adapter;
+- [x] cover the useful `fsystem.h` filesystem subset on top of the clean namespace/metadata/directory services, including adapter-local cwd rather than Stock-global cwd;
+- [x] classify raw KOS filesystem calls, raw handles/module helpers, controller sleep/wakeup and multi-volume global state that add no clean application value as Migration/Internal rather than canonical APIs;
+- [ ] close the representative historical-style filesystem flow in the final Storage E2E: standard/HP-style paths, read/write/seek/truncate, rename, mkdir/rmdir, adapter-local cwd, LFN enumeration, metadata and cleanup.
 
 #### M7.2 completion criterion
 
