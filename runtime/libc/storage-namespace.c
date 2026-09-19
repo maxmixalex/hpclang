@@ -464,6 +464,35 @@ off_t hpclang_namespace_lseek(int fd, off_t offset, int whence)
     return (off_t)target;
 }
 
+int hpclang_namespace_ftruncate(int fd, off_t length)
+{
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    if ((int64_t)length < 0 || (uint64_t)length > UINT32_MAX) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    FRESULT fr = f_lseek(&slot->file, (FSIZE_t)length);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    fr = f_truncate(&slot->file);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    /*
+     * POSIX ftruncate() does not change the logical file offset. The FatFs
+     * object had to seek to the truncation point internally; read/write will
+     * resynchronize the physical FatFs position from slot->position.
+     */
+    return 0;
+}
+
+
 static void export_fat_time(
     struct hpclang_stream_civil_datetime *dst,
     WORD date,
