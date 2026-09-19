@@ -127,21 +127,8 @@ static int lease_stock_idle(void *context)
 static int lease_direct_acquire(void *context)
 {
     (void)context;
-
-    int present = 0;
-    int read_only = 0;
-    if (hpclang_storage_stock_media_query(&present, &read_only) != 0)
-        return -1;
-    if (!present) {
-        errno = ENODEV;
-        return -1;
-    }
-
-    if (hpclang_hp4950_fatfs_controller_acquire(read_only) != 0) {
-        errno = EBUSY;
-        return -1;
-    }
-    return 0;
+    return hpclang_hp4950_fatfs_controller_acquire(
+        namespace_media_read_only != 0u);
 }
 
 static int lease_direct_mount(void *context)
@@ -225,6 +212,7 @@ static int namespace_acquire(void)
     if (result != HPCLANG_NAMESPACE_LEASE_OK) {
         switch (result) {
         case HPCLANG_NAMESPACE_LEASE_BUSY:
+        case HPCLANG_NAMESPACE_LEASE_ACQUIRE_FAILED:
             errno = EBUSY;
             break;
         case HPCLANG_NAMESPACE_LEASE_MOUNT_FAILED:
