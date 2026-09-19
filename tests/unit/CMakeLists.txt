@@ -70,3 +70,10 @@ hpclang_unit(s3c2410_sdio_core
     "${HPCLANG_ROOT}/runtime/libc/s3c2410-sdio-core.c")
 target_include_directories(test_s3c2410_sdio_core PRIVATE
     "${HPCLANG_ROOT}/runtime/libc")
+
+hpclang_unit(s3c2410_sdio_card
+    test_s3c2410_sdio_card.c
+    "${HPCLANG_ROOT}/runtime/libc/s3c2410-sdio-card.c"
+    "${HPCLANG_ROOT}/runtime/libc/s3c2410-sdio-core.c")
+target_include_directories(test_s3c2410_sdio_card PRIVATE
+    "${HPCLANG_ROOT}/runtime/libc")
