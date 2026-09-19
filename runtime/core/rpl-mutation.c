@@ -29,7 +29,9 @@ static int io_ready(const struct hpclang_rpl_mutation_io *io)
            io->temp_limit > RPL_MAIN_FIRST &&
            io->temp_limit <= RPL_MAIN_END &&
            io->user_limit >= RPL_MAIN_FIRST &&
-           io->user_limit < RPL_MAIN_END;
+           io->user_limit < RPL_MAIN_END &&
+           io->stack_reserve_nibbles <= RPL_MAIN_END - io->user_limit &&
+           (io->stack_reserve_nibbles % 5u) == 0u;
 }
 
 static int read_word(
@@ -191,115 +193,129 @@ static int stack_depth(
     }
 }
 
-static int temp_capacity(
+struct temp_plan {
+    uint32_t ttop;
+    uint32_t rstk;
+    uint32_t dstk;
+    uint32_t avmem;
+    uint32_t delta;
+    uint32_t temp_cost;
+    uint32_t new_rstk;
+    uint32_t new_ttop;
+    uint32_t object_address;
+};
+
+static int plan_temp(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t object_nibbles,
-    uint32_t *ttop,
-    uint32_t *rstk,
-    uint32_t *dstk)
+    struct temp_plan *plan)
 {
-    uint32_t local_ttop = 0u;
-    uint32_t local_rstk = 0u;
-    uint32_t local_dstk = 0u;
-
-    int result = read_word(io, RPL_TEMPTOP, 5u, &local_ttop);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    result = read_word(io, RPL_RSKTOP, 5u, &local_rstk);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    result = read_word(io, RPL_DSKTOP, 5u, &local_dstk);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    if (local_ttop < RPL_MAIN_FIRST ||
-        local_rstk < local_ttop ||
-        local_dstk <= local_rstk ||
-        local_dstk > RPL_MAIN_END ||
-        local_rstk >= io->temp_limit ||
-        local_dstk <= io->user_limit)
-        return HPCLANG_RPL_MUTATION_MALFORMED;
-
-    /*
-     * HPGCC 2/3 reserve eleven nibbles between RSKTOP and the first native
-     * page: six for the TEMPOB block link plus one five-nibble stack cell.
-     */
-    if (io->temp_limit - local_rstk <= 11u ||
-        object_nibbles > io->temp_limit - local_rstk - 11u)
-        return HPCLANG_RPL_MUTATION_NOSPACE;
-
-    if (local_dstk - io->user_limit < 5u)
-        return HPCLANG_RPL_MUTATION_NOSPACE;
-
-    if (ttop != NULL)
-        *ttop = local_ttop;
-    if (rstk != NULL)
-        *rstk = local_rstk;
-    if (dstk != NULL)
-        *dstk = local_dstk;
-    return HPCLANG_RPL_MUTATION_OK;
-}
-
-static int allocate_temp(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t object_nibbles,
-    uint32_t *object_address,
-    uint32_t *new_rstktop)
-{
-    if (object_address == NULL || new_rstktop == NULL ||
-        object_nibbles == 0u)
+    if (plan == NULL || object_nibbles == 0u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     uint32_t ttop = 0u;
     uint32_t rstk = 0u;
     uint32_t dstk = 0u;
-    int result = temp_capacity(
-        io, object_nibbles, &ttop, &rstk, &dstk);
+    uint32_t avmem = 0u;
+
+    int result = read_word(io, RPL_TEMPTOP, 5u, &ttop);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = read_word(io, RPL_RSKTOP, 5u, &rstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = read_word(io, RPL_DSKTOP, 5u, &dstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = read_word(io, RPL_AVMEM, 5u, &avmem);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    uint32_t delta = 0u;
-    if (!checked_add(object_nibbles, 6u, &delta) ||
-        delta > io->temp_limit - rstk)
+    if (ttop < RPL_MAIN_FIRST ||
+        rstk < ttop ||
+        dstk <= rstk ||
+        dstk > RPL_MAIN_END ||
+        rstk > io->temp_limit)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    /*
+     * Keep the HPGCC 2/3 five-nibble guard after the six-nibble TEMPOB block
+     * overhead. temp_limit is already tightened around hpclang native pages.
+     */
+    if (io->temp_limit - rstk <= 11u ||
+        object_nibbles > io->temp_limit - rstk - 11u)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
-    uint32_t moved_end = 0u;
-    if (!checked_add(rstk, delta, &moved_end) ||
-        moved_end > io->temp_limit)
+    uint32_t delta = 0u;
+    if (!checked_add(object_nibbles, 6u, &delta))
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+
+    uint32_t new_rstk = 0u;
+    uint32_t new_ttop = 0u;
+    if (!checked_add(rstk, delta, &new_rstk) ||
+        !checked_add(ttop, delta, &new_ttop) ||
+        new_rstk > io->temp_limit ||
+        new_rstk > dstk)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+
+    /*
+     * Preserve any launcher/native reservation already subtracted from AVMEM.
+     * Charge only the change in geometrically usable five-nibble cells.
+     */
+    uint32_t old_cells = (dstk - rstk) / 5u;
+    uint32_t new_cells = (dstk - new_rstk) / 5u;
+    if (new_cells > old_cells)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t temp_cost = old_cells - new_cells;
+    if (avmem < temp_cost)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
     uint32_t source_size = rstk - ttop;
     if (!range_mapped(io, ttop, source_size) ||
-        !range_mapped(io, ttop + delta, source_size) ||
-        !range_mapped(io, ttop + 1u, object_nibbles))
+        !range_mapped(io, new_ttop, source_size) ||
+        !range_mapped(io, ttop, delta))
         return HPCLANG_RPL_MUTATION_IO;
 
-    result = move_nibbles(io, ttop + delta, ttop, source_size);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    uint32_t link = ttop + 1u + object_nibbles;
-    result = write_word(io, link, 5u, delta);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    uint32_t new_rstk = rstk + delta;
-    uint32_t new_ttop = ttop + delta;
-    result = write_word(io, RPL_RSKTOP, 5u, new_rstk);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    result = write_word(io, RPL_TEMPTOP, 5u, new_ttop);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    uint32_t avmem = (dstk - new_rstk) / 5u;
-    result = write_word(io, RPL_AVMEM, 5u, avmem);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    *object_address = ttop + 1u;
-    *new_rstktop = new_rstk;
+    plan->ttop = ttop;
+    plan->rstk = rstk;
+    plan->dstk = dstk;
+    plan->avmem = avmem;
+    plan->delta = delta;
+    plan->temp_cost = temp_cost;
+    plan->new_rstk = new_rstk;
+    plan->new_ttop = new_ttop;
+    plan->object_address = ttop + 1u;
     return HPCLANG_RPL_MUTATION_OK;
+}
+
+static int commit_temp(
+    const struct hpclang_rpl_mutation_io *io,
+    const struct temp_plan *plan)
+{
+    if (plan == NULL)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t source_size = plan->rstk - plan->ttop;
+    int result = move_nibbles(
+        io, plan->new_ttop, plan->ttop, source_size);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t object_nibbles = plan->delta - 6u;
+    uint32_t link = plan->ttop + 1u + object_nibbles;
+    result = write_word(io, link, 5u, plan->delta);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = write_word(io, RPL_RSKTOP, 5u, plan->new_rstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = write_word(io, RPL_TEMPTOP, 5u, plan->new_ttop);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    return write_word(
+        io, RPL_AVMEM, 5u, plan->avmem - plan->temp_cost);
 }
 
 int hpclang_rpl_mutation_push_snapshot(
@@ -309,36 +325,34 @@ int hpclang_rpl_mutation_push_snapshot(
     if (!io_ready(io) || object == NULL || object->nibble_count == 0u)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
 
-    /*
-     * Check both allocator and data-stack capacity before TEMPOB changes, so a
-     * predictable NOSPACE result never leaves an orphan allocation.
-     */
-    uint32_t ttop = 0u;
-    uint32_t rstk = 0u;
-    uint32_t dstk = 0u;
-    int result = temp_capacity(
-        io, object->nibble_count, &ttop, &rstk, &dstk);
+    struct temp_plan plan;
+    int result = plan_temp(io, object->nibble_count, &plan);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
-    (void)ttop;
-    (void)rstk;
 
-    if (dstk < io->user_limit + 5u)
+    if (plan.dstk < 5u)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t slot = plan.dstk - 5u;
+
+    uint32_t stack_floor = 0u;
+    if (!checked_add(
+            io->user_limit,
+            io->stack_reserve_nibbles,
+            &stack_floor) ||
+        slot < stack_floor ||
+        plan.temp_cost == UINT32_MAX ||
+        plan.avmem < plan.temp_cost + 1u)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
-    uint32_t object_address = 0u;
-    uint32_t new_rstk = 0u;
-    result = allocate_temp(
-        io, object->nibble_count, &object_address, &new_rstk);
+    result = commit_temp(io, &plan);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    result = snapshot_copy_to_saturn(io, object_address, object);
+    result = snapshot_copy_to_saturn(io, plan.object_address, object);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    uint32_t slot = dstk - 5u;
-    result = write_word(io, slot, 5u, object_address);
+    result = write_word(io, slot, 5u, plan.object_address);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -347,7 +361,8 @@ int hpclang_rpl_mutation_push_snapshot(
         return result;
 
     return write_word(
-        io, RPL_AVMEM, 5u, (slot - new_rstk) / 5u);
+        io, RPL_AVMEM, 5u,
+        plan.avmem - plan.temp_cost - 1u);
 }
 
 int hpclang_rpl_mutation_drop(
@@ -418,18 +433,6 @@ int hpclang_rpl_mutation_replace(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    uint32_t object_address = 0u;
-    uint32_t new_rstk = 0u;
-    result = allocate_temp(
-        io, object->nibble_count, &object_address, &new_rstk);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    (void)new_rstk;
-
-    result = snapshot_copy_to_saturn(io, object_address, object);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
     uint32_t zero_based = level - 1u;
     if (zero_based > UINT32_MAX / 5u)
         return HPCLANG_RPL_MUTATION_LEVEL;
@@ -439,5 +442,18 @@ int hpclang_rpl_mutation_replace(
         slot > RPL_MAIN_END - 5u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    return write_word(io, slot, 5u, object_address);
+    struct temp_plan plan;
+    result = plan_temp(io, object->nibble_count, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = commit_temp(io, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = snapshot_copy_to_saturn(io, plan.object_address, object);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    return write_word(io, slot, 5u, plan.object_address);
 }

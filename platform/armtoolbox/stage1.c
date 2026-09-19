@@ -361,13 +361,17 @@ static int stage_rpl_memory_bounds(
             user_limit = sat_end;
     }
 
-    /* Keep the classic 11-nibble TEMPOB/return-stack safety gap. */
-    if (temp_limit <= rsktop + 11u || dsktop < user_limit + 5u)
+    /*
+     * Publish structural fences even if no growth is currently possible.
+     * drop/pop remain safe; push/replace report ENOSPC from their exact plan.
+     */
+    if (temp_limit < rsktop || user_limit > dsktop)
         return 0;
 
     bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC;
     bounds->temp_limit = temp_limit;
     bounds->user_limit = user_limit;
+    bounds->stack_reserve_nibbles = 0u;
     return 1;
 }
 
@@ -485,7 +489,7 @@ int hpclang_armtoolbox_stage1(
         code_count * HPCLANG_PAGE_SIZE);
 
     struct hpclang_launch_context launch;
-    struct hpclang_rpl_memory_bounds rpl_bounds = { 0u, 0u, 0u };
+    struct hpclang_rpl_memory_bounds rpl_bounds = { 0u, 0u, 0u, 0u };
     struct stage_launcher_bias launcher_bias = { 0u, 0u };
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
@@ -542,6 +546,14 @@ int hpclang_armtoolbox_stage1(
          model == HPCLANG_MODEL_HP50G) &&
         stage_rpl_memory_bounds(
             saturn_state, old_l2, total_pages, &rpl_bounds)) {
+        /*
+         * A hidden HPGCC-1.1-style Launcher-V3 pointer needs one physical
+         * stack cell when stage1 restores it after HPC1 returns. init/exit do
+         * not expose that reservation through AVMEM, so carry it explicitly.
+         */
+        rpl_bounds.stack_reserve_nibbles =
+            launcher_bias.active != 0u ? 5u : 0u;
+
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window
          * remains mapped for the complete hpclang_bootstrap_run() call.

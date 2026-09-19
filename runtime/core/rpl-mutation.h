@@ -27,6 +27,7 @@ struct hpclang_rpl_mutation_io {
      */
     uint32_t temp_limit;
     uint32_t user_limit;
+    uint32_t stack_reserve_nibbles;
 };
 
 enum hpclang_rpl_mutation_result {
