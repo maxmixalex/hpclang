@@ -8,6 +8,8 @@
 #include <hpclang/font-package.h>
 #include <hpclang/target.h>
 
+#include "saturn-view.h"
+
 /* Internal kinds are intentionally outside the checked-in package ABI. */
 #define FONT_KIND_HP39_MINI     0x1001u
 #define FONT_KIND_HP39_MAIN     0x1002u
@@ -190,38 +192,20 @@ uint32_t hpclang_font_advance(const struct hpclang_font *font)
     return 0u;
 }
 
-static uintptr_t saturn_page_base(uint32_t saturn_nibble_address)
-{
-    const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (boot == NULL || boot->saturn_state == 0u)
-        return 0u;
-
-    /* HPGCC's SAT_CPU starts with Read[257]. The launch ABI deliberately
-     * preserves that Saturn-state pointer for logical Saturn RAM/object
-     * access. Fixed HP39gs/40gs ROM raster assets intentionally do not use
-     * this live bank view; see hp39_font_nibble(). */
-    const uint32_t *read_map =
-        (const uint32_t *)(uintptr_t)boot->saturn_state;
-    return (uintptr_t)read_map[saturn_nibble_address >> 12];
-}
-
 static uint8_t saturn_nibble(uint32_t address)
 {
-    uintptr_t base = saturn_page_base(address);
-    if (base == 0u)
-        return 0u;
-
-    const volatile uint8_t *p =
-        (const volatile uint8_t *)(base + ((address & 0xfffu) >> 1));
-    uint8_t value = *p;
-    return (address & 1u) != 0u ? (uint8_t)(value >> 4) :
-                                  (uint8_t)(value & 0x0fu);
+    uint8_t value = 0u;
+    (void)hpclang_saturn_read_nibble(
+        hpclang_saturn_address_make(address), &value);
+    return value;
 }
 
 static uint8_t saturn_byte(uint32_t address)
 {
-    return (uint8_t)(saturn_nibble(address) |
-                     (uint8_t)(saturn_nibble(address + 1u) << 4));
+    uint8_t value = 0u;
+    (void)hpclang_saturn_read_byte(
+        hpclang_saturn_address_make(address), &value);
+    return value;
 }
 
 static uintptr_t hp39_font_window_base(void)
