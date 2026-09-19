@@ -74,6 +74,19 @@ These services keep platform representation and ownership below common APIs. Cal
 
 The project does not copy the historical HPGCC API surface wholesale. Historical names or services become adapters only when they describe useful source-level behavior over an already coherent hpclang core.
 
+## Downstream system boundary
+
+hpclang is an SDK/runtime layer, not the owner of downstream operating-system policy. Projects such as **39gsX** may consume hpclang services, but hpclang must not depend on, special-case, or expose an ABI branch for a downstream system.
+
+This means:
+
+- generic application-facing services such as input, display, fonts, time, storage semantics and future renderer-agnostic UI primitives may belong in hpclang;
+- machine-owning subsystems such as 39gsX OHCI/USB host or OTG policy, USB MSC transport, system VFS, file manager, native Aplet loader, alternative-system boot, kernel exception/MMU ownership and swap remain in 39gsX;
+- a platform-private driver may exist inside hpclang when it is only the implementation needed to provide a clean hpclang service (for example HP49g+/HP50g SDI beneath the standard stream API). That does not turn the driver into a general public hardware framework;
+- no `#ifdef HP39GSX`, 39gsX-specific boot mode, or reverse dependency belongs in hpclang.
+
+The dependency direction is therefore **hpclang → reusable application contract; 39gsX → downstream consumer/system owner**, never a two-way runtime dependency.
+
 ## Non-ROM policy
 
 The supported SDK must work through ordinary calculator software mechanisms. ROM replacement or ROM patching may be studied as an optional research or compatibility environment, but it is not part of the normal hpclang architecture.
