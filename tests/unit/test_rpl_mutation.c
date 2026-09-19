@@ -101,6 +101,7 @@ static struct hpclang_rpl_mutation_io setup(uint32_t depth)
         .context = NULL,
         .temp_limit = 0x86000u,
         .user_limit = 0x88000u,
+        .stack_reserve_nibbles = 0u,
     };
     return io;
 }
@@ -137,6 +138,64 @@ static void test_push_transaction(void)
 
     assert(get_word(AVMEM, 5u) ==
            (0x8fffbu - (0x85000u + delta)) / 5u);
+
+    hpclang_object_release(object);
+}
+
+static void test_avmem_reservation_is_preserved(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct hpclang_object *object = make_char('R');
+
+    uint32_t old_avmem = get_word(AVMEM, 5u) - 7u;
+    put_word(AVMEM, 5u, old_avmem);
+
+    uint32_t rstk = get_word(RSKTOP, 5u);
+    uint32_t dstk = get_word(DSKTOP, 5u);
+    uint32_t delta = object->nibble_count + 6u;
+    uint32_t old_cells = (dstk - rstk) / 5u;
+    uint32_t new_cells = (dstk - (rstk + delta)) / 5u;
+    uint32_t temp_cost = old_cells - new_cells;
+
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
+           HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(AVMEM, 5u) ==
+           old_avmem - temp_cost - 1u);
+
+    io = setup(1u);
+    old_avmem = get_word(AVMEM, 5u) - 9u;
+    put_word(AVMEM, 5u, old_avmem);
+    rstk = get_word(RSKTOP, 5u);
+    dstk = get_word(DSKTOP, 5u);
+    old_cells = (dstk - rstk) / 5u;
+    new_cells = (dstk - (rstk + delta)) / 5u;
+    temp_cost = old_cells - new_cells;
+
+    assert(hpclang_rpl_mutation_replace(&io, 1u, object) ==
+           HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(AVMEM, 5u) ==
+           old_avmem - temp_cost);
+
+    hpclang_object_release(object);
+}
+
+static void test_stack_reserve_blocks_last_cell(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct hpclang_object *object = make_char('S');
+
+    uint32_t dstk = get_word(DSKTOP, 5u);
+    io.user_limit = dstk - 10u;
+    io.stack_reserve_nibbles = 5u;
+
+    uint32_t before_ttop = get_word(TEMPTOP, 5u);
+    uint32_t before_rstk = get_word(RSKTOP, 5u);
+    uint32_t before_dstk = get_word(DSKTOP, 5u);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
+           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(get_word(TEMPTOP, 5u) == before_ttop);
+    assert(get_word(RSKTOP, 5u) == before_rstk);
+    assert(get_word(DSKTOP, 5u) == before_dstk);
 
     hpclang_object_release(object);
 }
@@ -202,6 +261,8 @@ static void test_drop_and_replace(void)
 int main(void)
 {
     test_push_transaction();
+    test_avmem_reservation_is_preserved();
+    test_stack_reserve_blocks_last_cell();
     test_nospace_is_non_mutating();
     test_drop_and_replace();
     return 0;

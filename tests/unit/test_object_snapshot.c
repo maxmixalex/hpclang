@@ -122,10 +122,27 @@ static void test_errors(void)
     assert(errno == EILSEQ);
 }
 
+static void test_character_constructor(void)
+{
+    struct hpclang_object *object = NULL;
+    assert(hpclang_object_create_character(0xa5u, &object) == 0);
+    assert(object != NULL);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_CHARACTER);
+    assert(object->nibble_count == 7u);
+    assert(object->native_prologue == 0x029bfu);
+
+    uint8_t value = 0u;
+    assert(hpclang_object_character_value(object, &value) == 0);
+    assert(value == 0xa5u);
+
+    hpclang_object_release(object);
+}
+
 int main(void)
 {
     test_real_snapshot();
     test_odd_character_snapshot();
+    test_character_constructor();
     test_errors();
     return 0;
 }
