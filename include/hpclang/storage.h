@@ -9,6 +9,8 @@ extern "C" {
 
 #define HPCLANG_STREAM_PATH_INFO_VERSION 2u
 #define HPCLANG_STREAM_STORAGE_INFO_VERSION 1u
+#define HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION 1u
+#define HPCLANG_STREAM_NAME_CAPACITY 256u
 
 enum hpclang_stream_path_type {
     HPCLANG_STREAM_PATH_TYPE_UNKNOWN = 0,
@@ -101,6 +103,43 @@ struct hpclang_stream_storage_info {
 int hpclang_stream_path_query(
     const char *path,
     struct hpclang_stream_path_info *info);
+
+
+/*
+ * Owned directory iterator.
+ *
+ * The implementation is intentionally opaque: unlike Stock KOS enumeration,
+ * each iterator owns independent traversal state. Paths are explicit UTF-8
+ * paths rooted at the SD volume; no calculator-global current directory is
+ * changed.
+ */
+struct hpclang_stream_directory;
+
+struct hpclang_stream_directory_entry {
+    uint32_t size;
+    uint32_t version;
+    uint64_t byte_size;
+    uint32_t type;
+    uint32_t attributes;
+    uint32_t time_validity;
+    uint32_t reserved;
+    struct hpclang_stream_civil_datetime last_modified;
+    char name[HPCLANG_STREAM_NAME_CAPACITY];
+};
+
+struct hpclang_stream_directory *hpclang_stream_directory_open(
+    const char *path);
+
+/*
+ * Return 1 and fill entry for one item, 0 at end-of-directory, or -1 with
+ * errno set on error.
+ */
+int hpclang_stream_directory_read(
+    struct hpclang_stream_directory *directory,
+    struct hpclang_stream_directory_entry *entry);
+
+int hpclang_stream_directory_close(
+    struct hpclang_stream_directory *directory);
 
 
 int hpclang_stream_storage_query(

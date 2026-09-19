@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "ff.h"
-#include "diskio.h"
+#include "../../third_party/fatfs/ff.h"
+#include "../../third_party/fatfs/diskio.h"
 #include "hp4950-fatfs-diskio.h"
 #include "s3c2410-sdio-card.h"
 

@@ -14,6 +14,8 @@
 #include <hpclang/storage.h>
 #include <hpclang/target.h>
 
+#include "storage-namespace.h"
+
 /*
  * Stock HP49g+/HP50g KOS filesystem bridge.
  *
@@ -119,6 +121,15 @@ struct stream_fd_state {
 };
 
 static struct stream_fd_state stream_fds[HPCLANG_STREAM_FD_SLOTS];
+
+int hpclang_storage_stock_idle(void)
+{
+    for (uint32_t i = 0u; i < HPCLANG_STREAM_FD_SLOTS; ++i) {
+        if (stream_fds[i].used)
+            return 0;
+    }
+    return 1;
+}
 
 static struct stream_fd_state *stream_fd_find(int fd)
 {
@@ -267,6 +278,10 @@ int open(const char *path, int flags, ...)
 {
     if (!stream_storage_available())
         return unsupported();
+    if (hpclang_namespace_direct_active()) {
+        errno = EBUSY;
+        return -1;
+    }
 
 #ifdef O_EXCL
     /*
@@ -586,6 +601,9 @@ off_t lseek(int fd, off_t offset, int whence)
 
 int unlink(const char *path)
 {
+    if (hpclang_namespace_direct_active())
+        return hpclang_namespace_unlink(path);
+
     uintptr_t addr = kos_entry(KOS_FUNC_FDELETE);
     if (addr == 0u)
         return unsupported();
@@ -623,6 +641,13 @@ static uint8_t stream_media_presence;
 static uint8_t stream_media_protect_known;
 static uint8_t stream_media_protected;
 
+void hpclang_storage_after_stock_reinit(void)
+{
+    stream_media_presence = STREAM_MEDIA_PRESENCE_UNKNOWN;
+    stream_media_protect_known = 0u;
+    stream_media_protected = 0u;
+}
+
 #ifdef HPCLANG_E2E_STORAGE
 void hpclang_e2e_kos_reset_sd(void)
 {
@@ -634,10 +659,7 @@ void hpclang_e2e_kos_reset_sd(void)
      */
     (void)hpclang_kos_swi3(KOS_SYSCALL_RESET_SD, 0u, 0u, 0u);
 
-    /* A Stock reinitialization invalidates the per-native-launch media sample. */
-    stream_media_presence = STREAM_MEDIA_PRESENCE_UNKNOWN;
-    stream_media_protect_known = 0u;
-    stream_media_protected = 0u;
+    hpclang_storage_after_stock_reinit();
 }
 #endif
 
@@ -783,6 +805,8 @@ int hpclang_stream_path_query(
         errno = EFAULT;
         return -1;
     }
+    if (hpclang_namespace_direct_active())
+        return hpclang_namespace_path_query(path, info);
 
     memset(info, 0, sizeof(*info));
     info->size = sizeof(*info);
@@ -873,22 +897,22 @@ int rename(const char *old_path, const char *new_path)
 {
     if (!stream_storage_available())
         return unsupported();
+    return hpclang_namespace_rename(old_path, new_path);
+}
 
-    if (old_path == NULL || new_path == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
+int mkdir(const char *path, mode_t mode)
+{
+    (void)mode;
+    if (!stream_storage_available())
+        return unsupported();
+    return hpclang_namespace_mkdir(path);
+}
 
-    /*
-     * Stock 2.15 on both HP49g+ and HP50g reproduces the historical HPGCC
-     * warning for KOS filesystem function 6: the native rename primitive
-     * fails with the undocumented -200 result. Do not fake POSIX rename with
-     * copy+delete: that would not be atomic and would lose metadata/object
-     * identity. Keep the standard API deterministic until a safe Stock
-     * primitive or ownership-safe filesystem backend exists.
-     */
-    errno = ENOTSUP;
-    return -1;
+int rmdir(const char *path)
+{
+    if (!stream_storage_available())
+        return unsupported();
+    return hpclang_namespace_rmdir(path);
 }
 
 int hpclang_stream_storage_query(
@@ -901,6 +925,8 @@ int hpclang_stream_storage_query(
         errno = EFAULT;
         return -1;
     }
+    if (hpclang_namespace_direct_active())
+        return hpclang_namespace_storage_query(info);
 
     memset(info, 0, sizeof(*info));
     info->size = sizeof(*info);
