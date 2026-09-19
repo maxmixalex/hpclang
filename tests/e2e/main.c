@@ -1369,51 +1369,137 @@ static uint32_t object_read_only_test(uint32_t model)
 
 #ifdef HPCLANG_E2E_KEYBOARD
     /*
-     * Canonical Stock RPL sequences place two dedicated numeric witnesses
-     * underneath the launcher object. stage1 normalizes any Launcher-V3 bias,
-     * so level 1/2 here are application-visible test objects rather than
-     * launcher state. Consume only those two objects.
+     * Build the mutation witness entirely inside HPC1. File Manager and VAR
+     * recall can place a pre-existing X-register value above the recalled
+     * launcher, so UI-prepared stack arguments are intentionally avoided.
      */
+    struct hpclang_object *char_a = NULL;
+    struct hpclang_object *char_b = NULL;
+    if (hpclang_object_create_character('A', &char_a) != 0 ||
+        hpclang_object_create_character('B', &char_b) != 0) {
+        hpclang_object_release(char_a);
+        hpclang_object_release(char_b);
+        return 0xa6u;
+    }
+
+    uint8_t character = 0u;
+    if (hpclang_object_character_value(char_a, &character) != 0 ||
+        character != 'A' ||
+        hpclang_object_character_value(char_b, &character) != 0 ||
+        character != 'B') {
+        hpclang_object_release(char_a);
+        hpclang_object_release(char_b);
+        return 0xa7u;
+    }
+
     if (live_stock_view) {
-        if (before < 2u)
-            return 0xa6u;
+        if (hpclang_stack_push(char_a) != 0) {
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xa8u;
+        }
+
+        uint32_t mutated_depth = UINT32_MAX;
+        if (hpclang_stack_depth(&mutated_depth) != 0 ||
+            mutated_depth != before + 1u) {
+            (void)hpclang_stack_drop(1u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xa9u;
+        }
+
+        if (hpclang_stack_replace(1u, char_b) != 0) {
+            (void)hpclang_stack_drop(1u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xaau;
+        }
+
+        struct hpclang_object *peek = NULL;
+        if (hpclang_stack_peek(1u, &peek) != 0 ||
+            peek == NULL ||
+            hpclang_object_character_value(peek, &character) != 0 ||
+            character != 'B') {
+            hpclang_object_release(peek);
+            (void)hpclang_stack_drop(1u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xabu;
+        }
+        hpclang_object_release(peek);
+
+        if (hpclang_stack_push(char_a) != 0) {
+            (void)hpclang_stack_drop(1u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xacu;
+        }
+
+        if (hpclang_stack_depth(&mutated_depth) != 0 ||
+            mutated_depth != before + 2u) {
+            (void)hpclang_stack_drop(2u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xadu;
+        }
 
         struct hpclang_object *popped = NULL;
-        errno = 0;
-        if (hpclang_stack_pop(&popped) != 0 || popped == NULL)
-            return 0xa7u;
-
-        enum hpclang_object_kind kind = hpclang_object_kind(popped);
-        if (kind != HPCLANG_OBJECT_INTEGER &&
-            kind != HPCLANG_OBJECT_REAL) {
+        if (hpclang_stack_pop(&popped) != 0 ||
+            popped == NULL ||
+            hpclang_object_character_value(popped, &character) != 0 ||
+            character != 'A') {
             hpclang_object_release(popped);
-            return 0xa8u;
+            (void)hpclang_stack_drop(2u);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xaeu;
         }
         hpclang_object_release(popped);
 
-        uint32_t after_pop = UINT32_MAX;
-        if (hpclang_stack_depth(&after_pop) != 0 ||
-            after_pop != before - 1u)
-            return 0xa9u;
-
-        if (hpclang_stack_drop(1u) != 0)
-            return 0xaau;
-
-        uint32_t after_drop = UINT32_MAX;
-        if (hpclang_stack_depth(&after_drop) != 0 ||
-            after_drop != before - 2u)
-            return 0xabu;
+        if (hpclang_stack_depth(&mutated_depth) != 0 ||
+            mutated_depth != before + 1u ||
+            hpclang_stack_drop(1u) != 0 ||
+            hpclang_stack_depth(&mutated_depth) != 0 ||
+            mutated_depth != before) {
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xafu;
+        }
     } else {
+        errno = 0;
+        if (hpclang_stack_push(char_a) != -1 || errno != ENOSYS) {
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xb0u;
+        }
+
+        errno = 0;
+        if (hpclang_stack_replace(1u, char_b) != -1 || errno != ENOSYS) {
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xb1u;
+        }
+
         struct hpclang_object *popped = NULL;
         errno = 0;
         if (hpclang_stack_pop(&popped) != -1 ||
-            popped != NULL || errno != ENOSYS)
-            return 0xacu;
+            popped != NULL || errno != ENOSYS) {
+            hpclang_object_release(popped);
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xb2u;
+        }
 
         errno = 0;
-        if (hpclang_stack_drop(1u) != -1 || errno != ENOSYS)
-            return 0xadu;
+        if (hpclang_stack_drop(1u) != -1 || errno != ENOSYS) {
+            hpclang_object_release(char_a);
+            hpclang_object_release(char_b);
+            return 0xb3u;
+        }
     }
+
+    hpclang_object_release(char_a);
+    hpclang_object_release(char_b);
 #endif
 
     return 0u;

@@ -27,6 +27,7 @@ static struct hpclang_rpl_memory_bounds fake_bounds = {
     .magic = HPCLANG_RPL_BOUNDS_MAGIC,
     .temp_limit = 0x88000u,
     .user_limit = 0x88000u,
+    .stack_reserve_nibbles = 0u,
 };
 
 static struct hpclang_boot_info fake_boot = {
@@ -211,6 +212,52 @@ static void test_public_pop(void)
     assert(get_word5(DSKTOP) == before);
 }
 
+static void test_public_push_replace_roundtrip(void)
+{
+    prepare_one_real();
+
+    uint32_t before = 0u;
+    assert(hpclang_stack_depth(&before) == 0);
+
+    struct hpclang_object *a = NULL;
+    struct hpclang_object *b = NULL;
+    assert(hpclang_object_create_character('A', &a) == 0);
+    assert(hpclang_object_create_character('B', &b) == 0);
+
+    assert(hpclang_stack_push(a) == 0);
+    uint32_t depth = 0u;
+    assert(hpclang_stack_depth(&depth) == 0);
+    assert(depth == before + 1u);
+
+    assert(hpclang_stack_replace(1u, b) == 0);
+    assert(hpclang_stack_depth(&depth) == 0);
+    assert(depth == before + 1u);
+
+    struct hpclang_object *peek = NULL;
+    assert(hpclang_stack_peek(1u, &peek) == 0);
+    uint8_t value = 0u;
+    assert(hpclang_object_character_value(peek, &value) == 0);
+    assert(value == 'B');
+    hpclang_object_release(peek);
+
+    assert(hpclang_stack_push(a) == 0);
+    assert(hpclang_stack_depth(&depth) == 0);
+    assert(depth == before + 2u);
+
+    struct hpclang_object *popped = NULL;
+    assert(hpclang_stack_pop(&popped) == 0);
+    assert(hpclang_object_character_value(popped, &value) == 0);
+    assert(value == 'A');
+    hpclang_object_release(popped);
+
+    assert(hpclang_stack_drop(1u) == 0);
+    assert(hpclang_stack_depth(&depth) == 0);
+    assert(depth == before);
+
+    hpclang_object_release(a);
+    hpclang_object_release(b);
+}
+
 static void test_mutation_requires_fence(void)
 {
     prepare_one_real();
@@ -248,6 +295,7 @@ int main(void)
     test_unavailable_family_and_mapping();
     test_public_drop();
     test_public_pop();
+    test_public_push_replace_roundtrip();
     test_mutation_requires_fence();
     test_malformed_stack_state();
     return 0;
