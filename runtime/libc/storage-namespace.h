@@ -19,6 +19,7 @@ int hpclang_namespace_close(int fd);
 ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count);
 ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count);
 off_t hpclang_namespace_lseek(int fd, off_t offset, int whence);
+int hpclang_namespace_ftruncate(int fd, off_t length);
 int hpclang_namespace_unlink(const char *path);
 int hpclang_namespace_rename(const char *old_path, const char *new_path);
 int hpclang_namespace_mkdir(const char *path);
