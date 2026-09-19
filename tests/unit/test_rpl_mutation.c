@@ -185,11 +185,11 @@ static void test_drop_and_replace(void)
     assert(replacement == 0x84001u);
     assert_char_at(replacement, 'C');
 
-    uint32_t rstk = get_word(RSKTOP, 5u);
+    uint32_t avmem = get_word(AVMEM, 5u);
     assert(hpclang_rpl_mutation_drop(&io, 2u) ==
            HPCLANG_RPL_MUTATION_OK);
     assert(get_word(DSKTOP, 5u) == old_top + 10u);
-    assert(get_word(AVMEM, 5u) == (old_top + 10u - rstk) / 5u);
+    assert(get_word(AVMEM, 5u) == avmem + 2u);
 
     uint32_t before = get_word(DSKTOP, 5u);
     assert(hpclang_rpl_mutation_drop(&io, 1u) ==

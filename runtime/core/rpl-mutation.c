@@ -367,15 +367,16 @@ int hpclang_rpl_mutation_drop(
         return HPCLANG_RPL_MUTATION_LEVEL;
 
     uint32_t dstk = 0u;
-    uint32_t rstk = 0u;
+    uint32_t avmem = 0u;
     result = read_word(io, RPL_DSKTOP, 5u, &dstk);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
-    result = read_word(io, RPL_RSKTOP, 5u, &rstk);
+    result = read_word(io, RPL_AVMEM, 5u, &avmem);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    if (count > UINT32_MAX / 5u)
+    if (count > UINT32_MAX / 5u ||
+        avmem > UINT32_MAX - count)
         return HPCLANG_RPL_MUTATION_LEVEL;
     uint32_t delta = count * 5u;
     uint32_t new_dstk = 0u;
@@ -383,12 +384,16 @@ int hpclang_rpl_mutation_drop(
         new_dstk > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
+    /*
+     * Match Stock/HPGCC stack semantics: AVMEM changes by stack cells, not by
+     * recomputing DSKTOP-RSKTOP. The latter would incorrectly count a hidden
+     * launcher-bias cell and hpclang-owned native pages as ordinary free RAM.
+     */
     result = write_word(io, RPL_DSKTOP, 5u, new_dstk);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    return write_word(
-        io, RPL_AVMEM, 5u, (new_dstk - rstk) / 5u);
+    return write_word(io, RPL_AVMEM, 5u, avmem + count);
 }
 
 int hpclang_rpl_mutation_replace(
