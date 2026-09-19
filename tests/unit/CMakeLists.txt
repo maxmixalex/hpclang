@@ -67,7 +67,8 @@ hpclang_unit(object
     "${HPCLANG_ROOT}/runtime/core/object.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c"
-    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c")
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c")
 target_include_directories(test_object PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")

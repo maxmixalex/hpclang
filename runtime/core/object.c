@@ -3,11 +3,13 @@
 #include <stdint.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/object.h>
 #include <hpclang/target.h>
 
 #include "object-snapshot.h"
+#include "rpl-mutation.h"
 #include "rpl-stack-view.h"
 #include "saturn-view.h"
 
@@ -35,6 +37,72 @@ static int stock_read_nibble(
     (void)context;
     return hpclang_saturn_read_nibble(
         hpclang_saturn_address_make(nibble_address), value);
+}
+
+static int stock_write_nibble(
+    void *context,
+    uint32_t nibble_address,
+    uint8_t value)
+{
+    (void)context;
+    return hpclang_saturn_write_nibble(
+        hpclang_saturn_address_make(nibble_address), value);
+}
+
+static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
+{
+    if (io == NULL || !stack_family_available())
+        return 0;
+
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot == NULL ||
+        (boot->platform_cookie &
+         HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
+        return 0;
+
+    uintptr_t raw =
+        boot->platform_cookie &
+        ~(uintptr_t)HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    const struct hpclang_rpl_memory_bounds *bounds =
+        (const struct hpclang_rpl_memory_bounds *)raw;
+
+    if (bounds == NULL ||
+        bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+        bounds->temp_limit <= UINT32_C(0x00080000) ||
+        bounds->temp_limit > UINT32_C(0x00100000) ||
+        bounds->user_limit < UINT32_C(0x00080000) ||
+        bounds->user_limit >= UINT32_C(0x00100000))
+        return 0;
+
+    io->read_nibble = stock_read_nibble;
+    io->write_nibble = stock_write_nibble;
+    io->context = NULL;
+    io->temp_limit = bounds->temp_limit;
+    io->user_limit = bounds->user_limit;
+    return 1;
+}
+
+static int set_mutation_errno(int result)
+{
+    switch (result) {
+    case HPCLANG_RPL_MUTATION_NOSPACE:
+        errno = ENOSPC;
+        break;
+    case HPCLANG_RPL_MUTATION_LEVEL:
+        errno = EINVAL;
+        break;
+    case HPCLANG_RPL_MUTATION_MALFORMED:
+        errno = EILSEQ;
+        break;
+    case HPCLANG_RPL_MUTATION_IO:
+        errno = EIO;
+        break;
+    case HPCLANG_RPL_MUTATION_UNAVAILABLE:
+    default:
+        errno = ENOSYS;
+        break;
+    }
+    return -1;
 }
 
 static const struct hpclang_rpl_reader stock_reader = {
@@ -106,4 +174,46 @@ int hpclang_stack_peek(
         address,
         SATURN_SPACE_NIBBLES - address,
         object);
+}
+
+int hpclang_stack_drop(uint32_t count)
+{
+    struct hpclang_rpl_mutation_io io;
+    if (!stock_mutation_io(&io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    int result = hpclang_rpl_mutation_drop(&io, count);
+    return result == HPCLANG_RPL_MUTATION_OK
+        ? 0
+        : set_mutation_errno(result);
+}
+
+int hpclang_stack_pop(struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    *object = NULL;
+
+    struct hpclang_rpl_mutation_io io;
+    if (!stock_mutation_io(&io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    struct hpclang_object *snapshot = NULL;
+    if (hpclang_stack_peek(1u, &snapshot) != 0)
+        return -1;
+
+    int result = hpclang_rpl_mutation_drop(&io, 1u);
+    if (result != HPCLANG_RPL_MUTATION_OK) {
+        hpclang_object_release(snapshot);
+        return set_mutation_errno(result);
+    }
+
+    *object = snapshot;
+    return 0;
 }
