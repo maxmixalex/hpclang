@@ -628,9 +628,20 @@ int hpclang_namespace_storage_query(
             (uint64_t)free_clusters * (uint64_t)fs->csize * UINT64_C(512);
         info->flags |= HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID;
 
-        LBA_t sectors = 0;
-        if (disk_ioctl(0u, GET_SECTOR_COUNT, &sectors) == RES_OK) {
-            info->capacity_bytes = (uint64_t)sectors * UINT64_C(512);
+        /*
+         * Report the mounted FAT volume, not the entire physical SD card.
+         * FatFs exposes the volume base, data base, cluster size and cluster
+         * count after mount. Reconstruct the addressable volume sectors from
+         * those fields so a partitioned card does not inflate FSGetVolumeSize.
+         */
+        if (fs->n_fatent >= 2u && fs->csize != 0u &&
+            fs->database >= fs->volbase) {
+            uint64_t metadata_sectors =
+                (uint64_t)(fs->database - fs->volbase);
+            uint64_t data_sectors =
+                (uint64_t)(fs->n_fatent - 2u) * (uint64_t)fs->csize;
+            info->capacity_bytes =
+                (metadata_sectors + data_sectors) * UINT64_C(512);
             info->flags |= HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID;
         }
     }
