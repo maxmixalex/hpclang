@@ -28,6 +28,7 @@ target_include_directories(test_display PRIVATE "${HPCLANG_ROOT}/include" "${HPC
 hpclang_unit(font
     test_font.c
     "${HPCLANG_ROOT}/runtime/core/font.c"
+    "${HPCLANG_ROOT}/runtime/core/saturn-view.c"
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_font PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
@@ -40,6 +41,12 @@ add_test(
         "-DHPCLANG_ROOT=${HPCLANG_ROOT}"
         -S "${HPCLANG_ROOT}/tests/font-cmake"
         -B "${CMAKE_CURRENT_BINARY_DIR}/font-cmake")
+
+hpclang_unit(rpl_object_span
+    test_rpl_object_span.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_object_span PRIVATE
+    "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
