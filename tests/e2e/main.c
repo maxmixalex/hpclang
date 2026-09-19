@@ -14,6 +14,7 @@
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
+#include <hpclang/object.h>
 #include <hpclang/storage.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
@@ -1310,6 +1311,65 @@ static int keyboard_transition(uint32_t model)
 }
 #endif
 
+static uint32_t object_read_only_test(uint32_t model)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    int rpl_family =
+        model == HPCLANG_MODEL_HP48GII ||
+        model == HPCLANG_MODEL_HP49GPLUS ||
+        model == HPCLANG_MODEL_HP50G;
+    int live_stock_view =
+        rpl_family && boot != NULL && boot->saturn_state != 0u;
+
+    uint32_t depth = UINT32_MAX;
+    errno = 0;
+    int result = hpclang_stack_depth(&depth);
+
+    if (!live_stock_view) {
+        if (result != -1 || depth != 0u || errno != ENOSYS)
+            return 0xa0u;
+        return 0u;
+    }
+
+    if (result != 0)
+        return 0xa1u;
+
+    uint32_t before = depth;
+    if (before != 0u) {
+        struct hpclang_object *object = NULL;
+        errno = 0;
+        result = hpclang_stack_peek(1u, &object);
+        if (result == 0) {
+            if (object == NULL)
+                return 0xa2u;
+            (void)hpclang_object_kind(object);
+            hpclang_object_release(object);
+        } else {
+            /*
+             * The first M7.3 slice is deliberately conservative: a Stock
+             * object whose exact native boundary is not frozen yet reports
+             * ENOTSUP rather than being copied heuristically.
+             */
+            if (object != NULL || errno != ENOTSUP)
+                return 0xa3u;
+        }
+    }
+
+    uint32_t after = UINT32_MAX;
+    if (hpclang_stack_depth(&after) != 0 || after != before)
+        return 0xa4u;
+
+    if (before != UINT32_MAX) {
+        struct hpclang_object *object = NULL;
+        errno = 0;
+        if (hpclang_stack_peek(before + 1u, &object) != -1 ||
+            object != NULL || errno != EINVAL)
+            return 0xa5u;
+    }
+
+    return 0u;
+}
+
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -1343,6 +1403,10 @@ int main(void)
 
     if (hpclang_e2e_cpp_test() != 0)
         return finish(0x12, boot->model);
+
+    uint32_t object_failure = object_read_only_test(boot->model);
+    if (object_failure != 0u)
+        return finish(object_failure, boot->model);
 
 #ifdef HPCLANG_E2E_STORAGE
     uint32_t storage_failure = stock_stream_storage_test(boot->model);
