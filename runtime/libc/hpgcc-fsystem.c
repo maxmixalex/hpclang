@@ -378,6 +378,22 @@ int FSWrite(char *buffer, int nbytes, FS_FILE *file)
             file->FileSize)
         return 0;
 
+    int base_mode =
+        file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY);
+
+    /*
+     * Historical MODIFY preserves the original extent. Cap the request at EOF
+     * instead of growing the file. NOGROW is stricter: a request that would
+     * grow at all is rejected as a whole.
+     */
+    if (base_mode == FSMODE_MODIFY) {
+        if (file->CurrentOffset >= file->FileSize)
+            return 0;
+        unsigned int remaining = file->FileSize - file->CurrentOffset;
+        if ((unsigned int)nbytes > remaining)
+            nbytes = (int)remaining;
+    }
+
     ssize_t written = write(file->_hpclang_fd, buffer, (size_t)nbytes);
     if (written < 0)
         return 0;
@@ -385,8 +401,19 @@ int FSWrite(char *buffer, int nbytes, FS_FILE *file)
     off_t position = lseek(file->_hpclang_fd, 0, SEEK_CUR);
     if (position >= 0)
         file->CurrentOffset = (unsigned int)position;
-    if (file->CurrentOffset > file->FileSize)
+
+    if (base_mode == FSMODE_WRITE) {
+        /*
+         * HPGCC FSMODE_WRITE truncates after every write, not only when the
+         * file is opened. This matters after seeking backwards.
+         */
+        if (ftruncate(file->_hpclang_fd, (off_t)file->CurrentOffset) != 0)
+            return 0;
         file->FileSize = file->CurrentOffset;
+    } else if (file->CurrentOffset > file->FileSize) {
+        file->FileSize = file->CurrentOffset;
+    }
+
     file->_hpclang_eof = 0u;
     return (int)written;
 }
