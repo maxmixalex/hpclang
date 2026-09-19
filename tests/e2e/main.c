@@ -1558,9 +1558,21 @@ static uint32_t object_store_read_only_test(uint32_t model)
         return 0u;
     }
 
-    static const uint8_t hpclang_name[] = {
+    static const uint8_t hp48_hpclang_name[] = {
         'H', 'P', 'C', 'L', 'A', 'N', 'G'
     };
+    static const uint8_t hp4950_hpclang_name[] = {
+        'H', 'P', 'C', 'L', 'A', 'N', 'G', '.', 'H', 'P'
+    };
+    const uint8_t *hpclang_name =
+        model == HPCLANG_MODEL_HP48GII
+            ? hp48_hpclang_name
+            : hp4950_hpclang_name;
+    uint32_t hpclang_name_length =
+        model == HPCLANG_MODEL_HP48GII
+            ? (uint32_t)sizeof(hp48_hpclang_name)
+            : (uint32_t)sizeof(hp4950_hpclang_name);
+
     static const uint8_t missing_name[] = {
         '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
         '_', 'E', '2', 'E', '_', 'M', 'I', 'S', 'S',
@@ -1597,9 +1609,9 @@ static uint32_t object_store_read_only_test(uint32_t model)
     struct hpclang_object_store_entry entry1;
     struct hpclang_object_store_entry entry2;
     int found1 = object_store_find_named(
-        first, hpclang_name, sizeof(hpclang_name), &entry1);
+        first, hpclang_name, hpclang_name_length, &entry1);
     int found2 = object_store_find_named(
-        second, hpclang_name, sizeof(hpclang_name), &entry2);
+        second, hpclang_name, hpclang_name_length, &entry2);
     if (found1 != 1 || found2 != 1) {
         failure = 0xc5u;
         goto done;
@@ -1615,7 +1627,7 @@ static uint32_t object_store_read_only_test(uint32_t model)
 
     errno = 0;
     child = hpclang_object_store_open_child(
-        home, hpclang_name, sizeof(hpclang_name));
+        home, hpclang_name, hpclang_name_length);
     if (child != NULL || errno != ENOTDIR) {
         failure = 0xc7u;
         goto done;
