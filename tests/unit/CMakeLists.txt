@@ -48,6 +48,12 @@ hpclang_unit(rpl_object_span
 target_include_directories(test_rpl_object_span PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_stack_view
+    test_rpl_stack_view.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c")
+target_include_directories(test_rpl_stack_view PRIVATE
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
 
