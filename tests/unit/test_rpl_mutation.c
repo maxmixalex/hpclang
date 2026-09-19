@@ -185,7 +185,7 @@ static void test_stack_reserve_blocks_last_cell(void)
     struct hpclang_object *object = make_char('S');
 
     uint32_t dstk = get_word(DSKTOP, 5u);
-    io.user_limit = dstk - 10u;
+    io.user_limit = dstk - 5u;
     io.stack_reserve_nibbles = 5u;
 
     uint32_t before_ttop = get_word(TEMPTOP, 5u);
