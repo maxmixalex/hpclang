@@ -1,6 +1,7 @@
 #ifndef HPCLANG_OBJECT_H
 #define HPCLANG_OBJECT_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -44,9 +45,32 @@ int hpclang_object_create_character(
     uint8_t value,
     struct hpclang_object **object);
 
+/*
+ * Convert native scalar/string snapshots without exposing native prologues.
+ *
+ * Integer conversion is exact. It accepts classic 20-bit BINT and arbitrary
+ * precision decimal ZINT only when the value fits int64_t; otherwise ERANGE.
+ *
+ * HP48/49/50 character and string objects are calculator 8-bit codes/bytes.
+ * They are not implicitly decoded as UTF-8. Use the byte APIs when lossless
+ * Stock-object round-trip matters.
+ */
+int hpclang_object_integer_i64(
+    const struct hpclang_object *object,
+    int64_t *value);
+
 int hpclang_object_character_value(
     const struct hpclang_object *object,
     uint8_t *value);
+
+int hpclang_object_string_size(
+    const struct hpclang_object *object,
+    size_t *byte_count);
+
+int hpclang_object_string_copy(
+    const struct hpclang_object *object,
+    uint8_t *buffer,
+    size_t capacity);
 
 /*
  * Observe a real calculator RPL stack.

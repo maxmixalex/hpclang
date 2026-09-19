@@ -239,6 +239,193 @@ int hpclang_object_create_character(
     return 0;
 }
 
+static int object_read_nibbles(
+    const struct hpclang_object *object,
+    uint32_t offset,
+    uint32_t count,
+    uint32_t *value)
+{
+    if (object == NULL || value == NULL || count > 8u ||
+        offset > object->nibble_count ||
+        count > object->nibble_count - offset)
+        return 0;
+
+    uint32_t out = 0u;
+    for (uint32_t i = 0u; i < count; ++i) {
+        uint8_t nibble = 0u;
+        if (!hpclang_object_snapshot_read_nibble(
+                object, offset + i, &nibble))
+            return 0;
+        out |= (uint32_t)nibble << (i * 4u);
+    }
+
+    *value = out;
+    return 1;
+}
+
+int hpclang_object_integer_i64(
+    const struct hpclang_object *object,
+    int64_t *value)
+{
+    if (object == NULL || value == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (object->kind != HPCLANG_OBJECT_INTEGER) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (object->native_prologue == RPL_DOBINT) {
+        if (object->nibble_count != 10u) {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        uint32_t raw = 0u;
+        if (!object_read_nibbles(object, 5u, 5u, &raw)) {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        int32_t signed_value =
+            (raw & UINT32_C(0x00080000)) != 0u
+                ? (int32_t)(raw | UINT32_C(0xfff00000))
+                : (int32_t)raw;
+        *value = (int64_t)signed_value;
+        return 0;
+    }
+
+    if (object->native_prologue != RPL_DOINT) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    uint32_t length = 0u;
+    if (object->nibble_count < 11u ||
+        !object_read_nibbles(object, 5u, 5u, &length) ||
+        length < 6u ||
+        length > UINT32_MAX - 5u ||
+        object->nibble_count != 5u + length) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t digits = length - 6u;
+    uint32_t sign_offset = 10u + digits;
+    uint8_t sign = 0u;
+    if (!hpclang_object_snapshot_read_nibble(
+            object, sign_offset, &sign) ||
+        (sign != 0u && sign != 9u)) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    const uint64_t positive_limit = (uint64_t)INT64_MAX;
+    const uint64_t negative_limit = positive_limit + UINT64_C(1);
+    uint64_t limit = sign == 9u ? negative_limit : positive_limit;
+    uint64_t magnitude = 0u;
+
+    for (uint32_t i = digits; i != 0u; --i) {
+        uint8_t digit = 0u;
+        if (!hpclang_object_snapshot_read_nibble(
+                object, 10u + i - 1u, &digit) ||
+            digit > 9u) {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        if (magnitude > (limit - digit) / UINT64_C(10)) {
+            errno = ERANGE;
+            return -1;
+        }
+        magnitude = magnitude * UINT64_C(10) + digit;
+    }
+
+    if (sign == 9u) {
+        if (magnitude == negative_limit)
+            *value = INT64_MIN;
+        else
+            *value = -(int64_t)magnitude;
+    } else {
+        *value = (int64_t)magnitude;
+    }
+    return 0;
+}
+
+static int object_string_length(
+    const struct hpclang_object *object,
+    size_t *byte_count)
+{
+    if (object == NULL || byte_count == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (object->kind != HPCLANG_OBJECT_STRING) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (object->native_prologue != RPL_DOCSTR) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    uint32_t length = 0u;
+    if (object->nibble_count < 10u ||
+        !object_read_nibbles(object, 5u, 5u, &length) ||
+        length < 5u ||
+        length > UINT32_MAX - 5u ||
+        object->nibble_count != 5u + length) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t payload_nibbles = length - 5u;
+    if ((payload_nibbles & 1u) != 0u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    *byte_count = (size_t)(payload_nibbles >> 1);
+    return 0;
+}
+
+int hpclang_object_string_size(
+    const struct hpclang_object *object,
+    size_t *byte_count)
+{
+    return object_string_length(object, byte_count);
+}
+
+int hpclang_object_string_copy(
+    const struct hpclang_object *object,
+    uint8_t *buffer,
+    size_t capacity)
+{
+    size_t byte_count = 0u;
+    if (object_string_length(object, &byte_count) != 0)
+        return -1;
+    if (byte_count != 0u && buffer == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (capacity < byte_count) {
+        errno = ENOBUFS;
+        return -1;
+    }
+
+    for (size_t i = 0u; i < byte_count; ++i) {
+        uint32_t packed = 0u;
+        uint32_t offset = 10u + (uint32_t)(i * 2u);
+        if (!object_read_nibbles(object, offset, 2u, &packed)) {
+            errno = EILSEQ;
+            return -1;
+        }
+        buffer[i] = (uint8_t)packed;
+    }
+    return 0;
+}
+
 int hpclang_object_character_value(
     const struct hpclang_object *object,
     uint8_t *value)

@@ -46,6 +46,51 @@ static struct hpclang_rpl_reader reader_for(struct image *image)
     return reader;
 }
 
+static struct hpclang_object *snapshot_from_image(struct image *image)
+{
+    struct hpclang_rpl_reader reader = reader_for(image);
+    struct hpclang_object *object = NULL;
+    assert(hpclang_object_snapshot_copy(
+               &reader, 0u, image->used, &object) == 0);
+    assert(object != NULL);
+    return object;
+}
+
+static void put_zint(
+    struct image *image,
+    const char *magnitude,
+    int negative)
+{
+    memset(image, 0, sizeof(*image));
+    size_t digits = strlen(magnitude);
+    assert(digits <= 100u);
+
+    put_nibbles(image, 0u, 0x02614u, 5u);
+    put_nibbles(image, 5u, (uint32_t)digits + 6u, 5u);
+    for (size_t i = 0u; i < digits; ++i) {
+        char ch = magnitude[digits - 1u - i];
+        assert(ch >= '0' && ch <= '9');
+        put_nibbles(image, 10u + (uint32_t)i, (uint32_t)(ch - '0'), 1u);
+    }
+    put_nibbles(
+        image, 10u + (uint32_t)digits, negative ? 9u : 0u, 1u);
+}
+
+static void put_string(
+    struct image *image,
+    const uint8_t *bytes,
+    size_t count)
+{
+    memset(image, 0, sizeof(*image));
+    assert(count <= 50u);
+
+    put_nibbles(image, 0u, 0x02a2cu, 5u);
+    put_nibbles(image, 5u, 5u + (uint32_t)(count * 2u), 5u);
+    for (size_t i = 0u; i < count; ++i)
+        put_nibbles(
+            image, 10u + (uint32_t)(i * 2u), bytes[i], 2u);
+}
+
 static void test_real_snapshot(void)
 {
     struct image image = {0};
@@ -97,6 +142,101 @@ static void test_odd_character_snapshot(void)
     hpclang_object_release(object);
 }
 
+static void test_integer_conversions(void)
+{
+    struct image image = {0};
+    int64_t value = 0;
+
+    put_nibbles(&image, 0u, 0x02911u, 5u);
+    put_nibbles(&image, 5u, 0x7ffffu, 5u);
+    image.used = 10u;
+    struct hpclang_object *object = snapshot_from_image(&image);
+    assert(hpclang_object_integer_i64(object, &value) == 0);
+    assert(value == 524287);
+    hpclang_object_release(object);
+
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02911u, 5u);
+    put_nibbles(&image, 5u, 0xfffffu, 5u);
+    image.used = 10u;
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_integer_i64(object, &value) == 0);
+    assert(value == -1);
+    hpclang_object_release(object);
+
+    put_zint(&image, "9223372036854775807", 0);
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_integer_i64(object, &value) == 0);
+    assert(value == INT64_MAX);
+    hpclang_object_release(object);
+
+    put_zint(&image, "9223372036854775808", 1);
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_integer_i64(object, &value) == 0);
+    assert(value == INT64_MIN);
+    hpclang_object_release(object);
+
+    put_zint(&image, "9223372036854775808", 0);
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_integer_i64(object, &value) == -1);
+    assert(errno == ERANGE);
+    hpclang_object_release(object);
+
+    put_zint(&image, "9223372036854775809", 1);
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_integer_i64(object, &value) == -1);
+    assert(errno == ERANGE);
+    hpclang_object_release(object);
+
+    put_zint(&image, "123", 0);
+    object = snapshot_from_image(&image);
+    object->data[5] = (uint8_t)((object->data[5] & 0xf0u) | 0x0au);
+    errno = 0;
+    assert(hpclang_object_integer_i64(object, &value) == -1);
+    assert(errno == EILSEQ);
+    hpclang_object_release(object);
+}
+
+static void test_raw_string_conversions(void)
+{
+    const uint8_t expected[] = { 0x41u, 0x00u, 0xffu };
+    struct image image = {0};
+    put_string(&image, expected, sizeof(expected));
+
+    struct hpclang_object *object = snapshot_from_image(&image);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_STRING);
+
+    size_t size = 0u;
+    assert(hpclang_object_string_size(object, &size) == 0);
+    assert(size == sizeof(expected));
+
+    uint8_t buffer[3] = { 0x11u, 0x22u, 0x33u };
+    errno = 0;
+    assert(hpclang_object_string_copy(object, buffer, 2u) == -1);
+    assert(errno == ENOBUFS);
+    assert(buffer[0] == 0x11u && buffer[1] == 0x22u &&
+           buffer[2] == 0x33u);
+
+    assert(hpclang_object_string_copy(
+               object, buffer, sizeof(buffer)) == 0);
+    assert(memcmp(buffer, expected, sizeof(expected)) == 0);
+    hpclang_object_release(object);
+
+    /* Odd payload nibble count cannot represent complete 8-bit bytes. */
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02a2cu, 5u);
+    put_nibbles(&image, 5u, 6u, 5u);
+    put_nibbles(&image, 10u, 0x0au, 1u);
+    image.used = 11u;
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_string_size(object, &size) == -1);
+    assert(errno == EILSEQ);
+    hpclang_object_release(object);
+}
+
 static void test_errors(void)
 {
     struct image image = {0};
@@ -143,6 +283,8 @@ int main(void)
     test_real_snapshot();
     test_odd_character_snapshot();
     test_character_constructor();
+    test_integer_conversions();
+    test_raw_string_conversions();
     test_errors();
     return 0;
 }
