@@ -43,3 +43,18 @@ add_test(
 
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")
+
+# FatFs is intentionally not linked into the calculator runtime yet. This host
+# target keeps the pinned core/configuration buildable while the hp4950 SDIO
+# media layer is implemented independently.
+add_library(hpclang_fatfs_vendor STATIC
+    "${HPCLANG_ROOT}/third_party/fatfs/ff.c"
+    "${HPCLANG_ROOT}/third_party/fatfs/ffunicode.c")
+target_compile_features(hpclang_fatfs_vendor PRIVATE c_std_11)
+target_include_directories(hpclang_fatfs_vendor PUBLIC
+    "${HPCLANG_ROOT}/third_party/fatfs")
+
+hpclang_unit(fatfs_config test_fatfs_config.c)
+target_include_directories(test_fatfs_config PRIVATE
+    "${HPCLANG_ROOT}/third_party/fatfs")
+target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
