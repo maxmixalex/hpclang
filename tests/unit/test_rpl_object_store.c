@@ -49,9 +49,12 @@ static uint32_t put_item(
     for (uint32_t i = 0u; i < length; ++i)
         put_nibbles(item + 2u + i * 2u, (uint8_t)name[i], 2u);
 
-    uint32_t trailing = item + 2u + length * 2u;
-    put_nibbles(trailing, length, 2u);
-    uint32_t object = trailing + 2u;
+    uint32_t object = item + 2u;
+    if (length != 0u) {
+        uint32_t trailing = item + 2u + length * 2u;
+        put_nibbles(trailing, length, 2u);
+        object = trailing + 2u;
+    }
     put_nibbles(object, prologue, 5u);
     return object;
 }
@@ -182,6 +185,55 @@ static void test_home_library_table_skip(void)
                &reader, &cursor, &entry) == 0);
 }
 
+static void test_null_named_hidden_directory(void)
+{
+    memset(memory, 0, sizeof(memory));
+
+    const uint32_t home = 0x82000u;
+    const uint32_t home_chain = home + 8u;
+    const uint32_t hidden_item = 0x82100u;
+
+    put_nibbles(USEROB, home, 5u);
+    put_nibbles(home, DORRP, 5u);
+    put_nibbles(home + 5u, 0u, 3u);
+    put_nibbles(home_chain, hidden_item - home_chain, 5u);
+
+    uint32_t hidden = put_item(hidden_item, "", DORRP);
+    assert(hidden == hidden_item + 2u);
+    put_nibbles(hidden_item - 5u, 0u, 5u);
+    put_nibbles(CONTEXT, hidden, 5u);
+    put_nibbles(hidden + 8u, 0u, 5u); /* empty Hidden directory */
+
+    struct hpclang_rpl_directory_cursor cursor;
+    assert(hpclang_rpl_directory_cursor_open(
+               &reader, home, &cursor) ==
+           HPCLANG_RPL_STORE_OK);
+
+    struct hpclang_rpl_directory_entry_view entry;
+    assert(hpclang_rpl_directory_cursor_next(
+               &reader, &cursor, &entry) == 1);
+    assert(entry.name_length == 0u);
+    assert(entry.object_address == hidden);
+    assert(entry.prologue == DORRP);
+    assert(hpclang_rpl_directory_cursor_next(
+               &reader, &cursor, &entry) == 0);
+
+    uint8_t path[8] = { 0xffu };
+    uint32_t bytes = 0u;
+    uint32_t components = 0u;
+    assert(hpclang_rpl_directory_path_to(
+               &reader, hidden, path, sizeof(path),
+               &bytes, &components) == HPCLANG_RPL_STORE_OK);
+    assert(bytes == 1u);
+    assert(components == 1u);
+    assert(path[0] == 0u);
+
+    assert(hpclang_rpl_directory_find(
+               &reader, home, NULL, 0u, &entry) ==
+           HPCLANG_RPL_STORE_OK);
+    assert(entry.object_address == hidden);
+}
+
 static void test_malformed_chain(void)
 {
     prepare_tree();
@@ -205,6 +257,7 @@ int main(void)
     test_home_and_current();
     test_enumeration_and_find();
     test_home_library_table_skip();
+    test_null_named_hidden_directory();
     test_malformed_chain();
     return 0;
 }
