@@ -4,6 +4,13 @@
 #include "rpl-object-span.h"
 
 enum {
+    RPL_DOINT     = 0x02614u,
+    RPL_DOLNGREAL = 0x0263au,
+    RPL_DOLNGCMP  = 0x02660u,
+    RPL_DOMATRIX  = 0x02686u,
+    RPL_DOFLASHP  = 0x026acu,
+    RPL_DOAPLET   = 0x026d5u,
+    RPL_DOMINIFONT = 0x026feu,
     RPL_DOBINT    = 0x02911u,
     RPL_DOREAL    = 0x02933u,
     RPL_DOEREL    = 0x02955u,
@@ -150,6 +157,50 @@ static int parse_object(
     uint32_t depth,
     uint32_t *span);
 
+static int recognized_prologue(uint32_t prologue)
+{
+    switch (prologue) {
+    case RPL_DOINT:
+    case RPL_DOLNGREAL:
+    case RPL_DOLNGCMP:
+    case RPL_DOMATRIX:
+    case RPL_DOFLASHP:
+    case RPL_DOAPLET:
+    case RPL_DOMINIFONT:
+    case RPL_DOBINT:
+    case RPL_DOREAL:
+    case RPL_DOEREL:
+    case RPL_DOCMP:
+    case RPL_DOECMP:
+    case RPL_DOCHAR:
+    case RPL_DOARRY:
+    case RPL_DOLNKARRY:
+    case RPL_DOCSTR:
+    case RPL_DOHSTR:
+    case RPL_DOLIST:
+    case RPL_DORRP:
+    case RPL_DOSYMB:
+    case RPL_DOEXT:
+    case RPL_DOTAG:
+    case RPL_DOGROB:
+    case RPL_DOLIB:
+    case RPL_DOBAK:
+    case RPL_DOEXT0:
+    case RPL_DOACPTR:
+    case RPL_DOEXT2:
+    case RPL_DOEXT3:
+    case RPL_DOEXT4:
+    case RPL_DOCOL:
+    case RPL_DOCODE:
+    case RPL_DOIDNT:
+    case RPL_DOLAM:
+    case RPL_DOROMP:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 static int composite_span(
     const struct hpclang_rpl_reader *reader,
     uint32_t address,
@@ -178,18 +229,20 @@ static int composite_span(
             return HPCLANG_RPL_SPAN_OK;
         }
 
-        uint32_t nested = 0u;
-        result = parse_object(
-            reader, address + offset, limit - offset, depth + 1u, &nested);
-        if (result == HPCLANG_RPL_SPAN_UNSUPPORTED) {
-            /*
-             * Runstreams also contain five-nibble ROM/object references. A
-             * word that is not a recognized inline object prologue is one
-             * reference cell and is skipped as such.
-             */
+        /*
+         * Runstreams contain both inline objects and five-nibble references.
+         * Only a word that is not any recognized object prologue may be
+         * treated as a reference cell. A known-but-unfrozen prologue must
+         * stop parsing rather than silently desynchronize the stream.
+         */
+        if (!recognized_prologue(word)) {
             offset += 5u;
             continue;
         }
+
+        uint32_t nested = 0u;
+        result = parse_object(
+            reader, address + offset, limit - offset, depth + 1u, &nested);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
         if (nested == 0u || nested > limit - offset)
@@ -260,6 +313,13 @@ static int parse_object(
      * Recognized prologues whose internal boundary is not yet frozen are
      * intentionally rejected rather than guessed.
      */
+    case RPL_DOINT:
+    case RPL_DOLNGREAL:
+    case RPL_DOLNGCMP:
+    case RPL_DOMATRIX:
+    case RPL_DOFLASHP:
+    case RPL_DOAPLET:
+    case RPL_DOMINIFONT:
     case RPL_DORRP:
     case RPL_DOTAG:
     case RPL_DOACPTR:
