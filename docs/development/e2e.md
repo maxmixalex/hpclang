@@ -21,17 +21,17 @@ emulator happens to execute them.
 
 The two tiers are deliberately separate. Direct runtime owns common-bootstrap execution and restoration correctness. Stock launch owns calculator-side package, transfer, menu, and launcher integration. A Stock job may additionally probe the post-return UI, but that visible-return evidence is not interchangeable with reaching HPC1 PASS.
 
-## Calculator-object read-only witness
+## Calculator-object and stack-mutation witness
 
-The canonical runtime payload now includes the first M7.3 object-service witness. It does not prepare or mutate a test stack.
+The canonical runtime payload now covers both read-only M7.3 observation and the bounded stack-mutation core.
 
-- Direct/non-Stock environments and HP39-family targets must reject the Stock-only RPL stack service cleanly with `ENOSYS`.
-- Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive stack depth, and may snapshot level 1 only when the object's native extent is provable.
-- A recognized but not-yet-frozen native object format returns `ENOTSUP` rather than being copied heuristically.
-- The witness re-reads depth after peek and requires it to be unchanged; it also verifies the first invalid level returns `EINVAL`.
+- Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.
+- Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive user-visible depth after launcher-bias normalization, and snapshot only objects whose native extent is provable.
+- The mutation witness is self-contained inside HPC1: it creates owned CHAR `A`/`B` snapshots, pushes A, replaces level 1 with B, peeks/validates B, pushes A again, pops/validates A, drops the remaining inserted object, and requires the final stack depth to equal the initial depth.
+- Pop snapshots before it mutates D1. Replace allocates/copies the new object before committing the target pointer. Expected capacity/level failures are planned before the first mutation.
 - No raw Saturn address or mapped ARM pointer is exposed to the E2E application.
 
-On `ff9a09b4`, **CI / Core runtime #285 (`35431683458`)** is fully green. **E2E / Runtime #232 (`35431683496`)** has green Stock hp48, Stock hp4950, Stock hp39, Direct hp48 and Direct hp39 jobs. Direct hp4950 fails later in the pre-existing keyboard transition with signature `0x46410010`; the object witness has already completed before that phase and the job is not used as object-service PASS evidence.
+Historical read-only evidence remains **Core #285 / Runtime #232**. Launcher-bias normalization is independently closed by fully-green **Runtime #237**. The current stack-mutation focused evidence is **Core #296 (`35439583956`)** plus the successful canonical-build, Direct hp39/hp48/hp4950, Stock hp48 and Stock hp4950 jobs of **Runtime #241 (`35439583995`)**. Runtime #241's Stock hp39 job was cancelled by the subsequent conversion push and is not represented as a pass or failure of the RPL mutation path.
 
 ## Return evidence
 
