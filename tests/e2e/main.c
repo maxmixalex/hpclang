@@ -273,8 +273,6 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
-void hpclang_e2e_kos_reset_sd(void);
-
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS &&
@@ -318,6 +316,19 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         if (rename("HPCLANG.A", "HPCLANG.B") == 0 ||
             errno != ENOSYS)
             return 0x57u;
+
+        errno = 0;
+        if (mkdir("M7DIR", 0777) == 0 || errno != ENOSYS)
+            return 0x70u;
+
+        errno = 0;
+        struct hpclang_stream_directory *unavailable_directory =
+            hpclang_stream_directory_open("/");
+        if (unavailable_directory != NULL || errno != ENOSYS) {
+            if (unavailable_directory != NULL)
+                (void)hpclang_stream_directory_close(unavailable_directory);
+            return 0x71u;
+        }
 
         return 0u;
     }
@@ -523,30 +534,109 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x48u;
 
     /*
-     * Stock 2.15 KOS FRENAME is measured broken on HP49g+ and HP50g.
-     * The public standard name therefore fails explicitly rather than doing
-     * a non-atomic copy+delete that would pretend to be POSIX rename.
+     * Stock KOS rename is broken, so standard rename switches to the owned
+     * FAT namespace backend. The operation must release direct controller
+     * ownership and reinitialize Stock before ordinary KOS stdio resumes.
      */
-    errno = 0;
-    if (rename("HPCLANG.NEW", "HPCLANG.REN") == 0)
+    if (rename("HPCLANG.NEW", "HPCLANG.REN") != 0)
         return 0x61u;
-    if (errno != ENOTSUP)
+
+    output = fopen("HPCLANG.REN", "rb");
+    if (output == NULL)
         return 0x62u;
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    output_close = fclose(output);
+    if (output_close != 0 ||
+        got != sizeof(create_expected) - 1u ||
+        memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
+        return 0x63u;
+
+    if (mkdir("M7DIR", 0777) != 0)
+        return 0x64u;
+    if (rename("HPCLANG.REN", "M7DIR/MiXeD Long Name.txt") != 0)
+        return 0x65u;
+
+    struct hpclang_stream_directory *directory =
+        hpclang_stream_directory_open("M7DIR");
+    if (directory == NULL)
+        return 0x66u;
+
+    int found_long_name = 0;
+    for (;;) {
+        struct hpclang_stream_directory_entry entry;
+        int next = hpclang_stream_directory_read(directory, &entry);
+        if (next < 0) {
+            (void)hpclang_stream_directory_close(directory);
+            return 0x72u;
+        }
+        if (next == 0)
+            break;
+        if (strcmp(entry.name, "MiXeD Long Name.txt") == 0) {
+            if (entry.version != HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION ||
+                entry.size < sizeof(entry) ||
+                entry.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+                entry.byte_size != sizeof(create_expected) - 1u) {
+                (void)hpclang_stream_directory_close(directory);
+                return 0x73u;
+            }
+            found_long_name = 1;
+        }
+    }
+    if (!found_long_name) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x74u;
+    }
+
+    /*
+     * A second iterator has independent FatFs DIR state. Case-insensitive FAT
+     * lookup must not alter the case preserved by enumeration above.
+     */
+    struct hpclang_stream_directory *root_directory =
+        hpclang_stream_directory_open("/");
+    if (root_directory == NULL) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x75u;
+    }
+    struct hpclang_stream_directory_entry root_entry;
+    if (hpclang_stream_directory_read(root_directory, &root_entry) < 0 ||
+        hpclang_stream_directory_close(root_directory) != 0) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x76u;
+    }
+
+    struct hpclang_stream_path_info direct_path_info;
+    if (hpclang_stream_path_query(
+            "M7DIR/mixed long name.TXT", &direct_path_info) != 0 ||
+        direct_path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+        direct_path_info.byte_size != sizeof(create_expected) - 1u) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x77u;
+    }
+
+    struct hpclang_stream_storage_info direct_storage_info;
+    if (hpclang_stream_storage_query(&direct_storage_info) != 0 ||
+        (direct_storage_info.flags &
+         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
+        direct_storage_info.capacity_bytes == 0u ||
+        direct_storage_info.capacity_bytes < direct_storage_info.free_bytes) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x78u;
+    }
+
+    if (hpclang_stream_directory_close(directory) != 0)
+        return 0x79u;
+
+    if (rename("M7DIR/MiXeD Long Name.txt", "HPCLANG.NEW") != 0)
+        return 0x7au;
+    if (rmdir("M7DIR") != 0)
+        return 0x7bu;
 
     output = fopen("HPCLANG.NEW", "rb");
     if (output == NULL)
-        return 0x63u;
+        return 0x7cu;
     if (fclose(output) != 0)
-        return 0x64u;
-
-    errno = 0;
-    output = fopen("HPCLANG.REN", "rb");
-    if (output != NULL) {
-        fclose(output);
-        return 0x65u;
-    }
-    if (errno != ENOENT)
-        return 0x66u;
+        return 0x7du;
 
     if (remove("HPCLANG.NEW") != 0)
         return 0x49u;
@@ -591,20 +681,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x52u;
 
     /*
-     * M7.2c lifecycle witness: after all KOS-backed stream handles are closed,
-     * exercise the documented Stock filesystem reinitialization boundary.
-     * The direct namespace backend is not implemented yet; this establishes
-     * that syscall 19 itself is return-safe and leaves ordinary KOS file access
-     * usable on both hp4950 Stock targets.
+     * The rename/mkdir/enumeration/rmdir sequence above repeatedly crosses the
+     * complete direct lease boundary and then resumes KOS stdio. Re-read the
+     * original fixture once more after those transitions.
      */
-    hpclang_e2e_kos_reset_sd();
-
-    struct hpclang_stream_path_info reset_path_info;
-    if (hpclang_stream_path_query("HPCLANG.TST", &reset_path_info) != 0 ||
-        reset_path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
-        reset_path_info.byte_size != sizeof(input_expected) - 1u)
-        return 0x6cu;
-
     FILE *reset_input = fopen("HPCLANG.TST", "rb");
     if (reset_input == NULL)
         return 0x6du;
