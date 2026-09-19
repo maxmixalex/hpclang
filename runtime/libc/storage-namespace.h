@@ -10,12 +10,11 @@
 extern "C" {
 #endif
 
-int hpclang_storage_stock_idle(void);
+int hpclang_storage_stock_media_query(int *present, int *read_only);
 void hpclang_storage_after_stock_reinit(void);
 
 int hpclang_namespace_direct_active(void);
 int hpclang_namespace_open(const char *path, int flags);
-int hpclang_namespace_fd_is_direct(int fd);
 int hpclang_namespace_close(int fd);
 ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count);
 ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count);
