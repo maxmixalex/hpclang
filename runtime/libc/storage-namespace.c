@@ -23,6 +23,8 @@ uint32_t hpclang_kos_swi3(
     uint32_t arg2,
     uint32_t arg3);
 
+#define FAT_ATTRIBUTE_VOLUME UINT8_C(0x08)
+
 struct hpclang_stream_directory {
     DIR fatfs;
     uint32_t magic;
@@ -255,7 +257,7 @@ static uint32_t export_type(BYTE attributes)
 {
     if ((attributes & AM_DIR) != 0u)
         return HPCLANG_STREAM_PATH_TYPE_DIRECTORY;
-    if ((attributes & AM_VOL) != 0u)
+    if ((attributes & FAT_ATTRIBUTE_VOLUME) != 0u)
         return HPCLANG_STREAM_PATH_TYPE_VOLUME_LABEL;
     return HPCLANG_STREAM_PATH_TYPE_FILE;
 }
