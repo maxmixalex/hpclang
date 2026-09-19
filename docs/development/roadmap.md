@@ -252,15 +252,20 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**In progress.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md); implementation begins with the private Saturn view and read-only object snapshots.
+**In progress.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md). M7.3a and the first read-only M7.3b vertical slice are implemented: a runtime-private 20-bit Saturn view, conservative RPL object-boundary parser, Stock stack view, opaque owned object snapshots, `hpclang_stack_depth()`, and non-mutating `hpclang_stack_peek()`.
 
 - [x] define the boundary: public objects are opaque owned snapshots; runtime Saturn nibble addresses remain an explicit private type and never ordinary ARM pointers;
 - [x] define copy/borrow/ownership/error rules: M7.3 returns owned immutable snapshots, exposes no public borrowed Stock-memory aliases, and requires failure-safe stack/store mutations;
+- [x] factor the launch-preserved `SAT_CPU->Read[]` mapping into one private Saturn reader and bound it to the real 20-bit nibble space;
+- [x] implement a conservative object-span parser: only fixed, verified length-prefixed, verified SEMI-terminated, tagged, or otherwise proven formats are snapshotted; unknown/unfrozen prologues are rejected rather than guessed;
+- [x] implement read-only HP48gII/HP49g+/HP50g stack observation through `DSKTOP`/D1 and `EDITLINE`, with 1-based level addressing and owned `stack_peek` snapshots;
+- [x] validate the read-only slice on original Stock hp48 and hp4950 without changing stack depth. Core #285 (`35431683458`) is green on `ff9a09b4`; Runtime #232 has green Stock hp48, Stock hp4950, Stock hp39, Direct hp48 and Direct hp39 jobs. Its only failing job is the pre-existing Direct hp4950 keyboard-transition signature `0x46410010`, after the new object witness has already passed;
+- [ ] add scalar/string conversion helpers above owned snapshots without exposing native prologues as public ABI;
+- [ ] implement failure-safe stack push/pop/drop/replace and temporary-object allocation/copy-back semantics;
 - [ ] implement the HP39 typed object-store path for named Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records;
-- [ ] implement HP48/49/50 RPL object exchange against the stock object namespace without flattening objects into byte-stream files;
-- [ ] add stack read/push/pop/replace operations where the platform meaning is real and safely restorable;
+- [ ] implement HP48/49/50 named RPL object exchange against explicit directory/store handles without flattening objects into byte-stream files or mutating Stock global cwd;
 - [ ] support common HPGCC `saturn.h` / `satdir.h` application patterns through adapters above the clean object service;
-- [ ] validate round trips against the original Stock environment, including malformed-object/error cases and return-state preservation.
+- [ ] validate mutation round trips against the original Stock environment, including malformed-object/error cases and return-state preservation.
 
 Completion criterion: typical HPGCC programs that exchange RPL/calculator objects or use the stack can migrate without raw Saturn pointers or private OS calling conventions.
 
