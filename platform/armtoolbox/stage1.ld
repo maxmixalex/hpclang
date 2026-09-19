@@ -14,6 +14,12 @@ SECTIONS
         . = ALIGN(4);
     }
 
+    .data : AT(SIZEOF(.text))
+    {
+        *(.data .data.*)
+        . = ALIGN(8);
+    }
+
     __stage1_end = .;
     __stage1_size = __stage1_end - 0x09000400;
 

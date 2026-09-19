@@ -27,6 +27,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-object-store.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-object-directory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-object-container.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-portal.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-store.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"

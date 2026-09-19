@@ -21,6 +21,7 @@
 #include <hpclang/time.h>
 
 int hpclang_e2e_cpp_test(void);
+int hpclang_hp39_portal_roundtrip(void);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -1765,6 +1766,20 @@ int main(void)
         return finish(object_failure, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
+    if (boot->model == HPCLANG_MODEL_HP39GS ||
+        boot->model == HPCLANG_MODEL_HP40GS) {
+        errno = 0;
+        int first_portal = hpclang_hp39_portal_roundtrip();
+        int second_portal =
+            first_portal == 0 ? hpclang_hp39_portal_roundtrip() : -1;
+        if (boot->saturn_state != 0u) {
+            if (first_portal != 0 || second_portal != 0)
+                return finish(0xb4u, boot->model);
+        } else if (first_portal != -1 || errno != ENOSYS) {
+            return finish(0xb5u, boot->model);
+        }
+    }
+
     uint32_t object_store_failure =
         object_store_read_only_test(boot->model);
     if (object_store_failure != 0u)

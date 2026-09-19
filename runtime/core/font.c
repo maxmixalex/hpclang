@@ -216,8 +216,19 @@ static uintptr_t hp39_font_window_base(void)
          boot->model != HPCLANG_MODEL_HP40GS))
         return 0u;
 
-    return boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE
-        ? boot->platform_cookie
+    if (boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE)
+        return boot->platform_cookie;
+
+    if ((boot->platform_cookie & (uintptr_t)3u) !=
+        HPCLANG_PLATFORM_COOKIE_HP39_TAG)
+        return 0u;
+
+    const struct hpclang_hp39_platform_context *context =
+        (const struct hpclang_hp39_platform_context *)(
+            boot->platform_cookie & ~(uintptr_t)3u);
+    return context->magic == HPCLANG_HP39_PLATFORM_MAGIC &&
+           context->font_window_base == (uintptr_t)HPCLANG_CODE_WINDOW_BASE
+        ? context->font_window_base
         : 0u;
 }
 

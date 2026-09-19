@@ -116,9 +116,21 @@ hpclang_armtoolbox_stage0:
     bl      .Lpublish_stage_code
 
     /*
-     * stage1(saturn_state, hpc1, stage1_size, model)
-     * The stage1 entry is ARM code at a fixed address.
+     * stage1(saturn_state, hpc1, stage1_size, model,
+     *        saturn_pc, emulator_lr, stock_cpsr, stock_frame)
+     *
+     * Copy the HP39 portal seed out of the original ARMSYS call frame before
+     * stage1 can temporarily hand execution back to the Stock emulator.
      */
+    ldr     r11, [sp]                 /* saved r0-r12/lr Stock frame */
+    ldr     r5, [r11, #0]            /* post-ARMSYS Saturn PC */
+    ldr     r12, [r11, #52]          /* emulator continuation LR */
+    sub     sp, sp, #16
+    str     r5, [sp, #0]
+    str     r12, [sp, #4]
+    str     r9, [sp, #8]             /* caller CPSR before stage0 masking */
+    str     r11, [sp, #12]
+
     mov     r0, r10
     mov     r1, r7
     mov     r2, r6
@@ -126,6 +138,7 @@ hpclang_armtoolbox_stage0:
     ldr     r4, =STAGE1_BASE
     mov     lr, pc
     bx      r4
+    add     sp, sp, #16
 
     /* Restore the original stock-launcher stack. */
     ldr     sp, [sp]

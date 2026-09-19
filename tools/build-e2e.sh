@@ -179,8 +179,9 @@ fi
 
 "$CC" "${COMMON[@]}" -Os -c "$ROOT/platform/armtoolbox/stage1.c" -o "$OUT/stage1.o"
 "$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/stage1-entry.S" -o "$OUT/stage1-entry.o"
+"$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/hp39-portal.S" -o "$OUT/stage1-hp39-portal.o"
 "$LD" -m armelf -T "$ROOT/platform/armtoolbox/stage1.ld" \
-    "$OUT/stage1-entry.o" "$OUT/stage1.o" \
+    "$OUT/stage1-entry.o" "$OUT/stage1.o" "$OUT/stage1-hp39-portal.o" \
     "$OUT/bootstrap-mmu.o" "$OUT/bootstrap-run.o" \
     "$OUT/bootstrap-sync.o" "$OUT/bootstrap-enter.o" \
     -o "$OUT/stage1.elf"
