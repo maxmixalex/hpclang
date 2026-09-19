@@ -219,10 +219,6 @@ static int namespace_acquire(void)
         case HPCLANG_NAMESPACE_LEASE_MOUNT_FAILED:
             errno = ENODEV;
             break;
-        case HPCLANG_NAMESPACE_LEASE_ACQUIRE_FAILED:
-            if (errno == 0)
-                errno = EIO;
-            break;
         default:
             errno = EIO;
             break;
