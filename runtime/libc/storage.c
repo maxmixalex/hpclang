@@ -175,6 +175,13 @@ off_t lseek(int fd, off_t offset, int whence)
     return hpclang_namespace_lseek(fd, offset, whence);
 }
 
+int ftruncate(int fd, off_t length)
+{
+    if (!stream_storage_available())
+        return unsupported();
+    return hpclang_namespace_ftruncate(fd, length);
+}
+
 int unlink(const char *path)
 {
     if (!stream_storage_available())
