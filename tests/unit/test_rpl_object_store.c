@@ -149,6 +149,39 @@ static void test_enumeration_and_find(void)
            HPCLANG_RPL_STORE_NOT_FOUND);
 }
 
+static void test_home_library_table_skip(void)
+{
+    memset(memory, 0, sizeof(memory));
+
+    const uint32_t home = 0x82000u;
+    const uint32_t library_count = 2u;
+    const uint32_t chain =
+        home + 5u + library_count * 13u + 3u;
+    const uint32_t item = 0x82200u;
+
+    put_nibbles(USEROB, home, 5u);
+    put_nibbles(CONTEXT, home, 5u);
+    put_nibbles(home, DORRP, 5u);
+    put_nibbles(home + 5u, library_count, 3u);
+    put_nibbles(chain, item - chain, 5u);
+    (void)put_item(item, "A", DOCHAR);
+    put_nibbles(item - 5u, 0u, 5u);
+
+    struct hpclang_rpl_directory_cursor cursor;
+    assert(hpclang_rpl_directory_cursor_open(
+               &reader, home, &cursor) ==
+           HPCLANG_RPL_STORE_OK);
+
+    struct hpclang_rpl_directory_entry_view entry;
+    assert(hpclang_rpl_directory_cursor_next(
+               &reader, &cursor, &entry) == 1);
+    assert(entry.name_length == 1u);
+    assert(entry.name[0] == 'A');
+    assert(entry.prologue == DOCHAR);
+    assert(hpclang_rpl_directory_cursor_next(
+               &reader, &cursor, &entry) == 0);
+}
+
 static void test_malformed_chain(void)
 {
     prepare_tree();
@@ -171,6 +204,7 @@ int main(void)
 {
     test_home_and_current();
     test_enumeration_and_find();
+    test_home_library_table_skip();
     test_malformed_chain();
     return 0;
 }
