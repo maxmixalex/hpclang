@@ -8,6 +8,7 @@ void _set_tls(void *tls);
 void __libc_init_array(void);
 void __libc_fini_array(void);
 void hpclang_time_init(void);
+void hpclang_storage_shutdown(void);
 
 int main(void);
 
@@ -22,6 +23,7 @@ int hpclang_start(const struct hpclang_boot_info *boot)
     int result = main();
 
     __libc_fini_array();
+    hpclang_storage_shutdown();
     return result;
 }
 
