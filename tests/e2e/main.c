@@ -15,6 +15,7 @@
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/object.h>
+#include <hpclang/object-store.h>
 #include <hpclang/storage.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
@@ -1505,6 +1506,146 @@ static uint32_t object_read_only_test(uint32_t model)
     return 0u;
 }
 
+#ifdef HPCLANG_E2E_KEYBOARD
+static int object_store_find_named(
+    struct hpclang_object_store_iterator *iterator,
+    const uint8_t *name,
+    uint32_t name_length,
+    struct hpclang_object_store_entry *found)
+{
+    struct hpclang_object_store_entry entry = {
+        .size = sizeof(struct hpclang_object_store_entry),
+        .version = HPCLANG_OBJECT_STORE_ENTRY_VERSION,
+    };
+
+    int result = 0;
+    while ((result = hpclang_object_store_iterator_read(
+                iterator, &entry)) > 0) {
+        if (entry.name_length == name_length &&
+            memcmp(entry.name, name, name_length) == 0) {
+            if (found != NULL)
+                *found = entry;
+            return 1;
+        }
+    }
+    return result;
+}
+
+static uint32_t object_store_read_only_test(uint32_t model)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    int rpl_family =
+        model == HPCLANG_MODEL_HP48GII ||
+        model == HPCLANG_MODEL_HP49GPLUS ||
+        model == HPCLANG_MODEL_HP50G;
+    int live_stock_view =
+        rpl_family && boot != NULL && boot->saturn_state != 0u;
+
+    if (!live_stock_view) {
+        errno = 0;
+        struct hpclang_object_store *store = hpclang_object_store_home();
+        if (store != NULL || errno != ENOSYS) {
+            hpclang_object_store_close(store);
+            return 0xc0u;
+        }
+
+        errno = 0;
+        store = hpclang_object_store_current();
+        if (store != NULL || errno != ENOSYS) {
+            hpclang_object_store_close(store);
+            return 0xc1u;
+        }
+        return 0u;
+    }
+
+    static const uint8_t hpclang_name[] = {
+        'H', 'P', 'C', 'L', 'A', 'N', 'G'
+    };
+    static const uint8_t missing_name[] = {
+        '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
+        '_', 'E', '2', 'E', '_', 'M', 'I', 'S', 'S',
+        'I', 'N', 'G', '_', '8', 'A', '1', '7', '_', '_'
+    };
+
+    uint32_t failure = 0u;
+    struct hpclang_object_store *home = hpclang_object_store_home();
+    struct hpclang_object_store *current = NULL;
+    struct hpclang_object_store *child = NULL;
+    struct hpclang_object_store_iterator *first = NULL;
+    struct hpclang_object_store_iterator *second = NULL;
+    struct hpclang_object_store_iterator *current_iterator = NULL;
+
+    if (home == NULL) {
+        failure = 0xc2u;
+        goto done;
+    }
+
+    current = hpclang_object_store_current();
+    if (current == NULL) {
+        failure = 0xc3u;
+        goto done;
+    }
+
+    first = hpclang_object_store_iterator_open(home);
+    second = hpclang_object_store_iterator_open(home);
+    current_iterator = hpclang_object_store_iterator_open(current);
+    if (first == NULL || second == NULL || current_iterator == NULL) {
+        failure = 0xc4u;
+        goto done;
+    }
+
+    struct hpclang_object_store_entry entry1;
+    struct hpclang_object_store_entry entry2;
+    int found1 = object_store_find_named(
+        first, hpclang_name, sizeof(hpclang_name), &entry1);
+    int found2 = object_store_find_named(
+        second, hpclang_name, sizeof(hpclang_name), &entry2);
+    if (found1 != 1 || found2 != 1) {
+        failure = 0xc5u;
+        goto done;
+    }
+
+    if (entry1.kind != HPCLANG_OBJECT_STRING ||
+        entry2.kind != HPCLANG_OBJECT_STRING ||
+        (entry1.flags & HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY) != 0u ||
+        (entry2.flags & HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY) != 0u) {
+        failure = 0xc6u;
+        goto done;
+    }
+
+    errno = 0;
+    child = hpclang_object_store_open_child(
+        home, hpclang_name, sizeof(hpclang_name));
+    if (child != NULL || errno != ENOTDIR) {
+        failure = 0xc7u;
+        goto done;
+    }
+
+    struct hpclang_object *missing = NULL;
+    errno = 0;
+    if (hpclang_object_store_get(
+            home,
+            missing_name,
+            sizeof(missing_name),
+            &missing) != -1 ||
+        missing != NULL ||
+        errno != ENOENT) {
+        hpclang_object_release(missing);
+        failure = 0xc8u;
+        goto done;
+    }
+
+done:
+    hpclang_object_store_iterator_close(current_iterator);
+    hpclang_object_store_iterator_close(second);
+    hpclang_object_store_iterator_close(first);
+    hpclang_object_store_close(child);
+    hpclang_object_store_close(current);
+    hpclang_object_store_close(home);
+    return failure;
+}
+#endif
+
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -1542,6 +1683,13 @@ int main(void)
     uint32_t object_failure = object_read_only_test(boot->model);
     if (object_failure != 0u)
         return finish(object_failure, boot->model);
+
+#ifdef HPCLANG_E2E_KEYBOARD
+    uint32_t object_store_failure =
+        object_store_read_only_test(boot->model);
+    if (object_store_failure != 0u)
+        return finish(object_store_failure, boot->model);
+#endif
 
 #ifdef HPCLANG_E2E_STORAGE
     uint32_t storage_failure = stock_stream_storage_test(boot->model);
