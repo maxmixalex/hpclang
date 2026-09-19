@@ -59,6 +59,16 @@ int hpclang_object_integer_i64(
     const struct hpclang_object *object,
     int64_t *value);
 
+/*
+ * Convert a classic Stock DOREAL to the nearest representable C double.
+ * This is inherently approximate. A nonzero value that would overflow to
+ * infinity or underflow to zero returns -1 with errno=ERANGE; EREAL/LONGREAL
+ * remain ENOTSUP until their separate formats are frozen.
+ */
+int hpclang_object_real_f64(
+    const struct hpclang_object *object,
+    double *value);
+
 int hpclang_object_character_value(
     const struct hpclang_object *object,
     uint8_t *value);
