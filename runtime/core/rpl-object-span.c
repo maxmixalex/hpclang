@@ -183,6 +183,113 @@ static int parse_object(
     uint32_t depth,
     uint32_t *span);
 
+static int library_span(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t limit,
+    uint32_t *span)
+{
+    uint32_t without_crc = 0u;
+    int result = length_prefixed_span(
+        reader, address, limit, &without_crc);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    uint32_t total = 0u;
+    if (!checked_add(without_crc, 4u, &total) || total > limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    *span = total;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+static int long_number_span(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t limit,
+    uint32_t component_count,
+    uint32_t *span)
+{
+    uint32_t offset = 5u;
+
+    for (uint32_t component = 0u; component < component_count; ++component) {
+        uint32_t current = 0u;
+        uint32_t remaining = 0u;
+        if (!address_at_offset(
+                address, offset, limit, &current, &remaining) ||
+            remaining < 5u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+
+        uint32_t component_size = 0u;
+        int result = read_nibbles(
+            reader, current, 5u, remaining, &component_size);
+        if (result != HPCLANG_RPL_SPAN_OK)
+            return result;
+
+        /*
+         * Each infinite-integer component carries its own five-nibble size
+         * field plus at least the sign nibble.
+         */
+        if (component_size < 6u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (component_size > remaining ||
+            !checked_add(offset, component_size, &offset))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+    }
+
+    if (offset > limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *span = offset;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+static int tagged_span(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t limit,
+    uint32_t depth,
+    uint32_t *span)
+{
+    if (depth >= RPL_MAX_RECURSION)
+        return HPCLANG_RPL_SPAN_DEPTH;
+    if (limit < 7u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t tag_address = 0u;
+    uint32_t tag_limit = 0u;
+    if (!address_at_offset(
+            address, 5u, limit, &tag_address, &tag_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t characters = 0u;
+    int result = read_nibbles(
+        reader, tag_address, 2u, tag_limit, &characters);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    if (characters > (UINT32_MAX - 7u) / 2u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t object_offset = 7u + characters * 2u;
+    uint32_t object_address = 0u;
+    uint32_t object_limit = 0u;
+    if (!address_at_offset(
+            address, object_offset, limit,
+            &object_address, &object_limit) ||
+        object_limit < 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t nested = 0u;
+    result = parse_object(
+        reader, object_address, object_limit, depth + 1u, &nested);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    if (!checked_add(object_offset, nested, span) || *span > limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 static int recognized_prologue(uint32_t prologue)
 {
     switch (prologue) {
@@ -304,6 +411,10 @@ static int parse_object(
     switch (prologue) {
     case RPL_DOBINT:
         return fixed_span(10u, limit, span);
+    case RPL_DOFLASHP:
+        return fixed_span(12u, limit, span);
+    case RPL_DOACPTR:
+        return fixed_span(15u, limit, span);
     case RPL_DOREAL:
         return fixed_span(21u, limit, span);
     case RPL_DOEREL:
@@ -317,19 +428,26 @@ static int parse_object(
     case RPL_DOROMP:
         return fixed_span(11u, limit, span);
 
+    case RPL_DOINT:
     case RPL_DOARRY:
     case RPL_DOLNKARRY:
     case RPL_DOCSTR:
     case RPL_DOHSTR:
     case RPL_DOGROB:
-    case RPL_DOLIB:
     case RPL_DOBAK:
     case RPL_DOEXT0:
     case RPL_DOEXT2:
-    case RPL_DOEXT3:
-    case RPL_DOEXT4:
     case RPL_DOCODE:
+    case RPL_DOMINIFONT:
         return length_prefixed_span(reader, address, limit, span);
+
+    case RPL_DOLIB:
+        return library_span(reader, address, limit, span);
+
+    case RPL_DOLNGREAL:
+        return long_number_span(reader, address, limit, 2u, span);
+    case RPL_DOLNGCMP:
+        return long_number_span(reader, address, limit, 4u, span);
 
     case RPL_DOIDNT:
     case RPL_DOLAM:
@@ -339,22 +457,20 @@ static int parse_object(
     case RPL_DOSYMB:
     case RPL_DOEXT:
     case RPL_DOCOL:
+    case RPL_DOMATRIX:
         return composite_span(reader, address, limit, depth, span);
+
+    case RPL_DOTAG:
+        return tagged_span(reader, address, limit, depth, span);
 
     /*
      * Recognized prologues whose internal boundary is not yet frozen are
      * intentionally rejected rather than guessed.
      */
-    case RPL_DOINT:
-    case RPL_DOLNGREAL:
-    case RPL_DOLNGCMP:
-    case RPL_DOMATRIX:
-    case RPL_DOFLASHP:
     case RPL_DOAPLET:
-    case RPL_DOMINIFONT:
     case RPL_DORRP:
-    case RPL_DOTAG:
-    case RPL_DOACPTR:
+    case RPL_DOEXT3:
+    case RPL_DOEXT4:
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
 
     default:

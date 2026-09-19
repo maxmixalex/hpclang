@@ -114,6 +114,126 @@ static void test_length_prefixed(void)
            HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+
+static void test_hp49_extended_formats(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /* ZINT: prologue + self-relative size field/body. */
+    put_nibbles(&image, 0u, 0x02614u, 5u);
+    put_nibbles(&image, 5u, 7u, 5u);
+    image.used = 12u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 12u);
+
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x026acu, 5u); /* Flash pointer */
+    image.used = 12u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 12u);
+
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02baau, 5u); /* Extended pointer */
+    image.used = 15u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 15u);
+
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x026feu, 5u); /* Minifont */
+    put_nibbles(&image, 5u, 8u, 5u);
+    image.used = 13u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 13u);
+}
+
+static void test_library_crc_extent(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /*
+     * Library length excludes the five-nibble prologue and the trailing
+     * four-nibble CRC.  A parser returning only 5+length would truncate it.
+     */
+    put_nibbles(&image, 0u, 0x02b40u, 5u);
+    put_nibbles(&image, 5u, 9u, 5u);
+    image.used = 18u; /* 5 + 9 + 4 */
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 18u);
+    assert(hpclang_rpl_object_span(&reader, 0u, 17u, &span) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+}
+
+static void test_long_numbers(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /* Long real = prologue + two self-sized infinite-integer components. */
+    put_nibbles(&image, 0u, 0x0263au, 5u);
+    put_nibbles(&image, 5u, 6u, 5u);
+    put_nibbles(&image, 11u, 7u, 5u);
+    image.used = 18u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 18u);
+
+    /* Long complex has four such components. */
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02660u, 5u);
+    uint32_t at = 5u;
+    for (uint32_t i = 0u; i < 4u; ++i) {
+        put_nibbles(&image, at, 6u, 5u);
+        at += 6u;
+    }
+    image.used = at;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == at);
+
+    put_nibbles(&image, 5u, 5u, 5u);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+}
+
+static void test_tagged_and_symbolic_matrix(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /* Tagged: prologue, 2-nibble tag length, tag bytes, embedded CHAR. */
+    put_nibbles(&image, 0u, 0x02afcu, 5u);
+    put_nibbles(&image, 5u, 2u, 2u);
+    put_nibbles(&image, 7u, 0x41u, 2u);
+    put_nibbles(&image, 9u, 0x42u, 2u);
+    put_nibbles(&image, 11u, 0x029bfu, 5u);
+    put_nibbles(&image, 16u, 0x43u, 2u);
+    image.used = 18u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 18u);
+
+    /* Symbolic matrix is a SEMI-terminated composite runstream. */
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02686u, 5u);
+    put_nibbles(&image, 5u, 0x12345u, 5u);
+    put_nibbles(&image, 10u, 0x0312bu, 5u);
+    image.used = 15u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 15u);
+}
+
 static void test_names(void)
 {
     struct image image = {0};
@@ -197,8 +317,8 @@ static void test_unfrozen_inline_prologue_is_not_a_reference(void)
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
 
-    /* A known 49G-specific prologue is likewise never treated as a ROM ref. */
-    put_nibbles(&image, 5u, 0x02614u, 5u);
+    /* A known but still-unfrozen Aplet prologue is never a ROM reference. */
+    put_nibbles(&image, 5u, 0x026d5u, 5u);
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
@@ -218,6 +338,13 @@ static void test_unknown_and_unfrozen_objects(void)
     put_nibbles(&image, 0u, 0x02a96u, 5u); /* DORRP directory */
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
+
+    put_nibbles(&image, 0u, 0x02beeu, 5u); /* reserved EXT3 */
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put_nibbles(&image, 0u, 0x02c10u, 5u); /* reserved EXT4 */
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
 int main(void)
@@ -225,6 +352,10 @@ int main(void)
     test_address_overflow_is_bounded();
     test_fixed_objects();
     test_length_prefixed();
+    test_hp49_extended_formats();
+    test_library_crc_extent();
+    test_long_numbers();
+    test_tagged_and_symbolic_matrix();
     test_names();
     test_composite_with_reference_and_nested_object();
     test_nested_composite();
