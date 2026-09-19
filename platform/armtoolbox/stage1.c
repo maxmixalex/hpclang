@@ -5,12 +5,16 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 
+#include "hp39-portal-private.h"
+
 #define STAGE_WINDOW_BASE   0x09000000u
 #define STAGE_CODE_OFFSET   0x00000400u
 #define STAGE_STACK_PAGES   2u
 
 #define ARMSYS_PAGE_COUNT   0x914u
 #define ARMSYS_L2_PHYS      0x920u
+#define ARMSYS_C_LO         0x91cu
+#define COARSE_L1_FLAGS     0x0011u
 
 #define RPL_RSKTOP           0x000806f3u
 #define RPL_DSKTOP           0x000806f8u
@@ -54,10 +58,145 @@ _Static_assert(
     "HP39 native font window must fit before HPCLANG_CODE_BASE");
 
 void hpclang_cache_clean(const void *start, uint32_t size);
+void hpclang_mmu_sync(
+    volatile uint32_t *l2_workspace,
+    volatile uint32_t *l1);
+uint32_t hpclang_irq_save_disable(void);
+void hpclang_irq_restore(uint32_t cpsr);
+
+struct hpclang_hp39_portal_context hpclang_hp39_portal_context
+    __attribute__((section(".data.hp39.portal"), aligned(8))) = {
+        .public_context = {
+            .magic = HPCLANG_HP39_PLATFORM_MAGIC,
+            .font_window_base = 0u,
+            .portal_entry = 0u,
+        },
+    };
 
 static uint32_t load32(const void *base, uint32_t offset)
 {
     return *(const uint32_t *)((const uint8_t *)base + offset);
+}
+
+static void store32(void *base, uint32_t offset, uint32_t value)
+{
+    *(volatile uint32_t *)((uint8_t *)base + offset) = value;
+}
+
+static void hp39_portal_configure(
+    const struct hpclang_launch_context *launch,
+    void *saturn_state,
+    uint32_t model,
+    uint32_t saturn_pc,
+    uintptr_t emulator_lr,
+    uint32_t stock_cpsr,
+    uintptr_t stock_frame)
+{
+    struct hpclang_hp39_portal_context *portal =
+        &hpclang_hp39_portal_context;
+
+    portal->public_context.magic = HPCLANG_HP39_PLATFORM_MAGIC;
+    portal->public_context.font_window_base =
+        (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
+    portal->public_context.portal_entry = 0u;
+    portal->saturn_state = (uintptr_t)saturn_state;
+    portal->emulator_lr = emulator_lr;
+    portal->replay_pc = saturn_pc >= 5u ? saturn_pc - 5u : 0u;
+    portal->armsys_target = 0u;
+    portal->stock_cpsr = stock_cpsr;
+    portal->l1 = (uintptr_t)launch->mmu.l1;
+    portal->l2_workspace = (uintptr_t)launch->mmu.l2_workspace;
+    portal->stock_data_l1 =
+        launch->mmu.l1[HPCLANG_L1_DATA_INDEX];
+    portal->stock_code_l1 =
+        launch->mmu.l1[HPCLANG_L1_CODE_INDEX];
+    portal->hpc_data_l1 =
+        launch->mmu.l2_workspace_phys | COARSE_L1_FLAGS;
+    portal->hpc_code_l1 =
+        (launch->mmu.l2_workspace_phys + HPCLANG_L2_BYTES) |
+        COARSE_L1_FLAGS;
+    portal->stock_frame = stock_frame;
+    portal->stock_sp = stock_frame + 14u * sizeof(uint32_t);
+    portal->active = 0u;
+    portal->trips = 0u;
+    portal->last_cpsr = 0u;
+
+    if (stock_frame != 0u) {
+        const volatile uint32_t *saved =
+            (const volatile uint32_t *)stock_frame;
+        for (uint32_t i = 0u; i < 14u; ++i)
+            portal->stock_regs[i] = saved[i];
+        for (uint32_t i = 0u; i < 8u; ++i)
+            portal->emulator_regs[i] = saved[i + 4u];
+    }
+
+    if ((model == HPCLANG_MODEL_HP39GS ||
+         model == HPCLANG_MODEL_HP40GS) &&
+        launch->saturn_state != 0u &&
+        saturn_pc >= 5u &&
+        emulator_lr != 0u &&
+        stock_frame != 0u) {
+        portal->armsys_target =
+            load32(saturn_state, ARMSYS_C_LO);
+        portal->public_context.portal_entry =
+            (uintptr_t)&hpclang_hp39_portal_enter;
+    }
+}
+
+void hpclang_hp39_portal_prepare_stock(void)
+{
+    struct hpclang_hp39_portal_context *portal =
+        &hpclang_hp39_portal_context;
+    volatile uint32_t *l1 =
+        (volatile uint32_t *)portal->l1;
+
+    store32(
+        (void *)portal->saturn_state,
+        ARMSYS_C_LO,
+        (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume);
+
+    l1[HPCLANG_L1_DATA_INDEX] = portal->stock_data_l1;
+    l1[HPCLANG_L1_CODE_INDEX] = portal->stock_code_l1;
+    hpclang_mmu_sync(
+        (volatile uint32_t *)portal->l2_workspace,
+        l1);
+
+    hpclang_irq_restore(portal->stock_cpsr);
+}
+
+int hpclang_hp39_portal_restore_hpc(void)
+{
+    struct hpclang_hp39_portal_context *portal =
+        &hpclang_hp39_portal_context;
+    volatile uint32_t *l1 =
+        (volatile uint32_t *)portal->l1;
+
+    portal->last_cpsr = hpclang_irq_save_disable();
+
+    store32(
+        (void *)portal->saturn_state,
+        ARMSYS_C_LO,
+        portal->armsys_target);
+
+    /*
+     * The emulator may have reused the original stage0 save slots while Stock
+     * mappings/SP were active. Rebuild them from the immutable first-entry
+     * copy so final stage0 teardown still restores the true launcher caller.
+     */
+    volatile uint32_t *saved =
+        (volatile uint32_t *)portal->stock_frame;
+    for (uint32_t i = 0u; i < 14u; ++i)
+        saved[i] = portal->stock_regs[i];
+
+    l1[HPCLANG_L1_DATA_INDEX] = portal->hpc_data_l1;
+    l1[HPCLANG_L1_CODE_INDEX] = portal->hpc_code_l1;
+    hpclang_mmu_sync(
+        (volatile uint32_t *)portal->l2_workspace,
+        l1);
+
+    ++portal->trips;
+    portal->active = 0u;
+    return 0;
 }
 
 static int hpc1_header_ok(const struct hpclang_image_header *header)
@@ -423,7 +562,11 @@ int hpclang_armtoolbox_stage1(
     void *saturn_state,
     const struct hpclang_image_header *hpc1,
     uint32_t stage1_size,
-    uint32_t model)
+    uint32_t model,
+    uint32_t saturn_pc,
+    uintptr_t emulator_lr,
+    uint32_t stock_cpsr,
+    uintptr_t stock_frame)
 {
     if (!hpc1_header_ok(hpc1))
         return -1;
@@ -538,7 +681,17 @@ int hpclang_armtoolbox_stage1(
             return -5;
     }
     if (launch.mmu.code_window_page_count != 0u) {
-        launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
+        hp39_portal_configure(
+            &launch,
+            saturn_state,
+            model,
+            saturn_pc,
+            emulator_lr,
+            stock_cpsr,
+            stock_frame);
+        launch.platform_cookie =
+            (uintptr_t)&hpclang_hp39_portal_context.public_context |
+            HPCLANG_PLATFORM_COOKIE_HP39_TAG;
     } else if (
         launch.saturn_state != 0u &&
         (model == HPCLANG_MODEL_HP48GII ||

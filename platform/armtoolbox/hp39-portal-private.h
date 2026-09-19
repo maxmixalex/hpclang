@@ -1,0 +1,87 @@
+#ifndef HPCLANG_ARMTOOLBOX_HP39_PORTAL_PRIVATE_H
+#define HPCLANG_ARMTOOLBOX_HP39_PORTAL_PRIVATE_H
+
+#define HPCLANG_HP39_PORTAL_MAGIC_VALUE 0x39335048
+
+#define HP39P_MAGIC          0
+#define HP39P_FONT_WINDOW    4
+#define HP39P_ENTRY          8
+#define HP39P_SATURN_STATE   12
+#define HP39P_EMULATOR_LR    16
+#define HP39P_REPLAY_PC      20
+#define HP39P_ARMSYS_TARGET  24
+#define HP39P_STOCK_CPSR     28
+#define HP39P_L1             32
+#define HP39P_L2_WORKSPACE   36
+#define HP39P_STOCK_DATA_L1  40
+#define HP39P_STOCK_CODE_L1  44
+#define HP39P_HPC_DATA_L1    48
+#define HP39P_HPC_CODE_L1    52
+#define HP39P_STOCK_FRAME    56
+#define HP39P_STOCK_SP       60
+#define HP39P_STOCK_REGS     64
+#define HP39P_APP_SP         120
+#define HP39P_APP_LR         124
+#define HP39P_APP_REGS       128
+#define HP39P_ACTIVE         160
+#define HP39P_TRIPS          164
+#define HP39P_LAST_CPSR      168
+#define HP39P_EMULATOR_REGS  172
+#define HP39P_RESERVED       204
+#define HP39P_STACK          208
+#define HP39P_STACK_SIZE     256
+#define HP39P_STACK_END      464
+
+#ifndef __ASSEMBLER__
+
+#include <stddef.h>
+#include <stdint.h>
+#include <hpclang/bootstrap.h>
+
+struct hpclang_hp39_portal_context {
+    struct hpclang_hp39_platform_context public_context;
+    uintptr_t saturn_state;
+    uintptr_t emulator_lr;
+    uint32_t replay_pc;
+    uint32_t armsys_target;
+    uint32_t stock_cpsr;
+    uintptr_t l1;
+    uintptr_t l2_workspace;
+    uint32_t stock_data_l1;
+    uint32_t stock_code_l1;
+    uint32_t hpc_data_l1;
+    uint32_t hpc_code_l1;
+    uintptr_t stock_frame;
+    uintptr_t stock_sp;
+    uint32_t stock_regs[14];
+    uintptr_t app_sp;
+    uintptr_t app_lr;
+    uint32_t app_regs[8];
+    uint32_t active;
+    uint32_t trips;
+    uint32_t last_cpsr;
+    uint32_t emulator_regs[8];
+    uint32_t reserved;
+    uint8_t portal_stack[HP39P_STACK_SIZE];
+};
+
+_Static_assert(
+    HPCLANG_HP39_PLATFORM_MAGIC == HPCLANG_HP39_PORTAL_MAGIC_VALUE,
+    "HP39 portal magic must match runtime cookie");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, public_context) == HP39P_MAGIC, "HP39 portal public prefix");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, saturn_state) == HP39P_SATURN_STATE, "HP39 portal Saturn state");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, stock_regs) == HP39P_STOCK_REGS, "HP39 portal Stock frame");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, app_sp) == HP39P_APP_SP, "HP39 portal application SP");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, app_regs) == HP39P_APP_REGS, "HP39 portal application registers");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, emulator_regs) == HP39P_EMULATOR_REGS, "HP39 portal emulator registers");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, portal_stack) == HP39P_STACK, "HP39 portal stack");
+_Static_assert(sizeof(struct hpclang_hp39_portal_context) == HP39P_STACK_END, "HP39 portal context size");
+
+extern struct hpclang_hp39_portal_context hpclang_hp39_portal_context;
+int hpclang_hp39_portal_enter(void);
+void hpclang_hp39_portal_resume(void);
+void hpclang_hp39_portal_prepare_stock(void);
+int hpclang_hp39_portal_restore_hpc(void);
+
+#endif
+#endif

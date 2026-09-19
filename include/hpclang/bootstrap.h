@@ -90,6 +90,23 @@ struct hpclang_rpl_memory_bounds {
 };
 
 /*
+ * ARMToolbox-private HP39 platform context prefix.
+ *
+ * The full context lives in the temporary 0x09000000 stage window for the
+ * complete HPC1 call. Runtime code may decode this prefix only after checking
+ * the opaque cookie tag and magic; applications still must not infer any
+ * platform_cookie representation.
+ */
+#define HPCLANG_HP39_PLATFORM_MAGIC UINT32_C(0x39335048) /* "HP39" */
+#define HPCLANG_PLATFORM_COOKIE_HP39_TAG ((uintptr_t)2u)
+
+struct hpclang_hp39_platform_context {
+    uint32_t magic;
+    uintptr_t font_window_base;
+    uintptr_t portal_entry;
+};
+
+/*
  * Family shims fill this after allocating/staging physical pages. No legacy
  * launcher memory flags or calculator-specific allocator state crosses this
  * boundary.
