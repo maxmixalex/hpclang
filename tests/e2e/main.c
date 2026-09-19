@@ -1531,6 +1531,14 @@ static int object_store_find_named(
     return result;
 }
 
+#define HPCLANG_E2E_OBJECT_STORE_PHASE UINT32_C(0x4f530000) /* OS + step */
+
+static void object_store_phase(uint32_t step)
+{
+    hpclang_e2e_result =
+        HPCLANG_E2E_OBJECT_STORE_PHASE | (step & UINT32_C(0xffff));
+}
+
 static uint32_t object_store_read_only_test(uint32_t model)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -1580,6 +1588,7 @@ static uint32_t object_store_read_only_test(uint32_t model)
     };
 
     uint32_t failure = 0u;
+    object_store_phase(1u); /* before HOME snapshot */
     struct hpclang_object_store *home = hpclang_object_store_home();
     struct hpclang_object_store *current = NULL;
     struct hpclang_object_store *child = NULL;
@@ -1592,26 +1601,44 @@ static uint32_t object_store_read_only_test(uint32_t model)
         goto done;
     }
 
+    object_store_phase(2u); /* HOME ready */
+    object_store_phase(3u); /* before current-directory snapshot */
     current = hpclang_object_store_current();
     if (current == NULL) {
         failure = 0xc3u;
         goto done;
     }
 
+    object_store_phase(4u); /* current path ready */
+    object_store_phase(5u); /* before first HOME iterator snapshot */
     first = hpclang_object_store_iterator_open(home);
+    if (first == NULL) {
+        failure = 0xc4u;
+        goto done;
+    }
+    object_store_phase(6u);
     second = hpclang_object_store_iterator_open(home);
+    if (second == NULL) {
+        failure = 0xc4u;
+        goto done;
+    }
+    object_store_phase(7u);
     current_iterator = hpclang_object_store_iterator_open(current);
-    if (first == NULL || second == NULL || current_iterator == NULL) {
+    if (current_iterator == NULL) {
         failure = 0xc4u;
         goto done;
     }
 
+    object_store_phase(8u); /* all iterator snapshots ready */
     struct hpclang_object_store_entry entry1;
     struct hpclang_object_store_entry entry2;
+    object_store_phase(9u); /* before first independent lookup */
     int found1 = object_store_find_named(
         first, hpclang_name, hpclang_name_length, &entry1);
+    object_store_phase(10u);
     int found2 = object_store_find_named(
         second, hpclang_name, hpclang_name_length, &entry2);
+    object_store_phase(11u);
     if (found1 != 1 || found2 != 1) {
         failure = 0xc5u;
         goto done;
@@ -1625,6 +1652,7 @@ static uint32_t object_store_read_only_test(uint32_t model)
         goto done;
     }
 
+    object_store_phase(12u); /* before ENOTDIR child-open check */
     errno = 0;
     child = hpclang_object_store_open_child(
         home, hpclang_name, hpclang_name_length);
@@ -1633,6 +1661,7 @@ static uint32_t object_store_read_only_test(uint32_t model)
         goto done;
     }
 
+    object_store_phase(13u); /* before missing-object lookup */
     struct hpclang_object *missing = NULL;
     errno = 0;
     if (hpclang_object_store_get(
@@ -1646,6 +1675,8 @@ static uint32_t object_store_read_only_test(uint32_t model)
         failure = 0xc8u;
         goto done;
     }
+
+    object_store_phase(14u); /* read-only object-store witness complete */
 
 done:
     hpclang_object_store_iterator_close(current_iterator);
