@@ -919,6 +919,19 @@ static void hold_result(void)
 #endif
 }
 
+static void hold_failure_result(void)
+{
+    /*
+     * FAIL is terminal for automated E2E. Keep the temporary runtime mapping
+     * alive until the harness observes FAIL_PREFIX and stops the emulator.
+     * A finite nop delay can be shorter than the Stock harness poll interval,
+     * causing the failure word to disappear during launcher teardown and
+     * degrading a precise failure into an uninformative timeout.
+     */
+    for (;;)
+        __asm__ volatile("nop");
+}
+
 static int finish(uint32_t failure, uint32_t model)
 {
     (void)model;
@@ -953,7 +966,7 @@ static int finish(uint32_t failure, uint32_t model)
     text(surface, 39, 48, "ENTER TO EXIT");
 #endif
     hpclang_e2e_result = 0x46410000u | failure;
-    hold_result();
+    hold_failure_result();
     return (int)failure;
 }
 
