@@ -14,6 +14,7 @@
 
 #define RPL_RSKTOP           0x000806f3u
 #define RPL_DSKTOP           0x000806f8u
+#define RPL_DOCSTR           0x00002a2cu
 #define RPL_MAIN_FIRST       0x00080000u
 #define RPL_MAIN_END         0x00100000u
 #define RPL_PHYS_PAGE_NIBBLES 0x00002000u
@@ -128,6 +129,152 @@ static int stage_saturn_read_word5(
     }
     *value = out;
     return 1;
+}
+
+static int stage_saturn_write_nibble(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint8_t value)
+{
+    if (read_map == NULL || value > 0x0fu || address >= RPL_MAIN_END)
+        return 0;
+
+    uint32_t base = read_map[address >> 12];
+    if (base == 0u)
+        return 0;
+
+    volatile uint8_t *p =
+        (volatile uint8_t *)(uintptr_t)(
+            base + ((address & UINT32_C(0x0fff)) >> 1));
+    uint8_t packed = *p;
+    if ((address & 1u) != 0u)
+        packed = (uint8_t)((packed & 0x0fu) | (uint8_t)(value << 4));
+    else
+        packed = (uint8_t)((packed & 0xf0u) | value);
+    *p = packed;
+    return 1;
+}
+
+static int stage_saturn_write_word5(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint32_t value)
+{
+    if (address > RPL_MAIN_END - 5u)
+        return 0;
+
+    /* Verify the complete target is mapped before the first write. */
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint8_t ignored = 0u;
+        if (!stage_saturn_read_nibble(read_map, address + i, &ignored))
+            return 0;
+    }
+
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        if (!stage_saturn_write_nibble(
+                read_map,
+                address + i,
+                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+            return 0;
+    }
+    return 1;
+}
+
+static int stage_saturn_read_byte(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint8_t *value)
+{
+    if (value == NULL)
+        return 0;
+
+    uint8_t low = 0u;
+    uint8_t high = 0u;
+    if (!stage_saturn_read_nibble(read_map, address, &low) ||
+        !stage_saturn_read_nibble(read_map, address + 1u, &high))
+        return 0;
+
+    *value = (uint8_t)(low | (uint8_t)(high << 4));
+    return 1;
+}
+
+struct stage_launcher_bias {
+    uint32_t object;
+    uint32_t active;
+};
+
+static int stage_hide_launcher_bias(
+    const void *saturn_state,
+    struct stage_launcher_bias *bias)
+{
+    static const uint8_t launcher_magic[] = {
+        0x4cu, 0xb3u, 0x80u, 0x41u, 0x3eu, 0x43u, 0x50u
+    };
+
+    if (saturn_state == NULL || bias == NULL)
+        return 0;
+
+    bias->object = 0u;
+    bias->active = 0u;
+
+    const uint32_t *read_map = (const uint32_t *)saturn_state;
+    uint32_t dsktop = 0u;
+    uint32_t object = 0u;
+    uint32_t prologue = 0u;
+    uint32_t length = 0u;
+
+    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
+        dsktop > RPL_MAIN_END - 5u ||
+        !stage_saturn_read_word5(read_map, dsktop, &object) ||
+        object > RPL_MAIN_END - 24u ||
+        !stage_saturn_read_word5(read_map, object, &prologue) ||
+        prologue != RPL_DOCSTR ||
+        !stage_saturn_read_word5(read_map, object + 5u, &length) ||
+        length < 19u)
+        return 0;
+
+    for (uint32_t i = 0u;
+         i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0]));
+         ++i) {
+        uint8_t byte = 0u;
+        if (!stage_saturn_read_byte(
+                read_map, object + 10u + i * 2u, &byte) ||
+            byte != launcher_magic[i])
+            return 0;
+    }
+
+    /*
+     * HPGCC 1.1's sat_stack_init() pseudo-drops this launcher cell without
+     * changing AVMEM. Preserve that exact reservation: it is needed again when
+     * the launcher object is restored after HPC1 returns.
+     */
+    if (!stage_saturn_write_word5(read_map, RPL_DSKTOP, dsktop + 5u))
+        return -1;
+
+    bias->object = object;
+    bias->active = 1u;
+    return 1;
+}
+
+static int stage_restore_launcher_bias(
+    const void *saturn_state,
+    const struct stage_launcher_bias *bias)
+{
+    if (bias == NULL || bias->active == 0u)
+        return 1;
+    if (saturn_state == NULL)
+        return 0;
+
+    const uint32_t *read_map = (const uint32_t *)saturn_state;
+    uint32_t dsktop = 0u;
+    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
+        dsktop < RPL_MAIN_FIRST + 5u)
+        return 0;
+
+    uint32_t slot = dsktop - 5u;
+    if (!stage_saturn_write_word5(read_map, slot, bias->object))
+        return 0;
+    return stage_saturn_write_word5(read_map, RPL_DSKTOP, slot);
 }
 
 /*
@@ -339,6 +486,7 @@ int hpclang_armtoolbox_stage1(
 
     struct hpclang_launch_context launch;
     struct hpclang_rpl_memory_bounds rpl_bounds = { 0u, 0u, 0u };
+    struct stage_launcher_bias launcher_bias = { 0u, 0u };
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace = (volatile uint32_t *)(uintptr_t)(
@@ -372,6 +520,19 @@ int hpclang_armtoolbox_stage1(
        page the current native-font runtime may dereference. This keeps Direct
        E2E's synthetic allocator block from masquerading as a live stock map. */
     launch.saturn_state = live_saturn_state(saturn_state, model);
+
+    /*
+     * Our Launcher-V3 wrapper is a DOCSTR whose payload starts with
+     * "L\xB3\x80A>CP". Historical HPGCC 1.1 launchers leave that object as
+     * a level-1 bias; newer launcher paths do not necessarily do so. Detect
+     * the actual object instead of hard-coding launcher version/model policy.
+     */
+    if (launch.saturn_state != 0u) {
+        int bias_status =
+            stage_hide_launcher_bias(saturn_state, &launcher_bias);
+        if (bias_status < 0)
+            return -5;
+    }
     if (launch.mmu.code_window_page_count != 0u) {
         launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
     } else if (
@@ -392,5 +553,10 @@ int hpclang_armtoolbox_stage1(
         launch.platform_cookie = old_l2_phys;
     }
 
-    return hpclang_bootstrap_run(&launch);
+    int result = hpclang_bootstrap_run(&launch);
+
+    if (!stage_restore_launcher_bias(saturn_state, &launcher_bias))
+        return -6;
+
+    return result;
 }
