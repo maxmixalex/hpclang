@@ -3,8 +3,10 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <fsystem.h>
@@ -505,7 +507,13 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
         dir->_hpclang_directory == NULL)
         return FS_INVHANDLE;
 
-    FSReleaseEntry(entry);
+    /*
+     * Historical callers commonly pass an uninitialized stack FS_FILE here.
+     * A previous successful entry must be released explicitly with
+     * FSReleaseEntry(), as required by the original API contract.
+     */
+    memset(entry, 0, sizeof(*entry));
+    entry->_hpclang_fd = -1;
 
     struct hpclang_stream_directory_entry raw;
     int result = hpclang_stream_directory_read(
