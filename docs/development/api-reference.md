@@ -278,7 +278,9 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | HPGCC2/3 `FS*` adapter | ⬜ M7.2d |
-| public raw KOS file API | ✕; KOS remains host coordination only |
+| HPGCC `hpstdio.h` adapter | ✅ standard libc + thin `fdelete()` |
+| HPGCC `fsystem.h` useful subset | ◐ implemented; final Direct/Stock compatibility flow gate pending |
+| public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 
 HP39 typed Aplet/Note/Program/etc. storage is deliberately a different M7.3-style object service rather than synthetic POSIX files.
 
