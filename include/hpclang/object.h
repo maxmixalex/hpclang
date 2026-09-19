@@ -52,6 +52,17 @@ int hpclang_stack_peek(
     uint32_t level,
     struct hpclang_object **object);
 
+/*
+ * Mutating stack services are available only when the Stock launcher can prove
+ * that native hpclang pages are fenced away from the live RPL arena.
+ *
+ * hpclang_stack_pop() is failure-safe for ordinary errors: it creates the
+ * owned snapshot first and drops level 1 only after snapshot creation succeeds.
+ */
+int hpclang_stack_drop(uint32_t count);
+
+int hpclang_stack_pop(struct hpclang_object **object);
+
 #ifdef __cplusplus
 }
 #endif

@@ -80,6 +80,7 @@ struct hpclang_mmu_saved {
  * opaque platform_cookie. Applications must never inspect it.
  */
 #define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x314c5052) /* "RPL1" */
+#define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
 struct hpclang_rpl_memory_bounds {
     uint32_t magic;

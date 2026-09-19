@@ -385,7 +385,8 @@ int hpclang_armtoolbox_stage1(
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window
          * remains mapped for the complete hpclang_bootstrap_run() call.
          */
-        launch.platform_cookie = (uintptr_t)&rpl_bounds;
+        launch.platform_cookie =
+            (uintptr_t)&rpl_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     } else {
         /* No mutation fence: read-only Saturn services may still be available. */
         launch.platform_cookie = old_l2_phys;
