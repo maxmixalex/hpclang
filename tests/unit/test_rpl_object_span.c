@@ -157,6 +157,28 @@ static void test_nested_composite(void)
     assert(span == 25u);
 }
 
+
+static void test_unfrozen_inline_prologue_is_not_a_reference(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /* DOCOL followed by DORRP must stop as unsupported, not skip five nibbles. */
+    put_nibbles(&image, 0u, 0x02d9du, 5u);
+    put_nibbles(&image, 5u, 0x02a96u, 5u);
+    put_nibbles(&image, 10u, 0x0312bu, 5u);
+    image.used = 15u;
+
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+
+    /* A known 49G-specific prologue is likewise never treated as a ROM ref. */
+    put_nibbles(&image, 5u, 0x02614u, 5u);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+}
+
 static void test_unknown_and_unfrozen_objects(void)
 {
     struct image image = {0};
@@ -181,6 +203,7 @@ int main(void)
     test_names();
     test_composite_with_reference_and_nested_object();
     test_nested_composite();
+    test_unfrozen_inline_prologue_is_not_a_reference();
     test_unknown_and_unfrozen_objects();
     return 0;
 }
