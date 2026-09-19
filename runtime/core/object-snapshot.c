@@ -33,7 +33,8 @@ enum {
     RPL_DOLAM      = 0x02e6du
 };
 
-static enum hpclang_object_kind classify(uint32_t prologue)
+enum hpclang_object_kind hpclang_object_kind_from_native_prologue(
+    uint32_t prologue)
 {
     switch (prologue) {
     case RPL_DOINT:
@@ -155,7 +156,8 @@ int hpclang_object_snapshot_copy(
         return -1;
     }
 
-    snapshot->kind = (uint32_t)classify(prologue);
+    snapshot->kind =
+        (uint32_t)hpclang_object_kind_from_native_prologue(prologue);
     snapshot->nibble_count = span;
     snapshot->native_prologue = prologue;
 

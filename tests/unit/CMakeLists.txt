@@ -54,6 +54,12 @@ hpclang_unit(rpl_stack_view
 target_include_directories(test_rpl_stack_view PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_object_store
+    test_rpl_object_store.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c")
+target_include_directories(test_rpl_object_store PRIVATE
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_snapshot
     test_object_snapshot.c
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
