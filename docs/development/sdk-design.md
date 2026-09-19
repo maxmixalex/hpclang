@@ -173,7 +173,15 @@ HP48/49/50 RPL/Saturn objects belong to the same typed-object side.
 
 ## Saturn/RPL integration
 
-Saturn addresses and RPL objects should never be ordinary C pointers. Use explicit address/object types or opaque handles with documented borrow/copy/ownership semantics. Historical `sat_*` APIs are adapters above this model.
+The M7.3 ownership contract is frozen in [Calculator object service design](object-service.md).
+
+Canonical public objects are opaque, owned, immutable snapshots. Reading from a calculator stack or named store copies into an ARM-side snapshot; pushing/storing copies back into the calculator. M7.3 deliberately exposes no borrowed Stock-memory alias. Unknown native objects may remain semantically unclassified while still round-tripping losslessly on the same family.
+
+Saturn nibble addresses remain an explicit **private runtime type**, never ordinary C pointers and never canonical object handles. The launch-preserved `SAT_CPU->Read[]` path already used by HP48/49/50 native fonts becomes the common private read primitive; mutation support must use the corresponding validated Stock mapping/operation rather than publishing raw `peek/poke/map_s2a` behavior.
+
+Stack mutations are failure-safe: peek is non-mutating; pop snapshots before dropping; replace/push/store must not intentionally leave a partially updated calculator state. Named object stores use explicit opaque handles and independent iterators rather than changing Stock global current-directory state.
+
+Historical `saturn.h` / `satdir.h` APIs are adapters above this model. Raw address/memory helpers remain Migration/Internal unless a clean application requirement appears.
 
 ## Capabilities
 
@@ -217,4 +225,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. The HP48 visible Stock-return repaint is closed as part of the canonical runtime gate. M7.2 now completes the HP49g+/HP50g byte-stream namespace/metadata/directory surface before M7.3 begins the typed calculator-object/Saturn-RPL bridge. Broad HPGCC adapters and the planned declarative UI engine remain downstream of stable clean-core services.
+M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3 is now active and begins with the owned calculator-object snapshot/private Saturn-view boundary before stack mutation and named-object-store backends. Broad HPGCC adapters and the planned declarative UI engine remain downstream of stable clean-core services.
