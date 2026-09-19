@@ -178,12 +178,14 @@ above or outside this clean object API.
 
 Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future long-lived named-store mutation. The public stack path does not expose raw allocation blocks or Saturn addresses.
 
-### M7.3d — named object stores — next
+### M7.3d — named object stores — read-only RPL closed; HP39 backend in progress
 
-- define logical root/current/child handles using length-delimited calculator-byte names rather than assuming UTF-8 paths;
-- HP48/49/50 read-only RPL directory resolution and independent enumeration must re-resolve logical names rather than retaining borrowed Saturn addresses across GC/moving allocation;
-- HP39 typed object-store backend maps Directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records into the same public store model;
-- close read-only get/enumeration first; add put/remove only after USEROB/HP39 mutation lifecycles are independently safe.
+- logical root/current/child handles use length-delimited calculator-byte names rather than assuming UTF-8 paths;
+- HP48gII/49g+/50g read-only RPL directory resolution, independent enumeration and owned named-object snapshots are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn addresses across GC/moving allocation;
+- Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
+- the HP39 `HP39AscA` transfer-directory grammar is now implemented as a strict private parser. It preserves the native A..K subtype, backing filename and Elsie name without flattening them into POSIX files;
+- the HP39 live object-fetch bridge remains open. The ROM entries `DoRecv/GetOb`, `DoGetObFrSto`, `OpenIO` and `StdIOProc` resolve to System-RPL/DOCOL controllers, not ARM-callable functions, so a private Saturn/System-RPL bridge must be proven before wiring public `get()`;
+- put/remove remain deferred until USEROB and HP39 mutation lifecycles are independently safe.
 
 ### M7.3e — HPGCC adapters and closure
 
