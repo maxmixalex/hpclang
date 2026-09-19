@@ -103,6 +103,8 @@ int FSGetVolumeFree(int volume);
 
 int FSMkdir(char *name);
 int FSRmdir(char *name);
+int FSChdir(char *name);
+char *FSGetcwd(int volume);
 int FSOpenDir(char *name, FS_FILE **fileptr);
 int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir);
 void FSReleaseEntry(FS_FILE *file);
