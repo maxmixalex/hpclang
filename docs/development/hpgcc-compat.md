@@ -171,17 +171,18 @@ Compatibility decision is split by responsibility:
 
 ## File I/O and standard C I/O
 
-The stable historical standard-C names should remain standard C where semantics fit.
+The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g now route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Stock KOS is retained only for insertion/write-protect sampling before takeover and `ResetSD` after release.
 
-HP49g+/HP50g now use private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Stock E2E validates ordinary `FILE *` read, create/truncate, write/flush, seek/ftell, reopen, append/create, remove and `ENOENT` behavior.
+M7.2's clean core covers path metadata, FAT attributes and last-modified civil time, media state, free/total capacity, rename/mkdir/rmdir, UTF-8 LFN, and independent owned directory iterators. HP39/40 and HP48 continue to return clean `ENOSYS` rather than treating calculator-object stores as files.
 
-The clean M7.2b layer now also covers size/type/portable path attributes, synthetic-root and real named-directory metadata, media-present/read-only state, free bytes, and a validity-gated FAT/KOS last-modified civil datetime. Raw KOS structs/module IDs remain private. Repeated Stock `CHECKINSERT` is not return-safe on HP49g+, so insertion/protect state is sampled once per native launch while free space remains a live query. Safe Stock KOS does not expose total capacity, and the broken native rename primitive remains explicit `ENOTSUP` rather than a non-atomic copy+delete emulation.
+The M7.2d source adapter now provides a deliberately bounded historical surface:
 
-HP39/40 and HP48 return clean `ENOSYS` for unsupported byte-stream and stream-metadata/media operations rather than pretending their calculator-object stores are SD files.
+- `hpstdio.h` delegates standard I/O to libc and maps `fdelete()` to the clean stream namespace;
+- `fsystem.h` covers useful file, seek/read/write, rename/delete, mkdir/rmdir, volume-space, metadata and directory-iteration patterns over the clean core;
+- common visible `FS_FILE` metadata fields are retained for source ports, but the historical binary layout and direct FAT/controller state are not reproduced;
+- the single real hpclang SD volume accepts legacy SD path aliases while multi-volume mutable state is not reintroduced.
 
-`fdelete` is naturally an Adapter/Migration candidate to standard `remove()`.
-
-The HPGCC 2.0 / HPGCC3 `fsystem.h` surface remains a possible source adapter after directory/path/object semantics justify it; the historical `FS_FILE` representation should not become the hpclang core ABI.
+Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and unverified timestamp/attribute mutation remain Migration/Internal rather than canonical compatibility APIs.
 
 ## HP39 calculator objects
 
