@@ -338,9 +338,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     char buffer[32];
 
     /*
-     * Test missing-file semantics before any write/delete can leave unrelated
-     * stock-OS error state behind. This is also the public regression for the
-     * stock KOS -200 fopen sentinel.
+     * The first byte-stream operation acquires the process-wide owned FatFs
+     * namespace. Missing paths must immediately expose normal POSIX ENOENT
+     * semantics without routing ordinary file I/O through Stock KOS.
      */
     errno = 0;
     FILE *missing = fopen("HPCLANG.MIS", "rb");
@@ -387,9 +387,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x69u;
 
     /*
-     * "/" is synthetic volume-root metadata because KOS GetSpecialFileInfo
-     * only addresses real directory entries. Exercise that contract separately
-     * from the real named-directory witness below.
+     * The FAT volume root is a directory even though it has no ordinary
+     * directory entry of its own. Exercise it separately from a named
+     * directory witness.
      */
     struct hpclang_stream_path_info root_info;
     if (hpclang_stream_path_query("/", &root_info) != 0 ||
@@ -419,11 +419,12 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
         (storage_info.flags &
          HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
-        storage_info.free_bytes == 0u)
+        (storage_info.flags &
+         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
+        storage_info.free_bytes == 0u ||
+        storage_info.capacity_bytes == 0u)
         return 0x5eu;
-    if ((storage_info.flags &
-         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) != 0u &&
-        storage_info.capacity_bytes < storage_info.free_bytes)
+    if (storage_info.capacity_bytes < storage_info.free_bytes)
         return 0x5fu;
 
     uint64_t free_bytes = 0u;
@@ -509,8 +510,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x44u;
 
     /*
-     * "w" must create a genuinely missing file. This specifically exercises
-     * O_CREAT|O_TRUNC when KOS delete reports the path as absent.
+     * "w" must create a genuinely missing file and preserve standard
+     * O_CREAT|O_TRUNC semantics through the FatFs adapter.
      */
     static const char create_expected[] = "new-file";
     output = fopen("HPCLANG.NEW", "w+b");
@@ -534,9 +535,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x48u;
 
     /*
-     * Stock KOS rename is broken, so the first namespace mutation switches
-     * this native process to the owned FAT namespace. From here through
-     * hpclang shutdown, stdio and directory operations share that backend.
+     * Namespace mutation, stdio and directory traversal all share the same
+     * already-owned FatFs namespace for the rest of the native process.
      */
     if (rename("HPCLANG.NEW", "HPCLANG.REN") != 0)
         return 0x61u;
@@ -661,9 +661,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x49u;
 
     /*
-     * HPGCC 2.0 documents a stock KOS bug where FILE_APPEND does not create a
-     * missing file. Standard fopen("a") must still create, then every later
-     * append must preserve existing contents.
+     * Standard fopen("a") must create a missing file and every later append
+     * must preserve existing contents. This retains the application behavior
+     * HPGCC users expected without inheriting the historical KOS append bug.
      */
     output = fopen("HPCLANG.APP", "ab");
     if (output == NULL)
