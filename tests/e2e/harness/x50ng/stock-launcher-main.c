@@ -21,6 +21,7 @@
 #define FAIL_PREFIX 0x46410000u
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define PHASE_KEYBOARD_ACK 0x4b410000u
+#define PHASE_OBJECT_STORE 0x4f530000u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
@@ -48,6 +49,7 @@ struct state {
     struct hpclang_lcd_quiescence return_quiescence;
     int saw_before;
     int saw_pass;
+    uint32_t object_store_phase;
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
@@ -532,6 +534,13 @@ static void fail(struct state *s, const char *why)
 {
     s->failed = 1;
     fprintf(stderr, "stock launcher FAIL: %s\n", why);
+    if (s->object_store_phase != 0u) {
+        fprintf(
+            stderr,
+            "stock launcher last object-store phase: OS%02u (0x%08x)\n",
+            (unsigned)(s->object_store_phase & 0xffffu),
+            s->object_store_phase);
+    }
     hpclang_log_cpu_snapshot(s, "failure");
     capture_named(s, "failure");
     write_json(s, why);
@@ -684,6 +693,16 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        if ((value & 0xffff0000u) == PHASE_OBJECT_STORE &&
+            value != s->object_store_phase) {
+            s->object_store_phase = value;
+            fprintf(
+                stderr,
+                "stock object-store phase OS%02u (0x%08x)\n",
+                (unsigned)(value & 0xffffu),
+                value);
+        }
+
         if (!s->saw_pass && value == PASS_WORD) {
             size_t keyboard_count = sizeof(payload_keyboard_codes) /
                                     sizeof(payload_keyboard_codes[0]);
