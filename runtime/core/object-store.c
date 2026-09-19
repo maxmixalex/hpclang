@@ -113,7 +113,12 @@ static struct hpclang_object_store *alloc_store(
 
 static int validate_name(const uint8_t *name, uint32_t name_length)
 {
-    if (name == NULL || name_length == 0u ||
+    /*
+     * A zero-length name is a real classic-RPL name: the Hidden directory and
+     * null-named variables use it. NULL is therefore valid exactly when the
+     * explicit length is zero.
+     */
+    if ((name == NULL && name_length != 0u) ||
         name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
         errno = EINVAL;
         return 0;
@@ -139,8 +144,7 @@ static int resolve_store(
     uint32_t components = 0u;
     while (offset < store->encoded_size) {
         uint32_t length = store->encoded_path[offset++];
-        if (length == 0u ||
-            length > store->encoded_size - offset) {
+        if (length > store->encoded_size - offset) {
             errno = EILSEQ;
             return -1;
         }
@@ -283,10 +287,12 @@ struct hpclang_object_store *hpclang_object_store_open_child(
     if (parent->encoded_size != 0u)
         memcpy(path, parent->encoded_path, parent->encoded_size);
     path[parent->encoded_size] = (uint8_t)name_length;
-    memcpy(
-        path + parent->encoded_size + 1u,
-        name,
-        name_length);
+    if (name_length != 0u) {
+        memcpy(
+            path + parent->encoded_size + 1u,
+            name,
+            name_length);
+    }
 
     struct hpclang_object_store *child =
         alloc_store(path, encoded_size, parent->component_count + 1u);

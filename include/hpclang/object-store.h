@@ -40,7 +40,10 @@ struct hpclang_object_store_entry {
 struct hpclang_object_store *hpclang_object_store_home(void);
 struct hpclang_object_store *hpclang_object_store_current(void);
 
-/* Open one direct child directory by exact raw-byte name. */
+/*
+ * Open one direct child directory by exact raw-byte name. A zero-length name
+ * is valid and addresses the classic RPL Hidden directory when present.
+ */
 struct hpclang_object_store *hpclang_object_store_open_child(
     const struct hpclang_object_store *parent,
     const uint8_t *name,

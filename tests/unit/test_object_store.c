@@ -71,16 +71,18 @@ static uint32_t put_item(
     uint32_t name_length,
     uint32_t prologue)
 {
-    assert(name != NULL);
-    assert(name_length < 256u);
+    assert((name != NULL || name_length == 0u) && name_length < 256u);
 
     put_nibbles(item, name_length, 2u);
     for (uint32_t i = 0u; i < name_length; ++i)
         put_nibbles(item + 2u + i * 2u, name[i], 2u);
 
-    uint32_t trailing = item + 2u + name_length * 2u;
-    put_nibbles(trailing, name_length, 2u);
-    uint32_t object = trailing + 2u;
+    uint32_t object = item + 2u;
+    if (name_length != 0u) {
+        uint32_t trailing = item + 2u + name_length * 2u;
+        put_nibbles(trailing, name_length, 2u);
+        object = trailing + 2u;
+    }
     put_nibbles(object, prologue, 5u);
     return object;
 }
@@ -244,6 +246,54 @@ static void test_iterator_snapshots_metadata(void)
     hpclang_object_store_close(home);
 }
 
+static void test_hidden_directory_logical_handle(void)
+{
+    memset(memory, 0, sizeof(memory));
+    fake_boot.saturn_state = 1u;
+    fake_device.model = HPCLANG_MODEL_HP50G;
+    fake_device.family = HPCLANG_FAMILY_HP4950;
+
+    const uint32_t home = 0x82000u;
+    const uint32_t home_chain = home + 8u;
+    const uint32_t hidden_item = 0x82100u;
+
+    put_nibbles(USEROB, home, 5u);
+    put_nibbles(home, DORRP, 5u);
+    put_nibbles(home + 5u, 0u, 3u);
+    put_nibbles(home_chain, hidden_item - home_chain, 5u);
+
+    uint32_t hidden = put_item(hidden_item, NULL, 0u, DORRP);
+    assert(hidden == hidden_item + 2u);
+    put_nibbles(hidden_item - 5u, 0u, 5u);
+    put_nibbles(hidden + 8u, 0u, 5u);
+    put_nibbles(CONTEXT, hidden, 5u);
+
+    struct hpclang_object_store *current =
+        hpclang_object_store_current();
+    assert(current != NULL);
+
+    /* The logical path must resolve its zero-length component later. */
+    put_nibbles(CONTEXT, home, 5u);
+    struct hpclang_object_store_iterator *iterator =
+        hpclang_object_store_iterator_open(current);
+    assert(iterator != NULL);
+
+    struct hpclang_object_store_entry entry = blank_entry();
+    assert(hpclang_object_store_iterator_read(iterator, &entry) == 0);
+
+    hpclang_object_store_iterator_close(iterator);
+    hpclang_object_store_close(current);
+
+    struct hpclang_object_store *home_store =
+        hpclang_object_store_home();
+    assert(home_store != NULL);
+    struct hpclang_object_store *hidden_store =
+        hpclang_object_store_open_child(home_store, NULL, 0u);
+    assert(hidden_store != NULL);
+    hpclang_object_store_close(hidden_store);
+    hpclang_object_store_close(home_store);
+}
+
 static void test_unsupported_environments(void)
 {
     prepare_tree();
@@ -267,6 +317,7 @@ int main(void)
     test_home_lookup_and_child();
     test_current_is_logical_path_snapshot();
     test_iterator_snapshots_metadata();
+    test_hidden_directory_logical_handle();
     test_unsupported_environments();
     return 0;
 }

@@ -209,16 +209,31 @@ int hpclang_rpl_directory_cursor_next(
 
     uint32_t name_nibbles = name_length * 2u;
     uint32_t object = 0u;
-    if (!checked_add(item, 4u + name_nibbles, &object) ||
+
+    /*
+     * Classic RPL has a special null-name encoding used by the Hidden
+     * directory/variables. HPGCC sat3_sknameup() proves the layout:
+     *
+     *   non-empty: [len][name bytes][trailing len][object]
+     *   empty:     [len=0][object]
+     *
+     * The empty form has no trailing duplicate length and therefore starts
+     * two nibbles earlier than the ordinary formula.
+     */
+    uint32_t object_offset =
+        name_length == 0u ? 2u : 4u + name_nibbles;
+    if (!checked_add(item, object_offset, &object) ||
         object > RPL_SPACE_NIBBLES - 5u)
         return HPCLANG_RPL_STORE_MALFORMED;
 
-    uint32_t trailing_length = 0u;
-    result = read_nibbles(reader, object - 2u, 2u, &trailing_length);
-    if (result != HPCLANG_RPL_STORE_OK)
-        return result;
-    if (trailing_length != name_length)
-        return HPCLANG_RPL_STORE_MALFORMED;
+    if (name_length != 0u) {
+        uint32_t trailing_length = 0u;
+        result = read_nibbles(reader, object - 2u, 2u, &trailing_length);
+        if (result != HPCLANG_RPL_STORE_OK)
+            return result;
+        if (trailing_length != name_length)
+            return HPCLANG_RPL_STORE_MALFORMED;
+    }
 
     memset(entry, 0, sizeof(*entry));
     entry->object_address = object;
