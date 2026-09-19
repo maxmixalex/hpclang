@@ -46,6 +46,8 @@ static int compat_error(void)
     case EPERM:
 #endif
         return FS_CANTWRITE;
+    case EXDEV:
+        return FS_BADVOLUME;
     case ENODEV:
 #ifdef ENXIO
     case ENXIO:
@@ -72,9 +74,94 @@ static int compat_error(void)
     }
 }
 
+static char compat_cwd[HPCLANG_STREAM_NAME_CAPACITY] = "/";
+
+static int valid_volume_char(char value)
+{
+    return (value >= '3' && value <= '6') ||
+           (value >= 'C' && value <= 'F') ||
+           (value >= 'c' && value <= 'f');
+}
+
 static int supported_volume_char(char value)
 {
     return value == '3' || value == 'C' || value == 'c';
+}
+
+static int parse_volume_prefix(const char **source)
+{
+    const char *p = *source;
+    char volume = 0;
+
+    if (p[0] == ':' && p[1] != '\0' && p[2] == ':') {
+        volume = p[1];
+        if (!valid_volume_char(volume)) {
+            errno = EINVAL;
+            return -1;
+        }
+        p += 3;
+    } else if (p[0] != '\0' && p[1] == ':') {
+        volume = p[0];
+        if (!valid_volume_char(volume)) {
+            errno = EINVAL;
+            return -1;
+        }
+        p += 2;
+    }
+
+    if (volume != 0 && !supported_volume_char(volume)) {
+        errno = EXDEV;
+        return -1;
+    }
+
+    *source = p;
+    return 0;
+}
+
+static int pop_component(char *path, size_t *length)
+{
+    if (*length <= 1u)
+        return 0;
+
+    size_t out = *length;
+    while (out > 1u && path[out - 1u] != '/')
+        --out;
+    if (out > 1u)
+        --out;
+
+    path[out] = '\0';
+    *length = out;
+    return 0;
+}
+
+static int append_component(
+    char *path,
+    size_t *length,
+    size_t capacity,
+    const char *component,
+    size_t component_length)
+{
+    if (component_length == 0u)
+        return 0;
+
+    if (component_length == 1u && component[0] == '.')
+        return 0;
+    if (component_length == 2u &&
+        component[0] == '.' && component[1] == '.')
+        return pop_component(path, length);
+
+    size_t need_separator = *length > 1u ? 1u : 0u;
+    if (*length + need_separator + component_length >= capacity) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    if (need_separator != 0u)
+        path[(*length)++] = '/';
+    memcpy(path + *length, component, component_length);
+    *length += component_length;
+    path[*length] = '\0';
+    return 0;
 }
 
 static int normalize_path(const char *source, char *dest, size_t capacity)
@@ -85,45 +172,75 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
     }
 
     const char *p = source;
-    if (p[0] == ':' && p[1] != '\0' && p[2] == ':') {
-        if (!supported_volume_char(p[1])) {
-            errno = ENODEV;
-            return -1;
-        }
-        p += 3;
-    } else if (p[0] != '\0' && p[1] == ':') {
-        if (!supported_volume_char(p[0])) {
-            errno = ENODEV;
-            return -1;
-        }
-        p += 2;
-    }
+    if (parse_volume_prefix(&p) != 0)
+        return -1;
 
-    size_t out = 0u;
-    if (*p != '/' && *p != '\\') {
-        if (out + 1u >= capacity) {
+    int absolute = *p == '/' || *p == '\\';
+    size_t out;
+
+    if (absolute) {
+        dest[0] = '/';
+        dest[1] = '\0';
+        out = 1u;
+        ++p;
+        if (*p == '/' || *p == '\\') {
+            errno = EINVAL;
+            return -1;
+        }
+    } else {
+        size_t cwd_length = strlen(compat_cwd);
+        if (cwd_length >= capacity) {
             errno = ENAMETOOLONG;
             return -1;
         }
-        dest[out++] = '/';
+        memcpy(dest, compat_cwd, cwd_length + 1u);
+        out = cwd_length;
     }
 
-    while (*p != '\0') {
-        char ch = *p++;
-        if (ch == '\\')
-            ch = '/';
-        if (out + 1u >= capacity) {
-            errno = ENAMETOOLONG;
+    const char *component = p;
+    for (;;) {
+        char ch = *p;
+        int separator = ch == '/' || ch == '\\';
+
+        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
+            ch == '<' || ch == '>' || ch == '|' ||
+            ((unsigned char)ch < 0x20u && ch != '\0')) {
+            errno = EINVAL;
             return -1;
         }
-        if (ch == '/' && out != 0u && dest[out - 1u] == '/')
+
+        if (separator || ch == '\0') {
+            size_t component_length = (size_t)(p - component);
+
+            if (component_length == 0u && separator) {
+                errno = EINVAL;
+                return -1;
+            }
+
+            if (append_component(
+                    dest, &out, capacity, component, component_length) != 0)
+                return -1;
+
+            if (ch == '\0')
+                break;
+
+            ++p;
+            if (*p == '\0')
+                break;
+            if (*p == '/' || *p == '\\') {
+                errno = EINVAL;
+                return -1;
+            }
+            component = p;
             continue;
-        dest[out++] = ch;
+        }
+        ++p;
     }
 
-    if (out == 0u)
-        dest[out++] = '/';
-    dest[out] = '\0';
+    if (out == 0u) {
+        dest[0] = '/';
+        dest[1] = '\0';
+    }
     return 0;
 }
 
@@ -499,6 +616,41 @@ int FSRmdir(char *name)
     return rmdir(path) == 0 ? FS_OK : compat_error();
 }
 
+int FSChdir(char *name)
+{
+    char path[HPCLANG_STREAM_NAME_CAPACITY];
+    if (normalize_path(name, path, sizeof(path)) != 0)
+        return compat_error();
+
+    struct hpclang_stream_path_info info;
+    if (hpclang_stream_path_query(path, &info) != 0)
+        return compat_error();
+    if (info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
+        return FS_BADNAME;
+
+    size_t length = strlen(path);
+    if (length >= sizeof(compat_cwd))
+        return FS_BADNAME;
+    memcpy(compat_cwd, path, length + 1u);
+    return FS_OK;
+}
+
+char *FSGetcwd(int volume)
+{
+    if (volume != 0)
+        return NULL;
+
+    size_t length = strlen(compat_cwd);
+    char *result = malloc(length + 1u);
+    if (result == NULL)
+        return NULL;
+
+    for (size_t i = 0u; i < length; ++i)
+        result[i] = compat_cwd[i] == '/' ? '\\' : compat_cwd[i];
+    result[length] = '\0';
+    return result;
+}
+
 int FSOpenDir(char *name, FS_FILE **fileptr)
 {
     if (fileptr == NULL)
@@ -708,14 +860,20 @@ int FSGetNameType(char *name)
 {
     if (name == NULL || name[0] == '\0')
         return FSNAME_INVALID;
+    if (strlen(name) > 255u)
+        return FSNAME_INVALID;
 
     const char *p = name;
     int flags = 0;
 
     if (p[0] == ':' && p[1] != '\0' && p[2] == ':') {
+        if (!valid_volume_char(p[1]))
+            return FSNAME_INVALID;
         flags |= FSNAME_HASVOL | FSNAME_VOLHP;
         p += 3;
     } else if (p[0] != '\0' && p[1] == ':') {
+        if (!valid_volume_char(p[0]))
+            return FSNAME_INVALID;
         flags |= FSNAME_HASVOL;
         p += 2;
     }
@@ -723,27 +881,62 @@ int FSGetNameType(char *name)
     if (*p == '/' || *p == '\\')
         flags |= FSNAME_ABSPATH;
 
-    int components = 0;
+    size_t components = 0u;
+    size_t component_length = 0u;
     int saw_separator = 0;
-    for (const char *q = p; *q != '\0'; ++q) {
-        if (*q == ':')
+    int trailing_separator = 0;
+
+    for (const char *q = p;; ++q) {
+        unsigned char ch = (unsigned char)*q;
+        int separator = ch == '/' || ch == '\\';
+
+        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
+            ch == '<' || ch == '>' || ch == '|' ||
+            (ch < 0x20u && ch != 0u))
             return FSNAME_INVALID;
-        if (*q == '/' || *q == '\\') {
-            flags |= FSNAME_HASPATH;
-            saw_separator = 1;
-            if (q[1] != '\0')
+
+        if (separator || ch == 0u) {
+            if (separator)
+                flags |= FSNAME_HASPATH;
+
+            if (component_length == 0u) {
+                if (separator) {
+                    if (q != p)
+                        return FSNAME_INVALID;
+                }
+            } else {
                 ++components;
+            }
+
+            if (ch == 0u) {
+                trailing_separator = q != p &&
+                    (q[-1] == '/' || q[-1] == '\\');
+                break;
+            }
+
+            saw_separator = 1;
+            component_length = 0u;
+            continue;
         }
+
+        ++component_length;
     }
 
-    size_t length = strlen(p);
-    if (length == 0u ||
-        (length != 0u && (p[length - 1u] == '/' || p[length - 1u] == '\\')))
-        flags |= FSNAME_EMPTY | FSNAME_ENDSLASH;
-    else if (saw_separator && components > 0)
-        --components;
+    if (*p == '\0' || trailing_separator) {
+        flags |= FSNAME_EMPTY;
+        if (trailing_separator)
+            flags |= FSNAME_ENDSLASH;
+    }
 
-    return flags | (components << 16);
+    size_t subdirectories = components;
+    if (!trailing_separator && component_length != 0u && subdirectories != 0u)
+        --subdirectories;
+    if (!saw_separator)
+        subdirectories = 0u;
+    if (subdirectories > 0x7fffu)
+        return FSNAME_INVALID;
+
+    return flags | ((int)subdirectories << 16);
 }
 
 char *FSGetFileName(FS_FILE *file, int pathflags)
@@ -752,16 +945,56 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
         return NULL;
 
     const char *source = file->Name;
-    if ((pathflags & (FSNAME_HASPATH | FSNAME_ABSPATH)) == 0) {
+    char relative[HPCLANG_STREAM_NAME_CAPACITY];
+    const char *body = source;
+
+    if ((pathflags & FSNAME_HASPATH) == 0 &&
+        (pathflags & FSNAME_ABSPATH) == 0) {
         const char *slash = strrchr(source, '/');
-        const char *backslash = strrchr(source, '\\');
-        const char *base = slash;
-        if (base == NULL || (backslash != NULL && backslash > base))
-            base = backslash;
-        if (base != NULL)
-            source = base + 1;
+        if (slash != NULL)
+            body = slash + 1;
+    } else if ((pathflags & FSNAME_ABSPATH) == 0) {
+        size_t cwd_length = strlen(compat_cwd);
+        if (strncmp(source, compat_cwd, cwd_length) == 0 &&
+            (compat_cwd[cwd_length - 1u] == '/' ||
+             source[cwd_length] == '/' ||
+             source[cwd_length] == '\0')) {
+            body = source + cwd_length;
+            if (*body == '/')
+                ++body;
+        }
     }
-    return compat_strdup(source);
+
+    size_t prefix = 0u;
+    if ((pathflags & FSNAME_HASVOL) != 0) {
+        const char *volume =
+            (pathflags & FSNAME_VOLHP) != 0 ? ":3:" : "C:";
+        prefix = strlen(volume);
+        memcpy(relative, volume, prefix);
+    }
+
+    size_t body_length = strlen(body);
+    int need_absolute_slash =
+        (pathflags & FSNAME_ABSPATH) != 0 &&
+        (body_length == 0u || body[0] != '/');
+
+    if (prefix + (size_t)need_absolute_slash + body_length + 2u >
+        sizeof(relative))
+        return NULL;
+
+    size_t out = prefix;
+    if (need_absolute_slash)
+        relative[out++] = '/';
+    memcpy(relative + out, body, body_length);
+    out += body_length;
+
+    if ((pathflags & FSNAME_ENDSLASH) != 0 &&
+        (file->Attr & FSATTR_DIR) != 0 &&
+        (out == 0u || relative[out - 1u] != '/'))
+        relative[out++] = '/';
+
+    relative[out] = '\0';
+    return compat_strdup(relative);
 }
 
 char *FSGetErrorMsg(int errornum)
