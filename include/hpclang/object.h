@@ -40,6 +40,14 @@ enum hpclang_object_kind hpclang_object_kind(
 
 void hpclang_object_release(struct hpclang_object *object);
 
+int hpclang_object_create_character(
+    uint8_t value,
+    struct hpclang_object **object);
+
+int hpclang_object_character_value(
+    const struct hpclang_object *object,
+    uint8_t *value);
+
 /*
  * Observe a real calculator RPL stack.
  *
@@ -62,6 +70,12 @@ int hpclang_stack_peek(
 int hpclang_stack_drop(uint32_t count);
 
 int hpclang_stack_pop(struct hpclang_object **object);
+
+int hpclang_stack_push(const struct hpclang_object *object);
+
+int hpclang_stack_replace(
+    uint32_t level,
+    const struct hpclang_object *object);
 
 #ifdef __cplusplus
 }

@@ -203,6 +203,72 @@ void hpclang_object_release(struct hpclang_object *object)
     free(object);
 }
 
+int hpclang_object_create_character(
+    uint8_t value,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    *object = NULL;
+
+    struct hpclang_object *snapshot =
+        calloc(1u, sizeof(*snapshot) + 4u);
+    if (snapshot == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    snapshot->kind = HPCLANG_OBJECT_CHARACTER;
+    snapshot->nibble_count = 7u;
+    snapshot->native_prologue = RPL_DOCHAR;
+
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint8_t nibble =
+            (uint8_t)((RPL_DOCHAR >> (i * 4u)) & 0x0fu);
+        if ((i & 1u) == 0u)
+            snapshot->data[i >> 1] = nibble;
+        else
+            snapshot->data[i >> 1] |= (uint8_t)(nibble << 4);
+    }
+    snapshot->data[2] |= (uint8_t)((value & 0x0fu) << 4);
+    snapshot->data[3] = (uint8_t)(value >> 4);
+
+    *object = snapshot;
+    return 0;
+}
+
+int hpclang_object_character_value(
+    const struct hpclang_object *object,
+    uint8_t *value)
+{
+    if (object == NULL || value == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (object->kind != HPCLANG_OBJECT_CHARACTER) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (object->nibble_count != 7u ||
+        object->native_prologue != RPL_DOCHAR) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint8_t low = 0u;
+    uint8_t high = 0u;
+    if (!hpclang_object_snapshot_read_nibble(object, 5u, &low) ||
+        !hpclang_object_snapshot_read_nibble(object, 6u, &high)) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    *value = (uint8_t)(low | (uint8_t)(high << 4));
+    return 0;
+}
+
 int hpclang_object_snapshot_read_nibble(
     const struct hpclang_object *object,
     uint32_t offset,

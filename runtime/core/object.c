@@ -71,7 +71,10 @@ static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
         bounds->temp_limit <= UINT32_C(0x00080000) ||
         bounds->temp_limit > UINT32_C(0x00100000) ||
         bounds->user_limit < UINT32_C(0x00080000) ||
-        bounds->user_limit >= UINT32_C(0x00100000))
+        bounds->user_limit >= UINT32_C(0x00100000) ||
+        bounds->stack_reserve_nibbles >
+            UINT32_C(0x00100000) - bounds->user_limit ||
+        (bounds->stack_reserve_nibbles % 5u) != 0u)
         return 0;
 
     io->read_nibble = stock_read_nibble;
@@ -79,6 +82,7 @@ static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
     io->context = NULL;
     io->temp_limit = bounds->temp_limit;
     io->user_limit = bounds->user_limit;
+    io->stack_reserve_nibbles = bounds->stack_reserve_nibbles;
     return 1;
 }
 
@@ -216,4 +220,44 @@ int hpclang_stack_pop(struct hpclang_object **object)
 
     *object = snapshot;
     return 0;
+}
+
+int hpclang_stack_push(const struct hpclang_object *object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    struct hpclang_rpl_mutation_io io;
+    if (!stock_mutation_io(&io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    int result = hpclang_rpl_mutation_push_snapshot(&io, object);
+    return result == HPCLANG_RPL_MUTATION_OK
+        ? 0
+        : set_mutation_errno(result);
+}
+
+int hpclang_stack_replace(
+    uint32_t level,
+    const struct hpclang_object *object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    struct hpclang_rpl_mutation_io io;
+    if (!stock_mutation_io(&io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    int result = hpclang_rpl_mutation_replace(&io, level, object);
+    return result == HPCLANG_RPL_MUTATION_OK
+        ? 0
+        : set_mutation_errno(result);
 }

@@ -85,7 +85,8 @@ struct hpclang_mmu_saved {
 struct hpclang_rpl_memory_bounds {
     uint32_t magic;
     uint32_t temp_limit; /* exclusive upper bound for RSKTOP/TEMPOB growth */
-    uint32_t user_limit; /* exclusive lower fence for DSKTOP downward growth */
+    uint32_t user_limit; /* lower native-page fence for DSKTOP growth */
+    uint32_t stack_reserve_nibbles; /* launcher-private cells below user D1 */
 };
 
 /*
