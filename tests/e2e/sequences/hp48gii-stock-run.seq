@@ -48,15 +48,21 @@
 160000 capture stored
 162000 chord on f3
 168000 capture after-warmstart
+# Put two dedicated numeric witnesses under the launcher. M7.3 pop/drop consumes
+# only these objects after stage1 hides any historical Launcher-V3 stack bias.
+168300 tap two
+168700 tap enter
+169100 tap two
+169500 tap enter
 # L275 moved to Port 0; HPCLANG remains the first HOME variable.
-169000 tap var
-170000 capture vars-after-install
-171000 tap f1
-173000 capture hpclang-stack
+170000 tap var
+171000 capture vars-after-install
+172000 tap f1
+174000 capture hpclang-stack
 # Library 275 is the first LIB entry; ARMTo exposes PrRUN on F1.
-175000 chord rshift two
-176500 capture lib-menu
-177500 tap f1
-179000 capture armtoolbox
-180000 tap f1
-183000 monitor 60000
+176000 chord rshift two
+177500 capture lib-menu
+178500 tap f1
+180000 capture armtoolbox
+181000 tap f1
+184000 monitor 60000
