@@ -14,8 +14,45 @@
 .global hpclang_armtoolbox_stage0
 .type hpclang_armtoolbox_stage0,%function
 hpclang_armtoolbox_stage0:
+#if defined(HPCLANG_STAGE0_ARMSYS_PROBE) && \
+    (HPCLANG_STAGE0_MODEL == 2 || HPCLANG_STAGE0_MODEL == 3)
+    /*
+     * Stock HP39gs/40gs enters stage0 through Saturn ARMSYS. Its ABI passes
+     * the post-ARMSYS Saturn PC in r0, SAT_CPU/ARMSYS state in r1 and the
+     * emulator continuation in lr. Direct E2E has no live Read[] map and
+     * therefore skips this path.
+     *
+     * Prove the reverse edge without touching RPL state: redirect C.LO to a
+     * local resume label, return r0-5 so the just-executed five-nibble ARMSYS
+     * instruction is replayed, then continue through the ordinary stage0.
+     * The normal SDK/hardware/storage launchers never define this probe.
+     */
+    ldr     r2, [r1, #0x1f0]        /* Read[0x7c]: HP39 main-font page */
+    cmp     r2, #0
+    beq     .Larmsys_probe_skip
+    ldr     r2, [r1, #0x1f8]        /* Read[0x7e]: HP39 mini-font page */
+    cmp     r2, #0
+    beq     .Larmsys_probe_skip
+    adr     r2, .Larmsys_probe_resume
+    str     r2, [r1, #0x91c]        /* Saturn C low 32 bits / ARMSYS target */
+    sub     r0, r0, #5              /* replay NIBHEX 80BFE */
+    bx      lr
+
+.Larmsys_probe_resume:
+    /*
+     * Save the second ARMSYS call exactly as the ordinary entry would, then
+     * restore C.LO to the stage0 primary entry before any bootstrap work.
+     */
+    stmfd   sp!, {r0-r12, lr}
+    adr     r2, hpclang_armtoolbox_stage0
+    str     r2, [r1, #0x91c]
+    b       .Lstage0_entry_saved
+
+.Larmsys_probe_skip:
+#endif
     stmfd   sp!, {r0-r12, lr}
 
+.Lstage0_entry_saved:
     mov     r10, r1                  /* ARMSYS/Saturn state */
     adr     r8, hpclang_armtoolbox_stage0
 

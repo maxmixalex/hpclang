@@ -210,8 +210,18 @@ EOF
 "$CC" "${COMMON[@]}" -c "$OUT/stage0-bundle.S" -o "$OUT/stage0-bundle.o"
 
 while read -r target model; do
+    stage0_extra_defs=()
+    if [[ "$MODE" == runtime &&
+          ( "$target" == hp39gs || "$target" == hp40gs ) ]]; then
+        # Runtime Stock E2E alone proves the HP39 ARMSYS reverse edge. Direct
+        # launchers share this binary but skip the probe because their
+        # synthetic ARMSYS block deliberately has no live Saturn Read[] map.
+        stage0_extra_defs=(-DHPCLANG_STAGE0_ARMSYS_PROBE=1)
+    fi
+
     "$CC" "${COMMON[@]}" \
         -DHPCLANG_STAGE0_MODEL="$model" \
+        "${stage0_extra_defs[@]}" \
         -c "$ROOT/platform/armtoolbox/stage0.S" \
         -o "$OUT/launchers/$target.o"
 
