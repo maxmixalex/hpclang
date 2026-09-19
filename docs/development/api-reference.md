@@ -182,7 +182,7 @@ The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current di
 | native font/text | ✅ | ✅ | Gallery #112 (`35298949457`) covers all Direct families; HP39 mini/main/EditLine pixels are validated through the physical-ROM path | Stock hp39gs/hp40gs/hp48gII/hp50g all green with settled return |
 | generated font selection | ✅ configure | ✅ | Gallery #112 exhaustively traverses all **245 generated faces** on all five automated targets | HP39gs/40gs/HP48gII/HP50g Stock generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
-| hp4950 stream storage | — | ✅ | non-stream families reject unsupported stream/metadata/media access cleanly | ✅ Storage #22: HP49g+/HP50g stdio, size/type/attributes, named directory, media/free-space snapshot semantics, fixed last-modified civil timestamp, stage teardown and Stock repaint |
+| hp4950 stream storage | — | ✅ | non-stream families reject unsupported stream/metadata/media access cleanly | ✅ Storage #53 (`35428824540`): unified FatFs stdio/metadata/capacity/namespace/directory semantics plus bounded HPGCC filesystem adapters; Direct hp39/hp48/hp4950 and Stock hp4950 all green |
 
 Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
@@ -200,7 +200,7 @@ Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Bui
 | `hptime.h` | — | 3 | 3 | — | monotonic/chrono API instead |
 | `hpstdio.h` | 26 | 37 | 40 | — | libc formatting plus hp4950 standard `FILE *` storage complete |
 | HPGCC3 `stdio.h` | — | — | — | 40 | hp4950 standard `FILE *` storage complete |
-| structured `fsystem.h` | — | — | 41 | 43 | no `FS*` adapter yet |
+| structured `fsystem.h` | — | — | 41 | 43 | bounded source adapter implemented over clean storage core; final Storage #53 green |
 | KOS `kos.h` | 15 | 32 | 33 | 33 | raw KOS kept private |
 | Saturn `saturn.h` | — | 50 | 58 | replaced | not implemented |
 | Saturn directory `satdir.h` | — | 29 | 29 | replaced | not implemented |
@@ -277,9 +277,9 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | rename/mkdir/rmdir | ✅ direct FatFs namespace |
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
-| HPGCC2/3 `FS*` adapter | ⬜ M7.2d |
+| HPGCC2/3 `FS*` adapter | ✅ bounded useful subset over clean FatFs core |
 | HPGCC `hpstdio.h` adapter | ✅ standard libc + thin `fdelete()` |
-| HPGCC `fsystem.h` useful subset | ◐ implemented; final Direct/Stock compatibility flow gate pending |
+| HPGCC `fsystem.h` useful subset | ✅ implemented and exercised in Storage #53 |
 | public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 
 HP39 typed Aplet/Note/Program/etc. storage is deliberately a different M7.3-style object service rather than synthetic POSIX files.
@@ -318,7 +318,7 @@ Based on historical stability, current implementation, and remaining dependencie
 3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
-6. complete M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
+6. ✅ M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
 7. design M7.3 Saturn/RPL and HP39 typed-object handles;
 8. only after the corresponding clean services are stable, begin broad HPG/keyboard/filesystem/object compatibility headers and the renderer-agnostic declarative UI layer.
 
