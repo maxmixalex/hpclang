@@ -14,7 +14,7 @@ HPGCC3 uses a separate 2011 license with redistribution restrictions. The licens
 
 HPGCC3 may be used to understand documented/public behavior, identify architectural ideas, and design independently implemented compatible APIs. In particular, FSystem is evidence that full directory/rename/LFN functionality was historically possible and `kos_ResetSD` documents an OS-filesystem reset boundary after FSystem use; neither fact grants permission to copy the implementation.
 
-hpclang adopts ChaN FatFs as the independent FAT namespace layer beginning in M7.2c. The pinned baseline is **R0.16 + official patch-1 + official patch-2 (2026-07-10)**; the vendor directory retains ChaN's permissive notice and records the transport mirror/commit used to import the bytes. FatFs permits source and binary redistribution with the source-notice condition retained.
+hpclang adopts ChaN FatFs as the independent FAT namespace layer beginning in M7.2c. The pinned baseline is **R0.16 + the official 2025-08-03 Unicode replacement + official patch-1 + official patch-2 (2026-07-10)**; the vendor directory retains ChaN's permissive notice and records the transport mirror/commit used to import the bytes. FatFs permits source and binary redistribution with the source-notice condition retained.
 
 Only the generic FatFs layer is vendored. `ffconf.h` is hpclang-owned configuration and the S3C2410 SDIO/media-ownership layer is a fresh hpclang implementation. HPGCC3 FSystem and its SD driver remain behavior evidence only and are not implementation source.
 
