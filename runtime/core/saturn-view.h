@@ -47,6 +47,18 @@ int hpclang_saturn_read_byte(
     struct hpclang_saturn_address address,
     uint8_t *value);
 
+/*
+ * Runtime-private mapped write.
+ *
+ * The mapping itself does not prove that a Saturn address is writable RAM.
+ * Callers must validate ownership/range before using this primitive. M7.3's
+ * mutation broker is the intended caller; this is never public application
+ * ABI and must not become a generic poke surface.
+ */
+int hpclang_saturn_write_nibble(
+    struct hpclang_saturn_address address,
+    uint8_t value);
+
 #ifdef __cplusplus
 }
 #endif

@@ -63,3 +63,26 @@ int hpclang_saturn_read_byte(
     *value = (uint8_t)(low | (uint8_t)(high << 4));
     return 1;
 }
+
+int hpclang_saturn_write_nibble(
+    struct hpclang_saturn_address address,
+    uint8_t value)
+{
+    if (value > 0x0fu)
+        return 0;
+
+    uintptr_t base = saturn_page_base(address);
+    if (base == 0u)
+        return 0;
+
+    volatile uint8_t *p =
+        (volatile uint8_t *)(
+            base + ((address.nibble & UINT32_C(0x0fff)) >> 1));
+    uint8_t packed = *p;
+    if ((address.nibble & 1u) != 0u)
+        packed = (uint8_t)((packed & 0x0fu) | (uint8_t)(value << 4));
+    else
+        packed = (uint8_t)((packed & 0xf0u) | value);
+    *p = packed;
+    return 1;
+}

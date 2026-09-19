@@ -70,6 +70,24 @@ struct hpclang_mmu_saved {
 };
 
 /*
+ * ARMToolbox-private RPL allocator fence.
+ *
+ * The Stock launcher has already removed a pool of physical main-RAM pages for
+ * the native ARM invocation. RPL object/stack mutation must not grow back into
+ * those pages merely because Stock AVMEM still describes the surrounding RPL
+ * arena. The HP48/49/50 stage computes conservative Saturn-nibble fences from
+ * the live Read[] map and publishes this short-lived structure through the
+ * opaque platform_cookie. Applications must never inspect it.
+ */
+#define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x314c5052) /* "RPL1" */
+
+struct hpclang_rpl_memory_bounds {
+    uint32_t magic;
+    uint32_t temp_limit; /* exclusive upper bound for RSKTOP/TEMPOB growth */
+    uint32_t user_limit; /* exclusive lower fence for DSKTOP downward growth */
+};
+
+/*
  * Family shims fill this after allocating/staging physical pages. No legacy
  * launcher memory flags or calculator-specific allocator state crosses this
  * boundary.
