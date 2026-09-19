@@ -54,6 +54,20 @@ static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
     return 1;
 }
 
+static int address_at_offset(
+    uint32_t address,
+    uint32_t offset,
+    uint32_t limit,
+    uint32_t *current,
+    uint32_t *remaining)
+{
+    if (offset > limit || !checked_add(address, offset, current))
+        return 0;
+    if (remaining != NULL)
+        *remaining = limit - offset;
+    return 1;
+}
+
 static int read_nibbles(
     const struct hpclang_rpl_reader *reader,
     uint32_t address,
@@ -102,8 +116,14 @@ static int length_prefixed_span(
     if (limit < 10u)
         return HPCLANG_RPL_SPAN_BOUNDS;
 
+    uint32_t field_address = 0u;
+    uint32_t field_limit = 0u;
+    if (!address_at_offset(address, 5u, limit, &field_address, &field_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
     uint32_t length = 0u;
-    int result = read_nibbles(reader, address + 5u, 5u, limit - 5u, &length);
+    int result = read_nibbles(
+        reader, field_address, 5u, field_limit, &length);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -132,8 +152,14 @@ static int name_span(
     if (limit < 7u)
         return HPCLANG_RPL_SPAN_BOUNDS;
 
+    uint32_t field_address = 0u;
+    uint32_t field_limit = 0u;
+    if (!address_at_offset(address, 5u, limit, &field_address, &field_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
     uint32_t characters = 0u;
-    int result = read_nibbles(reader, address + 5u, 2u, limit - 5u, &characters);
+    int result = read_nibbles(
+        reader, field_address, 2u, field_limit, &characters);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -215,17 +241,22 @@ static int composite_span(
 
     uint32_t offset = 5u;
     for (;;) {
-        if (limit - offset < 5u)
+        uint32_t current = 0u;
+        uint32_t remaining = 0u;
+        if (!address_at_offset(
+                address, offset, limit, &current, &remaining) ||
+            remaining < 5u)
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         uint32_t word = 0u;
         int result = read_nibbles(
-            reader, address + offset, 5u, limit - offset, &word);
+            reader, current, 5u, remaining, &word);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
 
         if (word == RPL_SEMI) {
-            *span = offset + 5u;
+            if (!checked_add(offset, 5u, span) || *span > limit)
+                return HPCLANG_RPL_SPAN_BOUNDS;
             return HPCLANG_RPL_SPAN_OK;
         }
 
@@ -236,19 +267,20 @@ static int composite_span(
          * stop parsing rather than silently desynchronize the stream.
          */
         if (!recognized_prologue(word)) {
-            offset += 5u;
+            if (!checked_add(offset, 5u, &offset) || offset > limit)
+                return HPCLANG_RPL_SPAN_BOUNDS;
             continue;
         }
 
         uint32_t nested = 0u;
         result = parse_object(
-            reader, address + offset, limit - offset, depth + 1u, &nested);
+            reader, current, remaining, depth + 1u, &nested);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
-        if (nested == 0u || nested > limit - offset)
+        if (nested == 0u || nested > remaining)
             return HPCLANG_RPL_SPAN_MALFORMED;
-
-        offset += nested;
+        if (!checked_add(offset, nested, &offset) || offset > limit)
+            return HPCLANG_RPL_SPAN_BOUNDS;
     }
 }
 
