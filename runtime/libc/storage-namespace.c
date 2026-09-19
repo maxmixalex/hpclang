@@ -1,4 +1,7 @@
 #include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,14 +31,22 @@ uint32_t hpclang_kos_swi3(
 struct hpclang_stream_directory {
     DIR fatfs;
     uint32_t magic;
-    uint8_t lease_ref;
 };
 
 #define DIRECTORY_MAGIC UINT32_C(0x48445031)
+#define DIRECT_FD_BASE  UINT32_C(0x4000)
+#define DIRECT_FD_SLOTS 8u
+
+struct direct_fd_state {
+    FIL file;
+    uint32_t position;
+    uint8_t used;
+    uint8_t append;
+};
 
 static FATFS namespace_fatfs;
 static struct hpclang_namespace_lease namespace_lease;
-static uint32_t namespace_refs;
+static struct direct_fd_state direct_fds[DIRECT_FD_SLOTS];
 static uint8_t namespace_ready;
 
 static int set_fatfs_errno(FRESULT result)
@@ -159,7 +170,7 @@ static void namespace_init(void)
     namespace_ready = 1u;
 }
 
-static int namespace_ref_acquire(void)
+static int namespace_acquire(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
     if (device == NULL || device->family != HPCLANG_FAMILY_HP4950) {
@@ -169,10 +180,8 @@ static int namespace_ref_acquire(void)
 
     namespace_init();
 
-    if (namespace_lease.state == HPCLANG_NAMESPACE_DIRECT) {
-        ++namespace_refs;
+    if (namespace_lease.state == HPCLANG_NAMESPACE_DIRECT)
         return 0;
-    }
     if (namespace_lease.state != HPCLANG_NAMESPACE_STOCK) {
         errno = EIO;
         return -1;
@@ -194,28 +203,6 @@ static int namespace_ref_acquire(void)
         return -1;
     }
 
-    namespace_refs = 1u;
-    return 0;
-}
-
-static int namespace_ref_release(void)
-{
-    if (!namespace_ready ||
-        namespace_lease.state != HPCLANG_NAMESPACE_DIRECT ||
-        namespace_refs == 0u) {
-        errno = EIO;
-        return -1;
-    }
-
-    --namespace_refs;
-    if (namespace_refs != 0u)
-        return 0;
-
-    int result = hpclang_namespace_lease_release(&namespace_lease);
-    if (result != HPCLANG_NAMESPACE_LEASE_OK) {
-        errno = EIO;
-        return -1;
-    }
     return 0;
 }
 
@@ -223,6 +210,241 @@ int hpclang_namespace_direct_active(void)
 {
     return namespace_ready &&
            namespace_lease.state == HPCLANG_NAMESPACE_DIRECT;
+}
+
+static struct direct_fd_state *direct_fd_from_number(int fd)
+{
+    if (fd < (int)DIRECT_FD_BASE ||
+        fd >= (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS))
+        return NULL;
+
+    struct direct_fd_state *slot =
+        &direct_fds[(uint32_t)fd - DIRECT_FD_BASE];
+    return slot->used ? slot : NULL;
+}
+
+int hpclang_namespace_fd_is_direct(int fd)
+{
+    return fd >= (int)DIRECT_FD_BASE &&
+           fd < (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS);
+}
+
+static struct direct_fd_state *direct_fd_claim(int *fd)
+{
+    for (uint32_t i = 0u; i < DIRECT_FD_SLOTS; ++i) {
+        if (!direct_fds[i].used) {
+            memset(&direct_fds[i], 0, sizeof(direct_fds[i]));
+            direct_fds[i].used = 1u;
+            *fd = (int)(DIRECT_FD_BASE + i);
+            return &direct_fds[i];
+        }
+    }
+
+    errno = EMFILE;
+    return NULL;
+}
+
+int hpclang_namespace_open(const char *path, int flags)
+{
+    if (!path_valid(path))
+        return -1;
+    if (namespace_acquire() != 0)
+        return -1;
+
+    int access = flags & O_ACCMODE;
+    BYTE mode;
+    if (access == O_RDONLY) {
+        mode = FA_READ;
+    } else if (access == O_WRONLY) {
+        mode = FA_WRITE;
+    } else if (access == O_RDWR) {
+        mode = FA_READ | FA_WRITE;
+    } else {
+        errno = EINVAL;
+        return -1;
+    }
+
+    int wants_create = (flags & O_CREAT) != 0;
+    int wants_truncate = (flags & O_TRUNC) != 0;
+    int wants_append = (flags & O_APPEND) != 0;
+#ifdef O_EXCL
+    int wants_exclusive = wants_create && (flags & O_EXCL) != 0;
+#else
+    int wants_exclusive = 0;
+#endif
+
+    if (wants_truncate && access == O_RDONLY) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    int fd;
+    struct direct_fd_state *slot = direct_fd_claim(&fd);
+    if (slot == NULL)
+        return -1;
+
+    BYTE method = FA_OPEN_EXISTING;
+    if (wants_exclusive)
+        method = FA_CREATE_NEW;
+    else if (wants_create && wants_truncate)
+        method = FA_CREATE_ALWAYS;
+    else if (wants_create)
+        method = FA_OPEN_ALWAYS;
+
+    /*
+     * O_RDONLY|O_CREAT on an existing read-only file must remain a read open,
+     * not an overwrite attempt. Probe only this special case before selecting
+     * FatFs' create method.
+     */
+    if (access == O_RDONLY && wants_create && !wants_exclusive) {
+        FILINFO info;
+        FRESULT stat_result = f_stat(path, &info);
+        if (stat_result == FR_OK)
+            method = FA_OPEN_EXISTING;
+        else if (stat_result != FR_NO_FILE && stat_result != FR_NO_PATH) {
+            memset(slot, 0, sizeof(*slot));
+            return set_fatfs_errno(stat_result);
+        }
+    }
+
+    FRESULT fr = f_open(&slot->file, path, mode | method);
+    if (fr != FR_OK) {
+        memset(slot, 0, sizeof(*slot));
+        return set_fatfs_errno(fr);
+    }
+
+    if (wants_truncate && !wants_create) {
+        fr = f_truncate(&slot->file);
+        if (fr != FR_OK) {
+            (void)f_close(&slot->file);
+            memset(slot, 0, sizeof(*slot));
+            return set_fatfs_errno(fr);
+        }
+    }
+
+    slot->append = wants_append && access != O_RDONLY;
+    slot->position = slot->append ? (uint32_t)f_size(&slot->file) : 0u;
+    return fd;
+}
+
+int hpclang_namespace_close(int fd)
+{
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+
+    FRESULT fr = f_close(&slot->file);
+    memset(slot, 0, sizeof(*slot));
+    return fr == FR_OK ? 0 : set_fatfs_errno(fr);
+}
+
+ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count)
+{
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    if (buffer == NULL && count != 0u) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (count > (size_t)INT32_MAX) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (count == 0u)
+        return 0;
+
+    uint32_t extent = (uint32_t)f_size(&slot->file);
+    if (slot->position >= extent)
+        return 0;
+
+    FRESULT fr = f_lseek(&slot->file, slot->position);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    UINT got = 0u;
+    fr = f_read(&slot->file, buffer, (UINT)count, &got);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    slot->position += got;
+    return (ssize_t)got;
+}
+
+ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count)
+{
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    if (buffer == NULL && count != 0u) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (count > (size_t)INT32_MAX) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (count == 0u)
+        return 0;
+
+    uint32_t target = slot->append
+        ? (uint32_t)f_size(&slot->file)
+        : slot->position;
+    FRESULT fr = f_lseek(&slot->file, target);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    UINT written = 0u;
+    fr = f_write(&slot->file, buffer, (UINT)count, &written);
+    if (fr != FR_OK)
+        return set_fatfs_errno(fr);
+
+    slot->position = target + written;
+    return (ssize_t)written;
+}
+
+off_t hpclang_namespace_lseek(int fd, off_t offset, int whence)
+{
+    struct direct_fd_state *slot = direct_fd_from_number(fd);
+    if (slot == NULL) {
+        errno = EBADF;
+        return (off_t)-1;
+    }
+
+    int64_t base;
+    switch (whence) {
+    case SEEK_SET:
+        base = 0;
+        break;
+    case SEEK_CUR:
+        base = slot->position;
+        break;
+    case SEEK_END:
+        base = (uint32_t)f_size(&slot->file);
+        break;
+    default:
+        errno = EINVAL;
+        return (off_t)-1;
+    }
+
+    int64_t target = base + (int64_t)offset;
+    if (target < 0 || target > INT32_MAX) {
+        errno = EINVAL;
+        return (off_t)-1;
+    }
+
+    /*
+     * Keep POSIX lseek logical: moving beyond EOF must not grow the FAT file.
+     * The physical FatFs pointer is synchronized lazily by read/write.
+     */
+    slot->position = (uint32_t)target;
+    return (off_t)target;
 }
 
 static void export_fat_time(
@@ -280,7 +502,7 @@ static int one_shot_begin(const char *path)
 {
     if (!path_valid(path))
         return -1;
-    return namespace_ref_acquire();
+    return namespace_acquire();
 }
 
 int hpclang_namespace_path_query(
@@ -310,8 +532,7 @@ int hpclang_namespace_path_query(
         }
     }
 
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return result;
 }
 
 int hpclang_namespace_storage_query(
@@ -321,7 +542,7 @@ int hpclang_namespace_storage_query(
         errno = EFAULT;
         return -1;
     }
-    if (namespace_ref_acquire() != 0)
+    if (namespace_acquire() != 0)
         return -1;
 
     memset(info, 0, sizeof(*info));
@@ -350,8 +571,7 @@ int hpclang_namespace_storage_query(
         }
     }
 
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return result;
 }
 
 static int fatfs_unlink(const char *path, int require_directory)
@@ -377,8 +597,7 @@ static int fatfs_unlink(const char *path, int require_directory)
             result = set_fatfs_errno(fr);
     }
 
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return result;
 }
 
 int hpclang_namespace_unlink(const char *path)
@@ -398,21 +617,19 @@ int hpclang_namespace_mkdir(const char *path)
 
     FRESULT fr = f_mkdir(path);
     int result = fr == FR_OK ? 0 : set_fatfs_errno(fr);
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return result;
 }
 
 int hpclang_namespace_rename(const char *old_path, const char *new_path)
 {
     if (!path_valid(old_path) || !path_valid(new_path))
         return -1;
-    if (namespace_ref_acquire() != 0)
+    if (namespace_acquire() != 0)
         return -1;
 
     FRESULT fr = f_rename(old_path, new_path);
     int result = fr == FR_OK ? 0 : set_fatfs_errno(fr);
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return result;
 }
 
 struct hpclang_stream_directory *hpclang_stream_directory_open(
@@ -420,13 +637,12 @@ struct hpclang_stream_directory *hpclang_stream_directory_open(
 {
     if (!path_valid(path))
         return NULL;
-    if (namespace_ref_acquire() != 0)
+    if (namespace_acquire() != 0)
         return NULL;
 
     struct hpclang_stream_directory *directory =
         malloc(sizeof(*directory));
     if (directory == NULL) {
-        (void)namespace_ref_release();
         errno = ENOMEM;
         return NULL;
     }
@@ -435,13 +651,11 @@ struct hpclang_stream_directory *hpclang_stream_directory_open(
     FRESULT fr = f_opendir(&directory->fatfs, path);
     if (fr != FR_OK) {
         free(directory);
-        (void)namespace_ref_release();
         set_fatfs_errno(fr);
         return NULL;
     }
 
     directory->magic = DIRECTORY_MAGIC;
-    directory->lease_ref = 1u;
     return directory;
 }
 
@@ -453,7 +667,7 @@ int hpclang_stream_directory_read(
         errno = EFAULT;
         return -1;
     }
-    if (directory->magic != DIRECTORY_MAGIC || !directory->lease_ref) {
+    if (directory->magic != DIRECTORY_MAGIC) {
         errno = EBADF;
         return -1;
     }
@@ -490,19 +704,16 @@ int hpclang_stream_directory_close(
         errno = EFAULT;
         return -1;
     }
-    if (directory->magic != DIRECTORY_MAGIC || !directory->lease_ref) {
+    if (directory->magic != DIRECTORY_MAGIC) {
         errno = EBADF;
         return -1;
     }
 
     FRESULT fr = f_closedir(&directory->fatfs);
-    directory->lease_ref = 0u;
     directory->magic = 0u;
     free(directory);
 
-    int result = fr == FR_OK ? 0 : set_fatfs_errno(fr);
-    int release_result = namespace_ref_release();
-    return result != 0 ? result : release_result;
+    return fr == FR_OK ? 0 : set_fatfs_errno(fr);
 }
 
 void hpclang_storage_shutdown(void)
@@ -511,6 +722,12 @@ void hpclang_storage_shutdown(void)
         namespace_lease.state != HPCLANG_NAMESPACE_DIRECT)
         return;
 
-    namespace_refs = 1u;
-    (void)namespace_ref_release();
+    for (uint32_t i = 0u; i < DIRECT_FD_SLOTS; ++i) {
+        if (direct_fds[i].used) {
+            (void)f_close(&direct_fds[i].file);
+            memset(&direct_fds[i], 0, sizeof(direct_fds[i]));
+        }
+    }
+
+    (void)hpclang_namespace_lease_release(&namespace_lease);
 }

@@ -278,10 +278,8 @@ int open(const char *path, int flags, ...)
 {
     if (!stream_storage_available())
         return unsupported();
-    if (hpclang_namespace_direct_active()) {
-        errno = EBUSY;
-        return -1;
-    }
+    if (hpclang_namespace_direct_active())
+        return hpclang_namespace_open(path, flags);
 
 #ifdef O_EXCL
     /*
@@ -451,6 +449,9 @@ int open(const char *path, int flags, ...)
 
 int close(int fd)
 {
+    if (hpclang_namespace_fd_is_direct(fd))
+        return hpclang_namespace_close(fd);
+
     struct stream_fd_state *state = stream_fd_find(fd);
     if (state == NULL) {
         errno = EBADF;
@@ -471,6 +472,9 @@ int close(int fd)
 
 ssize_t read(int fd, void *buffer, size_t count)
 {
+    if (hpclang_namespace_fd_is_direct(fd))
+        return hpclang_namespace_read(fd, buffer, count);
+
     if (count > (size_t)INT32_MAX) {
         errno = EINVAL;
         return -1;
@@ -504,6 +508,9 @@ ssize_t read(int fd, void *buffer, size_t count)
 
 ssize_t write(int fd, const void *buffer, size_t count)
 {
+    if (hpclang_namespace_fd_is_direct(fd))
+        return hpclang_namespace_write(fd, buffer, count);
+
     if (count > (size_t)INT32_MAX) {
         errno = EINVAL;
         return -1;
@@ -533,6 +540,9 @@ ssize_t write(int fd, const void *buffer, size_t count)
 
 off_t lseek(int fd, off_t offset, int whence)
 {
+    if (hpclang_namespace_fd_is_direct(fd))
+        return hpclang_namespace_lseek(fd, offset, whence);
+
     if ((int64_t)offset < INT32_MIN || (int64_t)offset > INT32_MAX) {
         errno = EOVERFLOW;
         return (off_t)-1;
