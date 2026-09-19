@@ -141,25 +141,27 @@ Storage is split by **semantics**, not by media.
 
 ### Byte-stream files
 
-HP49g+/HP50g provide private KOS-backed `open/close/read/write/lseek/unlink` hooks beneath picolibc. Public code uses ordinary `FILE *` APIs. Stock E2E covers read, create/truncate, write/flush, nonzero seek/ftell, reopen, append/create, remove and `ENOENT`.
+HP49g+/HP50g expose the SD card as the hpclang byte-stream filesystem. The clean runtime uses one process-lifetime owned namespace:
 
-The clean metadata/media boundary is `<hpclang/storage.h>`, not KOS. `hpclang_stream_path_query()` returns versioned byte size, path type, a portable FAT-style attribute subset, and an explicitly validity-gated last-modified civil datetime. The civil value is not a POSIX epoch: Stock FAT/KOS supplies local civil fields and hpclang does not invent a timezone. Creation/access timestamps remain private until their semantics are independently established.
+1. before takeover, Stock KOS is consulted once for SD insertion/write-protect state;
+2. hpclang acquires the S3C2410 SDI controller;
+3. the independently implemented block driver mounts the card through FatFs;
+4. all standard stream I/O, metadata, capacity, rename/mkdir/rmdir and directory traversal use that same namespace until process shutdown;
+5. shutdown closes remaining direct descriptors, unmounts FatFs, releases SDI ownership, invokes Stock KOS syscall 19 (`ResetSD`), and only then returns to the calculator OS.
 
-`hpclang_stream_storage_query()` reports media presence/read-only state and free bytes with validity flags. On Stock HP49g+/HP50g, physical insertion/protect state is a **native-launch snapshot**: it is sampled lazily once because repeated `CHECKINSERT` is not return-safe on HP49g+, then reused until the application returns. Free space remains live. Re-entering the native application is the resampling boundary for hot-plug/protect changes. Total capacity stays unavailable rather than borrowing HPGCC FSystem's direct-FAT/controller ownership behind the Stock OS.
+Ordinary application I/O therefore does **not** alternate between KOS and FatFs. The earlier KOS-backed stream bridge established the required POSIX-facing behavior during bring-up, but it is no longer the production file backend.
 
-HP39/40 and HP48 do not pretend to expose that SD byte-stream service; unsupported stream and stream-metadata/media operations fail cleanly with `ENOSYS`.
+The public surface remains normal libc plus typed hpclang queries. `hpclang_stream_path_query()` reports versioned FAT metadata and a validity-gated last-modified civil datetime without inventing timezone/epoch meaning. `hpclang_stream_storage_query()` reports media state, free bytes and total capacity from the owned backend. Repeated Stock `CHECKINSERT` is avoided because HP49g+ evidence showed it is not return-safe within one native launch.
 
-Raw KOS module/function IDs, FILE_INFO layout, creation/access timestamps, and stock global-directory cursor state remain runtime-private.
+HP39/40 and HP48 do not pretend to expose this SD byte-stream service; unsupported operations fail with `ENOSYS`.
 
 ### Namespace ownership
 
-Stock KOS is not a suitable implementation for the complete directory/path API. Its directory enumeration advances a Stock-global current-file-ID cursor, and its `chdir` has no lossless matching `getcwd`. Wrapping those operations in an iterator-shaped hpclang struct would create false ownership semantics and could leave the calculator OS in a different directory.
+The whole-process lease is the correctness boundary. Once hpclang has taken direct SD/FAT ownership, no live Stock-KOS file handle is allowed in the runtime and no filesystem operation goes back through KOS before shutdown. Independent FatFs `DIR` objects provide true iterator ownership, explicit paths avoid Stock global cwd mutation, and multiple iterators can coexist with ordinary stdio.
 
-M7.2c therefore uses a **whole-process stream-namespace lease** for directory/path work. Once the independent FAT backend is acquired, no Stock-KOS stream handle may remain live and all byte-stream namespace activity must use the leased backend until it is unmounted/released. Only after release is the Stock filesystem reinitialized. These are two separate lifecycle steps: direct-backend release returns the SD controller/media to a neutral state; Stock reinitialization makes the calculator OS rebuild its own filesystem state.
+The selected FAT baseline is upstream FatFs R0.16 with official patch-1 and patch-2 (2026-07-10), configured for one FAT12/16/32 volume, UTF-8 LFN, `FF_FS_RPATH=0`, no exFAT/mkfs, and bounded memory. Media I/O is supplied by hpclang's S3C2410 SDI driver; historical HPGCC FSystem/SD-driver code remains behavioral evidence only.
 
-The Stock side of that lifecycle is already measured. Storage #23 calls KOS syscall 19 after all KOS-backed handles are closed, then successfully performs ordinary metadata and reopen/read operations and returns cleanly on both HP49g+ and HP50g. The direct-backend release half remains unclaimed until the SDIO/FAT implementation exists.
-
-The selected FAT-layer baseline is upstream FatFs R0.16 with its official patch-1 and 2026-07-10 patch-2 applied. The initial profile is intentionally narrower than FatFs as a whole: one volume, FAT12/16/32, UTF-8 LFN, `FF_FS_RPATH=0`, no exFAT, no mkfs, and bounded memory. Media I/O is supplied by an independently implemented hpclang S3C2410 SDIO driver; historical HPGCC FSystem/SD-driver code is behavioral evidence, not source material.
+The internal HP49g+/50g HOME/Port 0, Port 1 and Port 2 stores are **not FAT volumes**. They hold calculator/RPL objects and therefore belong to the typed-object service below rather than to `FILE *` or FatFs.
 
 ### Calculator objects
 
