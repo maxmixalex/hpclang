@@ -42,6 +42,30 @@ static struct hpclang_rpl_reader reader_for(struct image *image)
     return reader;
 }
 
+static int read_zero(void *context, uint32_t address, uint8_t *value)
+{
+    (void)context;
+    (void)address;
+    if (value == NULL)
+        return 0;
+    *value = 0u;
+    return 1;
+}
+
+static void test_address_overflow_is_bounded(void)
+{
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = read_zero,
+        .context = NULL,
+    };
+    uint32_t span = 99u;
+
+    assert(hpclang_rpl_object_span(
+               &reader, UINT32_MAX - 2u, 5u, &span) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(span == 0u);
+}
+
 static void test_fixed_objects(void)
 {
     struct image image = {0};
@@ -198,6 +222,7 @@ static void test_unknown_and_unfrozen_objects(void)
 
 int main(void)
 {
+    test_address_overflow_is_bounded();
     test_fixed_objects();
     test_length_prefixed();
     test_names();
