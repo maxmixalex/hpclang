@@ -152,7 +152,7 @@ hpclang distinguishes byte streams from typed calculator objects.
 
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
-| byte-stream files | ✅ HP49g+/HP50g | private KOS-backed `open/close/read/write/lseek/unlink` feeds picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` for unsupported stream operations |
+| byte-stream files | ✅ HP49g+/HP50g | process-wide owned FatFs namespace feeds standard `open/close/read/write/lseek/unlink` and picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` |
 | calculator object store | HP39gs/40gs format/protocol known; API not implemented | typed/named object API; do not flatten into `FILE *` |
 | RPL/Saturn objects | HP48/49/50 historical platform capability; API not implemented | M7.3 typed object/stack bridge |
 
@@ -160,13 +160,13 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_stream_path_query()` | ✅ | Versioned size/type/portable-attribute metadata plus validity-gated last-modified civil datetime. `/` is the synthetic stream-volume root; real named-directory entries are independently Stock-validated. |
-| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID` | ✅ | The civil timestamp is usable only when this bit is set. FAT/KOS local civil fields are preserved directly; no timezone or epoch is invented. |
-| `hpclang_stream_storage_query()` | ✅ | Media-present/read-only flags and validity-gated free bytes. Stock insertion/protect state is sampled once per native launch; re-enter the native app to resample hot-plug/protect changes. |
-| `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query; total capacity remains unavailable unless a future backend can establish it safely. |
-| `rename()` | ◐ | Explicit `ENOTSUP` on the Stock backend because KOS function 6 returns the historical `-200`; hpclang does not fake atomic rename with copy+delete. |
+| `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable-attribute metadata plus validity-gated last-modified civil datetime. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
+| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID` | ✅ | The civil timestamp is usable only when this bit is set. FAT local civil fields are preserved directly; no timezone or epoch is invented. |
+| `hpclang_stream_storage_query()` | ✅ | Media-present/read-only flags plus free bytes and total capacity. Stock is consulted only once before direct takeover for insertion/protect state; space/capacity come from the owned FatFs/block backend. |
+| `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
+| `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
-Creation/access timestamps, KOS extended attributes, raw handles/module IDs, and total-capacity internals remain private or unsupported rather than being inferred from uncertain historical behavior.
+Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
 
 The HP39 object-store root is `HP39DIR.000`; `HP39DIR.CUR` tracks the current directory. These names describe the stock object-store protocol, not a general POSIX filesystem.
 
@@ -268,17 +268,17 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | --- | --- |
 | libc formatting/string/memory | ✅ |
 | heap-backed libc/C++ containers | ✅ |
-| HP49g+/HP50g file open/read/write/seek/close | ✅ through picolibc |
-| create/truncate/append/remove/ENOENT | ✅ Stock E2E |
-| size/type/portable path attributes | ✅ versioned typed query; file/root/named-directory Stock evidence |
-| media present/read-only + free bytes | ✅ typed query; physical media state snapshotted once per native launch |
-| last-modified timestamp | ✅ validity-gated FAT/KOS civil datetime; no timezone/epoch claim |
-| total capacity | ◐ explicitly unavailable on the Stock KOS backend |
-| rename | ◐ explicit `ENOTSUP`; native KOS primitive measured broken |
+| HP49g+/HP50g file open/read/write/seek/close | ✅ picolibc over process-wide FatFs |
+| create/truncate/append/remove/ENOENT | ✅ |
+| size/type/portable path attributes | ✅ versioned typed FAT query |
+| media present/read-only + free bytes | ✅; KOS only samples presence/protect before takeover |
+| last-modified timestamp | ✅ validity-gated FAT civil datetime; no timezone/epoch claim |
+| total capacity | ✅ direct block-device sector count |
+| rename/mkdir/rmdir | ✅ direct FatFs namespace |
+| owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
-| directory iteration | ⬜ |
-| HPGCC2/3 `FS*` adapter | ⬜ |
-| public raw KOS file API | ✕; backend remains private |
+| HPGCC2/3 `FS*` adapter | ⬜ M7.2d |
+| public raw KOS file API | ✕; KOS remains host coordination only |
 
 HP39 typed Aplet/Note/Program/etc. storage is deliberately a different M7.3-style object service rather than synthetic POSIX files.
 
@@ -316,7 +316,7 @@ Based on historical stability, current implementation, and remaining dependencie
 3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
-6. complete M7.2 HP49g+/HP50g namespace, metadata, media-state and directory semantics without leaking KOS globals;
+6. complete M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
 7. design M7.3 Saturn/RPL and HP39 typed-object handles;
 8. only after the corresponding clean services are stable, begin broad HPG/keyboard/filesystem/object compatibility headers and the renderer-agnostic declarative UI layer.
 
