@@ -12,6 +12,12 @@
 #define ARMSYS_PAGE_COUNT   0x914u
 #define ARMSYS_L2_PHYS      0x920u
 
+#define RPL_RSKTOP           0x000806f3u
+#define RPL_DSKTOP           0x000806f8u
+#define RPL_MAIN_FIRST       0x00080000u
+#define RPL_MAIN_END         0x00100000u
+#define RPL_PHYS_PAGE_NIBBLES 0x00002000u
+
 #define HP39_MAIN_FIRST_NIBBLE   0x0007c651u
 #define HP39_MAIN_LAST_NIBBLE    (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
 #define HP39_MINI_FIRST_NIBBLE   0x0007e695u
@@ -80,6 +86,141 @@ static int saturn_read_range_present(
         if (read_map[page] == 0u)
             return 0;
     }
+    return 1;
+}
+
+static int stage_saturn_read_nibble(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint8_t *value)
+{
+    if (read_map == NULL || value == NULL || address >= RPL_MAIN_END)
+        return 0;
+
+    uint32_t base = read_map[address >> 12];
+    if (base == 0u)
+        return 0;
+
+    const volatile uint8_t *p =
+        (const volatile uint8_t *)(uintptr_t)(
+            base + ((address & UINT32_C(0x0fff)) >> 1));
+    uint8_t packed = *p;
+    *value = (address & 1u) != 0u
+        ? (uint8_t)(packed >> 4)
+        : (uint8_t)(packed & 0x0fu);
+    return 1;
+}
+
+static int stage_saturn_read_word5(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint32_t *value)
+{
+    if (value == NULL || address > RPL_MAIN_END - 5u)
+        return 0;
+
+    uint32_t out = 0u;
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint8_t nibble = 0u;
+        if (!stage_saturn_read_nibble(read_map, address + i, &nibble))
+            return 0;
+        out |= (uint32_t)nibble << (i * 4u);
+    }
+    *value = out;
+    return 1;
+}
+
+/*
+ * Convert one 4 KiB physical main-RAM page into the corresponding 0x2000
+ * Saturn-nibble interval by using Stock SAT_CPU.Read[] as the authority.
+ * Two consecutive 0x1000-nibble Saturn pages normally share one ARM page.
+ */
+static int stage_phys_page_saturn_start(
+    const uint32_t *read_map,
+    uint32_t phys_page,
+    uint32_t *saturn_start)
+{
+    if (read_map == NULL || saturn_start == NULL)
+        return 0;
+
+    phys_page &= UINT32_C(0xfffff000);
+    for (uint32_t page = RPL_MAIN_FIRST >> 12;
+         page < RPL_MAIN_END >> 12;
+         ++page) {
+        uint32_t base = read_map[page];
+        if (base < phys_page || base >= phys_page + HPCLANG_PAGE_SIZE)
+            continue;
+
+        uint32_t byte_offset = base - phys_page;
+        uint32_t page_nibble = page << 12;
+        uint32_t nibble_offset = byte_offset << 1;
+        if (nibble_offset > page_nibble)
+            continue;
+
+        uint32_t candidate = page_nibble - nibble_offset;
+        if (candidate < RPL_MAIN_FIRST ||
+            candidate > RPL_MAIN_END - RPL_PHYS_PAGE_NIBBLES)
+            continue;
+
+        *saturn_start = candidate;
+        return 1;
+    }
+    return 0;
+}
+
+static int stage_rpl_memory_bounds(
+    const void *saturn_state,
+    volatile const uint32_t *pool_l2,
+    uint32_t pool_pages,
+    struct hpclang_rpl_memory_bounds *bounds)
+{
+    if (saturn_state == NULL || pool_l2 == NULL || bounds == NULL)
+        return 0;
+
+    const uint32_t *read_map = (const uint32_t *)saturn_state;
+    uint32_t rsktop = 0u;
+    uint32_t dsktop = 0u;
+    if (!stage_saturn_read_word5(read_map, RPL_RSKTOP, &rsktop) ||
+        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
+        rsktop < RPL_MAIN_FIRST || dsktop > RPL_MAIN_END ||
+        rsktop >= dsktop)
+        return 0;
+
+    /*
+     * If no native page lies between the two RPL stacks, the opposite Stock
+     * stack is the natural fence. Otherwise tighten each side to the nearest
+     * hpclang-owned physical page, matching the safety intent of HPGCC 2/3's
+     * MMU-aware free-space checks without importing their MMU table format.
+     */
+    uint32_t temp_limit = dsktop;
+    uint32_t user_limit = rsktop;
+
+    for (uint32_t i = 0u; i < pool_pages; ++i) {
+        uint32_t sat_start = 0u;
+        if (!stage_phys_page_saturn_start(
+                read_map, pool_l2[i] & UINT32_C(0xfffff000), &sat_start))
+            continue;
+
+        uint32_t sat_end = sat_start + RPL_PHYS_PAGE_NIBBLES;
+
+        /* A native page must not already overlap a live RPL stack boundary. */
+        if ((sat_start < rsktop && sat_end > rsktop) ||
+            (sat_start < dsktop && sat_end > dsktop))
+            return 0;
+
+        if (sat_start >= rsktop && sat_start < temp_limit)
+            temp_limit = sat_start;
+        if (sat_end <= dsktop && sat_end > user_limit)
+            user_limit = sat_end;
+    }
+
+    /* Keep the classic 11-nibble TEMPOB/return-stack safety gap. */
+    if (temp_limit <= rsktop + 11u || dsktop < user_limit + 5u)
+        return 0;
+
+    bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC;
+    bounds->temp_limit = temp_limit;
+    bounds->user_limit = user_limit;
     return 1;
 }
 
@@ -197,6 +338,7 @@ int hpclang_armtoolbox_stage1(
         code_count * HPCLANG_PAGE_SIZE);
 
     struct hpclang_launch_context launch;
+    struct hpclang_rpl_memory_bounds rpl_bounds = { 0u, 0u, 0u };
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace = (volatile uint32_t *)(uintptr_t)(
@@ -232,8 +374,20 @@ int hpclang_armtoolbox_stage1(
     launch.saturn_state = live_saturn_state(saturn_state, model);
     if (launch.mmu.code_window_page_count != 0u) {
         launch.platform_cookie = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
+    } else if (
+        launch.saturn_state != 0u &&
+        (model == HPCLANG_MODEL_HP48GII ||
+         model == HPCLANG_MODEL_HP49GPLUS ||
+         model == HPCLANG_MODEL_HP50G) &&
+        stage_rpl_memory_bounds(
+            saturn_state, old_l2, total_pages, &rpl_bounds)) {
+        /*
+         * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window
+         * remains mapped for the complete hpclang_bootstrap_run() call.
+         */
+        launch.platform_cookie = (uintptr_t)&rpl_bounds;
     } else {
-        /* Preserve the historical private token on platforms without a window. */
+        /* No mutation fence: read-only Saturn services may still be available. */
         launch.platform_cookie = old_l2_phys;
     }
 
