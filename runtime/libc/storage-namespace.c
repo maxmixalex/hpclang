@@ -115,14 +115,33 @@ static int path_valid(const char *path)
 
 static int lease_stock_idle(void *context)
 {
+    /*
+     * All hpclang byte-stream descriptors use the direct namespace now, so
+     * there are no runtime-owned Stock KOS file handles to drain before
+     * takeover. The callback remains part of the generic lease state machine.
+     */
     (void)context;
-    return hpclang_storage_stock_idle();
+    return 1;
 }
 
 static int lease_direct_acquire(void *context)
 {
     (void)context;
-    return hpclang_hp4950_fatfs_controller_acquire(0);
+
+    int present = 0;
+    int read_only = 0;
+    if (hpclang_storage_stock_media_query(&present, &read_only) != 0)
+        return -1;
+    if (!present) {
+        errno = ENODEV;
+        return -1;
+    }
+
+    if (hpclang_hp4950_fatfs_controller_acquire(read_only) != 0) {
+        errno = EBUSY;
+        return -1;
+    }
+    return 0;
 }
 
 static int lease_direct_mount(void *context)
@@ -196,6 +215,10 @@ static int namespace_acquire(void)
         case HPCLANG_NAMESPACE_LEASE_MOUNT_FAILED:
             errno = ENODEV;
             break;
+        case HPCLANG_NAMESPACE_LEASE_ACQUIRE_FAILED:
+            if (errno == 0)
+                errno = EIO;
+            break;
         default:
             errno = EIO;
             break;
@@ -221,12 +244,6 @@ static struct direct_fd_state *direct_fd_from_number(int fd)
     struct direct_fd_state *slot =
         &direct_fds[(uint32_t)fd - DIRECT_FD_BASE];
     return slot->used ? slot : NULL;
-}
-
-int hpclang_namespace_fd_is_direct(int fd)
-{
-    return fd >= (int)DIRECT_FD_BASE &&
-           fd < (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS);
 }
 
 static struct direct_fd_state *direct_fd_claim(int *fd)
@@ -549,6 +566,9 @@ int hpclang_namespace_storage_query(
     info->size = sizeof(*info);
     info->version = HPCLANG_STREAM_STORAGE_INFO_VERSION;
     info->flags = HPCLANG_STREAM_STORAGE_MEDIA_PRESENT;
+
+    if ((disk_status(0u) & STA_PROTECT) != 0u)
+        info->flags |= HPCLANG_STREAM_STORAGE_MEDIA_READ_ONLY;
 
     DWORD free_clusters = 0u;
     FATFS *fs = NULL;
