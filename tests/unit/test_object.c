@@ -138,7 +138,7 @@ static void test_public_read_only_stack(void)
 static void test_unfrozen_object_is_rejected(void)
 {
     prepare_one_real();
-    put_word5(0x71000u, 0x02a96u);
+    put_word5(0x91000u, 0x02a96u);
 
     struct hpclang_object *object = NULL;
     errno = 0;
@@ -233,7 +233,7 @@ static void test_mutation_requires_fence(void)
 static void test_malformed_stack_state(void)
 {
     prepare_one_real();
-    put_word5(EDITLINE, 0x70006u);
+    put_word5(EDITLINE, 0x90006u);
 
     uint32_t depth = 0u;
     errno = 0;
