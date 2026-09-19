@@ -64,3 +64,9 @@ hpclang_unit(namespace_lease
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
 target_include_directories(test_namespace_lease PRIVATE
     "${HPCLANG_ROOT}/runtime/libc")
+
+hpclang_unit(s3c2410_sdio_core
+    test_s3c2410_sdio_core.c
+    "${HPCLANG_ROOT}/runtime/libc/s3c2410-sdio-core.c")
+target_include_directories(test_s3c2410_sdio_core PRIVATE
+    "${HPCLANG_ROOT}/runtime/libc")

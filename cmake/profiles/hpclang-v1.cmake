@@ -35,6 +35,7 @@ set(HPCLANG_LIBC
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/platform.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-namespace-lease.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/s3c2410-sdio-core.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/kos-call.S")
 
 # These implementation objects deliberately stay in ARM state. Application C/C++
