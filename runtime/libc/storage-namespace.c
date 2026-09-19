@@ -93,11 +93,7 @@ static int path_valid(const char *path)
         errno = EFAULT;
         return 0;
     }
-    if (path[0] != '/') {
-        errno = EINVAL;
-        return 0;
-    }
-    if (strchr(path, ':') != NULL) {
+    if (path[0] == '\0' || strchr(path, ':') != NULL) {
         errno = EINVAL;
         return 0;
     }
