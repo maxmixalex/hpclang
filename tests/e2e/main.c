@@ -534,9 +534,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x48u;
 
     /*
-     * Stock KOS rename is broken, so standard rename switches to the owned
-     * FAT namespace backend. The operation must release direct controller
-     * ownership and reinitialize Stock before ordinary KOS stdio resumes.
+     * Stock KOS rename is broken, so the first namespace mutation switches
+     * this native process to the owned FAT namespace. From here through
+     * hpclang shutdown, stdio and directory operations share that backend.
      */
     if (rename("HPCLANG.NEW", "HPCLANG.REN") != 0)
         return 0x61u;
@@ -586,6 +586,25 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (!found_long_name) {
         (void)hpclang_stream_directory_close(directory);
         return 0x74u;
+    }
+
+    /*
+     * The same process-wide FAT namespace must serve normal stdio while an
+     * iterator is live; directory traversal must not make fopen() busy.
+     */
+    output = fopen("M7DIR/mixed long name.TXT", "rb");
+    if (output == NULL) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x7eu;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    got = fread(buffer, 1u, sizeof(buffer), output);
+    output_close = fclose(output);
+    if (output_close != 0 ||
+        got != sizeof(create_expected) - 1u ||
+        memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0) {
+        (void)hpclang_stream_directory_close(directory);
+        return 0x7fu;
     }
 
     /*
@@ -681,9 +700,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x52u;
 
     /*
-     * The rename/mkdir/enumeration/rmdir sequence above repeatedly crosses the
-     * complete direct lease boundary and then resumes KOS stdio. Re-read the
-     * original fixture once more after those transitions.
+     * Direct namespace ownership remains coherent through ordinary stream
+     * work. The runtime releases it and invokes Stock ResetSD only after
+     * destructors, immediately before returning to the calculator OS.
      */
     FILE *reset_input = fopen("HPCLANG.TST", "rb");
     if (reset_input == NULL)
