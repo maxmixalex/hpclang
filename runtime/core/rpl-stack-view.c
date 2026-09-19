@@ -107,9 +107,10 @@ int hpclang_rpl_stack_object_address(
     if (level > depth)
         return HPCLANG_RPL_STACK_LEVEL;
 
-    uint32_t offset = (level - 1u) * 5u;
-    if ((level - 1u) > UINT32_MAX / 5u)
+    uint32_t zero_based = level - 1u;
+    if (zero_based > UINT32_MAX / 5u)
         return HPCLANG_RPL_STACK_LEVEL;
+    uint32_t offset = zero_based * 5u;
 
     uint32_t slot = 0u;
     if (!checked_add(top, offset, &slot) || slot > RPL_SATURN_MAX - 4u)
