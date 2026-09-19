@@ -707,7 +707,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
      * on the same hpclang-owned FatFs namespace.
      */
     FS_FILE *legacy_file = NULL;
-    if (FSOpen("HPCLANG.TST", FSMODE_READ, &legacy_file) != FS_OK ||
+    if (FSOpen(":3:HPCLANG.TST", FSMODE_READ, &legacy_file) != FS_OK ||
         legacy_file == NULL)
         return 0x80u;
 
@@ -735,6 +735,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (FSCreate("HPCLANG.CMP", FSATTR_ARCHIVE, &legacy_file) != FS_OK ||
         legacy_file == NULL ||
         FSWrite("legacy", 6, legacy_file) != 6 ||
+        FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSWrite("X", 1, legacy_file) != 1 ||
+        FSFileLength(legacy_file) != 3 ||
         FSClose(legacy_file) != FS_OK)
         return 0x83u;
 
@@ -743,8 +746,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         legacy_file == NULL)
         return 0x84u;
     memset(buffer, 0, sizeof(buffer));
-    if (FSRead(buffer, 6, legacy_file) != 6 ||
-        memcmp(buffer, "legacy", 6u) != 0 ||
+    if (FSRead(buffer, 6, legacy_file) != 3 ||
+        memcmp(buffer, "leX", 3u) != 0 ||
+        !FSEof(legacy_file) ||
         FSClose(legacy_file) != FS_OK)
         return 0x85u;
 
@@ -769,7 +773,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
 
         if (legacy_entry.Name != NULL &&
             strcmp(legacy_entry.Name, "Legacy Long Name.txt") == 0) {
-            if (legacy_entry.FileSize != 6u ||
+            if (legacy_entry.FileSize != 3u ||
                 (FSAttr(&legacy_entry) & FSATTR_DIR) != 0) {
                 FSReleaseEntry(&legacy_entry);
                 (void)FSClose(legacy_dir);
