@@ -196,45 +196,48 @@ M7.1 font closure checklist:
 
 ### M7.2 — Byte-stream filesystem and standard I/O
 
-**In progress. M7.2a stream I/O and M7.2b metadata/media semantics are complete; directory/path semantics remain.**
+**Core storage implementation complete on the M7.2 branch; HPGCC parity adapters remain.**
 
-M7.2 covers the HP49g+/HP50g SD-card namespace and byte-stream semantics only. Calculator objects and Saturn/RPL storage are **not** part of this slice; they begin at M7.3.
+M7.2 covers the HP49g+/HP50g **SD-card FAT namespace** and byte-stream semantics only. HOME/Port 0, Port 1 and Port 2 are calculator-object stores, not FAT volumes; they remain M7.3 work.
 
-Historical baseline:
+The final ownership model is deliberately simpler than the historical bring-up path:
 
-- HPGCC 1.1 already exposed KOS file open/read/write/seek/close/delete plus rename, current-directory operations, file/directory metadata enumeration, attributes, free-space and media-state helpers.
-- HPGCC 2.0/HPGCC3 added the higher-level `fsystem.h` surface with directory traversal, mkdir/rmdir/chdir, file metadata, capacity/free-space queries, rename/delete, attributes, timestamps and handle helpers.
-- hpclang should prefer standard C/POSIX names where they express the same semantics, and use small clean hpclang capability APIs only where the historical operation has no safe portable equivalent.
+- the first hpclang byte-stream storage operation acquires a **whole-process direct namespace lease**;
+- hpclang then owns the S3C2410 SDI controller and mounts the card with the pinned FatFs R0.16 + official patch-1/patch-2 baseline;
+- all ordinary `open/read/write/lseek/unlink/stat/rename/mkdir/rmdir`, picolibc `FILE *` operations, metadata, capacity and directory traversal use that same FatFs namespace;
+- Stock KOS is **not** a second file-I/O backend. It is retained only at the host-coordination boundary: insertion/write-protect sampling before takeover and syscall 19 (`ResetSD`) after FatFs is unmounted and the controller is released;
+- the direct namespace remains active until native-process shutdown, preventing live KOS and FatFs handles from observing/mutating the same FAT state concurrently;
+- HP39/40 and HP48 continue to return deterministic `ENOSYS` for byte-stream storage rather than flattening their native calculator-object stores into POSIX files.
+
+This supersedes the earlier M7.2a/b implementation detail where simple streams and metadata temporarily used Stock KOS until a namespace operation forced a direct takeover. That bridge was useful for establishing behavior, but keeping two filesystem implementations exposed unnecessary semantic splits.
 
 #### M7.2a — standard stream core
 
-- [x] HP49g+/HP50g private KOS-backed `open`, `close`, `read`, `write`, `lseek`, and `unlink` feed picolibc.
-- [x] Normal `FILE *` use covers `fopen/fread/fwrite/fseek/ftell/fflush/fclose/remove`.
-- [x] Correct create/truncate/append behavior, including the historical broken-KOS append-create case.
-- [x] Missing-file/ENOENT behavior and clean `ENOSYS` on HP39/40 and HP48.
-- [x] Stock E2E on both HP49g+ and HP50g.
+- [x] standard `open/close/read/write/lseek/unlink` feed picolibc;
+- [x] normal `FILE *` use covers `fopen/fread/fwrite/fseek/ftell/fflush/fclose/remove`;
+- [x] create/truncate/append/exclusive-create and missing-file behavior have POSIX-facing semantics over FatFs;
+- [x] unsupported families fail explicitly with `ENOSYS`;
+- [x] HP49g+/HP50g share the same direct stream implementation.
 
-#### M7.2b — namespace mutation and metadata
+#### M7.2b — namespace metadata and media semantics
 
-- [x] resolve Stock rename semantics: KOS filesystem function 6 reproduces the historical `-200` failure on both HP49g+ and HP50g, so hpclang must not claim a working POSIX rename or fake atomicity with copy+delete; the canonical standard name remains explicitly unsupported until an ownership-safe namespace backend exists;
-- [x] expose file metadata through versioned `hpclang_stream_path_info`: byte size, file/directory/volume-label type, and the portable read-only/hidden/system/archive attribute subset are Stock-validated on HP49g+/HP50g without exposing KOS structs; both synthetic root and a real named-directory entry are covered;
-- [x] expose media state and free space through `hpclang_stream_storage_query()` / `hpclang_stream_storage_free_bytes()`; insertion and write-protect state are sampled lazily once per native launch because repeated Stock `CHECKINSERT` is not return-safe on HP49g+, while free space is queried per call; total capacity remains explicitly invalid because safe Stock KOS exposes no equivalent of FSystem's raw-FAT volume-size calculation;
-- [x] publish only the independently verified FAT/KOS last-modified civil datetime, with an explicit validity bit and no invented timezone/epoch conversion; creation/access timestamps and undocumented KTIME fields remain private pending independent semantics;
-- [x] preserve explicit unsupported/error behavior on non-stream families: HP39/40 and HP48 return deterministic `ENOSYS` for the stream metadata/media APIs.
+- [x] versioned `hpclang_stream_path_info` exposes byte size, file/directory/volume-label type, portable FAT attributes and validity-gated FAT last-modified civil time;
+- [x] `hpclang_stream_storage_query()` exposes media state, free bytes and direct-backend total capacity;
+- [x] write-protect state sampled at the Stock ownership boundary is carried into the direct block backend rather than ignored;
+- [x] no timezone/epoch meaning is invented for FAT civil timestamps;
+- [x] non-stream families retain explicit unsupported/error behavior.
 
 #### M7.2c — directories and path semantics
 
-- [ ] provide directory enumeration with genuinely owned iterator state and stable names/types; KOS `GetFirst/Next*Info` uses a system current-file-ID cursor and must not merely be hidden behind an iterator-shaped struct;
-- [ ] provide directory creation/removal where behavior can be made ownership-safe; public KOS has no mkdir/rmdir primitive, while historical FSystem obtains those capabilities by directly owning the SD/FAT layer;
-- [ ] support path-based traversal without leaking or permanently changing the calculator OS's global current-directory state; KOS enumeration is current-directory based and exposes no matching `getcwd` for lossless restoration;
-- [ ] add `chdir/getcwd` only if their Stock-global side effects can be contained/restored; otherwise prefer explicit-directory handles backed by an independent namespace implementation and document the migration;
-- [x] decide whether the missing namespace operations justify an ownership-safe FAT backend/lease rather than copying HPGCC's direct-controller assumptions into the common API: **yes**. Stock KOS enumeration is tied to a system current-file-ID cursor, `chdir` mutates Stock-global state, and KOS exposes no matching `getcwd`; these semantics cannot honestly back an owned iterator or losslessly restorable explicit-path API;
-  - the accepted architecture is a **whole-process stream-namespace lease**: do not keep Stock-KOS file handles live while the direct backend owns or mutates FAT state; mount/use one namespace implementation consistently, unmount/release it before return, then explicitly reinitialize the Stock filesystem;
-  - historical HPGCC documents syscall 19 (`kos_ResetSD`) as the Stock-filesystem reinitialization step after direct FSystem use. Storage #23 independently validates the reinitialization half of this lifecycle on HP49g+/HP50g Stock: after all KOS stream handles are closed, syscall 19 is issued, then ordinary KOS metadata plus reopen/read still work and the ARMToolbox stage returns cleanly;
-  - direct-backend **release/unmount** and Stock **filesystem reinitialization** remain distinct operations. Storage #23 proves only the latter until the hpclang SDIO/FAT backend exists;
-  - HPGCC3 FSystem is behavior evidence only and cannot be copied into hpclang under its redistribution-restricted license. The direct backend must be independently implemented from hardware/protocol documentation and suitably licensed components;
-  - FAT namespace baseline: FatFs **R0.16 with official patch-1 plus patch-2 (2026-07-10)**, not the unpatched R0.16 source. Initial configuration remains one volume, FAT12/16/32, UTF-8 LFN, explicit paths (`FF_FS_RPATH=0`), no exFAT/mkfs, and fixed/predictable memory, above an hpclang-owned S3C2410 SDIO block driver;
-- [ ] validate long-name/case behavior actually provided by each backend instead of promising the broader HPGCC FSystem semantics by assumption.
+- [x] directory enumeration uses genuinely independent FatFs `DIR` state;
+- [x] directory creation/removal and rename use the owned namespace rather than broken/absent KOS primitives;
+- [x] paths are explicit and do not mutate the Stock calculator's global current-directory state;
+- [x] multiple iterators may coexist while ordinary stdio remains active;
+- [x] UTF-8 LFN and case-insensitive FAT lookup are supported while enumeration preserves stored name case;
+- [x] the whole-process lease prevents mixed live KOS/FatFs file handles;
+- [x] shutdown closes remaining direct descriptors, unmounts FatFs, releases SDI ownership, invokes Stock `ResetSD`, and only then returns to the calculator OS.
+
+The pinned namespace backend is independently implemented. Historical HPGCC3 FSystem remains behavior evidence only and is not copied into hpclang.
 
 #### M7.2d — HPGCC parity adapter boundary
 
@@ -245,7 +248,7 @@ Historical baseline:
 
 #### M7.2 completion criterion
 
-M7.2 is complete when a typical HPGCC HP49g+/HP50g program that uses files and directories can be ported without losing application functionality, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. The hpclang surface should also improve on HPGCC by making unsupported-family behavior, ownership, name buffers, iterator lifetime, and errors explicit.
+M7.2 is complete when a typical HPGCC HP49g+/HP50g program that uses files and directories can be ported without losing application functionality, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. The remaining work after the clean storage core is therefore **adapter/source-compatibility closure**, not another filesystem backend.
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
