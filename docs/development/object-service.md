@@ -38,18 +38,22 @@ This intentionally prefers copying over borrowed aliases. ARM920T calculators
 have limited memory, so later zero-copy/borrow APIs may be added only with an
 explicit scoped lifetime if a real application requires them.
 
-## Lossless unknown-object rule
+## Opaque-object boundary rule
 
-The clean service does not need to understand every Stock object before it can
-preserve it.
+The clean service does not need semantic knowledge of every Stock object before
+it can preserve it, but it **must** be able to prove the object's storage
+boundary.
 
 A snapshot stores enough native representation to round-trip an object on the
 same supported family. `hpclang_object_kind()` exposes a stable coarse class
-when recognized, but an unrecognized native prologue/type remains a valid
-`HPCLANG_OBJECT_UNKNOWN` snapshot.
+when recognized. A semantically unknown object may still become
+`HPCLANG_OBJECT_UNKNOWN` when its native format has a proven fixed,
+length-prefixed, or otherwise verified boundary.
 
-This permits stack/store copying of future or uncommon native objects without
-making raw prologue numbers part of the canonical hpclang API.
+A completely unknown prologue whose object extent cannot be established is not
+copied heuristically. Snapshot creation fails with `EILSEQ` or `ENOTSUP`
+rather than risking a read into adjacent calculator objects. This keeps opaque
+round-trip support lossless without turning raw prologue values into public API.
 
 ## Object classes
 
