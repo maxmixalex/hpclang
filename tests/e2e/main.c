@@ -404,10 +404,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x68u;
 
     /*
-     * x50ng's host-directory SD fixture currently exposes the ordinary FAT
-     * archive bit on this pre-existing file. KOS FATTR mutation is not part of
-     * the public contract because this backend does not preserve requested
-     * read-only/hidden mutations even when Stock reports success.
+     * x50ng's host-directory SD fixture exposes the ordinary FAT archive bit
+     * on this pre-existing file. Preserve that stable FAT metadata contract.
      */
     if ((path_info.attributes &
          HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
