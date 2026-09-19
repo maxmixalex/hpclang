@@ -799,6 +799,13 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (!FSVolumeMounted(0) || FSVolumeInserted(0) != FS_OK ||
         FSGetCurrentVolume() != 0 || FSSetCurrentVolume(1) != FS_BADVOLUME)
         return 0x8eu;
+
+    int legacy_volume_size = FSGetVolumeSize(0);
+    int legacy_volume_free = FSGetVolumeFree(0);
+    if (legacy_volume_size <= 0 || legacy_volume_free < 0 ||
+        legacy_volume_free > legacy_volume_size)
+        return 0x92u;
+
     if (!FSNameCompare("Name.TXT", "name.txt", FSCASE_INSENS) ||
         FSNameCompare("Name.TXT", "name.txt", FSCASE_SENS) ||
         !FSNameCompare("Name.TXT;;", "Name.TXT", FSCASE_SENSHP))
