@@ -8,6 +8,11 @@ on:
   push:
     paths:
       - "runtime/libc/storage.c"
+      - "runtime/libc/storage-namespace*"
+      - "runtime/libc/s3c2410-sdio-*"
+      - "runtime/libc/hp4950-fatfs-*"
+      - "runtime/core/runtime.c"
+      - "third_party/fatfs/**"
       - "include/hpclang/storage.h"
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
@@ -36,6 +41,11 @@ on:
   pull_request:
     paths:
       - "runtime/libc/storage.c"
+      - "runtime/libc/storage-namespace*"
+      - "runtime/libc/s3c2410-sdio-*"
+      - "runtime/libc/hp4950-fatfs-*"
+      - "runtime/core/runtime.c"
+      - "third_party/fatfs/**"
       - "include/hpclang/storage.h"
       - "runtime/bootstrap/**"
       - "platform/armtoolbox/**"
