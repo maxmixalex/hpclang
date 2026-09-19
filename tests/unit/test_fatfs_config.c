@@ -22,6 +22,9 @@
 #if FF_FS_EXFAT != 0 || FF_USE_MKFS != 0
 #error initial M7.2c scope excludes exFAT and formatting
 #endif
+#if FF_FS_NORTC != 0
+#error application-visible direct FAT writes require a real clock provider
+#endif
 #if FF_FS_REENTRANT != 0
 #error whole-process namespace lease is intentionally single-threaded
 #endif
@@ -83,6 +86,13 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
     default:
         return RES_PARERR;
     }
+}
+
+DWORD get_fattime(void)
+{
+    return ((DWORD)(2026u - 1980u) << 25) |
+           ((DWORD)1u << 21) |
+           ((DWORD)1u << 16);
 }
 
 int main(void)
