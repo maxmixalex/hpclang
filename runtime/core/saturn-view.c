@@ -7,6 +7,9 @@
 
 static uintptr_t saturn_page_base(struct hpclang_saturn_address address)
 {
+    if (address.nibble > UINT32_C(0x000fffff))
+        return 0u;
+
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (boot == NULL || boot->saturn_state == 0u)
         return 0u;
