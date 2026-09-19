@@ -95,9 +95,11 @@ struct hpclang_stream_storage_info {
 };
 
 /*
- * These services are available on HP49g+/HP50g. Other calculator families
- * return -1 with errno=ENOSYS rather than treating calculator-object stores as
- * POSIX/byte-stream filesystems.
+ * These services address the HP49g+/HP50g SD-card FAT volume. HOME/Port 0,
+ * Port 1 and Port 2 are calculator/RPL object stores, not FAT byte-stream
+ * volumes, and belong to the separate calculator-object service boundary.
+ * Other calculator families return -1 with errno=ENOSYS rather than treating
+ * calculator-object stores as POSIX/byte-stream filesystems.
  */
 int hpclang_stream_path_query(
     const char *path,
