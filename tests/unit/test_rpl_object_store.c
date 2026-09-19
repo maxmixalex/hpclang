@@ -185,6 +185,37 @@ static void test_home_library_table_skip(void)
                &reader, &cursor, &entry) == 0);
 }
 
+static void test_current_path_skips_unrelated_higher_directory(void)
+{
+    prepare_tree();
+
+    /*
+     * A is the first/highest-addressed HOME entry and lies above the current
+     * /SUB object. Make A look like a directory with deliberately malformed
+     * contents. Address-guided current-path resolution must skip it rather
+     * than recursively entering an unrelated sibling.
+     */
+    const uint32_t object_a = 0x82206u;
+    put_nibbles(object_a, DORRP, 5u);
+    put_nibbles(object_a + 8u, 0xfffffu, 5u);
+
+    uint32_t current = 0u;
+    assert(hpclang_rpl_store_current_object(&reader, &current) ==
+           HPCLANG_RPL_STORE_OK);
+    assert(current == 0x8210au);
+
+    uint8_t path[16] = { 0u };
+    uint32_t bytes = 0u;
+    uint32_t components = 0u;
+    assert(hpclang_rpl_directory_path_to(
+               &reader, current, path, sizeof(path),
+               &bytes, &components) == HPCLANG_RPL_STORE_OK);
+    assert(bytes == 4u);
+    assert(components == 1u);
+    assert(path[0] == 3u);
+    assert(memcmp(path + 1u, "SUB", 3u) == 0);
+}
+
 static void test_null_named_hidden_directory(void)
 {
     memset(memory, 0, sizeof(memory));
@@ -257,6 +288,7 @@ int main(void)
     test_home_and_current();
     test_enumeration_and_find();
     test_home_library_table_skip();
+    test_current_path_skips_unrelated_higher_directory();
     test_null_named_hidden_directory();
     test_malformed_chain();
     return 0;

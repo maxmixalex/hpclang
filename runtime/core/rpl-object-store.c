@@ -312,7 +312,29 @@ struct path_search {
     uint32_t capacity;
     uint32_t used;
     uint32_t components;
+    uint32_t remaining_entries;
 };
+
+static int path_append_component(
+    struct path_search *search,
+    const struct hpclang_rpl_directory_entry_view *entry)
+{
+    uint32_t needed = 1u + entry->name_length;
+    if (search->used > search->capacity ||
+        needed > search->capacity - search->used)
+        return HPCLANG_RPL_STORE_LIMIT;
+
+    search->path[search->used++] = (uint8_t)entry->name_length;
+    if (entry->name_length != 0u) {
+        memcpy(
+            search->path + search->used,
+            entry->name,
+            entry->name_length);
+        search->used += entry->name_length;
+    }
+    ++search->components;
+    return HPCLANG_RPL_STORE_OK;
+}
 
 static int path_search_directory(
     struct path_search *search,
@@ -333,29 +355,37 @@ static int path_search_directory(
     struct hpclang_rpl_directory_entry_view entry;
     while ((result = hpclang_rpl_directory_cursor_next(
                 search->reader, &cursor, &entry)) > 0) {
-        if (entry.prologue != RPL_DORRP)
+        if (search->remaining_entries == 0u)
+            return HPCLANG_RPL_STORE_LIMIT;
+        --search->remaining_entries;
+
+        /*
+         * USEROB directory entries are visited from high addresses toward low
+         * addresses. HPGCC3's __sat3_getdir() exploits the same nesting:
+         * a target directory can only equal an entry or be embedded in the
+         * first lower-addressed directory object. Never DFS unrelated sibling
+         * subtrees merely to reconstruct CONTEXT.
+         */
+        if (entry.object_address > search->target)
             continue;
 
-        uint32_t old_used = search->used;
-        uint32_t old_components = search->components;
-        uint32_t needed = 1u + entry.name_length;
-        if (needed > search->capacity - search->used)
-            return HPCLANG_RPL_STORE_LIMIT;
+        if (entry.object_address == search->target) {
+            if (entry.prologue != RPL_DORRP)
+                return HPCLANG_RPL_STORE_NOT_DIRECTORY;
+            result = path_append_component(search, &entry);
+            return result;
+        }
 
-        search->path[search->used++] = (uint8_t)entry.name_length;
-        memcpy(search->path + search->used, entry.name, entry.name_length);
-        search->used += entry.name_length;
-        ++search->components;
+        /* entry.object_address < target */
+        if (entry.prologue != RPL_DORRP)
+            return HPCLANG_RPL_STORE_NOT_FOUND;
 
-        result = path_search_directory(
+        result = path_append_component(search, &entry);
+        if (result != HPCLANG_RPL_STORE_OK)
+            return result;
+
+        return path_search_directory(
             search, entry.object_address, depth + 1u);
-        if (result == HPCLANG_RPL_STORE_OK)
-            return result;
-        if (result != HPCLANG_RPL_STORE_NOT_FOUND)
-            return result;
-
-        search->used = old_used;
-        search->components = old_components;
     }
 
     if (result < 0)
@@ -390,6 +420,7 @@ int hpclang_rpl_directory_path_to(
         .capacity = capacity,
         .used = 0u,
         .components = 0u,
+        .remaining_entries = RPL_DIRECTORY_ENTRY_LIMIT,
     };
 
     result = path_search_directory(&search, home, 0u);
