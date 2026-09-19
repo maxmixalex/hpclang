@@ -757,3 +757,13 @@ char *FSGetErrorMsg(int errornum)
     default: return "Unknown filesystem error";
     }
 }
+
+int fdelete(char *filename)
+{
+    if (filename == NULL)
+        return -1;
+    char path[HPCLANG_STREAM_NAME_CAPACITY];
+    if (normalize_path(filename, path, sizeof(path)) != 0)
+        return -1;
+    return remove(path);
+}
