@@ -49,11 +49,9 @@ struct hpclang_stream_civil_datetime {
 /*
  * Portable metadata for one byte-stream filesystem path.
  *
- * The public attributes deliberately expose only stable FAT/KOS semantics.
- * Timestamp validity is explicit. The Stock backend publishes only the
- * independently verified last-modified civil datetime. KOS creation/access
- * timestamps and undocumented FILE_INFO fields remain runtime-private until
- * their semantics are independently established.
+ * The public attributes deliberately expose only stable FAT semantics.
+ * Timestamp validity is explicit. The owned FatFs backend publishes the FAT
+ * last-modified civil datetime without inventing a timezone/epoch conversion.
  */
 struct hpclang_stream_path_info {
     uint32_t size;
@@ -77,14 +75,15 @@ enum hpclang_stream_storage_flag {
 /*
  * Byte-stream media state.
  *
- * Validity bits are explicit because the Stock KOS filesystem exposes free
- * bytes and media state but no safe total-capacity query. capacity_bytes is
- * zero unless HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID is set.
+ * The HP49g+/HP50g SD volume is owned by one process-lifetime FatFs namespace
+ * once byte-stream storage is first used. Free space and total capacity come
+ * from that backend. Stock KOS is not used for ordinary file reads/writes; it
+ * is retained only for the narrow host-coordination boundary around SD
+ * ownership (pre-takeover media/protect sampling and post-release ResetSD).
  *
- * On the Stock HP49g+/HP50g backend, insertion and write-protect state are
- * sampled lazily and remain fixed for one native launch. Re-enter the native
- * application to resample physical SD hot-plug/protect changes. Free space is
- * queried on each call.
+ * Media insertion/write-protect state is sampled once per native launch before
+ * takeover. Re-enter the native application to resample hot-plug/protect
+ * changes.
  */
 struct hpclang_stream_storage_info {
     uint32_t size;
