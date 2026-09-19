@@ -163,23 +163,27 @@ above or outside this clean object API.
   `Read[]` path;
 - add object snapshot storage and coarse classification without stack mutation.
 
-### M7.3b — read-only stack/object inspection
+### M7.3b — read-only stack/object inspection — implemented
 
 - HP48gII/49g+/50g stack depth and owned peek;
 - object size/prologue parsing with strict bounds and malformed-object errors;
-- scalar/string conversions that do not mutate Stock state.
+- exact BINT/ZINT conversion, explicit classic DOREAL approximation, raw 8-bit CHAR/DOCSTR access.
 
-### M7.3c — stack mutation
+### M7.3c — stack mutation — implemented for the bounded core
 
 - push/pop/drop/replace with failure-safe ordering;
-- temporary-object allocation and Stock state restoration;
-- round-trip tests for recognized and unknown objects.
+- launcher-derived native-page fences plus Launcher-V3 bias normalization/restoration;
+- temporary-object allocation charged against existing Stock AVMEM reservations rather than raw geometry;
+- self-contained Stock HP48/HP4950 create/push/replace/peek/pop/drop round-trip evidence.
 
-### M7.3d — named object stores
+Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future long-lived named-store mutation. The public stack path does not expose raw allocation blocks or Saturn addresses.
 
-- HP48/49/50 explicit RPL directory handles and independent enumeration;
-- HP39 typed object-store backend;
-- get/put/remove and typed metadata without global cwd mutation.
+### M7.3d — named object stores — next
+
+- define logical root/current/child handles using length-delimited calculator-byte names rather than assuming UTF-8 paths;
+- HP48/49/50 read-only RPL directory resolution and independent enumeration must re-resolve logical names rather than retaining borrowed Saturn addresses across GC/moving allocation;
+- HP39 typed object-store backend maps Directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records into the same public store model;
+- close read-only get/enumeration first; add put/remove only after USEROB/HP39 mutation lifecycles are independently safe.
 
 ### M7.3e — HPGCC adapters and closure
 

@@ -45,18 +45,20 @@ These are separate claims and must remain separately observable:
 
 A nonblank `return.pgm` that still contains hpclang's last frame is insufficient for item 3. The harness must not manufacture success by copying the pre-launch framebuffer back. HP39 real-hardware validation uses **APLET** as the harmless post-return stock action.
 
-## M7.3 read-only object evidence
+## M7.3 object, conversion and stack-mutation evidence
 
-The first calculator-object vertical slice is intentionally non-mutating. Public applications see only opaque owned `struct hpclang_object` snapshots plus `hpclang_stack_depth()` / `hpclang_stack_peek()`; Saturn nibble addresses and the launch-preserved `SAT_CPU->Read[]` mapping remain runtime-private.
+M7.3 keeps Saturn addresses and mapped ARM aliases runtime-private. Public applications see opaque owned `struct hpclang_object` snapshots plus typed conversions and stack services. The object parser remains fail-closed: it snapshots only formats whose extent can be proven from verified fixed size, self-relative length, SEMI-terminated composite structure, tag+embedded-object structure, or another documented boundary rule.
 
-Host/runtime evidence on `ff9a09b4`:
+The evidence progressed in three stages:
 
-- **CI / Core runtime #285 (`35431683458`)** is fully green, including the new RPL object-span, stack-view, snapshot and public-object unit tests plus the HP39 package build;
-- **E2E / Runtime #232 (`35431683496`)** has green Stock hp48, Stock hp4950 and Stock hp39 jobs, and green Direct hp48/hp39 jobs;
-- Stock hp48 and Stock hp4950 therefore independently validate live `DSKTOP`/D1 + `EDITLINE` depth observation, level-pointer resolution, conservative object-boundary parsing, owned snapshot allocation/release and unchanged stack depth across the witness;
-- Runtime #232 is not a globally green canonical Runtime replacement: Direct hp4950 fails later in the existing keyboard-transition phase with the known `0x46410010` signature after the object witness has already completed. That unrelated job failure is not recorded as object-service evidence.
+- **Core #285 (`35431683458`)** and the successful Stock hp48/hp4950 jobs in **Runtime #232 (`35431683496`)** established the first non-mutating `DSKTOP`/D1 + `EDITLINE` stack view, level-pointer resolution, proven-boundary parsing and owned snapshots;
+- **Runtime #237 (`35435438471`)** is fully green after stage1 learned to dynamically recognize the hpclang Launcher-V3 DOCSTR and normalize the historical HPGCC 1.1 launcher level-1 bias, then restore it after HPC1 returns;
+- **Core #296 (`35439583956`)** is fully green for the bounded mutation core and exact integer/raw-string conversions. In **Runtime #241 (`35439583995`)**, the canonical build, Direct hp39/hp48/hp4950, Stock hp48 and Stock hp4950 jobs all succeed. The Stock RPL witness constructs owned CHAR A/B snapshots inside HPC1, performs push → replace → peek → push → pop → drop, and requires the final user-visible depth to equal the initial depth. The Stock hp39 job was cancelled by a later push and is deliberately not counted as RPL-mutation evidence;
+- on `87ce4349`, the Runtime/unit job in **Core #297 (`35440008729`)** passes the classic DOREAL conversion tests and ARM hardware-validation build, while the canonical-build job in **Runtime #242 (`35440008714`)** also succeeds.
 
-The object parser is deliberately fail-closed. It only snapshots formats whose extent can be proven from verified fixed size, self-relative length, SEMI-terminated composite structure, tag+embedded-object structure, or another documented boundary rule. Unknown or recognized-but-unfrozen prologues return an error rather than scanning into adjacent calculator state.
+The mutation allocator does not trust Stock `AVMEM` as a complete physical-memory description. Stage1 maps hpclang-owned ARMToolbox pages back into the live Saturn address space and publishes conservative TEMPOB/user-stack fences through a tagged private platform cookie. Expected `ENOSPC`/invalid-level failures are checked before the first mutation. `AVMEM` is updated relative to the existing Stock reservation rather than recomputed from raw `DSKTOP-RSKTOP` geometry, so launcher/native reservations are not accidentally made available.
+
+Conversions are explicit about representation loss: BINT/ZINT → `int64_t` is exact or `ERANGE`; classic DOREAL → `double` is approximate and returns `ERANGE` instead of silently clamping overflow or nonzero underflow to the old HPGCC behavior; CHAR and DOCSTR expose calculator 8-bit codes/bytes and are not mislabeled as UTF-8.
 
 ## Native-font validation and provenance
 

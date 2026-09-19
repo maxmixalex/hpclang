@@ -286,24 +286,24 @@ HP39 typed Aplet/Note/Program/etc. storage is deliberately a different M7.3-styl
 
 ## Saturn/RPL and calculator objects
 
-HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions. HPGCC 2.0 extends that surface; HPGCC3 replaces it with a larger `sat3_*` environment.
-
-The first canonical M7.3 slice is now implemented:
+HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions. HPGCC 2.0 extends that surface; HPGCC3 replaces it with a larger `sat3_*` environment. hpclang keeps historical raw address/MMU idioms out of the canonical API and exposes owned objects plus capability-level stack/store operations.
 
 | API / service | Status | Contract |
 | --- | --- | --- |
 | `struct hpclang_object` | ✅ opaque owned snapshot | ARM-side immutable copy of a proven-bounded native object; no Saturn pointer escapes the runtime |
-| `hpclang_object_kind()` | ✅ | Stable coarse semantic class; native prologue values remain private |
-| `hpclang_object_release()` | ✅ | Releases only the owned snapshot; never mutates Stock state |
-| `hpclang_stack_depth()` | ✅ HP48/HP4950 Stock | Read-only DSKTOP/D1 + EDITLINE depth observation; HP39 and launchers without live Stock Saturn state return `ENOSYS` |
-| `hpclang_stack_peek(level)` | ✅ HP48/HP4950 Stock | 1-based non-mutating owned snapshot; unsupported/unfrozen object formats fail closed rather than being copied heuristically |
-| private Saturn view | ✅ runtime-only | Explicit 20-bit nibble address + launch-preserved `SAT_CPU->Read[]`; never a public C pointer |
-| stack push/pop/drop/replace | ⬜ | M7.3c; requires failure-safe Stock temporary-object/mutation semantics |
-| named RPL / HP39 object stores | ⬜ | M7.3d explicit handles/iterators; never flattened into byte-stream files |
+| `hpclang_object_kind()` / `release()` | ✅ | Stable coarse semantic class and explicit ARM-side lifetime |
+| `hpclang_object_integer_i64()` | ✅ | Exact classic BINT/ZINT conversion; `ERANGE` if arbitrary-precision ZINT does not fit `int64_t` |
+| `hpclang_object_real_f64()` | ✅ classic DOREAL | Explicit approximate conversion; overflow or nonzero underflow is `ERANGE`, not silent HPGCC-style clamping; EREAL/LONGREAL remain `ENOTSUP` |
+| CHAR / DOCSTR conversion | ✅ | Raw calculator 8-bit code/bytes; no implicit UTF-8 reinterpretation |
+| `hpclang_stack_depth/peek` | ✅ HP48/HP4950 Stock | 1-based user-visible stack after launcher-bias normalization; peek returns an owned snapshot |
+| `hpclang_stack_push/pop/drop/replace` | ✅ HP48/HP4950 Stock | Bounded by launcher-derived native-page fences; pop snapshots before drop; replace copies before pointer commit |
+| private Saturn view | ✅ runtime-only | Explicit 20-bit nibble address + launch-preserved `SAT_CPU->Read[]`; arbitrary public poke is not exposed |
+| named RPL / HP39 object stores | ⬜ M7.3d | Explicit logical handles/independent iterators; never flattened into byte-stream files or implemented by mutating Stock global cwd |
 
-Core #285 is green for the new parser/view/snapshot units. Runtime #232 provides green Stock hp48 and Stock hp4950 live evidence; its overall failure is the unrelated existing Direct hp4950 keyboard `0x46410010` signature after the object witness.
+**Core #296 (`35439583956`)** is fully green for the current mutation core and exact integer/raw-string helpers. **Runtime #241 (`35439583995`)** supplies successful focused Stock hp48/hp4950 mutation evidence plus all three Direct jobs. The classic REAL conversion added on `87ce4349` passes the Runtime/unit and ARM hardware-validation job in **Core #297** and the canonical-build job in **Runtime #242**.
 
-The parser currently recognizes only object extents supported by verified layout rules. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove`-style operations remain Migration/Internal rather than defining the clean object API.
+The parser remains intentionally fail-closed. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove`-style operations remain Migration/Internal. The next clean-core target is the read-only named-store layer: logical root/current/child handles, raw-byte names, independent enumeration and owned object lookup without retaining borrowed Saturn addresses across allocations/GC.
+
 
 ## KOS, raw syscalls and widgets
 
@@ -334,7 +334,7 @@ Based on historical stability, current implementation, and remaining dependencie
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
 6. ✅ M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
-7. ◐ M7.3 owned-object + read-only HP48/HP4950 stack slice implemented; mutation and named object stores remain;
+7. ◐ M7.3 owned objects, conversions and bounded HP48/HP4950 stack mutation are implemented; named object stores and historical adapters remain;
 8. only after the corresponding clean services are stable, begin broad HPG/keyboard/filesystem/object compatibility headers and the renderer-agnostic declarative UI layer.
 
 This preserves the dependency direction: historical HPGCC APIs are implemented on top of a coherent hpclang core, not used to define that core.
