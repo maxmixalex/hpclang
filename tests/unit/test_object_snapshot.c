@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <float.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -74,6 +75,35 @@ static void put_zint(
     }
     put_nibbles(
         image, 10u + (uint32_t)digits, negative ? 9u : 0u, 1u);
+}
+
+static void put_real(
+    struct image *image,
+    int exponent,
+    uint64_t mantissa,
+    int negative)
+{
+    assert(exponent >= -500 && exponent <= 499);
+    assert(mantissa <= UINT64_C(999999999999));
+
+    memset(image, 0, sizeof(*image));
+    put_nibbles(image, 0u, 0x02933u, 5u);
+
+    uint32_t encoded =
+        exponent < 0 ? (uint32_t)(1000 + exponent) : (uint32_t)exponent;
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        put_nibbles(image, 5u + i, encoded % 10u, 1u);
+        encoded /= 10u;
+    }
+
+    uint64_t remaining = mantissa;
+    for (uint32_t i = 0u; i < 12u; ++i) {
+        put_nibbles(
+            image, 8u + i, (uint32_t)(remaining % UINT64_C(10)), 1u);
+        remaining /= UINT64_C(10);
+    }
+    put_nibbles(image, 20u, negative ? 9u : 0u, 1u);
+    image->used = 21u;
 }
 
 static void put_string(
@@ -199,6 +229,79 @@ static void test_integer_conversions(void)
     hpclang_object_release(object);
 }
 
+static void test_real_conversion(void)
+{
+    struct image image = {0};
+    double value = 0.0;
+
+    put_real(&image, 0, UINT64_C(100000000000), 0);
+    struct hpclang_object *object = snapshot_from_image(&image);
+    assert(hpclang_object_real_f64(object, &value) == 0);
+    assert(value > 0.999999999999 && value < 1.000000000001);
+    hpclang_object_release(object);
+
+    put_real(&image, 2, UINT64_C(123456000000), 1);
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_real_f64(object, &value) == 0);
+    assert(value < -123.455999 && value > -123.456001);
+    hpclang_object_release(object);
+
+    put_real(&image, 308, UINT64_C(100000000000), 0);
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_real_f64(object, &value) == 0);
+    assert(value > 9.99e307 && value < 1.01e308);
+    hpclang_object_release(object);
+
+    put_real(&image, 309, UINT64_C(100000000000), 0);
+    object = snapshot_from_image(&image);
+    value = 17.0;
+    errno = 0;
+    assert(hpclang_object_real_f64(object, &value) == -1);
+    assert(errno == ERANGE);
+    assert(value == 17.0);
+    hpclang_object_release(object);
+
+    put_real(&image, -400, UINT64_C(100000000000), 0);
+    object = snapshot_from_image(&image);
+    value = 19.0;
+    errno = 0;
+    assert(hpclang_object_real_f64(object, &value) == -1);
+    assert(errno == ERANGE);
+    assert(value == 19.0);
+    hpclang_object_release(object);
+
+    put_real(&image, 499, 0u, 1);
+    object = snapshot_from_image(&image);
+    assert(hpclang_object_real_f64(object, &value) == 0);
+    assert(value == 0.0);
+    hpclang_object_release(object);
+
+    put_real(&image, 0, UINT64_C(100000000000), 0);
+    image.nibbles[5] = 0x0au;
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_real_f64(object, &value) == -1);
+    assert(errno == EILSEQ);
+    hpclang_object_release(object);
+
+    put_real(&image, 0, UINT64_C(100000000000), 0);
+    image.nibbles[20] = 8u;
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_real_f64(object, &value) == -1);
+    assert(errno == EILSEQ);
+    hpclang_object_release(object);
+
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0u, 0x02955u, 5u); /* EREAL */
+    image.used = 26u;
+    object = snapshot_from_image(&image);
+    errno = 0;
+    assert(hpclang_object_real_f64(object, &value) == -1);
+    assert(errno == ENOTSUP);
+    hpclang_object_release(object);
+}
+
 static void test_raw_string_conversions(void)
 {
     const uint8_t expected[] = { 0x41u, 0x00u, 0xffu };
@@ -284,6 +387,7 @@ int main(void)
     test_odd_character_snapshot();
     test_character_constructor();
     test_integer_conversions();
+    test_real_conversion();
     test_raw_string_conversions();
     test_errors();
     return 0;

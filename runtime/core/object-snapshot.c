@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <float.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -350,6 +351,105 @@ int hpclang_object_integer_i64(
     } else {
         *value = (int64_t)magnitude;
     }
+    return 0;
+}
+
+static int object_read_bcd(
+    const struct hpclang_object *object,
+    uint32_t offset,
+    uint32_t digits,
+    uint64_t *value)
+{
+    if (object == NULL || value == NULL ||
+        offset > object->nibble_count ||
+        digits > object->nibble_count - offset)
+        return 0;
+
+    uint64_t out = 0u;
+    for (uint32_t i = digits; i != 0u; --i) {
+        uint8_t digit = 0u;
+        if (!hpclang_object_snapshot_read_nibble(
+                object, offset + i - 1u, &digit) ||
+            digit > 9u)
+            return 0;
+
+        if (out > (UINT64_MAX - digit) / UINT64_C(10))
+            return 0;
+        out = out * UINT64_C(10) + digit;
+    }
+
+    *value = out;
+    return 1;
+}
+
+int hpclang_object_real_f64(
+    const struct hpclang_object *object,
+    double *value)
+{
+    if (object == NULL || value == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (object->kind != HPCLANG_OBJECT_REAL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (object->native_prologue != RPL_DOREAL) {
+        errno = ENOTSUP;
+        return -1;
+    }
+    if (object->nibble_count != 21u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint64_t encoded_exponent = 0u;
+    uint64_t mantissa = 0u;
+    if (!object_read_bcd(object, 5u, 3u, &encoded_exponent) ||
+        !object_read_bcd(object, 8u, 12u, &mantissa)) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint8_t sign = 0u;
+    if (!hpclang_object_snapshot_read_nibble(object, 20u, &sign) ||
+        (sign != 0u && sign != 9u)) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    int exponent = (int)encoded_exponent;
+    if (exponent > 499)
+        exponent -= 1000;
+
+    if (mantissa == 0u) {
+        double zero = 0.0;
+        *value = sign == 9u ? -zero : zero;
+        return 0;
+    }
+
+    double result = (double)mantissa;
+    int scale = exponent - 11;
+
+    while (scale > 0) {
+        if (result > DBL_MAX / 10.0) {
+            errno = ERANGE;
+            return -1;
+        }
+        result *= 10.0;
+        --scale;
+    }
+
+    while (scale < 0) {
+        result /= 10.0;
+        if (result == 0.0) {
+            errno = ERANGE;
+            return -1;
+        }
+        ++scale;
+    }
+
+    *value = sign == 9u ? -result : result;
     return 0;
 }
 
