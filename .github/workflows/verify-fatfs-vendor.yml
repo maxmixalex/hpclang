@@ -19,7 +19,14 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Verify official FatFs bytes
-        run: tools/verify-fatfs-vendor.sh build/fatfs-official-verify
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p build/fatfs-official-verify
+          set -o pipefail
+          bash -x tools/verify-fatfs-vendor.sh build/fatfs-official-verify \
+            2>&1 | tee build/fatfs-official-verify/run.log
 
       - name: Upload official verification evidence
         if: always()
@@ -29,10 +36,15 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           path: |
+            build/fatfs-official-verify/run.log
             build/fatfs-official-verify/verification.txt
-            build/fatfs-official-verify/download/ff16p1.diff
-            build/fatfs-official-verify/download/ff16p2.diff
-            build/fatfs-official-verify/patched/ff.c
+            build/fatfs-official-verify/download/**
+            build/fatfs-official-verify/patched/**
+            build/fatfs-official-verify/unpacked/source/ff.c
             build/fatfs-official-verify/unpacked/source/ff.h
             build/fatfs-official-verify/unpacked/source/diskio.h
             build/fatfs-official-verify/unpacked/source/ffunicode.c
+
+      - name: Enforce official byte match
+        if: always()
+        run: test "${{ steps.verify.outcome }}" = success
