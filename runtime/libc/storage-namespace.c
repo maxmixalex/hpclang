@@ -48,6 +48,7 @@ static FATFS namespace_fatfs;
 static struct hpclang_namespace_lease namespace_lease;
 static struct direct_fd_state direct_fds[DIRECT_FD_SLOTS];
 static uint8_t namespace_ready;
+static uint8_t namespace_media_read_only;
 
 static int set_fatfs_errno(FRESULT result)
 {
