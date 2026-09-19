@@ -206,6 +206,21 @@ static int namespace_acquire(void)
         return -1;
     }
 
+    /*
+     * KOS participates only at the ownership boundary: sample insertion and
+     * write-protect state before touching the SD controller. All namespace
+     * and byte-stream operations after this point are FatFs-backed.
+     */
+    int present = 0;
+    int read_only = 0;
+    if (hpclang_storage_stock_media_query(&present, &read_only) != 0)
+        return -1;
+    if (!present) {
+        errno = ENODEV;
+        return -1;
+    }
+    namespace_media_read_only = read_only != 0;
+
     int result = hpclang_namespace_lease_acquire(&namespace_lease);
     if (result != HPCLANG_NAMESPACE_LEASE_OK) {
         switch (result) {
@@ -779,4 +794,5 @@ void hpclang_storage_shutdown(void)
     }
 
     (void)hpclang_namespace_lease_release(&namespace_lease);
+    namespace_media_read_only = 0u;
 }
