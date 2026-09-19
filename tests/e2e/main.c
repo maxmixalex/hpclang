@@ -1367,6 +1367,55 @@ static uint32_t object_read_only_test(uint32_t model)
             return 0xa5u;
     }
 
+#ifdef HPCLANG_E2E_KEYBOARD
+    /*
+     * Canonical Stock RPL sequences place two dedicated numeric witnesses
+     * underneath the launcher object. stage1 normalizes any Launcher-V3 bias,
+     * so level 1/2 here are application-visible test objects rather than
+     * launcher state. Consume only those two objects.
+     */
+    if (live_stock_view) {
+        if (before < 2u)
+            return 0xa6u;
+
+        struct hpclang_object *popped = NULL;
+        errno = 0;
+        if (hpclang_stack_pop(&popped) != 0 || popped == NULL)
+            return 0xa7u;
+
+        enum hpclang_object_kind kind = hpclang_object_kind(popped);
+        if (kind != HPCLANG_OBJECT_INTEGER &&
+            kind != HPCLANG_OBJECT_REAL) {
+            hpclang_object_release(popped);
+            return 0xa8u;
+        }
+        hpclang_object_release(popped);
+
+        uint32_t after_pop = UINT32_MAX;
+        if (hpclang_stack_depth(&after_pop) != 0 ||
+            after_pop != before - 1u)
+            return 0xa9u;
+
+        if (hpclang_stack_drop(1u) != 0)
+            return 0xaau;
+
+        uint32_t after_drop = UINT32_MAX;
+        if (hpclang_stack_depth(&after_drop) != 0 ||
+            after_drop != before - 2u)
+            return 0xabu;
+    } else {
+        struct hpclang_object *popped = NULL;
+        errno = 0;
+        if (hpclang_stack_pop(&popped) != -1 ||
+            popped != NULL || errno != ENOSYS)
+            return 0xacu;
+
+        errno = 0;
+        if (hpclang_stack_drop(1u) != -1 || errno != ENOSYS)
+            return 0xadu;
+    }
+#endif
+
     return 0u;
 }
 

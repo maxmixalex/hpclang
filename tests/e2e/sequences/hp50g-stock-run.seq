@@ -2,29 +2,35 @@
 # Copy HPCLANG.HP from SD to HOME, recall the native object from File Manager,
 # return to the stack with HALT, then follow the hardware-verified library menu:
 # RS+LIB exposes ARMTo on F1, and ARMTo exposes PrRUN on F1.
-2000 chord lshift files
-4200 capture files
-4500 tap up
-4800 tap f6
-6500 capture sd
-6900 tap enter
-7200 tap down
-7600 capture sd-payload
-8000 tap f2
-9200 capture copy-destination
-9500 tap down
-9800 tap f6
-11600 capture copy-result
-12100 tap f4
-13400 capture recalled-in-filer
-13800 tap nxt
-14200 tap nxt
-15000 capture filer-halt-menu
-15400 tap f1
-16700 capture payload-recalled
-17200 chord rshift two
-18450 capture lib
-18800 tap f1
-20100 capture armtoolbox
-20500 tap f1
-20800 monitor
+# The install phase leaves Stock in RPN. Put two dedicated numeric witnesses
+# below the later recalled launcher; the M7.3 mutation witness consumes only them.
+2000 tap two
+2400 tap enter
+2800 tap two
+3200 tap enter
+4000 chord lshift files
+6200 capture files
+6500 tap up
+6800 tap f6
+8500 capture sd
+8900 tap enter
+9200 tap down
+9600 capture sd-payload
+10000 tap f2
+11200 capture copy-destination
+11500 tap down
+11800 tap f6
+13600 capture copy-result
+14100 tap f4
+15400 capture recalled-in-filer
+15800 tap nxt
+16200 tap nxt
+17000 capture filer-halt-menu
+17400 tap f1
+18700 capture payload-recalled
+19200 chord rshift two
+20450 capture lib
+20800 tap f1
+22100 capture armtoolbox
+22500 tap f1
+22800 monitor
