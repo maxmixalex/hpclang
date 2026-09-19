@@ -7,6 +7,9 @@
 
 #include "rpl-object-span.h"
 
+enum hpclang_object_kind hpclang_object_kind_from_native_prologue(
+    uint32_t prologue);
+
 struct hpclang_object {
     uint32_t kind;
     uint32_t nibble_count;
