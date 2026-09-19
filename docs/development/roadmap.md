@@ -252,10 +252,10 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**Planned after the M7.2 filesystem namespace/metadata core is stable.**
+**In progress.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md); implementation begins with the private Saturn view and read-only object snapshots.
 
-- [ ] define opaque Saturn address/object references; never expose Saturn addresses as ordinary ARM pointers;
-- [ ] design copy/borrow/ownership/error rules for calculator objects before freezing public handles;
+- [x] define the boundary: public objects are opaque owned snapshots; runtime Saturn nibble addresses remain an explicit private type and never ordinary ARM pointers;
+- [x] define copy/borrow/ownership/error rules: M7.3 returns owned immutable snapshots, exposes no public borrowed Stock-memory aliases, and requires failure-safe stack/store mutations;
 - [ ] implement the HP39 typed object-store path for named Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records;
 - [ ] implement HP48/49/50 RPL object exchange against the stock object namespace without flattening objects into byte-stream files;
 - [ ] add stack read/push/pop/replace operations where the platform meaning is real and safely restorable;
