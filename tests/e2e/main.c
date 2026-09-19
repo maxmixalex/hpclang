@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <fsystem.h>
+#include <hpstdio.h>
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
@@ -698,6 +700,99 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x51u;
     if (errno != ENOENT)
         return 0x52u;
+
+    /*
+     * Representative HPGCC fsystem source-adapter flow. This intentionally
+     * uses the historical names/FS_FILE fields while all actual I/O remains
+     * on the same hpclang-owned FatFs namespace.
+     */
+    FS_FILE *legacy_file = NULL;
+    if (FSOpen("HPCLANG.TST", FSMODE_READ, &legacy_file) != FS_OK ||
+        legacy_file == NULL)
+        return 0x80u;
+
+    memset(buffer, 0, sizeof(buffer));
+    int legacy_read = FSRead(
+        buffer, (int)(sizeof(input_expected) - 1u), legacy_file);
+    if (legacy_read != (int)(sizeof(input_expected) - 1u) ||
+        memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0 ||
+        FSTell(legacy_file) != (int)(sizeof(input_expected) - 1u) ||
+        FSFileLength(legacy_file) != (int)(sizeof(input_expected) - 1u))
+        return 0x81u;
+
+    struct tm legacy_time;
+    FSGetWriteTime(legacy_file, &legacy_time);
+    if (legacy_time.tm_year != 124 ||
+        legacy_time.tm_mon != 0 ||
+        legacy_time.tm_mday != 2 ||
+        legacy_time.tm_hour != 3 ||
+        legacy_time.tm_min != 4 ||
+        legacy_time.tm_sec != 6 ||
+        FSClose(legacy_file) != FS_OK)
+        return 0x82u;
+
+    legacy_file = NULL;
+    if (FSCreate("HPCLANG.CMP", FSATTR_ARCHIVE, &legacy_file) != FS_OK ||
+        legacy_file == NULL ||
+        FSWrite("legacy", 6, legacy_file) != 6 ||
+        FSClose(legacy_file) != FS_OK)
+        return 0x83u;
+
+    legacy_file = NULL;
+    if (FSOpen("HPCLANG.CMP", FSMODE_READ, &legacy_file) != FS_OK ||
+        legacy_file == NULL)
+        return 0x84u;
+    memset(buffer, 0, sizeof(buffer));
+    if (FSRead(buffer, 6, legacy_file) != 6 ||
+        memcmp(buffer, "legacy", 6u) != 0 ||
+        FSClose(legacy_file) != FS_OK)
+        return 0x85u;
+
+    if (FSMkdir("CMPDIR") != FS_OK ||
+        FSRename("HPCLANG.CMP", "CMPDIR/Legacy Long Name.txt") != FS_OK)
+        return 0x86u;
+
+    FS_FILE *legacy_dir = NULL;
+    if (FSOpenDir("CMPDIR", &legacy_dir) != FS_OK || legacy_dir == NULL)
+        return 0x87u;
+
+    int legacy_found = 0;
+    for (;;) {
+        FS_FILE legacy_entry;
+        int legacy_next = FSGetNextEntry(&legacy_entry, legacy_dir);
+        if (legacy_next == FS_EOF)
+            break;
+        if (legacy_next != FS_OK) {
+            (void)FSClose(legacy_dir);
+            return 0x88u;
+        }
+
+        if (legacy_entry.Name != NULL &&
+            strcmp(legacy_entry.Name, "Legacy Long Name.txt") == 0) {
+            if (legacy_entry.FileSize != 6u ||
+                (FSAttr(&legacy_entry) & FSATTR_DIR) != 0) {
+                FSReleaseEntry(&legacy_entry);
+                (void)FSClose(legacy_dir);
+                return 0x89u;
+            }
+            legacy_found = 1;
+        }
+        FSReleaseEntry(&legacy_entry);
+    }
+
+    if (!legacy_found || FSClose(legacy_dir) != FS_OK)
+        return 0x8au;
+    if (!FSVolumeMounted(0) || FSVolumeInserted(0) != FS_OK ||
+        FSGetCurrentVolume() != 0 || FSSetCurrentVolume(1) != FS_BADVOLUME)
+        return 0x8bu;
+    if (!FSNameCompare("Name.TXT", "name.txt", FSCASE_INSENS) ||
+        FSNameCompare("Name.TXT", "name.txt", FSCASE_SENS))
+        return 0x8cu;
+
+    if (FSRename("CMPDIR/Legacy Long Name.txt", "HPCLANG.CMP") != FS_OK ||
+        FSRmdir("CMPDIR") != FS_OK ||
+        fdelete("HPCLANG.CMP") != 0)
+        return 0x8du;
 
     /*
      * Direct namespace ownership remains coherent through ordinary stream
