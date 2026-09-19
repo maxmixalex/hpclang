@@ -68,6 +68,16 @@ target_include_directories(test_object_snapshot PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(object_store
+    test_object_store.c
+    "${HPCLANG_ROOT}/runtime/core/object-store.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_store PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object
     test_object.c
     "${HPCLANG_ROOT}/runtime/core/object.c"
