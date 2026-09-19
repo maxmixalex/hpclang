@@ -98,7 +98,7 @@ static void test_home_and_current(void)
 
     assert(hpclang_rpl_store_current_object(&reader, &object) ==
            HPCLANG_RPL_STORE_OK);
-    assert(object == 0x82108u);
+    assert(object == 0x8210au);
 
     uint8_t path[64];
     uint32_t bytes = 0u;
@@ -141,7 +141,7 @@ static void test_enumeration_and_find(void)
                &reader, 0x82000u,
                (const uint8_t *)"SUB", 3u, &entry) ==
            HPCLANG_RPL_STORE_OK);
-    assert(entry.object_address == 0x82108u);
+    assert(entry.object_address == 0x8210au);
 
     assert(hpclang_rpl_directory_find(
                &reader, 0x82000u,
