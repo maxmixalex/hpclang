@@ -135,7 +135,7 @@ The focused Storage payload covers:
 - final stream access before runtime teardown;
 - deterministic `ENOSYS` for HP39/40 and HP48 byte-stream operations.
 
-Storage #22 (`35378151818`) remains the historical M7.2b evidence for the earlier KOS-backed metadata/stream bridge. Storage #23 independently established the Stock `ResetSD` reinitialization half. The later M7.2c runs, culminating in Storage #30 before the final first-use unification refactor, validate the direct SDIO/FatFs backend, owned iterators, namespace mutation, capacity and process-wide lease on Direct hp4950 and HP49g+/HP50g Stock. The current branch keeps the same backend and test flows while removing the remaining ordinary KOS file-I/O path.
+Storage #22 (`35378151818`) remains the historical M7.2b evidence for the earlier KOS-backed metadata/stream bridge. Storage #23 independently established the Stock `ResetSD` reinitialization half. The later M7.2c runs, culminating in Storage #30, established the direct SDIO/FatFs backend, owned iterators, namespace mutation, capacity and process-wide lease. Final M7.2 closure is **Storage #53 (`35428824540`)** on `c4b827fe`: Build, Direct hp39/hp48/hp4950 and Stock hp4950 all pass after ordinary KOS file I/O is removed, mounted-volume capacity replaces whole-card capacity, the HPGCC filesystem adapter flow is exercised, and POSIX `ftruncate()` extension is zero-filled. **Core #254 (`35428824495`)** also passes on the same head.
 
 The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06`; only the resulting FAT last-modified civil fields are public. Creation/access timestamp semantics remain outside the public contract.
 
