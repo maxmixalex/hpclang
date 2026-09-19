@@ -214,7 +214,7 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | legacy screen helpers | display service | mixed | M8/later |
 | time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
 | standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
-| HPGCC2/3 `FS*` | future adapter above storage/object services | Migration/Adapter | later |
+| HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented, final gate pending |
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3/M8 |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `win*` widgets | future UI toolkit | Migration, adapter later | later |
