@@ -22,6 +22,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/saturn-view.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-object-span.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stack-view.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-snapshot.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-key-map.c"
