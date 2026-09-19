@@ -753,12 +753,22 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x85u;
 
     if (FSMkdir("CMPDIR") != FS_OK ||
-        FSRename("HPCLANG.CMP", "CMPDIR/Legacy Long Name.txt") != FS_OK)
+        FSChdir("CMPDIR") != FS_OK)
         return 0x86u;
 
-    FS_FILE *legacy_dir = NULL;
-    if (FSOpenDir("CMPDIR", &legacy_dir) != FS_OK || legacy_dir == NULL)
+    char *legacy_cwd = FSGetcwd(0);
+    if (legacy_cwd == NULL || strcmp(legacy_cwd, "\\CMPDIR") != 0) {
+        free(legacy_cwd);
         return 0x87u;
+    }
+    free(legacy_cwd);
+
+    if (FSRename("/HPCLANG.CMP", "Legacy Long Name.txt") != FS_OK)
+        return 0x88u;
+
+    FS_FILE *legacy_dir = NULL;
+    if (FSOpenDir(".", &legacy_dir) != FS_OK || legacy_dir == NULL)
+        return 0x89u;
 
     int legacy_found = 0;
     for (;;) {
@@ -768,7 +778,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             break;
         if (legacy_next != FS_OK) {
             (void)FSClose(legacy_dir);
-            return 0x88u;
+            return 0x8au;
         }
 
         if (legacy_entry.Name != NULL &&
@@ -777,7 +787,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
                 (FSAttr(&legacy_entry) & FSATTR_DIR) != 0) {
                 FSReleaseEntry(&legacy_entry);
                 (void)FSClose(legacy_dir);
-                return 0x89u;
+                return 0x8bu;
             }
             legacy_found = 1;
         }
@@ -785,18 +795,29 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     }
 
     if (!legacy_found || FSClose(legacy_dir) != FS_OK)
-        return 0x8au;
+        return 0x8cu;
+    if (FSChdir("/") != FS_OK)
+        return 0x8du;
     if (!FSVolumeMounted(0) || FSVolumeInserted(0) != FS_OK ||
         FSGetCurrentVolume() != 0 || FSSetCurrentVolume(1) != FS_BADVOLUME)
-        return 0x8bu;
+        return 0x8eu;
     if (!FSNameCompare("Name.TXT", "name.txt", FSCASE_INSENS) ||
-        FSNameCompare("Name.TXT", "name.txt", FSCASE_SENS))
-        return 0x8cu;
+        FSNameCompare("Name.TXT", "name.txt", FSCASE_SENS) ||
+        !FSNameCompare("Name.TXT;;", "Name.TXT", FSCASE_SENSHP))
+        return 0x8fu;
+
+    int hp_name = FSGetNameType(":3:dir/file.txt");
+    if (hp_name < 0 ||
+        (hp_name & (FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_HASPATH)) !=
+            (FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_HASPATH) ||
+        (hp_name >> 16) != 1 ||
+        FSGetNameType("C:\\dir\\\\file") != FSNAME_INVALID)
+        return 0x90u;
 
     if (FSRename("CMPDIR/Legacy Long Name.txt", "HPCLANG.CMP") != FS_OK ||
         FSRmdir("CMPDIR") != FS_OK ||
         fdelete("HPCLANG.CMP") != 0)
-        return 0x8du;
+        return 0x91u;
 
     /*
      * Direct namespace ownership remains coherent through ordinary stream
