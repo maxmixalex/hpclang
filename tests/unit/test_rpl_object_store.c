@@ -66,7 +66,7 @@ static void prepare_tree(void)
     const uint32_t item_a = 0x82200u;
 
     put_nibbles(USEROB, home, 5u);
-    put_nibbles(CONTEXT, 0x82108u, 5u);
+    put_nibbles(CONTEXT, 0x8210au, 5u);
     put_nibbles(home, DORRP, 5u);
     put_nibbles(home + 5u, 0u, 3u);
     put_nibbles(home_chain, item_a - home_chain, 5u);
@@ -76,7 +76,7 @@ static void prepare_tree(void)
     put_nibbles(item_a - 5u, item_a - item_b - 5u, 5u);
 
     uint32_t object_b = put_item(item_b, "SUB", DORRP);
-    assert(object_b == 0x82108u);
+    assert(object_b == 0x8210au);
     put_nibbles(item_b - 5u, 0u, 5u);
 
     const uint32_t sub_chain = object_b + 8u;
@@ -154,7 +154,7 @@ static void test_malformed_chain(void)
     prepare_tree();
 
     /* First link points forward to A; make A's next link point forward again. */
-    put_nibbles(0x82200u - 5u, 1u, 5u);
+    put_nibbles(0x82200u - 5u, 0x82200u, 5u);
 
     struct hpclang_rpl_directory_cursor cursor;
     assert(hpclang_rpl_directory_cursor_open(
