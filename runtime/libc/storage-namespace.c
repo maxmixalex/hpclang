@@ -466,6 +466,8 @@ off_t hpclang_namespace_lseek(int fd, off_t offset, int whence)
 
 int hpclang_namespace_ftruncate(int fd, off_t length)
 {
+    static const BYTE zeroes[512] = { 0 };
+
     struct direct_fd_state *slot = direct_fd_from_number(fd);
     if (slot == NULL) {
         errno = EBADF;
@@ -476,18 +478,55 @@ int hpclang_namespace_ftruncate(int fd, off_t length)
         return -1;
     }
 
-    FRESULT fr = f_lseek(&slot->file, (FSIZE_t)length);
-    if (fr != FR_OK)
-        return set_fatfs_errno(fr);
+    FSIZE_t target = (FSIZE_t)length;
+    FSIZE_t original_size = f_size(&slot->file);
+    FRESULT fr;
 
-    fr = f_truncate(&slot->file);
-    if (fr != FR_OK)
-        return set_fatfs_errno(fr);
+    if (target <= original_size) {
+        fr = f_lseek(&slot->file, target);
+        if (fr != FR_OK)
+            return set_fatfs_errno(fr);
+
+        fr = f_truncate(&slot->file);
+        if (fr != FR_OK)
+            return set_fatfs_errno(fr);
+    } else {
+        /*
+         * FatFs can stretch a writable file by seeking beyond EOF, but the
+         * newly allocated range is not specified to be zero-filled. POSIX
+         * ftruncate() requires reads from the extended range to return zero,
+         * so materialize that range explicitly.
+         */
+        fr = f_lseek(&slot->file, original_size);
+        if (fr != FR_OK)
+            return set_fatfs_errno(fr);
+
+        FSIZE_t remaining = target - original_size;
+        while (remaining != 0u) {
+            UINT chunk = remaining > sizeof(zeroes)
+                ? (UINT)sizeof(zeroes)
+                : (UINT)remaining;
+            UINT written = 0u;
+            fr = f_write(&slot->file, zeroes, chunk, &written);
+            if (fr != FR_OK || written != chunk) {
+                /*
+                 * Best-effort rollback keeps an ENOSPC/I/O failure from
+                 * silently leaving a successful-looking larger file.
+                 */
+                (void)f_lseek(&slot->file, original_size);
+                (void)f_truncate(&slot->file);
+                if (fr != FR_OK)
+                    return set_fatfs_errno(fr);
+                errno = ENOSPC;
+                return -1;
+            }
+            remaining -= written;
+        }
+    }
 
     /*
-     * POSIX ftruncate() does not change the logical file offset. The FatFs
-     * object had to seek to the truncation point internally; read/write will
-     * resynchronize the physical FatFs position from slot->position.
+     * POSIX ftruncate() does not change the logical file offset. FatFs had to
+     * move its internal pointer; read/write resynchronize it from slot->position.
      */
     return 0;
 }
