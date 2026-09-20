@@ -120,15 +120,19 @@ enum {
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
     HP39P_MISS_NIBBLE = 160u,
     HP39P_MISS_NIBBLES = 10u,
-    HP39P_STATIC_NIBBLES = HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES,
+    HP39P_APLETVARS_NIBBLE = 170u,
+    HP39P_APLETVARS_NIBBLES = 35u,
+    HP39P_STATIC_NIBBLES =
+        HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
 _Static_assert(
     HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
+    HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
-    "HP39 Saturn portal request and miss sentinel must fit its private buffer");
+    "HP39 Saturn portal request helpers must fit its private buffer");
 
 struct hp39_saturn_builder {
     uint8_t *bytes;
@@ -279,6 +283,15 @@ static int hp39_request_words(
             *operation = UINT32_C(0x000281c7); /* CatPgm */
         else
             *operation = UINT32_C(0x00028154); /* CatNot */
+        return 1;
+    }
+
+    if (kind == HP39P_VARIABLE_SCHEMA && name_length == 0u) {
+        *arg = nop;
+        *operation = saturn_base + HP39P_APLETVARS_NIBBLE;
+        *pack = nop;
+        *normalize = nop;
+        *expected_prologue = UINT32_C(0x00002a74); /* DOLIST */
         return 1;
     }
 
@@ -506,6 +519,37 @@ static int hp39_portal_prepare_thunk(
             HP39P_MISS_NIBBLE + 5u,
             5u))
         return 0;
+
+    /*
+     * Current-Aplet variable schema helper:
+     *   :: tTYPE@ CARCOMP EIGHT PTYPE>PINFO DROP ;
+     *
+     * HPGCC39 =Head39.h defines ApletVars#=EIGHT. Stock uses the same
+     * tTYPE@ -> CARCOMP -> property-index -> PTYPE>PINFO protocol for
+     * ApletReset#=NINE at bank-7 logical 0x73D1C. Keep this helper in the
+     * private thunk so computed third-party Topic Type properties are honored
+     * exactly like built-in ones.
+     */
+    static const uint32_t aplet_vars_words[] = {
+        UINT32_C(0x00002d9d), /* DOCOL */
+        UINT32_C(0x00026f7f), /* tTYPE@ */
+        UINT32_C(0x00005842), /* CARCOMP */
+        UINT32_C(0x00004099), /* EIGHT */
+        UINT32_C(0x000347cc), /* PTYPE>PINFO */
+        UINT32_C(0x00003244), /* DROP */
+        UINT32_C(0x0000312b), /* SEMI */
+    };
+    for (uint32_t i = 0u;
+         i < (uint32_t)(sizeof(aplet_vars_words) /
+                        sizeof(aplet_vars_words[0]));
+         ++i) {
+        if (!hp39_saturn_buffer_store_word5(
+                hp39_saturn_portal_thunk,
+                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                HP39P_APLETVARS_NIBBLE + i * 5u,
+                aplet_vars_words[i]))
+            return 0;
+    }
 
     hpclang_cache_clean(
         hp39_saturn_portal_thunk,

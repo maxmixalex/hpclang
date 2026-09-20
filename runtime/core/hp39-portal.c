@@ -124,6 +124,46 @@ int hpclang_hp39_portal_roundtrip(void)
         &prologue);
 }
 
+int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    uint32_t address = 0u;
+    uint32_t prologue = 0u;
+    if (hp39_portal_result(
+            HP39P_VARIABLE_SCHEMA,
+            NULL,
+            0u,
+            HP39_RPL_DOLIST,
+            &address,
+            &prologue) != 0)
+        return -1;
+
+    if (hpclang_object_snapshot_copy(
+            &hp39_stock_reader,
+            address,
+            HP39_SATURN_LIMIT - address,
+            object) != 0)
+        return -1;
+    if (*object == NULL ||
+        hpclang_object_kind(*object) != HPCLANG_OBJECT_LIST) {
+        hpclang_object_release(*object);
+        *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
+}
+
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
 {
     if (!hp39_live_stock_available()) {
