@@ -12,6 +12,7 @@
 #define HP39_RPL_DOROMP UINT32_C(0x00002e92)
 #define HP39_RPL_DOBINT UINT32_C(0x00002911)
 #define HP39_RPL_DOREAL UINT32_C(0x00002933)
+#define HP39_RPL_DOARRY UINT32_C(0x000029e8)
 #define HP39_RPL_SEMI UINT32_C(0x0000312b)
 
 struct hp39_function_field_schema {
@@ -94,6 +95,10 @@ struct hp39_function_variable_schema {
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
       HPCLANG_HP39_FUNCTION_VARIABLE_BINT_UNCOERCE, field_, 0u }
+#define HP39_VAR_REAL_ARRAY_LIST(category_, name_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST, UINT8_MAX, 0u }
 #define HP39_VAR_FLAG(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
@@ -121,9 +126,12 @@ struct hp39_function_variable_schema {
  * NumType is also inverted: TBBuildBit set means Build Your Own, while the
  * published value is 0 for Build Your Own and 1 for Automatic.
  *
- * Similar-looking storage is deliberately not enough evidence: PageNum/Page,
- * NoteText, NumIndep and F0..F9 stay unresolved until their Stock value
- * semantics are mechanically closed.
+ * NumIndep is the proven exception to direct fixed-field projection: its
+ * Stock getter reads funcCache@ (LastBut3), enumerates the one-dimensional
+ * DOREAL array and rebuilds a DOLIST. The LIST setter path accepts values only
+ * when every element is a REAL, converts them to that same vector
+ * representation, and replaces funcCache. Similar-looking storage is still
+ * not enough evidence for PageNum/Page, NoteText or F0..F9.
  */
 static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_UNRESOLVED("Sketch", "PageNum"),
@@ -135,7 +143,7 @@ static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_DIRECT("Numeric", "NumStep", 23u),
     HP39_VAR_DIRECT("Numeric", "NumStart", 22u),
     HP39_VAR_BINT("Numeric", "NumRow", 26u),
-    HP39_VAR_UNRESOLVED("Numeric", "NumIndep"),
+    HP39_VAR_REAL_ARRAY_LIST("Numeric", "NumIndep"),
     HP39_VAR_FLAG("Numeric", "NumFont", 25u, 1u),
     HP39_VAR_BINT("Numeric", "NumCol", 27u),
     HP39_VAR_BINT("Numeric", "Format", 31u),
@@ -190,6 +198,7 @@ _Static_assert(
 #undef HP39_VAR_UNRESOLVED
 #undef HP39_VAR_DIRECT
 #undef HP39_VAR_BINT
+#undef HP39_VAR_REAL_ARRAY_LIST
 #undef HP39_VAR_FLAG
 #undef HP39_VAR_FLAG_NOT
 
@@ -403,6 +412,204 @@ int hpclang_hp39_function_field_snapshot(
         object);
 }
 
+struct hp39_real_array_list_reader {
+    const struct hpclang_rpl_reader *source;
+    uint32_t element_base;
+    uint32_t element_count;
+    uint32_t nibble_count;
+};
+
+static int hp39_function_func_cache(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    uint32_t *object_address)
+{
+    if (object_address == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object_address = 0u;
+
+    uint32_t entry_count = 0u;
+    if (hp39_function_entry_count_and_type(
+            reader, aplet_object, &entry_count) != 0)
+        return -1;
+    if (entry_count < 3u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    struct hpclang_rpl_directory_cursor cursor;
+    int result = hpclang_rpl_directory_cursor_open(
+        reader, aplet_object, &cursor);
+    if (result != HPCLANG_RPL_STORE_OK) {
+        errno = result == HPCLANG_RPL_STORE_UNAVAILABLE ? EIO : EILSEQ;
+        return -1;
+    }
+
+    struct hpclang_rpl_directory_entry_view entry = { 0u };
+    for (uint32_t ordinal = 0u; ordinal < 3u; ++ordinal) {
+        result = hpclang_rpl_directory_cursor_next(
+            reader, &cursor, &entry);
+        if (result <= 0) {
+            errno = result < 0 ? EILSEQ : ENOENT;
+            return -1;
+        }
+    }
+
+    /*
+     * HPGCC39/Stock define funcCache@ as LastBut3. Directory cursor order is
+     * newest to oldest, so the third entry is the cache object.
+     */
+    if (entry.name_length != 0u || entry.prologue != HP39_RPL_DOARRY) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    *object_address = entry.object_address;
+    return 0;
+}
+
+static int hp39_function_func_cache_elements(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    uint32_t *element_base,
+    uint32_t *element_count)
+{
+    if (element_base == NULL || element_count == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *element_base = 0u;
+    *element_count = 0u;
+
+    uint32_t cache = 0u;
+    if (hp39_function_func_cache(
+            reader, aplet_object, &cache) != 0)
+        return -1;
+    if (cache > HP39_SATURN_LIMIT - 25u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t length = 0u;
+    uint32_t element_type = 0u;
+    uint32_t dimensions = 0u;
+    uint32_t count = 0u;
+    if (!hp39_read_word(reader, cache + 5u, 5u, &length) ||
+        !hp39_read_word(reader, cache + 10u, 5u, &element_type) ||
+        !hp39_read_word(reader, cache + 15u, 5u, &dimensions) ||
+        !hp39_read_word(reader, cache + 20u, 5u, &count)) {
+        errno = EIO;
+        return -1;
+    }
+
+    /*
+     * Stock's LIST->funcCache conversion constructs a one-dimensional DOREAL
+     * generalized array. DOARRY stores one common prologue followed by
+     * prologue-less 16-nibble DOREAL bodies.
+     */
+    if (element_type != HP39_RPL_DOREAL || dimensions != 1u ||
+        count > (HP39_SATURN_LIMIT - 25u) / 16u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t total = 25u + count * 16u;
+    if (length != total - 5u ||
+        total > HP39_SATURN_LIMIT - cache) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    *element_base = cache + 25u;
+    *element_count = count;
+    return 0;
+}
+
+static int hp39_real_array_list_read(
+    void *context,
+    uint32_t address,
+    uint8_t *value)
+{
+    struct hp39_real_array_list_reader *view =
+        (struct hp39_real_array_list_reader *)context;
+    if (view == NULL || view->source == NULL ||
+        view->source->read_nibble == NULL || value == NULL ||
+        address >= view->nibble_count)
+        return 0;
+
+    if (address < 5u) {
+        *value = (uint8_t)(
+            (HP39_RPL_DOLIST >> (address * 4u)) & 0x0fu);
+        return 1;
+    }
+
+    uint32_t offset = address - 5u;
+    uint32_t element_nibbles = view->element_count * 21u;
+    if (offset < element_nibbles) {
+        uint32_t index = offset / 21u;
+        uint32_t within = offset % 21u;
+        if (within < 5u) {
+            *value = (uint8_t)(
+                (HP39_RPL_DOREAL >> (within * 4u)) & 0x0fu);
+            return 1;
+        }
+
+        return view->source->read_nibble(
+            view->source->context,
+            view->element_base + index * 16u + within - 5u,
+            value);
+    }
+
+    offset -= element_nibbles;
+    if (offset < 5u) {
+        *value = (uint8_t)(
+            (HP39_RPL_SEMI >> (offset * 4u)) & 0x0fu);
+        return 1;
+    }
+    return 0;
+}
+
+static int hp39_function_num_indep_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    struct hpclang_object **object)
+{
+    uint32_t element_base = 0u;
+    uint32_t element_count = 0u;
+    if (hp39_function_func_cache_elements(
+            reader,
+            aplet_object,
+            &element_base,
+            &element_count) != 0)
+        return -1;
+
+    if (element_count > (UINT32_MAX - 10u) / 21u) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+
+    struct hp39_real_array_list_reader view = {
+        .source = reader,
+        .element_base = element_base,
+        .element_count = element_count,
+        .nibble_count = 10u + element_count * 21u,
+    };
+    struct hpclang_rpl_reader list_reader = {
+        .read_nibble = hp39_real_array_list_read,
+        .context = &view,
+    };
+
+    /*
+     * Reproduce the Stock getter without numeric conversion: each compact
+     * DOREAL payload is wrapped with its prologue and the sequence is closed
+     * by SEMI, yielding the same owned LIST while preserving every BCD nibble.
+     */
+    return hpclang_object_snapshot_copy(
+        &list_reader, 0u, view.nibble_count, object);
+}
+
 struct hp39_inline_buffer {
     uint8_t nibbles[21];
     uint32_t nibble_count;
@@ -511,7 +718,7 @@ static void hp39_function_variable_projection_copy(
     projection->name_length = schema->name_length;
     projection->kind = schema->kind;
     projection->fixed_field_index =
-        schema->kind == HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED
+        schema->fixed_field_index == UINT8_MAX
             ? HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD
             : (uint32_t)schema->fixed_field_index;
     projection->mask = schema->mask;
@@ -600,6 +807,11 @@ int hpclang_hp39_function_variable_snapshot(
             aplet_object,
             projection.fixed_field_index,
             object);
+
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST)
+        return hp39_function_num_indep_snapshot(
+            reader, aplet_object, object);
 
     struct hpclang_hp39_function_field_view field;
     if (hpclang_hp39_function_field_at(

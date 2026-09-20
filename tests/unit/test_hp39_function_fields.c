@@ -7,6 +7,7 @@
 #include <hpclang/object.h>
 
 #include "hp39-function-fields.h"
+#include "object-snapshot.h"
 
 #define FIXTURE_NIBBLES 0x100000u
 #define RPL_DORRP UINT32_C(0x00002a96)
@@ -14,6 +15,7 @@
 #define RPL_DOROMP UINT32_C(0x00002e92)
 #define RPL_DOREAL UINT32_C(0x00002933)
 #define RPL_DOBINT UINT32_C(0x00002911)
+#define RPL_DOARRY UINT32_C(0x000029e8)
 #define RPL_SEMI UINT32_C(0x0000312b)
 #define RPL_USEROB UINT32_C(0x00080711)
 
@@ -92,6 +94,50 @@ static uint32_t put_null_field(
     return object + 10u;
 }
 
+static void put_real_body(
+    struct fixture *fixture,
+    uint32_t address,
+    uint64_t mantissa,
+    int negative)
+{
+    put_word(fixture, address, 0u, 3u);
+    for (uint32_t i = 0u; i < 12u; ++i) {
+        fixture->nibbles[address + 3u + i] =
+            (uint8_t)(mantissa % UINT64_C(10));
+        mantissa /= UINT64_C(10);
+    }
+    fixture->nibbles[address + 15u] = negative ? 9u : 0u;
+}
+
+static uint32_t put_real_array_1d(
+    struct fixture *fixture,
+    uint32_t item)
+{
+    static const uint64_t mantissas[] = {
+        UINT64_C(100000000000),
+        UINT64_C(250000000000),
+        UINT64_C(300000000000),
+    };
+    static const int negative[] = { 0, 0, 1 };
+    const uint32_t count =
+        (uint32_t)(sizeof(mantissas) / sizeof(mantissas[0]));
+
+    put_word(fixture, item, 0u, 2u);
+    uint32_t object = item + 2u;
+    put_word(fixture, object, RPL_DOARRY, 5u);
+    put_word(fixture, object + 5u, 20u + count * 16u, 5u);
+    put_word(fixture, object + 10u, RPL_DOREAL, 5u);
+    put_word(fixture, object + 15u, 1u, 5u);
+    put_word(fixture, object + 20u, count, 5u);
+    for (uint32_t i = 0u; i < count; ++i)
+        put_real_body(
+            fixture,
+            object + 25u + i * 16u,
+            mantissas[i],
+            negative[i]);
+    return object + 25u + count * 16u;
+}
+
 int main(void)
 {
     static struct fixture fixture;
@@ -120,6 +166,7 @@ int main(void)
     uint32_t item = root + 18u;
     uint32_t previous_item = item;
     uint32_t field_objects[HPCLANG_HP39_FUNCTION_FIXED_FIELD_COUNT] = { 0u };
+    uint32_t tail_objects[5] = { 0u };
 
     put_word(&fixture, RPL_USEROB, home, 5u);
     put_word(&fixture, home, RPL_DORRP, 5u);
@@ -146,12 +193,18 @@ int main(void)
         previous_item = item;
     }
 
-    /* Native Function carries five larger sections after its fixed prefix. */
+    /*
+     * Native Function carries five larger sections after its fixed prefix.
+     * funcCache@ is LastBut3, hence the middle (tail_objects[2]) object.
+     */
     for (uint32_t i = 0u; i < 5u; ++i) {
         uint32_t link = end;
         item = link + 5u;
         put_word(&fixture, link, link - previous_item, 5u);
-        end = put_null_field(&fixture, item, RPL_DOLIST, 0u);
+        tail_objects[i] = item + 2u;
+        end = i == 2u
+            ? put_real_array_1d(&fixture, item)
+            : put_null_field(&fixture, item, RPL_DOLIST, 0u);
         previous_item = item;
     }
     put_word(&fixture, root + 8u, previous_item - (root + 8u), 5u);
@@ -421,8 +474,18 @@ int main(void)
                &projection) == -1);
     assert(errno == ENOENT);
 
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumIndep",
+               sizeof("NumIndep") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST);
+    assert(projection.fixed_field_index ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD);
+
     object = NULL;
-    errno = 0;
     assert(hpclang_hp39_function_variable_snapshot(
                &reader,
                root,
@@ -430,9 +493,72 @@ int main(void)
                sizeof("Numeric") - 1u,
                (const uint8_t *)"NumIndep",
                sizeof("NumIndep") - 1u,
+               &object) == 0);
+    assert(object != NULL);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIST);
+    assert(object->nibble_count == 10u + 3u * 21u);
+
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        uint32_t out = 5u + i * 21u;
+        for (uint32_t j = 0u; j < 5u; ++j) {
+            uint8_t nibble = 0xffu;
+            assert(hpclang_object_snapshot_read_nibble(
+                object, out + j, &nibble));
+            assert(nibble ==
+                (uint8_t)((RPL_DOREAL >> (j * 4u)) & 0x0fu));
+        }
+        for (uint32_t j = 0u; j < 16u; ++j) {
+            uint8_t nibble = 0xffu;
+            assert(hpclang_object_snapshot_read_nibble(
+                object, out + 5u + j, &nibble));
+            assert(nibble ==
+                fixture.nibbles[tail_objects[2] + 25u + i * 16u + j]);
+        }
+    }
+    for (uint32_t j = 0u; j < 5u; ++j) {
+        uint8_t nibble = 0xffu;
+        assert(hpclang_object_snapshot_read_nibble(
+            object, 5u + 3u * 21u + j, &nibble));
+        assert(nibble ==
+            (uint8_t)((RPL_SEMI >> (j * 4u)) & 0x0fu));
+    }
+    hpclang_object_release(object);
+
+    put_word(&fixture, tail_objects[2] + 10u, RPL_DOBINT, 5u);
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Numeric", sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumIndep", sizeof("NumIndep") - 1u,
                &object) == -1);
     assert(object == NULL);
-    assert(errno == ENOTSUP);
+    assert(errno == EILSEQ);
+    put_word(&fixture, tail_objects[2] + 10u, RPL_DOREAL, 5u);
+
+    put_word(&fixture, tail_objects[2] + 15u, 2u, 5u);
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Numeric", sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumIndep", sizeof("NumIndep") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == EILSEQ);
+    put_word(&fixture, tail_objects[2] + 15u, 1u, 5u);
+
+    put_word(&fixture, tail_objects[2] + 5u, 21u + 3u * 16u, 5u);
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Numeric", sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumIndep", sizeof("NumIndep") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == EILSEQ);
+    put_word(&fixture, tail_objects[2] + 5u, 20u + 3u * 16u, 5u);
 
     errno = 0;
     assert(hpclang_hp39_function_variable_projection_find(
