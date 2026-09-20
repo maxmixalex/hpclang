@@ -85,18 +85,18 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * The synthetic program deliberately has no application-visible RPL effect:
  *
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
- *   colon:   DOCOL arg op pack normalize finalize SEMI
+ *   colon:   DOCOL arg op pack normalize finalize post fallback SEMI
  *   return:  -> DOCODE
  *   DOCODE:  restore C.W; ARMSYS
  *
- * Five threaded cells are patched before each trip while HPC mappings are
+ * Seven threaded cells are patched before each trip while HPC mappings are
  * still active:
- *   Aplet catalog   = NOP ; GetApDirList ; NOP  ; NOP ; NOP
- *   Program catalog = NOP ; CatPgm       ; {}N  ; NOP ; NOP
- *   Note catalog    = NOP ; CatNot       ; {}N  ; NOP ; NOP
- *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP
- *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP
- *   Variable value  = ' ; PTR(local extended ID) ; @ ; ?SKIP ; PTR(miss DOCSTR)
+ *   Aplet catalog   = NOP ; GetApDirList ; NOP ; NOP ; NOP ; NOP ; NOP
+ *   Program catalog = NOP ; CatPgm ; {}N ; NOP ; NOP ; NOP ; NOP
+ *   Note catalog    = NOP ; CatNot ; {}N ; NOP ; NOP ; NOP ; NOP
+ *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP ; NOP ; NOP
+ *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP ; NOP ; NOP
+ *   Variable value  = ' ; PTR(local extended ID) ; ' ; recall-word ; EVAL ; ?SKIP ; PTR(miss DOCSTR)
  * Catalog requests return one DOLIST. Body requests return one DOCSTR; an
  * absent name returns a private thunk-local sentinel whose Saturn address is
  * distinguishable from a real, possibly empty, Stock body. The result remains
@@ -115,11 +115,13 @@ enum {
     HP39P_PACK_NIBBLE = 43u,
     HP39P_NORMALIZE_NIBBLE = 48u,
     HP39P_FINALIZE_NIBBLE = 53u,
-    HP39P_RETURN_NIBBLE = 63u,
-    HP39P_DOCODE_NIBBLE = 68u,
-    HP39P_C_TEMPLATE_NIBBLE = 94u,
-    HP39P_EXEC_NIBBLES = 110u,
-    HP39P_NAME_NIBBLE = 112u,
+    HP39P_POSTPROCESS_NIBBLE = 58u,
+    HP39P_FALLBACK_NIBBLE = 63u,
+    HP39P_RETURN_NIBBLE = 73u,
+    HP39P_DOCODE_NIBBLE = 78u,
+    HP39P_C_TEMPLATE_NIBBLE = 104u,
+    HP39P_EXEC_NIBBLES = 120u,
+    HP39P_NAME_NIBBLE = 120u,
     HP39P_NAME_MAX_BYTES = 255u,
     HP39P_BODY_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
@@ -271,15 +273,20 @@ static int hp39_request_words(
     uint32_t *pack,
     uint32_t *normalize,
     uint32_t *finalize,
+    uint32_t *postprocess,
+    uint32_t *fallback,
     uint32_t *expected_prologue)
 {
     if (arg == NULL || operation == NULL || pack == NULL ||
         normalize == NULL || finalize == NULL ||
+        postprocess == NULL || fallback == NULL ||
         expected_prologue == NULL)
         return 0;
 
     const uint32_t nop = UINT32_C(0x0000765c);
     *finalize = nop;
+    *postprocess = nop;
+    *fallback = nop;
 
     if (kind == HP39P_CATALOG_APLET ||
         kind == HP39P_CATALOG_PROGRAM ||
@@ -332,17 +339,25 @@ static int hp39_request_words(
         /*
          * The supplied payload is the complete HP39 extended-ID payload:
          * visible bytes followed by the native three-byte descriptor pointer.
-         * Stock's @ dispatcher expects that ID as data: xNoteText's proven
-         * recall handler begins by DROPping it before switching to the current
-         * Aplet context. Quote the local ID exactly as Stock code does, then
-         * use @ and collapse its TRUE/FALSE result to either the typed value or
-         * the private miss sentinel.
+         *
+         * A variable descriptor's recall word is itself the Stock getter.
+         * xNoteText proves the calling convention: the getter begins by
+         * DROPping the quoted ID, saves/restores CONTEXT internally and returns
+         * object TRUE | FALSE.  Quote both the local ID and the descriptor
+         * getter, then EVAL the getter so virtual #3Fxxx entries receive the
+         * native supported-entry object context.  ?SKIP normalizes the recall
+         * flag exactly like Stock callers.
+         *
+         * normalize is patched to the descriptor recall word in
+         * hpclang_hp39_portal_prepare_stock().
          */
         *arg = UINT32_C(0x00007665);       /* ' */
         *operation = saturn_base + HP39P_NAME_NIBBLE;
-        *pack = UINT32_C(0x000081d3);      /* @ -> object TRUE | FALSE */
-        *normalize = UINT32_C(0x00007903); /* ?SKIP consumes recall flag */
-        *finalize = saturn_base + HP39P_MISS_NIBBLE;
+        *pack = UINT32_C(0x00007665);      /* ' */
+        *normalize = nop;                  /* descriptor recall word */
+        *finalize = UINT32_C(0x0000775c);  /* EVAL */
+        *postprocess = UINT32_C(0x00007903); /* ?SKIP */
+        *fallback = saturn_base + HP39P_MISS_NIBBLE;
         *expected_prologue = 0u; /* typed result or private miss sentinel */
         return 1;
     }
@@ -538,12 +553,14 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     /*
-     * Synthetic colon object. The five request cells start as the safe Aplet
+     * Synthetic colon object. The seven request cells start as the safe Aplet
      * catalog sequence and are rewritten transactionally before every trip.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
@@ -786,6 +803,8 @@ int hpclang_hp39_portal_prepare_stock(void)
     uint32_t pack = 0u;
     uint32_t normalize = 0u;
     uint32_t finalize = 0u;
+    uint32_t postprocess = 0u;
+    uint32_t fallback = 0u;
     uint32_t expected_prologue = 0u;
     if (!hp39_request_words(
             portal->request_kind,
@@ -796,12 +815,34 @@ int hpclang_hp39_portal_prepare_stock(void)
             &pack,
             &normalize,
             &finalize,
+            &postprocess,
+            &fallback,
             &expected_prologue) ||
         !hp39_store_request_name(
             portal->request_kind,
             portal->request_name_length,
-            (const uint8_t *)(uintptr_t)portal->request_name) ||
-        !hp39_saturn_buffer_store_word5(
+            (const uint8_t *)(uintptr_t)portal->request_name))
+        return -7;
+
+    if (portal->request_kind == HP39P_VARIABLE_VALUE) {
+        const uint8_t *request =
+            (const uint8_t *)(uintptr_t)portal->request_name;
+        uint32_t length = portal->request_name_length;
+        if (request == NULL || length <= 3u)
+            return -7;
+        uint32_t descriptor =
+            (uint32_t)request[length - 3u] |
+            ((uint32_t)request[length - 2u] << 8u) |
+            ((uint32_t)request[length - 1u] << 16u);
+        if (descriptor == 0u ||
+            descriptor > RPL_MAIN_END - 15u ||
+            !stage_saturn_read_word5(read_map, descriptor, &normalize) ||
+            normalize == 0u ||
+            normalize >= RPL_MAIN_END)
+            return -7;
+    }
+
+    if (!hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_ARG_NIBBLE,
@@ -825,7 +866,17 @@ int hpclang_hp39_portal_prepare_stock(void)
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_FINALIZE_NIBBLE,
-            finalize))
+            finalize) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_POSTPROCESS_NIBBLE,
+            postprocess) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_FALLBACK_NIBBLE,
+            fallback))
         return -7;
 
     portal->expected_prologue = expected_prologue;
@@ -834,17 +885,19 @@ int hpclang_hp39_portal_prepare_stock(void)
         (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     uint32_t observed = 0u;
-    const uint32_t offsets[5] = {
+    const uint32_t offsets[7] = {
         HP39P_ARG_NIBBLE,
         HP39P_OPERATION_NIBBLE,
         HP39P_PACK_NIBBLE,
         HP39P_NORMALIZE_NIBBLE,
         HP39P_FINALIZE_NIBBLE,
+        HP39P_POSTPROCESS_NIBBLE,
+        HP39P_FALLBACK_NIBBLE,
     };
-    const uint32_t expected[5] = {
-        arg, operation, pack, normalize, finalize
+    const uint32_t expected[7] = {
+        arg, operation, pack, normalize, finalize, postprocess, fallback
     };
-    for (uint32_t i = 0u; i < 5u; ++i) {
+    for (uint32_t i = 0u; i < 7u; ++i) {
         if (!stage_saturn_read_word5(
                 read_map,
                 portal->saturn_entry + offsets[i],
