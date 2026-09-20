@@ -125,10 +125,10 @@ enum {
     HP39P_MISS_NIBBLES = 10u,
     HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
-    HP39P_REFERENCE_EVAL_NIBBLE = 700u,
-    HP39P_REFERENCE_EVAL_NIBBLES = 15u,
+    HP39P_REFERENCE_LIST_NIBBLE = 700u,
+    HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_STATIC_NIBBLES =
-        HP39P_REFERENCE_EVAL_NIBBLE + HP39P_REFERENCE_EVAL_NIBBLES,
+        HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -137,7 +137,7 @@ _Static_assert(
     HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
     HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
     HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
-        HP39P_REFERENCE_EVAL_NIBBLE &&
+        HP39P_REFERENCE_LIST_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
     "HP39 Saturn portal request helpers must fit its private buffer");
 _Static_assert(
@@ -306,10 +306,17 @@ static int hp39_request_words(
     }
 
     if (kind == HP39P_REFERENCE_EVAL && name_length == 3u) {
-        *arg = nop;
-        *operation = saturn_base + HP39P_REFERENCE_EVAL_NIBBLE;
-        *pack = nop;
-        *normalize = nop;
+        /*
+         * Put the referenced object on the Stock data stack first, then ask
+         * Stock EVAL to execute it. This preserves the current-object context
+         * required by the #11111 -> #3FD06 supported-entry dispatcher.
+         * Executing a #3Fxxx value directly as a hand-built threaded cell does
+         * not provide that contract.
+         */
+        *arg = saturn_base + HP39P_REFERENCE_LIST_NIBBLE;
+        *operation = UINT32_C(0x00004053); /* ONE */
+        *pack = UINT32_C(0x0000f476);      /* NTHCOMPDROP */
+        *normalize = UINT32_C(0x0000775c); /* EVAL */
         *expected_prologue = 0u;
         return 1;
     }
@@ -370,7 +377,7 @@ static int hp39_store_request_name(
             ((uint32_t)name[2] << 16u);
         if (reference == 0u || reference >= UINT32_C(0x00100000))
             return 0;
-        uint32_t patch = HP39P_REFERENCE_EVAL_NIBBLE + 5u;
+        uint32_t patch = HP39P_REFERENCE_LIST_NIBBLE + 5u;
         return hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
@@ -620,25 +627,25 @@ static int hp39_portal_prepare_thunk(
     }
 
     /*
-     * Supported-entry executor. The middle cell is patched only after runtime
-     * has read the referenced logical cell and proved its #11111 Stock
-     * supported-entry trampoline. Ordinary data/ID pointers are snapshotted
-     * directly and never executed.
+     * Supported-entry reference container. Runtime patches the middle cell
+     * only after proving the logical #3Fxxx cell carries the #11111 Stock
+     * supported-entry trampoline. The portal then extracts this element and
+     * invokes Stock EVAL, preserving the dispatcher's native object context.
      */
     if (!hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_EVAL_NIBBLE,
-            UINT32_C(0x00002d9d)) || /* DOCOL */
+            HP39P_REFERENCE_LIST_NIBBLE,
+            UINT32_C(0x00002a74)) || /* DOLIST */
         !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_EVAL_NIBBLE + 5u,
-            UINT32_C(0x0000765c)) || /* safe placeholder: NOP */
+            HP39P_REFERENCE_LIST_NIBBLE + 5u,
+            UINT32_C(0x00004053)) || /* safe placeholder: ONE */
         !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_EVAL_NIBBLE + 10u,
+            HP39P_REFERENCE_LIST_NIBBLE + 10u,
             UINT32_C(0x0000312b)))   /* SEMI */
         return 0;
 
@@ -853,7 +860,7 @@ int hpclang_hp39_portal_prepare_stock(void)
             (uint32_t)request[0] |
             ((uint32_t)request[1] << 8u) |
             ((uint32_t)request[2] << 16u);
-        uint32_t patch = HP39P_REFERENCE_EVAL_NIBBLE + 5u;
+        uint32_t patch = HP39P_REFERENCE_LIST_NIBBLE + 5u;
         uint32_t observed_reference = 0u;
         if (!stage_saturn_read_word5(
                 read_map,
