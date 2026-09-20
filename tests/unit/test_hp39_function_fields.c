@@ -109,6 +109,34 @@ static void put_real_body(
     fixture->nibbles[address + 15u] = negative ? 9u : 0u;
 }
 
+static uint32_t put_function_equations(
+    struct fixture *fixture,
+    uint32_t item)
+{
+    put_word(fixture, item, 0u, 2u);
+    uint32_t object = item + 2u;
+    put_word(fixture, object, RPL_DOLIST, 5u);
+    uint32_t cursor = object + 5u;
+
+    for (uint32_t slot = 1u; slot <= 10u; ++slot) {
+        if (slot == 4u) {
+            put_word(fixture, cursor, RPL_DOBINT, 5u);
+            put_word(fixture, cursor + 5u, 0u, 5u);
+            cursor += 10u;
+            continue;
+        }
+
+        put_word(fixture, cursor, RPL_DOREAL, 5u);
+        put_word(fixture, cursor + 5u, 0u, 3u);
+        put_word(fixture, cursor + 8u, slot, 12u);
+        put_word(fixture, cursor + 20u, 0u, 1u);
+        cursor += 21u;
+    }
+
+    put_word(fixture, cursor, RPL_SEMI, 5u);
+    return cursor + 5u;
+}
+
 static uint32_t put_real_array_1d(
     struct fixture *fixture,
     uint32_t item)
@@ -202,9 +230,12 @@ int main(void)
         item = link + 5u;
         put_word(&fixture, link, link - previous_item, 5u);
         tail_objects[i] = item + 2u;
-        end = i == 2u
-            ? put_real_array_1d(&fixture, item)
-            : put_null_field(&fixture, item, RPL_DOLIST, 0u);
+        if (i == 1u)
+            end = put_function_equations(&fixture, item);
+        else if (i == 2u)
+            end = put_real_array_1d(&fixture, item);
+        else
+            end = put_null_field(&fixture, item, RPL_DOLIST, 0u);
         previous_item = item;
     }
     put_word(&fixture, root + 8u, previous_item - (root + 8u), 5u);
@@ -559,6 +590,66 @@ int main(void)
     assert(object == NULL);
     assert(errno == EILSEQ);
     put_word(&fixture, tail_objects[2] + 5u, 20u + 3u * 16u, 5u);
+
+    static const struct {
+        const char *name;
+        uint32_t slot;
+    } function_equations[] = {
+        { "F1", 1u }, { "F2", 2u }, { "F9", 9u }, { "F0", 10u },
+    };
+    for (size_t i = 0u;
+         i < sizeof(function_equations) / sizeof(function_equations[0]);
+         ++i) {
+        assert(hpclang_hp39_function_variable_projection_find(
+                   (const uint8_t *)"Symbolic",
+                   sizeof("Symbolic") - 1u,
+                   (const uint8_t *)function_equations[i].name,
+                   strlen(function_equations[i].name),
+                   &projection) == 0);
+        assert(projection.kind ==
+            HPCLANG_HP39_FUNCTION_VARIABLE_SYMBOLIC_SLOT);
+        assert(projection.fixed_field_index ==
+            HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD);
+        assert(projection.mask == function_equations[i].slot);
+
+        object = NULL;
+        assert(hpclang_hp39_function_variable_snapshot(
+                   &reader, root,
+                   (const uint8_t *)"Symbolic", sizeof("Symbolic") - 1u,
+                   (const uint8_t *)function_equations[i].name,
+                   strlen(function_equations[i].name),
+                   &object) == 0);
+        assert(object != NULL);
+        assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+        uint8_t low_mantissa = 0xffu;
+        assert(hpclang_object_snapshot_read_nibble(
+            object, 8u, &low_mantissa));
+        assert(low_mantissa ==
+            (uint8_t)(function_equations[i].slot & 0x0fu));
+        hpclang_object_release(object);
+    }
+
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Symbolic", sizeof("Symbolic") - 1u,
+               (const uint8_t *)"F4", sizeof("F4") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == ENOENT);
+
+    put_word(&fixture, tail_objects[1], RPL_DOREAL, 5u);
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Symbolic", sizeof("Symbolic") - 1u,
+               (const uint8_t *)"F1", sizeof("F1") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == EILSEQ);
+    put_word(&fixture, tail_objects[1], RPL_DOLIST, 5u);
 
     errno = 0;
     assert(hpclang_hp39_function_variable_projection_find(
