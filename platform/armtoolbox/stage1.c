@@ -190,6 +190,14 @@ static int stage_saturn_read_nibble(
     const uint32_t *read_map,
     uint32_t address,
     uint8_t *value);
+static int stage_saturn_read_word5(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint32_t *value);
+static int stage_saturn_write_word5(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint32_t value);
 static int stage_phys_page_saturn_start(
     const uint32_t *read_map,
     uint32_t phys_page,
