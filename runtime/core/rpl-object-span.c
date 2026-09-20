@@ -43,7 +43,8 @@ enum {
 };
 
 enum {
-    RPL_MAX_RECURSION = 32u
+    RPL_MAX_RECURSION = 32u,
+    RPL_USEROB = 0x00080711u
 };
 
 static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
@@ -290,6 +291,149 @@ static int tagged_span(
     return HPCLANG_RPL_SPAN_OK;
 }
 
+/*
+ * Classic RPL directories do not carry a length field. HPGCC's
+ * sat_objgetdir()/sat_dirfindfirst()/sat_sknameup()/sat_skipob() establish the
+ * boundary: locate the newest item from the directory chain, then the end of
+ * that item's stored object is the end of the whole DORRP.
+ *
+ * HOME alone has an attached-library prefix. The null-name encoding is the
+ * native layout used by HP39's Hidden directory and by the generic store
+ * walker: [len=0][object], with no duplicate trailing length field.
+ */
+static int directory_span(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t limit,
+    uint32_t depth,
+    uint32_t *span)
+{
+    if (depth >= RPL_MAX_RECURSION)
+        return HPCLANG_RPL_SPAN_DEPTH;
+    if (limit < 13u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t home = 0u;
+    int result = read_nibbles(reader, RPL_USEROB, 5u, 5u, &home);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    uint32_t chain_offset = 5u;
+    if (address == home) {
+        uint32_t count_address = 0u;
+        uint32_t count_limit = 0u;
+        if (!address_at_offset(
+                address, chain_offset, limit,
+                &count_address, &count_limit) ||
+            count_limit < 3u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+
+        uint32_t libraries = 0u;
+        result = read_nibbles(
+            reader, count_address, 3u, count_limit, &libraries);
+        if (result != HPCLANG_RPL_SPAN_OK)
+            return result;
+        if (libraries > (UINT32_MAX - chain_offset) / 13u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        chain_offset += libraries * 13u;
+    }
+
+    if (!checked_add(chain_offset, 3u, &chain_offset) ||
+        chain_offset > limit || limit - chain_offset < 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t chain_address = 0u;
+    uint32_t chain_limit = 0u;
+    if (!address_at_offset(
+            address, chain_offset, limit,
+            &chain_address, &chain_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t newest_offset = 0u;
+    result = read_nibbles(
+        reader, chain_address, 5u, chain_limit, &newest_offset);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    if (newest_offset == 0u) {
+        if (!checked_add(chain_offset, 5u, span) || *span > limit)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        return HPCLANG_RPL_SPAN_OK;
+    }
+
+    uint32_t item_offset = 0u;
+    if (!checked_add(chain_offset, newest_offset, &item_offset) ||
+        item_offset > limit || limit - item_offset < 2u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t item_address = 0u;
+    uint32_t item_limit = 0u;
+    if (!address_at_offset(
+            address, item_offset, limit,
+            &item_address, &item_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t name_length = 0u;
+    result = read_nibbles(
+        reader, item_address, 2u, item_limit, &name_length);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+
+    uint32_t object_offset = 0u;
+    if (name_length == 0u) {
+        if (!checked_add(item_offset, 2u, &object_offset))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+    } else {
+        if (name_length > (UINT32_MAX - 4u) / 2u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t item_object_offset = 4u + name_length * 2u;
+        if (!checked_add(
+                item_offset, item_object_offset, &object_offset))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+
+        if (object_offset > limit || object_offset < 2u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t trailing_address = 0u;
+        uint32_t trailing_limit = 0u;
+        if (!address_at_offset(
+                address, object_offset - 2u, limit,
+                &trailing_address, &trailing_limit) ||
+            trailing_limit < 2u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+
+        uint32_t trailing_length = 0u;
+        result = read_nibbles(
+            reader, trailing_address, 2u,
+            trailing_limit, &trailing_length);
+        if (result != HPCLANG_RPL_SPAN_OK)
+            return result;
+        if (trailing_length != name_length)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+
+    if (object_offset > limit || limit - object_offset < 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t object_address = 0u;
+    uint32_t object_limit = 0u;
+    if (!address_at_offset(
+            address, object_offset, limit,
+            &object_address, &object_limit))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+
+    uint32_t nested = 0u;
+    result = parse_object(
+        reader, object_address, object_limit, depth + 1u, &nested);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return result;
+    if (nested == 0u || nested > object_limit)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+
+    if (!checked_add(object_offset, nested, span) || *span > limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 static int recognized_prologue(uint32_t prologue)
 {
     switch (prologue) {
@@ -463,12 +607,14 @@ static int parse_object(
     case RPL_DOTAG:
         return tagged_span(reader, address, limit, depth, span);
 
+    case RPL_DORRP:
+        return directory_span(reader, address, limit, depth, span);
+
     /*
      * Recognized prologues whose internal boundary is not yet frozen are
      * intentionally rejected rather than guessed.
      */
     case RPL_DOAPLET:
-    case RPL_DORRP:
     case RPL_DOEXT3:
     case RPL_DOEXT4:
         return HPCLANG_RPL_SPAN_UNSUPPORTED;

@@ -5,9 +5,15 @@
 
 #include "rpl-object-span.h"
 
+enum {
+    TEST_RPL_USEROB = 0x00080711u
+};
+
 struct image {
     uint8_t nibbles[512];
     uint32_t used;
+    uint32_t home;
+    int expose_home;
 };
 
 static void put_nibbles(
@@ -27,7 +33,18 @@ static void put_nibbles(
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
     struct image *image = context;
-    if (image == NULL || value == NULL || address >= image->used)
+    if (image == NULL || value == NULL)
+        return 0;
+
+    if (image->expose_home &&
+        address >= TEST_RPL_USEROB &&
+        address < TEST_RPL_USEROB + 5u) {
+        uint32_t shift = (address - TEST_RPL_USEROB) * 4u;
+        *value = (uint8_t)((image->home >> shift) & 0x0fu);
+        return 1;
+    }
+
+    if (address >= image->used)
         return 0;
     *value = image->nibbles[address];
     return 1;
@@ -302,23 +319,127 @@ static void test_nested_composite(void)
 }
 
 
+static void test_directory_spans(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    uint32_t span = 0u;
+
+    /* Empty non-HOME directory: DORRP, 3-nibble header, empty chain. */
+    image.expose_home = 1;
+    image.home = 0x100u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 8u, 0u, 5u);
+    image.used = 13u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 13u);
+
+    /*
+     * One ordinary named item. The chain points past a five-nibble terminal
+     * link to [len][name][duplicate len][object].
+     */
+    memset(&image, 0, sizeof(image));
+    image.expose_home = 1;
+    image.home = 0x100u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 8u, 10u, 5u);
+    put_nibbles(&image, 13u, 0u, 5u);
+    put_nibbles(&image, 18u, 1u, 2u);
+    put_nibbles(&image, 20u, 0x41u, 2u);
+    put_nibbles(&image, 22u, 1u, 2u);
+    put_nibbles(&image, 24u, 0x029bfu, 5u);
+    put_nibbles(&image, 29u, 0x42u, 2u);
+    image.used = 31u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 31u);
+    assert(hpclang_rpl_object_span(&reader, 0u, 30u, &span) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+
+    /*
+     * Real HP39's HOME Hidden entry proves len=0 has no duplicate trailing
+     * length: its object begins exactly two nibbles after the item.
+     */
+    memset(&image, 0, sizeof(image));
+    image.expose_home = 1;
+    image.home = 0x100u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 8u, 10u, 5u);
+    put_nibbles(&image, 13u, 0u, 5u);
+    put_nibbles(&image, 18u, 0u, 2u);
+    put_nibbles(&image, 20u, 0x029bfu, 5u);
+    put_nibbles(&image, 25u, 0x43u, 2u);
+    image.used = 27u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 27u);
+
+    /* The newest object may itself be a directory; recurse to its exact end. */
+    memset(&image, 0, sizeof(image));
+    image.expose_home = 1;
+    image.home = 0x100u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 8u, 10u, 5u);
+    put_nibbles(&image, 13u, 0u, 5u);
+    put_nibbles(&image, 18u, 1u, 2u);
+    put_nibbles(&image, 20u, 0x41u, 2u);
+    put_nibbles(&image, 22u, 1u, 2u);
+    put_nibbles(&image, 24u, 0x02a96u, 5u);
+    put_nibbles(&image, 32u, 0u, 5u);
+    image.used = 37u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 37u);
+
+    /* HOME inserts 13 nibbles per attached library before the 3-nibble header. */
+    memset(&image, 0, sizeof(image));
+    image.expose_home = 1;
+    image.home = 0u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 5u, 2u, 3u);
+    put_nibbles(&image, 34u, 0u, 5u);
+    image.used = 39u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_OK);
+    assert(span == 39u);
+
+    /* A non-empty name must repeat its length immediately before the object. */
+    memset(&image, 0, sizeof(image));
+    image.expose_home = 1;
+    image.home = 0x100u;
+    put_nibbles(&image, 0u, 0x02a96u, 5u);
+    put_nibbles(&image, 8u, 10u, 5u);
+    put_nibbles(&image, 13u, 0u, 5u);
+    put_nibbles(&image, 18u, 1u, 2u);
+    put_nibbles(&image, 20u, 0x41u, 2u);
+    put_nibbles(&image, 22u, 2u, 2u);
+    put_nibbles(&image, 24u, 0x029bfu, 5u);
+    put_nibbles(&image, 29u, 0x42u, 2u);
+    image.used = 31u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+
+    /* Boundary parsing stays fail-closed on an unfrozen newest object. */
+    put_nibbles(&image, 22u, 1u, 2u);
+    put_nibbles(&image, 24u, 0x026d5u, 5u);
+    image.used = 29u;
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+}
+
 static void test_unfrozen_inline_prologue_is_not_a_reference(void)
 {
     struct image image = {0};
     struct hpclang_rpl_reader reader = reader_for(&image);
     uint32_t span = 0u;
 
-    /* DOCOL followed by DORRP must stop as unsupported, not skip five nibbles. */
+    /* A known but still-unfrozen Aplet prologue is never a ROM reference. */
     put_nibbles(&image, 0u, 0x02d9du, 5u);
-    put_nibbles(&image, 5u, 0x02a96u, 5u);
+    put_nibbles(&image, 5u, 0x026d5u, 5u);
     put_nibbles(&image, 10u, 0x0312bu, 5u);
     image.used = 15u;
 
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
-
-    /* A known but still-unfrozen Aplet prologue is never a ROM reference. */
-    put_nibbles(&image, 5u, 0x026d5u, 5u);
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
@@ -334,10 +455,6 @@ static void test_unknown_and_unfrozen_objects(void)
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(span == 0u);
-
-    put_nibbles(&image, 0u, 0x02a96u, 5u); /* DORRP directory */
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
 
     put_nibbles(&image, 0u, 0x02beeu, 5u); /* reserved EXT3 */
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
@@ -359,6 +476,7 @@ int main(void)
     test_names();
     test_composite_with_reference_and_nested_object();
     test_nested_composite();
+    test_directory_spans();
     test_unfrozen_inline_prologue_is_not_a_reference();
     test_unknown_and_unfrozen_objects();
     return 0;
