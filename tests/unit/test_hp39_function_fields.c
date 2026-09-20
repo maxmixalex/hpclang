@@ -223,16 +223,18 @@ int main(void)
 
     /*
      * Native Function carries five larger sections after its fixed prefix.
-     * funcCache@ is LastBut3, hence the middle (tail_objects[2]) object.
+     * They are appended oldest->newest. LastBut0 is newest, therefore
+     * ListOfEqs@=LastBut4 is tail_objects[0] and
+     * funcCache@=LastBut3 is tail_objects[1].
      */
     for (uint32_t i = 0u; i < 5u; ++i) {
         uint32_t link = end;
         item = link + 5u;
         put_word(&fixture, link, link - previous_item, 5u);
         tail_objects[i] = item + 2u;
-        if (i == 1u)
+        if (i == 0u)
             end = put_function_equations(&fixture, item);
-        else if (i == 2u)
+        else if (i == 1u)
             end = put_real_array_1d(&fixture, item);
         else
             end = put_null_field(&fixture, item, RPL_DOLIST, 0u);
@@ -543,7 +545,7 @@ int main(void)
             assert(hpclang_object_snapshot_read_nibble(
                 object, out + 5u + j, &nibble));
             assert(nibble ==
-                fixture.nibbles[tail_objects[2] + 25u + i * 16u + j]);
+                fixture.nibbles[tail_objects[1] + 25u + i * 16u + j]);
         }
     }
     for (uint32_t j = 0u; j < 5u; ++j) {
@@ -555,7 +557,7 @@ int main(void)
     }
     hpclang_object_release(object);
 
-    put_word(&fixture, tail_objects[2] + 10u, RPL_DOBINT, 5u);
+    put_word(&fixture, tail_objects[1] + 10u, RPL_DOBINT, 5u);
     object = NULL;
     errno = 0;
     assert(hpclang_hp39_function_variable_snapshot(
@@ -565,9 +567,9 @@ int main(void)
                &object) == -1);
     assert(object == NULL);
     assert(errno == EILSEQ);
-    put_word(&fixture, tail_objects[2] + 10u, RPL_DOREAL, 5u);
+    put_word(&fixture, tail_objects[1] + 10u, RPL_DOREAL, 5u);
 
-    put_word(&fixture, tail_objects[2] + 15u, 2u, 5u);
+    put_word(&fixture, tail_objects[1] + 15u, 2u, 5u);
     object = NULL;
     errno = 0;
     assert(hpclang_hp39_function_variable_snapshot(
@@ -577,9 +579,9 @@ int main(void)
                &object) == -1);
     assert(object == NULL);
     assert(errno == EILSEQ);
-    put_word(&fixture, tail_objects[2] + 15u, 1u, 5u);
+    put_word(&fixture, tail_objects[1] + 15u, 1u, 5u);
 
-    put_word(&fixture, tail_objects[2] + 5u, 21u + 3u * 16u, 5u);
+    put_word(&fixture, tail_objects[1] + 5u, 21u + 3u * 16u, 5u);
     object = NULL;
     errno = 0;
     assert(hpclang_hp39_function_variable_snapshot(
@@ -589,7 +591,7 @@ int main(void)
                &object) == -1);
     assert(object == NULL);
     assert(errno == EILSEQ);
-    put_word(&fixture, tail_objects[2] + 5u, 20u + 3u * 16u, 5u);
+    put_word(&fixture, tail_objects[1] + 5u, 20u + 3u * 16u, 5u);
 
     static const struct {
         const char *name;
@@ -639,7 +641,7 @@ int main(void)
     assert(object == NULL);
     assert(errno == ENOENT);
 
-    put_word(&fixture, tail_objects[1], RPL_DOREAL, 5u);
+    put_word(&fixture, tail_objects[0], RPL_DOREAL, 5u);
     object = NULL;
     errno = 0;
     assert(hpclang_hp39_function_variable_snapshot(
@@ -649,7 +651,7 @@ int main(void)
                &object) == -1);
     assert(object == NULL);
     assert(errno == EILSEQ);
-    put_word(&fixture, tail_objects[1], RPL_DOLIST, 5u);
+    put_word(&fixture, tail_objects[0], RPL_DOLIST, 5u);
 
     errno = 0;
     assert(hpclang_hp39_function_variable_projection_find(

@@ -510,8 +510,12 @@ static int hp39_function_symbolic_slot_snapshot(
     *object = NULL;
 
     uint32_t list = 0u;
+    /*
+     * ListOfEqs@=LastBut4 is the fifth newest entry because LastBut0 is the
+     * newest directory entry.
+     */
     if (hp39_function_tail_object(
-            reader, aplet_object, 4u, HP39_RPL_DOLIST, &list) != 0)
+            reader, aplet_object, 5u, HP39_RPL_DOLIST, &list) != 0)
         return -1;
     if (list > HP39_SATURN_LIMIT - 5u) {
         errno = EILSEQ;
@@ -568,8 +572,12 @@ static int hp39_function_func_cache(
     uint32_t aplet_object,
     uint32_t *object_address)
 {
+    /*
+     * LastBut numbering is zero-based: LastBut0 is the newest directory
+     * entry, so funcCache@=LastBut3 is the fourth newest entry.
+     */
     return hp39_function_tail_object(
-        reader, aplet_object, 3u, HP39_RPL_DOARRY, object_address);
+        reader, aplet_object, 4u, HP39_RPL_DOARRY, object_address);
 }
 
 static int hp39_function_func_cache_elements(
