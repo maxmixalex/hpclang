@@ -231,7 +231,8 @@ static int hp39_variable_reference_snapshot(
         return -1;
     }
 
-    if ((*object)->native_prologue != expected_prologue) {
+    if (expected_prologue != 0u &&
+        (*object)->native_prologue != expected_prologue) {
         hpclang_object_release(*object);
         *object = NULL;
         errno = EILSEQ;
@@ -346,39 +347,39 @@ int hpclang_hp39_variable_value_snapshot(
     }
     hpclang_object_release(schema);
 
-    uint32_t payload_length = (uint32_t)name_length + 3u;
-    uint8_t payload[HP39_VARIABLE_ID_MAX];
-    for (size_t i = 0u; i < name_length; ++i)
-        payload[i] = name[i];
-    payload[name_length] =
-        (uint8_t)(match.descriptor_address & 0xffu);
-    payload[name_length + 1u] =
-        (uint8_t)((match.descriptor_address >> 8u) & 0xffu);
-    payload[name_length + 2u] =
-        (uint8_t)((match.descriptor_address >> 16u) & 0xffu);
-
-    uint32_t address = 0u;
-    uint32_t prologue = 0u;
-    if (hp39_portal_result(
-            HP39P_VARIABLE_VALUE,
-            payload,
-            payload_length,
-            0u,
-            &address,
-            &prologue) != 0)
-        return -1;
-
-    if (hpclang_object_snapshot_copy(
+    /*
+     * An HP39 extended variable ID names a 15-nibble descriptor whose three
+     * words are the Stock recall handler, type predicate and store handler.
+     * Execute the descriptor's recall word directly through the same Stock
+     * EVAL bridge used for supported-entry schema references.  This follows
+     * the native Aplet variable contract instead of reconstructing the ID and
+     * feeding it back through generic @.
+     *
+     * In particular, xNoteText's Stock recall handler performs its own
+     * temporary Aplet-context switch and restoration; hpclang must not invent
+     * a parallel context/projection layer around it.
+     */
+    struct hpclang_hp39_variable_descriptor descriptor;
+    if (hpclang_hp39_variable_descriptor_read(
             &hp39_stock_reader,
-            address,
-            HP39_SATURN_LIMIT - address,
-            object) != 0)
+            match.descriptor_address,
+            &descriptor) != 0)
         return -1;
-    if (*object == NULL) {
+    if (descriptor.recall_word >= HP39_SATURN_LIMIT) {
         errno = EILSEQ;
         return -1;
     }
-    return 0;
+
+    uint8_t payload[3] = {
+        (uint8_t)(descriptor.recall_word & 0xffu),
+        (uint8_t)((descriptor.recall_word >> 8u) & 0xffu),
+        (uint8_t)((descriptor.recall_word >> 16u) & 0xffu),
+    };
+    return hp39_variable_reference_snapshot(
+        HP39P_REFERENCE_EVAL,
+        payload,
+        0u,
+        object);
 }
 
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
