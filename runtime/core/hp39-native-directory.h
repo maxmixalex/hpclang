@@ -13,6 +13,15 @@ extern "C" {
 #endif
 
 /*
+ * Snapshot the native Aplet catalog from HOME's null-named Hidden directory.
+ * This is the read-only equivalent of GetApDirList and returns an empty DOLIST
+ * when the private ApDirList variable is absent.
+ */
+int hpclang_hp39_native_aplet_catalog_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    struct hpclang_object **object);
+
+/*
  * Read the HP39 Program/Note private directory format without entering the
  * Stock evaluator. context_pointer_address is the five-nibble RAM cell used by
  * PGMCXT@/NOTESCXT@. The returned catalog is an owned DOLIST of base DOIDNT

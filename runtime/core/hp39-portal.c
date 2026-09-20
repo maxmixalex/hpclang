@@ -126,38 +126,14 @@ int hpclang_hp39_portal_roundtrip(void)
 
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
 {
-    if (object == NULL) {
-        errno = EINVAL;
+    if (!hp39_live_stock_available()) {
+        if (object != NULL)
+            *object = NULL;
+        errno = ENOSYS;
         return -1;
     }
-    *object = NULL;
-
-    uint32_t address = 0u;
-    uint32_t prologue = 0u;
-    if (hp39_portal_result(
-            HP39P_CATALOG_APLET,
-            NULL,
-            0u,
-            HP39_RPL_DOLIST,
-            &address,
-            &prologue) != 0)
-        return -1;
-
-    if (hpclang_object_snapshot_copy(
-            &hp39_stock_reader,
-            address,
-            HP39_SATURN_LIMIT - address,
-            object) != 0)
-        return -1;
-
-    if (*object == NULL ||
-        hpclang_object_kind(*object) != HPCLANG_OBJECT_LIST) {
-        hpclang_object_release(*object);
-        *object = NULL;
-        errno = EILSEQ;
-        return -1;
-    }
-    return 0;
+    return hpclang_hp39_native_aplet_catalog_snapshot(
+        &hp39_stock_reader, object);
 }
 
 static int hp39_native_catalog_snapshot(
