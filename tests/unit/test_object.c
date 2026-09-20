@@ -139,7 +139,7 @@ static void test_public_read_only_stack(void)
 static void test_unfrozen_object_is_rejected(void)
 {
     prepare_one_real();
-    put_word5(0x91000u, 0x02a96u);
+    put_word5(0x91000u, 0x026d5u);
 
     struct hpclang_object *object = NULL;
     errno = 0;
@@ -203,7 +203,7 @@ static void test_public_pop(void)
     hpclang_object_release(object);
 
     prepare_one_real();
-    put_word5(0x91000u, 0x02a96u); /* unsupported directory boundary */
+    put_word5(0x91000u, 0x026d5u); /* unsupported Aplet boundary */
     uint32_t before = get_word5(DSKTOP);
     errno = 0;
     assert(hpclang_stack_pop(&object) == -1);

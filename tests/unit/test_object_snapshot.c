@@ -346,7 +346,7 @@ static void test_errors(void)
     struct hpclang_rpl_reader reader = reader_for(&image);
     struct hpclang_object *object = (struct hpclang_object *)(uintptr_t)1u;
 
-    put_nibbles(&image, 0u, 0x02a96u, 5u); /* directory: unfrozen */
+    put_nibbles(&image, 0u, 0x026d5u, 5u); /* Aplet: boundary unfrozen */
     image.used = 5u;
     errno = 0;
     assert(hpclang_object_snapshot_copy(
