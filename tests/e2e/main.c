@@ -25,6 +25,12 @@ int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object);
+int hpclang_hp39_variable_value_snapshot(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object);
 int hpclang_hp39_program_body_snapshot(
     const uint8_t *name,
     size_t name_length,
@@ -1826,6 +1832,27 @@ int main(void)
                 return finish(0xb4u, boot->model);
             }
 
+            static const uint8_t note_category[] = "Note";
+            static const uint8_t note_text_name[] = "NoteText";
+            struct hpclang_object *note_text_value = NULL;
+            if (hpclang_hp39_variable_value_snapshot(
+                    note_category,
+                    sizeof(note_category) - 1u,
+                    note_text_name,
+                    sizeof(note_text_name) - 1u,
+                    &note_text_value) != 0 ||
+                note_text_value == NULL ||
+                hpclang_object_kind(note_text_value) !=
+                    HPCLANG_OBJECT_STRING) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                return finish(0xb9u, boot->model);
+            }
+            hpclang_object_release(note_text_value);
+
             uint32_t aplet_count = 0u;
             uint32_t program_count = 0u;
             uint32_t note_count = 0u;
@@ -1927,6 +1954,7 @@ int main(void)
                 "HPCLANG-NO-SUCH";
             struct hpclang_object *missing_body = NULL;
             struct hpclang_object *direct_schema = NULL;
+            struct hpclang_object *direct_value = NULL;
             errno = 0;
             int missing_result =
                 hpclang_hp39_program_body_snapshot(
@@ -1938,13 +1966,25 @@ int main(void)
             int direct_schema_result =
                 hpclang_hp39_variable_schema_snapshot(&direct_schema);
             int schema_errno = errno;
+            errno = 0;
+            int direct_value_result =
+                hpclang_hp39_variable_value_snapshot(
+                    (const uint8_t *)"Note",
+                    sizeof("Note") - 1u,
+                    (const uint8_t *)"NoteText",
+                    sizeof("NoteText") - 1u,
+                    &direct_value);
+            int value_errno = errno;
             hpclang_object_release(missing_body);
             hpclang_object_release(direct_schema);
+            hpclang_object_release(direct_value);
             if (aplet_result != -1 ||
                 missing_result != -1 ||
                 missing_errno != ENOSYS ||
                 direct_schema_result != -1 ||
-                schema_errno != ENOSYS)
+                schema_errno != ENOSYS ||
+                direct_value_result != -1 ||
+                value_errno != ENOSYS)
                 return finish(0xb5u, boot->model);
         }
     }

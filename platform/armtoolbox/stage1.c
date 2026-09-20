@@ -75,10 +75,12 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
     };
 
 /*
- * Keep the evaluator portal on its own 128-byte cache/page sub-boundary. The
- * ARM stage rewrites only this private buffer, cleans it, and executes it only
- * through Stock's Saturn Read[] alias. 128-byte alignment proves this 128-byte
- * buffer cannot cross a 4 KiB page.
+ * Keep the evaluator portal on its own 512-byte page sub-boundary. The ARM
+ * stage rewrites only this private buffer, cleans it, and executes it only
+ * through Stock's Saturn Read[] alias. 512-byte alignment proves this
+ * 512-byte buffer cannot cross a 4 KiB page. The larger private buffer is
+ * required only so a complete HP39 extended DOIDNT (up to 255 payload bytes)
+ * can be handed back to Stock without truncating third-party variable IDs.
  *
  * The synthetic program deliberately has no application-visible RPL effect:
  *
@@ -101,8 +103,8 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * until the ARM resume validates one pushed cell, records its pointer and rolls
  * DSKTOP back to the pre-call value.
  */
-static uint8_t hp39_saturn_portal_thunk[128]
-    __attribute__((section(".data.hp39.thunk"), aligned(128)));
+static uint8_t hp39_saturn_portal_thunk[512]
+    __attribute__((section(".data.hp39.thunk"), aligned(512)));
 
 enum {
     HP39P_MACHINE_NIBBLE = 0u,
@@ -116,11 +118,12 @@ enum {
     HP39P_C_TEMPLATE_NIBBLE = 89u,
     HP39P_EXEC_NIBBLES = 105u,
     HP39P_NAME_NIBBLE = 112u,
-    HP39P_NAME_MAX_BYTES = 19u,
+    HP39P_NAME_MAX_BYTES = 255u,
+    HP39P_BODY_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
-    HP39P_MISS_NIBBLE = 160u,
+    HP39P_MISS_NIBBLE = 640u,
     HP39P_MISS_NIBBLES = 10u,
-    HP39P_APLETVARS_NIBBLE = 170u,
+    HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
     HP39P_STATIC_NIBBLES =
         HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES,
@@ -133,6 +136,9 @@ _Static_assert(
     HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
     "HP39 Saturn portal request helpers must fit its private buffer");
+_Static_assert(
+    HPCLANG_PAGE_SIZE % sizeof(hp39_saturn_portal_thunk) == 0u,
+    "HP39 portal thunk alignment must partition a 4 KiB page");
 
 struct hp39_saturn_builder {
     uint8_t *bytes;
@@ -295,9 +301,27 @@ static int hp39_request_words(
         return 1;
     }
 
+    if (kind == HP39P_VARIABLE_VALUE &&
+        name_length > 3u &&
+        name_length <= HP39P_NAME_MAX_BYTES) {
+        /*
+         * The supplied payload is the complete HP39 extended-ID payload:
+         * visible bytes followed by the native three-byte descriptor pointer.
+         * Rebuild the DOIDNT locally and use the official HP39 recall primitive
+         * @ (#081D3). Unlike EVAL, @ returns the stored typed value without
+         * executing that value a second time.
+         */
+        *arg = saturn_base + HP39P_NAME_NIBBLE;
+        *operation = UINT32_C(0x000081d3); /* @ */
+        *pack = nop;
+        *normalize = nop;
+        *expected_prologue = 0u; /* typed result; validated by snapshot parser */
+        return 1;
+    }
+
     if ((kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) &&
         name_length != 0u &&
-        name_length <= HP39P_NAME_MAX_BYTES) {
+        name_length <= HP39P_BODY_NAME_MAX_BYTES) {
         *arg = saturn_base + HP39P_NAME_NIBBLE;
         *operation = kind == HP39P_BODY_PROGRAM
             ? UINT32_C(0x00027f6d)
@@ -317,10 +341,18 @@ static int hp39_store_request_name(
     const uint8_t *name)
 {
 
-    if (kind != HP39P_BODY_PROGRAM && kind != HP39P_BODY_NOTE)
+    const int body_request =
+        kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
+    const int variable_request = kind == HP39P_VARIABLE_VALUE;
+    if (!body_request && !variable_request)
         return name_length == 0u;
+
+    uint32_t maximum = body_request
+        ? HP39P_BODY_NAME_MAX_BYTES
+        : HP39P_NAME_MAX_BYTES;
     if (name == NULL || name_length == 0u ||
-        name_length > HP39P_NAME_MAX_BYTES)
+        name_length > maximum ||
+        (variable_request && name_length <= 3u))
         return 0;
 
     if (!hp39_saturn_buffer_store_word5(
@@ -428,8 +460,7 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     uint32_t saturn_base = saturn_page + byte_offset * 2u;
-    if (saturn_base > RPL_MAIN_END -
-            (HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES))
+    if (saturn_base > RPL_MAIN_END - HP39P_STATIC_NIBBLES)
         return 0;
 
     uint32_t colon = saturn_base + HP39P_COLON_NIBBLE;
@@ -746,7 +777,9 @@ int hpclang_hp39_portal_prepare_stock(void)
 
     const uint32_t kind = portal->request_kind;
     const uint32_t name_length = portal->request_name_length;
-    if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
+    if (kind == HP39P_BODY_PROGRAM ||
+        kind == HP39P_BODY_NOTE ||
+        kind == HP39P_VARIABLE_VALUE) {
         uint32_t name_end =
             HP39P_NAME_NIBBLE + 7u + name_length * 2u;
         for (uint32_t i = HP39P_NAME_NIBBLE; i < name_end; ++i) {
@@ -800,7 +833,8 @@ int hpclang_hp39_portal_restore_hpc(void)
             !stage_saturn_read_word5(read_map, post_dsktop, &object) ||
             object > RPL_MAIN_END - 5u ||
             !stage_saturn_read_word5(read_map, object, &prologue) ||
-            prologue != portal->expected_prologue) {
+            (portal->expected_prologue != 0u &&
+             prologue != portal->expected_prologue)) {
             result = -5;
         } else {
             const uint32_t kind = portal->request_kind;

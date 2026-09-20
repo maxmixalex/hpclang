@@ -8,6 +8,7 @@
 #include <hpclang/target.h>
 
 #include "hp39-native-directory.h"
+#include "hp39-variable-schema.h"
 #include "object-snapshot.h"
 #include "../../platform/armtoolbox/hp39-portal-private.h"
 #include "saturn-view.h"
@@ -15,6 +16,7 @@
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_BODY_NAME_MAX 19u
+#define HP39_VARIABLE_ID_MAX 255u
 #define HP39_PGMCXT_POINTER UINT32_C(0x00080739)
 #define HP39_NOTESCXT_POINTER UINT32_C(0x0008073e)
 
@@ -77,7 +79,11 @@ static int hp39_portal_result(
         return -1;
     }
 
-    if (name_length > HP39_BODY_NAME_MAX ||
+    size_t maximum_name_length =
+        kind == HP39P_VARIABLE_VALUE
+            ? HP39_VARIABLE_ID_MAX
+            : HP39_BODY_NAME_MAX;
+    if (name_length > maximum_name_length ||
         (name == NULL && name_length != 0u)) {
         errno = EINVAL;
         return -1;
@@ -104,7 +110,8 @@ static int hp39_portal_result(
         return -1;
     }
     if (*object >= HP39_SATURN_LIMIT ||
-        *prologue != expected_prologue) {
+        (expected_prologue != 0u &&
+         *prologue != expected_prologue)) {
         errno = EILSEQ;
         return -1;
     }
@@ -158,6 +165,113 @@ int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
         hpclang_object_kind(*object) != HPCLANG_OBJECT_LIST) {
         hpclang_object_release(*object);
         *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
+}
+
+static int hp39_snapshot_payload_byte(
+    const struct hpclang_object *object,
+    uint32_t nibble_offset,
+    uint8_t *value)
+{
+    if (object == NULL || value == NULL)
+        return 0;
+
+    uint8_t low = 0u;
+    uint8_t high = 0u;
+    if (!hpclang_object_snapshot_read_nibble(
+            object, nibble_offset, &low) ||
+        !hpclang_object_snapshot_read_nibble(
+            object, nibble_offset + 1u, &high) ||
+        low > 0x0fu || high > 0x0fu)
+        return 0;
+
+    *value = (uint8_t)(low | (uint8_t)(high << 4u));
+    return 1;
+}
+
+int hpclang_hp39_variable_value_snapshot(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object)
+{
+    if (object == NULL ||
+        category == NULL || category_length == 0u ||
+        name == NULL || name_length == 0u) {
+        if (object != NULL)
+            *object = NULL;
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    struct hpclang_object *schema = NULL;
+    if (hpclang_hp39_variable_schema_snapshot(&schema) != 0)
+        return -1;
+
+    struct hpclang_hp39_variable_schema_match match;
+    if (hpclang_hp39_variable_schema_find(
+            schema,
+            category,
+            category_length,
+            name,
+            name_length,
+            &match) != 0) {
+        hpclang_object_release(schema);
+        return -1;
+    }
+
+    if (match.id_span < 7u ||
+        ((match.id_span - 7u) & 1u) != 0u) {
+        hpclang_object_release(schema);
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t payload_length = (match.id_span - 7u) / 2u;
+    if (payload_length <= 3u ||
+        payload_length > HP39_VARIABLE_ID_MAX) {
+        hpclang_object_release(schema);
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint8_t payload[HP39_VARIABLE_ID_MAX];
+    uint32_t payload_offset = match.id_offset + 7u;
+    for (uint32_t i = 0u; i < payload_length; ++i) {
+        if (!hp39_snapshot_payload_byte(
+                schema,
+                payload_offset + i * 2u,
+                &payload[i])) {
+            hpclang_object_release(schema);
+            errno = EILSEQ;
+            return -1;
+        }
+    }
+    hpclang_object_release(schema);
+
+    uint32_t address = 0u;
+    uint32_t prologue = 0u;
+    if (hp39_portal_result(
+            HP39P_VARIABLE_VALUE,
+            payload,
+            payload_length,
+            0u,
+            &address,
+            &prologue) != 0)
+        return -1;
+
+    if (hpclang_object_snapshot_copy(
+            &hp39_stock_reader,
+            address,
+            HP39_SATURN_LIMIT - address,
+            object) != 0)
+        return -1;
+    if (*object == NULL) {
         errno = EILSEQ;
         return -1;
     }
