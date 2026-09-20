@@ -32,7 +32,7 @@ hpclang_hp39_portal_enter:
     add     r1, r12, #HP39P_EMULATOR_REGS
     ldmia   r1, {r4-r11}
     ldr     sp, [r12, #HP39P_STOCK_SP]
-    ldr     r0, [r12, #HP39P_REPLAY_PC]
+    ldr     r0, [r12, #HP39P_SATURN_ENTRY]
     ldr     r1, [r12, #HP39P_SATURN_STATE]
     ldr     r2, [r12, #HP39P_EMULATOR_LR]
     bx      r2
@@ -52,8 +52,6 @@ hpclang_hp39_portal_resume:
     str     r1, [r12, #HP39P_SATURN_STATE]
     str     lr, [r12, #HP39P_EMULATOR_LR]
     str     sp, [r12, #HP39P_STOCK_SP]
-    sub     r2, r0, #5
-    str     r2, [r12, #HP39P_REPLAY_PC]
     add     r2, r12, #HP39P_EMULATOR_REGS
     stmia   r2, {r4-r11}
 

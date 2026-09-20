@@ -8,7 +8,7 @@
 #define HP39P_ENTRY          8
 #define HP39P_SATURN_STATE   12
 #define HP39P_EMULATOR_LR    16
-#define HP39P_REPLAY_PC      20
+#define HP39P_SATURN_ENTRY   20
 #define HP39P_ARMSYS_TARGET  24
 #define HP39P_STOCK_CPSR     28
 #define HP39P_L1             32
@@ -42,7 +42,7 @@ struct hpclang_hp39_portal_context {
     struct hpclang_hp39_platform_context public_context;
     uintptr_t saturn_state;
     uintptr_t emulator_lr;
-    uint32_t replay_pc;
+    uint32_t saturn_entry;
     uint32_t armsys_target;
     uint32_t stock_cpsr;
     uintptr_t l1;
