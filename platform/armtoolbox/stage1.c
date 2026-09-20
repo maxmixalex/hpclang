@@ -82,14 +82,17 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * The synthetic program deliberately has no application-visible RPL effect:
  *
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
- *   colon:   DOCOL GetApDirList SEMI
+ *   colon:   DOCOL catalog-op catalog-pack SEMI
  *   return:  -> DOCODE
  *   DOCODE:  restore C.W; ARMSYS
  *
- * GetApDirList is a real read-only Stock internal Aplet-catalog primitive. ROM
- * evidence shows it returns the ApDirList list (or NULL{} when absent) through
- * a context-restoring wrapper. The result remains on the private RPL data stack
- * until the ARM resume validates exactly one pushed DOLIST cell, records its
+ * The two catalog cells are patched before each trip while HPC mappings are
+ * still active:
+ *   Aplet   = GetApDirList ; NOP
+ *   Program = CatPgm       ; {}N
+ *   Note    = CatNot       ; {}N
+ * Each sequence returns exactly one DOLIST. The result remains on the private
+ * RPL data stack until the ARM resume validates one pushed cell, records its
  * pointer and rolls DSKTOP back to the pre-call value. DOCOL/SEMI still balance
  * their B/D threaded-return changes before the DOCODE machine resume.
  */
@@ -99,10 +102,12 @@ static uint8_t hp39_saturn_portal_thunk[64]
 enum {
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
-    HP39P_RETURN_NIBBLE = 43u,
-    HP39P_DOCODE_NIBBLE = 48u,
-    HP39P_C_TEMPLATE_NIBBLE = 74u,
-    HP39P_TOTAL_NIBBLES = 90u,
+    HP39P_CATALOG_OP_NIBBLE = 33u,
+    HP39P_CATALOG_PACK_NIBBLE = 38u,
+    HP39P_RETURN_NIBBLE = 48u,
+    HP39P_DOCODE_NIBBLE = 53u,
+    HP39P_C_TEMPLATE_NIBBLE = 79u,
+    HP39P_TOTAL_NIBBLES = 95u,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -184,6 +189,56 @@ static uint8_t hp39_saturn_buffer_nibble(
     return (nibble & 1u) != 0u
         ? (uint8_t)(packed >> 4)
         : (uint8_t)(packed & 0x0fu);
+}
+
+static int hp39_saturn_buffer_store_word5(
+    uint8_t *bytes,
+    uint32_t capacity_nibbles,
+    uint32_t offset,
+    uint32_t value)
+{
+    if (bytes == NULL || value >= UINT32_C(0x00100000) ||
+        offset > capacity_nibbles ||
+        capacity_nibbles - offset < 5u)
+        return 0;
+
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint32_t nibble = offset + i;
+        uint8_t value_nibble =
+            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        uint8_t *packed = &bytes[nibble >> 1];
+        if ((nibble & 1u) != 0u)
+            *packed = (uint8_t)((*packed & 0x0fu) | (value_nibble << 4));
+        else
+            *packed = (uint8_t)((*packed & 0xf0u) | value_nibble);
+    }
+    return 1;
+}
+
+static int hp39_catalog_words(
+    uint32_t kind,
+    uint32_t *operation,
+    uint32_t *pack)
+{
+    if (operation == NULL || pack == NULL)
+        return 0;
+
+    switch (kind) {
+    case HP39P_CATALOG_APLET:
+        *operation = UINT32_C(0x0003f5ab); /* GetApDirList */
+        *pack = UINT32_C(0x0000765c);      /* NOP */
+        return 1;
+    case HP39P_CATALOG_PROGRAM:
+        *operation = UINT32_C(0x000281c7); /* CatPgm */
+        *pack = UINT32_C(0x00005c12);      /* {}N */
+        return 1;
+    case HP39P_CATALOG_NOTE:
+        *operation = UINT32_C(0x00028154); /* CatNot */
+        *pack = UINT32_C(0x00005c12);      /* {}N */
+        return 1;
+    default:
+        return 0;
+    }
 }
 
 static int stage_saturn_read_nibble(
@@ -287,15 +342,15 @@ static int hp39_portal_prepare_thunk(
 
     /*
      * Synthetic colon object:
-     *   [DOCOL][GetApDirList][SEMI]
+     *   [DOCOL][catalog-op][catalog-pack][SEMI]
      *
-     * GetApDirList is supported entry #3F5AB. Its resolved Stock body reads
-     * the internal ApDirList ID through a temporary context binding and always
-     * returns one object (the list or NULL{}). The ARM resume owns the matching
-     * one-cell rollback after validating the returned DOLIST.
+     * The initial cells are safe Aplet defaults. prepare_stock() rewrites both
+     * cells for every trip, cleans the cache line and verifies the rewritten
+     * words through the Stock Saturn alias before releasing the emulator.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
         builder.nibbles != HP39P_RETURN_NIBBLE)
         return 0;
@@ -411,6 +466,7 @@ static void hp39_portal_configure(
     portal->pre_dsktop = 0u;
     portal->result_object = 0u;
     portal->result_prologue = 0u;
+    portal->request_kind = 0u;
 
     if (stock_frame != 0u) {
         const volatile uint32_t *saved =
@@ -455,6 +511,40 @@ int hpclang_hp39_portal_prepare_stock(void)
     portal->pre_dsktop = dsktop;
     portal->result_object = 0u;
     portal->result_prologue = 0u;
+
+    uint32_t operation = 0u;
+    uint32_t pack = 0u;
+    if (!hp39_catalog_words(
+            portal->request_kind, &operation, &pack) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_CATALOG_OP_NIBBLE,
+            operation) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_CATALOG_PACK_NIBBLE,
+            pack))
+        return -7;
+
+    hpclang_cache_clean(
+        hp39_saturn_portal_thunk,
+        (uint32_t)sizeof(hp39_saturn_portal_thunk));
+
+    uint32_t observed_operation = 0u;
+    uint32_t observed_pack = 0u;
+    if (!stage_saturn_read_word5(
+            read_map,
+            portal->saturn_entry + HP39P_CATALOG_OP_NIBBLE,
+            &observed_operation) ||
+        !stage_saturn_read_word5(
+            read_map,
+            portal->saturn_entry + HP39P_CATALOG_PACK_NIBBLE,
+            &observed_pack) ||
+        observed_operation != operation ||
+        observed_pack != pack)
+        return -7;
 
     store32(
         (void *)portal->saturn_state,
@@ -503,9 +593,10 @@ int hpclang_hp39_portal_restore_hpc(void)
         }
 
         /*
-         * GetApDirList is a read-only one-result primitive. Roll the private
-         * RPL data stack back even when result-shape validation fails, so the
-         * probe never leaks its temporary cell into Stock execution.
+         * Every supported catalog request is read-only and normalized to one
+         * DOLIST result. Roll the private RPL data stack back even when
+         * result-shape validation fails, so the portal never leaks its
+         * temporary cell into Stock execution.
          */
         if (!stage_saturn_write_word5(
                 read_map, RPL_DSKTOP, portal->pre_dsktop))
