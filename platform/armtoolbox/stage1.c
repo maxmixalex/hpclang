@@ -82,15 +82,16 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * The synthetic program deliberately has no application-visible RPL effect:
  *
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
- *   colon:   DOCOL GetApDirList DROP SEMI
+ *   colon:   DOCOL GetApDirList SEMI
  *   return:  -> DOCODE
  *   DOCODE:  restore C.W; ARMSYS
  *
  * GetApDirList is a real read-only Stock internal Aplet-catalog primitive. ROM
  * evidence shows it returns the ApDirList list (or NULL{} when absent) through
- * a context-restoring wrapper. DROP removes that one result before SEMI, so the
- * probe has no net data-stack effect. DOCOL/SEMI still balance their B/D
- * threaded-return changes before the DOCODE machine resume.
+ * a context-restoring wrapper. The result remains on the private RPL data stack
+ * until the ARM resume validates exactly one pushed DOLIST cell, records its
+ * pointer and rolls DSKTOP back to the pre-call value. DOCOL/SEMI still balance
+ * their B/D threaded-return changes before the DOCODE machine resume.
  */
 static uint8_t hp39_saturn_portal_thunk[64]
     __attribute__((section(".data.hp39.thunk"), aligned(64)));
@@ -98,10 +99,10 @@ static uint8_t hp39_saturn_portal_thunk[64]
 enum {
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
-    HP39P_RETURN_NIBBLE = 48u,
-    HP39P_DOCODE_NIBBLE = 53u,
-    HP39P_C_TEMPLATE_NIBBLE = 79u,
-    HP39P_TOTAL_NIBBLES = 95u,
+    HP39P_RETURN_NIBBLE = 43u,
+    HP39P_DOCODE_NIBBLE = 48u,
+    HP39P_C_TEMPLATE_NIBBLE = 74u,
+    HP39P_TOTAL_NIBBLES = 90u,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -278,16 +279,15 @@ static int hp39_portal_prepare_thunk(
 
     /*
      * Synthetic colon object:
-     *   [DOCOL][GetApDirList][DROP][SEMI]
+     *   [DOCOL][GetApDirList][SEMI]
      *
      * GetApDirList is supported entry #3F5AB. Its resolved Stock body reads
      * the internal ApDirList ID through a temporary context binding and always
-     * returns one object (the list or NULL{}). DROP (#03244) consumes exactly
-     * that result, keeping this first native-catalog probe observational.
+     * returns one object (the list or NULL{}). The ARM resume owns the matching
+     * one-cell rollback after validating the returned DOLIST.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
-        !hp39_saturn_put_word5(&builder, UINT32_C(0x00003244)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
         builder.nibbles != HP39P_RETURN_NIBBLE)
         return 0;
@@ -400,6 +400,9 @@ static void hp39_portal_configure(
     portal->active = 0u;
     portal->trips = 0u;
     portal->last_cpsr = 0u;
+    portal->pre_dsktop = 0u;
+    portal->result_object = 0u;
+    portal->result_prologue = 0u;
 
     if (stock_frame != 0u) {
         const volatile uint32_t *saved =
@@ -425,12 +428,25 @@ static void hp39_portal_configure(
     }
 }
 
-void hpclang_hp39_portal_prepare_stock(void)
+int hpclang_hp39_portal_prepare_stock(void)
 {
     struct hpclang_hp39_portal_context *portal =
         &hpclang_hp39_portal_context;
     volatile uint32_t *l1 =
         (volatile uint32_t *)portal->l1;
+    const uint32_t *read_map =
+        (const uint32_t *)portal->saturn_state;
+
+    uint32_t dsktop = 0u;
+    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
+        dsktop < RPL_MAIN_FIRST + 5u || dsktop > RPL_MAIN_END) {
+        portal->pre_dsktop = 0u;
+        return -3;
+    }
+
+    portal->pre_dsktop = dsktop;
+    portal->result_object = 0u;
+    portal->result_prologue = 0u;
 
     store32(
         (void *)portal->saturn_state,
@@ -444,6 +460,7 @@ void hpclang_hp39_portal_prepare_stock(void)
         l1);
 
     hpclang_irq_restore(portal->stock_cpsr);
+    return 0;
 }
 
 int hpclang_hp39_portal_restore_hpc(void)
@@ -454,6 +471,38 @@ int hpclang_hp39_portal_restore_hpc(void)
         (volatile uint32_t *)portal->l1;
 
     portal->last_cpsr = hpclang_irq_save_disable();
+
+    int result = 0;
+    const uint32_t *read_map =
+        (const uint32_t *)portal->saturn_state;
+    uint32_t post_dsktop = 0u;
+    uint32_t object = 0u;
+    uint32_t prologue = 0u;
+
+    if (portal->pre_dsktop < RPL_MAIN_FIRST + 5u ||
+        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
+        result = -4;
+    } else {
+        if (post_dsktop + 5u != portal->pre_dsktop ||
+            !stage_saturn_read_word5(read_map, post_dsktop, &object) ||
+            object > RPL_MAIN_END - 5u ||
+            !stage_saturn_read_word5(read_map, object, &prologue) ||
+            prologue != UINT32_C(0x00002a74)) {
+            result = -5;
+        } else {
+            portal->result_object = object;
+            portal->result_prologue = prologue;
+        }
+
+        /*
+         * GetApDirList is a read-only one-result primitive. Roll the private
+         * RPL data stack back even when result-shape validation fails, so the
+         * probe never leaks its temporary cell into Stock execution.
+         */
+        if (!stage_saturn_write_word5(
+                read_map, RPL_DSKTOP, portal->pre_dsktop))
+            result = -6;
+    }
 
     store32(
         (void *)portal->saturn_state,
@@ -478,7 +527,7 @@ int hpclang_hp39_portal_restore_hpc(void)
 
     ++portal->trips;
     portal->active = 0u;
-    return 0;
+    return result;
 }
 
 static int hpc1_header_ok(const struct hpclang_image_header *header)

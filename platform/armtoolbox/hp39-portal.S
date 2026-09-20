@@ -27,6 +27,8 @@ hpclang_hp39_portal_enter:
 
     add     sp, r12, #HP39P_STACK_END
     bl      hpclang_hp39_portal_prepare_stock
+    cmp     r0, #0
+    bne     .Lportal_prepare_failed
 
     ldr     r12, =hpclang_hp39_portal_context
     add     r1, r12, #HP39P_EMULATOR_REGS
@@ -36,6 +38,18 @@ hpclang_hp39_portal_enter:
     ldr     r1, [r12, #HP39P_SATURN_STATE]
     ldr     r2, [r12, #HP39P_EMULATOR_LR]
     bx      r2
+
+.Lportal_prepare_failed:
+    mov     r3, r0
+    ldr     r12, =hpclang_hp39_portal_context
+    mov     r1, #0
+    str     r1, [r12, #HP39P_ACTIVE]
+    add     r1, r12, #HP39P_APP_REGS
+    ldmia   r1, {r4-r11}
+    ldr     sp, [r12, #HP39P_APP_SP]
+    ldr     lr, [r12, #HP39P_APP_LR]
+    mov     r0, r3
+    bx      lr
 
 .Lportal_busy:
     mvn     r0, #1
