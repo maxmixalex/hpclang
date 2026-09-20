@@ -73,6 +73,93 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
         },
     };
 
+/*
+ * Keep the Saturn portal thunk on its own cache line. The ARM stage writes
+ * these bytes exactly once, cleans the line and then executes them only
+ * through the Stock Saturn Read[] mapping. No later portal-context updates can
+ * alias and overwrite the instruction bytes.
+ *
+ * Nibbles: NOP3 (420) + ARMSYS (80BFE).
+ */
+static uint8_t hp39_saturn_portal_thunk[32]
+    __attribute__((section(".data.hp39.thunk"), aligned(32)));
+
+static int stage_saturn_read_nibble(
+    const uint32_t *read_map,
+    uint32_t address,
+    uint8_t *value);
+static int stage_phys_page_saturn_start(
+    const uint32_t *read_map,
+    uint32_t phys_page,
+    uint32_t *saturn_start);
+
+static int hp39_portal_prepare_thunk(
+    void *saturn_state,
+    struct hpclang_hp39_portal_context *portal)
+{
+    static const uint8_t thunk_bytes[] = {
+        0x24u, 0x80u, 0xb0u, 0xefu
+    };
+    static const uint8_t thunk_nibbles[] = {
+        0x4u, 0x2u, 0x0u, 0x8u, 0x0u, 0xbu, 0xfu, 0xeu
+    };
+
+    if (saturn_state == NULL || portal == NULL)
+        return 0;
+
+    uintptr_t thunk_address = (uintptr_t)hp39_saturn_portal_thunk;
+    uintptr_t stage_limit =
+        (uintptr_t)STAGE_WINDOW_BASE +
+        (uintptr_t)HPCLANG_L2_ENTRIES * HPCLANG_PAGE_SIZE;
+    if (thunk_address < (uintptr_t)STAGE_WINDOW_BASE ||
+        thunk_address > stage_limit - sizeof(thunk_bytes))
+        return 0;
+
+    uintptr_t delta = thunk_address - (uintptr_t)STAGE_WINDOW_BASE;
+    uint32_t page_index = (uint32_t)(delta / HPCLANG_PAGE_SIZE);
+    uint32_t byte_offset = (uint32_t)(delta % HPCLANG_PAGE_SIZE);
+    if (page_index >= HPCLANG_L2_ENTRIES ||
+        byte_offset > HPCLANG_PAGE_SIZE - sizeof(thunk_bytes))
+        return 0;
+
+    const volatile uint32_t *stage_l2 =
+        (const volatile uint32_t *)(uintptr_t)STAGE_WINDOW_BASE;
+    uint32_t saturn_page = 0u;
+    if (!stage_phys_page_saturn_start(
+            (const uint32_t *)saturn_state,
+            stage_l2[page_index] & UINT32_C(0xfffff000),
+            &saturn_page))
+        return 0;
+
+    uint32_t saturn_entry = saturn_page + byte_offset * 2u;
+    if (saturn_entry > RPL_MAIN_END - sizeof(thunk_nibbles))
+        return 0;
+
+    for (uint32_t i = 0u; i < sizeof(thunk_bytes); ++i)
+        hp39_saturn_portal_thunk[i] = thunk_bytes[i];
+    hpclang_cache_clean(
+        hp39_saturn_portal_thunk,
+        (uint32_t)sizeof(hp39_saturn_portal_thunk));
+
+    /*
+     * Prove the physical-page-to-Saturn translation before exposing the
+     * portal. A wrong alias fails closed instead of sending Stock execution to
+     * guessed memory.
+     */
+    for (uint32_t i = 0u; i < sizeof(thunk_nibbles); ++i) {
+        uint8_t nibble = 0u;
+        if (!stage_saturn_read_nibble(
+                (const uint32_t *)saturn_state,
+                saturn_entry + i,
+                &nibble) ||
+            nibble != thunk_nibbles[i])
+            return 0;
+    }
+
+    portal->saturn_entry = saturn_entry;
+    return 1;
+}
+
 static uint32_t load32(const void *base, uint32_t offset)
 {
     return *(const uint32_t *)((const uint8_t *)base + offset);
@@ -101,7 +188,7 @@ static void hp39_portal_configure(
     portal->public_context.portal_entry = 0u;
     portal->saturn_state = (uintptr_t)saturn_state;
     portal->emulator_lr = emulator_lr;
-    portal->replay_pc = saturn_pc >= 5u ? saturn_pc - 5u : 0u;
+    portal->saturn_entry = 0u;
     portal->armsys_target = 0u;
     portal->stock_cpsr = stock_cpsr;
     portal->l1 = (uintptr_t)launch->mmu.l1;
@@ -138,8 +225,10 @@ static void hp39_portal_configure(
         stock_frame != 0u) {
         portal->armsys_target =
             load32(saturn_state, ARMSYS_C_LO);
-        portal->public_context.portal_entry =
-            (uintptr_t)&hpclang_hp39_portal_enter;
+        if (hp39_portal_prepare_thunk(saturn_state, portal)) {
+            portal->public_context.portal_entry =
+                (uintptr_t)&hpclang_hp39_portal_enter;
+        }
     }
 }
 
