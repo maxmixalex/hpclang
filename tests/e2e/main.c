@@ -24,6 +24,14 @@ int hpclang_e2e_cpp_test(void);
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
+int hpclang_hp39_catalog_name_count(
+    const struct hpclang_object *catalog,
+    uint32_t *count);
+int hpclang_hp39_catalog_contains_name(
+    const struct hpclang_object *catalog,
+    const uint8_t *name,
+    size_t name_length,
+    int *found);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -1799,6 +1807,32 @@ int main(void)
                 hpclang_object_release(note_catalog);
                 return finish(0xb4u, boot->model);
             }
+
+            uint32_t aplet_count = 0u;
+            uint32_t program_count = 0u;
+            uint32_t note_count = 0u;
+            int fixture_found = 0;
+            static const uint8_t fixture_name[] =
+                "HPCLANG HPC1 TEST";
+            if (hpclang_hp39_catalog_name_count(
+                    aplet_catalog, &aplet_count) != 0 ||
+                hpclang_hp39_catalog_name_count(
+                    program_catalog, &program_count) != 0 ||
+                hpclang_hp39_catalog_name_count(
+                    note_catalog, &note_count) != 0 ||
+                hpclang_hp39_catalog_contains_name(
+                    aplet_catalog,
+                    fixture_name,
+                    sizeof(fixture_name) - 1u,
+                    &fixture_found) != 0 ||
+                fixture_found == 0 ||
+                aplet_count == 0u) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                return finish(0xb6u, boot->model);
+            }
+
             hpclang_object_release(aplet_catalog);
             hpclang_object_release(program_catalog);
             hpclang_object_release(note_catalog);
