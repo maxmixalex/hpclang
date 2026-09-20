@@ -186,9 +186,11 @@ Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, F
 
 ## HP39 calculator objects
 
-HP39gs/40gs have real storage, but it is typed calculator-object storage: directory, Zaplet/Aplet, Note, Program, Variable, List, Matrix, Library and related records, with `HP39DIR.000` / `HP39DIR.CUR` metadata.
+HP39gs/40gs have typed internal calculator objects, but the native storage model is split across Stock catalogs/contexts rather than one demonstrated HOME-like directory hierarchy. Internal Aplet operations such as `GetApDirList`, `RclAplet`, and `StoAplet` operate on that native context/catalog model.
 
-Historical HP39 ROM maps expose System-RPL-side operations such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc`. A future implementation should reach them through the typed Saturn/object bridge rather than publish ROM addresses or flatten objects into `FILE *`.
+`HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA`, and `HP39BinX` are a different layer: the typed external Disk Drive/Conn3x transfer protocol used to import/export Aplets, Programs, Notes and related records. Historical `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to this transfer/I/O path and must not be treated as proof that `HP39DIR.*` is the internal calculator namespace.
+
+Compatibility code may preserve that transfer protocol privately, while canonical internal object access should go through the proven Saturn/System-RPL portal and native catalog/context primitives. ROM addresses/calling conventions stay private, and HP39 is not flattened into `FILE *` or a fabricated HOME tree.
 
 ## Saturn / RPL object bridge
 

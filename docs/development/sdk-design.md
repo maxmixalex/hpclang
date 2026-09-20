@@ -165,11 +165,11 @@ The internal HP49g+/50g HOME/Port 0, Port 1 and Port 2 stores are **not FAT volu
 
 ### Calculator objects
 
-HP39gs/40gs have a real typed object store: directory, Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related records, rooted at `HP39DIR.000` with `HP39DIR.CUR` tracking the current directory. These are not POSIX files and need a typed/named object service.
+HP39gs/40gs have typed native calculator objects, but Stock does not present them as one proven HOME-like directory namespace. Aplets, Programs, Variables and related objects are managed through native catalogs/contexts. The generic named-store mapping therefore remains unfrozen on HP39 instead of inventing a synthetic hierarchy.
 
-The HP39 ROM exposes System-RPL-side object operations such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc`. A future implementation should reach them through the typed Saturn/object bridge rather than make their addresses/calling conventions public ARM ABI.
+Separately, `HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA` and `HP39BinX` define the external typed Disk Drive/Conn3x transfer protocol. They are useful private transfer-format evidence but are not the calculator's internal object-store root. ROM entries such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to that transfer/I/O path.
 
-HP48/49/50 RPL/Saturn objects belong to the same typed-object side.
+HP39 internal object access should use the private Saturn/System-RPL portal with genuine native catalog/context primitives such as `GetApDirList` and `RclAplet`; ROM addresses and calling conventions remain private. HP48/49/50 RPL/Saturn objects belong to the same owned-object service, with family-specific namespace semantics hidden below it.
 
 ## Saturn/RPL integration
 
