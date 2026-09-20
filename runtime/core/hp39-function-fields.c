@@ -90,14 +90,18 @@ struct hp39_function_variable_schema {
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
       HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD, field_, 0u }
+#define HP39_VAR_BINT(category_, name_, field_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_BINT_UNCOERCE, field_, 0u }
 #define HP39_VAR_FLAG(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
-      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN, field_, mask_ }
+      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL, field_, mask_ }
 #define HP39_VAR_FLAG_NOT(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
-      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED, field_, mask_ }
+      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL_INVERTED, field_, mask_ }
 
 /*
  * Function ApletVars is the Topic Type property #8 schema at FPTR 8:02A
@@ -105,14 +109,21 @@ struct hp39_function_variable_schema {
  * variable order, including unresolved entries.
  *
  * Direct-field mappings are backed by HPGCC39 Sharedvar.h + Funcdir.h and the
- * Stock fixed-offset accessors. PlotFlag/Plot2Flg masks and Table TFlags bits
- * come from HEADER.H. NumType is intentionally inverted: TBBuildBit set means
- * Build Your Own, while the published NumType value is 0 for Build Your Own
- * and 1 for Automatic.
+ * Stock fixed-offset accessors. The native getter table at bank-2 0x428FF..
+ * 0x42CB0 proves which internal BINTs are UNCOERCEd to public REALs and maps
+ * Indep/Xcross/Ycross to LastIndep/LastX/LastY. PlotFlag/Plot2Flg masks and
+ * Table TFlags bits come from HEADER.H.
+ *
+ * User-facing names come from the ID objects themselves, not their internal
+ * x-symbol labels: xHzoom/xVzoom expose Xzoom/Yzoom, xHTick/xVTick expose
+ * Xtick/Ytick, xHighRes exposes FastRes and xInvCursor exposes InvCross.
+ * FastRes and InvCross are intentionally inverted by their Stock getters.
+ * NumType is also inverted: TBBuildBit set means Build Your Own, while the
+ * published value is 0 for Build Your Own and 1 for Automatic.
  *
  * Similar-looking storage is deliberately not enough evidence: PageNum/Page,
- * F0..F9, NumRow/NumCol/NumIndep, Format/Digits, Xcross/Ycross and Indep stay
- * unresolved until their Stock getter semantics are mechanically closed.
+ * NoteText, NumIndep and F0..F9 stay unresolved until their Stock value
+ * semantics are mechanically closed.
  */
 static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_UNRESOLVED("Sketch", "PageNum"),
@@ -123,12 +134,12 @@ static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_FLAG_NOT("Numeric", "NumType", 25u, 2u),
     HP39_VAR_DIRECT("Numeric", "NumStep", 23u),
     HP39_VAR_DIRECT("Numeric", "NumStart", 22u),
-    HP39_VAR_UNRESOLVED("Numeric", "NumRow"),
+    HP39_VAR_BINT("Numeric", "NumRow", 26u),
     HP39_VAR_UNRESOLVED("Numeric", "NumIndep"),
     HP39_VAR_FLAG("Numeric", "NumFont", 25u, 1u),
-    HP39_VAR_UNRESOLVED("Numeric", "NumCol"),
-    HP39_VAR_UNRESOLVED("Numeric", "Format"),
-    HP39_VAR_UNRESOLVED("Numeric", "Digits"),
+    HP39_VAR_BINT("Numeric", "NumCol", 27u),
+    HP39_VAR_BINT("Numeric", "Format", 31u),
+    HP39_VAR_BINT("Numeric", "Digits", 32u),
 
     HP39_VAR_UNRESOLVED("Symbolic", "F0"),
     HP39_VAR_UNRESOLVED("Symbolic", "F9"),
@@ -140,7 +151,7 @@ static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_UNRESOLVED("Symbolic", "F3"),
     HP39_VAR_UNRESOLVED("Symbolic", "F2"),
     HP39_VAR_UNRESOLVED("Symbolic", "F1"),
-    HP39_VAR_DIRECT("Symbolic", "Angle", 12u),
+    HP39_VAR_BINT("Symbolic", "Angle", 12u),
 
     HP39_VAR_DIRECT("Plot FCN", "Slope", 35u),
     HP39_VAR_DIRECT("Plot FCN", "Root", 33u),
@@ -148,24 +159,24 @@ static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_DIRECT("Plot FCN", "Extremum", 37u),
     HP39_VAR_DIRECT("Plot FCN", "Area", 34u),
 
-    HP39_VAR_DIRECT("Plot", "Vzoom", 11u),
-    HP39_VAR_DIRECT("Plot", "Hzoom", 10u),
+    HP39_VAR_DIRECT("Plot", "Yzoom", 11u),
+    HP39_VAR_DIRECT("Plot", "Xzoom", 10u),
     HP39_VAR_DIRECT("Plot", "Ymax", 3u),
     HP39_VAR_DIRECT("Plot", "Ymin", 2u),
     HP39_VAR_DIRECT("Plot", "Xmax", 1u),
     HP39_VAR_DIRECT("Plot", "Xmin", 0u),
-    HP39_VAR_DIRECT("Plot", "VTick", 9u),
-    HP39_VAR_DIRECT("Plot", "HTick", 8u),
-    HP39_VAR_UNRESOLVED("Plot", "Ycross"),
-    HP39_VAR_UNRESOLVED("Plot", "Xcross"),
+    HP39_VAR_DIRECT("Plot", "Ytick", 9u),
+    HP39_VAR_DIRECT("Plot", "Xtick", 8u),
+    HP39_VAR_DIRECT("Plot", "Ycross", 14u),
+    HP39_VAR_DIRECT("Plot", "Xcross", 13u),
     HP39_VAR_FLAG("Plot", "Tracing", 18u, 1024u),
     HP39_VAR_FLAG("Plot", "Simult", 17u, 256u),
     HP39_VAR_FLAG("Plot", "Recenter", 17u, 128u),
     HP39_VAR_FLAG("Plot", "Labels", 17u, 64u),
-    HP39_VAR_FLAG("Plot", "InvCursor", 17u, 512u),
-    HP39_VAR_UNRESOLVED("Plot", "Indep"),
+    HP39_VAR_FLAG_NOT("Plot", "InvCross", 17u, 512u),
+    HP39_VAR_DIRECT("Plot", "Indep", 15u),
     HP39_VAR_FLAG("Plot", "Grid", 17u, 16u),
-    HP39_VAR_FLAG("Plot", "HighRes", 17u, 32u),
+    HP39_VAR_FLAG_NOT("Plot", "FastRes", 17u, 32u),
     HP39_VAR_FLAG("Plot", "Coord", 18u, 2048u),
     HP39_VAR_FLAG("Plot", "Connect", 17u, 4u),
     HP39_VAR_FLAG("Plot", "Axes", 17u, 2u),
@@ -178,6 +189,7 @@ _Static_assert(
 
 #undef HP39_VAR_UNRESOLVED
 #undef HP39_VAR_DIRECT
+#undef HP39_VAR_BINT
 #undef HP39_VAR_FLAG
 #undef HP39_VAR_FLAG_NOT
 
@@ -391,25 +403,45 @@ int hpclang_hp39_function_field_snapshot(
         object);
 }
 
-struct hp39_bint_buffer {
-    uint8_t nibbles[10];
+struct hp39_inline_buffer {
+    uint8_t nibbles[21];
+    uint32_t nibble_count;
 };
 
-static int hp39_bint_buffer_read(
+static int hp39_inline_buffer_read(
     void *context,
     uint32_t address,
     uint8_t *value)
 {
-    struct hp39_bint_buffer *buffer =
-        (struct hp39_bint_buffer *)context;
-    if (buffer == NULL || value == NULL || address >= 10u)
+    struct hp39_inline_buffer *buffer =
+        (struct hp39_inline_buffer *)context;
+    if (buffer == NULL || value == NULL ||
+        address >= buffer->nibble_count)
         return 0;
     *value = buffer->nibbles[address];
     return 1;
 }
 
-static int hp39_make_bint_snapshot(
-    uint32_t value,
+static int hp39_read_bint_value(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t object_address,
+    int32_t *value)
+{
+    uint32_t raw = 0u;
+    if (value == NULL ||
+        !hp39_read_word(reader, object_address, 5u, &raw) ||
+        raw != HP39_RPL_DOBINT ||
+        !hp39_read_word(reader, object_address + 5u, 5u, &raw))
+        return 0;
+
+    *value = (raw & UINT32_C(0x00080000)) != 0u
+        ? (int32_t)(raw | UINT32_C(0xfff00000))
+        : (int32_t)raw;
+    return 1;
+}
+
+static int hp39_make_integer_real_snapshot(
+    int32_t value,
     struct hpclang_object **object)
 {
     if (object == NULL) {
@@ -417,24 +449,56 @@ static int hp39_make_bint_snapshot(
         return -1;
     }
     *object = NULL;
-    if (value > UINT32_C(0x000fffff)) {
+
+    int64_t signed_magnitude = value;
+    uint64_t magnitude =
+        signed_magnitude < 0
+            ? (uint64_t)(-signed_magnitude)
+            : (uint64_t)signed_magnitude;
+
+    uint32_t digits = 1u;
+    if (magnitude != 0u) {
+        uint64_t scan = magnitude;
+        digits = 0u;
+        while (scan != 0u) {
+            ++digits;
+            scan /= UINT64_C(10);
+        }
+    }
+    if (digits > 12u) {
         errno = ERANGE;
         return -1;
     }
 
-    struct hp39_bint_buffer buffer = { { 0u } };
-    for (uint32_t i = 0u; i < 5u; ++i) {
-        buffer.nibbles[i] =
-            (uint8_t)((HP39_RPL_DOBINT >> (i * 4u)) & 0x0fu);
-        buffer.nibbles[5u + i] =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
-    }
+    uint32_t exponent = magnitude == 0u ? 0u : digits - 1u;
+    uint64_t mantissa = magnitude;
+    for (uint32_t i = digits; i < 12u; ++i)
+        mantissa *= UINT64_C(10);
 
-    struct hpclang_rpl_reader reader = {
-        .read_nibble = hp39_bint_buffer_read,
+    struct hp39_inline_buffer buffer = {
+        .nibbles = { 0u },
+        .nibble_count = 21u,
+    };
+    for (uint32_t i = 0u; i < 5u; ++i)
+        buffer.nibbles[i] =
+            (uint8_t)((HP39_RPL_DOREAL >> (i * 4u)) & 0x0fu);
+    for (uint32_t i = 0u; i < 3u; ++i) {
+        buffer.nibbles[5u + i] = (uint8_t)(exponent % 10u);
+        exponent /= 10u;
+    }
+    for (uint32_t i = 0u; i < 12u; ++i) {
+        buffer.nibbles[8u + i] =
+            (uint8_t)(mantissa % UINT64_C(10));
+        mantissa /= UINT64_C(10);
+    }
+    buffer.nibbles[20u] = value < 0 ? 9u : 0u;
+
+    struct hpclang_rpl_reader encoded_reader = {
+        .read_nibble = hp39_inline_buffer_read,
         .context = &buffer,
     };
-    return hpclang_object_snapshot_copy(&reader, 0u, 10u, object);
+    return hpclang_object_snapshot_copy(
+        &encoded_reader, 0u, buffer.nibble_count, object);
 }
 
 static void hp39_function_variable_projection_copy(
@@ -549,17 +613,22 @@ int hpclang_hp39_function_variable_snapshot(
         return -1;
     }
 
-    uint32_t flags = 0u;
-    if (!hp39_read_word(
-            reader, field.object_address + 5u, 5u, &flags)) {
+    int32_t stored = 0;
+    if (!hp39_read_bint_value(
+            reader, field.object_address, &stored)) {
         errno = EIO;
         return -1;
     }
 
-    uint32_t value = (flags & projection.mask) != 0u ? 1u : 0u;
     if (projection.kind ==
-        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED)
+        HPCLANG_HP39_FUNCTION_VARIABLE_BINT_UNCOERCE)
+        return hp39_make_integer_real_snapshot(stored, object);
+
+    uint32_t value =
+        ((uint32_t)stored & projection.mask) != 0u ? 1u : 0u;
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL_INVERTED)
         value ^= 1u;
 
-    return hp39_make_bint_snapshot(value, object);
+    return hp39_make_integer_real_snapshot((int32_t)value, object);
 }
