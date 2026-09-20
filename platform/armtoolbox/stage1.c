@@ -91,10 +91,12 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  *   Aplet catalog   = NOP ; GetApDirList ; NOP  ; NOP
  *   Program catalog = NOP ; CatPgm       ; {}N  ; NOP
  *   Note catalog    = NOP ; CatNot       ; {}N  ; NOP
- *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; NULL$
- *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; NULL$
- * Catalog requests return one DOLIST; body requests return one DOCSTR even
- * when the name is absent. The result remains on the private RPL data stack
+ *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR)
+ *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR)
+ * Catalog requests return one DOLIST. Body requests return one DOCSTR; an
+ * absent name returns a private thunk-local sentinel whose Saturn address is
+ * distinguishable from a real, possibly empty, Stock body. The result remains
+ * on the private RPL data stack
  * until the ARM resume validates one pushed cell, records its pointer and rolls
  * DSKTOP back to the pre-call value.
  */
@@ -115,14 +117,17 @@ enum {
     HP39P_NAME_NIBBLE = 112u,
     HP39P_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
+    HP39P_MISS_NIBBLE = 160u,
+    HP39P_MISS_NIBBLES = 10u,
+    HP39P_STATIC_NIBBLES = HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
 _Static_assert(
-    HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <=
-        sizeof(hp39_saturn_portal_thunk) * 2u,
-    "HP39 Saturn portal request must fit its private buffer");
+    HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
+    HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
+    "HP39 Saturn portal request and miss sentinel must fit its private buffer");
 
 struct hp39_saturn_builder {
     uint8_t *bytes;
@@ -283,8 +288,8 @@ static int hp39_request_words(
         *operation = kind == HP39P_BODY_PROGRAM
             ? UINT32_C(0x00027f6d)
             : UINT32_C(0x000280f0);
-        *pack = UINT32_C(0x00007903);      /* ?SKIP */
-        *normalize = UINT32_C(0x00005d98); /* NULL$ */
+        *pack = UINT32_C(0x00007903); /* ?SKIP */
+        *normalize = saturn_base + HP39P_MISS_NIBBLE;
         *expected_prologue = UINT32_C(0x00002a2c); /* DOCSTR */
         return 1;
     }
@@ -488,7 +493,17 @@ static int hp39_portal_prepare_thunk(
             &builder,
             (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
         !hp39_saturn_put_u32(&builder, c_hi) ||
-        builder.nibbles != HP39P_EXEC_NIBBLES)
+        builder.nibbles != HP39P_EXEC_NIBBLES ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_MISS_NIBBLE,
+            UINT32_C(0x00002a2c)) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_MISS_NIBBLE + 5u,
+            5u))
         return 0;
 
     hpclang_cache_clean(
@@ -500,7 +515,7 @@ static int hp39_portal_prepare_thunk(
      * portal is published. This catches wrong physical-page inversion, odd
      * nibble packing and stale aliasing without executing guessed memory.
      */
-    for (uint32_t i = 0u; i < HP39P_EXEC_NIBBLES; ++i) {
+    for (uint32_t i = 0u; i < HP39P_STATIC_NIBBLES; ++i) {
         uint8_t nibble = 0u;
         if (!stage_saturn_read_nibble(
                 (const uint32_t *)saturn_state,
@@ -737,8 +752,22 @@ int hpclang_hp39_portal_restore_hpc(void)
             prologue != portal->expected_prologue) {
             result = -5;
         } else {
-            portal->result_object = object;
-            portal->result_prologue = prologue;
+            const uint32_t kind = portal->request_kind;
+            const int body_request =
+                kind == HP39P_BODY_PROGRAM ||
+                kind == HP39P_BODY_NOTE;
+            const uint32_t miss_object =
+                portal->saturn_entry + HP39P_MISS_NIBBLE;
+            if (body_request && object == miss_object) {
+                /*
+                 * Keep semantic miss distinct from an existing empty body.
+                 * The thunk-local sentinel is never exposed to runtime.
+                 */
+                result = 1;
+            } else {
+                portal->result_object = object;
+                portal->result_prologue = prologue;
+            }
         }
 
         /*
