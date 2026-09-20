@@ -82,13 +82,15 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * The synthetic program deliberately has no application-visible RPL effect:
  *
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
- *   colon:   DOCOL SEMI
+ *   colon:   DOCOL GetApDirList DROP SEMI
  *   return:  -> DOCODE
  *   DOCODE:  restore C.W; ARMSYS
  *
- * DOCOL/SEMI therefore exercise the real Stock threaded evaluator and balance
- * their B/D return-stack changes before the DOCODE machine resume. No user data
- * stack object or I/O primitive is touched.
+ * GetApDirList is a real read-only Stock internal Aplet-catalog primitive. ROM
+ * evidence shows it returns the ApDirList list (or NULL{} when absent) through
+ * a context-restoring wrapper. DROP removes that one result before SEMI, so the
+ * probe has no net data-stack effect. DOCOL/SEMI still balance their B/D
+ * threaded-return changes before the DOCODE machine resume.
  */
 static uint8_t hp39_saturn_portal_thunk[64]
     __attribute__((section(".data.hp39.thunk"), aligned(64)));
@@ -96,10 +98,10 @@ static uint8_t hp39_saturn_portal_thunk[64]
 enum {
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
-    HP39P_RETURN_NIBBLE = 38u,
-    HP39P_DOCODE_NIBBLE = 43u,
-    HP39P_C_TEMPLATE_NIBBLE = 69u,
-    HP39P_TOTAL_NIBBLES = 85u,
+    HP39P_RETURN_NIBBLE = 48u,
+    HP39P_DOCODE_NIBBLE = 53u,
+    HP39P_C_TEMPLATE_NIBBLE = 79u,
+    HP39P_TOTAL_NIBBLES = 95u,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -276,9 +278,16 @@ static int hp39_portal_prepare_thunk(
 
     /*
      * Synthetic colon object:
-     *   [DOCOL prologue][SEMI threaded object]
+     *   [DOCOL][GetApDirList][DROP][SEMI]
+     *
+     * GetApDirList is supported entry #3F5AB. Its resolved Stock body reads
+     * the internal ApDirList ID through a temporary context binding and always
+     * returns one object (the list or NULL{}). DROP (#03244) consumes exactly
+     * that result, keeping this first native-catalog probe observational.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x00003244)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
         builder.nibbles != HP39P_RETURN_NIBBLE)
         return 0;
