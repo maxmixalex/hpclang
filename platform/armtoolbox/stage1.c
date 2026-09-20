@@ -251,9 +251,6 @@ static int hp39_portal_prepare_thunk(
     uint32_t docode = saturn_base + HP39P_DOCODE_NIBBLE;
     uint32_t c_template = saturn_base + HP39P_C_TEMPLATE_NIBBLE;
 
-    for (uint32_t i = 0u; i < sizeof(hp39_saturn_portal_thunk); ++i)
-        hp39_saturn_portal_thunk[i] = 0u;
-
     struct hp39_saturn_builder builder = {
         .bytes = hp39_saturn_portal_thunk,
         .capacity_nibbles =
