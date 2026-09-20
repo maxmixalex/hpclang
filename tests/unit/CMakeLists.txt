@@ -72,6 +72,13 @@ hpclang_unit(hp39_transfer_container
 target_include_directories(test_hp39_transfer_container PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(hp39_catalog
+    test_hp39_catalog.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-catalog.c")
+target_include_directories(test_hp39_catalog PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_snapshot
     test_object_snapshot.c
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
