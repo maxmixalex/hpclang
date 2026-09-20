@@ -194,9 +194,19 @@ Compatibility code may preserve that transfer protocol privately, while canonica
 
 ## Saturn / RPL object bridge
 
-The common 1.1/2.0 `sat_*` surface is broad: raw memory/object inspection, stack operations, push/pop conversions, directory/variable access, and temporary object construction.
+The common 1.1/2.0 `sat_*` surface mixes two materially different layers: application-level object/stack/directory jobs and raw Saturn-address mechanics.
 
-Compatibility decision: **Adapter**, deferred until the canonical ownership/lifetime model exists. The core should use explicit Saturn address/object types or opaque handles. HPGCC3's `SAT_OBJECT` direction is useful design evidence but not an ABI target.
+The original 1.1/2.0 `satdir.h` makes that split explicit. Its high-level API maintains an **internal C-side cwd** and provides path get/RCL/search plus REAL fetch helpers; it does not change the calculator's Stock cwd merely to navigate. Below that are low-level helpers such as `sat_skipob`, `sat_dirfindfirst`, `sat_dirfindnext` and `sat_itemgetname` that expose raw Saturn addresses and directory records directly.
+
+Compatibility decision:
+
+- **Adapter** for high-level stack/object and `satdir` application behavior. hpclang's owned `hpclang_object` snapshots and explicit `hpclang_object_store` handles already provide the clean lifetime/navigation substrate; an HPGCC adapter may keep adapter-local cwd/path state above them.
+- **Migration/Internal** for low-level address-returning `satdir`, raw memory mapping/peek/poke and helpers whose public contract is fundamentally an `unsigned` Saturn address. They are implementation evidence, not requirements for the canonical ABI.
+- HPGCC 1.1/2.0 parity does not by itself require general named-object mutation: the historical `satdir.h` surface is read/search/recall oriented. HPGCC3's later `sat3_sto*` / `sat3_purge*` APIs are useful mutation/lifetime evidence if a real port needs those operations.
+
+HP39 follows the same capability boundary without pretending to be a classic HOME tree. Native Aplet/Program/Note structures can be snapshotted directly; Aplet Variable values follow their Stock/HPGCC descriptor handlers. The earlier GBP39 player is a representative HPGCC39 application pattern: it read song data from native Note storage through Saturn directory inspection rather than a synthetic byte-stream filesystem.
+
+HPGCC3's `SAT_OBJECT` direction remains useful design evidence but is not an ABI target; hpclang deliberately replaces borrowed raw addresses with owned snapshots.
 
 ## KOS and direct stock-OS calls
 
