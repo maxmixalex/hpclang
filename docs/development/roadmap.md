@@ -252,7 +252,7 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**In progress; M7.3a–c are implemented and M7.3d named stores are next.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md). The current core has a runtime-private Saturn view, conservative proven-boundary parser, opaque owned snapshots, scalar/raw-string conversions, read-only stack observation, and bounded failure-safe stack mutation.
+**In progress; M7.3a–c are implemented and M7.3d read-only named stores are being closed.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md). The current core has a runtime-private Saturn view, conservative proven-boundary parser, opaque owned snapshots, scalar/raw-string conversions, read-only stack observation, bounded failure-safe stack mutation, and read-only classic-RPL named-store handles.
 
 - [x] define the boundary: public objects are opaque owned snapshots; runtime Saturn nibble addresses remain an explicit private type and never ordinary ARM pointers;
 - [x] define copy/borrow/ownership/error rules: M7.3 returns owned immutable snapshots, exposes no public borrowed Stock-memory aliases, and requires failure-safe stack/store mutations;
@@ -263,12 +263,15 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 - [x] implement bounded stack `push/pop/drop/replace`: launcher-native pages are fenced by stage1, historical Launcher-V3 level-1 bias is dynamically hidden/restored, TEMPOB allocation charges existing `AVMEM` relatively, pop snapshots before drop, and replace allocates/copies before pointer commit;
 - [x] validate stack mutation on original Stock HP48gII and HP49g+/HP50g with a self-contained CHAR A/B round trip (create → push → replace → peek → push → pop → drop) returning to the original depth. **Core #296 (`35439583956`)** is fully green; **Runtime #241 (`35439583995`)** has successful canonical build, all three Direct families, Stock hp48 and Stock hp4950. Its Stock hp39 job was later cancelled by the next push and is not claimed as part of this focused RPL evidence;
 - [x] validate the explicit REAL conversion in host units and ARM cross-build: the Runtime/unit job in **Core #297 (`35440008729`)** and the canonical-build job in **Runtime #242 (`35440008714`)** succeed on `87ce4349`;
-- [ ] implement the HP39 typed object-store path for named Aplet/Zaplet, Note, Program, Variable, List, Matrix, Library and related native records;
-- [ ] implement HP48/49/50 named RPL object exchange against explicit directory/store handles without flattening objects into byte-stream files or mutating Stock global cwd;
-- [ ] support common HPGCC `saturn.h` / `satdir.h` application patterns through adapters above the clean object service;
-- [ ] validate named-store get/enumeration and later put/remove round trips against original Stock environments, including malformed-object/error cases and return-state preservation.
+- [x] implement HP48gII/49g+/50g read-only named RPL object exchange against explicit directory/store handles without flattening objects into byte-stream files or mutating Stock global cwd;
+- [x] implement HP39 native read-only Aplet snapshots and Program/Note catalog/body lookup using the calculator's real DORRP / `PGMCXT` / `NOTESCXT` structures rather than a synthetic HOME hierarchy;
+- [x] recover the HP39 Aplet-variable model: current Topic Type property `ApletVars# = EIGHT` supplies the schema, extended IDs carry native recall/type/store descriptors, and third-party HPGCC Aplets can supply their own schema instead of inheriting a hard-coded Stock family table;
+- [ ] close Stock validation of HP39 descriptor-driven variable recall (current witness: HPGCC-standard `NoteText`) and then freeze the read-only HP39 object boundary;
+- [ ] support common HPGCC `saturn.h` / `satdir.h` read/iterate/recall application patterns through adapters above the clean object service;
+- [ ] validate the read-only named-store get/enumeration paths against original Stock environments, including malformed-object/error cases and return-state preservation;
+- [ ] add named-object mutation only where a concrete application or compatibility target requires it. HPGCC3 `sat3_sto*` / `sat3_purge*` is mutation evidence, but general put/remove is not a prerequisite for HPGCC 1.1/2.0 parity.
 
-Completion criterion: typical HPGCC programs that exchange RPL/calculator objects or use the stack can migrate without raw Saturn pointers or private OS calling conventions.
+Completion criterion: typical HPGCC 1.1/2.0 programs that inspect/exchange RPL/calculator objects or use the stack can migrate without raw Saturn pointers or private OS calling conventions. Mutation beyond those historical application needs may follow separately.
 
 ### M7.4 — Common system services
 
