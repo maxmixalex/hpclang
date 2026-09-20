@@ -82,7 +82,9 @@ static int hp39_portal_result(
     size_t maximum_name_length =
         kind == HP39P_VARIABLE_VALUE
             ? HP39_VARIABLE_ID_MAX
-            : HP39_BODY_NAME_MAX;
+            : kind == HP39P_REFERENCE_OBJECT
+                ? 3u
+                : HP39_BODY_NAME_MAX;
     if (name_length > maximum_name_length ||
         (name == NULL && name_length != 0u)) {
         errno = EINVAL;
@@ -171,25 +173,54 @@ int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
     return 0;
 }
 
-static int hp39_snapshot_payload_byte(
-    const struct hpclang_object *object,
-    uint32_t nibble_offset,
-    uint8_t *value)
+static int hp39_variable_reference_resolve(
+    void *context,
+    uint32_t reference,
+    uint32_t expected_prologue,
+    struct hpclang_object **object)
 {
-    if (object == NULL || value == NULL)
-        return 0;
+    (void)context;
+    if (object == NULL ||
+        reference == 0u ||
+        reference >= HP39_SATURN_LIMIT) {
+        if (object != NULL)
+            *object = NULL;
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
 
-    uint8_t low = 0u;
-    uint8_t high = 0u;
-    if (!hpclang_object_snapshot_read_nibble(
-            object, nibble_offset, &low) ||
-        !hpclang_object_snapshot_read_nibble(
-            object, nibble_offset + 1u, &high) ||
-        low > 0x0fu || high > 0x0fu)
-        return 0;
+    uint8_t payload[3] = {
+        (uint8_t)(reference & 0xffu),
+        (uint8_t)((reference >> 8u) & 0xffu),
+        (uint8_t)((reference >> 16u) & 0xffu),
+    };
 
-    *value = (uint8_t)(low | (uint8_t)(high << 4u));
-    return 1;
+    uint32_t address = 0u;
+    uint32_t prologue = 0u;
+    if (hp39_portal_result(
+            HP39P_REFERENCE_OBJECT,
+            payload,
+            sizeof(payload),
+            expected_prologue,
+            &address,
+            &prologue) != 0)
+        return -1;
+
+    if (hpclang_object_snapshot_copy(
+            &hp39_stock_reader,
+            address,
+            HP39_SATURN_LIMIT - address,
+            object) != 0)
+        return -1;
+    if (*object == NULL ||
+        (*object)->native_prologue != expected_prologue) {
+        hpclang_object_release(*object);
+        *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
 }
 
 int hpclang_hp39_variable_value_snapshot(
@@ -201,7 +232,8 @@ int hpclang_hp39_variable_value_snapshot(
 {
     if (object == NULL ||
         category == NULL || category_length == 0u ||
-        name == NULL || name_length == 0u) {
+        name == NULL || name_length == 0u ||
+        name_length > HP39_VARIABLE_ID_MAX - 3u) {
         if (object != NULL)
             *object = NULL;
         errno = EINVAL;
@@ -214,45 +246,30 @@ int hpclang_hp39_variable_value_snapshot(
         return -1;
 
     struct hpclang_hp39_variable_schema_match match;
-    if (hpclang_hp39_variable_schema_find(
+    if (hpclang_hp39_variable_schema_find_resolved(
             schema,
             category,
             category_length,
             name,
             name_length,
+            hp39_variable_reference_resolve,
+            NULL,
             &match) != 0) {
         hpclang_object_release(schema);
         return -1;
     }
-
-    if (match.id_span < 7u ||
-        ((match.id_span - 7u) & 1u) != 0u) {
-        hpclang_object_release(schema);
-        errno = EILSEQ;
-        return -1;
-    }
-
-    uint32_t payload_length = (match.id_span - 7u) / 2u;
-    if (payload_length <= 3u ||
-        payload_length > HP39_VARIABLE_ID_MAX) {
-        hpclang_object_release(schema);
-        errno = EILSEQ;
-        return -1;
-    }
-
-    uint8_t payload[HP39_VARIABLE_ID_MAX];
-    uint32_t payload_offset = match.id_offset + 7u;
-    for (uint32_t i = 0u; i < payload_length; ++i) {
-        if (!hp39_snapshot_payload_byte(
-                schema,
-                payload_offset + i * 2u,
-                &payload[i])) {
-            hpclang_object_release(schema);
-            errno = EILSEQ;
-            return -1;
-        }
-    }
     hpclang_object_release(schema);
+
+    uint32_t payload_length = (uint32_t)name_length + 3u;
+    uint8_t payload[HP39_VARIABLE_ID_MAX];
+    for (size_t i = 0u; i < name_length; ++i)
+        payload[i] = name[i];
+    payload[name_length] =
+        (uint8_t)(match.descriptor_address & 0xffu);
+    payload[name_length + 1u] =
+        (uint8_t)((match.descriptor_address >> 8u) & 0xffu);
+    payload[name_length + 2u] =
+        (uint8_t)((match.descriptor_address >> 16u) & 0xffu);
 
     uint32_t address = 0u;
     uint32_t prologue = 0u;

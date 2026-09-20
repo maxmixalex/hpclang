@@ -125,8 +125,10 @@ enum {
     HP39P_MISS_NIBBLES = 10u,
     HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
+    HP39P_REFERENCE_LIST_NIBBLE = 700u,
+    HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_STATIC_NIBBLES =
-        HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES,
+        HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -134,6 +136,8 @@ enum {
 _Static_assert(
     HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
     HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
+    HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
+        HP39P_REFERENCE_LIST_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
     "HP39 Saturn portal request helpers must fit its private buffer");
 _Static_assert(
@@ -301,6 +305,21 @@ static int hp39_request_words(
         return 1;
     }
 
+    if (kind == HP39P_REFERENCE_OBJECT && name_length == 3u) {
+        /*
+         * Materialize one schema reference without executing the referenced
+         * object: the request payload patches a private one-element list
+         * { ref }, then Stock ONE/NTHCOMPDROP returns its first data element.
+         * Runtime validates the returned prologue before using it.
+         */
+        *arg = saturn_base + HP39P_REFERENCE_LIST_NIBBLE;
+        *operation = UINT32_C(0x00004053); /* ONE */
+        *pack = UINT32_C(0x0000f476);      /* NTHCOMPDROP */
+        *normalize = nop;
+        *expected_prologue = 0u;
+        return 1;
+    }
+
     if (kind == HP39P_VARIABLE_VALUE &&
         name_length > 3u &&
         name_length <= HP39P_NAME_MAX_BYTES) {
@@ -344,8 +363,25 @@ static int hp39_store_request_name(
     const int body_request =
         kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
     const int variable_request = kind == HP39P_VARIABLE_VALUE;
-    if (!body_request && !variable_request)
+    const int reference_request = kind == HP39P_REFERENCE_OBJECT;
+    if (!body_request && !variable_request && !reference_request)
         return name_length == 0u;
+
+    if (reference_request) {
+        if (name == NULL || name_length != 3u)
+            return 0;
+        uint32_t reference =
+            (uint32_t)name[0] |
+            ((uint32_t)name[1] << 8u) |
+            ((uint32_t)name[2] << 16u);
+        if (reference == 0u || reference >= UINT32_C(0x00100000))
+            return 0;
+        return hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 5u,
+            reference);
+    }
 
     uint32_t maximum = body_request
         ? HP39P_BODY_NAME_MAX_BYTES
@@ -588,6 +624,29 @@ static int hp39_portal_prepare_thunk(
             return 0;
     }
 
+    /*
+     * Reference materializer container. The middle cell is patched per
+     * request; treating it as a DOLIST element lets Stock resolve supported
+     * #3Fxxx data references through composite semantics without executing the
+     * referenced object.
+     */
+    if (!hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE,
+            UINT32_C(0x00002a74)) || /* DOLIST */
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 5u,
+            UINT32_C(0x00004053)) || /* safe placeholder: ONE */
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 10u,
+            UINT32_C(0x0000312b)))   /* SEMI */
+        return 0;
+
     hpclang_cache_clean(
         hp39_saturn_portal_thunk,
         (uint32_t)sizeof(hp39_saturn_portal_thunk));
@@ -792,6 +851,21 @@ int hpclang_hp39_portal_prepare_stock(void)
                     hp39_saturn_portal_thunk, i))
                 return -7;
         }
+    } else if (kind == HP39P_REFERENCE_OBJECT) {
+        const uint8_t *request =
+            (const uint8_t *)(uintptr_t)portal->request_name;
+        uint32_t expected_reference =
+            (uint32_t)request[0] |
+            ((uint32_t)request[1] << 8u) |
+            ((uint32_t)request[2] << 16u);
+        uint32_t observed_reference = 0u;
+        if (!stage_saturn_read_word5(
+                read_map,
+                portal->saturn_entry +
+                    HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                &observed_reference) ||
+            observed_reference != expected_reference)
+            return -7;
     }
 
     store32(
