@@ -14,6 +14,7 @@
 #include "saturn-view.h"
 
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
+#define HP39_RPL_DOCOL UINT32_C(0x00002d9d)
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_BODY_NAME_MAX 19u
 #define HP39_VARIABLE_ID_MAX 255u
@@ -82,7 +83,8 @@ static int hp39_portal_result(
     size_t maximum_name_length =
         kind == HP39P_VARIABLE_VALUE
             ? HP39_VARIABLE_ID_MAX
-            : kind == HP39P_REFERENCE_OBJECT
+            : (kind == HP39P_REFERENCE_OBJECT ||
+               kind == HP39P_REFERENCE_EVAL)
                 ? 3u
                 : HP39_BODY_NAME_MAX;
     if (name_length > maximum_name_length ||
@@ -173,6 +175,49 @@ int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
     return 0;
 }
 
+static int hp39_variable_reference_snapshot(
+    uint32_t kind,
+    const uint8_t payload[3],
+    uint32_t expected_prologue,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t address = 0u;
+    uint32_t prologue = 0u;
+    if (hp39_portal_result(
+            kind,
+            payload,
+            3u,
+            0u,
+            &address,
+            &prologue) != 0)
+        return -1;
+
+    if (hpclang_object_snapshot_copy(
+            &hp39_stock_reader,
+            address,
+            HP39_SATURN_LIMIT - address,
+            object) != 0)
+        return -1;
+    if (*object == NULL) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    if ((*object)->native_prologue != expected_prologue) {
+        hpclang_object_release(*object);
+        *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
+}
+
 static int hp39_variable_reference_resolve(
     void *context,
     uint32_t reference,
@@ -196,31 +241,57 @@ static int hp39_variable_reference_resolve(
         (uint8_t)((reference >> 16u) & 0xffu),
     };
 
+    /*
+     * Stage one always materializes the reference as a composite element.
+     * Direct data references (for example xNoteText inside the returned
+     * {xNoteText} list) therefore stay inert and can be type-checked directly.
+     */
     uint32_t address = 0u;
     uint32_t prologue = 0u;
     if (hp39_portal_result(
             HP39P_REFERENCE_OBJECT,
             payload,
             sizeof(payload),
-            expected_prologue,
+            0u,
             &address,
             &prologue) != 0)
         return -1;
 
-    if (hpclang_object_snapshot_copy(
-            &hp39_stock_reader,
-            address,
-            HP39_SATURN_LIMIT - address,
-            object) != 0)
-        return -1;
-    if (*object == NULL ||
-        (*object)->native_prologue != expected_prologue) {
-        hpclang_object_release(*object);
-        *object = NULL;
+    if (prologue == expected_prologue) {
+        if (hpclang_object_snapshot_copy(
+                &hp39_stock_reader,
+                address,
+                HP39_SATURN_LIMIT - address,
+                object) != 0)
+            return -1;
+        if (*object == NULL ||
+            (*object)->native_prologue != expected_prologue) {
+            hpclang_object_release(*object);
+            *object = NULL;
+            errno = EILSEQ;
+            return -1;
+        }
+        return 0;
+    }
+
+    /*
+     * Stock ApletVars permits computed nested schema entries. Real MiniVar
+     * uses #3F8FB/#3F900, which materialize as DOCOL handlers such as
+     *   :: { xNoteText } TOTEMPOB ;
+     * Execute only this explicitly identified program case, then require the
+     * caller's exact expected data prologue. Arbitrary referenced IDs/data are
+     * never EVALed by this resolver.
+     */
+    if (prologue != HP39_RPL_DOCOL) {
         errno = EILSEQ;
         return -1;
     }
-    return 0;
+
+    return hp39_variable_reference_snapshot(
+        HP39P_REFERENCE_EVAL,
+        payload,
+        expected_prologue,
+        object);
 }
 
 int hpclang_hp39_variable_value_snapshot(
