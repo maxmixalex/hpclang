@@ -90,6 +90,16 @@ target_include_directories(test_hp39_native_directory PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(hp39_function_fields
+    test_hp39_function_fields.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-function-fields.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_hp39_function_fields PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_snapshot
     test_object_snapshot.c
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
