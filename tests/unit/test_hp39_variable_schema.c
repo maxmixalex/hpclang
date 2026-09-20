@@ -7,6 +7,7 @@
 #include <hpclang/object.h>
 
 #include "hp39-variable-schema.h"
+#include "object-snapshot.h"
 
 enum {
     RPL_DOLIST = 0x02a74u,
