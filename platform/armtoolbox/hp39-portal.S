@@ -10,6 +10,8 @@
 .type hpclang_hp39_portal_enter,%function
 hpclang_hp39_portal_enter:
     ldr     r12, =hpclang_hp39_portal_context
+    str     r0, [r12, #HP39P_APP_RESULT_OBJ]
+    str     r1, [r12, #HP39P_APP_RESULT_PRO]
     ldr     r1, [r12, #HP39P_MAGIC]
     ldr     r2, =HPCLANG_HP39_PORTAL_MAGIC_VALUE
     cmp     r1, r2
@@ -74,6 +76,17 @@ hpclang_hp39_portal_resume:
     mov     r3, r0
 
     ldr     r12, =hpclang_hp39_portal_context
+    cmp     r3, #0
+    bne     .Lportal_result_done
+    ldr     r1, [r12, #HP39P_APP_RESULT_OBJ]
+    cmp     r1, #0
+    ldrne   r0, [r12, #HP39P_RESULT_OBJECT]
+    strne   r0, [r1]
+    ldr     r1, [r12, #HP39P_APP_RESULT_PRO]
+    cmp     r1, #0
+    ldrne   r0, [r12, #HP39P_RESULT_PROLOGUE]
+    strne   r0, [r1]
+.Lportal_result_done:
     add     r1, r12, #HP39P_APP_REGS
     ldmia   r1, {r4-r11}
     ldr     sp, [r12, #HP39P_APP_SP]
