@@ -168,6 +168,10 @@ int main(void)
         1024u | 2048u,
         5u);
     put_word(&fixture, field_objects[25u] + 5u, 1u, 5u);
+    put_word(&fixture, field_objects[26u] + 5u, 7u, 5u);
+    put_word(&fixture, field_objects[27u] + 5u, 3u, 5u);
+    put_word(&fixture, field_objects[31u] + 5u, 4u, 5u);
+    put_word(&fixture, field_objects[32u] + 5u, 6u, 5u);
 
     struct hpclang_hp39_function_field_view field;
     assert(hpclang_hp39_function_field_at(
@@ -228,7 +232,7 @@ int main(void)
     assert(strcmp(projection.category, "Plot") == 0);
     assert(strcmp(projection.name, "Axes") == 0);
     assert(projection.kind ==
-        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN);
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL);
     assert(projection.fixed_field_index == 17u);
     assert(projection.mask == 2u);
 
@@ -249,7 +253,7 @@ int main(void)
                sizeof("NumType") - 1u,
                &projection) == 0);
     assert(projection.kind ==
-        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED);
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL_INVERTED);
     assert(projection.fixed_field_index == 25u);
     assert(projection.mask == 2u);
 
@@ -266,7 +270,7 @@ int main(void)
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
     hpclang_object_release(object);
 
-    int64_t integer = -1;
+    double real = -1.0;
     object = NULL;
     assert(hpclang_hp39_function_variable_snapshot(
                &reader,
@@ -276,12 +280,13 @@ int main(void)
                (const uint8_t *)"NumFont",
                sizeof("NumFont") - 1u,
                &object) == 0);
-    assert(hpclang_object_integer_i64(object, &integer) == 0);
-    assert(integer == 1);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+    assert(hpclang_object_real_f64(object, &real) == 0);
+    assert(real == 1.0);
     hpclang_object_release(object);
 
     object = NULL;
-    integer = -1;
+    real = -1.0;
     assert(hpclang_hp39_function_variable_snapshot(
                &reader,
                root,
@@ -290,13 +295,45 @@ int main(void)
                (const uint8_t *)"NumType",
                sizeof("NumType") - 1u,
                &object) == 0);
-    assert(hpclang_object_integer_i64(object, &integer) == 0);
-    assert(integer == 1);
+    assert(hpclang_object_real_f64(object, &real) == 0);
+    assert(real == 1.0);
     hpclang_object_release(object);
+
+    static const struct {
+        const char *name;
+        double expected;
+    } numeric_bints[] = {
+        { "NumRow", 7.0 },
+        { "NumCol", 3.0 },
+        { "Format", 4.0 },
+        { "Digits", 6.0 },
+        { "Angle", 13.0 },
+    };
+    for (size_t i = 0u;
+         i < sizeof(numeric_bints) / sizeof(numeric_bints[0]);
+         ++i) {
+        const char *category =
+            strcmp(numeric_bints[i].name, "Angle") == 0
+                ? "Symbolic" : "Numeric";
+        object = NULL;
+        real = -1.0;
+        assert(hpclang_hp39_function_variable_snapshot(
+                   &reader,
+                   root,
+                   (const uint8_t *)category,
+                   strlen(category),
+                   (const uint8_t *)numeric_bints[i].name,
+                   strlen(numeric_bints[i].name),
+                   &object) == 0);
+        assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+        assert(hpclang_object_real_f64(object, &real) == 0);
+        assert(real == numeric_bints[i].expected);
+        hpclang_object_release(object);
+    }
 
     put_word(&fixture, field_objects[25u] + 5u, 2u, 5u);
     object = NULL;
-    integer = -1;
+    real = -1.0;
     assert(hpclang_hp39_function_variable_snapshot(
                &reader,
                root,
@@ -305,19 +342,19 @@ int main(void)
                (const uint8_t *)"NumType",
                sizeof("NumType") - 1u,
                &object) == 0);
-    assert(hpclang_object_integer_i64(object, &integer) == 0);
-    assert(integer == 0);
+    assert(hpclang_object_real_f64(object, &real) == 0);
+    assert(real == 0.0);
     hpclang_object_release(object);
 
     static const char *const plot_true_flags[] = {
-        "Axes", "Connect", "Grid", "HighRes", "Labels",
-        "Recenter", "Simult", "InvCursor", "Tracing", "Coord"
+        "Axes", "Connect", "Grid", "Labels",
+        "Recenter", "Simult", "Tracing", "Coord"
     };
     for (size_t i = 0u;
          i < sizeof(plot_true_flags) / sizeof(plot_true_flags[0]);
          ++i) {
         object = NULL;
-        integer = -1;
+        real = -1.0;
         const char *flag_name = plot_true_flags[i];
         assert(hpclang_hp39_function_variable_snapshot(
                    &reader,
@@ -327,10 +364,62 @@ int main(void)
                    (const uint8_t *)flag_name,
                    strlen(flag_name),
                    &object) == 0);
-        assert(hpclang_object_integer_i64(object, &integer) == 0);
-        assert(integer == 1);
+        assert(hpclang_object_real_f64(object, &real) == 0);
+        assert(real == 1.0);
         hpclang_object_release(object);
     }
+
+    static const char *const plot_inverted_flags[] = {
+        "FastRes", "InvCross"
+    };
+    for (size_t i = 0u;
+         i < sizeof(plot_inverted_flags) /
+             sizeof(plot_inverted_flags[0]);
+         ++i) {
+        object = NULL;
+        real = -1.0;
+        assert(hpclang_hp39_function_variable_snapshot(
+                   &reader,
+                   root,
+                   (const uint8_t *)"Plot",
+                   sizeof("Plot") - 1u,
+                   (const uint8_t *)plot_inverted_flags[i],
+                   strlen(plot_inverted_flags[i]),
+                   &object) == 0);
+        assert(hpclang_object_real_f64(object, &real) == 0);
+        assert(real == 0.0);
+        hpclang_object_release(object);
+    }
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Plot",
+               sizeof("Plot") - 1u,
+               (const uint8_t *)"Xzoom",
+               sizeof("Xzoom") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD);
+    assert(projection.fixed_field_index == 10u);
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Plot",
+               sizeof("Plot") - 1u,
+               (const uint8_t *)"FastRes",
+               sizeof("FastRes") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_REAL_INVERTED);
+    assert(projection.fixed_field_index == 17u);
+    assert(projection.mask == 32u);
+
+    errno = 0;
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Plot",
+               sizeof("Plot") - 1u,
+               (const uint8_t *)"HighRes",
+               sizeof("HighRes") - 1u,
+               &projection) == -1);
+    assert(errno == ENOENT);
 
     object = NULL;
     errno = 0;
@@ -339,8 +428,8 @@ int main(void)
                root,
                (const uint8_t *)"Numeric",
                sizeof("Numeric") - 1u,
-               (const uint8_t *)"NumRow",
-               sizeof("NumRow") - 1u,
+               (const uint8_t *)"NumIndep",
+               sizeof("NumIndep") - 1u,
                &object) == -1);
     assert(object == NULL);
     assert(errno == ENOTSUP);
