@@ -336,9 +336,8 @@ int main(void)
     assert(strcmp(projection.category, "Sketch") == 0);
     assert(strcmp(projection.name, "PageNum") == 0);
     assert(projection.kind ==
-        HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED);
-    assert(projection.fixed_field_index ==
-        HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD);
+        HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER);
+    assert(projection.fixed_field_index == 18u);
 
     assert(hpclang_hp39_function_variable_projection_at(
                HPCLANG_HP39_FUNCTION_VARIABLE_COUNT - 1u,
