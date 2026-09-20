@@ -121,7 +121,7 @@ enum {
     HP39P_MISS_NIBBLE = 160u,
     HP39P_MISS_NIBBLES = 10u,
     HP39P_APLETVARS_NIBBLE = 170u,
-    HP39P_APLETVARS_NIBBLES = 35u,
+    HP39P_APLETVARS_NIBBLES = 50u,
     HP39P_STATIC_NIBBLES =
         HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
@@ -522,13 +522,16 @@ static int hp39_portal_prepare_thunk(
 
     /*
      * Current-Aplet variable schema helper:
-     *   :: tTYPE@ CARCOMP EIGHT PTYPE>PINFO DROP ;
+     *   :: tTYPE@ CARCOMP EIGHT PTYPE>PINFO DROP
+     *      DUPTYPELIST? ?SKIP EVAL ;
      *
      * HPGCC39 =Head39.h defines ApletVars#=EIGHT. Stock uses the same
      * tTYPE@ -> CARCOMP -> property-index -> PTYPE>PINFO protocol for
-     * ApletReset#=NINE at bank-7 logical 0x73D1C. Keep this helper in the
-     * private thunk so computed third-party Topic Type properties are honored
-     * exactly like built-in ones.
+     * ApletReset#=NINE at bank-7 logical 0x73D1C. Topic properties may be
+     * direct objects or executable/computed properties; Stock's AltViews
+     * consumer uses this exact DUPTYPELIST?/?SKIP/EVAL normalization pattern.
+     * ApletVars needs the same normalization so HPGCC/custom Aplets can return
+     * their schema dynamically instead of being mistaken for a non-list.
      */
     static const uint32_t aplet_vars_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
@@ -537,6 +540,9 @@ static int hp39_portal_prepare_thunk(
         UINT32_C(0x00004099), /* EIGHT */
         UINT32_C(0x000347cc), /* PTYPE>PINFO */
         UINT32_C(0x00003244), /* DROP */
+        UINT32_C(0x0000dce4), /* DUPTYPELIST? */
+        UINT32_C(0x00007903), /* ?SKIP */
+        UINT32_C(0x0000775c), /* EVAL */
         UINT32_C(0x0000312b), /* SEMI */
     };
     for (uint32_t i = 0u;
