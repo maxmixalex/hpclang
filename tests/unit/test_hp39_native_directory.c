@@ -249,12 +249,7 @@ int main(void)
     put_word(
         &fixture,
         home_root + 8u,
-        apletdir_item - (home_root + 8u),
-        5u);
-    put_word(
-        &fixture,
-        apletdir_item - 5u,
-        apletdir_item - 5u - hidden_item,
+        hidden_item - (home_root + 8u),
         5u);
     put_word(&fixture, hidden_item - 5u, 0u, 5u);
     put_word(&fixture, hidden_item, 0u, 2u); /* null-name special form */
@@ -322,6 +317,22 @@ int main(void)
             "Aplet catalog contains Function"))
         return 1;
     hpclang_object_release(catalog);
+
+    /*
+     * Add 'apletdir only after the ApDirList witness above has been read.
+     * Linking an all-zero future fixture item into HOME earlier accidentally
+     * makes it look like the legitimate null-named Hidden entry.
+     */
+    put_word(
+        &fixture,
+        home_root + 8u,
+        apletdir_item - (home_root + 8u),
+        5u);
+    put_word(
+        &fixture,
+        apletdir_item - 5u,
+        apletdir_item - 5u - hidden_item,
+        5u);
 
     /*
      * Stock RclAplet first enters HOME's 'apletdir and prepends an apostrophe
