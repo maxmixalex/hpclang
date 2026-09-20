@@ -18,7 +18,14 @@ static int read_nibble(
     uint32_t offset,
     uint8_t *value)
 {
-    return hpclang_object_snapshot_read_nibble(object, offset, value);
+    if (object == NULL || value == NULL || offset >= object->nibble_count)
+        return 0;
+
+    uint8_t packed = object->data[offset >> 1];
+    *value = (offset & 1u) != 0u
+        ? (uint8_t)(packed >> 4)
+        : (uint8_t)(packed & 0x0fu);
+    return 1;
 }
 
 static int read_word(
