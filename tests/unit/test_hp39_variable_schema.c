@@ -325,6 +325,37 @@ static void test_descriptor_triple(void)
     assert(descriptor.store_word == 0x3f4f0u);
 }
 
+static void test_note_text_descriptor_triple(void)
+{
+    /*
+     * Stock HP39 2.22 xNoteText is an extended ID whose descriptor pointer is
+     * 0x29A20. The descriptor is source/ROM-closed as:
+     *   recall = #3F4CB, type = DUPTYPECSTR? (#0DC5D), store = #3F4CC.
+     *
+     * Keep this distinct from the xNoteText object address (#2C812): schema
+     * references name the ID object, while value recall executes this getter.
+     */
+    struct descriptor_fixture fixture = {
+        .address = 0x29a20u,
+        .nibbles = { 0u },
+    };
+    fixture_put_word(&fixture, 0u, 0x3f4cbu);
+    fixture_put_word(&fixture, 5u, 0x0dc5du);
+    fixture_put_word(&fixture, 10u, 0x3f4ccu);
+
+    struct hpclang_rpl_reader reader = {
+        .read_nibble = descriptor_read_nibble,
+        .context = &fixture,
+    };
+    struct hpclang_hp39_variable_descriptor descriptor;
+    assert(hpclang_hp39_variable_descriptor_read(
+               &reader, 0x29a20u, &descriptor) == 0);
+    assert(descriptor.address == 0x29a20u);
+    assert(descriptor.recall_word == 0x3f4cbu);
+    assert(descriptor.type_predicate_word == 0x0dc5du);
+    assert(descriptor.store_word == 0x3f4ccu);
+}
+
 static void test_malformed_extended_id(void)
 {
     struct hpclang_object *schema = make_inline_schema();
@@ -350,6 +381,7 @@ int main(void)
     test_inline_schema_find();
     test_reference_schema_find();
     test_descriptor_triple();
+    test_note_text_descriptor_triple();
     test_malformed_extended_id();
     return 0;
 }
