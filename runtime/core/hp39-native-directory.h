@@ -22,6 +22,17 @@ int hpclang_hp39_native_aplet_catalog_snapshot(
     struct hpclang_object **object);
 
 /*
+ * Snapshot one native Aplet directory by its display/base name. Stock
+ * RclAplet normalizes that name to an apostrophe-prefixed ID under HOME's
+ * private 'apletdir; this helper follows the same storage path read-only.
+ */
+int hpclang_hp39_native_aplet_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object);
+
+/*
  * Read the HP39 Program/Note private directory format without entering the
  * Stock evaluator. context_pointer_address is the five-nibble RAM cell used by
  * PGMCXT@/NOTESCXT@. The returned catalog is an owned DOLIST of base DOIDNT

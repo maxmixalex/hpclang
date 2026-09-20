@@ -241,13 +241,20 @@ int main(void)
     const uint32_t hidden_item = 0x81200u;
     const uint32_t hidden_root = hidden_item + 2u;
     const uint32_t aplet_item = 0x81300u;
+    const uint32_t apletdir_item = 0x81400u;
+    const uint32_t function_item = 0x81500u;
     put_word(&fixture, RPL_USEROB, home_root, 5u);
     put_word(&fixture, home_root, RPL_DORRP, 5u);
     put_word(&fixture, home_root + 5u, 0u, 3u); /* no attached libraries */
     put_word(
         &fixture,
         home_root + 8u,
-        hidden_item - (home_root + 8u),
+        apletdir_item - (home_root + 8u),
+        5u);
+    put_word(
+        &fixture,
+        apletdir_item - 5u,
+        apletdir_item - 5u - hidden_item,
         5u);
     put_word(&fixture, hidden_item - 5u, 0u, 5u);
     put_word(&fixture, hidden_item, 0u, 2u); /* null-name special form */
@@ -315,6 +322,84 @@ int main(void)
             "Aplet catalog contains Function"))
         return 1;
     hpclang_object_release(catalog);
+
+    /*
+     * Stock RclAplet first enters HOME's 'apletdir and prepends an apostrophe
+     * to the display name. Model that exact storage path with one empty
+     * Function Aplet directory.
+     */
+    const char *apletdir_raw_name = "'apletdir";
+    size_t apletdir_raw_length = strlen(apletdir_raw_name);
+    put_word(
+        &fixture, apletdir_item,
+        (uint32_t)apletdir_raw_length, 2u);
+    for (size_t i = 0u; i < apletdir_raw_length; ++i)
+        put_byte(
+            &fixture,
+            apletdir_item + 2u + (uint32_t)i * 2u,
+            (uint8_t)apletdir_raw_name[i]);
+    put_byte(
+        &fixture,
+        apletdir_item + 2u + (uint32_t)apletdir_raw_length * 2u,
+        (uint8_t)apletdir_raw_length);
+    uint32_t apletdir_root =
+        apletdir_item + 4u + (uint32_t)apletdir_raw_length * 2u;
+    put_word(&fixture, apletdir_root, RPL_DORRP, 5u);
+    put_word(
+        &fixture,
+        apletdir_root + 8u,
+        function_item - (apletdir_root + 8u),
+        5u);
+    put_word(&fixture, function_item - 5u, 0u, 5u);
+
+    const char *function_raw_name = "'Function";
+    size_t function_raw_length = strlen(function_raw_name);
+    put_word(
+        &fixture, function_item,
+        (uint32_t)function_raw_length, 2u);
+    for (size_t i = 0u; i < function_raw_length; ++i)
+        put_byte(
+            &fixture,
+            function_item + 2u + (uint32_t)i * 2u,
+            (uint8_t)function_raw_name[i]);
+    put_byte(
+        &fixture,
+        function_item + 2u + (uint32_t)function_raw_length * 2u,
+        (uint8_t)function_raw_length);
+    uint32_t function_root =
+        function_item + 4u + (uint32_t)function_raw_length * 2u;
+    put_word(&fixture, function_root, RPL_DORRP, 5u);
+    put_word(&fixture, function_root + 8u, 0u, 5u);
+
+    struct hpclang_object *aplet = NULL;
+    if (!expect(
+            hpclang_hp39_native_aplet_snapshot(
+                &reader,
+                function_name,
+                sizeof(function_name),
+                &aplet) == 0,
+            "Function Aplet snapshot follows HOME/'apletdir/'Function") ||
+        !expect(aplet != NULL, "Function Aplet snapshot is returned") ||
+        !expect(
+            hpclang_object_kind(aplet) == HPCLANG_OBJECT_DIRECTORY,
+            "Function Aplet snapshot is a directory") ||
+        !expect(
+            aplet->nibble_count == 13u,
+            "empty Function fixture has exact DORRP span"))
+        return 1;
+    hpclang_object_release(aplet);
+
+    aplet = NULL;
+    errno = 0;
+    if (!expect(
+            hpclang_hp39_native_aplet_snapshot(
+                &reader,
+                (const uint8_t *)"Missing",
+                sizeof("Missing") - 1u,
+                &aplet) == -1 &&
+                aplet == NULL && errno == ENOENT,
+            "missing Aplet reports ENOENT"))
+        return 1;
 
     /* GetApDirList semantics: missing private variable becomes NULL{}. */
     put_word(&fixture, hidden_root + 8u, 0u, 5u);

@@ -446,6 +446,79 @@ int hpclang_hp39_native_aplet_catalog_snapshot(
     return 0;
 }
 
+int hpclang_hp39_native_aplet_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object)
+{
+    static const uint8_t aplet_directory_name[] = {
+        '\'', 'a', 'p', 'l', 'e', 't', 'd', 'i', 'r'
+    };
+
+    if (object == NULL || name == NULL || name_length == 0u ||
+        name_length > HPCLANG_RPL_STORE_NAME_CAPACITY - 2u) {
+        if (object != NULL)
+            *object = NULL;
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t home = 0u;
+    int result = hpclang_rpl_store_home_object(reader, &home);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+
+    struct hpclang_rpl_directory_entry_view aplet_directory;
+    result = hpclang_rpl_directory_find(
+        reader,
+        home,
+        aplet_directory_name,
+        (uint32_t)sizeof(aplet_directory_name),
+        &aplet_directory);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+    if (aplet_directory.prologue != HP39_RPL_DORRP) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint8_t stored_name[HPCLANG_RPL_STORE_NAME_CAPACITY];
+    stored_name[0] = HP39_CATALOG_PREFIX;
+    for (size_t i = 0u; i < name_length; ++i)
+        stored_name[i + 1u] = name[i];
+
+    struct hpclang_rpl_directory_entry_view entry;
+    result = hpclang_rpl_directory_find(
+        reader,
+        aplet_directory.object_address,
+        stored_name,
+        (uint32_t)name_length + 1u,
+        &entry);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+    if (entry.prologue != HP39_RPL_DORRP) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    if (hpclang_object_snapshot_copy(
+            reader,
+            entry.object_address,
+            HP39_SATURN_LIMIT - entry.object_address,
+            object) != 0)
+        return -1;
+    if (*object == NULL ||
+        hpclang_object_kind(*object) != HPCLANG_OBJECT_DIRECTORY) {
+        hpclang_object_release(*object);
+        *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
+}
+
 int hpclang_hp39_native_catalog_snapshot(
     const struct hpclang_rpl_reader *reader,
     uint32_t context_pointer_address,

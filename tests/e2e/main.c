@@ -22,6 +22,10 @@
 
 int hpclang_e2e_cpp_test(void);
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
+int hpclang_hp39_aplet_snapshot(
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object);
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object);
@@ -1832,6 +1836,24 @@ int main(void)
                 return finish(0xb4u, boot->model);
             }
 
+            static const uint8_t function_aplet_name[] = "Function";
+            struct hpclang_object *function_aplet = NULL;
+            if (hpclang_hp39_aplet_snapshot(
+                    function_aplet_name,
+                    sizeof(function_aplet_name) - 1u,
+                    &function_aplet) != 0 ||
+                function_aplet == NULL ||
+                hpclang_object_kind(function_aplet) !=
+                    HPCLANG_OBJECT_DIRECTORY) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(function_aplet);
+                return finish(0xbau, boot->model);
+            }
+            hpclang_object_release(function_aplet);
+
             static const uint8_t note_category[] = "Note";
             static const uint8_t note_text_name[] = "NoteText";
             struct hpclang_object *note_text_value = NULL;
@@ -1953,6 +1975,7 @@ int main(void)
             static const uint8_t missing_body_name[] =
                 "HPCLANG-NO-SUCH";
             struct hpclang_object *missing_body = NULL;
+            struct hpclang_object *direct_aplet = NULL;
             struct hpclang_object *direct_schema = NULL;
             struct hpclang_object *direct_value = NULL;
             errno = 0;
@@ -1962,6 +1985,13 @@ int main(void)
                     sizeof(missing_body_name) - 1u,
                     &missing_body);
             int missing_errno = errno;
+            errno = 0;
+            int direct_aplet_result =
+                hpclang_hp39_aplet_snapshot(
+                    (const uint8_t *)"Function",
+                    sizeof("Function") - 1u,
+                    &direct_aplet);
+            int aplet_errno = errno;
             errno = 0;
             int direct_schema_result =
                 hpclang_hp39_variable_schema_snapshot(&direct_schema);
@@ -1976,11 +2006,14 @@ int main(void)
                     &direct_value);
             int value_errno = errno;
             hpclang_object_release(missing_body);
+            hpclang_object_release(direct_aplet);
             hpclang_object_release(direct_schema);
             hpclang_object_release(direct_value);
             if (aplet_result != -1 ||
                 missing_result != -1 ||
                 missing_errno != ENOSYS ||
+                direct_aplet_result != -1 ||
+                aplet_errno != ENOSYS ||
                 direct_schema_result != -1 ||
                 schema_errno != ENOSYS ||
                 direct_value_result != -1 ||
