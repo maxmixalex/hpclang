@@ -60,16 +60,16 @@ hpclang_unit(rpl_object_store
 target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
-hpclang_unit(hp39_object_directory
-    test_hp39_object_directory.c
-    "${HPCLANG_ROOT}/runtime/core/hp39-object-directory.c")
-target_include_directories(test_hp39_object_directory PRIVATE
+hpclang_unit(hp39_transfer_directory
+    test_hp39_transfer_directory.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-transfer-directory.c")
+target_include_directories(test_hp39_transfer_directory PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
-hpclang_unit(hp39_object_container
-    test_hp39_object_container.c
-    "${HPCLANG_ROOT}/runtime/core/hp39-object-container.c")
-target_include_directories(test_hp39_object_container PRIVATE
+hpclang_unit(hp39_transfer_container
+    test_hp39_transfer_container.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-transfer-container.c")
+target_include_directories(test_hp39_transfer_container PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(object_snapshot

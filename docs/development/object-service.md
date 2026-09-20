@@ -106,14 +106,20 @@ Named objects use opaque store and iterator handles. The clean core never
 changes the Stock calculator's global current-directory state as an implicit
 side effect.
 
-A store handle identifies an explicit namespace:
+A store handle identifies an explicit namespace. The currently frozen mapping is:
 
 - HP48gII/49g+/50g: HOME/current RPL directory or an explicitly opened child
-  directory;
-- HP39gs/40gs: the native typed object-store namespace rooted in
-  `HP39DIR.000` / `HP39DIR.CUR`, with Aplet/Zaplet, Note, Program,
-  Variable, List, Matrix, Library and related records represented as native
-  objects rather than files.
+  directory.
+- HP39gs/40gs: no generic HOME/current mapping is frozen yet. Stock exposes
+  several native internal catalogs/contexts (Aplets, Programs, Variables and
+  related typed objects), not one proven HOME-like directory tree. Until a
+  faithful mapping is established, generic named-store entry points remain
+  `ENOSYS` rather than inventing a synthetic hierarchy.
+
+`HP39DIR.000`, `HP39DIR.CUR`, `HP39AscA` and `HP39BinX` belong to the
+external typed transfer/disk protocol used by HP39/40G import/export. Their
+private parsers are transfer-format support and must not define the internal
+calculator object-store model.
 
 Lookup returns owned snapshots. Put copies from a snapshot. Enumeration owns
 independent iterator state. Names are exposed as text only when the underlying
@@ -178,14 +184,15 @@ above or outside this clean object API.
 
 Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future long-lived named-store mutation. The public stack path does not expose raw allocation blocks or Saturn addresses.
 
-### M7.3d — named object stores — read-only RPL closed; HP39 backend in progress
+### M7.3d — named object stores — read-only RPL closed; HP39 internal model in progress
 
 - logical root/current/child handles use length-delimited calculator-byte names rather than assuming UTF-8 paths;
 - HP48gII/49g+/50g read-only RPL directory resolution, independent enumeration and owned named-object snapshots are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn addresses across GC/moving allocation;
 - Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
-- the HP39 `HP39AscA` transfer-directory grammar is now implemented as a strict private parser. It preserves the native A..K subtype, backing filename and Elsie name without flattening them into POSIX files;
-- the HP39 live object-fetch bridge remains open. The ROM entries `DoRecv/GetOb`, `DoGetObFrSto`, `OpenIO` and `StdIOProc` resolve to System-RPL/DOCOL controllers, not ARM-callable functions, so a private Saturn/System-RPL bridge must be proven before wiring public `get()`;
-- put/remove remain deferred until USEROB and HP39 mutation lifecycles are independently safe.
+- HP39 `HP39AscA` / `HP39BinX` parsing is retained privately as external typed-transfer protocol support. ROM and HPGCC39 evidence show `HP39DIR.*` belongs to the Disk Drive/Conn3x transfer path, so it is not an internal HOME/root backend;
+- the reverse ARMSYS edge, repeated mid-bootstrap ARM→Saturn→ARM portal, and execution of an hpclang-owned Saturn thunk are proven on Stock HP39gs/40gs. The next internal HP39 slice targets genuine native catalog/context primitives such as `GetApDirList` / `RclAplet`, not `DoGetObFrSto`'s external disk-transfer controller;
+- no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store calls stay `ENOSYS` until a faithful internal mapping is demonstrated;
+- put/remove remain deferred until USEROB and HP39 native-catalog mutation lifecycles are independently safe.
 
 ### M7.3e — HPGCC adapters and closure
 
