@@ -79,6 +79,16 @@ target_include_directories(test_hp39_catalog PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(hp39_native_directory
+    test_hp39_native_directory.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-native-directory.c"
+    "${HPCLANG_ROOT}/runtime/core/hp39-catalog.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_hp39_native_directory PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_snapshot
     test_object_snapshot.c
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"

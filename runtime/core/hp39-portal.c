@@ -7,14 +7,16 @@
 #include <hpclang/object.h>
 #include <hpclang/target.h>
 
+#include "hp39-native-directory.h"
 #include "object-snapshot.h"
 #include "../../platform/armtoolbox/hp39-portal-private.h"
 #include "saturn-view.h"
 
-#define HP39_RPL_DOCSTR UINT32_C(0x00002a2c)
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_BODY_NAME_MAX 19u
+#define HP39_PGMCXT_POINTER UINT32_C(0x00080739)
+#define HP39_NOTESCXT_POINTER UINT32_C(0x0008073e)
 
 static int hp39_snapshot_read_nibble(
     void *context,
@@ -24,6 +26,20 @@ static int hp39_snapshot_read_nibble(
     (void)context;
     return hpclang_saturn_read_nibble(
         hpclang_saturn_address_make(nibble_address), value);
+}
+
+static const struct hpclang_rpl_reader hp39_stock_reader = {
+    .read_nibble = hp39_snapshot_read_nibble,
+    .context = NULL,
+};
+
+static int hp39_live_stock_available(void)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    return boot != NULL &&
+        (boot->model == HPCLANG_MODEL_HP39GS ||
+         boot->model == HPCLANG_MODEL_HP40GS) &&
+        boot->saturn_state != 0u;
 }
 
 static int hp39_portal_result(
@@ -108,9 +124,7 @@ int hpclang_hp39_portal_roundtrip(void)
         &prologue);
 }
 
-static int hp39_catalog_snapshot(
-    uint32_t kind,
-    struct hpclang_object **object)
+int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EINVAL;
@@ -121,7 +135,7 @@ static int hp39_catalog_snapshot(
     uint32_t address = 0u;
     uint32_t prologue = 0u;
     if (hp39_portal_result(
-            kind,
+            HP39P_CATALOG_APLET,
             NULL,
             0u,
             HP39_RPL_DOLIST,
@@ -129,12 +143,8 @@ static int hp39_catalog_snapshot(
             &prologue) != 0)
         return -1;
 
-    struct hpclang_rpl_reader reader = {
-        .read_nibble = hp39_snapshot_read_nibble,
-        .context = NULL,
-    };
     if (hpclang_object_snapshot_copy(
-            &reader,
+            &hp39_stock_reader,
             address,
             HP39_SATURN_LIMIT - address,
             object) != 0)
@@ -150,23 +160,32 @@ static int hp39_catalog_snapshot(
     return 0;
 }
 
-int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
+static int hp39_native_catalog_snapshot(
+    uint32_t context_pointer,
+    struct hpclang_object **object)
 {
-    return hp39_catalog_snapshot(HP39P_CATALOG_APLET, object);
+    if (!hp39_live_stock_available()) {
+        if (object != NULL)
+            *object = NULL;
+        errno = ENOSYS;
+        return -1;
+    }
+    return hpclang_hp39_native_catalog_snapshot(
+        &hp39_stock_reader, context_pointer, object);
 }
 
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object)
 {
-    return hp39_catalog_snapshot(HP39P_CATALOG_PROGRAM, object);
+    return hp39_native_catalog_snapshot(HP39_PGMCXT_POINTER, object);
 }
 
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object)
 {
-    return hp39_catalog_snapshot(HP39P_CATALOG_NOTE, object);
+    return hp39_native_catalog_snapshot(HP39_NOTESCXT_POINTER, object);
 }
 
 static int hp39_body_snapshot(
-    uint32_t kind,
+    uint32_t context_pointer,
     const uint8_t *name,
     size_t name_length,
     struct hpclang_object **object)
@@ -182,36 +201,17 @@ static int hp39_body_snapshot(
     }
     *object = NULL;
 
-    uint32_t address = 0u;
-    uint32_t prologue = 0u;
-    if (hp39_portal_result(
-            kind,
-            name,
-            name_length,
-            HP39_RPL_DOCSTR,
-            &address,
-            &prologue) != 0)
-        return -1;
-
-    struct hpclang_rpl_reader reader = {
-        .read_nibble = hp39_snapshot_read_nibble,
-        .context = NULL,
-    };
-    if (hpclang_object_snapshot_copy(
-            &reader,
-            address,
-            HP39_SATURN_LIMIT - address,
-            object) != 0)
-        return -1;
-
-    if (*object == NULL ||
-        hpclang_object_kind(*object) != HPCLANG_OBJECT_STRING) {
-        hpclang_object_release(*object);
-        *object = NULL;
-        errno = EILSEQ;
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
         return -1;
     }
-    return 0;
+
+    return hpclang_hp39_native_body_snapshot(
+        &hp39_stock_reader,
+        context_pointer,
+        name,
+        name_length,
+        object);
 }
 
 int hpclang_hp39_program_body_snapshot(
@@ -220,7 +220,7 @@ int hpclang_hp39_program_body_snapshot(
     struct hpclang_object **object)
 {
     return hp39_body_snapshot(
-        HP39P_BODY_PROGRAM, name, name_length, object);
+        HP39_PGMCXT_POINTER, name, name_length, object);
 }
 
 int hpclang_hp39_note_body_snapshot(
@@ -229,5 +229,5 @@ int hpclang_hp39_note_body_snapshot(
     struct hpclang_object **object)
 {
     return hp39_body_snapshot(
-        HP39P_BODY_NOTE, name, name_length, object);
+        HP39_NOTESCXT_POINTER, name, name_length, object);
 }
