@@ -72,6 +72,115 @@ _Static_assert(
         HPCLANG_HP39_FUNCTION_FIXED_FIELD_COUNT,
     "Function fixed-field schema must stay source-complete");
 
+struct hp39_function_variable_schema {
+    const char *category;
+    uint8_t category_length;
+    const char *name;
+    uint8_t name_length;
+    enum hpclang_hp39_function_variable_projection_kind kind;
+    uint8_t fixed_field_index;
+    uint16_t mask;
+};
+
+#define HP39_VAR_UNRESOLVED(category_, name_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED, UINT8_MAX, 0u }
+#define HP39_VAR_DIRECT(category_, name_, field_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD, field_, 0u }
+#define HP39_VAR_FLAG(category_, name_, field_, mask_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN, field_, mask_ }
+#define HP39_VAR_FLAG_NOT(category_, name_, field_, mask_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED, field_, mask_ }
+
+/*
+ * Function ApletVars is the Topic Type property #8 schema at FPTR 8:02A
+ * (bank-7 logical 0x599B0). Keep this table in the ROM-published category and
+ * variable order, including unresolved entries.
+ *
+ * Direct-field mappings are backed by HPGCC39 Sharedvar.h + Funcdir.h and the
+ * Stock fixed-offset accessors. PlotFlag/Plot2Flg masks and Table TFlags bits
+ * come from HEADER.H. NumType is intentionally inverted: TBBuildBit set means
+ * Build Your Own, while the published NumType value is 0 for Build Your Own
+ * and 1 for Automatic.
+ *
+ * Similar-looking storage is deliberately not enough evidence: PageNum/Page,
+ * F0..F9, NumRow/NumCol/NumIndep, Format/Digits, Xcross/Ycross and Indep stay
+ * unresolved until their Stock getter semantics are mechanically closed.
+ */
+static const struct hp39_function_variable_schema hp39_function_variables[] = {
+    HP39_VAR_UNRESOLVED("Sketch", "PageNum"),
+    HP39_VAR_UNRESOLVED("Sketch", "Page"),
+    HP39_VAR_UNRESOLVED("Note", "NoteText"),
+
+    HP39_VAR_DIRECT("Numeric", "NumZoom", 24u),
+    HP39_VAR_FLAG_NOT("Numeric", "NumType", 25u, 2u),
+    HP39_VAR_DIRECT("Numeric", "NumStep", 23u),
+    HP39_VAR_DIRECT("Numeric", "NumStart", 22u),
+    HP39_VAR_UNRESOLVED("Numeric", "NumRow"),
+    HP39_VAR_UNRESOLVED("Numeric", "NumIndep"),
+    HP39_VAR_FLAG("Numeric", "NumFont", 25u, 1u),
+    HP39_VAR_UNRESOLVED("Numeric", "NumCol"),
+    HP39_VAR_UNRESOLVED("Numeric", "Format"),
+    HP39_VAR_UNRESOLVED("Numeric", "Digits"),
+
+    HP39_VAR_UNRESOLVED("Symbolic", "F0"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F9"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F8"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F7"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F6"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F5"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F4"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F3"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F2"),
+    HP39_VAR_UNRESOLVED("Symbolic", "F1"),
+    HP39_VAR_DIRECT("Symbolic", "Angle", 12u),
+
+    HP39_VAR_DIRECT("Plot FCN", "Slope", 35u),
+    HP39_VAR_DIRECT("Plot FCN", "Root", 33u),
+    HP39_VAR_DIRECT("Plot FCN", "Isect", 36u),
+    HP39_VAR_DIRECT("Plot FCN", "Extremum", 37u),
+    HP39_VAR_DIRECT("Plot FCN", "Area", 34u),
+
+    HP39_VAR_DIRECT("Plot", "Vzoom", 11u),
+    HP39_VAR_DIRECT("Plot", "Hzoom", 10u),
+    HP39_VAR_DIRECT("Plot", "Ymax", 3u),
+    HP39_VAR_DIRECT("Plot", "Ymin", 2u),
+    HP39_VAR_DIRECT("Plot", "Xmax", 1u),
+    HP39_VAR_DIRECT("Plot", "Xmin", 0u),
+    HP39_VAR_DIRECT("Plot", "VTick", 9u),
+    HP39_VAR_DIRECT("Plot", "HTick", 8u),
+    HP39_VAR_UNRESOLVED("Plot", "Ycross"),
+    HP39_VAR_UNRESOLVED("Plot", "Xcross"),
+    HP39_VAR_FLAG("Plot", "Tracing", 18u, 1024u),
+    HP39_VAR_FLAG("Plot", "Simult", 17u, 256u),
+    HP39_VAR_FLAG("Plot", "Recenter", 17u, 128u),
+    HP39_VAR_FLAG("Plot", "Labels", 17u, 64u),
+    HP39_VAR_FLAG("Plot", "InvCursor", 17u, 512u),
+    HP39_VAR_UNRESOLVED("Plot", "Indep"),
+    HP39_VAR_FLAG("Plot", "Grid", 17u, 16u),
+    HP39_VAR_FLAG("Plot", "HighRes", 17u, 32u),
+    HP39_VAR_FLAG("Plot", "Coord", 18u, 2048u),
+    HP39_VAR_FLAG("Plot", "Connect", 17u, 4u),
+    HP39_VAR_FLAG("Plot", "Axes", 17u, 2u),
+};
+
+_Static_assert(
+    sizeof(hp39_function_variables) / sizeof(hp39_function_variables[0]) ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_COUNT,
+    "Function ApletVars projection must stay ROM-schema complete");
+
+#undef HP39_VAR_UNRESOLVED
+#undef HP39_VAR_DIRECT
+#undef HP39_VAR_FLAG
+#undef HP39_VAR_FLAG_NOT
+
 static int hp39_read_word(
     const struct hpclang_rpl_reader *reader,
     uint32_t address,
@@ -280,4 +389,177 @@ int hpclang_hp39_function_field_snapshot(
         field.object_address,
         HP39_SATURN_LIMIT - field.object_address,
         object);
+}
+
+struct hp39_bint_buffer {
+    uint8_t nibbles[10];
+};
+
+static int hp39_bint_buffer_read(
+    void *context,
+    uint32_t address,
+    uint8_t *value)
+{
+    struct hp39_bint_buffer *buffer =
+        (struct hp39_bint_buffer *)context;
+    if (buffer == NULL || value == NULL || address >= 10u)
+        return 0;
+    *value = buffer->nibbles[address];
+    return 1;
+}
+
+static int hp39_make_bint_snapshot(
+    uint32_t value,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+    if (value > UINT32_C(0x000fffff)) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    struct hp39_bint_buffer buffer = { { 0u } };
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        buffer.nibbles[i] =
+            (uint8_t)((HP39_RPL_DOBINT >> (i * 4u)) & 0x0fu);
+        buffer.nibbles[5u + i] =
+            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+    }
+
+    struct hpclang_rpl_reader reader = {
+        .read_nibble = hp39_bint_buffer_read,
+        .context = &buffer,
+    };
+    return hpclang_object_snapshot_copy(&reader, 0u, 10u, object);
+}
+
+static void hp39_function_variable_projection_copy(
+    const struct hp39_function_variable_schema *schema,
+    struct hpclang_hp39_function_variable_projection *projection)
+{
+    projection->category = schema->category;
+    projection->category_length = schema->category_length;
+    projection->name = schema->name;
+    projection->name_length = schema->name_length;
+    projection->kind = schema->kind;
+    projection->fixed_field_index =
+        schema->kind == HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED
+            ? HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD
+            : (uint32_t)schema->fixed_field_index;
+    projection->mask = schema->mask;
+}
+
+int hpclang_hp39_function_variable_projection_at(
+    uint32_t index,
+    struct hpclang_hp39_function_variable_projection *projection)
+{
+    if (projection == NULL ||
+        index >= HPCLANG_HP39_FUNCTION_VARIABLE_COUNT) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    hp39_function_variable_projection_copy(
+        &hp39_function_variables[index], projection);
+    return 0;
+}
+
+int hpclang_hp39_function_variable_projection_find(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_hp39_function_variable_projection *projection)
+{
+    if (category == NULL || category_length == 0u ||
+        name == NULL || name_length == 0u || projection == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    for (uint32_t i = 0u;
+         i < HPCLANG_HP39_FUNCTION_VARIABLE_COUNT;
+         ++i) {
+        const struct hp39_function_variable_schema *schema =
+            &hp39_function_variables[i];
+        if (category_length == schema->category_length &&
+            name_length == schema->name_length &&
+            memcmp(category, schema->category, category_length) == 0 &&
+            memcmp(name, schema->name, name_length) == 0) {
+            hp39_function_variable_projection_copy(schema, projection);
+            return 0;
+        }
+    }
+
+    errno = ENOENT;
+    return -1;
+}
+
+int hpclang_hp39_function_variable_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    struct hpclang_hp39_function_variable_projection projection;
+    if (hpclang_hp39_function_variable_projection_find(
+            category,
+            category_length,
+            name,
+            name_length,
+            &projection) != 0)
+        return -1;
+
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD)
+        return hpclang_hp39_function_field_snapshot(
+            reader,
+            aplet_object,
+            projection.fixed_field_index,
+            object);
+
+    struct hpclang_hp39_function_field_view field;
+    if (hpclang_hp39_function_field_at(
+            reader,
+            aplet_object,
+            projection.fixed_field_index,
+            &field) != 0)
+        return -1;
+    if (field.prologue != HP39_RPL_DOBINT) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t flags = 0u;
+    if (!hp39_read_word(
+            reader, field.object_address + 5u, 5u, &flags)) {
+        errno = EIO;
+        return -1;
+    }
+
+    uint32_t value = (flags & projection.mask) != 0u ? 1u : 0u;
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED)
+        value ^= 1u;
+
+    return hp39_make_bint_snapshot(value, object);
 }
