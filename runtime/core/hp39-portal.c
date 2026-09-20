@@ -17,6 +17,7 @@
 #define HP39_SUPPORTED_ENTRY UINT32_C(0x00011111)
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_BODY_NAME_MAX 19u
+#define HP39_APLET_NAME_MAX 254u
 #define HP39_VARIABLE_ID_MAX 255u
 #define HP39_PGMCXT_POINTER UINT32_C(0x00080739)
 #define HP39_NOTESCXT_POINTER UINT32_C(0x0008073e)
@@ -390,6 +391,28 @@ int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
     }
     return hpclang_hp39_native_aplet_catalog_snapshot(
         &hp39_stock_reader, object);
+}
+
+int hpclang_hp39_aplet_snapshot(
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_object **object)
+{
+    if (object == NULL || name == NULL || name_length == 0u ||
+        name_length > HP39_APLET_NAME_MAX) {
+        if (object != NULL)
+            *object = NULL;
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return hpclang_hp39_native_aplet_snapshot(
+        &hp39_stock_reader, name, name_length, object);
 }
 
 static int hp39_native_catalog_snapshot(
