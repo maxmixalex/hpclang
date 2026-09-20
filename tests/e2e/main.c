@@ -21,7 +21,7 @@
 #include <hpclang/time.h>
 
 int hpclang_e2e_cpp_test(void);
-int hpclang_hp39_portal_roundtrip(void);
+int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -1769,14 +1769,30 @@ int main(void)
     if (boot->model == HPCLANG_MODEL_HP39GS ||
         boot->model == HPCLANG_MODEL_HP40GS) {
         errno = 0;
-        int first_portal = hpclang_hp39_portal_roundtrip();
+        struct hpclang_object *first_catalog = NULL;
+        struct hpclang_object *second_catalog = NULL;
+        int first_portal =
+            hpclang_hp39_aplet_catalog_snapshot(&first_catalog);
         int second_portal =
-            first_portal == 0 ? hpclang_hp39_portal_roundtrip() : -1;
+            first_portal == 0
+                ? hpclang_hp39_aplet_catalog_snapshot(&second_catalog)
+                : -1;
         if (boot->saturn_state != 0u) {
-            if (first_portal != 0 || second_portal != 0)
+            if (first_portal != 0 || second_portal != 0 ||
+                first_catalog == NULL || second_catalog == NULL ||
+                hpclang_object_kind(first_catalog) != HPCLANG_OBJECT_LIST ||
+                hpclang_object_kind(second_catalog) != HPCLANG_OBJECT_LIST) {
+                hpclang_object_release(first_catalog);
+                hpclang_object_release(second_catalog);
                 return finish(0xb4u, boot->model);
-        } else if (first_portal != -1 || errno != ENOSYS) {
-            return finish(0xb5u, boot->model);
+            }
+            hpclang_object_release(first_catalog);
+            hpclang_object_release(second_catalog);
+        } else {
+            hpclang_object_release(first_catalog);
+            hpclang_object_release(second_catalog);
+            if (first_portal != -1 || errno != ENOSYS)
+                return finish(0xb5u, boot->model);
         }
     }
 
