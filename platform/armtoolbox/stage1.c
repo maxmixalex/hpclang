@@ -439,7 +439,7 @@ int hpclang_hp39_portal_prepare_stock(void)
 
     uint32_t dsktop = 0u;
     if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        dsktop < RPL_MAIN_FIRST + 5u || dsktop > RPL_MAIN_END) {
+        dsktop < 5u || dsktop > RPL_MAIN_END) {
         portal->pre_dsktop = 0u;
         return -3;
     }
@@ -479,7 +479,7 @@ int hpclang_hp39_portal_restore_hpc(void)
     uint32_t object = 0u;
     uint32_t prologue = 0u;
 
-    if (portal->pre_dsktop < RPL_MAIN_FIRST + 5u ||
+    if (portal->pre_dsktop < 5u ||
         !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
         result = -4;
     } else {
