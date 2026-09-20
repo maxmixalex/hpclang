@@ -13,6 +13,9 @@ hpclang_hp39_portal_enter:
     str     r0, [r12, #HP39P_APP_RESULT_OBJ]
     str     r1, [r12, #HP39P_APP_RESULT_PRO]
     str     r2, [r12, #HP39P_REQUEST_KIND]
+    str     r3, [r12, #HP39P_REQUEST_NAME]
+    ldr     r2, [sp]
+    str     r2, [r12, #HP39P_REQUEST_NAME_LEN]
     ldr     r1, [r12, #HP39P_MAGIC]
     ldr     r2, =HPCLANG_HP39_PORTAL_MAGIC_VALUE
     cmp     r1, r2

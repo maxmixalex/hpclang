@@ -74,47 +74,55 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
     };
 
 /*
- * Keep the evaluator probe on its own 64-byte cache/page sub-boundary. The ARM
- * stage writes it once, cleans it, and then executes it only through Stock's
- * Saturn Read[] alias. 64-byte alignment also proves this 64-byte buffer cannot
- * cross a 4 KiB page.
+ * Keep the evaluator portal on its own 128-byte cache/page sub-boundary. The
+ * ARM stage rewrites only this private buffer, cleans it, and executes it only
+ * through Stock's Saturn Read[] alias. 128-byte alignment proves this 128-byte
+ * buffer cannot cross a 4 KiB page.
  *
  * The synthetic program deliberately has no application-visible RPL effect:
  *
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
- *   colon:   DOCOL catalog-op catalog-pack SEMI
+ *   colon:   DOCOL arg op pack normalize SEMI
  *   return:  -> DOCODE
  *   DOCODE:  restore C.W; ARMSYS
  *
- * The two catalog cells are patched before each trip while HPC mappings are
+ * Four threaded cells are patched before each trip while HPC mappings are
  * still active:
- *   Aplet   = GetApDirList ; NOP
- *   Program = CatPgm       ; {}N
- *   Note    = CatNot       ; {}N
- * Each sequence returns exactly one DOLIST. The result remains on the private
- * RPL data stack until the ARM resume validates one pushed cell, records its
- * pointer and rolls DSKTOP back to the pre-call value. DOCOL/SEMI still balance
- * their B/D threaded-return changes before the DOCODE machine resume.
+ *   Aplet catalog   = NOP ; GetApDirList ; NOP  ; NOP
+ *   Program catalog = NOP ; CatPgm       ; {}N  ; NOP
+ *   Note catalog    = NOP ; CatNot       ; {}N  ; NOP
+ *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; NULL$
+ *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; NULL$
+ * Catalog requests return one DOLIST; body requests return one DOCSTR even
+ * when the name is absent. The result remains on the private RPL data stack
+ * until the ARM resume validates one pushed cell, records its pointer and rolls
+ * DSKTOP back to the pre-call value.
  */
-static uint8_t hp39_saturn_portal_thunk[64]
-    __attribute__((section(".data.hp39.thunk"), aligned(64)));
+static uint8_t hp39_saturn_portal_thunk[128]
+    __attribute__((section(".data.hp39.thunk"), aligned(128)));
 
 enum {
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
-    HP39P_CATALOG_OP_NIBBLE = 33u,
-    HP39P_CATALOG_PACK_NIBBLE = 38u,
-    HP39P_RETURN_NIBBLE = 48u,
-    HP39P_DOCODE_NIBBLE = 53u,
-    HP39P_C_TEMPLATE_NIBBLE = 79u,
-    HP39P_TOTAL_NIBBLES = 95u,
+    HP39P_ARG_NIBBLE = 33u,
+    HP39P_OPERATION_NIBBLE = 38u,
+    HP39P_PACK_NIBBLE = 43u,
+    HP39P_NORMALIZE_NIBBLE = 48u,
+    HP39P_RETURN_NIBBLE = 58u,
+    HP39P_DOCODE_NIBBLE = 63u,
+    HP39P_C_TEMPLATE_NIBBLE = 89u,
+    HP39P_EXEC_NIBBLES = 105u,
+    HP39P_NAME_NIBBLE = 112u,
+    HP39P_NAME_MAX_BYTES = 19u,
+    HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
 _Static_assert(
-    HP39P_TOTAL_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
-    "HP39 Saturn evaluator probe must fit its private buffer");
+    HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <=
+        sizeof(hp39_saturn_portal_thunk) * 2u,
+    "HP39 Saturn portal request must fit its private buffer");
 
 struct hp39_saturn_builder {
     uint8_t *bytes;
@@ -191,6 +199,23 @@ static uint8_t hp39_saturn_buffer_nibble(
         : (uint8_t)(packed & 0x0fu);
 }
 
+static int hp39_saturn_buffer_store_nibble(
+    uint8_t *bytes,
+    uint32_t capacity_nibbles,
+    uint32_t offset,
+    uint8_t value)
+{
+    if (bytes == NULL || value > 0x0fu || offset >= capacity_nibbles)
+        return 0;
+
+    uint8_t *packed = &bytes[offset >> 1];
+    if ((offset & 1u) != 0u)
+        *packed = (uint8_t)((*packed & 0x0fu) | (uint8_t)(value << 4));
+    else
+        *packed = (uint8_t)((*packed & 0xf0u) | value);
+    return 1;
+}
+
 static int hp39_saturn_buffer_store_word5(
     uint8_t *bytes,
     uint32_t capacity_nibbles,
@@ -215,30 +240,105 @@ static int hp39_saturn_buffer_store_word5(
     return 1;
 }
 
-static int hp39_catalog_words(
+static int hp39_request_words(
     uint32_t kind,
+    uint32_t name_length,
+    uint32_t saturn_base,
+    uint32_t *arg,
     uint32_t *operation,
-    uint32_t *pack)
+    uint32_t *pack,
+    uint32_t *normalize,
+    uint32_t *expected_prologue)
 {
-    if (operation == NULL || pack == NULL)
+    if (arg == NULL || operation == NULL || pack == NULL ||
+        normalize == NULL || expected_prologue == NULL)
         return 0;
 
-    switch (kind) {
-    case HP39P_CATALOG_APLET:
-        *operation = UINT32_C(0x0003f5ab); /* GetApDirList */
-        *pack = UINT32_C(0x0000765c);      /* NOP */
+    const uint32_t nop = UINT32_C(0x0000765c);
+
+    if (kind == HP39P_CATALOG_APLET ||
+        kind == HP39P_CATALOG_PROGRAM ||
+        kind == HP39P_CATALOG_NOTE) {
+        if (name_length != 0u)
+            return 0;
+        *arg = nop;
+        *pack = kind == HP39P_CATALOG_APLET
+            ? nop
+            : UINT32_C(0x00005c12); /* {}N */
+        *normalize = nop;
+        *expected_prologue = UINT32_C(0x00002a74); /* DOLIST */
+        if (kind == HP39P_CATALOG_APLET)
+            *operation = UINT32_C(0x0003f5ab); /* GetApDirList */
+        else if (kind == HP39P_CATALOG_PROGRAM)
+            *operation = UINT32_C(0x000281c7); /* CatPgm */
+        else
+            *operation = UINT32_C(0x00028154); /* CatNot */
         return 1;
-    case HP39P_CATALOG_PROGRAM:
-        *operation = UINT32_C(0x000281c7); /* CatPgm */
-        *pack = UINT32_C(0x00005c12);      /* {}N */
-        return 1;
-    case HP39P_CATALOG_NOTE:
-        *operation = UINT32_C(0x00028154); /* CatNot */
-        *pack = UINT32_C(0x00005c12);      /* {}N */
-        return 1;
-    default:
-        return 0;
     }
+
+    if ((kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) &&
+        name_length != 0u &&
+        name_length <= HP39P_NAME_MAX_BYTES) {
+        *arg = saturn_base + HP39P_NAME_NIBBLE;
+        *operation = kind == HP39P_BODY_PROGRAM
+            ? UINT32_C(0x00027f6d)
+            : UINT32_C(0x000280f0);
+        *pack = UINT32_C(0x00007903);      /* ?SKIP */
+        *normalize = UINT32_C(0x00005d98); /* NULL$ */
+        *expected_prologue = UINT32_C(0x00002a2c); /* DOCSTR */
+        return 1;
+    }
+
+    return 0;
+}
+
+static int hp39_store_request_name(
+    uint32_t kind,
+    uint32_t name_length,
+    const uint8_t *name)
+{
+
+    if (kind != HP39P_BODY_PROGRAM && kind != HP39P_BODY_NOTE)
+        return name_length == 0u;
+    if (name == NULL || name_length == 0u ||
+        name_length > HP39P_NAME_MAX_BYTES)
+        return 0;
+
+    if (!hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_NAME_NIBBLE,
+            UINT32_C(0x00002e48))) /* DOIDNT */
+        return 0;
+
+    uint32_t length_offset = HP39P_NAME_NIBBLE + 5u;
+    if (!hp39_saturn_buffer_store_nibble(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            length_offset,
+            (uint8_t)(name_length & 0x0fu)) ||
+        !hp39_saturn_buffer_store_nibble(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            length_offset + 1u,
+            (uint8_t)((name_length >> 4) & 0x0fu)))
+        return 0;
+
+    uint32_t payload = HP39P_NAME_NIBBLE + 7u;
+    for (uint32_t i = 0u; i < name_length; ++i) {
+        if (!hp39_saturn_buffer_store_nibble(
+                hp39_saturn_portal_thunk,
+                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                payload + i * 2u,
+                (uint8_t)(name[i] & 0x0fu)) ||
+            !hp39_saturn_buffer_store_nibble(
+                hp39_saturn_portal_thunk,
+                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                payload + i * 2u + 1u,
+                (uint8_t)(name[i] >> 4)))
+            return 0;
+    }
+    return 1;
 }
 
 static int stage_saturn_read_nibble(
@@ -309,7 +409,8 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     uint32_t saturn_base = saturn_page + byte_offset * 2u;
-    if (saturn_base > RPL_MAIN_END - HP39P_TOTAL_NIBBLES)
+    if (saturn_base > RPL_MAIN_END -
+            (HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES))
         return 0;
 
     uint32_t colon = saturn_base + HP39P_COLON_NIBBLE;
@@ -341,15 +442,13 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     /*
-     * Synthetic colon object:
-     *   [DOCOL][catalog-op][catalog-pack][SEMI]
-     *
-     * The initial cells are safe Aplet defaults. prepare_stock() rewrites both
-     * cells for every trip, cleans the cache line and verifies the rewritten
-     * words through the Stock Saturn alias before releasing the emulator.
+     * Synthetic colon object. The four request cells start as the safe Aplet
+     * catalog sequence and are rewritten transactionally before every trip.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
         builder.nibbles != HP39P_RETURN_NIBBLE)
@@ -389,7 +488,7 @@ static int hp39_portal_prepare_thunk(
             &builder,
             (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
         !hp39_saturn_put_u32(&builder, c_hi) ||
-        builder.nibbles != HP39P_TOTAL_NIBBLES)
+        builder.nibbles != HP39P_EXEC_NIBBLES)
         return 0;
 
     hpclang_cache_clean(
@@ -401,7 +500,7 @@ static int hp39_portal_prepare_thunk(
      * portal is published. This catches wrong physical-page inversion, odd
      * nibble packing and stale aliasing without executing guessed memory.
      */
-    for (uint32_t i = 0u; i < HP39P_TOTAL_NIBBLES; ++i) {
+    for (uint32_t i = 0u; i < HP39P_EXEC_NIBBLES; ++i) {
         uint8_t nibble = 0u;
         if (!stage_saturn_read_nibble(
                 (const uint32_t *)saturn_state,
@@ -467,6 +566,9 @@ static void hp39_portal_configure(
     portal->result_object = 0u;
     portal->result_prologue = 0u;
     portal->request_kind = 0u;
+    portal->request_name = 0u;
+    portal->request_name_length = 0u;
+    portal->expected_prologue = UINT32_C(0x00002a74);
 
     if (stock_frame != 0u) {
         const volatile uint32_t *saved =
@@ -512,39 +614,86 @@ int hpclang_hp39_portal_prepare_stock(void)
     portal->result_object = 0u;
     portal->result_prologue = 0u;
 
+    uint32_t arg = 0u;
     uint32_t operation = 0u;
     uint32_t pack = 0u;
-    if (!hp39_catalog_words(
-            portal->request_kind, &operation, &pack) ||
+    uint32_t normalize = 0u;
+    uint32_t expected_prologue = 0u;
+    if (!hp39_request_words(
+            portal->request_kind,
+            portal->request_name_length,
+            portal->saturn_entry,
+            &arg,
+            &operation,
+            &pack,
+            &normalize,
+            &expected_prologue) ||
+        !hp39_store_request_name(
+            portal->request_kind,
+            portal->request_name_length,
+            (const uint8_t *)(uintptr_t)portal->request_name) ||
         !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_CATALOG_OP_NIBBLE,
+            HP39P_ARG_NIBBLE,
+            arg) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_OPERATION_NIBBLE,
             operation) ||
         !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_CATALOG_PACK_NIBBLE,
-            pack))
+            HP39P_PACK_NIBBLE,
+            pack) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_NORMALIZE_NIBBLE,
+            normalize))
         return -7;
 
+    portal->expected_prologue = expected_prologue;
     hpclang_cache_clean(
         hp39_saturn_portal_thunk,
         (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
-    uint32_t observed_operation = 0u;
-    uint32_t observed_pack = 0u;
-    if (!stage_saturn_read_word5(
-            read_map,
-            portal->saturn_entry + HP39P_CATALOG_OP_NIBBLE,
-            &observed_operation) ||
-        !stage_saturn_read_word5(
-            read_map,
-            portal->saturn_entry + HP39P_CATALOG_PACK_NIBBLE,
-            &observed_pack) ||
-        observed_operation != operation ||
-        observed_pack != pack)
-        return -7;
+    uint32_t observed = 0u;
+    const uint32_t offsets[4] = {
+        HP39P_ARG_NIBBLE,
+        HP39P_OPERATION_NIBBLE,
+        HP39P_PACK_NIBBLE,
+        HP39P_NORMALIZE_NIBBLE,
+    };
+    const uint32_t expected[4] = {
+        arg, operation, pack, normalize
+    };
+    for (uint32_t i = 0u; i < 4u; ++i) {
+        if (!stage_saturn_read_word5(
+                read_map,
+                portal->saturn_entry + offsets[i],
+                &observed) ||
+            observed != expected[i])
+            return -7;
+    }
+
+    const uint32_t kind = portal->request_kind;
+    const uint32_t name_length = portal->request_name_length;
+    if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
+        uint32_t name_end =
+            HP39P_NAME_NIBBLE + 7u + name_length * 2u;
+        for (uint32_t i = HP39P_NAME_NIBBLE; i < name_end; ++i) {
+            uint8_t nibble = 0u;
+            if (!stage_saturn_read_nibble(
+                    read_map,
+                    portal->saturn_entry + i,
+                    &nibble) ||
+                nibble != hp39_saturn_buffer_nibble(
+                    hp39_saturn_portal_thunk, i))
+                return -7;
+        }
+    }
 
     store32(
         (void *)portal->saturn_state,
@@ -585,7 +734,7 @@ int hpclang_hp39_portal_restore_hpc(void)
             !stage_saturn_read_word5(read_map, post_dsktop, &object) ||
             object > RPL_MAIN_END - 5u ||
             !stage_saturn_read_word5(read_map, object, &prologue) ||
-            prologue != UINT32_C(0x00002a74)) {
+            prologue != portal->expected_prologue) {
             result = -5;
         } else {
             portal->result_object = object;
@@ -593,8 +742,8 @@ int hpclang_hp39_portal_restore_hpc(void)
         }
 
         /*
-         * Every supported catalog request is read-only and normalized to one
-         * DOLIST result. Roll the private RPL data stack back even when
+         * Every supported request is read-only and normalized to exactly one
+         * result object. Roll the private RPL data stack back even when
          * result-shape validation fails, so the portal never leaks its
          * temporary cell into Stock execution.
          */
