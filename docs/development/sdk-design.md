@@ -165,11 +165,11 @@ The internal HP49g+/50g HOME/Port 0, Port 1 and Port 2 stores are **not FAT volu
 
 ### Calculator objects
 
-HP39gs/40gs have typed native calculator objects, but Stock does not present them as one proven HOME-like directory namespace. Aplets, Programs, Variables and related objects are managed through native catalogs/contexts. The generic named-store mapping therefore remains unfrozen on HP39 instead of inventing a synthetic hierarchy.
+HP39gs/40gs have typed native calculator objects, but Stock does not present them as one HOME-like directory namespace. The internal model is context-oriented: the Aplet directory is the top-level catalog; Program and Note catalogs use the current `PGMCXT` / `NOTESCXT` bindings; ordinary variables live in whichever Aplet/topic context is active. The generic named-store mapping therefore remains unfrozen on HP39 instead of inventing a synthetic hierarchy.
 
 Separately, `HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA` and `HP39BinX` define the external typed Disk Drive/Conn3x transfer protocol. They are useful private transfer-format evidence but are not the calculator's internal object-store root. ROM entries such as `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to that transfer/I/O path.
 
-HP39 internal object access should use the private Saturn/System-RPL portal with genuine native catalog/context primitives such as `GetApDirList` and `RclAplet`; ROM addresses and calling conventions remain private. HP48/49/50 RPL/Saturn objects belong to the same owned-object service, with family-specific namespace semantics hidden below it.
+HP39 internal object access uses the private Saturn/System-RPL portal with genuine native catalog/context primitives; ROM addresses and calling conventions remain private. The private bridge can already snapshot Aplet (`GetApDirList`), Program (`CatPgm -> {}N`) and Note (`CatNot -> {}N`) catalogs as owned immutable lists while rolling the temporary RPL stack cell back before returning to HPC. This is evidence for the model, not yet a public HP39 catalog API. HP48/49/50 RPL/Saturn objects belong to the same owned-object service, with family-specific namespace semantics hidden below it.
 
 ## Saturn/RPL integration
 

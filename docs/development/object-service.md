@@ -110,10 +110,12 @@ A store handle identifies an explicit namespace. The currently frozen mapping is
 
 - HP48gII/49g+/50g: HOME/current RPL directory or an explicitly opened child
   directory.
-- HP39gs/40gs: no generic HOME/current mapping is frozen yet. Stock exposes
-  several native internal catalogs/contexts (Aplets, Programs, Variables and
-  related typed objects), not one proven HOME-like directory tree. Until a
-  faithful mapping is established, generic named-store entry points remain
+- HP39gs/40gs: no generic HOME/current mapping is frozen. Stock exposes a
+  hierarchy of native catalogs/contexts rather than one HOME-like directory:
+  the Aplet directory is the top-level catalog; Program and Note catalogs are
+  reached through the current `PGMCXT` / `NOTESCXT` bindings; ordinary
+  variables are context-local (for example Stock explicitly executes
+  `DoInCalcCxt -> StoVar`). Generic named-store entry points therefore remain
   `ENOSYS` rather than inventing a synthetic hierarchy.
 
 `HP39DIR.000`, `HP39DIR.CUR`, `HP39AscA` and `HP39BinX` belong to the
@@ -190,8 +192,9 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - HP48gII/49g+/50g read-only RPL directory resolution, independent enumeration and owned named-object snapshots are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn addresses across GC/moving allocation;
 - Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
 - HP39 `HP39AscA` / `HP39BinX` parsing is retained privately as external typed-transfer protocol support. ROM and HPGCC39 evidence show `HP39DIR.*` belongs to the Disk Drive/Conn3x transfer path, so it is not an internal HOME/root backend;
-- the reverse ARMSYS edge, repeated mid-bootstrap ARM→Saturn→ARM portal, and execution of an hpclang-owned Saturn thunk are proven on Stock HP39gs/40gs. The next internal HP39 slice targets genuine native catalog/context primitives such as `GetApDirList` / `RclAplet`, not `DoGetObFrSto`'s external disk-transfer controller;
-- no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store calls stay `ENOSYS` until a faithful internal mapping is demonstrated;
+- the reverse ARMSYS edge, repeated mid-bootstrap ARM→Saturn→ARM portal, execution of an hpclang-owned threaded Saturn thunk, and transactional one-result rollback are implemented. The private catalog bridge now normalizes three real Stock internal catalogs to owned `DOLIST` snapshots: Aplet via `GetApDirList`, Program via `CatPgm -> {}N`, and Note via `CatNot -> {}N`;
+- ROM inspection establishes the internal hierarchy: `CatPgm` runs `CatThisCxt` inside `PGMCXT`; `CatNot` does the same inside `NOTESCXT`; Aplet creation/selection updates those context pointers alongside `apletPTR`; ordinary variables remain context-local rather than belonging to one global Variable catalog;
+- no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. These catalog snapshots remain runtime-private while the public catalog/lookup shape is designed; generic named-store calls stay `ENOSYS`;
 - put/remove remain deferred until USEROB and HP39 native-catalog mutation lifecycles are independently safe.
 
 ### M7.3e — HPGCC adapters and closure

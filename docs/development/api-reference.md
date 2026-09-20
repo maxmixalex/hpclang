@@ -153,7 +153,7 @@ hpclang distinguishes byte streams from typed calculator objects.
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
 | byte-stream files | ✅ HP49g+/HP50g | process-wide owned FatFs namespace feeds standard `open/close/read/write/lseek/unlink` and picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` |
-| calculator object store | ✅ read-only HP48/49/50 named RPL stores; HP39 internal namespace mapping not frozen | owned typed/named object API; HP39 native catalogs/contexts must not be flattened into a fake HOME tree or `FILE *` |
+| calculator object store | ✅ read-only HP48/49/50 named RPL stores; HP39 private Aplet/Program/Note catalog snapshots implemented, public mapping not frozen | owned typed/named object API; HP39 native catalogs/contexts must not be flattened into a fake HOME tree or `FILE *` |
 | RPL/Saturn objects | ✅ HP48/49/50 owned snapshots + bounded stack mutation; HP39 private portal proven | M7.3 typed object/stack bridge |
 
 The byte-stream metadata layer is also public and typed rather than exposing KOS structures:
@@ -168,7 +168,7 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 
 Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
 
-`HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts; no generic HOME/current mapping is claimed until that model is faithfully represented.
+`HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private runtime currently snapshots Aplet, Program and Note catalogs through the proven ARM↔Saturn portal, but no generic HOME/current mapping or public catalog API is claimed yet.
 
 ## Validation by service
 

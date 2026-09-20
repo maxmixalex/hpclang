@@ -186,11 +186,11 @@ Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, F
 
 ## HP39 calculator objects
 
-HP39gs/40gs have typed internal calculator objects, but the native storage model is split across Stock catalogs/contexts rather than one demonstrated HOME-like directory hierarchy. Internal Aplet operations such as `GetApDirList`, `RclAplet`, and `StoAplet` operate on that native context/catalog model.
+HP39gs/40gs have typed internal calculator objects, but the native storage model is split across Stock catalogs/contexts rather than one HOME-like directory hierarchy. ROM evidence establishes the current structure: `GetApDirList` exposes the Aplet catalog; `CatPgm` enumerates `PGMCXT`; `CatNot` enumerates `NOTESCXT`; ordinary variable operations such as `StoVar` run inside the caller's active Aplet/topic context. Aplet selection/creation updates the Program/Note context pointers together with the active Aplet state.
 
 `HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA`, and `HP39BinX` are a different layer: the typed external Disk Drive/Conn3x transfer protocol used to import/export Aplets, Programs, Notes and related records. Historical `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to this transfer/I/O path and must not be treated as proof that `HP39DIR.*` is the internal calculator namespace.
 
-Compatibility code may preserve that transfer protocol privately, while canonical internal object access should go through the proven Saturn/System-RPL portal and native catalog/context primitives. ROM addresses/calling conventions stay private, and HP39 is not flattened into `FILE *` or a fabricated HOME tree.
+Compatibility code may preserve that transfer protocol privately, while canonical internal object access goes through the proven Saturn/System-RPL portal and native catalog/context primitives. The current private bridge normalizes Aplet, Program and Note catalogs into owned list snapshots without exposing ROM addresses or leaving its temporary RPL stack cell behind. The public HP39 catalog/lookup shape remains deliberately unfrozen, and HP39 is not flattened into `FILE *` or a fabricated HOME tree.
 
 ## Saturn / RPL object bridge
 
