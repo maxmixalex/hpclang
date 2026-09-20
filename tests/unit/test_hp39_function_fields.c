@@ -16,6 +16,7 @@
 #define RPL_DOREAL UINT32_C(0x00002933)
 #define RPL_DOBINT UINT32_C(0x00002911)
 #define RPL_DOARRY UINT32_C(0x000029e8)
+#define RPL_DOCSTR UINT32_C(0x00002a2c)
 #define RPL_SEMI UINT32_C(0x0000312b)
 #define RPL_USEROB UINT32_C(0x00080711)
 
@@ -107,6 +108,31 @@ static void put_real_body(
         mantissa /= UINT64_C(10);
     }
     fixture->nibbles[address + 15u] = negative ? 9u : 0u;
+}
+
+static uint32_t put_cstr_tail(
+    struct fixture *fixture,
+    uint32_t item,
+    const char *text)
+{
+    size_t length = strlen(text);
+    assert(length <= 40u);
+
+    put_word(fixture, item, 0u, 2u);
+    uint32_t object = item + 2u;
+    put_word(fixture, object, RPL_DOCSTR, 5u);
+    put_word(
+        fixture,
+        object + 5u,
+        5u + (uint32_t)(length * 2u),
+        5u);
+    for (size_t i = 0u; i < length; ++i)
+        put_word(
+            fixture,
+            object + 10u + (uint32_t)(i * 2u),
+            (uint8_t)text[i],
+            2u);
+    return object + 10u + (uint32_t)(length * 2u);
 }
 
 static uint32_t put_function_equations(
@@ -236,6 +262,8 @@ int main(void)
             end = put_function_equations(&fixture, item);
         else if (i == 1u)
             end = put_real_array_1d(&fixture, item);
+        else if (i == 3u)
+            end = put_cstr_tail(&fixture, item, "memo");
         else
             end = put_null_field(&fixture, item, RPL_DOLIST, 0u);
         previous_item = item;
@@ -251,7 +279,7 @@ int main(void)
     put_word(
         &fixture,
         field_objects[18u] + 5u,
-        1024u | 2048u,
+        1024u | 2048u | (6u << 6),
         5u);
     put_word(&fixture, field_objects[25u] + 5u, 1u, 5u);
     put_word(&fixture, field_objects[26u] + 5u, 7u, 5u);
@@ -592,6 +620,79 @@ int main(void)
     assert(object == NULL);
     assert(errno == EILSEQ);
     put_word(&fixture, tail_objects[1] + 5u, 20u + 3u * 16u, 5u);
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Sketch",
+               sizeof("Sketch") - 1u,
+               (const uint8_t *)"PageNum",
+               sizeof("PageNum") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER);
+    assert(projection.fixed_field_index == 18u);
+
+    object = NULL;
+    real = -1.0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Sketch", sizeof("Sketch") - 1u,
+               (const uint8_t *)"PageNum", sizeof("PageNum") - 1u,
+               &object) == 0);
+    assert(object != NULL);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+    assert(hpclang_object_real_f64(object, &real) == 0);
+    assert(real == 7.0);
+    hpclang_object_release(object);
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Note",
+               sizeof("Note") - 1u,
+               (const uint8_t *)"NoteText",
+               sizeof("NoteText") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_NOTE_TEXT);
+    assert(projection.fixed_field_index ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD);
+
+    object = NULL;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Note", sizeof("Note") - 1u,
+               (const uint8_t *)"NoteText", sizeof("NoteText") - 1u,
+               &object) == 0);
+    assert(object != NULL);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_STRING);
+    size_t note_size = 0u;
+    assert(hpclang_object_string_size(object, &note_size) == 0);
+    assert(note_size == 4u);
+    uint8_t note_bytes[4] = { 0u };
+    assert(hpclang_object_string_copy(
+               object, note_bytes, sizeof(note_bytes)) == 0);
+    assert(memcmp(note_bytes, "memo", 4u) == 0);
+    hpclang_object_release(object);
+
+    put_word(&fixture, tail_objects[3], RPL_DOLIST, 5u);
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Note", sizeof("Note") - 1u,
+               (const uint8_t *)"NoteText", sizeof("NoteText") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == EILSEQ);
+    put_word(&fixture, tail_objects[3], RPL_DOCSTR, 5u);
+
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader, root,
+               (const uint8_t *)"Sketch", sizeof("Sketch") - 1u,
+               (const uint8_t *)"Page", sizeof("Page") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == ENOTSUP);
 
     static const struct {
         const char *name;

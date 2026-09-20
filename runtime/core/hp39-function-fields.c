@@ -13,6 +13,7 @@
 #define HP39_RPL_DOBINT UINT32_C(0x00002911)
 #define HP39_RPL_DOREAL UINT32_C(0x00002933)
 #define HP39_RPL_DOARRY UINT32_C(0x000029e8)
+#define HP39_RPL_DOCSTR UINT32_C(0x00002a2c)
 #define HP39_RPL_SEMI UINT32_C(0x0000312b)
 
 struct hp39_function_field_schema {
@@ -103,6 +104,14 @@ struct hp39_function_variable_schema {
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
       HPCLANG_HP39_FUNCTION_VARIABLE_SYMBOLIC_SLOT, UINT8_MAX, slot_ }
+#define HP39_VAR_NOTE_TEXT(category_, name_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_NOTE_TEXT, UINT8_MAX, 0u }
+#define HP39_VAR_PAGE_NUMBER(category_, name_, field_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER, field_, 0u }
 #define HP39_VAR_FLAG(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
@@ -142,13 +151,22 @@ struct hp39_function_variable_schema {
  * Primitive 0x6132B only turns a returned DOBINT slot into FALSE, establishing
  * DOBINT as the undefined-slot sentinel rather than an expression transform.
  *
- * Similar-looking storage is still not enough evidence for PageNum/Page or
- * NoteText.
+ * HPGCC39's standard Aplet skeleton proves the shared tail convention:
+ * DirNot is LastBut1 and is a CSTR, while DirEnd/LastBut0 is the Sketch set.
+ * Stock pairs NoteText getter/setter at 0x42CCE/0x43859, so NoteText is the
+ * LastBut1 CSTR snapshot.
+ *
+ * PageNum is separately source-closed by the Stock 0x42E18 getter and helper
+ * 0x4BB8F: ((Plot2Flg / YHI) & 15) + 1, with YHI=#40 (64). Thus public
+ * PageNum is a REAL in 1..16 encoded in Plot2Flg bits 6..9.
+ *
+ * Page itself remains unresolved until the LastBut0 Sketch-set element format
+ * and empty-page semantics are mechanically closed.
  */
 static const struct hp39_function_variable_schema hp39_function_variables[] = {
-    HP39_VAR_UNRESOLVED("Sketch", "PageNum"),
+    HP39_VAR_PAGE_NUMBER("Sketch", "PageNum", 18u),
     HP39_VAR_UNRESOLVED("Sketch", "Page"),
-    HP39_VAR_UNRESOLVED("Note", "NoteText"),
+    HP39_VAR_NOTE_TEXT("Note", "NoteText"),
 
     HP39_VAR_DIRECT("Numeric", "NumZoom", 24u),
     HP39_VAR_FLAG_NOT("Numeric", "NumType", 25u, 2u),
@@ -212,6 +230,8 @@ _Static_assert(
 #undef HP39_VAR_BINT
 #undef HP39_VAR_REAL_ARRAY_LIST
 #undef HP39_VAR_SYMBOLIC_SLOT
+#undef HP39_VAR_NOTE_TEXT
+#undef HP39_VAR_PAGE_NUMBER
 #undef HP39_VAR_FLAG
 #undef HP39_VAR_FLAG_NOT
 
@@ -558,6 +578,29 @@ static int hp39_function_symbolic_slot_snapshot(
 
     errno = ENOENT;
     return -1;
+}
+
+static int hp39_function_note_text_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t address = 0u;
+    if (hp39_function_tail_object(
+            reader, aplet_object, 2u, HP39_RPL_DOCSTR, &address) != 0)
+        return -1;
+
+    return hpclang_object_snapshot_copy(
+        reader,
+        address,
+        HP39_SATURN_LIMIT - address,
+        object);
 }
 
 struct hp39_real_array_list_reader {
@@ -928,6 +971,11 @@ int hpclang_hp39_function_variable_snapshot(
         return hp39_function_symbolic_slot_snapshot(
             reader, aplet_object, (uint32_t)projection.mask, object);
 
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_NOTE_TEXT)
+        return hp39_function_note_text_snapshot(
+            reader, aplet_object, object);
+
     struct hpclang_hp39_function_field_view field;
     if (hpclang_hp39_function_field_at(
             reader,
@@ -950,6 +998,13 @@ int hpclang_hp39_function_variable_snapshot(
     if (projection.kind ==
         HPCLANG_HP39_FUNCTION_VARIABLE_BINT_UNCOERCE)
         return hp39_make_integer_real_snapshot(stored, object);
+
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER) {
+        uint32_t page =
+            (((uint32_t)stored / UINT32_C(64)) & UINT32_C(15)) + 1u;
+        return hp39_make_integer_real_snapshot((int32_t)page, object);
+    }
 
     uint32_t value =
         ((uint32_t)stored & projection.mask) != 0u ? 1u : 0u;
