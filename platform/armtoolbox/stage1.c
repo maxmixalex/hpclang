@@ -18,6 +18,7 @@
 
 #define RPL_RSKTOP           0x000806f3u
 #define RPL_DSKTOP           0x000806f8u
+#define RPL_AVMEM            0x00080e9bu
 #define RPL_DOCSTR           0x00002a2cu
 #define RPL_MAIN_FIRST       0x00080000u
 #define RPL_MAIN_END         0x00100000u
@@ -772,12 +773,20 @@ int hpclang_hp39_portal_restore_hpc(void)
 
         /*
          * Every supported request is read-only and normalized to exactly one
-         * result object. Roll the private RPL data stack back even when
-         * result-shape validation fails, so the portal never leaks its
-         * temporary cell into Stock execution.
+         * result object. Mirror Stock DROP exactly when removing that private
+         * result cell: DSKTOP advances by one five-nibble pointer and AVMEM
+         * gains one stack level. Do not restore pre-call AVMEM wholesale:
+         * Program/Note catalog packing may legitimately leave a temporary
+         * result object allocated below RSKTOP until the ARM snapshot copies
+         * it.
          */
-        if (!stage_saturn_write_word5(
-                read_map, RPL_DSKTOP, portal->pre_dsktop))
+        uint32_t avmem = 0u;
+        if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
+            avmem >= UINT32_C(0x000fffff) ||
+            !stage_saturn_write_word5(
+                read_map, RPL_DSKTOP, portal->pre_dsktop) ||
+            !stage_saturn_write_word5(
+                read_map, RPL_AVMEM, avmem + 1u))
             result = -6;
     }
 
