@@ -45,6 +45,7 @@
 #define HP39P_CATALOG_NOTE     3
 #define HP39P_BODY_PROGRAM     4
 #define HP39P_BODY_NOTE        5
+#define HP39P_VARIABLE_SCHEMA  6
 
 #ifndef __ASSEMBLER__
 
