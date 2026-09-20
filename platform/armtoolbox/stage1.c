@@ -125,9 +125,7 @@ enum {
     HP39P_MISS_NIBBLES = 10u,
     HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
-    HP39P_REFERENCE_LIST_NIBBLE = 700u,
-    HP39P_REFERENCE_LIST_NIBBLES = 15u,
-    HP39P_REFERENCE_EVAL_NIBBLE = 715u,
+    HP39P_REFERENCE_EVAL_NIBBLE = 700u,
     HP39P_REFERENCE_EVAL_NIBBLES = 15u,
     HP39P_STATIC_NIBBLES =
         HP39P_REFERENCE_EVAL_NIBBLE + HP39P_REFERENCE_EVAL_NIBBLES,
@@ -139,8 +137,6 @@ _Static_assert(
     HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
     HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
     HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
-        HP39P_REFERENCE_LIST_NIBBLE &&
-    HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES <=
         HP39P_REFERENCE_EVAL_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
     "HP39 Saturn portal request helpers must fit its private buffer");
@@ -309,21 +305,6 @@ static int hp39_request_words(
         return 1;
     }
 
-    if (kind == HP39P_REFERENCE_OBJECT && name_length == 3u) {
-        /*
-         * First stage: materialize one schema reference without executing the
-         * referenced object. Runtime may accept the object directly, or—only
-         * when it is explicitly a DOCOL handler—make a second REFERENCE_EVAL
-         * trip. This keeps ordinary referenced IDs/data inert.
-         */
-        *arg = saturn_base + HP39P_REFERENCE_LIST_NIBBLE;
-        *operation = UINT32_C(0x00004053); /* ONE */
-        *pack = UINT32_C(0x0000f476);      /* NTHCOMPDROP */
-        *normalize = nop;
-        *expected_prologue = 0u;
-        return 1;
-    }
-
     if (kind == HP39P_REFERENCE_EVAL && name_length == 3u) {
         *arg = nop;
         *operation = saturn_base + HP39P_REFERENCE_EVAL_NIBBLE;
@@ -344,10 +325,10 @@ static int hp39_request_words(
          * executing that value a second time.
          */
         *arg = saturn_base + HP39P_NAME_NIBBLE;
-        *operation = UINT32_C(0x000081d3); /* @ */
-        *pack = nop;
-        *normalize = nop;
-        *expected_prologue = 0u; /* typed result; validated by snapshot parser */
+        *operation = UINT32_C(0x000081d3); /* @ -> object TRUE | FALSE */
+        *pack = UINT32_C(0x00007903);      /* ?SKIP consumes recall flag */
+        *normalize = saturn_base + HP39P_MISS_NIBBLE;
+        *expected_prologue = 0u; /* typed result or private miss sentinel */
         return 1;
     }
 
@@ -376,8 +357,7 @@ static int hp39_store_request_name(
     const int body_request =
         kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
     const int variable_request = kind == HP39P_VARIABLE_VALUE;
-    const int reference_request =
-        kind == HP39P_REFERENCE_OBJECT || kind == HP39P_REFERENCE_EVAL;
+    const int reference_request = kind == HP39P_REFERENCE_EVAL;
     if (!body_request && !variable_request && !reference_request)
         return name_length == 0u;
 
@@ -390,10 +370,7 @@ static int hp39_store_request_name(
             ((uint32_t)name[2] << 16u);
         if (reference == 0u || reference >= UINT32_C(0x00100000))
             return 0;
-        uint32_t patch =
-            kind == HP39P_REFERENCE_OBJECT
-                ? HP39P_REFERENCE_LIST_NIBBLE + 5u
-                : HP39P_REFERENCE_EVAL_NIBBLE + 5u;
+        uint32_t patch = HP39P_REFERENCE_EVAL_NIBBLE + 5u;
         return hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
@@ -643,27 +620,12 @@ static int hp39_portal_prepare_thunk(
     }
 
     /*
-     * Reference materializer container. The middle cell is patched per
-     * request; treating it as a DOLIST element lets Stock resolve supported
-     * #3Fxxx data references through composite semantics without executing the
-     * referenced object.
+     * Supported-entry executor. The middle cell is patched only after runtime
+     * has read the referenced logical cell and proved its #11111 Stock
+     * supported-entry trampoline. Ordinary data/ID pointers are snapshotted
+     * directly and never executed.
      */
     if (!hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE,
-            UINT32_C(0x00002a74)) || /* DOLIST */
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 5u,
-            UINT32_C(0x00004053)) || /* safe placeholder: ONE */
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 10u,
-            UINT32_C(0x0000312b)) || /* SEMI */
-        !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_REFERENCE_EVAL_NIBBLE,
@@ -884,18 +846,14 @@ int hpclang_hp39_portal_prepare_stock(void)
                     hp39_saturn_portal_thunk, i))
                 return -7;
         }
-    } else if (kind == HP39P_REFERENCE_OBJECT ||
-               kind == HP39P_REFERENCE_EVAL) {
+    } else if (kind == HP39P_REFERENCE_EVAL) {
         const uint8_t *request =
             (const uint8_t *)(uintptr_t)portal->request_name;
         uint32_t expected_reference =
             (uint32_t)request[0] |
             ((uint32_t)request[1] << 8u) |
             ((uint32_t)request[2] << 16u);
-        uint32_t patch =
-            kind == HP39P_REFERENCE_OBJECT
-                ? HP39P_REFERENCE_LIST_NIBBLE + 5u
-                : HP39P_REFERENCE_EVAL_NIBBLE + 5u;
+        uint32_t patch = HP39P_REFERENCE_EVAL_NIBBLE + 5u;
         uint32_t observed_reference = 0u;
         if (!stage_saturn_read_word5(
                 read_map,
@@ -949,12 +907,13 @@ int hpclang_hp39_portal_restore_hpc(void)
             result = -5;
         } else {
             const uint32_t kind = portal->request_kind;
-            const int body_request =
+            const int miss_request =
                 kind == HP39P_BODY_PROGRAM ||
-                kind == HP39P_BODY_NOTE;
+                kind == HP39P_BODY_NOTE ||
+                kind == HP39P_VARIABLE_VALUE;
             const uint32_t miss_object =
                 portal->saturn_entry + HP39P_MISS_NIBBLE;
-            if (body_request && object == miss_object) {
+            if (miss_request && object == miss_object) {
                 /*
                  * Keep semantic miss distinct from an existing empty body.
                  * The thunk-local sentinel is never exposed to runtime.

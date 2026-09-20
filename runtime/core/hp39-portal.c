@@ -14,7 +14,7 @@
 #include "saturn-view.h"
 
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
-#define HP39_RPL_DOCOL UINT32_C(0x00002d9d)
+#define HP39_SUPPORTED_ENTRY UINT32_C(0x00011111)
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_BODY_NAME_MAX 19u
 #define HP39_VARIABLE_ID_MAX 255u
@@ -35,6 +35,28 @@ static const struct hpclang_rpl_reader hp39_stock_reader = {
     .read_nibble = hp39_snapshot_read_nibble,
     .context = NULL,
 };
+
+static int hp39_stock_read_word5(
+    uint32_t address,
+    uint32_t *value)
+{
+    if (value == NULL || address > HP39_SATURN_LIMIT - 5u)
+        return 0;
+
+    uint32_t out = 0u;
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint8_t nibble = 0u;
+        if (!hp39_stock_reader.read_nibble(
+                hp39_stock_reader.context,
+                address + i,
+                &nibble) ||
+            nibble > 0x0fu)
+            return 0;
+        out |= (uint32_t)nibble << (i * 4u);
+    }
+    *value = out;
+    return 1;
+}
 
 static int hp39_live_stock_available(void)
 {
@@ -83,8 +105,7 @@ static int hp39_portal_result(
     size_t maximum_name_length =
         kind == HP39P_VARIABLE_VALUE
             ? HP39_VARIABLE_ID_MAX
-            : (kind == HP39P_REFERENCE_OBJECT ||
-               kind == HP39P_REFERENCE_EVAL)
+            : kind == HP39P_REFERENCE_EVAL
                 ? 3u
                 : HP39_BODY_NAME_MAX;
     if (name_length > maximum_name_length ||
@@ -235,33 +256,22 @@ static int hp39_variable_reference_resolve(
     }
     *object = NULL;
 
-    uint8_t payload[3] = {
-        (uint8_t)(reference & 0xffu),
-        (uint8_t)((reference >> 8u) & 0xffu),
-        (uint8_t)((reference >> 16u) & 0xffu),
-    };
+    uint32_t prologue = 0u;
+    if (!hp39_stock_read_word5(reference, &prologue)) {
+        errno = EIO;
+        return -1;
+    }
 
     /*
-     * Stage one always materializes the reference as a composite element.
-     * Direct data references (for example xNoteText inside the returned
-     * {xNoteText} list) therefore stay inert and can be type-checked directly.
+     * Ordinary schema references, including xNoteText (#2C812), are real
+     * object addresses. Preserve their data semantics by snapshotting them
+     * directly; do not route them through EVAL.
      */
-    uint32_t address = 0u;
-    uint32_t prologue = 0u;
-    if (hp39_portal_result(
-            HP39P_REFERENCE_OBJECT,
-            payload,
-            sizeof(payload),
-            0u,
-            &address,
-            &prologue) != 0)
-        return -1;
-
     if (prologue == expected_prologue) {
         if (hpclang_object_snapshot_copy(
                 &hp39_stock_reader,
-                address,
-                HP39_SATURN_LIMIT - address,
+                reference,
+                HP39_SATURN_LIMIT - reference,
                 object) != 0)
             return -1;
         if (*object == NULL ||
@@ -275,18 +285,22 @@ static int hp39_variable_reference_resolve(
     }
 
     /*
-     * Stock ApletVars permits computed nested schema entries. Real MiniVar
-     * uses #3F8FB/#3F900, which materialize as DOCOL handlers such as
-     *   :: { xNoteText } TOTEMPOB ;
-     * Execute only this explicitly identified program case, then require the
-     * caller's exact expected data prologue. Arbitrary referenced IDs/data are
-     * never EVALed by this resolver.
+     * Stock virtual #3Fxxx supported entries carry the #11111 trampoline in
+     * the logical cell. The reviewed HP39 ROM proves MiniVar's {NoteText} and
+     * {SketchSet} entries use this mechanism. Execute only this explicitly
+     * recognized trampoline through Stock, then require the caller's exact
+     * expected data prologue. Unknown references fail closed.
      */
-    if (prologue != HP39_RPL_DOCOL) {
+    if (prologue != HP39_SUPPORTED_ENTRY) {
         errno = EILSEQ;
         return -1;
     }
 
+    uint8_t payload[3] = {
+        (uint8_t)(reference & 0xffu),
+        (uint8_t)((reference >> 8u) & 0xffu),
+        (uint8_t)((reference >> 16u) & 0xffu),
+    };
     return hp39_variable_reference_snapshot(
         HP39P_REFERENCE_EVAL,
         payload,
