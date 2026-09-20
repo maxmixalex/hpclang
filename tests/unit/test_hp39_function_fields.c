@@ -119,6 +119,7 @@ int main(void)
     const uint32_t root = 0x100u;
     uint32_t item = root + 18u;
     uint32_t previous_item = item;
+    uint32_t field_objects[HPCLANG_HP39_FUNCTION_FIXED_FIELD_COUNT] = { 0u };
 
     put_word(&fixture, RPL_USEROB, home, 5u);
     put_word(&fixture, home, RPL_DORRP, 5u);
@@ -139,6 +140,7 @@ int main(void)
         uint32_t link = end;
         item = link + 5u;
         put_word(&fixture, link, link - previous_item, 5u);
+        field_objects[i] = item + 2u;
         end = put_null_field(
             &fixture, item, field_prologues[i], i + 1u);
         previous_item = item;
@@ -153,6 +155,19 @@ int main(void)
         previous_item = item;
     }
     put_word(&fixture, root + 8u, previous_item - (root + 8u), 5u);
+
+    /* Source-proven public-variable flag storage. */
+    put_word(
+        &fixture,
+        field_objects[17u] + 5u,
+        2u | 4u | 16u | 32u | 64u | 128u | 256u | 512u,
+        5u);
+    put_word(
+        &fixture,
+        field_objects[18u] + 5u,
+        1024u | 2048u,
+        5u);
+    put_word(&fixture, field_objects[25u] + 5u, 1u, 5u);
 
     struct hpclang_hp39_function_field_view field;
     assert(hpclang_hp39_function_field_at(
@@ -196,6 +211,148 @@ int main(void)
     assert(object != NULL);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
     hpclang_object_release(object);
+
+    struct hpclang_hp39_function_variable_projection projection;
+    assert(hpclang_hp39_function_variable_projection_at(
+               0u, &projection) == 0);
+    assert(strcmp(projection.category, "Sketch") == 0);
+    assert(strcmp(projection.name, "PageNum") == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED);
+    assert(projection.fixed_field_index ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD);
+
+    assert(hpclang_hp39_function_variable_projection_at(
+               HPCLANG_HP39_FUNCTION_VARIABLE_COUNT - 1u,
+               &projection) == 0);
+    assert(strcmp(projection.category, "Plot") == 0);
+    assert(strcmp(projection.name, "Axes") == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN);
+    assert(projection.fixed_field_index == 17u);
+    assert(projection.mask == 2u);
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumStart",
+               sizeof("NumStart") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD);
+    assert(projection.fixed_field_index == 22u);
+
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumType",
+               sizeof("NumType") - 1u,
+               &projection) == 0);
+    assert(projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED);
+    assert(projection.fixed_field_index == 25u);
+    assert(projection.mask == 2u);
+
+    object = NULL;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader,
+               root,
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumStart",
+               sizeof("NumStart") - 1u,
+               &object) == 0);
+    assert(object != NULL);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+    hpclang_object_release(object);
+
+    int64_t integer = -1;
+    object = NULL;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader,
+               root,
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumFont",
+               sizeof("NumFont") - 1u,
+               &object) == 0);
+    assert(hpclang_object_integer_i64(object, &integer) == 0);
+    assert(integer == 1);
+    hpclang_object_release(object);
+
+    object = NULL;
+    integer = -1;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader,
+               root,
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumType",
+               sizeof("NumType") - 1u,
+               &object) == 0);
+    assert(hpclang_object_integer_i64(object, &integer) == 0);
+    assert(integer == 1);
+    hpclang_object_release(object);
+
+    put_word(&fixture, field_objects[25u] + 5u, 2u, 5u);
+    object = NULL;
+    integer = -1;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader,
+               root,
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumType",
+               sizeof("NumType") - 1u,
+               &object) == 0);
+    assert(hpclang_object_integer_i64(object, &integer) == 0);
+    assert(integer == 0);
+    hpclang_object_release(object);
+
+    static const char *const plot_true_flags[] = {
+        "Axes", "Connect", "Grid", "HighRes", "Labels",
+        "Recenter", "Simult", "InvCursor", "Tracing", "Coord"
+    };
+    for (size_t i = 0u;
+         i < sizeof(plot_true_flags) / sizeof(plot_true_flags[0]);
+         ++i) {
+        object = NULL;
+        integer = -1;
+        const char *flag_name = plot_true_flags[i];
+        assert(hpclang_hp39_function_variable_snapshot(
+                   &reader,
+                   root,
+                   (const uint8_t *)"Plot",
+                   sizeof("Plot") - 1u,
+                   (const uint8_t *)flag_name,
+                   strlen(flag_name),
+                   &object) == 0);
+        assert(hpclang_object_integer_i64(object, &integer) == 0);
+        assert(integer == 1);
+        hpclang_object_release(object);
+    }
+
+    object = NULL;
+    errno = 0;
+    assert(hpclang_hp39_function_variable_snapshot(
+               &reader,
+               root,
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NumRow",
+               sizeof("NumRow") - 1u,
+               &object) == -1);
+    assert(object == NULL);
+    assert(errno == ENOTSUP);
+
+    errno = 0;
+    assert(hpclang_hp39_function_variable_projection_find(
+               (const uint8_t *)"Numeric",
+               sizeof("Numeric") - 1u,
+               (const uint8_t *)"NotAVariable",
+               sizeof("NotAVariable") - 1u,
+               &projection) == -1);
+    assert(errno == ENOENT);
 
     /* A compatible-looking directory without the Function tTYPE is rejected. */
     put_word(&fixture, function_type + 10u, UINT32_C(0x123456), 6u);

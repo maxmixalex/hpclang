@@ -21,6 +21,26 @@ struct hpclang_hp39_function_field_view {
     uint32_t prologue;
 };
 
+#define HPCLANG_HP39_FUNCTION_VARIABLE_COUNT 50u
+#define HPCLANG_HP39_FUNCTION_VARIABLE_NO_FIELD UINT32_MAX
+
+enum hpclang_hp39_function_variable_projection_kind {
+    HPCLANG_HP39_FUNCTION_VARIABLE_UNRESOLVED = 0,
+    HPCLANG_HP39_FUNCTION_VARIABLE_DIRECT_FIELD = 1,
+    HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN = 2,
+    HPCLANG_HP39_FUNCTION_VARIABLE_FLAG_BOOLEAN_INVERTED = 3
+};
+
+struct hpclang_hp39_function_variable_projection {
+    const char *category;
+    size_t category_length;
+    const char *name;
+    size_t name_length;
+    enum hpclang_hp39_function_variable_projection_kind kind;
+    uint32_t fixed_field_index;
+    uint32_t mask;
+};
+
 /*
  * Runtime-private reader for the fixed-length prefix of a native Function
  * Aplet DORRP. The schema is the HP39 SDK's Sharedvar.h + Funcdir.h layout.
@@ -47,6 +67,34 @@ int hpclang_hp39_function_field_snapshot(
     const struct hpclang_rpl_reader *reader,
     uint32_t aplet_object,
     uint32_t index,
+    struct hpclang_object **object);
+
+/*
+ * Runtime-private projection of Function's native ApletVars schema.
+ *
+ * projection_at/find describe all 50 published schema entries, including
+ * entries whose value semantics are not yet closed. snapshot() succeeds only
+ * for source-proven direct fields and flag projections; unresolved entries
+ * return ENOTSUP rather than guessing from similarly named storage fields.
+ */
+int hpclang_hp39_function_variable_projection_at(
+    uint32_t index,
+    struct hpclang_hp39_function_variable_projection *projection);
+
+int hpclang_hp39_function_variable_projection_find(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    struct hpclang_hp39_function_variable_projection *projection);
+
+int hpclang_hp39_function_variable_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
     struct hpclang_object **object);
 
 #ifdef __cplusplus
