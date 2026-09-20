@@ -161,7 +161,13 @@ static struct hpclang_object *make_reference_variable_list(void)
     struct hpclang_object *list =
         alloc_object(HPCLANG_OBJECT_LIST, RPL_DOLIST, 15u);
     put_word(list, 0u, 5u, RPL_DOLIST);
-    put_word(list, 5u, 5u, 0x3f4cbu);
+    /*
+     * Real MiniVar's Note category resolves #3F8FB to { xNoteText }.
+     * The list element is the xNoteText extended-ID object at #2C812;
+     * #3F4CB belongs to that ID's descriptor and is its recall handler,
+     * not the schema reference itself.
+     */
+    put_word(list, 5u, 5u, 0x2c812u);
     put_word(list, 10u, 5u, RPL_SEMI);
     return list;
 }
@@ -197,7 +203,7 @@ static int mock_resolver(
         *object = make_reference_variable_list();
         return 0;
     }
-    if (reference == 0x3f4cbu &&
+    if (reference == 0x2c812u &&
         expected_prologue == RPL_DOIDNT) {
         *object = make_note_text_id();
         return 0;
