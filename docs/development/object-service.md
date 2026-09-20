@@ -186,16 +186,18 @@ above or outside this clean object API.
 
 Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future long-lived named-store mutation. The public stack path does not expose raw allocation blocks or Saturn addresses.
 
-### M7.3d — named object stores — read-only RPL closed; HP39 internal model in progress
+### M7.3d — named object stores — read-only classic RPL closed; HP39 read-only model in progress
 
 - logical root/current/child handles use length-delimited calculator-byte names rather than assuming UTF-8 paths;
 - HP48gII/49g+/50g read-only RPL directory resolution, independent enumeration and owned named-object snapshots are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn addresses across GC/moving allocation;
 - Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
 - HP39 `HP39AscA` / `HP39BinX` parsing is retained privately as external typed-transfer protocol support. ROM and HPGCC39 evidence show `HP39DIR.*` belongs to the Disk Drive/Conn3x transfer path, so it is not an internal HOME/root backend;
-- the reverse ARMSYS edge, repeated mid-bootstrap ARM→Saturn→ARM portal, execution of an hpclang-owned threaded Saturn thunk, and transactional one-result rollback are implemented. The private catalog bridge now normalizes three real Stock internal catalogs to owned `DOLIST` snapshots: Aplet via `GetApDirList`, Program via `CatPgm -> {}N`, and Note via `CatNot -> {}N`;
-- ROM inspection establishes the internal hierarchy: `CatPgm` runs `CatThisCxt` inside `PGMCXT`; `CatNot` does the same inside `NOTESCXT`; Aplet creation/selection updates those context pointers alongside `apletPTR`; ordinary variables remain context-local rather than belonging to one global Variable catalog;
-- no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. These catalog snapshots remain runtime-private while the public catalog/lookup shape is designed; generic named-store calls stay `ENOSYS`;
-- put/remove remain deferred until USEROB and HP39 native-catalog mutation lifecycles are independently safe.
+- HP39 Aplet, Program and Note storage is read through the calculator's native structures rather than a synthetic filesystem. Aplet snapshots follow HOME → `'apletdir` → `'Name` and preserve the native DORRP as an owned snapshot; Program and Note catalogs/bodies use the current `PGMCXT` / `NOTESCXT` directory bindings;
+- HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble descriptor containing recall, type-predicate and store words. Runtime should execute the Aplet/Stock descriptor contract rather than project arbitrary variables from guessed fixed offsets. The current descriptor-recall bridge is under Stock validation;
+- no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store entry points remain `ENOSYS` where the Stock model has no matching namespace;
+- historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
+- named put/remove is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation is deferred until a concrete compatibility/application requirement justifies the additional lifecycle work.
+
 
 ### M7.3e — HPGCC adapters and closure
 
