@@ -74,15 +74,114 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
     };
 
 /*
- * Keep the Saturn portal thunk on its own cache line. The ARM stage writes
- * these bytes exactly once, cleans the line and then executes them only
- * through the Stock Saturn Read[] mapping. No later portal-context updates can
- * alias and overwrite the instruction bytes.
+ * Keep the evaluator probe on its own 64-byte cache/page sub-boundary. The ARM
+ * stage writes it once, cleans it, and then executes it only through Stock's
+ * Saturn Read[] alias. 64-byte alignment also proves this 64-byte buffer cannot
+ * cross a 4 KiB page.
  *
- * Nibbles: NOP3 (420) + ARMSYS (80BFE).
+ * The synthetic program deliberately has no application-visible RPL effect:
+ *
+ *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
+ *   colon:   DOCOL SEMI
+ *   return:  -> DOCODE
+ *   DOCODE:  restore C.W; ARMSYS
+ *
+ * DOCOL/SEMI therefore exercise the real Stock threaded evaluator and balance
+ * their B/D return-stack changes before the DOCODE machine resume. No user data
+ * stack object or I/O primitive is touched.
  */
-static uint8_t hp39_saturn_portal_thunk[32]
-    __attribute__((section(".data.hp39.thunk"), aligned(32)));
+static uint8_t hp39_saturn_portal_thunk[64]
+    __attribute__((section(".data.hp39.thunk"), aligned(64)));
+
+enum {
+    HP39P_MACHINE_NIBBLE = 0u,
+    HP39P_COLON_NIBBLE = 28u,
+    HP39P_RETURN_NIBBLE = 38u,
+    HP39P_DOCODE_NIBBLE = 43u,
+    HP39P_C_TEMPLATE_NIBBLE = 69u,
+    HP39P_TOTAL_NIBBLES = 85u,
+    HP39P_DOCODE_MACHINE_NIBBLES = 16u,
+    HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
+};
+
+_Static_assert(
+    HP39P_TOTAL_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
+    "HP39 Saturn evaluator probe must fit its private buffer");
+
+struct hp39_saturn_builder {
+    uint8_t *bytes;
+    uint32_t capacity_nibbles;
+    uint32_t nibbles;
+};
+
+static int hp39_saturn_put_nibble(
+    struct hp39_saturn_builder *builder,
+    uint8_t nibble)
+{
+    if (builder == NULL || nibble > 0x0fu ||
+        builder->nibbles >= builder->capacity_nibbles)
+        return 0;
+
+    uint32_t offset = builder->nibbles++;
+    if ((offset & 1u) != 0u) {
+        builder->bytes[offset >> 1] |= (uint8_t)(nibble << 4);
+    } else {
+        builder->bytes[offset >> 1] = nibble;
+    }
+    return 1;
+}
+
+static int hp39_saturn_put_word5(
+    struct hp39_saturn_builder *builder,
+    uint32_t value)
+{
+    if (value >= UINT32_C(0x00100000))
+        return 0;
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        if (!hp39_saturn_put_nibble(
+                builder,
+                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+            return 0;
+    }
+    return 1;
+}
+
+static int hp39_saturn_put_u32(
+    struct hp39_saturn_builder *builder,
+    uint32_t value)
+{
+    for (uint32_t i = 0u; i < 8u; ++i) {
+        if (!hp39_saturn_put_nibble(
+                builder,
+                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+            return 0;
+    }
+    return 1;
+}
+
+static int hp39_saturn_put_sequence(
+    struct hp39_saturn_builder *builder,
+    const uint8_t *nibbles,
+    uint32_t count)
+{
+    if (nibbles == NULL && count != 0u)
+        return 0;
+    for (uint32_t i = 0u; i < count; ++i) {
+        if (!hp39_saturn_put_nibble(builder, nibbles[i]))
+            return 0;
+    }
+    return 1;
+}
+
+static uint8_t hp39_saturn_buffer_nibble(
+    const uint8_t *bytes,
+    uint32_t nibble)
+{
+    uint8_t packed = bytes[nibble >> 1];
+    return (nibble & 1u) != 0u
+        ? (uint8_t)(packed >> 4)
+        : (uint8_t)(packed & 0x0fu);
+}
 
 static int stage_saturn_read_nibble(
     const uint32_t *read_map,
@@ -97,12 +196,24 @@ static int hp39_portal_prepare_thunk(
     void *saturn_state,
     struct hpclang_hp39_portal_context *portal)
 {
-    static const uint8_t thunk_bytes[] = {
-        0x24u, 0x80u, 0xb0u, 0xefu
+    /*
+     * These machine encodings are fixed by the HP39 Saturn ISA and are also
+     * present in the original HPGCC39 LIB275 build:
+     *   8F C03F0  GOSBVL $jGETPTR (#0F30C)
+     *   1B xxxxx  D0=(5)
+     *   132       AD0EX
+     *   808C      PC=(A)
+     *   1567      C=DAT0 W
+     *   80BFE     ARMSYS
+     */
+    static const uint8_t getptr[] = {
+        0x8u, 0xfu, 0xcu, 0x0u, 0x3u, 0xfu, 0x0u
     };
-    static const uint8_t thunk_nibbles[] = {
-        0x4u, 0x2u, 0x0u, 0x8u, 0x0u, 0xbu, 0xfu, 0xeu
-    };
+    static const uint8_t d0_imm[] = { 0x1u, 0xbu };
+    static const uint8_t ad0ex[] = { 0x1u, 0x3u, 0x2u };
+    static const uint8_t pc_indirect[] = { 0x8u, 0x0u, 0x8u, 0xcu };
+    static const uint8_t c_dat0_w[] = { 0x1u, 0x5u, 0x6u, 0x7u };
+    static const uint8_t armsys[] = { 0x8u, 0x0u, 0xbu, 0xfu, 0xeu };
 
     if (saturn_state == NULL || portal == NULL)
         return 0;
@@ -112,14 +223,14 @@ static int hp39_portal_prepare_thunk(
         (uintptr_t)STAGE_WINDOW_BASE +
         (uintptr_t)HPCLANG_L2_ENTRIES * HPCLANG_PAGE_SIZE;
     if (thunk_address < (uintptr_t)STAGE_WINDOW_BASE ||
-        thunk_address > stage_limit - sizeof(thunk_bytes))
+        thunk_address > stage_limit - sizeof(hp39_saturn_portal_thunk))
         return 0;
 
     uintptr_t delta = thunk_address - (uintptr_t)STAGE_WINDOW_BASE;
     uint32_t page_index = (uint32_t)(delta / HPCLANG_PAGE_SIZE);
     uint32_t byte_offset = (uint32_t)(delta % HPCLANG_PAGE_SIZE);
     if (page_index >= HPCLANG_L2_ENTRIES ||
-        byte_offset > HPCLANG_PAGE_SIZE - sizeof(thunk_bytes))
+        byte_offset > HPCLANG_PAGE_SIZE - sizeof(hp39_saturn_portal_thunk))
         return 0;
 
     const volatile uint32_t *stage_l2 =
@@ -131,32 +242,108 @@ static int hp39_portal_prepare_thunk(
             &saturn_page))
         return 0;
 
-    uint32_t saturn_entry = saturn_page + byte_offset * 2u;
-    if (saturn_entry > RPL_MAIN_END - sizeof(thunk_nibbles))
+    uint32_t saturn_base = saturn_page + byte_offset * 2u;
+    if (saturn_base > RPL_MAIN_END - HP39P_TOTAL_NIBBLES)
         return 0;
 
-    for (uint32_t i = 0u; i < sizeof(thunk_bytes); ++i)
-        hp39_saturn_portal_thunk[i] = thunk_bytes[i];
+    uint32_t colon = saturn_base + HP39P_COLON_NIBBLE;
+    uint32_t return_stream = saturn_base + HP39P_RETURN_NIBBLE;
+    uint32_t docode = saturn_base + HP39P_DOCODE_NIBBLE;
+    uint32_t c_template = saturn_base + HP39P_C_TEMPLATE_NIBBLE;
+
+    for (uint32_t i = 0u; i < sizeof(hp39_saturn_portal_thunk); ++i)
+        hp39_saturn_portal_thunk[i] = 0u;
+
+    struct hp39_saturn_builder builder = {
+        .bytes = hp39_saturn_portal_thunk,
+        .capacity_nibbles =
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+        .nibbles = 0u,
+    };
+
+    /* Machine entry: restore interpreter state and enter synthetic DOCOL. */
+    if (!hp39_saturn_put_sequence(
+            &builder, getptr, (uint32_t)sizeof(getptr)) ||
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, colon) ||
+        !hp39_saturn_put_sequence(
+            &builder, ad0ex, (uint32_t)sizeof(ad0ex)) ||
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, return_stream) ||
+        !hp39_saturn_put_sequence(
+            &builder, pc_indirect, (uint32_t)sizeof(pc_indirect)) ||
+        builder.nibbles != HP39P_COLON_NIBBLE)
+        return 0;
+
+    /*
+     * Synthetic colon object:
+     *   [DOCOL prologue][SEMI threaded object]
+     */
+    if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
+        builder.nibbles != HP39P_RETURN_NIBBLE)
+        return 0;
+
+    /* SEMI returns here and executes the synthetic DOCODE object. */
+    if (!hp39_saturn_put_word5(&builder, docode) ||
+        builder.nibbles != HP39P_DOCODE_NIBBLE)
+        return 0;
+
+    /*
+     * DOCODE framing. Its five-nibble size field counts from the size cell
+     * through the end of the native body, hence 5 + 16 = 21 nibbles.
+     */
+    if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002dcc)) ||
+        !hp39_saturn_put_word5(&builder, HP39P_DOCODE_SIZE_NIBBLES) ||
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, c_template) ||
+        !hp39_saturn_put_sequence(
+            &builder, c_dat0_w, (uint32_t)sizeof(c_dat0_w)) ||
+        !hp39_saturn_put_sequence(
+            &builder, armsys, (uint32_t)sizeof(armsys)) ||
+        builder.nibbles != HP39P_C_TEMPLATE_NIBBLE)
+        return 0;
+
+    /*
+     * ARMSYS consumes C.LO as the ARM entry and C.HI as the Stock ARM RAM
+     * context. Keep the launcher's original high half, but target the portal
+     * resume stub in the low half. ARMSYS_L2_PHYS and C.HI intentionally share
+     * offset 0x920 in the historical HPGCC39 ARMSYS block.
+     */
+    uint32_t c_hi =
+        *(const volatile uint32_t *)(
+            (const uint8_t *)saturn_state + ARMSYS_L2_PHYS);
+    if (!hp39_saturn_put_u32(
+            &builder,
+            (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
+        !hp39_saturn_put_u32(&builder, c_hi) ||
+        builder.nibbles != HP39P_TOTAL_NIBBLES)
+        return 0;
+
     hpclang_cache_clean(
         hp39_saturn_portal_thunk,
         (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     /*
-     * Prove the physical-page-to-Saturn translation before exposing the
-     * portal. A wrong alias fails closed instead of sending Stock execution to
-     * guessed memory.
+     * Prove the complete generated stream through the Saturn alias before the
+     * portal is published. This catches wrong physical-page inversion, odd
+     * nibble packing and stale aliasing without executing guessed memory.
      */
-    for (uint32_t i = 0u; i < sizeof(thunk_nibbles); ++i) {
+    for (uint32_t i = 0u; i < HP39P_TOTAL_NIBBLES; ++i) {
         uint8_t nibble = 0u;
         if (!stage_saturn_read_nibble(
                 (const uint32_t *)saturn_state,
-                saturn_entry + i,
+                saturn_base + i,
                 &nibble) ||
-            nibble != thunk_nibbles[i])
+            nibble != hp39_saturn_buffer_nibble(
+                hp39_saturn_portal_thunk, i))
             return 0;
     }
 
-    portal->saturn_entry = saturn_entry;
+    portal->saturn_entry = saturn_base + HP39P_MACHINE_NIBBLE;
     return 1;
 }
 
