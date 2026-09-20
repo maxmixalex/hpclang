@@ -75,6 +75,10 @@ static int hp39_portal_result(
             context->portal_entry;
     int result = entry(
         object, prologue, kind, name, (uint32_t)name_length);
+    if (result == 1) {
+        errno = ENOENT;
+        return -1;
+    }
     if (result == -2) {
         errno = EBUSY;
         return -1;

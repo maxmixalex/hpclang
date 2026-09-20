@@ -1820,8 +1820,11 @@ int main(void)
             uint32_t program_count = 0u;
             uint32_t note_count = 0u;
             int fixture_found = 0;
+            int editline_found = 0;
             static const uint8_t fixture_name[] =
                 "HPCLANG HPC1 TEST";
+            static const uint8_t editline_name[] =
+                "Editline";
             if (hpclang_hp39_catalog_name_count(
                     aplet_catalog, &aplet_count) != 0 ||
                 hpclang_hp39_catalog_name_count(
@@ -1833,48 +1836,70 @@ int main(void)
                     fixture_name,
                     sizeof(fixture_name) - 1u,
                     &fixture_found) != 0 ||
+                hpclang_hp39_catalog_contains_name(
+                    program_catalog,
+                    editline_name,
+                    sizeof(editline_name) - 1u,
+                    &editline_found) != 0 ||
                 fixture_found == 0 ||
-                aplet_count == 0u) {
+                editline_found == 0 ||
+                aplet_count == 0u ||
+                program_count == 0u) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
                 return finish(0xb6u, boot->model);
             }
 
+            struct hpclang_object *editline_body = NULL;
+            size_t editline_size = 0u;
+            if (hpclang_hp39_program_body_snapshot(
+                    editline_name,
+                    sizeof(editline_name) - 1u,
+                    &editline_body) != 0 ||
+                editline_body == NULL ||
+                hpclang_object_kind(editline_body) != HPCLANG_OBJECT_STRING ||
+                hpclang_object_string_size(
+                    editline_body, &editline_size) != 0) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(editline_body);
+                return finish(0xb7u, boot->model);
+            }
+            hpclang_object_release(editline_body);
+
             static const uint8_t missing_body_name[] =
                 "HPCLANG-NO-SUCH";
             struct hpclang_object *missing_program = NULL;
             struct hpclang_object *missing_note = NULL;
-            size_t missing_program_size = 99u;
-            size_t missing_note_size = 99u;
-            if (hpclang_hp39_program_body_snapshot(
+            errno = 0;
+            int missing_program_result =
+                hpclang_hp39_program_body_snapshot(
                     missing_body_name,
                     sizeof(missing_body_name) - 1u,
-                    &missing_program) != 0 ||
+                    &missing_program);
+            int missing_program_errno = errno;
+            errno = 0;
+            int missing_note_result =
                 hpclang_hp39_note_body_snapshot(
                     missing_body_name,
                     sizeof(missing_body_name) - 1u,
-                    &missing_note) != 0 ||
-                missing_program == NULL ||
-                missing_note == NULL ||
-                hpclang_object_kind(missing_program) != HPCLANG_OBJECT_STRING ||
-                hpclang_object_kind(missing_note) != HPCLANG_OBJECT_STRING ||
-                hpclang_object_string_size(
-                    missing_program, &missing_program_size) != 0 ||
-                hpclang_object_string_size(
-                    missing_note, &missing_note_size) != 0 ||
-                missing_program_size != 0u ||
-                missing_note_size != 0u) {
+                    &missing_note);
+            int missing_note_errno = errno;
+            if (missing_program_result != -1 ||
+                missing_note_result != -1 ||
+                missing_program != NULL ||
+                missing_note != NULL ||
+                missing_program_errno != ENOENT ||
+                missing_note_errno != ENOENT) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
                 hpclang_object_release(missing_program);
                 hpclang_object_release(missing_note);
-                return finish(0xb7u, boot->model);
+                return finish(0xb8u, boot->model);
             }
-
-            hpclang_object_release(missing_program);
-            hpclang_object_release(missing_note);
             hpclang_object_release(aplet_catalog);
             hpclang_object_release(program_catalog);
             hpclang_object_release(note_catalog);
