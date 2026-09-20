@@ -10,9 +10,12 @@
 #include "hp39-native-directory.h"
 #include "object-snapshot.h"
 
-#define FIXTURE_NIBBLES 0x500u
+#define FIXTURE_NIBBLES 0x100000u
 #define RPL_DORRP UINT32_C(0x00002a96)
 #define RPL_DOCSTR UINT32_C(0x00002a2c)
+#define RPL_DOLIST UINT32_C(0x00002a74)
+#define RPL_SEMI UINT32_C(0x0000312b)
+#define RPL_USEROB UINT32_C(0x00080711)
 
 struct fixture {
     uint8_t nibbles[FIXTURE_NIBBLES];
@@ -66,10 +69,10 @@ static uint32_t put_item(
     put_byte(
         fixture,
         item + 2u + (uint32_t)raw_length * 2u,
-        0u);
+        (uint8_t)raw_length);
 
     uint32_t object =
-        item + 2u + 2u * ((uint32_t)raw_length + 1u);
+        item + 4u + 2u * (uint32_t)raw_length;
     if (body != NULL) {
         put_word(fixture, object, RPL_DOCSTR, 5u);
         put_word(
@@ -96,7 +99,7 @@ static int expect(int condition, const char *message)
 
 int main(void)
 {
-    struct fixture fixture = { { 0u } };
+    static struct fixture fixture;
     struct hpclang_rpl_reader reader = {
         .read_nibble = fixture_read,
         .context = &fixture,
@@ -227,6 +230,104 @@ int main(void)
             hpclang_hp39_catalog_name_count(catalog, &count) == 0 &&
                 count == 0u,
             "empty directory becomes empty DOLIST"))
+        return 1;
+    hpclang_object_release(catalog);
+
+    /*
+     * Real HP39 HOME stores a null-named Hidden directory. Its private
+     * apostrophe-prefixed ApDirList variable is a DOLIST of display strings.
+     */
+    const uint32_t home_root = 0x81000u;
+    const uint32_t hidden_item = 0x81200u;
+    const uint32_t hidden_root = hidden_item + 2u;
+    const uint32_t aplet_item = 0x81300u;
+    put_word(&fixture, RPL_USEROB, home_root, 5u);
+    put_word(&fixture, home_root, RPL_DORRP, 5u);
+    put_word(&fixture, home_root + 5u, 0u, 3u); /* no attached libraries */
+    put_word(
+        &fixture,
+        home_root + 8u,
+        hidden_item - (home_root + 8u),
+        5u);
+    put_word(&fixture, hidden_item - 5u, 0u, 5u);
+    put_word(&fixture, hidden_item, 0u, 2u); /* null-name special form */
+    put_word(&fixture, hidden_root, RPL_DORRP, 5u);
+    put_word(
+        &fixture,
+        hidden_root + 8u,
+        aplet_item - (hidden_root + 8u),
+        5u);
+    put_word(&fixture, aplet_item - 5u, 0u, 5u);
+
+    const char *aplet_raw_name = "'ApDirList";
+    size_t aplet_raw_length = strlen(aplet_raw_name);
+    put_word(&fixture, aplet_item, (uint32_t)aplet_raw_length, 2u);
+    for (size_t i = 0u; i < aplet_raw_length; ++i)
+        put_byte(
+            &fixture,
+            aplet_item + 2u + (uint32_t)i * 2u,
+            (uint8_t)aplet_raw_name[i]);
+    put_byte(
+        &fixture,
+        aplet_item + 2u + (uint32_t)aplet_raw_length * 2u,
+        (uint8_t)aplet_raw_length);
+    uint32_t aplet_object =
+        aplet_item + 4u + (uint32_t)aplet_raw_length * 2u;
+    put_word(&fixture, aplet_object, RPL_DOLIST, 5u);
+    uint32_t aplet_string = aplet_object + 5u;
+    static const uint8_t function_name[] = {
+        'F', 'u', 'n', 'c', 't', 'i', 'o', 'n'
+    };
+    put_word(&fixture, aplet_string, RPL_DOCSTR, 5u);
+    put_word(
+        &fixture,
+        aplet_string + 5u,
+        5u + (uint32_t)sizeof(function_name) * 2u,
+        5u);
+    for (size_t i = 0u; i < sizeof(function_name); ++i)
+        put_byte(
+            &fixture,
+            aplet_string + 10u + (uint32_t)i * 2u,
+            function_name[i]);
+    put_word(
+        &fixture,
+        aplet_string + 10u + (uint32_t)sizeof(function_name) * 2u,
+        RPL_SEMI,
+        5u);
+
+    catalog = NULL;
+    count = UINT32_MAX;
+    found = 0;
+    if (!expect(
+            hpclang_hp39_native_aplet_catalog_snapshot(
+                &reader, &catalog) == 0,
+            "Aplet catalog reads HOME Hidden/ApDirList") ||
+        !expect(
+            hpclang_hp39_catalog_name_count(catalog, &count) == 0 &&
+                count == 1u,
+            "Aplet catalog preserves one display string") ||
+        !expect(
+            hpclang_hp39_catalog_contains_name(
+                catalog,
+                function_name,
+                sizeof(function_name),
+                &found) == 0 && found,
+            "Aplet catalog contains Function"))
+        return 1;
+    hpclang_object_release(catalog);
+
+    /* GetApDirList semantics: missing private variable becomes NULL{}. */
+    put_word(&fixture, hidden_root + 8u, 0u, 5u);
+    catalog = NULL;
+    count = UINT32_MAX;
+    if (!expect(
+            hpclang_hp39_native_aplet_catalog_snapshot(
+                &reader, &catalog) == 0,
+            "missing ApDirList becomes an empty catalog") ||
+        !expect(
+            hpclang_hp39_catalog_name_count(catalog, &count) == 0 &&
+                count == 0u,
+            "missing ApDirList becomes empty DOLIST"))
         return 1;
     hpclang_object_release(catalog);
 

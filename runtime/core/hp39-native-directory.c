@@ -7,6 +7,7 @@
 
 #include "hp39-native-directory.h"
 #include "object-snapshot.h"
+#include "rpl-object-store.h"
 
 #define HP39_SATURN_LIMIT UINT32_C(0x00100000)
 #define HP39_RPL_DORRP UINT32_C(0x00002a96)
@@ -327,6 +328,122 @@ static int hp39_buffer_read_nibble(
         ? (uint8_t)(packed >> 4)
         : (uint8_t)(packed & 0x0fu);
     return 1;
+}
+
+static int hp39_store_errno(int result)
+{
+    switch (result) {
+    case HPCLANG_RPL_STORE_NOT_FOUND:
+        errno = ENOENT;
+        break;
+    case HPCLANG_RPL_STORE_LIMIT:
+        errno = EOVERFLOW;
+        break;
+    case HPCLANG_RPL_STORE_UNAVAILABLE:
+        errno = EIO;
+        break;
+    case HPCLANG_RPL_STORE_NOT_DIRECTORY:
+    case HPCLANG_RPL_STORE_MALFORMED:
+    default:
+        errno = EILSEQ;
+        break;
+    }
+    return -1;
+}
+
+static int hp39_empty_list_snapshot(struct hpclang_object **object)
+{
+    uint8_t encoded[5] = { 0u, 0u, 0u, 0u, 0u };
+    struct hp39_catalog_writer writer = {
+        .bytes = encoded,
+        .capacity_nibbles = 10u,
+        .offset = 0u,
+    };
+    if (!hp39_buffer_put_word(&writer, HP39_RPL_DOLIST, 5u) ||
+        !hp39_buffer_put_word(&writer, HP39_RPL_SEMI, 5u) ||
+        writer.offset != 10u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    struct hp39_buffer_reader buffer = {
+        .bytes = encoded,
+        .nibble_count = 10u,
+    };
+    struct hpclang_rpl_reader encoded_reader = {
+        .read_nibble = hp39_buffer_read_nibble,
+        .context = &buffer,
+    };
+    return hpclang_object_snapshot_copy(
+        &encoded_reader, 0u, 10u, object);
+}
+
+int hpclang_hp39_native_aplet_catalog_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    struct hpclang_object **object)
+{
+    static const uint8_t aplet_list_name[] = {
+        '\'', 'A', 'p', 'D', 'i', 'r', 'L', 'i', 's', 't'
+    };
+
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t home = 0u;
+    int result = hpclang_rpl_store_home_object(reader, &home);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+
+    /*
+     * HP39 HOME carries one null-named Hidden directory. The Stock
+     * GetApDirList word enters that directory and reads the private
+     * apostrophe-prefixed ApDirList variable. Reproduce the same lookup
+     * read-only instead of re-entering the RPL evaluator while native pages
+     * occupy the ordinary temporary-object arena.
+     */
+    struct hpclang_rpl_directory_entry_view hidden;
+    result = hpclang_rpl_directory_find(
+        reader, home, NULL, 0u, &hidden);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+    if (hidden.prologue != HP39_RPL_DORRP) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    struct hpclang_rpl_directory_entry_view aplet_list;
+    result = hpclang_rpl_directory_find(
+        reader,
+        hidden.object_address,
+        aplet_list_name,
+        (uint32_t)sizeof(aplet_list_name),
+        &aplet_list);
+    if (result == HPCLANG_RPL_STORE_NOT_FOUND)
+        return hp39_empty_list_snapshot(object);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return hp39_store_errno(result);
+    if (aplet_list.prologue != HP39_RPL_DOLIST) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    if (hpclang_object_snapshot_copy(
+            reader,
+            aplet_list.object_address,
+            HP39_SATURN_LIMIT - aplet_list.object_address,
+            object) != 0)
+        return -1;
+    if (*object == NULL ||
+        hpclang_object_kind(*object) != HPCLANG_OBJECT_LIST) {
+        hpclang_object_release(*object);
+        *object = NULL;
+        errno = EILSEQ;
+        return -1;
+    }
+    return 0;
 }
 
 int hpclang_hp39_native_catalog_snapshot(
