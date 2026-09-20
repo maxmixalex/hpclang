@@ -99,6 +99,10 @@ struct hp39_function_variable_schema {
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
       HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST, UINT8_MAX, 0u }
+#define HP39_VAR_SYMBOLIC_SLOT(category_, name_, slot_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_SYMBOLIC_SLOT, UINT8_MAX, slot_ }
 #define HP39_VAR_FLAG(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
@@ -130,8 +134,16 @@ struct hp39_function_variable_schema {
  * Stock getter reads funcCache@ (LastBut3), enumerates the one-dimensional
  * DOREAL array and rebuilds a DOLIST. The LIST setter path accepts values only
  * when every element is a REAL, converts them to that same vector
- * representation, and replaces funcCache. Similar-looking storage is still
- * not enough evidence for PageNum/Page, NoteText or F0..F9.
+ * representation, and replaces funcCache.
+ *
+ * Function's Symbolic variables are the idF1..idF0 IDs, not the callable
+ * xF1..xF0 command objects. Stock 0x61399 maps those IDs to positions 1..10
+ * in ListOfEqs@ (LastBut4), then NTHELCOMP returns the stored object unchanged.
+ * Primitive 0x6132B only turns a returned DOBINT slot into FALSE, establishing
+ * DOBINT as the undefined-slot sentinel rather than an expression transform.
+ *
+ * Similar-looking storage is still not enough evidence for PageNum/Page or
+ * NoteText.
  */
 static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_UNRESOLVED("Sketch", "PageNum"),
@@ -149,16 +161,16 @@ static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_BINT("Numeric", "Format", 31u),
     HP39_VAR_BINT("Numeric", "Digits", 32u),
 
-    HP39_VAR_UNRESOLVED("Symbolic", "F0"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F9"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F8"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F7"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F6"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F5"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F4"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F3"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F2"),
-    HP39_VAR_UNRESOLVED("Symbolic", "F1"),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F0", 10u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F9", 9u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F8", 8u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F7", 7u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F6", 6u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F5", 5u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F4", 4u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F3", 3u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F2", 2u),
+    HP39_VAR_SYMBOLIC_SLOT("Symbolic", "F1", 1u),
     HP39_VAR_BINT("Symbolic", "Angle", 12u),
 
     HP39_VAR_DIRECT("Plot FCN", "Slope", 35u),
@@ -199,6 +211,7 @@ _Static_assert(
 #undef HP39_VAR_DIRECT
 #undef HP39_VAR_BINT
 #undef HP39_VAR_REAL_ARRAY_LIST
+#undef HP39_VAR_SYMBOLIC_SLOT
 #undef HP39_VAR_FLAG
 #undef HP39_VAR_FLAG_NOT
 
@@ -412,19 +425,15 @@ int hpclang_hp39_function_field_snapshot(
         object);
 }
 
-struct hp39_real_array_list_reader {
-    const struct hpclang_rpl_reader *source;
-    uint32_t element_base;
-    uint32_t element_count;
-    uint32_t nibble_count;
-};
-
-static int hp39_function_func_cache(
+static int hp39_function_tail_object(
     const struct hpclang_rpl_reader *reader,
     uint32_t aplet_object,
+    uint32_t ordinal_from_newest,
+    uint32_t expected_prologue,
     uint32_t *object_address)
 {
-    if (object_address == NULL) {
+    if (reader == NULL || reader->read_nibble == NULL ||
+        ordinal_from_newest == 0u || object_address == NULL) {
         errno = EINVAL;
         return -1;
     }
@@ -434,7 +443,7 @@ static int hp39_function_func_cache(
     if (hp39_function_entry_count_and_type(
             reader, aplet_object, &entry_count) != 0)
         return -1;
-    if (entry_count < 3u) {
+    if (entry_count < ordinal_from_newest) {
         errno = EILSEQ;
         return -1;
     }
@@ -448,7 +457,9 @@ static int hp39_function_func_cache(
     }
 
     struct hpclang_rpl_directory_entry_view entry = { 0u };
-    for (uint32_t ordinal = 0u; ordinal < 3u; ++ordinal) {
+    for (uint32_t ordinal = 1u;
+         ordinal <= ordinal_from_newest;
+         ++ordinal) {
         result = hpclang_rpl_directory_cursor_next(
             reader, &cursor, &entry);
         if (result <= 0) {
@@ -457,17 +468,108 @@ static int hp39_function_func_cache(
         }
     }
 
-    /*
-     * HPGCC39/Stock define funcCache@ as LastBut3. Directory cursor order is
-     * newest to oldest, so the third entry is the cache object.
-     */
-    if (entry.name_length != 0u || entry.prologue != HP39_RPL_DOARRY) {
+    if (entry.name_length != 0u ||
+        entry.prologue != expected_prologue) {
         errno = EILSEQ;
         return -1;
     }
 
     *object_address = entry.object_address;
     return 0;
+}
+
+static int hp39_span_error(int result)
+{
+    switch (result) {
+    case HPCLANG_RPL_SPAN_UNAVAILABLE:
+        errno = EIO;
+        break;
+    case HPCLANG_RPL_SPAN_UNSUPPORTED:
+        errno = ENOTSUP;
+        break;
+    case HPCLANG_RPL_SPAN_MALFORMED:
+    case HPCLANG_RPL_SPAN_BOUNDS:
+    case HPCLANG_RPL_SPAN_DEPTH:
+    default:
+        errno = EILSEQ;
+        break;
+    }
+    return -1;
+}
+
+static int hp39_function_symbolic_slot_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    uint32_t slot,
+    struct hpclang_object **object)
+{
+    if (object == NULL || slot == 0u || slot > 10u) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t list = 0u;
+    if (hp39_function_tail_object(
+            reader, aplet_object, 4u, HP39_RPL_DOLIST, &list) != 0)
+        return -1;
+    if (list > HP39_SATURN_LIMIT - 5u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t cursor = list + 5u;
+    for (uint32_t index = 1u; index <= slot; ++index) {
+        if (cursor > HP39_SATURN_LIMIT - 5u) {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        uint32_t prologue = 0u;
+        if (!hp39_read_word(reader, cursor, 5u, &prologue)) {
+            errno = EIO;
+            return -1;
+        }
+        if (prologue == HP39_RPL_SEMI) {
+            errno = ENOENT;
+            return -1;
+        }
+
+        uint32_t span = 0u;
+        int result = hpclang_rpl_object_span(
+            reader, cursor, HP39_SATURN_LIMIT - cursor, &span);
+        if (result != HPCLANG_RPL_SPAN_OK || span == 0u)
+            return hp39_span_error(result);
+
+        if (index == slot) {
+            if (prologue == HP39_RPL_DOBINT) {
+                errno = ENOENT;
+                return -1;
+            }
+            return hpclang_object_snapshot_copy(
+                reader, cursor, span, object);
+        }
+        cursor += span;
+    }
+
+    errno = ENOENT;
+    return -1;
+}
+
+struct hp39_real_array_list_reader {
+    const struct hpclang_rpl_reader *source;
+    uint32_t element_base;
+    uint32_t element_count;
+    uint32_t nibble_count;
+};
+
+static int hp39_function_func_cache(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    uint32_t *object_address)
+{
+    return hp39_function_tail_object(
+        reader, aplet_object, 3u, HP39_RPL_DOARRY, object_address);
 }
 
 static int hp39_function_func_cache_elements(
@@ -812,6 +914,11 @@ int hpclang_hp39_function_variable_snapshot(
         HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST)
         return hp39_function_num_indep_snapshot(
             reader, aplet_object, object);
+
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_SYMBOLIC_SLOT)
+        return hp39_function_symbolic_slot_snapshot(
+            reader, aplet_object, (uint32_t)projection.mask, object);
 
     struct hpclang_hp39_function_field_view field;
     if (hpclang_hp39_function_field_at(
