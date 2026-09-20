@@ -33,7 +33,8 @@ enum hpclang_hp39_function_variable_projection_kind {
     HPCLANG_HP39_FUNCTION_VARIABLE_REAL_ARRAY_LIST = 5,
     HPCLANG_HP39_FUNCTION_VARIABLE_SYMBOLIC_SLOT = 6,
     HPCLANG_HP39_FUNCTION_VARIABLE_NOTE_TEXT = 7,
-    HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER = 8
+    HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER = 8,
+    HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_GROB = 9
 };
 
 struct hpclang_hp39_function_variable_projection {
@@ -81,9 +82,10 @@ int hpclang_hp39_function_field_snapshot(
  * entries whose value semantics are not yet closed. snapshot() succeeds only
  * for source-proven direct fields, BINT->REAL UNCOERCE projections, flag
  * projections, NumIndep's real-array->LIST projection, the source-proven
- * F1..F0 ListOfEqs slot projection, NoteText's LastBut1 CSTR projection and
- * PageNum's Plot2Flg bitfield projection. Unresolved entries return ENOTSUP
- * rather than guessing from similarly named storage fields.
+ * F1..F0 ListOfEqs slot projection, NoteText's LastBut1 CSTR projection,
+ * PageNum's Plot2Flg bitfield projection and Page's native SketchSet->GROB
+ * projection. Unresolved entries return ENOTSUP rather than guessing from
+ * similarly named storage fields.
  */
 int hpclang_hp39_function_variable_projection_at(
     uint32_t index,

@@ -14,7 +14,12 @@
 #define HP39_RPL_DOREAL UINT32_C(0x00002933)
 #define HP39_RPL_DOARRY UINT32_C(0x000029e8)
 #define HP39_RPL_DOCSTR UINT32_C(0x00002a2c)
+#define HP39_RPL_DOGROB UINT32_C(0x00002b1e)
 #define HP39_RPL_SEMI UINT32_C(0x0000312b)
+
+#define HP39_PAGE_WIDTH UINT32_C(131)
+#define HP39_PAGE_HEIGHT UINT32_C(64)
+#define HP39_PAGE_STRIDE_NIBBLES UINT32_C(33)
 
 struct hp39_function_field_schema {
     const char *name;
@@ -112,6 +117,10 @@ struct hp39_function_variable_schema {
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
       HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER, field_, 0u }
+#define HP39_VAR_PAGE_GROB(category_, name_) \
+    { category_, (uint8_t)(sizeof(category_) - 1u), \
+      name_, (uint8_t)(sizeof(name_) - 1u), \
+      HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_GROB, UINT8_MAX, 0u }
 #define HP39_VAR_FLAG(category_, name_, field_, mask_) \
     { category_, (uint8_t)(sizeof(category_) - 1u), \
       name_, (uint8_t)(sizeof(name_) - 1u), \
@@ -160,12 +169,18 @@ struct hp39_function_variable_schema {
  * 0x4BB8F: ((Plot2Flg / YHI) & 15) + 1, with YHI=#40 (64). Thus public
  * PageNum is a REAL in 1..16 encoded in Plot2Flg bits 6..9.
  *
- * Page itself remains unresolved until the LastBut0 Sketch-set element format
- * and empty-page semantics are mechanically closed.
+ * Page is closed by the Stock getter at 0x42D0F plus the native Sketch
+ * loader at bank-3 0x5D706. LastBut0 is a flat DOLIST of optional CSTR hints
+ * and GROB pages; CSTR updates the hint for the next GROB, while each GROB
+ * advances the page count. The getter locates PageNum's GROB. With no hint it
+ * returns that GROB unchanged; with a hint it reads bytes 5 and 7 as X/Y,
+ * creates a blank 131x64 GROB, and GROB! copies the stored page at that offset.
+ * DefaultHint is the eight bytes 83 00 40 00 00 00 00 00, confirming
+ * width=131, height=64, x=0, y=0 in the shared hint encoding.
  */
 static const struct hp39_function_variable_schema hp39_function_variables[] = {
     HP39_VAR_PAGE_NUMBER("Sketch", "PageNum", 18u),
-    HP39_VAR_UNRESOLVED("Sketch", "Page"),
+    HP39_VAR_PAGE_GROB("Sketch", "Page"),
     HP39_VAR_NOTE_TEXT("Note", "NoteText"),
 
     HP39_VAR_DIRECT("Numeric", "NumZoom", 24u),
@@ -232,6 +247,7 @@ _Static_assert(
 #undef HP39_VAR_SYMBOLIC_SLOT
 #undef HP39_VAR_NOTE_TEXT
 #undef HP39_VAR_PAGE_NUMBER
+#undef HP39_VAR_PAGE_GROB
 #undef HP39_VAR_FLAG
 #undef HP39_VAR_FLAG_NOT
 
@@ -800,6 +816,322 @@ static int hp39_read_bint_value(
     return 1;
 }
 
+struct hp39_page_grob_reader {
+    const struct hpclang_rpl_reader *source;
+    uint32_t source_payload;
+    uint32_t source_width;
+    uint32_t source_height;
+    uint32_t source_stride;
+    uint32_t x;
+    uint32_t y;
+    uint32_t nibble_count;
+};
+
+static int hp39_page_grob_read(
+    void *context,
+    uint32_t address,
+    uint8_t *value)
+{
+    struct hp39_page_grob_reader *view =
+        (struct hp39_page_grob_reader *)context;
+    if (view == NULL || view->source == NULL ||
+        view->source->read_nibble == NULL || value == NULL ||
+        address >= view->nibble_count)
+        return 0;
+
+    uint32_t word = 0u;
+    uint32_t offset = 0u;
+    if (address < 5u) {
+        word = HP39_RPL_DOGROB;
+        offset = address;
+    } else if (address < 10u) {
+        word = 15u + HP39_PAGE_HEIGHT * HP39_PAGE_STRIDE_NIBBLES;
+        offset = address - 5u;
+    } else if (address < 15u) {
+        word = HP39_PAGE_HEIGHT;
+        offset = address - 10u;
+    } else if (address < 20u) {
+        word = HP39_PAGE_WIDTH;
+        offset = address - 15u;
+    } else {
+        uint32_t payload = address - 20u;
+        uint32_t row = payload / HP39_PAGE_STRIDE_NIBBLES;
+        uint32_t nibble_x = payload % HP39_PAGE_STRIDE_NIBBLES;
+        uint32_t base_x = nibble_x * 4u;
+        uint8_t out = 0u;
+
+        for (uint32_t bit = 0u; bit < 4u; ++bit) {
+            uint32_t dx = base_x + bit;
+            if (dx >= HP39_PAGE_WIDTH ||
+                row < view->y ||
+                row >= view->y + view->source_height ||
+                dx < view->x ||
+                dx >= view->x + view->source_width)
+                continue;
+
+            uint32_t sx = dx - view->x;
+            uint32_t sy = row - view->y;
+            uint8_t source_nibble = 0u;
+            if (!view->source->read_nibble(
+                    view->source->context,
+                    view->source_payload +
+                        sy * view->source_stride +
+                        sx / 4u,
+                    &source_nibble) ||
+                source_nibble > 0x0fu)
+                return 0;
+
+            if ((source_nibble & (uint8_t)(1u << (sx & 3u))) != 0u)
+                out |= (uint8_t)(1u << bit);
+        }
+
+        *value = out;
+        return 1;
+    }
+
+    *value = (uint8_t)((word >> (offset * 4u)) & 0x0fu);
+    return 1;
+}
+
+static int hp39_function_page_number_value(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    uint32_t *page)
+{
+    if (page == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *page = 0u;
+
+    struct hpclang_hp39_function_field_view field;
+    if (hpclang_hp39_function_field_at(
+            reader, aplet_object, 18u, &field) != 0)
+        return -1;
+    if (field.prologue != HP39_RPL_DOBINT) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    int32_t stored = 0;
+    if (!hp39_read_bint_value(reader, field.object_address, &stored)) {
+        errno = EIO;
+        return -1;
+    }
+
+    *page = (((uint32_t)stored / UINT32_C(64)) & UINT32_C(15)) + 1u;
+    return 0;
+}
+
+static int hp39_function_grob_layout(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t *width,
+    uint32_t *height,
+    uint32_t *payload,
+    uint32_t *span)
+{
+    if (width == NULL || height == NULL ||
+        payload == NULL || span == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    uint32_t prologue = 0u;
+    uint32_t length = 0u;
+    uint32_t h = 0u;
+    uint32_t w = 0u;
+    if (!hp39_read_word(reader, address, 5u, &prologue) ||
+        !hp39_read_word(reader, address + 5u, 5u, &length) ||
+        !hp39_read_word(reader, address + 10u, 5u, &h) ||
+        !hp39_read_word(reader, address + 15u, 5u, &w)) {
+        errno = EIO;
+        return -1;
+    }
+    if (prologue != HP39_RPL_DOGROB ||
+        w > HP39_PAGE_WIDTH || h > HP39_PAGE_HEIGHT) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t stride = (w + 3u) / 4u;
+    uint32_t data_nibbles = stride * h;
+    uint32_t expected_length = 15u + data_nibbles;
+    if (length != expected_length ||
+        address > HP39_SATURN_LIMIT - (5u + expected_length)) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    *width = w;
+    *height = h;
+    *payload = address + 20u;
+    *span = 5u + expected_length;
+    return 0;
+}
+
+static int hp39_function_page_hint(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t address,
+    uint32_t *x,
+    uint32_t *y)
+{
+    if (x == NULL || y == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    uint32_t prologue = 0u;
+    uint32_t length = 0u;
+    if (!hp39_read_word(reader, address, 5u, &prologue) ||
+        !hp39_read_word(reader, address + 5u, 5u, &length)) {
+        errno = EIO;
+        return -1;
+    }
+    /* Need at least seven bytes so Stock's SUB$1# indices 5 and 7 exist. */
+    if (prologue != HP39_RPL_DOCSTR ||
+        length < 5u + 14u ||
+        ((length - 5u) & 1u) != 0u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    if (!hp39_read_word(reader, address + 18u, 2u, x) ||
+        !hp39_read_word(reader, address + 22u, 2u, y)) {
+        errno = EIO;
+        return -1;
+    }
+    return 0;
+}
+
+static int hp39_function_page_normalized_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t grob_address,
+    uint32_t hint_address,
+    struct hpclang_object **object)
+{
+    uint32_t width = 0u;
+    uint32_t height = 0u;
+    uint32_t payload = 0u;
+    uint32_t span = 0u;
+    if (hp39_function_grob_layout(
+            reader,
+            grob_address,
+            &width,
+            &height,
+            &payload,
+            &span) != 0)
+        return -1;
+
+    if (hint_address == 0u)
+        return hpclang_object_snapshot_copy(
+            reader, grob_address, span, object);
+
+    uint32_t x = 0u;
+    uint32_t y = 0u;
+    if (hp39_function_page_hint(
+            reader, hint_address, &x, &y) != 0)
+        return -1;
+    if (x > HP39_PAGE_WIDTH || y > HP39_PAGE_HEIGHT ||
+        width > HP39_PAGE_WIDTH - x ||
+        height > HP39_PAGE_HEIGHT - y) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    struct hp39_page_grob_reader view = {
+        .source = reader,
+        .source_payload = payload,
+        .source_width = width,
+        .source_height = height,
+        .source_stride = (width + 3u) / 4u,
+        .x = x,
+        .y = y,
+        .nibble_count =
+            20u + HP39_PAGE_HEIGHT * HP39_PAGE_STRIDE_NIBBLES,
+    };
+    struct hpclang_rpl_reader page_reader = {
+        .read_nibble = hp39_page_grob_read,
+        .context = &view,
+    };
+    return hpclang_object_snapshot_copy(
+        &page_reader, 0u, view.nibble_count, object);
+}
+
+static int hp39_function_page_snapshot(
+    const struct hpclang_rpl_reader *reader,
+    uint32_t aplet_object,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+
+    uint32_t page = 0u;
+    if (hp39_function_page_number_value(
+            reader, aplet_object, &page) != 0)
+        return -1;
+
+    uint32_t sketch = 0u;
+    if (hp39_function_tail_object(
+            reader, aplet_object, 1u, HP39_RPL_DOLIST, &sketch) != 0)
+        return -1;
+    if (sketch > HP39_SATURN_LIMIT - 5u) {
+        errno = EILSEQ;
+        return -1;
+    }
+
+    uint32_t cursor = sketch + 5u;
+    uint32_t hint = 0u;
+    uint32_t current_page = 0u;
+    for (;;) {
+        if (cursor > HP39_SATURN_LIMIT - 5u) {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        uint32_t prologue = 0u;
+        if (!hp39_read_word(reader, cursor, 5u, &prologue)) {
+            errno = EIO;
+            return -1;
+        }
+        if (prologue == HP39_RPL_SEMI) {
+            errno = ENOENT;
+            return -1;
+        }
+
+        uint32_t span = 0u;
+        int result = hpclang_rpl_object_span(
+            reader,
+            cursor,
+            HP39_SATURN_LIMIT - cursor,
+            &span);
+        if (result != HPCLANG_RPL_SPAN_OK || span == 0u)
+            return hp39_span_error(result);
+
+        if (prologue == HP39_RPL_DOCSTR) {
+            hint = cursor;
+        } else if (prologue == HP39_RPL_DOGROB) {
+            ++current_page;
+            if (current_page == page)
+                return hp39_function_page_normalized_snapshot(
+                    reader, cursor, hint, object);
+            hint = 0u;
+        } else {
+            errno = EILSEQ;
+            return -1;
+        }
+
+        if (span > HP39_SATURN_LIMIT - cursor) {
+            errno = EILSEQ;
+            return -1;
+        }
+        cursor += span;
+    }
+}
+
 static int hp39_make_integer_real_snapshot(
     int32_t value,
     struct hpclang_object **object)
@@ -976,6 +1308,11 @@ int hpclang_hp39_function_variable_snapshot(
         return hp39_function_note_text_snapshot(
             reader, aplet_object, object);
 
+    if (projection.kind ==
+        HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_GROB)
+        return hp39_function_page_snapshot(
+            reader, aplet_object, object);
+
     struct hpclang_hp39_function_field_view field;
     if (hpclang_hp39_function_field_at(
             reader,
@@ -1001,8 +1338,10 @@ int hpclang_hp39_function_variable_snapshot(
 
     if (projection.kind ==
         HPCLANG_HP39_FUNCTION_VARIABLE_PAGE_NUMBER) {
-        uint32_t page =
-            (((uint32_t)stored / UINT32_C(64)) & UINT32_C(15)) + 1u;
+        uint32_t page = 0u;
+        if (hp39_function_page_number_value(
+                reader, aplet_object, &page) != 0)
+            return -1;
         return hp39_make_integer_real_snapshot((int32_t)page, object);
     }
 
