@@ -32,9 +32,14 @@
 #define HP39P_RESULT_PROLOGUE 212
 #define HP39P_APP_RESULT_OBJ  216
 #define HP39P_APP_RESULT_PRO  220
-#define HP39P_STACK           224
+#define HP39P_REQUEST_KIND    224
+#define HP39P_STACK           228
 #define HP39P_STACK_SIZE      256
-#define HP39P_STACK_END       480
+#define HP39P_STACK_END       484
+
+#define HP39P_CATALOG_APLET   1
+#define HP39P_CATALOG_PROGRAM 2
+#define HP39P_CATALOG_NOTE    3
 
 #ifndef __ASSEMBLER__
 
@@ -70,6 +75,7 @@ struct hpclang_hp39_portal_context {
     uint32_t result_prologue;
     uintptr_t app_result_object;
     uintptr_t app_result_prologue;
+    uint32_t request_kind;
     uint8_t portal_stack[HP39P_STACK_SIZE];
 };
 
@@ -87,6 +93,7 @@ _Static_assert(offsetof(struct hpclang_hp39_portal_context, result_object) == HP
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, result_prologue) == HP39P_RESULT_PROLOGUE, "HP39 portal result prologue");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, app_result_object) == HP39P_APP_RESULT_OBJ, "HP39 portal app result object");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, app_result_prologue) == HP39P_APP_RESULT_PRO, "HP39 portal app result prologue");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, request_kind) == HP39P_REQUEST_KIND, "HP39 portal request kind");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, portal_stack) == HP39P_STACK, "HP39 portal stack");
 _Static_assert(sizeof(struct hpclang_hp39_portal_context) == HP39P_STACK_END, "HP39 portal context size");
 

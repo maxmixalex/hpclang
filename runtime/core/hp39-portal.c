@@ -8,6 +8,7 @@
 #include <hpclang/target.h>
 
 #include "object-snapshot.h"
+#include "../../platform/armtoolbox/hp39-portal-private.h"
 #include "saturn-view.h"
 
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
@@ -23,7 +24,8 @@ static int hp39_snapshot_read_nibble(
         hpclang_saturn_address_make(nibble_address), value);
 }
 
-static int hp39_portal_aplet_catalog_result(
+static int hp39_portal_catalog_result(
+    uint32_t kind,
     uint32_t *object,
     uint32_t *prologue)
 {
@@ -54,10 +56,10 @@ static int hp39_portal_aplet_catalog_result(
         return -1;
     }
 
-    int (*entry)(uint32_t *, uint32_t *) =
-        (int (*)(uint32_t *, uint32_t *))(uintptr_t)
+    int (*entry)(uint32_t *, uint32_t *, uint32_t) =
+        (int (*)(uint32_t *, uint32_t *, uint32_t))(uintptr_t)
             context->portal_entry;
-    int result = entry(object, prologue);
+    int result = entry(object, prologue, kind);
     if (result == -2) {
         errno = EBUSY;
         return -1;
@@ -78,10 +80,13 @@ int hpclang_hp39_portal_roundtrip(void)
 {
     uint32_t object = 0u;
     uint32_t prologue = 0u;
-    return hp39_portal_aplet_catalog_result(&object, &prologue);
+    return hp39_portal_catalog_result(
+        HP39P_CATALOG_APLET, &object, &prologue);
 }
 
-int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
+static int hp39_catalog_snapshot(
+    uint32_t kind,
+    struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EINVAL;
@@ -91,7 +96,8 @@ int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
 
     uint32_t address = 0u;
     uint32_t prologue = 0u;
-    if (hp39_portal_aplet_catalog_result(&address, &prologue) != 0)
+    if (hp39_portal_catalog_result(
+            kind, &address, &prologue) != 0)
         return -1;
 
     struct hpclang_rpl_reader reader = {
@@ -113,4 +119,19 @@ int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
         return -1;
     }
     return 0;
+}
+
+int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
+{
+    return hp39_catalog_snapshot(HP39P_CATALOG_APLET, object);
+}
+
+int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object)
+{
+    return hp39_catalog_snapshot(HP39P_CATALOG_PROGRAM, object);
+}
+
+int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object)
+{
+    return hp39_catalog_snapshot(HP39P_CATALOG_NOTE, object);
 }

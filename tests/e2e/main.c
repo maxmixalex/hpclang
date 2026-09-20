@@ -22,6 +22,8 @@
 
 int hpclang_e2e_cpp_test(void);
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
+int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
+int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -1769,29 +1771,42 @@ int main(void)
     if (boot->model == HPCLANG_MODEL_HP39GS ||
         boot->model == HPCLANG_MODEL_HP40GS) {
         errno = 0;
-        struct hpclang_object *first_catalog = NULL;
-        struct hpclang_object *second_catalog = NULL;
-        int first_portal =
-            hpclang_hp39_aplet_catalog_snapshot(&first_catalog);
-        int second_portal =
-            first_portal == 0
-                ? hpclang_hp39_aplet_catalog_snapshot(&second_catalog)
+        struct hpclang_object *aplet_catalog = NULL;
+        struct hpclang_object *program_catalog = NULL;
+        struct hpclang_object *note_catalog = NULL;
+        int aplet_result =
+            hpclang_hp39_aplet_catalog_snapshot(&aplet_catalog);
+        int program_result =
+            aplet_result == 0
+                ? hpclang_hp39_program_catalog_snapshot(&program_catalog)
+                : -1;
+        int note_result =
+            program_result == 0
+                ? hpclang_hp39_note_catalog_snapshot(&note_catalog)
                 : -1;
         if (boot->saturn_state != 0u) {
-            if (first_portal != 0 || second_portal != 0 ||
-                first_catalog == NULL || second_catalog == NULL ||
-                hpclang_object_kind(first_catalog) != HPCLANG_OBJECT_LIST ||
-                hpclang_object_kind(second_catalog) != HPCLANG_OBJECT_LIST) {
-                hpclang_object_release(first_catalog);
-                hpclang_object_release(second_catalog);
+            if (aplet_result != 0 ||
+                program_result != 0 ||
+                note_result != 0 ||
+                aplet_catalog == NULL ||
+                program_catalog == NULL ||
+                note_catalog == NULL ||
+                hpclang_object_kind(aplet_catalog) != HPCLANG_OBJECT_LIST ||
+                hpclang_object_kind(program_catalog) != HPCLANG_OBJECT_LIST ||
+                hpclang_object_kind(note_catalog) != HPCLANG_OBJECT_LIST) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
                 return finish(0xb4u, boot->model);
             }
-            hpclang_object_release(first_catalog);
-            hpclang_object_release(second_catalog);
+            hpclang_object_release(aplet_catalog);
+            hpclang_object_release(program_catalog);
+            hpclang_object_release(note_catalog);
         } else {
-            hpclang_object_release(first_catalog);
-            hpclang_object_release(second_catalog);
-            if (first_portal != -1 || errno != ENOSYS)
+            hpclang_object_release(aplet_catalog);
+            hpclang_object_release(program_catalog);
+            hpclang_object_release(note_catalog);
+            if (aplet_result != -1 || errno != ENOSYS)
                 return finish(0xb5u, boot->model);
         }
     }
