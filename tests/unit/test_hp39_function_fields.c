@@ -8,13 +8,14 @@
 
 #include "hp39-function-fields.h"
 
-#define FIXTURE_NIBBLES 0x5000u
+#define FIXTURE_NIBBLES 0x100000u
 #define RPL_DORRP UINT32_C(0x00002a96)
 #define RPL_DOLIST UINT32_C(0x00002a74)
 #define RPL_DOROMP UINT32_C(0x00002e92)
 #define RPL_DOREAL UINT32_C(0x00002933)
 #define RPL_DOBINT UINT32_C(0x00002911)
 #define RPL_SEMI UINT32_C(0x0000312b)
+#define RPL_USEROB UINT32_C(0x00080711)
 
 struct fixture {
     uint8_t nibbles[FIXTURE_NIBBLES];
@@ -114,9 +115,15 @@ int main(void)
         RPL_DOREAL, RPL_DOREAL, RPL_DOREAL, RPL_DOREAL, RPL_DOREAL,
     };
 
+    const uint32_t home = 0x90000u;
     const uint32_t root = 0x100u;
     uint32_t item = root + 18u;
     uint32_t previous_item = item;
+
+    put_word(&fixture, RPL_USEROB, home, 5u);
+    put_word(&fixture, home, RPL_DORRP, 5u);
+    put_word(&fixture, home + 5u, 0u, 3u);
+    put_word(&fixture, home + 8u, 0u, 5u);
 
     put_word(&fixture, root, RPL_DORRP, 5u);
     put_word(&fixture, root + 5u, 0x7ffu, 3u);
