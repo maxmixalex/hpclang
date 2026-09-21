@@ -130,7 +130,7 @@ enum {
     HP39P_REFERENCE_LIST_NIBBLE = 700u,
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_VARIABLE_RECALL_NIBBLE = 715u,
-    HP39P_VARIABLE_RECALL_NIBBLES = 40u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 35u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
@@ -404,14 +404,14 @@ static int hp39_store_request_name(
             return 0;
 
         /*
-         * Keep the real extended ID as a component of a Stock RPL object.
-         * The helper extracts that component as data immediately before @,
-         * so @ sees the original DOIDNT object rather than a reconstruction.
+         * Quote the genuine extended ID directly in the helper runstream.
+         * Stock's own DummyVarProc uses exactly this form (`' DummyVar`);
+         * no temporary list/component extraction is needed before @.
          */
         return hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 5u,
+            HP39P_VARIABLE_RECALL_NIBBLE + 10u,
             id_reference);
     }
 
@@ -676,18 +676,18 @@ static int hp39_portal_prepare_thunk(
     /*
      * Generic HP39 extended-variable recall:
      *
-     *   :: { genuine-id } ONE NTHCOMPDROP @ ?SKIP <miss> ;
+     *   :: ' <genuine-id> @ ?SKIP <miss> ;
      *
-     * Stock @ is itself the special/extended-ID dispatcher. Its DOIDNT path
-     * follows the trailing descriptor pointer and invokes descriptor word 0,
-     * including the #11111 / #3Fxxx supported-entry path. Keeping the genuine
-     * ID inside this list avoids reconstructing calculator-owned object bytes.
+     * Stock's own DummyVarProc proves the quote form for extended IDs. Stock
+     * @ then follows the trailing descriptor pointer and tail-dispatches word
+     * 0, including the #11111 / #3Fxxx supported-entry path. This keeps the
+     * complete operation inside Stock's native extended-ID contract without
+     * reconstructing the object or routing it through a temporary DOLIST.
      */
     const uint32_t variable_recall_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
-        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
-        UINT32_C(0x00004053), /* ONE */
-        UINT32_C(0x0000f476), /* NTHCOMPDROP */
+        UINT32_C(0x00007665), /* ' */
+        UINT32_C(0x00004053), /* patched: genuine ID; safe placeholder ONE */
         UINT32_C(0x000081d3), /* @ -> value TRUE | FALSE */
         UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
         saturn_base + HP39P_MISS_NIBBLE,
@@ -926,7 +926,7 @@ int hpclang_hp39_portal_prepare_stock(void)
         uint32_t observed_id = 0u;
         if (!stage_saturn_read_word5(
                 read_map,
-                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
                 &observed_id) ||
             observed_id != expected_id)
             return -7;
