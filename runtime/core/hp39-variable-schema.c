@@ -342,6 +342,13 @@ static int find_in_variable_list_reader(
                 return -1;
             }
             if (same != 0) {
+                /*
+                 * Preserve the live Stock object reference. The resolved
+                 * snapshot proves the object shape, but value recall should
+                 * execute the calculator's original extended ID instead of a
+                 * byte-identical reconstruction in hpclang-owned memory.
+                 */
+                candidate.source_reference = word;
                 *match = candidate;
                 return 0;
             }
