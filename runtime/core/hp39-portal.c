@@ -231,7 +231,8 @@ static int hp39_variable_reference_snapshot(
         return -1;
     }
 
-    if ((*object)->native_prologue != expected_prologue) {
+    if (expected_prologue != 0u &&
+        (*object)->native_prologue != expected_prologue) {
         hpclang_object_release(*object);
         *object = NULL;
         errno = EILSEQ;
@@ -346,39 +347,34 @@ int hpclang_hp39_variable_value_snapshot(
     }
     hpclang_object_release(schema);
 
-    uint32_t payload_length = (uint32_t)name_length + 3u;
-    uint8_t payload[HP39_VARIABLE_ID_MAX];
-    for (size_t i = 0u; i < name_length; ++i)
-        payload[i] = name[i];
-    payload[name_length] =
-        (uint8_t)(match.descriptor_address & 0xffu);
-    payload[name_length + 1u] =
-        (uint8_t)((match.descriptor_address >> 8u) & 0xffu);
-    payload[name_length + 2u] =
-        (uint8_t)((match.descriptor_address >> 16u) & 0xffu);
-
-    uint32_t address = 0u;
-    uint32_t prologue = 0u;
-    if (hp39_portal_result(
-            HP39P_VARIABLE_VALUE,
-            payload,
-            payload_length,
-            0u,
-            &address,
-            &prologue) != 0)
-        return -1;
-
-    if (hpclang_object_snapshot_copy(
-            &hp39_stock_reader,
-            address,
-            HP39_SATURN_LIMIT - address,
-            object) != 0)
-        return -1;
-    if (*object == NULL) {
-        errno = EILSEQ;
+    /*
+     * The schema parser may have resolved the matching extended ID through a
+     * real five-nibble Stock reference (for example MiniVar's xNoteText at
+     * #2C812). Execute that original object through the already-proven Stock
+     * EVAL bridge. Do not reconstruct a byte-identical ID in the ARM portal
+     * buffer: Stock @ performs calculator-context/address handling before its
+     * extended-ID dispatch, so object bytes alone are not a proven substitute
+     * for the live calculator object.
+     *
+     * Inline IDs in an owned schema snapshot have no trustworthy calculator
+     * address. They remain fail-closed until a historical HPGCC use case
+     * requires a safe materialization path.
+     */
+    if (match.source_reference == 0u) {
+        errno = ENOTSUP;
         return -1;
     }
-    return 0;
+
+    uint8_t payload[3] = {
+        (uint8_t)(match.source_reference & 0xffu),
+        (uint8_t)((match.source_reference >> 8u) & 0xffu),
+        (uint8_t)((match.source_reference >> 16u) & 0xffu),
+    };
+    return hp39_variable_reference_snapshot(
+        HP39P_REFERENCE_EVAL,
+        payload,
+        0u,
+        object);
 }
 
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
