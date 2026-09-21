@@ -96,7 +96,7 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  *   Note catalog    = NOP ; CatNot       ; {}N  ; NOP ; NOP
  *   Program body    = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP
  *   Note body       = PTR(local ID) ; body-getter ; ?SKIP ; PTR(miss DOCSTR) ; NOP
- *   Variable value  = ' ; PTR(local extended ID) ; @ ; ?SKIP ; PTR(miss DOCSTR)
+ *   Variable value  = NOP ; PTR(variable-recall helper) ; NOP ; NOP ; NOP
  * Catalog requests return one DOLIST. Body requests return one DOCSTR; an
  * absent name returns a private thunk-local sentinel whose Saturn address is
  * distinguishable from a real, possibly empty, Stock body. The result remains
@@ -128,9 +128,11 @@ enum {
     HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
     HP39P_REFERENCE_LIST_NIBBLE = 700u,
-    HP39P_REFERENCE_LIST_NIBBLES = 15u,
+    HP39P_REFERENCE_LIST_NIBBLES = 20u,
+    HP39P_VARIABLE_RECALL_NIBBLE = 720u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 55u,
     HP39P_STATIC_NIBBLES =
-        HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES,
+        HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -140,6 +142,8 @@ _Static_assert(
     HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
     HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
         HP39P_REFERENCE_LIST_NIBBLE &&
+    HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES <=
+        HP39P_VARIABLE_RECALL_NIBBLE &&
     HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
     "HP39 Saturn portal request helpers must fit its private buffer");
 _Static_assert(
@@ -326,24 +330,20 @@ static int hp39_request_words(
         return 1;
     }
 
-    if (kind == HP39P_VARIABLE_VALUE &&
-        name_length > 3u &&
-        name_length <= HP39P_NAME_MAX_BYTES) {
+    if (kind == HP39P_VARIABLE_VALUE && name_length == 6u) {
         /*
-         * The supplied payload is the complete HP39 extended-ID payload:
-         * visible bytes followed by the native three-byte descriptor pointer.
-         * Stock's @ dispatcher expects that ID as data: xNoteText's proven
-         * recall handler begins by DROPping it before switching to the current
-         * Aplet context. Quote the local ID exactly as Stock code does, then
-         * use @ and collapse its TRUE/FALSE result to either the typed value or
-         * the private miss sentinel.
+         * The private payload is two genuine Stock references:
+         *   bytes 0..2 = extended ID, bytes 3..5 = descriptor recall word.
+         * A thunk-local helper materializes both references from one DOLIST,
+         * leaves the ID below the getter, EVALs the getter, then consumes the
+         * standard value TRUE | FALSE recall flag. This reproduces the native
+         * descriptor contract without knowing any variable name or Aplet.
          */
-        *arg = UINT32_C(0x00007665);       /* ' */
-        *operation = saturn_base + HP39P_NAME_NIBBLE;
-        *pack = UINT32_C(0x000081d3);      /* @ -> object TRUE | FALSE */
-        *normalize = UINT32_C(0x00007903); /* ?SKIP consumes recall flag */
-        *finalize = saturn_base + HP39P_MISS_NIBBLE;
-        *expected_prologue = 0u; /* typed result or private miss sentinel */
+        *arg = nop;
+        *operation = saturn_base + HP39P_VARIABLE_RECALL_NIBBLE;
+        *pack = nop;
+        *normalize = nop;
+        *expected_prologue = 0u;
         return 1;
     }
 
@@ -393,12 +393,36 @@ static int hp39_store_request_name(
             reference);
     }
 
-    uint32_t maximum = body_request
-        ? HP39P_BODY_NAME_MAX_BYTES
-        : HP39P_NAME_MAX_BYTES;
-    if (name == NULL || name_length == 0u ||
-        name_length > maximum ||
-        (variable_request && name_length <= 3u))
+    if (variable_request) {
+        if (name == NULL || name_length != 6u)
+            return 0;
+        uint32_t id_reference =
+            (uint32_t)name[0] |
+            ((uint32_t)name[1] << 8u) |
+            ((uint32_t)name[2] << 16u);
+        uint32_t recall_reference =
+            (uint32_t)name[3] |
+            ((uint32_t)name[4] << 8u) |
+            ((uint32_t)name[5] << 16u);
+        if (id_reference == 0u ||
+            id_reference >= UINT32_C(0x00100000) ||
+            recall_reference == 0u ||
+            recall_reference >= UINT32_C(0x00100000))
+            return 0;
+        return hp39_saturn_buffer_store_word5(
+                   hp39_saturn_portal_thunk,
+                   (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                   HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                   id_reference) &&
+            hp39_saturn_buffer_store_word5(
+                   hp39_saturn_portal_thunk,
+                   (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                   HP39P_REFERENCE_LIST_NIBBLE + 10u,
+                   recall_reference);
+    }
+
+    uint32_t maximum = HP39P_BODY_NAME_MAX_BYTES;
+    if (name == NULL || name_length == 0u || name_length > maximum)
         return 0;
 
     if (!hp39_saturn_buffer_store_word5(
@@ -636,10 +660,9 @@ static int hp39_portal_prepare_thunk(
     }
 
     /*
-     * Supported-entry reference container. Runtime patches the middle cell
-     * only after proving the logical #3Fxxx cell carries the #11111 Stock
-     * supported-entry trampoline. The portal then extracts this element and
-     * invokes Stock EVAL, preserving the dispatcher's native object context.
+     * Reference container. REFERENCE_EVAL uses element 1. Variable recall
+     * patches elements 1 and 2 with the genuine extended ID and the getter
+     * word read from that ID's descriptor.
      */
     if (!hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
@@ -655,8 +678,48 @@ static int hp39_portal_prepare_thunk(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_REFERENCE_LIST_NIBBLE + 10u,
+            UINT32_C(0x000040d5)) || /* safe placeholder: TWO */
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 15u,
             UINT32_C(0x0000312b)))   /* SEMI */
         return 0;
+
+    /*
+     * Generic HP39 extended-variable recall:
+     *   :: { id getter } ONE NTHCOMPDROP
+     *      { id getter } TWO NTHCOMPDROP EVAL
+     *      ?SKIP miss ;
+     *
+     * The first extraction leaves the original ID on the data stack. The
+     * second yields its descriptor-declared getter, so Stock EVAL invokes the
+     * same getter ABI used by standard and third-party extended variables.
+     */
+    const uint32_t variable_recall_words[] = {
+        UINT32_C(0x00002d9d), /* DOCOL */
+        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
+        UINT32_C(0x00004053), /* ONE */
+        UINT32_C(0x0000f476), /* NTHCOMPDROP */
+        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
+        UINT32_C(0x000040d5), /* TWO */
+        UINT32_C(0x0000f476), /* NTHCOMPDROP */
+        UINT32_C(0x0000775c), /* EVAL */
+        UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
+        saturn_base + HP39P_MISS_NIBBLE,
+        UINT32_C(0x0000312b), /* SEMI */
+    };
+    for (uint32_t i = 0u;
+         i < (uint32_t)(sizeof(variable_recall_words) /
+                        sizeof(variable_recall_words[0]));
+         ++i) {
+        if (!hp39_saturn_buffer_store_word5(
+                hp39_saturn_portal_thunk,
+                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                HP39P_VARIABLE_RECALL_NIBBLE + i * 5u,
+                variable_recall_words[i]))
+            return 0;
+    }
 
     hpclang_cache_clean(
         hp39_saturn_portal_thunk,
@@ -856,8 +919,7 @@ int hpclang_hp39_portal_prepare_stock(void)
     const uint32_t kind = portal->request_kind;
     const uint32_t name_length = portal->request_name_length;
     if (kind == HP39P_BODY_PROGRAM ||
-        kind == HP39P_BODY_NOTE ||
-        kind == HP39P_VARIABLE_VALUE) {
+        kind == HP39P_BODY_NOTE) {
         uint32_t name_end =
             HP39P_NAME_NIBBLE + 7u + name_length * 2u;
         for (uint32_t i = HP39P_NAME_NIBBLE; i < name_end; ++i) {
@@ -870,6 +932,30 @@ int hpclang_hp39_portal_prepare_stock(void)
                     hp39_saturn_portal_thunk, i))
                 return -7;
         }
+    } else if (kind == HP39P_VARIABLE_VALUE) {
+        const uint8_t *request =
+            (const uint8_t *)(uintptr_t)portal->request_name;
+        uint32_t expected_id =
+            (uint32_t)request[0] |
+            ((uint32_t)request[1] << 8u) |
+            ((uint32_t)request[2] << 16u);
+        uint32_t expected_recall =
+            (uint32_t)request[3] |
+            ((uint32_t)request[4] << 8u) |
+            ((uint32_t)request[5] << 16u);
+        uint32_t observed_id = 0u;
+        uint32_t observed_recall = 0u;
+        if (!stage_saturn_read_word5(
+                read_map,
+                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                &observed_id) ||
+            !stage_saturn_read_word5(
+                read_map,
+                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 10u,
+                &observed_recall) ||
+            observed_id != expected_id ||
+            observed_recall != expected_recall)
+            return -7;
     } else if (kind == HP39P_REFERENCE_EVAL) {
         const uint8_t *request =
             (const uint8_t *)(uintptr_t)portal->request_name;
