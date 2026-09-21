@@ -130,7 +130,7 @@ enum {
     HP39P_REFERENCE_LIST_NIBBLE = 700u,
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_VARIABLE_RECALL_NIBBLE = 715u,
-    HP39P_VARIABLE_RECALL_NIBBLES = 35u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 40u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
@@ -330,14 +330,13 @@ static int hp39_request_words(
         return 1;
     }
 
-    if (kind == HP39P_VARIABLE_VALUE && name_length == 6u) {
+    if (kind == HP39P_VARIABLE_VALUE && name_length == 3u) {
         /*
-         * The private payload is two genuine Stock references:
-         *   bytes 0..2 = extended ID, bytes 3..5 = descriptor recall word.
-         * A thunk-local helper materializes both references from one DOLIST,
-         * leaves the ID below the getter, EVALs the getter, then consumes the
-         * standard value TRUE | FALSE recall flag. This reproduces the native
-         * descriptor contract without knowing any variable name or Aplet.
+         * The private payload is the genuine Stock extended-ID reference.
+         * The thunk-local helper extracts that data object and calls Stock @.
+         * HP39's @ DOIDNT path is the native generic special-variable
+         * dispatcher: it parses the ID's descriptor and invokes descriptor
+         * word 0 with the supported-entry context Stock expects.
          */
         *arg = nop;
         *operation = saturn_base + HP39P_VARIABLE_RECALL_NIBBLE;
@@ -394,39 +393,26 @@ static int hp39_store_request_name(
     }
 
     if (variable_request) {
-        if (name == NULL || name_length != 6u)
+        if (name == NULL || name_length != 3u)
             return 0;
         uint32_t id_reference =
             (uint32_t)name[0] |
             ((uint32_t)name[1] << 8u) |
             ((uint32_t)name[2] << 16u);
-        uint32_t recall_reference =
-            (uint32_t)name[3] |
-            ((uint32_t)name[4] << 8u) |
-            ((uint32_t)name[5] << 16u);
         if (id_reference == 0u ||
-            id_reference >= UINT32_C(0x00100000) ||
-            recall_reference == 0u ||
-            recall_reference >= UINT32_C(0x00100000))
+            id_reference >= UINT32_C(0x00100000))
             return 0;
 
         /*
-         * Quote the genuine extended-ID token exactly as Stock's
-         * DummyVarProc does, then execute descriptor word 0 directly as the
-         * next threaded token. This keeps both the ID and supported-entry
-         * getter in their native interpreter roles instead of re-wrapping
-         * either one as an EVAL data object.
+         * Keep the real extended ID as a component of a Stock RPL object.
+         * The helper extracts that component as data immediately before @,
+         * so @ sees the original DOIDNT object rather than a reconstruction.
          */
         return hp39_saturn_buffer_store_word5(
-                   hp39_saturn_portal_thunk,
-                   (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                   HP39P_VARIABLE_RECALL_NIBBLE + 10u,
-                   id_reference) &&
-            hp39_saturn_buffer_store_word5(
-                   hp39_saturn_portal_thunk,
-                   (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                   HP39P_VARIABLE_RECALL_NIBBLE + 15u,
-                   recall_reference);
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 5u,
+            id_reference);
     }
 
     uint32_t maximum = HP39P_BODY_NAME_MAX_BYTES;
@@ -690,20 +676,19 @@ static int hp39_portal_prepare_thunk(
     /*
      * Generic HP39 extended-variable recall:
      *
-     *   :: ' <genuine extended ID>
-     *      <descriptor word 0>
-     *      ?SKIP <miss> ;
+     *   :: { genuine-id } ONE NTHCOMPDROP @ ?SKIP <miss> ;
      *
-     * DummyVarProc proves the native quote form for an extended ID. The
-     * descriptor's recall word is an execution token, so let the threaded
-     * Stock interpreter execute it directly. Standard getters consume the ID
-     * and return value TRUE | FALSE.
+     * Stock @ is itself the special/extended-ID dispatcher. Its DOIDNT path
+     * follows the trailing descriptor pointer and invokes descriptor word 0,
+     * including the #11111 / #3Fxxx supported-entry path. Keeping the genuine
+     * ID inside this list avoids reconstructing calculator-owned object bytes.
      */
     const uint32_t variable_recall_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
-        UINT32_C(0x00007665), /* ' */
-        UINT32_C(0x00004053), /* patched: genuine ID; safe placeholder ONE */
-        UINT32_C(0x0000765c), /* patched: recall token; safe placeholder NOP */
+        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
+        UINT32_C(0x00004053), /* ONE */
+        UINT32_C(0x0000f476), /* NTHCOMPDROP */
+        UINT32_C(0x000081d3), /* @ -> value TRUE | FALSE */
         UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
         saturn_base + HP39P_MISS_NIBBLE,
         UINT32_C(0x0000312b), /* SEMI */
@@ -938,22 +923,12 @@ int hpclang_hp39_portal_prepare_stock(void)
             (uint32_t)request[0] |
             ((uint32_t)request[1] << 8u) |
             ((uint32_t)request[2] << 16u);
-        uint32_t expected_recall =
-            (uint32_t)request[3] |
-            ((uint32_t)request[4] << 8u) |
-            ((uint32_t)request[5] << 16u);
         uint32_t observed_id = 0u;
-        uint32_t observed_recall = 0u;
         if (!stage_saturn_read_word5(
                 read_map,
-                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
+                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 5u,
                 &observed_id) ||
-            !stage_saturn_read_word5(
-                read_map,
-                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 15u,
-                &observed_recall) ||
-            observed_id != expected_id ||
-            observed_recall != expected_recall)
+            observed_id != expected_id)
             return -7;
     } else if (kind == HP39P_REFERENCE_EVAL) {
         const uint8_t *request =
