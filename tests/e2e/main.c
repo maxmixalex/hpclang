@@ -1876,6 +1876,16 @@ int main(void)
                     code = 0xc1u;
                 else if (errno == ENOTSUP)
                     code = 0xc2u;
+                else if (errno == EBADF)
+                    code = 0xc4u; /* portal -3: pre-call DSKTOP */
+                else if (errno == EFAULT)
+                    code = 0xc5u; /* portal -4: post-call DSKTOP */
+                else if (errno == E2BIG)
+                    code = 0xc6u; /* portal -5: result shape */
+                else if (errno == ENOMEM)
+                    code = 0xc7u; /* portal -6: cleanup */
+                else if (errno == EINVAL)
+                    code = 0xc8u; /* portal -7: request/thunk */
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
