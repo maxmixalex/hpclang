@@ -1886,6 +1886,20 @@ int main(void)
                     code = 0xc7u; /* portal -6: cleanup */
                 else if (errno == EINVAL)
                     code = 0xc8u; /* portal -7: request/thunk */
+                else if (errno == EDOM)
+                    code = 0xd0u; /* portal -8: zero results */
+                else if (errno == ESRCH)
+                    code = 0xd1u; /* portal -9: two results */
+                else if (errno == ERANGE)
+                    code = 0xd2u; /* portal -10: other stack delta */
+                else if (errno == ENOEXEC)
+                    code = 0xd3u; /* portal -11: result cell unreadable */
+                else if (errno == EACCES)
+                    code = 0xd4u; /* portal -12: result pointer invalid */
+                else if (errno == EPERM)
+                    code = 0xd5u; /* portal -13: prologue unreadable */
+                else if (errno == ENFILE)
+                    code = 0xd6u; /* portal -14: prologue mismatch */
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);

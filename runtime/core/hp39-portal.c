@@ -137,6 +137,13 @@ static int hp39_portal_result(
      *   -5 result stack/object shape invalid
      *   -6 private result-cell cleanup failed
      *   -7 generated request/thunk validation failed
+     *   -8 Stock returned no result stack object
+     *   -9 Stock returned two result stack objects
+     *  -10 Stock returned another unexpected stack-depth delta
+     *  -11 result stack cell unreadable
+     *  -12 result object pointer outside Saturn main
+     *  -13 result prologue unreadable
+     *  -14 result prologue violates the request contract
      *
      * The public object API still reports failure through errno, while Stock
      * validation can now identify the exact broken boundary instead of
@@ -160,6 +167,34 @@ static int hp39_portal_result(
     }
     if (result == -7) {
         errno = EINVAL;
+        return -1;
+    }
+    if (result == -8) {
+        errno = EDOM;
+        return -1;
+    }
+    if (result == -9) {
+        errno = ESRCH;
+        return -1;
+    }
+    if (result == -10) {
+        errno = ERANGE;
+        return -1;
+    }
+    if (result == -11) {
+        errno = ENOEXEC;
+        return -1;
+    }
+    if (result == -12) {
+        errno = EACCES;
+        return -1;
+    }
+    if (result == -13) {
+        errno = EPERM;
+        return -1;
+    }
+    if (result == -14) {
+        errno = ENFILE;
         return -1;
     }
     if (result != 0) {

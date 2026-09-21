@@ -982,13 +982,28 @@ int hpclang_hp39_portal_restore_hpc(void)
         !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
         result = -4;
     } else {
-        if (post_dsktop + 5u != portal->pre_dsktop ||
-            !stage_saturn_read_word5(read_map, post_dsktop, &object) ||
-            object > RPL_MAIN_END - 5u ||
-            !stage_saturn_read_word5(read_map, object, &prologue) ||
-            (portal->expected_prologue != 0u &&
-             prologue != portal->expected_prologue)) {
-            result = -5;
+        /*
+         * Keep result-shape failures precise while closing the HP39
+         * extended-variable recall path. The normal portal contract is one
+         * newly-pushed object (post DSKTOP = pre DSKTOP - 5).
+         */
+        if (post_dsktop == portal->pre_dsktop) {
+            result = -8;  /* Stock returned no stack object. */
+        } else if (post_dsktop + 10u == portal->pre_dsktop) {
+            result = -9;  /* Stock returned two stack objects. */
+        } else if (post_dsktop + 5u != portal->pre_dsktop) {
+            result = -10; /* Other stack-depth delta. */
+        } else if (!stage_saturn_read_word5(
+                       read_map, post_dsktop, &object)) {
+            result = -11; /* Result stack cell unreadable. */
+        } else if (object > RPL_MAIN_END - 5u) {
+            result = -12; /* Result object pointer outside Saturn main. */
+        } else if (!stage_saturn_read_word5(
+                       read_map, object, &prologue)) {
+            result = -13; /* Result prologue unreadable. */
+        } else if (portal->expected_prologue != 0u &&
+                   prologue != portal->expected_prologue) {
+            result = -14; /* Result type violates request contract. */
         } else {
             const uint32_t kind = portal->request_kind;
             const int miss_request =
