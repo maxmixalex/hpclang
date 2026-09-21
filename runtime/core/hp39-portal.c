@@ -129,6 +129,39 @@ static int hp39_portal_result(
         errno = EBUSY;
         return -1;
     }
+    /*
+     * Keep the private Stock-portal failure classes distinguishable. These are
+     * structural transport failures, not calculator-object lookup misses:
+     *   -3 pre-call DSKTOP unreadable
+     *   -4 post-call DSKTOP unreadable
+     *   -5 result stack/object shape invalid
+     *   -6 private result-cell cleanup failed
+     *   -7 generated request/thunk validation failed
+     *
+     * The public object API still reports failure through errno, while Stock
+     * validation can now identify the exact broken boundary instead of
+     * collapsing every portal fault to EIO.
+     */
+    if (result == -3) {
+        errno = EBADF;
+        return -1;
+    }
+    if (result == -4) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (result == -5) {
+        errno = E2BIG;
+        return -1;
+    }
+    if (result == -6) {
+        errno = ENOMEM;
+        return -1;
+    }
+    if (result == -7) {
+        errno = EINVAL;
+        return -1;
+    }
     if (result != 0) {
         errno = EIO;
         return -1;
