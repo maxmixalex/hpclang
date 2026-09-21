@@ -256,6 +256,7 @@ static void test_inline_schema_find(void)
                &match) == 0);
     assert(match.visible_name_length == 4u);
     assert(match.descriptor_address == 0x298e5u);
+    assert(match.source_reference == 0u);
 
     assert(hpclang_hp39_variable_schema_find(
                schema,
@@ -264,6 +265,7 @@ static void test_inline_schema_find(void)
                &match) == 0);
     assert(match.visible_name_length == 8u);
     assert(match.descriptor_address == 0x29a20u);
+    assert(match.source_reference == 0u);
 
     errno = 0;
     assert(hpclang_hp39_variable_schema_find(
@@ -299,6 +301,7 @@ static void test_reference_schema_find(void)
     assert(fixture.calls == 2u);
     assert(match.visible_name_length == 8u);
     assert(match.descriptor_address == 0x29a20u);
+    assert(match.source_reference == 0x2c812u);
     free(schema);
 }
 
