@@ -105,7 +105,7 @@ static int hp39_portal_result(
 
     size_t maximum_name_length =
         kind == HP39P_VARIABLE_VALUE
-            ? HP39_VARIABLE_ID_MAX
+            ? 6u
             : kind == HP39P_REFERENCE_EVAL
                 ? 3u
                 : HP39_BODY_NAME_MAX;
@@ -199,7 +199,8 @@ int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
 
 static int hp39_variable_reference_snapshot(
     uint32_t kind,
-    const uint8_t payload[3],
+    const uint8_t *payload,
+    size_t payload_length,
     uint32_t expected_prologue,
     struct hpclang_object **object)
 {
@@ -214,7 +215,7 @@ static int hp39_variable_reference_snapshot(
     if (hp39_portal_result(
             kind,
             payload,
-            3u,
+            payload_length,
             0u,
             &address,
             &prologue) != 0)
@@ -306,6 +307,7 @@ static int hp39_variable_reference_resolve(
     return hp39_variable_reference_snapshot(
         HP39P_REFERENCE_EVAL,
         payload,
+        3u,
         expected_prologue,
         object);
 }
@@ -348,31 +350,45 @@ int hpclang_hp39_variable_value_snapshot(
     hpclang_object_release(schema);
 
     /*
-     * The schema parser may have resolved the matching extended ID through a
-     * real five-nibble Stock reference (for example MiniVar's xNoteText at
-     * #2C812). Execute that original object through the already-proven Stock
-     * EVAL bridge. Do not reconstruct a byte-identical ID in the ARM portal
-     * buffer: Stock @ performs calculator-context/address handling before its
-     * extended-ID dispatch, so object bytes alone are not a proven substitute
-     * for the live calculator object.
+     * HP39 extended IDs are self-describing: their final three payload bytes
+     * name a 15-nibble descriptor whose first word is the recall/getter
+     * entry. Stock standard getters share one calling convention: the
+     * original extended ID is on the data stack, the getter consumes it, and
+     * recall returns value TRUE or FALSE.
      *
-     * Inline IDs in an owned schema snapshot have no trustworthy calculator
-     * address. They remain fail-closed until a historical HPGCC use case
-     * requires a safe materialization path.
+     * Preserve the genuine Stock ID reference when the schema supplied one,
+     * read its descriptor without executing metadata, then let the Stock
+     * portal invoke that descriptor-declared getter. This path is descriptor-
+     * generic: no variable name or Aplet family is hard-coded here.
+     *
+     * Inline IDs in an owned schema snapshot still have no trustworthy live
+     * calculator address. They remain fail-closed until a concrete HPGCC
+     * schema requires safe Stock-side materialization.
      */
     if (match.source_reference == 0u) {
         errno = ENOTSUP;
         return -1;
     }
 
-    uint8_t payload[3] = {
+    struct hpclang_hp39_variable_descriptor descriptor;
+    if (hpclang_hp39_variable_descriptor_read(
+            &hp39_stock_reader,
+            match.descriptor_address,
+            &descriptor) != 0)
+        return -1;
+
+    uint8_t payload[6] = {
         (uint8_t)(match.source_reference & 0xffu),
         (uint8_t)((match.source_reference >> 8u) & 0xffu),
         (uint8_t)((match.source_reference >> 16u) & 0xffu),
+        (uint8_t)(descriptor.recall_word & 0xffu),
+        (uint8_t)((descriptor.recall_word >> 8u) & 0xffu),
+        (uint8_t)((descriptor.recall_word >> 16u) & 0xffu),
     };
     return hp39_variable_reference_snapshot(
-        HP39P_REFERENCE_EVAL,
+        HP39P_VARIABLE_VALUE,
         payload,
+        sizeof(payload),
         0u,
         object);
 }
