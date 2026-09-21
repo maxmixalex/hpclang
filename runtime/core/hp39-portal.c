@@ -104,11 +104,9 @@ static int hp39_portal_result(
     }
 
     size_t maximum_name_length =
-        kind == HP39P_VARIABLE_VALUE
-            ? 6u
-            : kind == HP39P_REFERENCE_EVAL
-                ? 3u
-                : HP39_BODY_NAME_MAX;
+        kind == HP39P_VARIABLE_VALUE || kind == HP39P_REFERENCE_EVAL
+            ? 3u
+            : HP39_BODY_NAME_MAX;
     if (name_length > maximum_name_length ||
         (name == NULL && name_length != 0u)) {
         errno = EINVAL;
@@ -350,18 +348,17 @@ int hpclang_hp39_variable_value_snapshot(
     hpclang_object_release(schema);
 
     /*
-     * HP39 extended IDs are self-describing: their final three payload bytes
-     * name a 15-nibble descriptor whose first word is the recall/getter
-     * entry. Stock standard getters share one calling convention: the
-     * original extended ID is on the data stack, the getter consumes it, and
-     * recall returns value TRUE or FALSE.
+     * HP39 Stock @ is the native generic recall dispatcher for special /
+     * extended IDs. Its DOIDNT path reads the ID's trailing descriptor
+     * pointer, selects descriptor word 0 and preserves the execution-token
+     * context required by #11111 / #3Fxxx supported entries.
      *
-     * Preserve the genuine Stock ID reference when the schema supplied one,
-     * read its descriptor without executing metadata, then let the Stock
-     * portal invoke that descriptor-declared getter. This path is descriptor-
-     * generic: no variable name or Aplet family is hard-coded here.
+     * Therefore value recall must hand @ the calculator's genuine extended-ID
+     * object. Do not reconstruct the ID and do not execute its descriptor
+     * getter separately in hpclang; both shortcuts bypass part of Stock's
+     * special-variable dispatch semantics.
      *
-     * Inline IDs in an owned schema snapshot still have no trustworthy live
+     * Inline IDs in an owned schema snapshot have no trustworthy live
      * calculator address. They remain fail-closed until a concrete HPGCC
      * schema requires safe Stock-side materialization.
      */
@@ -370,20 +367,10 @@ int hpclang_hp39_variable_value_snapshot(
         return -1;
     }
 
-    struct hpclang_hp39_variable_descriptor descriptor;
-    if (hpclang_hp39_variable_descriptor_read(
-            &hp39_stock_reader,
-            match.descriptor_address,
-            &descriptor) != 0)
-        return -1;
-
-    uint8_t payload[6] = {
+    uint8_t payload[3] = {
         (uint8_t)(match.source_reference & 0xffu),
         (uint8_t)((match.source_reference >> 8u) & 0xffu),
         (uint8_t)((match.source_reference >> 16u) & 0xffu),
-        (uint8_t)(descriptor.recall_word & 0xffu),
-        (uint8_t)((descriptor.recall_word >> 8u) & 0xffu),
-        (uint8_t)((descriptor.recall_word >> 16u) & 0xffu),
     };
     return hp39_variable_reference_snapshot(
         HP39P_VARIABLE_VALUE,
