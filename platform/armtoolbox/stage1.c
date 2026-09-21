@@ -128,9 +128,9 @@ enum {
     HP39P_APLETVARS_NIBBLE = 650u,
     HP39P_APLETVARS_NIBBLES = 50u,
     HP39P_REFERENCE_LIST_NIBBLE = 700u,
-    HP39P_REFERENCE_LIST_NIBBLES = 20u,
-    HP39P_VARIABLE_RECALL_NIBBLE = 720u,
-    HP39P_VARIABLE_RECALL_NIBBLES = 55u,
+    HP39P_REFERENCE_LIST_NIBBLES = 15u,
+    HP39P_VARIABLE_RECALL_NIBBLE = 715u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 35u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
@@ -409,15 +409,23 @@ static int hp39_store_request_name(
             recall_reference == 0u ||
             recall_reference >= UINT32_C(0x00100000))
             return 0;
+
+        /*
+         * Quote the genuine extended-ID token exactly as Stock's
+         * DummyVarProc does, then execute descriptor word 0 directly as the
+         * next threaded token. This keeps both the ID and supported-entry
+         * getter in their native interpreter roles instead of re-wrapping
+         * either one as an EVAL data object.
+         */
         return hp39_saturn_buffer_store_word5(
                    hp39_saturn_portal_thunk,
                    (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                   HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                   HP39P_VARIABLE_RECALL_NIBBLE + 10u,
                    id_reference) &&
             hp39_saturn_buffer_store_word5(
                    hp39_saturn_portal_thunk,
                    (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                   HP39P_REFERENCE_LIST_NIBBLE + 10u,
+                   HP39P_VARIABLE_RECALL_NIBBLE + 15u,
                    recall_reference);
     }
 
@@ -660,9 +668,7 @@ static int hp39_portal_prepare_thunk(
     }
 
     /*
-     * Reference container. REFERENCE_EVAL uses element 1. Variable recall
-     * patches elements 1 and 2 with the genuine extended ID and the getter
-     * word read from that ID's descriptor.
+     * Supported-entry reference container used only by REFERENCE_EVAL.
      */
     if (!hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
@@ -678,33 +684,26 @@ static int hp39_portal_prepare_thunk(
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_REFERENCE_LIST_NIBBLE + 10u,
-            UINT32_C(0x000040d5)) || /* safe placeholder: TWO */
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 15u,
             UINT32_C(0x0000312b)))   /* SEMI */
         return 0;
 
     /*
      * Generic HP39 extended-variable recall:
-     *   :: { id getter } ONE NTHCOMPDROP
-     *      { id getter } TWO NTHCOMPDROP EVAL
-     *      ?SKIP miss ;
      *
-     * The first extraction leaves the original ID on the data stack. The
-     * second yields its descriptor-declared getter, so Stock EVAL invokes the
-     * same getter ABI used by standard and third-party extended variables.
+     *   :: ' <genuine extended ID>
+     *      <descriptor word 0>
+     *      ?SKIP <miss> ;
+     *
+     * DummyVarProc proves the native quote form for an extended ID. The
+     * descriptor's recall word is an execution token, so let the threaded
+     * Stock interpreter execute it directly. Standard getters consume the ID
+     * and return value TRUE | FALSE.
      */
     const uint32_t variable_recall_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
-        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
-        UINT32_C(0x00004053), /* ONE */
-        UINT32_C(0x0000f476), /* NTHCOMPDROP */
-        saturn_base + HP39P_REFERENCE_LIST_NIBBLE,
-        UINT32_C(0x000040d5), /* TWO */
-        UINT32_C(0x0000f476), /* NTHCOMPDROP */
-        UINT32_C(0x0000775c), /* EVAL */
+        UINT32_C(0x00007665), /* ' */
+        UINT32_C(0x00004053), /* patched: genuine ID; safe placeholder ONE */
+        UINT32_C(0x0000765c), /* patched: recall token; safe placeholder NOP */
         UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
         saturn_base + HP39P_MISS_NIBBLE,
         UINT32_C(0x0000312b), /* SEMI */
@@ -947,11 +946,11 @@ int hpclang_hp39_portal_prepare_stock(void)
         uint32_t observed_recall = 0u;
         if (!stage_saturn_read_word5(
                 read_map,
-                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 5u,
+                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
                 &observed_id) ||
             !stage_saturn_read_word5(
                 read_map,
-                portal->saturn_entry + HP39P_REFERENCE_LIST_NIBBLE + 10u,
+                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 15u,
                 &observed_recall) ||
             observed_id != expected_id ||
             observed_recall != expected_recall)
