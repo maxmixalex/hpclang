@@ -15,6 +15,12 @@ extern "C" {
 struct hpclang_hp39_variable_schema_match {
     size_t visible_name_length;
     uint32_t descriptor_address;
+    /*
+     * Live Stock address of the matched extended-ID object when the schema
+     * named it through a five-nibble reference. Zero means the ID existed only
+     * inline in an owned snapshot, so no calculator address may be assumed.
+     */
+    uint32_t source_reference;
 };
 
 struct hpclang_hp39_variable_descriptor {
