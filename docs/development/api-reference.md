@@ -155,7 +155,7 @@ hpclang distinguishes byte streams from typed calculator objects.
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
 | byte-stream files | ✅ HP49g+/HP50g | process-wide owned FatFs namespace feeds standard `open/close/read/write/lseek/unlink` and picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` |
-| calculator object store | ✅ read-only HP48/49/50 named RPL stores; 🧪 HP39 native Aplet/Program/Note reads with descriptor-driven Variable recall under Stock validation | owned typed/named object API; HP39 native catalogs/contexts must not be flattened into a fake HOME tree or `FILE *` |
+| calculator object store | ✅ read-only HP48/49/50 named RPL stores; 🧪 HP39 native Aplet/Program/Note reads with descriptor-driven Variable recall under Stock validation | owned typed/named object API; named put/remove is not implemented; HP39 native catalogs/contexts must not be flattened into a fake HOME tree or `FILE *` |
 | RPL/Saturn objects | ✅ HP48/49/50 owned snapshots + bounded stack mutation; HP39 private Stock portal/native readers implemented | M7.3 typed object/stack bridge |
 
 The byte-stream metadata layer is also public and typed rather than exposing KOS structures:
@@ -302,12 +302,13 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | private Saturn view | ✅ runtime-only | Explicit 20-bit nibble address + launch-preserved `SAT_CPU->Read[]`; arbitrary public poke is not exposed |
 | `hpclang_object_store_home/current/open_child/get` | ✅ HP48/HP4950 Stock | Read-only logical store handles re-resolve paths; named lookup returns owned snapshots and never changes Stock cwd |
 | `hpclang_object_store_iterator_*` | ✅ HP48/HP4950 Stock | Independent ARM-side metadata snapshots; raw calculator-byte names are preserved |
+| named object put/remove | ⬜ deferred | No general HP48/HP4950 named-store mutation API is implemented. HP39 descriptor store words are known metadata, not yet a validated generic write path. Stack push/pop/drop/replace is a separate implemented capability. |
 | HP39 Aplet/Program/Note native reads | ✅ private runtime | Native DORRP / `PGMCXT` / `NOTESCXT` structures; no fabricated classic-RPL hierarchy |
-| HP39 Aplet Variable value recall | 🧪 private runtime | `ApletVars#` schema + extended-ID descriptor; Stock descriptor-recall path is the current validation target |
+| HP39 Aplet Variable value recall | 🧪 private runtime | `ApletVars#` schema + extended-ID descriptor and genuine source references are preserved; direct EVAL of `xNoteText #2C812` is disproven by the HP39gs/40gs `B9` Stock result, so the remaining target is the native descriptor dispatcher/calling convention |
 
 **Core #296 (`35439583956`)** is fully green for the current mutation core and exact integer/raw-string helpers. **Runtime #241 (`35439583995`)** supplies successful focused Stock hp48/hp4950 mutation evidence plus all three Direct jobs. The classic REAL conversion added on `87ce4349` passes the Runtime/unit and ARM hardware-validation job in **Core #297** and the canonical-build job in **Runtime #242**.
 
-The parser remains intentionally fail-closed. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove` and low-level address-returning `satdir` operations remain Migration/Internal. The remaining M7.3 read-only blocker is HP39 descriptor-driven Variable recall on original Stock; after that, compatibility work should sit above the existing owned object/store core rather than add another storage abstraction. General named-object mutation is not required merely to match HPGCC 1.1/2.0 `satdir.h`.
+The parser remains intentionally fail-closed. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove` and low-level address-returning `satdir` operations remain Migration/Internal. The remaining M7.3 read-only blocker is HP39 descriptor-driven Variable recall on original Stock. The latest Stock evidence rules out direct EVAL of the genuine `xNoteText` source object as the generic protocol; static tracing now targets `DummyVar` and the common descriptor dispatcher/calling convention. After that, compatibility work should sit above the existing owned object/store core rather than add another storage abstraction. General named-object mutation is currently unimplemented and is not required merely to match HPGCC 1.1/2.0 `satdir.h`.
 
 
 ## KOS, raw syscalls and widgets
