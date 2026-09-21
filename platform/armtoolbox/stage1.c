@@ -130,7 +130,7 @@ enum {
     HP39P_REFERENCE_LIST_NIBBLE = 700u,
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_VARIABLE_RECALL_NIBBLE = 715u,
-    HP39P_VARIABLE_RECALL_NIBBLES = 35u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 40u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 16u,
@@ -676,21 +676,25 @@ static int hp39_portal_prepare_thunk(
     /*
      * Generic HP39 extended-variable recall:
      *
-     *   :: ' <genuine-id> @ ?SKIP <miss> ;
+     *   :: ' <genuine-id> @ ?SKIP <miss> SWAPDROP ;
      *
      * Stock's own DummyVarProc proves the quote form for extended IDs. Stock
      * @ then follows the trailing descriptor pointer and tail-dispatches word
-     * 0, including the #11111 / #3Fxxx supported-entry path. This keeps the
-     * complete operation inside Stock's native extended-ID contract without
-     * reconstructing the object or routing it through a temporary DOLIST.
+     * 0, including the #11111 / #3Fxxx supported-entry path.
+     *
+     * HP39 special-ID recall preserves the original ID while the descriptor
+     * getter returns value TRUE | FALSE. After ?SKIP normalizes success versus
+     * miss, both paths therefore contain exactly id + result; SWAPDROP removes
+     * that retained ID and restores the portal's one-result-object contract.
      */
     const uint32_t variable_recall_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
         UINT32_C(0x00007665), /* ' */
         UINT32_C(0x00004053), /* patched: genuine ID; safe placeholder ONE */
-        UINT32_C(0x000081d3), /* @ -> value TRUE | FALSE */
+        UINT32_C(0x000081d3), /* @ -> id value TRUE | id FALSE */
         UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
         saturn_base + HP39P_MISS_NIBBLE,
+        UINT32_C(0x0000cd73), /* SWAPDROP: id result -> result */
         UINT32_C(0x0000312b), /* SEMI */
     };
     for (uint32_t i = 0u;
