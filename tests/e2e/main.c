@@ -1865,7 +1865,17 @@ int main(void)
                 sizeof(note_text_name) - 1u,
                 &note_text_value);
             if (note_text_result != 0) {
-                uint32_t code = errno == ENOENT ? 0xbbu : 0xbcu;
+                uint32_t code = 0xc3u;
+                if (errno == ENOENT)
+                    code = 0xbbu;
+                else if (errno == EIO)
+                    code = 0xbfu;
+                else if (errno == EILSEQ)
+                    code = 0xc0u;
+                else if (errno == EBUSY)
+                    code = 0xc1u;
+                else if (errno == ENOTSUP)
+                    code = 0xc2u;
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
