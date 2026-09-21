@@ -123,10 +123,19 @@ external typed transfer/disk protocol used by HP39/40G import/export. Their
 private parsers are transfer-format support and must not define the internal
 calculator object-store model.
 
-Lookup returns owned snapshots. Put copies from a snapshot. Enumeration owns
-independent iterator state. Names are exposed as text only when the underlying
-Stock object model has a text name; implementation-specific record addresses
-remain private.
+Lookup returns owned snapshots. Enumeration owns independent iterator state.
+Names are exposed as text only when the underlying Stock object model has a text
+name; implementation-specific record addresses remain private.
+
+The **contract** for a future named-store put operation is to copy from an owned
+snapshot rather than transfer the caller's handle. That contract must not be
+confused with current implementation status: M7.3 currently implements
+HP48gII/49g+/50g named stores as read-only, and HP39 has no generic named-store
+put/remove API. HP39 variable descriptors do contain native store-handler words,
+but no general Stock invocation path for those handlers has been validated.
+This is separate from RPL stack mutation: `stack_push`, `stack_pop`,
+`stack_drop` and `stack_replace` are already implemented for the bounded
+HP48gII/49g+/50g Stock stack path.
 
 ## Error and mutation rules
 
@@ -193,10 +202,10 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
 - HP39 `HP39AscA` / `HP39BinX` parsing is retained privately as external typed-transfer protocol support. ROM and HPGCC39 evidence show `HP39DIR.*` belongs to the Disk Drive/Conn3x transfer path, so it is not an internal HOME/root backend;
 - HP39 Aplet, Program and Note storage is read through the calculator's native structures rather than a synthetic filesystem. Aplet snapshots follow HOME → `'apletdir` → `'Name` and preserve the native DORRP as an owned snapshot; Program and Note catalogs/bodies use the current `PGMCXT` / `NOTESCXT` directory bindings;
-- HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble descriptor containing recall, type-predicate and store words. Runtime should execute the Aplet/Stock descriptor contract rather than project arbitrary variables from guessed fixed offsets. The current descriptor-recall bridge is under Stock validation;
+- HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble descriptor containing recall, type-predicate and store words. Runtime preserves genuine schema source references where they exist (for example MiniVar's `xNoteText` at `#2C812`) rather than fabricating an equivalent-looking ID. Directly EVALing that genuine Stock ID is now disproven as the generic recall protocol: formal Stock HP39 validation reaches the same private `B9` failure on both HP39gs and HP40gs. The remaining question is therefore the caller/dispatcher convention that interprets an extended-ID descriptor, not the location of Note storage or the descriptor layout itself. The next static target is the simpler Stock `DummyVar` path, traced from caller through dispatcher before another runtime experiment;
 - no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store entry points remain `ENOSYS` where the Stock model has no matching namespace;
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
-- named put/remove is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation is deferred until a concrete compatibility/application requirement justifies the additional lifecycle work.
+- named put/remove is **not implemented as a general M7.3 capability** and is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation stays deferred until a concrete compatibility/application requirement justifies the additional lifecycle work. The presence of an HP39 descriptor store word is evidence about Stock's variable contract, not proof that hpclang already has a safe generic variable-write bridge.
 
 
 ### M7.3e — HPGCC adapters and closure
