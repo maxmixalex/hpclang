@@ -1857,21 +1857,37 @@ int main(void)
             static const uint8_t note_category[] = "Note";
             static const uint8_t note_text_name[] = "NoteText";
             struct hpclang_object *note_text_value = NULL;
-            if (hpclang_hp39_variable_value_snapshot(
-                    note_category,
-                    sizeof(note_category) - 1u,
-                    note_text_name,
-                    sizeof(note_text_name) - 1u,
-                    &note_text_value) != 0 ||
-                note_text_value == NULL ||
-                hpclang_object_kind(note_text_value) !=
-                    HPCLANG_OBJECT_STRING) {
+            errno = 0;
+            int note_text_result = hpclang_hp39_variable_value_snapshot(
+                note_category,
+                sizeof(note_category) - 1u,
+                note_text_name,
+                sizeof(note_text_name) - 1u,
+                &note_text_value);
+            if (note_text_result != 0) {
+                uint32_t code = errno == ENOENT ? 0xbbu : 0xbcu;
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
                 hpclang_object_release(variable_schema);
                 hpclang_object_release(note_text_value);
-                return finish(0xb9u, boot->model);
+                return finish(code, boot->model);
+            }
+            if (note_text_value == NULL) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                return finish(0xbdu, boot->model);
+            }
+            if (hpclang_object_kind(note_text_value) !=
+                HPCLANG_OBJECT_STRING) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                return finish(0xbeu, boot->model);
             }
             hpclang_object_release(note_text_value);
 
