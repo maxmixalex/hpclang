@@ -981,6 +981,7 @@ int hpclang_hp39_portal_restore_hpc(void)
     uint32_t post_dsktop = 0u;
     uint32_t object = 0u;
     uint32_t prologue = 0u;
+    uint32_t result_cells = 1u;
 
     if (portal->pre_dsktop < 5u ||
         !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
@@ -994,21 +995,55 @@ int hpclang_hp39_portal_restore_hpc(void)
         if (post_dsktop == portal->pre_dsktop) {
             result = -8;  /* Stock returned no stack object. */
         } else if (post_dsktop + 10u == portal->pre_dsktop) {
-            result = -9;  /* Stock returned two stack objects. */
+            /*
+             * HP39 special-variable @ is allowed one private retained-ID cell.
+             * Runtime #315/#316 proves the descriptor path reaches this exact
+             * two-cell shape even after Stock-side flag normalization.
+             *
+             * Accept it only when exactly one cell is the genuine extended-ID
+             * reference that hpclang patched into the helper. The other cell
+             * is then the sole public result. Any other two-cell shape stays
+             * fail-closed as -9.
+             */
+            uint32_t expected_id = 0u;
+            uint32_t first = 0u;
+            uint32_t second = 0u;
+            if (portal->request_kind != HP39P_VARIABLE_VALUE ||
+                !stage_saturn_read_word5(
+                    read_map,
+                    portal->saturn_entry +
+                        HP39P_VARIABLE_RECALL_NIBBLE + 10u,
+                    &expected_id) ||
+                !stage_saturn_read_word5(read_map, post_dsktop, &first) ||
+                !stage_saturn_read_word5(
+                    read_map, post_dsktop + 5u, &second) ||
+                expected_id == 0u ||
+                (first == expected_id) == (second == expected_id)) {
+                result = -9; /* Unproven two-result shape. */
+            } else {
+                object = first == expected_id ? second : first;
+                result_cells = 2u;
+            }
         } else if (post_dsktop + 5u != portal->pre_dsktop) {
             result = -10; /* Other stack-depth delta. */
         } else if (!stage_saturn_read_word5(
                        read_map, post_dsktop, &object)) {
             result = -11; /* Result stack cell unreadable. */
-        } else if (object > RPL_MAIN_END - 5u) {
+        }
+
+        if (result == 0 && object > RPL_MAIN_END - 5u) {
             result = -12; /* Result object pointer outside Saturn main. */
-        } else if (!stage_saturn_read_word5(
+        } else if (result == 0 &&
+                   !stage_saturn_read_word5(
                        read_map, object, &prologue)) {
             result = -13; /* Result prologue unreadable. */
-        } else if (portal->expected_prologue != 0u &&
+        } else if (result == 0 &&
+                   portal->expected_prologue != 0u &&
                    prologue != portal->expected_prologue) {
             result = -14; /* Result type violates request contract. */
-        } else {
+        }
+
+        if (result == 0) {
             const uint32_t kind = portal->request_kind;
             const int miss_request =
                 kind == HP39P_BODY_PROGRAM ||
@@ -1039,11 +1074,11 @@ int hpclang_hp39_portal_restore_hpc(void)
          */
         uint32_t avmem = 0u;
         if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
-            avmem >= UINT32_C(0x000fffff) ||
+            result_cells > UINT32_C(0x000fffff) - avmem ||
             !stage_saturn_write_word5(
                 read_map, RPL_DSKTOP, portal->pre_dsktop) ||
             !stage_saturn_write_word5(
-                read_map, RPL_AVMEM, avmem + 1u))
+                read_map, RPL_AVMEM, avmem + result_cells))
             result = -6;
     }
 
