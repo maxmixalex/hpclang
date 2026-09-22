@@ -15,7 +15,9 @@ export TARGET
 NOR="$ROOT/build/$TARGET-nor.bin"
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
+HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 mkdir -p "$SEND"
+rm -f "$HOST_GATE"
 
 curl -fL --retry 3 \
     https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin \
@@ -27,6 +29,13 @@ python3 "$ROOT/tools/prepare-hp48gii-nor.py" "$NOR" "$STATE"
 
 cp "$ASSETS_DIR/L275_48" "$SEND/L275_48"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
+
+KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
+    "$SEND/L275_48" "$SEND/HPCLANG.HP")"
+EMULATOR_TIMEOUT=$((35 + KERMIT_TIMEOUT + 120))
+printf 'HP48 Stock transfer watchdog: kermit=%ss emulator=%ss bytes=%s\n' \
+    "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT" \
+    "$(( $(stat -c %s "$SEND/L275_48") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
@@ -41,6 +50,7 @@ cleanup() {
     kill "${X50_PID:-}" "$SOCAT_PID" 2>/dev/null || true
     wait "${X50_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
+    rm -f "$HOST_GATE"
 }
 trap cleanup EXIT
 
@@ -56,27 +66,29 @@ export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
+export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-run.seq"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 
-# The current canonical launcher is roughly 40 KiB. At 9600 baud with the
-# stock-compatible 80-byte Kermit packets and control-byte quoting it needs
-# more than the historical 70 s transfer window. Keep the emulator alive past
-# the conservative host-transfer window plus the final 60 s PASS monitor.
-timeout 270s "$ROOT/build/x50ng/dist/x50ng" \
+# The UI sequence is no longer paced by an assumed transfer duration. x50ng
+# stops at host-gate until the Kermit process below completes successfully.
+# The dynamic timeouts are only watchdog ceilings for a genuinely stalled run.
+timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$STATE" \
     --overwrite-config \
     --style="$ROOT/build/x50ng/dist/style-40g.css" &
 X50_PID=$!
 
 sleep 35
-timeout 110s "$ROOT/tools/run-hp48-kermit-send.sh" \
+timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
     L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
+: > "$HOST_GATE"
+printf 'HP48 Stock Kermit completed; released host gate: %s\n' "$HOST_GATE"
 
 wait "$X50_PID"
 X50_PID=

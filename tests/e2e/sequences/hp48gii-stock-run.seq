@@ -31,32 +31,34 @@
 30000 tap down
 31500 tap enter
 33500 capture server-serial
-# Host begins Kermit at t=35s and may use the full 110s transfer budget for the
-# current ~40 KiB canonical launcher. Do not resume calculator UI automation
-# before t=145s or a still-active receive can consume the navigation keys.
-150000 capture after-transfer
+# The host starts Kermit at t=35s. Do not guess how long the transfer takes:
+# pause all following sequence actions until the host reports successful Kermit
+# completion through HPCLANG_E2E_HOST_GATE_FILE. Times below are relative to
+# that release, not to emulator start.
+35000 host-gate
+1000 capture after-transfer
 # Install ARMToolbox48 Library 275 into Port 0. With both variables present,
 # HPCLANG is F1 and L275 is F2 in the HOME VAR menu.
-151000 tap var
-152000 capture vars-before-install
-153000 tap f2
-154000 capture l275-stack
-155000 tap zero
-156000 tap enter
-157000 capture port-zero-stack
-158000 tap sto
-160000 capture stored
-162000 chord on f3
-168000 capture after-warmstart
+2000 tap var
+3000 capture vars-before-install
+4000 tap f2
+5000 capture l275-stack
+6000 tap zero
+7000 tap enter
+8000 capture port-zero-stack
+9000 tap sto
+11000 capture stored
+13000 chord on f3
+19000 capture after-warmstart
 # L275 moved to Port 0; HPCLANG remains the first HOME variable.
-169000 tap var
-170000 capture vars-after-install
-171000 tap f1
-173000 capture hpclang-stack
+20000 tap var
+21000 capture vars-after-install
+22000 tap f1
+24000 capture hpclang-stack
 # Library 275 is the first LIB entry; ARMTo exposes PrRUN on F1.
-175000 chord rshift two
-176500 capture lib-menu
-177500 tap f1
-179000 capture armtoolbox
-179500 monitor 60000
-180000 tap f1
+26000 chord rshift two
+27500 capture lib-menu
+28500 tap f1
+30500 capture armtoolbox
+31000 monitor 60000
+31500 tap f1
