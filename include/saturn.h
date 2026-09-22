@@ -48,6 +48,15 @@ char *sat_pop_str_alloc(void);
 #define sat_stack_pick_string(l, b) sat_pick_str((l), (b))
 #define sat_stack_pick_string_alloc(l) sat_pick_str_alloc((l))
 
+/*
+ * Historical HPGCC names these as numeric pushes, but their source contract is
+ * textual: format the C value, then push a calculator String. They therefore do
+ * not create native Integer/REAL objects or expose Saturn representation.
+ */
+int _sat_stack_push_int(int z, int radix, int binary);
+int sat_stack_push_int(int z);
+int sat_stack_push_double(double d);
+
 double sat_pop_real(void);
 BOOL sat_push_char(char byte);
 
