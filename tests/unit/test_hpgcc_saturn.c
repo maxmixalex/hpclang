@@ -121,6 +121,13 @@ static struct hpclang_object *make_real_1_5(void)
     return object;
 }
 
+static void expect_top_string(const char *expected)
+{
+    char buffer[128];
+    assert(sat_pick_str(1, buffer) == buffer);
+    assert(strcmp(buffer, expected) == 0);
+}
+
 static void test_scope_depth_and_drop(void)
 {
     clear_stack();
@@ -171,6 +178,47 @@ static void test_strings(void)
     assert(sat_stack_depth() == 0);
 }
 
+static void test_numeric_string_pushes(void)
+{
+    clear_stack();
+
+    assert(sat_stack_push_int(42) == 1);
+    expect_top_string("42");
+    clear_stack();
+
+    assert(sat_stack_push_int(-42) == 1);
+    expect_top_string("-42");
+    clear_stack();
+
+    assert(_sat_stack_push_int(255, 16, 0) == 1);
+    expect_top_string("ff");
+    clear_stack();
+
+    assert(_sat_stack_push_int(255, 16, 1) == 1);
+    expect_top_string("#ffh");
+    clear_stack();
+
+    assert(_sat_stack_push_int(255, 8, 1) == 1);
+    expect_top_string("#377o");
+    clear_stack();
+
+    assert(_sat_stack_push_int(255, 10, 1) == 1);
+    expect_top_string("#255d");
+    clear_stack();
+
+    assert(_sat_stack_push_int(10, 2, 1) == 1);
+    expect_top_string("1010");
+    clear_stack();
+
+    assert(sat_stack_push_double(1.5) == 1);
+    expect_top_string("1.500000");
+    clear_stack();
+
+    assert(sat_stack_push_double(-2.25) == 1);
+    expect_top_string("-2.250000");
+    clear_stack();
+}
+
 static void test_real_pop_is_type_safe(void)
 {
     clear_stack();
@@ -205,6 +253,7 @@ int main(void)
 {
     test_scope_depth_and_drop();
     test_strings();
+    test_numeric_string_pushes();
     test_real_pop_is_type_safe();
     test_char_push();
     clear_stack();
