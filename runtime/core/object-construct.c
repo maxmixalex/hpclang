@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 
 enum {
     RPL_DOINT = 0x02614u,
+    RPL_DOREAL = 0x02933u,
     RPL_DOCSTR = 0x02a2cu,
     RPL_SPACE_NIBBLES = 0x00100000u
 };
@@ -37,6 +39,18 @@ static void set_nibbles(
             object,
             offset + i,
             (uint8_t)((value >> (i * 4u)) & 0x0fu));
+}
+
+static void set_bcd_digits(
+    struct hpclang_object *object,
+    uint32_t offset,
+    uint64_t value,
+    uint32_t count)
+{
+    for (uint32_t i = 0u; i < count; ++i) {
+        set_nibble(object, offset + i, (uint8_t)(value % UINT64_C(10)));
+        value /= UINT64_C(10);
+    }
 }
 
 int hpclang_object_create_integer_i64(
@@ -90,6 +104,73 @@ int hpclang_object_create_integer_i64(
         remaining /= UINT64_C(10);
     }
     set_nibble(snapshot, 10u + digits, value < 0 ? 9u : 0u);
+
+    *object = snapshot;
+    return 0;
+}
+
+int hpclang_object_create_real_f64(
+    double value,
+    struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    *object = NULL;
+
+    if (!isfinite(value)) {
+        errno = EDOM;
+        return -1;
+    }
+
+    int negative = signbit(value) != 0;
+    double magnitude = negative ? -value : value;
+    int exponent = 0;
+    uint64_t mantissa = 0u;
+
+    if (magnitude != 0.0) {
+        double normalized = magnitude;
+        while (normalized >= 10.0) {
+            normalized /= 10.0;
+            ++exponent;
+        }
+        while (normalized < 1.0) {
+            normalized *= 10.0;
+            --exponent;
+        }
+
+        /* Round the binary input to the classic REAL's 12 decimal digits. */
+        double scaled = normalized * 100000000000.0;
+        mantissa = (uint64_t)(scaled + 0.5);
+        if (mantissa >= UINT64_C(1000000000000)) {
+            mantissa = UINT64_C(100000000000);
+            ++exponent;
+        }
+    }
+
+    /* Every finite IEEE double lies inside the classic DOREAL exponent range. */
+    if (exponent < -500 || exponent > 499) {
+        errno = ERANGE;
+        return -1;
+    }
+    uint32_t encoded_exponent =
+        exponent < 0 ? (uint32_t)(1000 + exponent) : (uint32_t)exponent;
+
+    struct hpclang_object *snapshot =
+        calloc(1u, sizeof(*snapshot) + 11u);
+    if (snapshot == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    snapshot->kind = HPCLANG_OBJECT_REAL;
+    snapshot->nibble_count = 21u;
+    snapshot->native_prologue = RPL_DOREAL;
+    set_nibbles(snapshot, 0u, RPL_DOREAL, 5u);
+    set_bcd_digits(snapshot, 5u, encoded_exponent, 3u);
+    set_bcd_digits(snapshot, 8u, mantissa, 12u);
+    set_nibble(snapshot, 20u, negative ? 9u : 0u);
 
     *object = snapshot;
     return 0;

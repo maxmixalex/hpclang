@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -75,51 +76,6 @@ static void clear_stack(void)
     while (stack_depth_value != 0u)
         assert(hpclang_stack_drop(stack_depth_value) == 0);
     last_drop_count = 0u;
-}
-
-static void set_nibble(
-    struct hpclang_object *object,
-    uint32_t offset,
-    uint8_t value)
-{
-    uint8_t *packed = &object->data[offset >> 1];
-    if ((offset & 1u) == 0u)
-        *packed = (uint8_t)((*packed & 0xf0u) | (value & 0x0fu));
-    else
-        *packed = (uint8_t)((*packed & 0x0fu) | ((value & 0x0fu) << 4));
-}
-
-static void set_nibbles(
-    struct hpclang_object *object,
-    uint32_t offset,
-    uint32_t value,
-    uint32_t count)
-{
-    for (uint32_t i = 0u; i < count; ++i)
-        set_nibble(
-            object,
-            offset + i,
-            (uint8_t)((value >> (i * 4u)) & 0x0fu));
-}
-
-static struct hpclang_object *make_real_1_5(void)
-{
-    struct hpclang_object *object =
-        calloc(1u, sizeof(*object) + 11u);
-    assert(object != NULL);
-    object->kind = HPCLANG_OBJECT_REAL;
-    object->nibble_count = 21u;
-    object->native_prologue = 0x02933u;
-    set_nibbles(object, 0u, 0x02933u, 5u);
-
-    /* exponent 0, mantissa 150000000000, positive sign */
-    uint64_t mantissa = UINT64_C(150000000000);
-    for (uint32_t i = 0u; i < 12u; ++i) {
-        set_nibble(object, 8u + i, (uint8_t)(mantissa % 10u));
-        mantissa /= 10u;
-    }
-    set_nibble(object, 20u, 0u);
-    return object;
 }
 
 static void expect_top_string(const char *expected)
@@ -271,19 +227,32 @@ static void test_historical_stack_example_flow(void)
     assert(sat_stack_depth() == 0);
 }
 
-static void test_real_pop_is_type_safe(void)
+static void test_real_exchange(void)
 {
     clear_stack();
+
+    assert(sat_push_real(1.5) == TRUE);
+    assert(sat_stack_depth() == 1);
+    struct hpclang_object *object = NULL;
+    assert(hpclang_stack_peek(1u, &object) == 0);
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
+    hpclang_object_release(object);
+    double value = sat_pop_real();
+    assert(value > 1.49999999999 && value < 1.50000000001);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_push_real(-2.25) == TRUE);
+    value = sat_pop_real();
+    assert(value > -2.25000000001 && value < -2.24999999999);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_push_real(INFINITY) == FALSE);
+    assert(sat_stack_depth() == 0);
+
     assert(sat_stack_push_string("not-real") == 1);
     assert(sat_pop_real() == 0.0);
     assert(sat_stack_depth() == 1);
     clear_stack();
-
-    stack_items[0] = make_real_1_5();
-    stack_depth_value = 1u;
-    double value = sat_pop_real();
-    assert(value > 1.499999 && value < 1.500001);
-    assert(sat_stack_depth() == 0);
 }
 
 static void test_char_push(void)
@@ -308,7 +277,7 @@ int main(void)
     test_numeric_string_pushes();
     test_zint_exchange();
     test_historical_stack_example_flow();
-    test_real_pop_is_type_safe();
+    test_real_exchange();
     test_char_push();
     clear_stack();
     return 0;
