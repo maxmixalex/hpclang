@@ -87,7 +87,7 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
  *   colon:   DOCOL arg op pack normalize finalize SEMI
  *   return:  -> DOCODE
- *   DOCODE:  restore C.W; ARMSYS
+ *   DOCODE:  commit final RPL stack pointers; restore C.W; ARMSYS
  *
  * Five threaded cells are patched before each trip while HPC mappings are
  * still active:
@@ -117,23 +117,23 @@ enum {
     HP39P_FINALIZE_NIBBLE = 53u,
     HP39P_RETURN_NIBBLE = 63u,
     HP39P_DOCODE_NIBBLE = 68u,
-    HP39P_C_TEMPLATE_NIBBLE = 94u,
-    HP39P_EXEC_NIBBLES = 110u,
-    HP39P_NAME_NIBBLE = 112u,
+    HP39P_C_TEMPLATE_NIBBLE = 134u,
+    HP39P_EXEC_NIBBLES = 150u,
+    HP39P_NAME_NIBBLE = 152u,
     HP39P_NAME_MAX_BYTES = 255u,
     HP39P_BODY_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
-    HP39P_MISS_NIBBLE = 640u,
+    HP39P_MISS_NIBBLE = 680u,
     HP39P_MISS_NIBBLES = 10u,
-    HP39P_APLETVARS_NIBBLE = 650u,
+    HP39P_APLETVARS_NIBBLE = 690u,
     HP39P_APLETVARS_NIBBLES = 50u,
-    HP39P_REFERENCE_LIST_NIBBLE = 700u,
+    HP39P_REFERENCE_LIST_NIBBLE = 740u,
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
-    HP39P_VARIABLE_RECALL_NIBBLE = 715u,
-    HP39P_VARIABLE_RECALL_NIBBLES = 40u,
+    HP39P_VARIABLE_RECALL_NIBBLE = 755u,
+    HP39P_VARIABLE_RECALL_NIBBLES = 35u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
-    HP39P_DOCODE_MACHINE_NIBBLES = 16u,
+    HP39P_DOCODE_MACHINE_NIBBLES = 56u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
@@ -493,6 +493,11 @@ static int hp39_portal_prepare_thunk(
     static const uint8_t d0_imm[] = { 0x1u, 0xbu };
     static const uint8_t ad0ex[] = { 0x1u, 0x3u, 0x2u };
     static const uint8_t pc_indirect[] = { 0x8u, 0x0u, 0x8u, 0xcu };
+    static const uint8_t cd1ex[] = { 0x1u, 0x3u, 0x7u };
+    static const uint8_t d1_c[] = { 0x1u, 0x3u, 0x5u };
+    static const uint8_t dat0_c_a[] = { 0x1u, 0x4u, 0x4u };
+    static const uint8_t c_b_a[] = { 0xdu, 0x9u };
+    static const uint8_t c_d_a[] = { 0xdu, 0xbu };
     static const uint8_t c_dat0_w[] = { 0x1u, 0x5u, 0x6u, 0x7u };
     static const uint8_t armsys[] = { 0x8u, 0x0u, 0xbu, 0xfu, 0xeu };
 
@@ -575,11 +580,44 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     /*
-     * DOCODE framing. Its five-nibble size field counts from the size cell
-     * through the end of the native body, hence 5 + 16 = 21 nibbles.
+     * DOCODE framing. Before crossing back to ARM, commit the final live RPL
+     * data-stack pointer, return-stack pointer and AVMEM counter. HP39's
+     * exported DSKTOP/RSKTOP/AVMEM cells are authoritative only after the
+     * interpreter pointers have been saved; nested machine primitives such as
+     * special-ID @ may otherwise leave an earlier transient snapshot there.
+     *
+     * Do not commit INTRPPTR: D0 currently belongs to this synthetic return
+     * stream, not to Stock's suspended application runstream.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002dcc)) ||
         !hp39_saturn_put_word5(&builder, HP39P_DOCODE_SIZE_NIBBLES) ||
+
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, RPL_DSKTOP) ||
+        !hp39_saturn_put_sequence(
+            &builder, cd1ex, (uint32_t)sizeof(cd1ex)) ||
+        !hp39_saturn_put_sequence(
+            &builder, d1_c, (uint32_t)sizeof(d1_c)) ||
+        !hp39_saturn_put_sequence(
+            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
+
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, RPL_RSKTOP) ||
+        !hp39_saturn_put_sequence(
+            &builder, c_b_a, (uint32_t)sizeof(c_b_a)) ||
+        !hp39_saturn_put_sequence(
+            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
+
+        !hp39_saturn_put_sequence(
+            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_word5(&builder, RPL_AVMEM) ||
+        !hp39_saturn_put_sequence(
+            &builder, c_d_a, (uint32_t)sizeof(c_d_a)) ||
+        !hp39_saturn_put_sequence(
+            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
+
         !hp39_saturn_put_sequence(
             &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, c_template) ||
@@ -676,25 +714,21 @@ static int hp39_portal_prepare_thunk(
     /*
      * Generic HP39 extended-variable recall:
      *
-     *   :: ' <genuine-id> @ ?SKIP <miss> SWAPDROP ;
+     *   :: ' <genuine-id> @ ?SKIP <miss> ;
      *
      * Stock's own DummyVarProc proves the quote form for extended IDs. Stock
-     * @ then follows the trailing descriptor pointer and tail-dispatches word
-     * 0, including the #11111 / #3Fxxx supported-entry path.
-     *
-     * HP39 special-ID recall preserves the original ID while the descriptor
-     * getter returns value TRUE | FALSE. After ?SKIP normalizes success versus
-     * miss, both paths therefore contain exactly id + result; SWAPDROP removes
-     * that retained ID and restores the portal's one-result-object contract.
+     * @ follows the trailing descriptor pointer and tail-dispatches word 0,
+     * including the #11111 / #3Fxxx supported-entry path. Standard variable
+     * getters consume the quoted ID and return value TRUE | FALSE; ?SKIP
+     * collapses that to exactly one value or the private miss sentinel.
      */
     const uint32_t variable_recall_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
         UINT32_C(0x00007665), /* ' */
         UINT32_C(0x00004053), /* patched: genuine ID; safe placeholder ONE */
-        UINT32_C(0x000081d3), /* @ -> id value TRUE | id FALSE */
+        UINT32_C(0x000081d3), /* @ -> value TRUE | FALSE */
         UINT32_C(0x00007903), /* ?SKIP consumes recall flag */
         saturn_base + HP39P_MISS_NIBBLE,
-        UINT32_C(0x0000cd73), /* SWAPDROP: id result -> result */
         UINT32_C(0x0000312b), /* SEMI */
     };
     for (uint32_t i = 0u;
@@ -981,7 +1015,6 @@ int hpclang_hp39_portal_restore_hpc(void)
     uint32_t post_dsktop = 0u;
     uint32_t object = 0u;
     uint32_t prologue = 0u;
-    uint32_t result_cells = 1u;
 
     if (portal->pre_dsktop < 5u ||
         !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
@@ -995,36 +1028,7 @@ int hpclang_hp39_portal_restore_hpc(void)
         if (post_dsktop == portal->pre_dsktop) {
             result = -8;  /* Stock returned no stack object. */
         } else if (post_dsktop + 10u == portal->pre_dsktop) {
-            result_cells = 2u;
-            /*
-             * HP39 special-variable @ is allowed one private retained-ID cell.
-             * Runtime #315/#316 proves the descriptor path reaches this exact
-             * two-cell shape even after Stock-side flag normalization.
-             *
-             * Accept it only when exactly one cell is the genuine extended-ID
-             * reference that hpclang patched into the helper. The other cell
-             * is then the sole public result. Any other two-cell shape stays
-             * fail-closed as -9.
-             */
-            uint32_t expected_id = 0u;
-            uint32_t first = 0u;
-            uint32_t second = 0u;
-            if (portal->request_kind != HP39P_VARIABLE_VALUE ||
-                !stage_saturn_read_word5(
-                    read_map,
-                    portal->saturn_entry +
-                        HP39P_VARIABLE_RECALL_NIBBLE + 10u,
-                    &expected_id) ||
-                !stage_saturn_read_word5(read_map, post_dsktop, &first) ||
-                !stage_saturn_read_word5(
-                    read_map, post_dsktop + 5u, &second) ||
-                expected_id == 0u ||
-                (first == expected_id) == (second == expected_id)) {
-                result = -9; /* Unproven two-result shape. */
-            } else {
-                object = first == expected_id ? second : first;
-                result_cells = 2u;
-            }
+            result = -9;  /* Stock returned two stack objects. */
         } else if (post_dsktop + 5u != portal->pre_dsktop) {
             result = -10; /* Other stack-depth delta. */
         } else if (!stage_saturn_read_word5(
@@ -1075,11 +1079,11 @@ int hpclang_hp39_portal_restore_hpc(void)
          */
         uint32_t avmem = 0u;
         if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
-            result_cells > UINT32_C(0x000fffff) - avmem ||
+            avmem >= UINT32_C(0x000fffff) ||
             !stage_saturn_write_word5(
                 read_map, RPL_DSKTOP, portal->pre_dsktop) ||
             !stage_saturn_write_word5(
-                read_map, RPL_AVMEM, avmem + result_cells))
+                read_map, RPL_AVMEM, avmem + 1u))
             result = -6;
     }
 
