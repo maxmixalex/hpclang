@@ -127,6 +127,12 @@ target_include_directories(test_object_store PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(hpgcc_satdir
+    test_hpgcc_satdir.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-satdir.c")
+target_include_directories(test_hpgcc_satdir PRIVATE
+    "${HPCLANG_ROOT}/include")
+
 hpclang_unit(object
     test_object.c
     "${HPCLANG_ROOT}/runtime/core/object.c"
