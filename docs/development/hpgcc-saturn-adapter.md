@@ -67,9 +67,9 @@ The old internal helpers `_sat_find_path`, `_sat_dir_path`, `_sat_dir_getroot`,
 an application ABI. Equivalent bookkeeping stays private to the adapter rather
 than recreating HPGCC's borrowed-address directory tree.
 
-## `saturn.h`: first safe stack/object subset
+## `saturn.h`: bounded stack/object subset
 
-The first bounded `saturn.h` slice contains only operations that can be mapped
+The current bounded `saturn.h` slice contains operations that can be mapped
 without exposing native addresses or weakening mutation guarantees:
 
 | Historical interface | Clean backing | Status |
@@ -81,6 +81,10 @@ without exposing native addresses or weakening mutation guarantees:
 | `sat_stack_push_string` | raw-byte DOCSTR constructor + `hpclang_stack_push` | implemented |
 | `sat_pick_str`, `sat_pick_str_alloc` | owned peek + raw-byte DOCSTR copy | implemented |
 | `sat_pop_str`, `sat_pop_str_alloc` | successful pick followed by clean drop | implemented |
+| `_sat_stack_push_int`, `sat_stack_push_int` | historical textual integer formatting followed by `sat_stack_push_string` | implemented |
+| `sat_stack_push_double` | historical `%f` textual formatting followed by `sat_stack_push_string` | implemented |
+| `sat_push_zint_llong` | exact owned ZINT constructor + clean stack push | implemented |
+| `sat_pop_zint_llong` | owned peek + exact `int64_t` conversion, then drop only after successful conversion | implemented |
 | `sat_pop_real` | owned peek + classic REAL conversion, then drop only after successful conversion | implemented |
 | `sat_push_char` | clean character constructor + stack push | implemented |
 
@@ -88,6 +92,36 @@ without exposing native addresses or weakening mutation guarantees:
 missing symmetric constructor for raw calculator-byte strings. It preserves
 embedded zero bytes because the clean API has an explicit length; the historical
 `sat_stack_push_string()` wrapper naturally remains C-string based.
+
+The second safe slice adds `hpclang_object_create_integer_i64()`. It constructs
+an owned classic DOINT/ZINT snapshot for the complete `int64_t` range and is the
+exact inverse, over that range, of `hpclang_object_integer_i64()`. This is a
+canonical capability rather than an HPGCC-only object hack; the compatibility
+`push/pop_zint_llong` functions are thin wrappers above it.
+
+### Important historical distinction: textual numbers vs ZINT
+
+The historical names are easy to misread. HPGCC 1.1 implements
+`_sat_stack_push_int`, `sat_stack_push_int`, and `sat_stack_push_double` by
+formatting the C value into a **String** and calling `sat_stack_push_string`.
+They do not create calculator Integer/REAL objects. hpclang preserves that source
+behavior rather than silently changing the object type:
+
+- integer formatting accepts the historical radix argument and lower-case
+  digits; `binary` adds `#...o`, `#...d`, or `#...h` only for radix 8/10/16;
+- `sat_stack_push_double` retains historical `%f` text semantics, but uses a
+  bounded formatter rather than reproducing the old fixed-buffer `sprintf`
+  overflow hazard;
+- `sat_push_zint_llong` / `sat_pop_zint_llong` are different: they exchange a
+  real exact calculator ZINT object.
+
+The complete 1.1 distribution's bundled examples reinforce this split. The
+representative `examples/stack/stack.c` performs exact ZINT pop/compute/push,
+pushes a String, queries stack depth, and exits the compatibility scope. String
+push/pop and `sat_dir_rclobject` are also common bundled-example patterns. By
+contrast, `swap`/`nip` and the textual int/double pushes are not reasons to
+invent new canonical object kinds merely because their names exist in the
+header.
 
 ### Deferred safe adapters
 
@@ -97,11 +131,12 @@ a raw workaround:
 - `sat_stack_swap` and `sat_stack_nip`: do **not** implement these as two
   sequential `stack_replace` calls. If the second replacement failed, the
   calculator stack could be left half-swapped. They wait for a transactional
-  stack reorder primitive or another proven atomic implementation.
-- `sat_stack_push_int`, `_sat_stack_push_int`, `sat_stack_push_double`,
-  `sat_push_zint_llong`, `sat_push_zint_array`, and the list-building family:
-  add them only when the corresponding clean object constructors are justified
-  and tested.
+  stack reorder primitive or another proven atomic implementation justified by
+  a representative application.
+- `sat_push_zint_array` and the list-building family: add them only if a real
+  port needs arbitrary-precision construction or list assembly. The current
+  exact `int64_t` ZINT path already covers the historical `LONGLONG` example
+  without exposing the internal digit-array representation.
 - pure conversion helpers such as `sat_convert_zint_array` and
   `sat_convert_double_real` can be compatibility utilities later; they do not
   justify exposing raw Saturn memory.
@@ -120,10 +155,16 @@ or native prologue record:
 - `sat_pushptr` and the raw `sat_push_string(type_prolog, size_nibbles, data)`;
 - `_sat_decode_string`, `sat_decode_stack_element` where the input descriptor is
   the raw-address historical representation;
-- `sat_BCD2LONGLONG`, `sat_real2double`, and `sat_decode_real` in their
-  address-taking forms;
+- address-taking BCD/REAL helpers such as `sat_BCD2LONGLONG`, `sat_real2double`,
+  `sat_decode_real`, and decNumber glue that expects raw Saturn object storage;
 - `sat_check_type(level, prologue)` as a native-prologue contract rather than a
   semantic object-kind query.
+
+This is also why the old decNumber/RPL-stack examples do not justify exposing
+raw pointers merely to compile unchanged: their application-level requirement
+should first be identified and expressed as an owned typed service. If the code
+fundamentally manipulates Saturn addresses, it remains an explicit migration
+case.
 
 Application ports that genuinely need one of these operations should identify
 the capability they are trying to achieve. A typed hpclang service can then be
@@ -136,13 +177,24 @@ M7.3e validation is layered:
 
 1. host unit tests exercise C-side cwd/path semantics, get vs recall, recursive
    search, REAL conversion, object token lifetime, stack depth/drop behavior,
-   string pick/pop/push, REAL pop type safety, CHAR push, and raw-byte string
+   string pick/pop/push, historical textual int/double push formatting, exact
+   ZINT construction/exchange including `INT64_MIN`/`INT64_MAX`, failed-type
+   pop preservation, REAL pop type safety, CHAR push, and raw-byte string
    construction;
 2. the unified ARM build proves the adapters link through the same hpclang v1
    runtime used by real calculator payloads;
-3. Stock E2E is used to detect adapter regressions, but pre-existing launcher /
-   emulator startup failures on unrelated model jobs are not treated as reasons
-   to reintroduce raw HPGCC internals or special-case the object core.
+3. Stock E2E is used only when it adds calculator-specific evidence. Re-running
+   a pre-existing launcher failure merely to obtain a green badge is not a
+   substitute for focused object/stack evidence.
+
+The first adapter slice is green in Core #396 and Storage #122. The textual
+numeric-push extension is green in Core #398, including host units, ARMv4T
+hardware-validation build and HP39 package. The exact ZINT slice is covered by
+Core #399: its host/unit stage and ARMv4T hardware-validation build pass on
+commit `552a2557`; the packaging job is orthogonal to the ZINT object semantics.
+Runtime #326 remains intentionally outside the closure claim because its red
+Stock jobs fail in launcher/emulator paths rather than proving an adapter
+semantic failure.
 
 General named-object put/remove remains outside the HPGCC 1.1/2.0 read/search /
 recall parity baseline.
