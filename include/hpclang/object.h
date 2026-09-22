@@ -46,6 +46,15 @@ int hpclang_object_create_character(
     struct hpclang_object **object);
 
 /*
+ * Construct an exact classic calculator ZINT covering the complete int64_t
+ * range. The result is an owned snapshot and can be pushed through the normal
+ * bounded stack-mutation service.
+ */
+int hpclang_object_create_integer_i64(
+    int64_t value,
+    struct hpclang_object **object);
+
+/*
  * Construct a classic calculator DOCSTR from raw calculator bytes.
  * No UTF-8 decoding or transcoding is performed. Embedded zero bytes are
  * preserved because the length is explicit.

@@ -21,6 +21,12 @@
 #define TRUE (!FALSE)
 #endif
 
+#ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
+#define HPCLANG_HPGCC_LONG_TYPES_DEFINED
+typedef unsigned long long ULONGLONG;
+typedef long long LONGLONG;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +62,10 @@ char *sat_pop_str_alloc(void);
 int _sat_stack_push_int(int z, int radix, int binary);
 int sat_stack_push_int(int z);
 int sat_stack_push_double(double d);
+
+/* Exact ZINT exchange used by the historical stack examples. */
+BOOL sat_push_zint_llong(LONGLONG num);
+LONGLONG sat_pop_zint_llong(void);
 
 double sat_pop_real(void);
 BOOL sat_push_char(char byte);

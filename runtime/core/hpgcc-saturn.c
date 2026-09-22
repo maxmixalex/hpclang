@@ -252,6 +252,35 @@ int sat_stack_push_double(double d)
     return sat_stack_push_string(buffer);
 }
 
+BOOL sat_push_zint_llong(LONGLONG num)
+{
+    struct hpclang_object *object = NULL;
+    if (hpclang_object_create_integer_i64((int64_t)num, &object) != 0)
+        return FALSE;
+
+    BOOL result = hpclang_stack_push(object) == 0 ? TRUE : FALSE;
+    hpclang_object_release(object);
+    return result;
+}
+
+LONGLONG sat_pop_zint_llong(void)
+{
+    struct hpclang_object *object = sat_pick_object(1u);
+    if (object == NULL)
+        return 0;
+
+    int64_t value = 0;
+    if (hpclang_object_integer_i64(object, &value) != 0) {
+        hpclang_object_release(object);
+        return 0;
+    }
+    hpclang_object_release(object);
+
+    if (hpclang_stack_drop(1u) != 0)
+        return 0;
+    return (LONGLONG)value;
+}
+
 double sat_pop_real(void)
 {
     struct hpclang_object *object = sat_pick_object(1u);
