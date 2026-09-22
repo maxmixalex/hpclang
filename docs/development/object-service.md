@@ -164,21 +164,22 @@ launch-preserved `SAT_CPU->Read[]`/write mapping. Such values are not C
 pointers and are never returned as canonical hpclang object handles.
 
 The existing native-font backend already proves the read-map path on live Stock
-HP48gII/49g+/50g launches. M7.3 should factor the common nibble-map mechanics
-into a private helper rather than duplicate `sat_map_s2a`-style arithmetic in
-each object implementation.
+HP48gII/49g+/50g launches. M7.3 factors the common nibble-map mechanics through
+private helpers rather than duplicating `sat_map_s2a`-style arithmetic in each
+object implementation.
 
 Raw `peek/poke/map_s2a/memmove` compatibility, if provided at all, belongs
 above or outside this clean object API.
 
 ## Implementation slices
 
-### M7.3a — ownership and private Saturn view
+### M7.3a — ownership and private Saturn view — implemented
 
-- freeze the owned-snapshot contract above;
-- factor a private explicit Saturn-address/read helper from the existing live
-  `Read[]` path;
-- add object snapshot storage and coarse classification without stack mutation.
+- frozen owned-snapshot contract above;
+- private explicit Saturn-address/read helper factored from the live `Read[]`
+  path;
+- owned object snapshot storage and coarse classification implemented without
+  requiring public stack mutation.
 
 ### M7.3b — read-only stack/object inspection — implemented
 
@@ -207,10 +208,35 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
 - named put/remove is **not implemented as a general M7.3 capability** and is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation stays deferred until a concrete compatibility/application requirement justifies the additional lifecycle work. The presence of an HP39 descriptor store word is evidence about Stock's variable contract, not proof that hpclang already has a safe generic variable-write bridge.
 
-### M7.3e — HPGCC adapters and closure
+### M7.3e — HPGCC adapters and closure — first adapter slice implemented
 
-- bounded `saturn.h` / `satdir.h` source adapters over the clean core;
-- raw address/memory helpers remain Migration/Internal unless a clean
-  application requirement is demonstrated;
-- Stock round-trip E2E including malformed objects, stack preservation and
-  clean return.
+The first source-compatibility layer is now above the clean core rather than
+inside it:
+
+- high-level HPGCC 1.1/2.0 `satdir.h` C-side navigation, exact get, parent
+  recall, recursive HOME search and REAL fetch are implemented on owned store
+  handles/snapshots. Historical `SAT_OBJ_DSCR.addr` is deliberately an opaque
+  compatibility token, not a Saturn address;
+- the first safe `saturn.h` stack/object subset implements scope init/exit,
+  depth, drop/dropn, C-string push/pick/pop, REAL pop and CHAR push through the
+  canonical object/stack service;
+- `hpclang_object_create_string()` adds the clean raw-calculator-byte DOCSTR
+  constructor needed by string push while preserving explicit-length semantics
+  in the canonical API;
+- raw Saturn address/memory functions remain Migration/Internal. They are not
+  reintroduced merely to make the historical header numerically complete;
+- `sat_stack_swap`/`sat_stack_nip` are intentionally deferred until a
+  transactional reorder primitive or equivalently failure-safe implementation
+  exists; two sequential replacements would weaken the M7.3 mutation contract;
+- Core #396 validates the code-bearing M7.3e head through host units, unified
+  ARMv4T soft-float runtime/hardware-validation build, and HP39 package build.
+
+The precise implemented/deferred/Migration split is recorded in
+[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md).
+
+Remaining M7.3e closure work is targeted rather than another Saturn reverse:
+add further high-value typed constructors/adapters only where the clean object
+service can preserve ownership/failure semantics, and extend Stock round-trip
+coverage for malformed objects, stack preservation and clean return. General
+named-object mutation remains separately deferred until a concrete application
+or compatibility requirement justifies it.
