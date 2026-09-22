@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -219,6 +220,33 @@ static void test_numeric_string_pushes(void)
     clear_stack();
 }
 
+static void test_zint_exchange(void)
+{
+    clear_stack();
+
+    assert(sat_push_zint_llong(123456789LL) == TRUE);
+    assert(sat_stack_depth() == 1);
+    assert(sat_pop_zint_llong() == 123456789LL);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_push_zint_llong(-987654321LL) == TRUE);
+    assert(sat_pop_zint_llong() == -987654321LL);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_push_zint_llong(LLONG_MIN) == TRUE);
+    assert(sat_pop_zint_llong() == LLONG_MIN);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_push_zint_llong(0) == TRUE);
+    assert(sat_pop_zint_llong() == 0);
+    assert(sat_stack_depth() == 0);
+
+    assert(sat_stack_push_string("not-zint") == 1);
+    assert(sat_pop_zint_llong() == 0);
+    assert(sat_stack_depth() == 1);
+    clear_stack();
+}
+
 static void test_real_pop_is_type_safe(void)
 {
     clear_stack();
@@ -254,6 +282,7 @@ int main(void)
     test_scope_depth_and_drop();
     test_strings();
     test_numeric_string_pushes();
+    test_zint_exchange();
     test_real_pop_is_type_safe();
     test_char_push();
     clear_stack();
