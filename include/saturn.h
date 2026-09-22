@@ -67,7 +67,10 @@ int sat_stack_push_double(double d);
 BOOL sat_push_zint_llong(LONGLONG num);
 LONGLONG sat_pop_zint_llong(void);
 
+/* Numeric classic REAL exchange without exposing its native BCD layout. */
+BOOL sat_push_real(double number);
 double sat_pop_real(void);
+
 BOOL sat_push_char(char byte);
 
 #ifdef __cplusplus

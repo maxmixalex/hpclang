@@ -281,6 +281,17 @@ LONGLONG sat_pop_zint_llong(void)
     return (LONGLONG)value;
 }
 
+BOOL sat_push_real(double number)
+{
+    struct hpclang_object *object = NULL;
+    if (hpclang_object_create_real_f64(number, &object) != 0)
+        return FALSE;
+
+    BOOL result = hpclang_stack_push(object) == 0 ? TRUE : FALSE;
+    hpclang_object_release(object);
+    return result;
+}
+
 double sat_pop_real(void)
 {
     struct hpclang_object *object = sat_pick_object(1u);

@@ -55,6 +55,15 @@ int hpclang_object_create_integer_i64(
     struct hpclang_object **object);
 
 /*
+ * Construct a classic Stock DOREAL from a finite C double. The value is
+ * rounded to the calculator format's 12 significant decimal digits; signed
+ * zero is preserved. NaN and infinities are rejected with errno=EDOM.
+ */
+int hpclang_object_create_real_f64(
+    double value,
+    struct hpclang_object **object);
+
+/*
  * Construct a classic calculator DOCSTR from raw calculator bytes.
  * No UTF-8 decoding or transcoding is performed. Embedded zero bytes are
  * preserved because the length is explicit.
