@@ -28,6 +28,7 @@ HP 39g+ support builds and the read-only flash-dump mechanism has been verified,
 - [Fixture provenance](development/fixtures.md) — where firmware/full-NOR inputs come from and how they are verified.
 - [Roadmap](development/roadmap.md) — M0–M8 milestones and remaining work.
 - [Calculator object service](development/object-service.md) — M7.3 owned-object, Saturn/RPL stack, and named-store ownership contract.
+- [HPGCC Saturn adapter map](development/hpgcc-saturn-adapter.md) — M7.3e source-compatibility boundary for high-level `satdir.h` / `saturn.h`, including implemented adapters and raw-address APIs intentionally kept Migration/Internal.
 - [History](development/history.md) — HPGCC lineage and compatibility facts retained by hpclang.
 - [Licensing](development/licensing.md) — historical source, firmware, and independent-reimplementation rules.
 - [Retired experiments](development/experiments.md) — conclusions preserved from removed bring-up and compiler experiments.
