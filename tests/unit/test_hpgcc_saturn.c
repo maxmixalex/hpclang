@@ -135,6 +135,46 @@ static void test_strings(void)
     assert(sat_stack_depth() == 0);
 }
 
+static void test_stdargs(void)
+{
+    clear_stack();
+    assert(sat_stack_push_string("'left'") == 1);
+    assert(sat_stack_push_string("right") == 1);
+
+    char **argv = NULL;
+    assert(sat_stack_pop_stdargs(&argv) == 2);
+    assert(argv != NULL);
+    assert(strcmp(argv[0], "left") == 0);
+    assert(strcmp(argv[1], "right") == 0);
+    assert(sat_stack_depth() == 0);
+    free(argv[0]);
+    free(argv[1]);
+    free(argv);
+
+    assert(sat_stack_push_string("'value'") == 1);
+    const char *program = "lotto";
+    argv = NULL;
+    assert(_sat_stack_pop_stdargs(program, &argv) == 2);
+    assert(argv != NULL);
+    assert(argv[0] == program);
+    assert(strcmp(argv[1], "value") == 0);
+    assert(sat_stack_depth() == 0);
+    free(argv[1]);
+    free(argv);
+
+    argv = (char **)(uintptr_t)1u;
+    assert(sat_stack_pop_stdargs(&argv) == 0);
+    assert(argv == NULL);
+
+    assert(sat_stack_push_string("good") == 1);
+    assert(sat_push_char('x') == TRUE);
+    argv = (char **)(uintptr_t)1u;
+    assert(sat_stack_pop_stdargs(&argv) == 0);
+    assert(argv == NULL);
+    assert(sat_stack_depth() == 2);
+    clear_stack();
+}
+
 static void test_numeric_string_pushes(void)
 {
     clear_stack();
@@ -274,6 +314,7 @@ int main(void)
 {
     test_scope_depth_and_drop();
     test_strings();
+    test_stdargs();
     test_numeric_string_pushes();
     test_zint_exchange();
     test_historical_stack_example_flow();

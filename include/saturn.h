@@ -55,6 +55,14 @@ char *sat_pop_str_alloc(void);
 #define sat_stack_pick_string_alloc(l) sat_pick_str_alloc((l))
 
 /*
+ * Build the historical argc/argv view from String objects currently on the
+ * calculator stack. The output array contains exactly argc entries and has no
+ * trailing NULL, matching HPGCC 2.0. `_sat_...` optionally supplies argv[0].
+ */
+int sat_stack_pop_stdargs(char ***argv);
+int _sat_stack_pop_stdargs(const char *arg0, char ***argv);
+
+/*
  * Historical HPGCC names these as numeric pushes, but their source contract is
  * textual: format the C value, then push a calculator String. They therefore do
  * not create native Integer/REAL objects or expose Saturn representation.
