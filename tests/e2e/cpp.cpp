@@ -52,8 +52,8 @@ static bool hpclang_e2e_restore_stack(uint32_t before)
 
 static int hpclang_e2e_saturn_compat_test()
 {
-    const hpclang_device_info *device = hpclang_device_info();
-    const hpclang_boot_info *boot = hpclang_boot_info();
+    const struct hpclang_device_info *device = hpclang_device_info();
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (device == nullptr)
         return 1;
 
