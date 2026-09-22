@@ -33,36 +33,39 @@
 30000 tap down
 31500 tap enter
 33500 capture server-serial
-# Host begins Kermit at t=35s and may use the full 110s transfer budget.
-150000 capture after-transfer
+# The host starts Kermit at t=35s. The Gallery resumes only after the host has
+# completed both transfers and released HPCLANG_E2E_HOST_GATE_FILE. Times below
+# are relative to that release.
+35000 host-gate
+1000 capture after-transfer
 # Install ARMToolbox48 Library 275 into Port 0. HPCLANG is F1 and L275 is F2.
-151000 tap var
-152000 capture vars-before-install
-153000 tap f2
-154000 capture l275-stack
-155000 tap zero
-156000 tap enter
-157000 capture port-zero-stack
-158000 tap sto
-160000 capture stored
-162000 chord on f3
-168000 capture after-warmstart
-169000 tap var
-170000 capture vars-after-install
-171000 tap f1
-173000 capture hpclang-stack
+2000 tap var
+3000 capture vars-before-install
+4000 tap f2
+5000 capture l275-stack
+6000 tap zero
+7000 tap enter
+8000 capture port-zero-stack
+9000 tap sto
+11000 capture stored
+13000 chord on f3
+19000 capture after-warmstart
+20000 tap var
+21000 capture vars-after-install
+22000 tap f1
+24000 capture hpclang-stack
 # Library 275 is the first LIB entry; ARMTo exposes PrRUN on F1.
-175000 chord rshift two
-176500 capture lib-menu
-177500 tap f1
-179000 capture armtoolbox
-179500 monitor 60000
-180000 tap f1
+26000 chord rshift two
+27500 capture lib-menu
+28500 tap f1
+30500 capture armtoolbox
+31000 monitor 60000
+31500 tap f1
 # Compact Gallery starts on Native / calculator minifont. DOWN changes face
 # within the Native family; RIGHT then advances to the generated-control family.
-188000 capture native-mini
-190000 tap down
-192000 capture native-main
-194000 tap right
-196000 capture generated-control
-198000 tap on
+39000 capture native-mini
+41000 tap down
+43000 capture native-main
+45000 tap right
+47000 capture generated-control
+49000 tap on
