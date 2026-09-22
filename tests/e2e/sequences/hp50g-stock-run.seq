@@ -26,5 +26,5 @@
 18450 capture lib
 18800 tap f1
 20100 capture armtoolbox
+20300 monitor
 20500 tap f1
-20800 monitor
