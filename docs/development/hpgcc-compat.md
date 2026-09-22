@@ -202,7 +202,7 @@ Compatibility decision and current implementation:
 
 - **Adapter** for high-level stack/object and `satdir` application behavior. The first M7.3e adapter slice is implemented above owned `hpclang_object` snapshots and explicit `hpclang_object_store` handles. It preserves adapter-local cwd semantics, exact object lookup, ancestor RCL lookup, recursive HOME search and REAL fetch behavior without changing Stock cwd.
 - Historical `SAT_OBJ_DSCR.addr` is retained only as an adapter-private opaque token. It is deliberately **not** a real Saturn address; source that extracts it and feeds it into raw `sat_peek()`-style code is a Migration case rather than a hidden escape from the owned-object boundary.
-- A first safe `saturn.h` stack/object subset is also implemented: lifecycle/no-op setup, depth/drop, String pick/pop/push, REAL/int pop/push and CHAR push. String push constructs an owned calculator String snapshot and then uses the clean stack mutation path. See [HPGCC Saturn adapter boundary](hpgcc-saturn-adapter.md).
+- A first safe `saturn.h` stack/object subset is also implemented: `sat_stack_init/exit/depth/drop/dropn`, String push/pick/pop (including allocating variants), `sat_pop_real`, and `sat_push_char`. Integer/REAL push, transactional swap/nip, list builders and raw-address helpers remain deferred or Migration/Internal. String push constructs an owned calculator String snapshot and then uses the clean stack mutation path. See [HPGCC Saturn adapter boundary](hpgcc-saturn-adapter.md).
 - **Migration/Internal** remains the classification for low-level address-returning `satdir`, raw memory mapping/peek/poke/memmove and helpers whose public contract is fundamentally a Saturn address. They are implementation evidence, not requirements for the canonical ABI.
 - HPGCC 1.1/2.0 parity does not by itself require general named-object mutation: the historical `satdir.h` surface is read/search/recall oriented. General HP48/49/50 named put/remove is therefore currently deferred, not implemented. HPGCC3's later `sat3_sto*` / `sat3_purge*` APIs are useful mutation/lifetime evidence if a real port needs those operations. HP39's descriptor store word likewise documents a Stock write handler but does not by itself prove a safe generic hpclang variable-write bridge.
 
@@ -230,7 +230,7 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | legacy screen helpers | display service | mixed | M8/later |
 | time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
 | standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
-| HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented, final gate pending |
+| HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
 | Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e first safe slice implemented |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `win*` widgets | future UI toolkit | Migration, adapter later | later |
