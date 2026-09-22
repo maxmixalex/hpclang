@@ -149,6 +149,73 @@ char *sat_pop_str_alloc(void)
     return result;
 }
 
+static void sat_unquote_owned(char *value, char quote)
+{
+    if (value == NULL)
+        return;
+
+    size_t length = strlen(value);
+    if (length >= 2u && value[0] == quote && value[length - 1u] == quote) {
+        memmove(value, value + 1u, length - 2u);
+        value[length - 2u] = '\0';
+    }
+}
+
+int _sat_stack_pop_stdargs(const char *arg0, char ***argv)
+{
+    if (argv == NULL)
+        return 0;
+    *argv = NULL;
+
+    uint32_t depth = 0u;
+    if (hpclang_stack_depth(&depth) != 0 || depth > (uint32_t)INT32_MAX)
+        return 0;
+
+    size_t arg_start = arg0 != NULL ? 1u : 0u;
+    if ((size_t)depth > SIZE_MAX - arg_start)
+        return 0;
+    size_t argc = (size_t)depth + arg_start;
+    if (argc == 0u)
+        return 0;
+    if (argc > SIZE_MAX / sizeof(char *))
+        return 0;
+
+    char **result = calloc(argc, sizeof(*result));
+    if (result == NULL)
+        return 0;
+
+    if (arg0 != NULL)
+        result[0] = (char *)arg0;
+
+    for (uint32_t i = 0u; i < depth; ++i) {
+        uint32_t level = depth - i;
+        char *value = sat_pick_str_alloc((int)level);
+        if (value == NULL) {
+            for (uint32_t j = 0u; j < i; ++j)
+                free(result[arg_start + j]);
+            free(result);
+            return 0;
+        }
+        sat_unquote_owned(value, '\'');
+        result[arg_start + i] = value;
+    }
+
+    if (depth != 0u && hpclang_stack_drop(depth) != 0) {
+        for (uint32_t i = 0u; i < depth; ++i)
+            free(result[arg_start + i]);
+        free(result);
+        return 0;
+    }
+
+    *argv = result;
+    return (int)argc;
+}
+
+int sat_stack_pop_stdargs(char ***argv)
+{
+    return _sat_stack_pop_stdargs(NULL, argv);
+}
+
 int sat_stack_push_string(const char *str)
 {
     if (str == NULL)
