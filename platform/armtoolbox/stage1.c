@@ -995,6 +995,7 @@ int hpclang_hp39_portal_restore_hpc(void)
         if (post_dsktop == portal->pre_dsktop) {
             result = -8;  /* Stock returned no stack object. */
         } else if (post_dsktop + 10u == portal->pre_dsktop) {
+            result_cells = 2u;
             /*
              * HP39 special-variable @ is allowed one private retained-ID cell.
              * Runtime #315/#316 proves the descriptor path reaches this exact
