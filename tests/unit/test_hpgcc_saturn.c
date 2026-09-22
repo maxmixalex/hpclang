@@ -247,6 +247,30 @@ static void test_zint_exchange(void)
     clear_stack();
 }
 
+static void test_historical_stack_example_flow(void)
+{
+    clear_stack();
+
+    /* Mirror the bundled HPGCC examples/stack/stack.c usage pattern. */
+    assert(sat_push_zint_llong(21) == TRUE);
+    unsigned scope = sat_stack_init();
+    assert(scope != 0u);
+
+    assert(sat_push_zint_llong(sat_pop_zint_llong() * 2) == TRUE);
+    assert(sat_stack_push_string("Hello, World!") == 1);
+    assert(sat_push_zint_llong((LONGLONG)sat_stack_depth()) == TRUE);
+    sat_stack_exit(scope);
+
+    assert(sat_stack_depth() == 3);
+    assert(sat_pop_zint_llong() == 2);
+
+    char buffer[32];
+    assert(sat_pop_str(buffer) == buffer);
+    assert(strcmp(buffer, "Hello, World!") == 0);
+    assert(sat_pop_zint_llong() == 42);
+    assert(sat_stack_depth() == 0);
+}
+
 static void test_real_pop_is_type_safe(void)
 {
     clear_stack();
@@ -283,6 +307,7 @@ int main(void)
     test_strings();
     test_numeric_string_pushes();
     test_zint_exchange();
+    test_historical_stack_example_flow();
     test_real_pop_is_type_safe();
     test_char_push();
     clear_stack();
