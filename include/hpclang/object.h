@@ -46,6 +46,16 @@ int hpclang_object_create_character(
     struct hpclang_object **object);
 
 /*
+ * Construct a classic calculator DOCSTR from raw calculator bytes.
+ * No UTF-8 decoding or transcoding is performed. Embedded zero bytes are
+ * preserved because the length is explicit.
+ */
+int hpclang_object_create_string(
+    const uint8_t *bytes,
+    size_t byte_count,
+    struct hpclang_object **object);
+
+/*
  * Convert native scalar/string snapshots without exposing native prologues.
  *
  * Integer conversion is exact. It accepts classic 20-bit BINT and arbitrary
