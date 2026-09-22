@@ -117,6 +117,15 @@ target_include_directories(test_object_snapshot PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(object_construct
+    test_object_construct.c
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_construct PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_store
     test_object_store.c
     "${HPCLANG_ROOT}/runtime/core/object-store.c"
@@ -132,6 +141,16 @@ hpclang_unit(hpgcc_satdir
     "${HPCLANG_ROOT}/runtime/core/hpgcc-satdir.c")
 target_include_directories(test_hpgcc_satdir PRIVATE
     "${HPCLANG_ROOT}/include")
+
+hpclang_unit(hpgcc_saturn
+    test_hpgcc_saturn.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-saturn.c"
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_hpgcc_saturn PRIVATE
+    "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(object
     test_object.c
