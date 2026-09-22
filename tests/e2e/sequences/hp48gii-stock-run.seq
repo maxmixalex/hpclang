@@ -58,5 +58,5 @@
 176500 capture lib-menu
 177500 tap f1
 179000 capture armtoolbox
+179500 monitor 60000
 180000 tap f1
-183000 monitor 60000

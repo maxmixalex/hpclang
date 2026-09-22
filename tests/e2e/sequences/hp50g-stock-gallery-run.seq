@@ -26,10 +26,10 @@
 26850 capture lib
 27200 tap f1
 28500 capture armtoolbox
+28700 monitor 90000
 28900 tap f1
 # Compact Gallery starts on Native / calculator minifont. DOWN changes face
 # within the Native family; RIGHT then advances to the generated-control family.
-32000 monitor 90000
 40000 capture native-mini
 41500 tap down
 43000 capture native-main

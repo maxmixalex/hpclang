@@ -54,6 +54,8 @@ struct state {
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
     int return_mapping_restored;
+    int stage_baseline_valid;
+    uint32_t stage_baseline_descriptor;
     int hp48_stage_alias_seen;
     uint32_t hp48_stage_alias_descriptor;
     int hp48_stage_alias_cleared;
@@ -452,6 +454,46 @@ static int guest_read32(hdw_t *h, uint32_t address, uint32_t *value)
     return 1;
 }
 
+static int armtoolbox_capture_stage_baseline(struct state *s)
+{
+    uint32_t stage_slot = 0;
+
+    if (!uses_armtoolbox_stage_alias() || s->stage_baseline_valid)
+        return 1;
+    if (!guest_read32(
+            s->hdw, HPCLANG_STOCK_STAGE_L1_SLOT, &stage_slot))
+        return 0;
+
+    s->stage_baseline_valid = 1;
+    s->stage_baseline_descriptor = stage_slot;
+    fprintf(stderr,
+            "stock launcher: ARMToolbox stage baseline: 0x%08x\n",
+            stage_slot);
+    return 1;
+}
+
+static void armtoolbox_observe_stage_alias(struct state *s)
+{
+    uint32_t stage_slot = 0;
+
+    if (!uses_armtoolbox_stage_alias() ||
+        !s->stage_baseline_valid ||
+        s->hp48_stage_alias_seen)
+        return;
+    if (!guest_read32(
+            s->hdw, HPCLANG_STOCK_STAGE_L1_SLOT, &stage_slot))
+        return;
+    if (stage_slot == s->stage_baseline_descriptor ||
+        (stage_slot & 3u) != 1u)
+        return;
+
+    s->hp48_stage_alias_seen = 1;
+    s->hp48_stage_alias_descriptor = stage_slot;
+    fprintf(stderr,
+            "stock launcher: ARMToolbox stage alias active: 0x%08x\n",
+            stage_slot);
+}
+
 static int return_is_settled(const struct state *s)
 {
     return s->return_quiescence.changed_from_baseline &&
@@ -606,6 +648,26 @@ static int armtoolbox_wait_for_stage_teardown(struct state *s)
     if (!readable)
         return 0;
 
+    if (s->stage_baseline_valid &&
+        stage_slot == s->stage_baseline_descriptor) {
+        if (!s->hp48_stage_alias_cleared) {
+            s->hp48_stage_alias_cleared = 1;
+            if (s->hp48_stage_alias_seen) {
+                fprintf(stderr,
+                        "stock launcher: ARMToolbox stage alias released: "
+                        "0x%08x -> 0x%08x; continuing with Stock UI witness\n",
+                        s->hp48_stage_alias_descriptor, stage_slot);
+            } else {
+                fprintf(stderr,
+                        "stock launcher: ARMToolbox stage alias already "
+                        "released at baseline 0x%08x; continuing with "
+                        "Stock UI witness\n",
+                        stage_slot);
+            }
+        }
+        return 1;
+    }
+
     if (!s->hp48_stage_alias_seen) {
         if ((stage_slot & 3u) != 1u)
             return 0;
@@ -656,6 +718,7 @@ static void monitor(void *arg)
         s->saw_before = 1;
     }
 
+    armtoolbox_observe_stage_alias(s);
     readable = guest_read32(s->hdw, s->result_addr, &value);
 
     if (!s->payload_keyboard_scheduled && readable &&
@@ -743,10 +806,12 @@ static void monitor(void *arg)
      * PASS, disappearance/change of that word proves only that the common
      * bootstrap restored the stock MMU. HP48gII, HP49g+ and HP50g still have
      * to return through stage1 and stage0; injecting a key during that teardown
-     * can trip the stock launcher. Record the exact L1[0x90] descriptor
-     * installed by this stage0 invocation and wait until that descriptor no
-     * longer occupies the observed slot. The slot may be immediately reused
-     * or remapped by Stock, so a transient literal zero is not required.
+     * can trip the stock launcher. The monitor snapshots the pre-PrRUN Stock
+     * L1[0x90] descriptor and observes the stage0 coarse alias while the
+     * payload runs. After PASS, returning to that baseline or otherwise leaving
+     * the observed alias proves that stage0 no longer owns the slot. Stock may
+     * immediately reuse/remap the address space, so a transient literal zero is
+     * not required.
      *
      * On hp4950 the restored Stock address space can leave the old result
      * virtual address readable with the same PASS word. The stage0 ownership
@@ -840,6 +905,13 @@ static void seq_monitor(void *arg)
 {
     struct seq_monitor_event *event = arg;
     struct state *s = event->state;
+
+    if (!armtoolbox_capture_stage_baseline(s)) {
+        free(event);
+        fail(s, "stage-baseline");
+        return;
+    }
+
     s->deadline = timer_get_clock() + event->timeout_us;
     free(event);
     monitor(s);
