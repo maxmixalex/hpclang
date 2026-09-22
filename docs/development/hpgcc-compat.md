@@ -198,13 +198,17 @@ The common 1.1/2.0 `sat_*` surface mixes two materially different layers: applic
 
 The original 1.1/2.0 `satdir.h` makes that split explicit. Its high-level API maintains an **internal C-side cwd** and provides path get/RCL/search plus REAL fetch helpers; it does not change the calculator's Stock cwd merely to navigate. Below that are low-level helpers such as `sat_skipob`, `sat_dirfindfirst`, `sat_dirfindnext` and `sat_itemgetname` that expose raw Saturn addresses and directory records directly.
 
-Compatibility decision:
+Compatibility decision and current implementation:
 
-- **Adapter** for high-level stack/object and `satdir` application behavior. hpclang's owned `hpclang_object` snapshots and explicit `hpclang_object_store` handles already provide the clean lifetime/navigation substrate; an HPGCC adapter may keep adapter-local cwd/path state above them.
-- **Migration/Internal** for low-level address-returning `satdir`, raw memory mapping/peek/poke and helpers whose public contract is fundamentally an `unsigned` Saturn address. They are implementation evidence, not requirements for the canonical ABI.
+- **Adapter** for high-level stack/object and `satdir` application behavior. The first M7.3e adapter slice is implemented above owned `hpclang_object` snapshots and explicit `hpclang_object_store` handles. It preserves adapter-local cwd semantics, exact object lookup, ancestor RCL lookup, recursive HOME search and REAL fetch behavior without changing Stock cwd.
+- Historical `SAT_OBJ_DSCR.addr` is retained only as an adapter-private opaque token. It is deliberately **not** a real Saturn address; source that extracts it and feeds it into raw `sat_peek()`-style code is a Migration case rather than a hidden escape from the owned-object boundary.
+- A first safe `saturn.h` stack/object subset is also implemented: lifecycle/no-op setup, depth/drop, String pick/pop/push, REAL/int pop/push and CHAR push. String push constructs an owned calculator String snapshot and then uses the clean stack mutation path. See [HPGCC Saturn adapter boundary](hpgcc-saturn-adapter.md).
+- **Migration/Internal** remains the classification for low-level address-returning `satdir`, raw memory mapping/peek/poke/memmove and helpers whose public contract is fundamentally a Saturn address. They are implementation evidence, not requirements for the canonical ABI.
 - HPGCC 1.1/2.0 parity does not by itself require general named-object mutation: the historical `satdir.h` surface is read/search/recall oriented. General HP48/49/50 named put/remove is therefore currently deferred, not implemented. HPGCC3's later `sat3_sto*` / `sat3_purge*` APIs are useful mutation/lifetime evidence if a real port needs those operations. HP39's descriptor store word likewise documents a Stock write handler but does not by itself prove a safe generic hpclang variable-write bridge.
 
-HP39 follows the same capability boundary without pretending to be a classic HOME tree. Native Aplet/Program/Note structures can be snapshotted directly; Aplet Variable values follow their Stock/HPGCC descriptor handlers. The schema and genuine source references are now understood well enough to rule out one tempting shortcut: executing the real `xNoteText #2C812` source object through ordinary Stock EVAL produces the same `B9` failure on HP39gs and HP40gs, so the remaining compatibility question is the extended-ID descriptor dispatcher/calling convention. Static tracing continues from the simpler Stock `DummyVar` path. The earlier GBP39 player is a representative HPGCC39 application pattern: it read song data from native Note storage through Saturn directory inspection rather than a synthetic byte-stream filesystem.
+HP39 follows the same capability boundary without pretending to be a classic HOME tree. Native Aplet/Program/Note structures are snapshotted directly. Descriptor-driven Aplet Variable recall is now closed: hpclang quotes the genuine extended variable ID into Stock and invokes Stock `@`, allowing the descriptor recall handler to run through the calculator's own contract. The portal enters through `GETPTR`, commits the final live RPL pointers through `SAVPTR`, and restores the suspended runstream pointer before returning to ARM. Runtime #320 validates the standard `NoteText` witness on both HP39gs and HP40gs with HPC1 PASS and the complete 52-frame progression. The older Runtime #304 `xNoteText #2C812`-through-EVAL `B9` result remains useful negative evidence against that discarded shortcut, but it is no longer an open recall blocker. The earlier GBP39 player remains a representative HPGCC39 application pattern: it read song data from native Note storage through Saturn directory inspection rather than a synthetic byte-stream filesystem.
+
+The first M7.3e adapter units and unified ARM-runtime linkage are green in **Core #396**; **Storage #122** also stays green with the adapter objects linked. Full Runtime closure is still separate: Runtime #326 is not fully green and therefore is not claimed as the final adapter E2E gate.
 
 HPGCC3's `SAT_OBJECT` direction remains useful design evidence but is not an ABI target; hpclang deliberately replaces borrowed raw addresses with owned snapshots.
 
@@ -227,7 +231,7 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
 | standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented, final gate pending |
-| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3/M8 |
+| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e first safe slice implemented |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `win*` widgets | future UI toolkit | Migration, adapter later | later |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
