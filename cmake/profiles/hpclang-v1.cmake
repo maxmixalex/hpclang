@@ -33,6 +33,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-function-fields.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-portal.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-store.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-satdir.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
