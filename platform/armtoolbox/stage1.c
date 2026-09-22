@@ -18,6 +18,7 @@
 
 #define RPL_RSKTOP           0x000806f3u
 #define RPL_DSKTOP           0x000806f8u
+#define RPL_INTRPPTR         0x0008076bu
 #define RPL_AVMEM            0x00080e9bu
 #define RPL_DOCSTR           0x00002a2cu
 #define RPL_MAIN_FIRST       0x00080000u
@@ -87,7 +88,7 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  *   machine: GETPTR; A=colon; D0=return_stream; PC=(A)
  *   colon:   DOCOL arg op pack normalize finalize SEMI
  *   return:  -> DOCODE
- *   DOCODE:  commit final RPL stack pointers; restore C.W; ARMSYS
+ *   DOCODE:  SAVPTR; restore original INTRPPTR; restore C.W; ARMSYS
  *
  * Five threaded cells are patched before each trip while HPC mappings are
  * still active:
@@ -117,9 +118,10 @@ enum {
     HP39P_FINALIZE_NIBBLE = 53u,
     HP39P_RETURN_NIBBLE = 63u,
     HP39P_DOCODE_NIBBLE = 68u,
-    HP39P_C_TEMPLATE_NIBBLE = 134u,
-    HP39P_EXEC_NIBBLES = 150u,
-    HP39P_NAME_NIBBLE = 152u,
+    HP39P_C_TEMPLATE_NIBBLE = 121u,
+    HP39P_SAVED_INTRPPTR_NIBBLE = 137u,
+    HP39P_EXEC_NIBBLES = 142u,
+    HP39P_NAME_NIBBLE = 144u,
     HP39P_NAME_MAX_BYTES = 255u,
     HP39P_BODY_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
@@ -133,7 +135,7 @@ enum {
     HP39P_VARIABLE_RECALL_NIBBLES = 35u,
     HP39P_STATIC_NIBBLES =
         HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
-    HP39P_DOCODE_MACHINE_NIBBLES = 56u,
+    HP39P_DOCODE_MACHINE_NIBBLES = 43u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
@@ -481,23 +483,26 @@ static int hp39_portal_prepare_thunk(
      * These machine encodings are fixed by the HP39 Saturn ISA and are also
      * present in the original HPGCC39 LIB275 build:
      *   8F C03F0  GOSBVL $jGETPTR (#0F30C)
+     *   8F 37F60  GOSBVL SAVPTR (#06F73)
      *   1B xxxxx  D0=(5)
      *   132       AD0EX
      *   808C      PC=(A)
+     *   146       C=DAT0 A
+     *   144       DAT0=C A
      *   1567      C=DAT0 W
      *   80BFE     ARMSYS
      */
     static const uint8_t getptr[] = {
         0x8u, 0xfu, 0xcu, 0x0u, 0x3u, 0xfu, 0x0u
     };
+    static const uint8_t savptr[] = {
+        0x8u, 0xfu, 0x3u, 0x7u, 0xfu, 0x6u, 0x0u
+    };
     static const uint8_t d0_imm[] = { 0x1u, 0xbu };
     static const uint8_t ad0ex[] = { 0x1u, 0x3u, 0x2u };
     static const uint8_t pc_indirect[] = { 0x8u, 0x0u, 0x8u, 0xcu };
-    static const uint8_t cd1ex[] = { 0x1u, 0x3u, 0x7u };
-    static const uint8_t d1_c[] = { 0x1u, 0x3u, 0x5u };
+    static const uint8_t c_dat0_a[] = { 0x1u, 0x4u, 0x6u };
     static const uint8_t dat0_c_a[] = { 0x1u, 0x4u, 0x4u };
-    static const uint8_t c_b_a[] = { 0xdu, 0x9u };
-    static const uint8_t c_d_a[] = { 0xdu, 0xbu };
     static const uint8_t c_dat0_w[] = { 0x1u, 0x5u, 0x6u, 0x7u };
     static const uint8_t armsys[] = { 0x8u, 0x0u, 0xbu, 0xfu, 0xeu };
 
@@ -536,6 +541,7 @@ static int hp39_portal_prepare_thunk(
     uint32_t return_stream = saturn_base + HP39P_RETURN_NIBBLE;
     uint32_t docode = saturn_base + HP39P_DOCODE_NIBBLE;
     uint32_t c_template = saturn_base + HP39P_C_TEMPLATE_NIBBLE;
+    uint32_t saved_intrpptr = saturn_base + HP39P_SAVED_INTRPPTR_NIBBLE;
 
     struct hp39_saturn_builder builder = {
         .bytes = hp39_saturn_portal_thunk,
@@ -580,44 +586,27 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     /*
-     * DOCODE framing. Before crossing back to ARM, commit the final live RPL
-     * data-stack pointer, return-stack pointer and AVMEM counter. HP39's
-     * exported DSKTOP/RSKTOP/AVMEM cells are authoritative only after the
-     * interpreter pointers have been saved; nested machine primitives such as
-     * special-ID @ may otherwise leave an earlier transient snapshot there.
-     *
-     * Do not commit INTRPPTR: D0 currently belongs to this synthetic return
-     * stream, not to Stock's suspended application runstream.
+     * Save the final live interpreter pointers through Stock's own SAVPTR.
+     * This is the exact inverse of the GETPTR used at portal entry and avoids
+     * duplicating its register-exchange contract in synthetic machine code.
+     * SAVPTR also writes the current synthetic D0 to INTRPPTR, so restore the
+     * original suspended Stock runstream from a thunk-private cell before
+     * crossing back to ARM.
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002dcc)) ||
         !hp39_saturn_put_word5(&builder, HP39P_DOCODE_SIZE_NIBBLES) ||
-
+        !hp39_saturn_put_sequence(
+            &builder, savptr, (uint32_t)sizeof(savptr)) ||
         !hp39_saturn_put_sequence(
             &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
-        !hp39_saturn_put_word5(&builder, RPL_DSKTOP) ||
+        !hp39_saturn_put_word5(&builder, saved_intrpptr) ||
         !hp39_saturn_put_sequence(
-            &builder, cd1ex, (uint32_t)sizeof(cd1ex)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d1_c, (uint32_t)sizeof(d1_c)) ||
-        !hp39_saturn_put_sequence(
-            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
-
+            &builder, c_dat0_a, (uint32_t)sizeof(c_dat0_a)) ||
         !hp39_saturn_put_sequence(
             &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
-        !hp39_saturn_put_word5(&builder, RPL_RSKTOP) ||
-        !hp39_saturn_put_sequence(
-            &builder, c_b_a, (uint32_t)sizeof(c_b_a)) ||
+        !hp39_saturn_put_word5(&builder, RPL_INTRPPTR) ||
         !hp39_saturn_put_sequence(
             &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
-
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
-        !hp39_saturn_put_word5(&builder, RPL_AVMEM) ||
-        !hp39_saturn_put_sequence(
-            &builder, c_d_a, (uint32_t)sizeof(c_d_a)) ||
-        !hp39_saturn_put_sequence(
-            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
-
         !hp39_saturn_put_sequence(
             &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, c_template) ||
@@ -641,6 +630,7 @@ static int hp39_portal_prepare_thunk(
             &builder,
             (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
         !hp39_saturn_put_u32(&builder, c_hi) ||
+        !hp39_saturn_put_word5(&builder, 0u) ||
         builder.nibbles != HP39P_EXEC_NIBBLES ||
         !hp39_saturn_buffer_store_word5(
             hp39_saturn_portal_thunk,
@@ -856,8 +846,11 @@ int hpclang_hp39_portal_prepare_stock(void)
         (const uint32_t *)portal->saturn_state;
 
     uint32_t dsktop = 0u;
+    uint32_t intrpptr = 0u;
     if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        dsktop < 5u || dsktop > RPL_MAIN_END) {
+        !stage_saturn_read_word5(read_map, RPL_INTRPPTR, &intrpptr) ||
+        dsktop < 5u || dsktop > RPL_MAIN_END ||
+        intrpptr >= RPL_MAIN_END) {
         portal->pre_dsktop = 0u;
         return -3;
     }
@@ -910,7 +903,12 @@ int hpclang_hp39_portal_prepare_stock(void)
             hp39_saturn_portal_thunk,
             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
             HP39P_FINALIZE_NIBBLE,
-            finalize))
+            finalize) ||
+        !hp39_saturn_buffer_store_word5(
+            hp39_saturn_portal_thunk,
+            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_SAVED_INTRPPTR_NIBBLE,
+            intrpptr))
         return -7;
 
     portal->expected_prologue = expected_prologue;
@@ -937,6 +935,12 @@ int hpclang_hp39_portal_prepare_stock(void)
             observed != expected[i])
             return -7;
     }
+    if (!stage_saturn_read_word5(
+            read_map,
+            portal->saturn_entry + HP39P_SAVED_INTRPPTR_NIBBLE,
+            &observed) ||
+        observed != intrpptr)
+        return -7;
 
     const uint32_t kind = portal->request_kind;
     const uint32_t name_length = portal->request_name_length;
