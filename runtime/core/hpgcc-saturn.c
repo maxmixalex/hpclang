@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -164,6 +165,91 @@ int sat_stack_push_string(const char *str)
     int result = hpclang_stack_push(object) == 0 ? 1 : 0;
     hpclang_object_release(object);
     return result;
+}
+
+static int sat_format_int(char *buffer, size_t capacity, int value, int radix)
+{
+    static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    char reversed[sizeof(unsigned int) * 8u + 1u];
+    size_t count = 0u;
+    size_t prefix = 0u;
+
+    if (buffer == NULL || capacity == 0u || radix < 2 || radix > 36)
+        return 0;
+
+    unsigned int magnitude;
+    if (value < 0) {
+        if (capacity < 2u)
+            return 0;
+        buffer[0] = '-';
+        prefix = 1u;
+        magnitude = 0u - (unsigned int)value;
+    } else {
+        magnitude = (unsigned int)value;
+    }
+
+    do {
+        reversed[count++] = digits[magnitude % (unsigned int)radix];
+        magnitude /= (unsigned int)radix;
+    } while (magnitude != 0u);
+
+    if (prefix + count + 1u > capacity)
+        return 0;
+
+    for (size_t i = 0u; i < count; ++i)
+        buffer[prefix + i] = reversed[count - i - 1u];
+    buffer[prefix + count] = '\0';
+    return 1;
+}
+
+int _sat_stack_push_int(int z, int radix, int binary)
+{
+    char digits[sizeof(unsigned int) * 8u + 2u];
+    if (!sat_format_int(digits, sizeof(digits), z, radix))
+        return 0;
+
+    char suffix = '\0';
+    if (binary) {
+        switch (radix) {
+        case 8:
+            suffix = 'o';
+            break;
+        case 10:
+            suffix = 'd';
+            break;
+        case 16:
+            suffix = 'h';
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (suffix == '\0')
+        return sat_stack_push_string(digits);
+
+    char formatted[sizeof(digits) + 3u];
+    formatted[0] = '#';
+    size_t digit_count = strlen(digits);
+    memcpy(formatted + 1u, digits, digit_count);
+    formatted[digit_count + 1u] = suffix;
+    formatted[digit_count + 2u] = '\0';
+    return sat_stack_push_string(formatted);
+}
+
+int sat_stack_push_int(int z)
+{
+    return _sat_stack_push_int(z, 10, 0);
+}
+
+int sat_stack_push_double(double d)
+{
+    /* Historical HPGCC uses sprintf("%f") and pushes the resulting String. */
+    char buffer[384];
+    int length = snprintf(buffer, sizeof(buffer), "%f", d);
+    if (length < 0 || (size_t)length >= sizeof(buffer))
+        return 0;
+    return sat_stack_push_string(buffer);
 }
 
 double sat_pop_real(void)
