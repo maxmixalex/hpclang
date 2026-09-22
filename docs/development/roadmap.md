@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete five-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, and hp4950 stream stdio through picolibc. Storage namespace/metadata, calculator-object/RPL integration, several system services, and higher-level compatibility remain active SDK work.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete five-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3 read-side calculator-object core. Remaining work is concentrated in compatibility-adapter closure, several common system services, and higher-level compatibility.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -112,7 +112,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**M7.1 complete; later M7 slices remain in progress.**
+**M7.1 and M7.2 complete; M7.3 read core complete and M7.3e compatibility-adapter closure in progress.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -252,7 +252,7 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**In progress; M7.3a–c are implemented and M7.3d read-only named stores are being closed.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md). The current core has a runtime-private Saturn view, conservative proven-boundary parser, opaque owned snapshots, scalar/raw-string conversions, read-only stack observation, bounded failure-safe stack mutation, and read-only classic-RPL named-store handles.
+**In progress; M7.3a–d read-side capability is closed, and the first M7.3e HPGCC adapter slice is implemented.** The ownership/API boundary is frozen in [Calculator object service design](object-service.md). The clean core now has a runtime-private Saturn view, conservative proven-boundary parser, opaque owned snapshots, scalar/raw-string conversions, read-only stack observation, bounded failure-safe stack mutation, read-only classic-RPL named-store handles, and the HP39 native Aplet/Program/Note/Variable read path. Remaining M7.3 work is compatibility breadth and focused Runtime closure, not another HP39 storage reverse-engineering pass.
 
 - [x] define the boundary: public objects are opaque owned snapshots; runtime Saturn nibble addresses remain an explicit private type and never ordinary ARM pointers;
 - [x] define copy/borrow/ownership/error rules: M7.3 returns owned immutable snapshots, exposes no public borrowed Stock-memory aliases, and requires failure-safe stack/store mutations;
@@ -266,9 +266,12 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 - [x] implement HP48gII/49g+/50g read-only named RPL object exchange against explicit directory/store handles without flattening objects into byte-stream files or mutating Stock global cwd;
 - [x] implement HP39 native read-only Aplet snapshots and Program/Note catalog/body lookup using the calculator's real DORRP / `PGMCXT` / `NOTESCXT` structures rather than a synthetic HOME hierarchy;
 - [x] recover the HP39 Aplet-variable model: current Topic Type property `ApletVars# = EIGHT` supplies the schema, extended IDs carry native recall/type/store descriptors, and third-party HPGCC Aplets can supply their own schema instead of inheriting a hard-coded Stock family table;
-- [ ] close Stock validation of HP39 descriptor-driven variable recall (current witness: HPGCC-standard `NoteText`) and then freeze the read-only HP39 object boundary. The schema/source-reference side is preserved through `c61f5d8b`; direct EVAL of the genuine `xNoteText #2C812` source object is not the missing generic protocol, because Runtime #304 fails with the same private `B9` result on both HP39gs and HP40gs. Next trace the simpler Stock `DummyVar` caller → descriptor dispatcher statically before another portal experiment;
-- [ ] support common HPGCC `saturn.h` / `satdir.h` read/iterate/recall application patterns through adapters above the clean object service;
-- [ ] validate the read-only named-store get/enumeration paths against original Stock environments, including malformed-object/error cases and return-state preservation;
+- [x] close Stock validation of HP39 descriptor-driven variable recall using HPGCC-standard `NoteText`. The working bridge quotes the genuine extended variable ID and invokes Stock `@`, enters through `GETPTR`, commits final live RPL pointers through `SAVPTR`, and restores the suspended runstream before returning to ARM. **Runtime #320 Stock / hp39** validates both HP39gs and HP40gs with HPC1 PASS, `stock-hp39.json` PASS, and the complete 52-frame progression. Runtime #304's matching `B9` result for direct EVAL of `xNoteText #2C812` is retained only as negative evidence against that discarded shortcut;
+- [x] implement the first high-level HPGCC `satdir.h` read/search/recall adapter above the owned object-store core, including adapter-local cwd semantics rather than changing Stock cwd;
+- [x] implement the first safe `saturn.h` stack/object subset above the clean object API: setup/lifecycle compatibility, depth/drop, String pick/pop/push, REAL/int pop/push and CHAR push. Historical raw-address helpers remain Migration/Internal rather than canonical ABI;
+- [x] add a clean calculator-String constructor needed by the adapter and link the compatibility object helpers through the normal ARM runtime. **Core #396 (`35739959095`)** and **Storage #122 (`35739887793`)** are fully green with these units linked;
+- [ ] finish focused M7.3e Runtime closure with new evidence that actually exercises malformed-object/error handling, stack preservation and clean Stock return. **Runtime #326 is not counted as a green closure gate:** HP39 Stock failures occur in the launcher before HPC1 and match an already-existing failure class, HP40gs Direct stops at 41/52 frames while HP39gs completes, and Stock hp48 remains red. Do not replace this with repeated CI reruns that add no new object evidence;
+- [ ] expand `saturn.h` / `satdir.h` compatibility only where representative HPGCC 1.1/2.0 applications need additional safe behavior. Low-level address-returning `satdir`, `sat_peek/poke/map_s2a/memmove`, and similar raw Saturn mechanics stay Migration/Internal unless a concrete clean use case appears;
 - [ ] add named-object mutation only where a concrete application or compatibility target requires it. **Current status is read-only for named object stores:** HP48gII/49g+/50g named put/remove is not implemented, and HP39 variable descriptor store handlers do not yet have a validated generic invocation bridge. This is distinct from the already-implemented HP48gII/49g+/50g stack push/pop/drop/replace path. HPGCC3 `sat3_sto*` / `sat3_purge*` is mutation evidence, but general put/remove is not a prerequisite for HPGCC 1.1/2.0 parity.
 
 Completion criterion: typical HPGCC 1.1/2.0 programs that inspect/exchange RPL/calculator objects or use the stack can migrate without raw Saturn pointers or private OS calling conventions. Mutation beyond those historical application needs may follow separately.
