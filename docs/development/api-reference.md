@@ -39,6 +39,8 @@ The application-facing surface currently includes:
 - `<hpclang/object.h>` for owned calculator-object snapshots and stack exchange
 - `<hpclang/object-store.h>` for read-only HP48gII/HP49g+/HP50g named RPL stores
 
+Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<saturn.h>`. They are **adapters above the canonical object/stack API**, not alternate core object models. In particular they do not expose raw Saturn memory access, real Saturn-address descriptors, or borrowed Stock-memory lifetimes.
+
 ## Execution and device identity
 
 | API | Status | Notes |
@@ -155,8 +157,8 @@ hpclang distinguishes byte streams from typed calculator objects.
 | Storage class | Platform status | Canonical direction |
 | --- | --- | --- |
 | byte-stream files | ✅ HP49g+/HP50g | process-wide owned FatFs namespace feeds standard `open/close/read/write/lseek/unlink` and picolibc `fopen/fread/fwrite/fseek/remove`; HP39/40 and HP48 return clean `ENOSYS` |
-| calculator object store | ✅ read-only HP48/49/50 named RPL stores; 🧪 HP39 native Aplet/Program/Note reads with descriptor-driven Variable recall under Stock validation | owned typed/named object API; named put/remove is not implemented; HP39 native catalogs/contexts must not be flattened into a fake HOME tree or `FILE *` |
-| RPL/Saturn objects | ✅ HP48/49/50 owned snapshots + bounded stack mutation; HP39 private Stock portal/native readers implemented | M7.3 typed object/stack bridge |
+| calculator object store | ✅ read-only HP48/49/50 named RPL stores; ✅ HP39 native Aplet/Program/Note reads plus descriptor-driven Variable recall | owned typed/named object API; named put/remove is not implemented; HP39 native catalogs/contexts are not flattened into a fake HOME tree or `FILE *` |
+| RPL/Saturn objects | ✅ HP48/49/50 owned snapshots + bounded stack mutation; ✅ HP39 private Stock portal/native readers | M7.3 typed object/stack bridge; bounded HPGCC compatibility adapters sit above it |
 
 The byte-stream metadata layer is also public and typed rather than exposing KOS structures:
 
@@ -170,7 +172,7 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 
 Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
 
-`HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. No generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
+`HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
 ## Validation by service
 
@@ -185,6 +187,7 @@ Creation/access timestamps, raw KOS handles/module IDs, and implementation-speci
 | generated font selection | ✅ configure | ✅ | Gallery #112 exhaustively traverses all **245 generated faces** on all five automated targets | HP39gs/40gs/HP48gII/HP50g Stock generated controls green |
 | C++23 + libc++ | ✅ | ✅ | 5/5 real-service PASS | same canonical HPC1 payload builds |
 | hp4950 stream storage | — | ✅ | non-stream families reject unsupported stream/metadata/media access cleanly | ✅ Storage #53 (`35428824540`): unified FatFs stdio/metadata/capacity/namespace/directory semantics plus bounded HPGCC filesystem adapters; Direct hp39/hp48/hp4950 and Stock hp4950 all green |
+| calculator objects / M7.3 | ✅ owned-object + adapter units | ✅ Core #396 | HP39gs completes Runtime #326; HP40gs stops at 41/52 in that run | ✅ Runtime #320 Stock/hp39 closes descriptor-driven `NoteText` recall on HP39gs/40gs; Core #396 and Storage #122 are green with first `satdir`/`saturn` adapters linked; Runtime #326 is not claimed as a fully-green closure gate |
 
 Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ remains outside emulator E2E until a trustworthy real-machine full-flash fixture exists.
 
@@ -204,8 +207,8 @@ Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Bui
 | HPGCC3 `stdio.h` | — | — | — | 40 | hp4950 standard `FILE *` storage complete |
 | structured `fsystem.h` | — | — | 41 | 43 | bounded source adapter implemented over clean storage core; final Storage #53 green |
 | KOS `kos.h` | 15 | 32 | 33 | 33 | raw KOS kept private |
-| Saturn `saturn.h` | — | 50 | 58 | replaced | not implemented |
-| Saturn directory `satdir.h` | — | 29 | 29 | replaced | not implemented |
+| Saturn `saturn.h` | — | 50 | 58 | replaced | 🧪 bounded safe stack/object subset implemented; raw-address functions remain Migration/Internal |
+| Saturn directory `satdir.h` | — | 29 | 29 | replaced | 🧪 high-level cwd/get/recall/search/REAL subset implemented; address-returning tree helpers remain Migration/Internal |
 | conio | 27 | 27 | 26 | 49 in new `conio.h` | not implemented as a subsystem |
 | raw `syscall.h` | 9 | 9 | 9 | 9 | intentionally not canonical |
 
@@ -294,6 +297,8 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | --- | --- | --- |
 | `struct hpclang_object` | ✅ opaque owned snapshot | ARM-side immutable copy of a proven-bounded native object; no Saturn pointer escapes the runtime |
 | `hpclang_object_kind()` / `release()` | ✅ | Stable coarse semantic class and explicit ARM-side lifetime |
+| `hpclang_object_create_character()` | ✅ | Construct an owned calculator CHARACTER object without exposing its native prologue |
+| `hpclang_object_create_string()` | ✅ | Construct an owned classic calculator DOCSTR from explicit-length raw calculator bytes; embedded zero bytes are preserved and no UTF-8 transcoding occurs |
 | `hpclang_object_integer_i64()` | ✅ | Exact classic BINT/ZINT conversion; `ERANGE` if arbitrary-precision ZINT does not fit `int64_t` |
 | `hpclang_object_real_f64()` | ✅ classic DOREAL | Explicit approximate conversion; overflow or nonzero underflow is `ERANGE`, not silent HPGCC-style clamping; EREAL/LONGREAL remain `ENOTSUP` |
 | CHAR / DOCSTR conversion | ✅ | Raw calculator 8-bit code/bytes; no implicit UTF-8 reinterpretation |
@@ -304,12 +309,15 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | `hpclang_object_store_iterator_*` | ✅ HP48/HP4950 Stock | Independent ARM-side metadata snapshots; raw calculator-byte names are preserved |
 | named object put/remove | ⬜ deferred | No general HP48/HP4950 named-store mutation API is implemented. HP39 descriptor store words are known metadata, not yet a validated generic write path. Stack push/pop/drop/replace is a separate implemented capability. |
 | HP39 Aplet/Program/Note native reads | ✅ private runtime | Native DORRP / `PGMCXT` / `NOTESCXT` structures; no fabricated classic-RPL hierarchy |
-| HP39 Aplet Variable value recall | 🧪 private runtime | `ApletVars#` schema + extended-ID descriptor and genuine source references are preserved; direct EVAL of `xNoteText #2C812` is disproven by the HP39gs/40gs `B9` Stock result, so the remaining target is the native descriptor dispatcher/calling convention |
+| HP39 Aplet Variable value recall | ✅ private runtime | `ApletVars#` schema + genuine extended ID are resolved through the Stock descriptor contract by quoting the ID and invoking Stock `@`; Runtime #320 Stock/hp39 validates `NoteText` on both HP39gs and HP40gs with HPC1 PASS and the full 52-frame progression |
+| HPGCC `<satdir.h>` high-level subset | 🧪 compatibility adapter | `sat_dir_open/close/curdir/chdir`, exact get, ancestor recall, recursive HOME search, owned search-result cleanup, REAL kind/query and get/recall REAL are implemented above owned store handles. `SAT_OBJ_DSCR.addr` is an opaque adapter token, not a Saturn address. |
+| HPGCC `<saturn.h>` safe subset | 🧪 compatibility adapter | `sat_stack_init/exit/depth/drop/dropn`, String push/pick/pop (including alloc variants), `sat_pop_real`, and `sat_push_char` are implemented above the clean stack/object service. Integer/REAL push, swap/nip and raw-address operations remain deferred or Migration/Internal. |
 
-**Core #296 (`35439583956`)** is fully green for the current mutation core and exact integer/raw-string helpers. **Runtime #241 (`35439583995`)** supplies successful focused Stock hp48/hp4950 mutation evidence plus all three Direct jobs. The classic REAL conversion added on `87ce4349` passes the Runtime/unit and ARM hardware-validation job in **Core #297** and the canonical-build job in **Runtime #242**.
+**Core #296 (`35439583956`)** is fully green for the bounded mutation core and exact integer/raw-string helpers. **Runtime #241 (`35439583995`)** supplies successful focused Stock hp48/hp4950 mutation evidence plus all three Direct jobs. The classic REAL conversion added on `87ce4349` passes the Runtime/unit and ARM hardware-validation job in **Core #297** and the canonical-build job in **Runtime #242**. HP39 descriptor-driven Variable recall is closed by **Runtime #320 Stock/hp39**. The first M7.3e compatibility units and normal ARM-runtime linkage are green in **Core #396 (`35739959095`)**, and **Storage #122 (`35739887793`)** remains green with those adapter objects linked.
 
-The parser remains intentionally fail-closed. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove` and low-level address-returning `satdir` operations remain Migration/Internal. The remaining M7.3 read-only blocker is HP39 descriptor-driven Variable recall on original Stock. The latest Stock evidence rules out direct EVAL of the genuine `xNoteText` source object as the generic protocol; static tracing now targets `DummyVar` and the common descriptor dispatcher/calling convention. After that, compatibility work should sit above the existing owned object/store core rather than add another storage abstraction. General named-object mutation is currently unimplemented and is not required merely to match HPGCC 1.1/2.0 `satdir.h`.
+The parser remains intentionally fail-closed. Unknown or recognized-but-unfrozen prologues are rejected rather than treated as arbitrary memory ranges. Raw HPGCC `sat_peek/poke/map_s2a/memmove`, low-level address-returning `satdir` operations, borrowed stack descriptors and raw native-prologue contracts remain Migration/Internal. M7.3 no longer has an HP39 read-side reverse-engineering blocker: Aplet/Program/Note/Variable read behavior is closed at the intended HPGCC 1.1/2.0 parity boundary. General named-object mutation remains deferred because the read/search/recall baseline does not require it.
 
+The remaining M7.3e work is narrower: expand safe source adapters only when representative applications require them, and add a focused Runtime closure gate that contributes new object evidence (malformed/error handling, stack preservation and clean return). **Runtime #326 is explicitly not treated as a green closure gate.** Its Stock hp39 failures occur before HPC1 in the launcher and match a failure class already present before the adapters; HP40gs Direct stops at 41/52 frames while HP39gs completes; Stock hp48 remains red. Re-running the same workflow without new evidence is not a substitute for that focused closure.
 
 ## KOS, raw syscalls and widgets
 
@@ -340,8 +348,8 @@ Based on historical stability, current implementation, and remaining dependencie
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
 6. ✅ M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
-7. ◐ M7.3 owned objects, conversions and bounded HP48/HP4950 stack mutation are implemented; named object stores and historical adapters remain;
-8. only after the corresponding clean services are stable, begin broad HPG/keyboard/filesystem/object compatibility headers and the renderer-agnostic declarative UI layer.
+7. 🧪 M7.3a–d read capability is closed, HP39 descriptor recall is validated, and the first bounded `satdir.h` / `saturn.h` adapters are implemented; focused Runtime closure and any additional representative safe wrappers remain;
+8. only after the corresponding clean services are stable, begin broad HPG/keyboard/system compatibility headers and the renderer-agnostic declarative UI layer.
 
 This preserves the dependency direction: historical HPGCC APIs are implemented on top of a coherent hpclang core, not used to define that core.
 
@@ -351,7 +359,7 @@ The public keyboard service stops at physical key identity plus modifier state. 
 
 ### Current bitmap-only font closure status (2026-09-14)
 
-Canonical bundled assets are bitmap-source only. The generated catalog is **245 faces / 1,639,485 mapped glyphs / 3,472 assembly sources** with **245/245** source-to-generated parity. Font Assets **#24** is green and regeneration produces no drift; the general TTF importer has been removed.
+Canonical bundled assets are bitmap-source only. The generated catalog is **245 faces / 1,639,485 mapped glyphs / 3,472 assembly sources** with **245/245** source→generated parity. Font Assets **#24** is green and regeneration produces no drift; the general TTF importer has been removed.
 
 Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with source provenance retained. Ark Pixel labels/specimens now expose useful locale differences, and Gallery text covers width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
