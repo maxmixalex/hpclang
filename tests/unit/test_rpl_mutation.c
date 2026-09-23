@@ -393,30 +393,41 @@ static void test_named_size_changing_replace(void)
     hpclang_object_release(char_b);
 }
 
-static void test_named_size_change_busy_is_non_mutating(void)
+static void test_named_size_change_preserves_reference(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
     struct named_pair pair = prepare_two_named_chars();
     struct hpclang_object *string_b = make_string1('B');
 
     uint32_t old_dstk = get_word(DSKTOP, 5u);
-    uint32_t old_avmem = get_word(AVMEM, 5u);
-    uint32_t old_home = get_word(USEROB, 5u);
-    uint32_t old_chain = get_word(pair.chain, 5u);
-
     put_word(old_dstk, 5u, pair.object_b);
+
     assert(hpclang_rpl_mutation_store_replace(
                &io,
                pair.home,
                (const uint8_t *)"B",
                1u,
-               string_b) == HPCLANG_RPL_MUTATION_BUSY);
+               string_b) == HPCLANG_RPL_MUTATION_OK);
 
-    assert(get_word(DSKTOP, 5u) == old_dstk);
-    assert(get_word(AVMEM, 5u) == old_avmem);
-    assert(get_word(USEROB, 5u) == old_home);
-    assert(get_word(pair.chain, 5u) == old_chain);
-    assert_char_at(pair.object_b, 'B');
+    uint32_t new_dstk = get_word(DSKTOP, 5u);
+    assert(new_dstk == old_dstk - 5u);
+    uint32_t preserved = get_word(new_dstk, 5u);
+    assert(preserved != pair.object_b - 5u);
+    assert_char_at(preserved, 'B');
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = read_nibble,
+        .context = NULL,
+    };
+    uint32_t expanded_home = get_word(USEROB, 5u);
+    struct hpclang_rpl_directory_entry_view entry;
+    assert(hpclang_rpl_directory_find(
+               &reader,
+               expanded_home,
+               (const uint8_t *)"B",
+               1u,
+               &entry) == HPCLANG_RPL_STORE_OK);
+    assert(entry.prologue == 0x02a2cu);
 
     hpclang_object_release(string_b);
 }
@@ -692,7 +703,7 @@ int main(void)
     test_named_same_size_replace();
     test_named_reference_preservation_nospace_is_non_mutating();
     test_named_size_changing_replace();
-    test_named_size_change_busy_is_non_mutating();
+    test_named_size_change_preserves_reference();
     test_userob_shift_roundtrip();
     test_userob_shift_rejects_removed_reference();
     test_userob_shift_nospace_is_non_mutating();

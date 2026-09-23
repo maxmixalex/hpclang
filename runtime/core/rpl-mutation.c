@@ -540,7 +540,8 @@ static int object_reference_state(
 static int preserve_userob_references_to_temp(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t start,
-    uint32_t end);
+    uint32_t end,
+    int32_t future_user_delta);
 
 static int store_result_to_mutation(int result)
 {
@@ -935,6 +936,26 @@ static int plan_userob_shift(
         .pointer_offset = (int32_t)pointer_offset_wide,
     };
 
+    /*
+     * Prove directory geometry before reference state. A BUSY result can then
+     * be treated by higher-level replace/remove as the only remaining blocker,
+     * preserved through TEMPOB, and retried without discovering a structural
+     * directory error after the first mutation.
+     */
+    directory_plan->count = 0u;
+    directory_plan->remaining_entries =
+        RPL_DIRECTORY_ENTRY_LIMIT;
+    result = collect_directory_patches(
+        io,
+        &reader,
+        geometry,
+        directory_plan,
+        home,
+        RPL_MAIN_END,
+        0u);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
     const struct pointer_scan_request pointer_request = {
         .move_start = old_dstk,
         .move_end = move_end,
@@ -943,21 +964,7 @@ static int plan_userob_shift(
         .offset = geometry->pointer_offset,
         .mode = POINTER_SCAN_VALIDATE_SHIFT,
     };
-    result = scan_all_references(io, &pointer_request);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    directory_plan->count = 0u;
-    directory_plan->remaining_entries =
-        RPL_DIRECTORY_ENTRY_LIMIT;
-    return collect_directory_patches(
-        io,
-        &reader,
-        geometry,
-        directory_plan,
-        home,
-        RPL_MAIN_END,
-        0u);
+    return scan_all_references(io, &pointer_request);
 }
 
 int hpclang_rpl_mutation_userob_shift_before(
@@ -1145,7 +1152,8 @@ int hpclang_rpl_mutation_store_replace(
             result = preserve_userob_references_to_temp(
                 io,
                 entry.object_address,
-                entry.object_address + span);
+                entry.object_address + span,
+                0);
             if (result != HPCLANG_RPL_MUTATION_OK)
                 return result;
         }
@@ -1153,18 +1161,15 @@ int hpclang_rpl_mutation_store_replace(
             io, entry.object_address, object);
     }
 
-    /*
-     * Size-changing replacement moves the old USEROB prefix. Until the
-     * separate TEMPOB-preservation step is enabled, never relocate a live
-     * reference away from an object whose value is about to disappear.
-     */
     uint32_t old_end = 0u;
     if (!checked_add(entry.object_address, span, &old_end))
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    result = object_reference_state(
+
+    int reference_state = object_reference_state(
         io, entry.object_address, old_end);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
+    if (reference_state != HPCLANG_RPL_MUTATION_OK &&
+        reference_state != HPCLANG_RPL_MUTATION_BUSY)
+        return reference_state;
 
     int64_t delta_wide =
         (int64_t)object->nibble_count - (int64_t)span;
@@ -1188,6 +1193,29 @@ int hpclang_rpl_mutation_store_replace(
     if (!range_mapped(
             io, new_address, object->nibble_count))
         return HPCLANG_RPL_MUTATION_IO;
+
+    struct userob_shift_geometry shift_geometry;
+    struct directory_patch_plan shift_directory_plan;
+    result = plan_userob_shift(
+        io,
+        old_end,
+        delta,
+        &shift_geometry,
+        &shift_directory_plan);
+    if (result != HPCLANG_RPL_MUTATION_OK &&
+        !(result == HPCLANG_RPL_MUTATION_BUSY &&
+          reference_state == HPCLANG_RPL_MUTATION_BUSY))
+        return result;
+
+    if (reference_state == HPCLANG_RPL_MUTATION_BUSY) {
+        result = preserve_userob_references_to_temp(
+            io,
+            entry.object_address,
+            old_end,
+            delta);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
 
     result = hpclang_rpl_mutation_userob_shift_before(
         io, old_end, delta);
@@ -1414,7 +1442,8 @@ static int commit_temp(
 static int preserve_userob_references_to_temp(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t start,
-    uint32_t end)
+    uint32_t end,
+    int32_t future_user_delta)
 {
     if (!io_ready(io) ||
         start >= end ||
@@ -1432,6 +1461,45 @@ static int preserve_userob_references_to_temp(
     result = plan_temp(io, span, &plan);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+
+    /*
+     * TEMP growth raises RSKTOP while USEROB growth lowers DSKTOP. Prove the
+     * combined final geometry now so an ordinary ENOSPC cannot appear only
+     * after references have already been redirected to the TEMP copy.
+     */
+    if (future_user_delta != 0) {
+        int64_t final_dstk_wide =
+            (int64_t)plan.dstk - (int64_t)future_user_delta;
+        if (final_dstk_wide < RPL_MAIN_FIRST ||
+            final_dstk_wide >= RPL_MAIN_END)
+            return future_user_delta > 0
+                ? HPCLANG_RPL_MUTATION_NOSPACE
+                : HPCLANG_RPL_MUTATION_MALFORMED;
+        uint32_t final_dstk = (uint32_t)final_dstk_wide;
+
+        uint32_t stack_floor = 0u;
+        if (!checked_add(
+                io->user_limit,
+                io->stack_reserve_nibbles,
+                &stack_floor) ||
+            (future_user_delta > 0 && final_dstk < stack_floor) ||
+            final_dstk <= plan.new_rstk)
+            return HPCLANG_RPL_MUTATION_NOSPACE;
+
+        uint32_t old_cells =
+            (plan.dstk - plan.rstk) / 5u;
+        uint32_t final_cells =
+            (final_dstk - plan.new_rstk) / 5u;
+        if (final_cells < old_cells) {
+            uint32_t total_cost = old_cells - final_cells;
+            if (plan.avmem < total_cost)
+                return HPCLANG_RPL_MUTATION_NOSPACE;
+        } else {
+            uint32_t gain = final_cells - old_cells;
+            if (plan.avmem > UINT32_MAX - gain)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+    }
 
     int64_t offset_wide =
         (int64_t)plan.object_address - (int64_t)start;

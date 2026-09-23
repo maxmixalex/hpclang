@@ -70,10 +70,9 @@ int hpclang_rpl_mutation_replace(
 
 /*
  * Replace an existing non-directory USEROB object from an owned snapshot.
- * Same-size writes happen in place. Size-changing writes use the bounded
- * USEROB shift primitive and currently require the old object to be
- * unreferenced; referenced-value preservation through TEMPOB is the next
- * M7.3f layer.
+ * Same-size and size-changing writes both preserve live Stock references to
+ * the old value through a bounded TEMPOB copy before the named object is
+ * overwritten or resized.
  */
 int hpclang_rpl_mutation_store_replace(
     const struct hpclang_rpl_mutation_io *io,
@@ -85,7 +84,7 @@ int hpclang_rpl_mutation_store_replace(
 /*
  * Strict compatibility helper for the first live M7.3f witness. It rejects a
  * different native extent even though the general replacement path can now
- * resize an unreferenced object.
+ * resize objects while preserving live references to the old value.
  */
 int hpclang_rpl_mutation_store_replace_same_size(
     const struct hpclang_rpl_mutation_io *io,
