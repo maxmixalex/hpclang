@@ -20,7 +20,7 @@ NM="${ARM_NM:-$ATFE/bin/llvm-nm}"
 rm -rf "$OUT" "$BUILD"
 mkdir -p "$OUT/calculator" "$OUT/tools" "$BUILD"
 
-for tool in "$CC" "$LD" "$OBJCOPY" "$READELF" "$NM" python3 cc; do
+for tool in "$CC" "$LD" "$OBJCOPY" "$READELF" "$NM" python3 cc go; do
     [[ -x "$tool" ]] || command -v "$tool" >/dev/null 2>&1 || {
         echo "missing required tool: $tool" >&2
         exit 1
@@ -111,6 +111,7 @@ for rel in (
     "calculator/HP39DIR.000",
     "calculator/HP39DIR.CUR",
     "calculator/LIB275L.000",
+    "hp39gplus-rom-receiver.exe",
     "tools/receive-rom-stream.py",
 ):
     p = root / rel
