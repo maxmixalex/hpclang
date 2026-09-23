@@ -602,6 +602,12 @@ struct directory_patch_plan {
     uint32_t remaining_entries;
 };
 
+struct directory_delete_context {
+    uint32_t directory;
+    uint32_t item;
+    uint32_t found;
+};
+
 static int map_structural_address(
     const struct userob_shift_geometry *geometry,
     uint32_t address,
@@ -715,6 +721,56 @@ static int plan_directory_relation(
     return add_directory_patch(plan, slot, updated);
 }
 
+
+static int plan_directory_rewire(
+    const struct hpclang_rpl_mutation_io *io,
+    const struct userob_shift_geometry *geometry,
+    struct directory_patch_plan *plan,
+    uint32_t slot,
+    uint32_t old_target,
+    uint32_t new_target)
+{
+    uint32_t current = 0u;
+    int result = read_word(io, slot, 5u, &current);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t expected = 0u;
+    if (old_target > slot)
+        expected = old_target - slot;
+    else if (slot > old_target)
+        expected = slot - old_target;
+    else
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    if (current != expected)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t mapped_slot = 0u;
+    result = map_structural_address(
+        geometry, slot, 5u, &mapped_slot);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t updated = 0u;
+    if (new_target != 0u) {
+        uint32_t mapped_target = 0u;
+        result = map_structural_address(
+            geometry, new_target, 1u, &mapped_target);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        if (mapped_target > mapped_slot)
+            updated = mapped_target - mapped_slot;
+        else if (mapped_slot > mapped_target)
+            updated = mapped_slot - mapped_target;
+        else
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+
+    if (updated == current)
+        return HPCLANG_RPL_MUTATION_OK;
+    return add_directory_patch(plan, slot, updated);
+}
+
 static int collect_directory_patches(
     const struct hpclang_rpl_mutation_io *io,
     const struct hpclang_rpl_reader *reader,
@@ -722,7 +778,8 @@ static int collect_directory_patches(
     struct directory_patch_plan *plan,
     uint32_t directory,
     uint32_t enclosing_end,
-    uint32_t depth)
+    uint32_t depth,
+    struct directory_delete_context *delete_context)
 {
     if (depth > RPL_DIRECTORY_DEPTH_LIMIT)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
@@ -750,11 +807,8 @@ static int collect_directory_patches(
         cursor.item >= directory_end)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    result = plan_directory_relation(
-        io, geometry, plan,
-        cursor.chain, cursor.item, 1);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
+    uint32_t incoming_slot = cursor.chain;
+    int incoming_planned = 0;
 
     while (!cursor.finished) {
         if (plan->remaining_entries == 0u)
@@ -777,31 +831,73 @@ static int collect_directory_patches(
             entry.object_address >= directory_end)
             return HPCLANG_RPL_MUTATION_MALFORMED;
 
-        if (!cursor.finished) {
+        int deleting =
+            delete_context != NULL &&
+            directory == delete_context->directory &&
+            item == delete_context->item;
+
+        if (deleting) {
+            if (delete_context->found != 0u ||
+                entry.prologue == RPL_DORRP)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+
+            uint32_t next =
+                cursor.finished ? 0u : cursor.item;
+            result = plan_directory_rewire(
+                io,
+                geometry,
+                plan,
+                incoming_slot,
+                item,
+                next);
+            if (result != HPCLANG_RPL_MUTATION_OK)
+                return result;
+
+            delete_context->found = 1u;
+            incoming_planned = 1;
+        } else {
+            if (!incoming_planned) {
+                result = plan_directory_relation(
+                    io,
+                    geometry,
+                    plan,
+                    incoming_slot,
+                    item,
+                    item > incoming_slot);
+                if (result != HPCLANG_RPL_MUTATION_OK)
+                    return result;
+            } else {
+                incoming_planned = 0;
+            }
+
+            if (entry.prologue == RPL_DORRP) {
+                result = collect_directory_patches(
+                    io,
+                    reader,
+                    geometry,
+                    plan,
+                    entry.object_address,
+                    directory_end,
+                    depth + 1u,
+                    delete_context);
+                if (result != HPCLANG_RPL_MUTATION_OK)
+                    return result;
+            }
+        }
+
+        if (!cursor.finished && !deleting) {
             if (item < 5u ||
                 cursor.item <= cursor.chain ||
                 cursor.item >= item)
                 return HPCLANG_RPL_MUTATION_MALFORMED;
-            result = plan_directory_relation(
-                io, geometry, plan,
-                item - 5u, cursor.item, 0);
-            if (result != HPCLANG_RPL_MUTATION_OK)
-                return result;
-        }
-
-        if (entry.prologue == RPL_DORRP) {
-            result = collect_directory_patches(
-                io,
-                reader,
-                geometry,
-                plan,
-                entry.object_address,
-                directory_end,
-                depth + 1u);
-            if (result != HPCLANG_RPL_MUTATION_OK)
-                return result;
+            incoming_slot = item - 5u;
         }
     }
+
+    if (delete_context != NULL &&
+        directory == delete_context->directory &&
+        delete_context->found == 0u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
 
     return HPCLANG_RPL_MUTATION_OK;
 }
@@ -811,7 +907,8 @@ static int plan_userob_shift(
     uint32_t position,
     int32_t delta,
     struct userob_shift_geometry *geometry,
-    struct directory_patch_plan *directory_plan)
+    struct directory_patch_plan *directory_plan,
+    struct directory_delete_context *delete_context)
 {
     if (!io_ready(io) || geometry == NULL || directory_plan == NULL)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -945,6 +1042,8 @@ static int plan_userob_shift(
     directory_plan->count = 0u;
     directory_plan->remaining_entries =
         RPL_DIRECTORY_ENTRY_LIMIT;
+    if (delete_context != NULL)
+        delete_context->found = 0u;
     result = collect_directory_patches(
         io,
         &reader,
@@ -952,7 +1051,8 @@ static int plan_userob_shift(
         directory_plan,
         home,
         RPL_MAIN_END,
-        0u);
+        0u,
+        delete_context);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -965,6 +1065,56 @@ static int plan_userob_shift(
         .mode = POINTER_SCAN_VALIDATE_SHIFT,
     };
     return scan_all_references(io, &pointer_request);
+}
+
+
+static int commit_userob_shift(
+    const struct hpclang_rpl_mutation_io *io,
+    const struct userob_shift_geometry *geometry,
+    const struct directory_patch_plan *directory_plan)
+{
+    if (geometry == NULL || directory_plan == NULL)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    int result = HPCLANG_RPL_MUTATION_OK;
+    for (uint32_t i = 0u; i < directory_plan->count; ++i) {
+        result = write_word(
+            io,
+            directory_plan->patches[i].slot,
+            5u,
+            directory_plan->patches[i].value);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
+
+    const struct pointer_scan_request pointer_request = {
+        .move_start = geometry->old_dstk,
+        .move_end = geometry->move_end,
+        .remove_start = geometry->remove_start,
+        .remove_end = geometry->remove_end,
+        .offset = geometry->pointer_offset,
+        .mode = POINTER_SCAN_APPLY_SHIFT,
+    };
+    result = scan_all_references(io, &pointer_request);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t move_count =
+        geometry->move_end - geometry->old_dstk;
+    result = move_nibbles(
+        io,
+        geometry->new_dstk,
+        geometry->old_dstk,
+        move_count);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = write_word(
+        io, RPL_DSKTOP, 5u, geometry->new_dstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return write_word(
+        io, RPL_AVMEM, 5u, geometry->new_avmem);
 }
 
 int hpclang_rpl_mutation_userob_shift_before(
@@ -980,7 +1130,7 @@ int hpclang_rpl_mutation_userob_shift_before(
     struct userob_shift_geometry geometry;
     struct directory_patch_plan directory_plan;
     int result = plan_userob_shift(
-        io, position, delta, &geometry, &directory_plan);
+        io, position, delta, &geometry, &directory_plan, NULL);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -989,50 +1139,8 @@ int hpclang_rpl_mutation_userob_shift_before(
      * Relative links are patched in their old locations so moved link cells
      * carry the corrected value with them.
      */
-    for (uint32_t i = 0u; i < directory_plan.count; ++i) {
-        result = write_word(
-            io,
-            directory_plan.patches[i].slot,
-            5u,
-            directory_plan.patches[i].value);
-        if (result != HPCLANG_RPL_MUTATION_OK)
-            return result;
-    }
-
-    const struct pointer_scan_request pointer_request = {
-        .move_start = geometry.old_dstk,
-        .move_end = geometry.move_end,
-        .remove_start = geometry.remove_start,
-        .remove_end = geometry.remove_end,
-        .offset = geometry.pointer_offset,
-        .mode = POINTER_SCAN_APPLY_SHIFT,
-    };
-    result = scan_all_references(io, &pointer_request);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    uint32_t move_count =
-        geometry.move_end - geometry.old_dstk;
-    result = move_nibbles(
-        io,
-        geometry.new_dstk,
-        geometry.old_dstk,
-        move_count);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    /*
-     * DSKTOP is also part of the system-reference table and has already been
-     * relocated, but write the planned value explicitly as the final USEROB
-     * boundary commit. AVMEM preserves any pre-existing launcher/native bias
-     * by applying only the geometric five-nibble-cell delta.
-     */
-    result = write_word(
-        io, RPL_DSKTOP, 5u, geometry.new_dstk);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    return write_word(
-        io, RPL_AVMEM, 5u, geometry.new_avmem);
+    return commit_userob_shift(
+        io, &geometry, &directory_plan);
 }
 
 static int snapshot_matches_saturn(
@@ -1340,7 +1448,8 @@ int hpclang_rpl_mutation_store_replace(
         old_end,
         delta,
         &shift_geometry,
-        &shift_directory_plan);
+        &shift_directory_plan,
+        NULL);
     if (result != HPCLANG_RPL_MUTATION_OK &&
         !(result == HPCLANG_RPL_MUTATION_BUSY &&
           reference_state == HPCLANG_RPL_MUTATION_BUSY))
@@ -1363,6 +1472,107 @@ int hpclang_rpl_mutation_store_replace(
 
     return snapshot_copy_to_saturn(
         io, new_address, object);
+}
+
+
+int hpclang_rpl_mutation_store_remove(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length)
+{
+    if (!io_ready(io) ||
+        (name == NULL && name_length != 0u) ||
+        name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    struct hpclang_rpl_directory_entry_view entry;
+    uint32_t span = 0u;
+    int result = store_replace_target(
+        io, directory, name, name_length, &entry, &span);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t item_nibbles =
+        name_length == 0u ? 2u : 4u + name_length * 2u;
+    if (entry.object_address < item_nibbles + 5u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t item = entry.object_address - item_nibbles;
+    uint32_t link = item - 5u;
+    uint32_t object_end = 0u;
+    if (!checked_add(entry.object_address, span, &object_end) ||
+        object_end <= link)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t remove_nibbles = object_end - link;
+    if (remove_nibbles > INT32_MAX)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+
+    /*
+     * Structural link/name bytes have no value-preservation semantics. Reject
+     * any Stock pointer into them. References to the object itself are
+     * preserved through TEMPOB exactly like destructive replacement.
+     */
+    result = object_reference_state(
+        io, link, entry.object_address);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    int reference_state = object_reference_state(
+        io, entry.object_address, object_end);
+    if (reference_state != HPCLANG_RPL_MUTATION_OK &&
+        reference_state != HPCLANG_RPL_MUTATION_BUSY)
+        return reference_state;
+
+    struct directory_delete_context delete_context = {
+        .directory = directory,
+        .item = item,
+        .found = 0u,
+    };
+    struct userob_shift_geometry geometry;
+    struct directory_patch_plan directory_plan;
+    int32_t delta = -(int32_t)remove_nibbles;
+
+    result = plan_userob_shift(
+        io,
+        object_end,
+        delta,
+        &geometry,
+        &directory_plan,
+        &delete_context);
+    if (result != HPCLANG_RPL_MUTATION_OK &&
+        !(result == HPCLANG_RPL_MUTATION_BUSY &&
+          reference_state == HPCLANG_RPL_MUTATION_BUSY))
+        return result;
+    if (delete_context.found == 0u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    if (reference_state == HPCLANG_RPL_MUTATION_BUSY) {
+        result = preserve_userob_references_to_temp(
+            io,
+            entry.object_address,
+            object_end,
+            delta);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+
+        delete_context.found = 0u;
+        result = plan_userob_shift(
+            io,
+            object_end,
+            delta,
+            &geometry,
+            &directory_plan,
+            &delete_context);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        if (delete_context.found == 0u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+
+    return commit_userob_shift(
+        io, &geometry, &directory_plan);
 }
 
 int hpclang_rpl_mutation_store_replace_same_size(

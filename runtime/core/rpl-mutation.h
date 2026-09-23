@@ -95,6 +95,17 @@ int hpclang_rpl_mutation_store_create(
     const struct hpclang_object *object);
 
 /*
+ * Remove one existing non-directory classic-RPL entry. Live references to the
+ * object value are preserved through TEMPOB; references into the entry's
+ * structural name/link prefix are rejected.
+ */
+int hpclang_rpl_mutation_store_remove(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length);
+
+/*
  * Strict compatibility helper for the first live M7.3f witness. It rejects a
  * different native extent even though the general replacement path can now
  * resize objects while preserving live references to the old value.
