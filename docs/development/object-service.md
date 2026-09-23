@@ -254,9 +254,10 @@ HP48 uses a deliberately small transferred `ZZE2E` DOCSTR
 (`"HPCLANG-E2E"`) for successful owned named-object snapshot validation; the
 large launcher remains enumerable but is no longer abused as a memory-stress
 fixture. HP39/40 launch timing is gated on actual lazy-fetch completion and then
-uses sparse Stock-UI ENTER retries; once the payload reaches its acknowledged
-keyboard phase, later sequence key-downs are suppressed. Those harness fixes
-close launch/return races without changing object semantics.
+uses sparse launch-only Stock-UI ENTER retries. Once the payload announces that
+it has started, only still-pending launch-retry key-downs are discarded; normal
+sequence input remains available for Runtime/Gallery navigation. Those harness
+fixes close launch/return races without changing object semantics.
 
 Malformed/truncated/overflow object layouts and failed typed-pop/stdargs
 preservation remain covered by host units, while Runtime #338 supplies the
