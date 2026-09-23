@@ -22,6 +22,8 @@ on:
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
       - "tests/e2e/specs/font-gallery-stock.json"
+      - "tests/e2e/report.py"
+      - "tests/e2e/harness/verify-hp39-native-font.py"
       - "tools/prepare-x50ng-gallery.py"
       - "tools/fetch-x50ng.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -34,6 +36,7 @@ on:
       - "tools/prepare-hp48gii-nor.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
+      - "tools/pgm-to-summary.py"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
   pull_request:
@@ -53,6 +56,8 @@ on:
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
       - "tests/e2e/specs/font-gallery-stock.json"
+      - "tests/e2e/report.py"
+      - "tests/e2e/harness/verify-hp39-native-font.py"
       - "tools/prepare-x50ng-gallery.py"
       - "tools/fetch-x50ng.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -65,6 +70,7 @@ on:
       - "tools/prepare-hp48gii-nor.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
+      - "tools/pgm-to-summary.py"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
 
