@@ -491,7 +491,7 @@ static void test_named_reference_preservation_nospace_is_non_mutating(void)
 
     const uint32_t dstk = get_word(DSKTOP, 5u);
     put_word(dstk, 5u, object_address);
-    io.temp_limit = get_word(RSKTOP, 5u) + 20u;
+    io.temp_limit = get_word(RSKTOP, 5u) + 17u;
 
     assert(hpclang_rpl_mutation_store_replace_same_size(
                &io,
