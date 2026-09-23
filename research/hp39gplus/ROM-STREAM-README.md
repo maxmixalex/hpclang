@@ -19,19 +19,24 @@ USB Raw HID. The user starts the aplet only once.
    used for ordinary aplets. `LIB275L.000` only needs to be installed once if
    the matching library is already present.
 4. Close Conn3x / HP Connectivity Kit before running the stream receiver.
-5. On the PC, install the receiver dependency:
+5. On Windows, no runtime install is required for the preferred receiver. Use
+   `hp39gplus-rom-receiver.exe`, which talks directly to the built-in Windows
+   HID/SetupAPI stack and does not require Python, hidapi, or an extra DLL.
 
-   `python -m pip install -r requirements.txt`
+   The Python receiver remains in `tools/` as a diagnostic fallback. Its
+   optional dependency file is `requirements-python-fallback.txt`.
 
 ## Dump procedure
 
 1. **Unplug the calculator USB cable.** The aplet deliberately refuses to take
    ownership of a USB controller that is already connected to a host.
-2. On the PC run:
+2. On a normal 64-bit Windows PC run:
 
-   `python tools/receive-rom-stream.py hp39gplus-flash.bin`
+   `hp39gplus-rom-receiver.exe hp39gplus-flash.bin`
 
-   The receiver waits for the temporary HID device.
+   The receiver is a standalone Go executable. It waits for the temporary HID
+   device through Windows `hid.dll` / `setupapi.dll`; no Conn3x API, Python,
+   hidapi package, or bundled runtime DLL is used.
 3. On the calculator launch **H39 ROM USB** while USB is still unplugged.
 4. Plug the USB cable in.
 5. The transfer now runs automatically. The PC checks every 16 KiB block and
@@ -56,3 +61,17 @@ fallback and diagnostic path.
 
 If the PC receiver aborts after the HID device is active, unplug USB. The aplet
 uses physical disconnect as the safe boundary before it restores stock state.
+
+## Windows receiver details
+
+The preferred PC tool is built with `CGO_ENABLED=0 GOOS=windows GOARCH=amd64`.
+It enumerates the system HID class with SetupAPI, selects VID `03f0` / PID
+`0121`, verifies the `HP39g+ ROM Stream` product string and Raw HID usage
+page/usage, reads the report lengths reported by Windows, and then uses
+overlapped `ReadFile` / `WriteFile` I/O. Windows prepends a zero report-ID
+byte to this device's 64-byte HID payload, so the Win32 I/O buffers are 65
+bytes while the on-wire application protocol remains unchanged.
+
+The Go protocol test and the older Python protocol simulation both deliberately
+corrupt one first-pass block and require an automatic retry before accepting the
+final 1 MiB image.
