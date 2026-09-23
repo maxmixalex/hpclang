@@ -222,10 +222,10 @@ Compatibility decision and current implementation:
   justifies a transactional reorder primitive;
 - HPGCC 1.1/2.0 adapter parity does not itself require general named-object
   mutation because historical `satdir.h` is read/search/recall oriented.
-  HP48gII/49g+/50g named put/remove plus a validated HP39 generic
-  descriptor-store bridge therefore remain demand-driven clean-core extensions,
-  separate from the closed M7.3 parity baseline and bounded historical adapter
-  surface.
+  However, hpclang's M7 capability plan still includes that write side as
+  **M7.3f**: HP48gII/49g+/50g named put/remove plus a validated HP39 generic
+  descriptor-store bridge. Those clean-core mutations remain separate from the
+  bounded historical adapter surface.
 
 HP39 follows the same capability boundary without pretending to be a classic
 HOME tree. Native Aplet/Program/Note structures are snapshotted directly.
@@ -244,9 +244,10 @@ round-trips ZINT/REAL/String values without changing the incoming depth, uses
 HP48's successful named-object get uses a bounded `ZZE2E` DOCSTR rather than
 copying the large launcher merely as a test fixture.
 
-**M7.3 is complete at the intended HPGCC 1.1/2.0 object/stack adapter
-baseline.** Named-store write/delete and additional raw/native helpers remain
-explicit demand-driven future work or Migration/Internal where appropriate.
+**M7.3a-e are complete at the intended HPGCC 1.1/2.0 object/stack adapter
+baseline.** M7.3f named-store write/delete remains planned M7 clean-core work.
+Additional raw/native helpers remain explicit Migration or demand-driven future
+compatibility work.
 
 HPGCC3's `SAT_OBJECT` direction remains useful design evidence but is not an ABI target; hpclang deliberately replaces borrowed raw addresses with owned snapshots.
 
@@ -269,7 +270,7 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
 | standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
-| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3 bounded application subset complete; Runtime #338 green; general named-store mutation deferred |
+| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f named-store mutation still pending in clean core |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `win*` widgets | future UI toolkit | Migration, adapter later | later |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |
