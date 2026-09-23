@@ -30,7 +30,24 @@
 .global hp39_rom_stream
 .type hp39_rom_stream,%function
 hp39_rom_stream:
+    /*
+     * Preserve the ARMToolbox caller frame on its original stack, then move
+     * all C execution to the scratch block PrRUN allocated for this entry.
+     * r1 points at the emulated Saturn register file:
+     *   B.lo @ +0x914 = allocated bytes
+     *   C.hi @ +0x920 = allocated ARM address
+     */
     stmfd   sp!, {r0-r12, lr}
+    mov     r9, sp
+    ldr     r10, [r1, #0x914]
+    ldr     r11, [r1, #0x920]
+    cmp     r10, #1024
+    blo     .Lreturn_old_stack
+    cmp     r11, #0
+    beq     .Lreturn_old_stack
+    add     r12, r11, r10
+    bic     r12, r12, #7
+    mov     sp, r12
 
     /* Refuse to borrow any virtual section that the stock OS already uses. */
     ldr     r4, =L1_FLASH
@@ -40,19 +57,19 @@ hp39_rom_stream:
     ldr     r8, =L1_INT
     ldr     r0, [r4]
     cmp     r0, #0
-    bne     .Lreturn
+    bne     .Lreturn_scratch
     ldr     r0, [r5]
     cmp     r0, #0
-    bne     .Lreturn
+    bne     .Lreturn_scratch
     ldr     r0, [r6]
     cmp     r0, #0
-    bne     .Lreturn
+    bne     .Lreturn_scratch
     ldr     r0, [r7]
     cmp     r0, #0
-    bne     .Lreturn
+    bne     .Lreturn_scratch
     ldr     r0, [r8]
     cmp     r0, #0
-    bne     .Lreturn
+    bne     .Lreturn_scratch
 
     ldr     r0, =DESC_FLASH
     str     r0, [r4]
@@ -77,7 +94,9 @@ hp39_rom_stream:
     str     r0, [r8]
     bl      .Lpublish_maps
 
-.Lreturn:
+.Lreturn_scratch:
+    mov     sp, r9
+.Lreturn_old_stack:
     ldmfd   sp!, {r0-r12, pc}
 .size hp39_rom_stream, .-hp39_rom_stream
 

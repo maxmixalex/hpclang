@@ -7,8 +7,10 @@ import argparse
 import struct
 from pathlib import Path
 
-# Streamer does not return a ROM object and requests no launcher result buffer.
-REQUEST_BYTES = 0
+# Reserve private scratch RAM for the streamer C stack.  ARMToolbox39 PrRUN
+# passes the allocated byte count in Saturn B.lo and the ARM address in C.hi;
+# rom-stream-entry.S switches SP to the top of this block before calling C.
+REQUEST_BYTES = 4096
 FLAGS = 0x000
 MEMORY_WORD = (FLAGS << 20) | REQUEST_BYTES
 LINK_MARKER = 0x3176B34C

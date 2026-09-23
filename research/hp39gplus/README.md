@@ -42,11 +42,15 @@ ACK/retry for the full image. There is no 64-aplet/manual-chunk fallback.
 Flash remains read-only. The temporary USB/MMU state is restored only after
 physical cable disconnect.
 
-The first physical attempt established the HPGCC39 launch sequence: START enters
-the aplet view and ENTER executes the ARM action. It also exposed a stock-state
-assumption in the initial streamer: cable detection read GPFDAT before selecting
-GPF1/EINT1. The streamer now configures and restores that GPIO mux exactly like
-newRPL target_39gs before trusting the cable state.
+The first physical attempts established the HPGCC39 launch sequence: START
+enters the aplet view and ENTER executes the ARM action. They also exposed two
+stock-state assumptions in the initial streamer. First, cable detection read
+GPFDAT before selecting GPF1/EINT1. Second, HPGCC39's CRT enters slow mode
+(about 3 MHz PCLK in its own source comments), while newRPL requires PCLK above
+20 MHz for S3C2410 USB. The corrected streamer configures/restores GPF1/EINT1,
+uses a USB-safe temporary clock/divider with all SoC IRQs masked and LCD off,
+and runs its C code on 4 KiB of PrRUN-allocated scratch RAM rather than the
+unknown caller stack.
 
 Until a physical HP39g+ completes the corrected path, CI/build success proves
 packaging, relocation safety, Windows receiver construction, and host protocol

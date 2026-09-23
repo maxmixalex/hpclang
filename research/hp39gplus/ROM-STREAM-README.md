@@ -4,7 +4,9 @@ This is the experimental first-real-hardware path for obtaining the complete
 **1 MiB physical NOR image** from an HP39g+.
 
 The calculator-side payload is read-only with respect to flash: it maps NOR for
-loads and contains no NOR erase/program sequence. Internally the image is
+loads and contains no NOR erase/program sequence. The current build also asks
+ARMToolbox39 for a private 4 KiB scratch block and runs all streamer C code on
+that stack instead of borrowing the stock caller stack. Internally the image is
 validated in 64 blocks of 16 KiB, but all blocks are streamed automatically over
 USB Raw HID. You transfer the aplet once and start it once.
 
@@ -65,7 +67,11 @@ then **ENTER** executes the embedded ARM action. If ENTER is never pressed, the
 PC receiver will simply time out because no temporary USB device is created.
 
 The streamer configures GPF1 as EINT1 before reading the cable-detect bit,
-matching newRPL's target_39gs USB driver. If a cable is already connected when
+matching newRPL's target_39gs USB driver. It also compensates for HPGCC39's
+default slow mode: if PCLK is below 20 MHz, it temporarily switches to the
+stock normal-speed PLL with a USB-safe divider, masks all SoC IRQ sources, and
+turns the LCD controller off while the bus clock differs. The exact prior
+clock, LCD, GPIO, interrupt and USB state is restored after disconnect. If a cable is already connected when
 ENTER executes, the payload restores that GPIO setting and returns without
 taking USB ownership.
 

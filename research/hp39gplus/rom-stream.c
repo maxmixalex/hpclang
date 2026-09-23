@@ -8,7 +8,8 @@
  * Safety contract:
  *   - Caller maps aliases before entry and removes them after return.
  *   - Start with the USB cable unplugged.  If it is already connected, return.
- *   - USB IRQs 25 and cable EINT1 are masked while we own the controller.
+ *   - All SoC IRQ sources are masked while this polling payload owns clocks
+ *     and the USB controller; the exact prior mask is restored afterwards.
  *   - After host FINISH, wait for cable removal before restoring hardware.
  */
 
@@ -26,6 +27,8 @@ typedef unsigned int u32;
 #define CLK_BASE            0x0c000000u
 #define GPIO_BASE           0x0d000000u
 #define INT_BASE            0x0e000000u
+/* HPGCC39 exposes the stock LCD controller at this established ARM VA. */
+#define LCD_BASE            0x07300000u
 
 #define FUNC_ADDR_REG       REG32(USBD_BASE + 0x140)
 #define PWR_REG             REG32(USBD_BASE + 0x144)
@@ -47,13 +50,16 @@ typedef unsigned int u32;
 #define EP1_FIFO            REG32(USBD_BASE + 0x1c4)
 #define EP2_FIFO            REG32(USBD_BASE + 0x1c8)
 
+#define MPLLCON             REG32(CLK_BASE + 0x04)
 #define UPLLCON             REG32(CLK_BASE + 0x08)
 #define CLKCON              REG32(CLK_BASE + 0x0c)
 #define CLKSLOW             REG32(CLK_BASE + 0x10)
+#define CLKDIVN             REG32(CLK_BASE + 0x14)
 #define GPFCON              REG32(GPIO_BASE + 0x50)
 #define GPFDAT              REG32(GPIO_BASE + 0x54)
 #define MISCCR              REG32(GPIO_BASE + 0x80)
 #define INTMSK              REG32(INT_BASE + 0x08)
+#define LCDCON1             REG32(LCD_BASE + 0x00)
 
 #define EP0_OUT_PKT_RDY             0x01u
 #define EP0_IN_PKT_RDY              0x02u
@@ -71,8 +77,6 @@ typedef unsigned int u32;
 #define EPN_OUT_CLR_DATA_TOGGLE     0x80u
 
 #define USB_RESET_BIT       0x04u
-#define IRQ_USB_DEVICE      (1u << 25)
-#define IRQ_EINT1           (1u << 1)
 
 #define GET_STATUS          0u
 #define CLEAR_FEATURE       1u
@@ -100,6 +104,8 @@ struct hw_snapshot {
     u32 clkcon;
     u32 upllcon;
     u32 clkslow;
+    u32 clkdivn;
+    u32 lcdcon1;
     u32 misccr;
     u32 intmsk;
     u32 gpfcon;
@@ -200,8 +206,16 @@ static void take_snapshot(struct hw_snapshot *s)
     s->clkcon = CLKCON;
     s->upllcon = UPLLCON;
     s->clkslow = CLKSLOW;
+    s->clkdivn = CLKDIVN;
+    s->lcdcon1 = LCDCON1;
     s->misccr = MISCCR;
     s->intmsk = INTMSK;
+
+    /*
+     * This payload is entirely polled.  Keep every stock IRQ handler out while
+     * clocks and USB state are temporarily different from the OS's view.
+     */
+    INTMSK = 0xffffffffu;
 
     /* Temporarily clock the device block so indexed register state is readable. */
     CLKCON = (s->clkcon & ~0x40u) | 0x80u;
@@ -256,16 +270,58 @@ static void restore_hw(const struct hw_snapshot *s)
     GPFCON = s->gpfcon;
     MISCCR = s->misccr;
     UPLLCON = s->upllcon;
+    CLKDIVN = s->clkdivn;
     CLKSLOW = s->clkslow;
     CLKCON = s->clkcon;
+    LCDCON1 = s->lcdcon1;
     INTMSK = s->intmsk;
+}
+
+static u32 current_pclk(void)
+{
+    u32 fclk = 12000000u;
+    u32 slow = CLKSLOW;
+    u32 div = CLKDIVN;
+    if(slow & 0x10u) {
+        u32 slow_div = slow & 7u;
+        if(slow_div)
+            fclk /= slow_div << 1;
+    }
+    else {
+        u32 pll = MPLLCON;
+        u32 m = ((pll >> 12) & 0xffu) + 8u;
+        u32 p = ((pll >> 4) & 0x1fu) + 2u;
+        u32 s = pll & 3u;
+        fclk = (m * 12000000u) / (p << s);
+    }
+    if(div & 2u)
+        fclk >>= 1;
+    if(div & 1u)
+        fclk >>= 1;
+    return fclk;
+}
+
+static int prepare_usb_clock(void)
+{
+    /*
+     * HPGCC39's CRT deliberately enters slow mode before main; its own source
+     * notes a typical 3 MHz PCLK there.  The newRPL S3C2410 USB driver requires
+     * PCLK > 20 MHz.  Reuse the stock normal-mode MPLL, but choose the same
+     * 75 MHz divider policy as newRPL (HCLK=FCLK/2, PCLK=HCLK).
+     *
+     * Keep the LCD controller off while HCLK changes.  We restore the exact
+     * saved LCDCON1 only after the original clock state is back.
+     */
+    LCDCON1 &= ~1u;
+    if(current_pclk() < 20000000u) {
+        CLKDIVN = (CLKDIVN & ~3u) | 2u;
+        CLKSLOW &= ~0x10u;
+    }
+    return current_pclk() >= 20000000u;
 }
 
 static void usb_hwsetup(void)
 {
-    /* Polling driver: keep stock handlers from touching our temporary state. */
-    INTMSK |= IRQ_USB_DEVICE | IRQ_EINT1;
-
     CLKCON &= ~0x40u;   /* USB host off */
     CLKCON |= 0x80u;    /* USB device on */
     UPLLCON = 0x78023u; /* 48 MHz USB PLL, same value as newRPL target_39gs */
@@ -335,7 +391,7 @@ static u32 make_hid_report_desc(u8 *d)
 static u32 make_config_desc(u8 *d)
 {
     u32 i=0;
-    d[i++]=9; d[i++]=2; d[i++]=41; d[i++]=0; d[i++]=1; d[i++]=1; d[i++]=0; d[i++]=0x80; d[i++]=50;
+    d[i++]=9; d[i++]=2; d[i++]=41; d[i++]=0; d[i++]=1; d[i++]=1; d[i++]=0; d[i++]=0xc0; d[i++]=50;
     d[i++]=9; d[i++]=4; d[i++]=0; d[i++]=0; d[i++]=2; d[i++]=3; d[i++]=0; d[i++]=0; d[i++]=0;
     d[i++]=9; d[i++]=0x21; d[i++]=0x11; d[i++]=0x01; d[i++]=0; d[i++]=1; d[i++]=0x22; d[i++]=28; d[i++]=0;
     d[i++]=7; d[i++]=5; d[i++]=0x81; d[i++]=3; d[i++]=64; d[i++]=0; d[i++]=2;
@@ -502,6 +558,7 @@ static void pump_usb(int *configured)
         *configured=0;
         reset_endpoints();
         USB_INT_REG=USB_RESET_BIT;
+        return;
     }
     if(u & 0x03u)
         USB_INT_REG=u & 0x03u;
@@ -607,6 +664,10 @@ int hp39_rom_stream_main(void)
     }
 
     take_snapshot(&saved);
+    if(!prepare_usb_clock()) {
+        restore_hw(&saved);
+        return 2;
+    }
     usb_hwsetup();
 
     /* Wait for physical insertion and USB enumeration. */
