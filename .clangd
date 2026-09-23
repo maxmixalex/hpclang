@@ -2,7 +2,9 @@ CompileFlags:
   Add:
     - --target=arm-none-eabi
     - -march=armv4t
-    - -marm
+    - -mthumb
+    - -mabi=aapcs
+    - -mfloat-abi=soft
     - -ffreestanding
     - -fno-builtin
     - -fno-stack-protector
