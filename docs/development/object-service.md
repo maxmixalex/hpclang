@@ -206,7 +206,7 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble recall/type/store descriptor. Runtime preserves genuine schema source references (for example MiniVar's `xNoteText` at `#2C812`) and recalls values generically by quoting that genuine extended ID into Stock and invoking Stock `@`, which follows descriptor word 0 including the supported-entry path. The portal enters through `GETPTR`, commits the final live RPL pointers through Stock `SAVPTR`, and restores the suspended `#8076B` runstream pointer before returning to ARM. Runtime #320 validates this path on both HP39gs and HP40gs: `NoteText` passes as the standard witness, each model reaches HPC1 PASS, `stock-hp39.json` passes, and the complete 52-frame keyboard progression returns cleanly;
 - no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store entry points remain `ENOSYS` where the Stock model has no matching namespace;
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
-- named put/remove is **not implemented as a general M7.3 capability** and is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation stays deferred until a concrete compatibility/application requirement justifies the additional lifecycle work. The presence of an HP39 descriptor store word is evidence about Stock's variable contract, not proof that hpclang already has a safe generic variable-write bridge.
+- named put/remove is **not implemented yet**. It is not required to close the HPGCC 1.1/2.0 read/search/recall adapter baseline, but it remains planned M7 work in M7.3f. HP48gII/49g+/50g need failure-safe named put/remove above explicit logical store handles; HP39 needs a validated generic descriptor-store invocation path for Aplet variables. HPGCC3's later `sat3_sto*` / `sat3_purge*` family and the recovered HP39 descriptor store word are implementation evidence, not permission to expose their raw address/lifetime model.
 
 ### M7.3e — HPGCC adapters and closure — complete at the bounded parity baseline
 
@@ -231,9 +231,10 @@ inside it:
   descriptors are not reintroduced merely to make the historical header
   numerically complete;
 - `sat_stack_swap` / `sat_stack_nip` stay outside the bounded subset until a
-  real port justifies a transactional reorder primitive. Their omission, like
-  general named put/remove, is an explicit compatibility classification rather
-  than unfinished M7.3 core work.
+  real port justifies a transactional reorder primitive. Their omission is an
+  explicit compatibility classification. General named put/remove is different:
+  it remains a planned clean-core capability in M7.3f rather than part of the
+  bounded historical `saturn.h` / `satdir.h` adapter surface.
 
 Validation progressed from Core #396 (first adapter slice) through Core #399
 (exact ZINT), Core #400 (the bundled HPGCC `stack.c` flow), and Core #402/#404
@@ -241,7 +242,7 @@ Validation progressed from Core #396 (first adapter slice) through Core #399
 #125/#126 then kept the normal Stock storage/return gate green while the shared
 stage-alias teardown race was made baseline-aware.
 
-The final M7.3 closure gate is **E2E / Runtime #338
+The final M7.3e read/adapter closure gate is **E2E / Runtime #338
 (`35812005032`) on `ba2c0398`**. Build, all three Direct families, Stock
 HP39gs/HP40gs, Stock HP48gII, Stock HP49g+/HP50g, and evidence publication all
 pass. The focused Stock witness preserves the incoming stack depth while
@@ -259,12 +260,24 @@ close launch/return races without changing object semantics.
 
 Malformed/truncated/overflow object layouts and failed typed-pop/stdargs
 preservation remain covered by host units, while Runtime #338 supplies the
-cross-family Stock round-trip and clean-return evidence. This is sufficient to
-close **M7.3** at the intended HPGCC 1.1/2.0 read/search/recall/stack-exchange
+cross-family Stock round-trip and clean-return evidence. This closes
+**M7.3a-e** at the intended HPGCC 1.1/2.0 read/search/recall/stack-exchange
 baseline.
 
-The precise implemented/deferred/Migration split remains recorded in
-[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md). General named
-object mutation is still separately deferred until a concrete application or
-compatibility requirement justifies its additional lifetime and failure-safety
-work.
+### M7.3f — named object-store mutation — planned
+
+M7.3f finishes the write side that was intentionally left out while the read
+model and compatibility boundary were being proven:
+
+- HP48gII/49g+/50g: add named put/replace/remove through explicit logical store
+  handles, with owned input snapshots and no Stock-global cwd mutation;
+- HP39gs/40gs: validate the descriptor store word as a generic variable-write
+  bridge and preserve the native Aplet/topic context instead of inventing a
+  synthetic HOME hierarchy;
+- make create/replace/remove failure-safe, with bounded allocation/lifetime
+  handling and original-Stock round-trip evidence;
+- keep raw Saturn addresses and HPGCC3 native mutation descriptors private.
+
+The precise adapter/Migration split remains recorded in
+[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md). M7.3 as a whole
+closes after this named write/delete slice is implemented and validated.
