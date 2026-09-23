@@ -71,7 +71,8 @@ export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
-export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+export HPCLANG_STOCK_RESULT_ADDR
 if [[ "$TARGET" == hp40gs ]]; then
     SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
 else

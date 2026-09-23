@@ -77,7 +77,8 @@ if [[ "$STORAGE_WITNESS" == 1 ]]; then
 else
     export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-run.seq"
 fi
-export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+export HPCLANG_STOCK_RESULT_ADDR
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-run"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
 

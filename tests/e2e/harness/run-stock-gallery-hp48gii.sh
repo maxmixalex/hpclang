@@ -13,7 +13,10 @@ ASSETS_DIR="$(realpath "$2")"
 export TARGET
 
 while IFS= read -r line; do
-    export "$line"
+    env_name="${line%%=*}"
+    env_value="${line#*=}"
+    printf -v "$env_name" '%s' "$env_value"
+    export "$env_name"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
 export HPCLANG_X50NG_HARNESS=stock
@@ -79,7 +82,8 @@ export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-gallery-run.seq"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery.json"
-export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+export HPCLANG_STOCK_RESULT_ADDR
 
 # UI automation resumes only after Kermit actually finishes; these dynamic
 # limits are watchdog ceilings rather than synchronization delays.

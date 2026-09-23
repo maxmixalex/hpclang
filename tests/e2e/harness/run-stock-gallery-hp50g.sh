@@ -12,7 +12,10 @@ APP_DIR="$(realpath "$1")"
 export TARGET
 
 while IFS= read -r line; do
-    export "$line"
+    env_name="${line%%=*}"
+    env_value="${line#*=}"
+    printf -v "$env_name" '%s' "$env_value"
+    export "$env_name"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
 export HPCLANG_X50NG_HARNESS=stock
@@ -61,7 +64,8 @@ export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-gallery-run.seq"
-export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+export HPCLANG_STOCK_RESULT_ADDR
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery.json"
 
