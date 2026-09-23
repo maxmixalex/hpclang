@@ -63,6 +63,21 @@ def main() -> int:
                 return 2
             print(f"HPCLANG_E2E_{key.upper()}={value}")
 
+    nor = data.get("nor")
+    if nor is not None:
+        if not isinstance(nor, dict):
+            print(f"{path}: nor must be an object", file=sys.stderr)
+            return 2
+        for key in ("path", "compression", "bytes", "sha256"):
+            value = str(nor.get(key, ""))
+            if not value:
+                print(f"{path}: nor.{key} is required", file=sys.stderr)
+                return 2
+            if "\n" in value or "\r" in value:
+                print(f"{path}: newline in nor.{key}", file=sys.stderr)
+                return 2
+            print(f"HPCLANG_E2E_NOR_{key.upper()}={value}")
+
     return 0
 
 
