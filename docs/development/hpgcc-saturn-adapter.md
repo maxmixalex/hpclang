@@ -239,17 +239,18 @@ hp39, Stock hp48, Stock hp4950, and evidence publication all pass. HP48's
 successful named-object snapshot uses the bounded `ZZE2E` DOCSTR rather than
 requiring an owned copy of the roughly 74 KiB launcher. HP39/40 reaches the
 payload only after the serial-disk lazy fetch has actually completed, with
-sparse post-gate ENTER retries covering Stock's asynchronous UI/install
-settling; both models then reach HPC1 PASS and clean Stock return.
+sparse post-gate launch-only ENTER retries covering Stock's asynchronous
+UI/install settling; pending retry key-downs are discarded once the payload
+announces that it has started, while normal sequence input remains available.
 
 Runtime #326 remains useful historical diagnostic evidence, but it is
 superseded as an M7.3e closure gate. Its launcher/pre-HPC1 failures are not
 treated as adapter semantics, and no repeated workflow rerun is needed to
 replace the stronger focused evidence above.
 
-The bounded source surface is therefore frozen for **M7.3e**. General named-object
-put/remove remains outside the HPGCC 1.1/2.0 read/search/recall adapter
-baseline, but it remains planned hpclang clean-core work in **M7.3f**.
-Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders, and
-non-transactional stack reorders stay Migration/Internal or demand-driven
-future compatibility work rather than requirements for M7.3f.
+The bounded source surface is therefore frozen for **M7.3**. General named-object
+put/remove remains outside the HPGCC 1.1/2.0 read/search/recall adapter baseline
+and is deferred until a concrete port requires it. Raw-address `satdir`, raw
+Saturn memory/BCD helpers, list builders, and non-transactional stack reorders
+stay Migration/Internal or demand-driven future compatibility work rather than
+requirements for M7.3 parity.
