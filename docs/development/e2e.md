@@ -23,7 +23,7 @@ The two tiers are deliberately separate. Direct runtime owns common-bootstrap ex
 
 ## Calculator-object and stack-mutation witness
 
-The canonical runtime payload covers the closed M7.3 read/search/recall/stack/adapter baseline. General named-store write/delete is intentionally deferred beyond this HPGCC 1.1/2.0 parity gate, so no named-write round-trip E2E claim is made.
+The canonical runtime payload now covers the closed M7.3a-e read/stack/adapter baseline. M7.3f named-store write/delete is not implemented yet and therefore has no write-round-trip E2E claim.
 
 - Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.
 - Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive user-visible depth after launcher-bias normalization, and snapshot only objects whose native extent is provable.
