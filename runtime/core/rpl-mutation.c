@@ -1322,6 +1322,27 @@ static int plan_temp(
         !range_mapped(io, ttop, delta))
         return HPCLANG_RPL_MUTATION_IO;
 
+    /*
+     * Existing TEMPOB objects and the live return-stack cells occupy the
+     * [TEMPTOP, RSKTOP) interval that will move upward. Validate every
+     * Stock-visible pointer before committing the move; unlike historical
+     * sat3_createtemp(), hpclang must not leave an existing TEMP reference
+     * pointing at the old address after allocation.
+     */
+    if (delta > INT32_MAX)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    const struct pointer_scan_request pointer_request = {
+        .move_start = ttop,
+        .move_end = rstk,
+        .remove_start = 0u,
+        .remove_end = 0u,
+        .offset = (int32_t)delta,
+        .mode = POINTER_SCAN_VALIDATE_SHIFT,
+    };
+    result = scan_all_references(io, &pointer_request);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
     plan->ttop = ttop;
     plan->rstk = rstk;
     plan->dstk = dstk;
@@ -1342,7 +1363,27 @@ static int commit_temp(
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     uint32_t source_size = plan->rstk - plan->ttop;
-    int result = move_nibbles(
+    if (plan->delta > INT32_MAX)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+
+    /*
+     * Rewrite pointers in their old cells before moving the interval. Pointer
+     * cells that themselves live in TEMPOB/return-stack memory then carry the
+     * corrected value to their new address with the memmove.
+     */
+    const struct pointer_scan_request pointer_request = {
+        .move_start = plan->ttop,
+        .move_end = plan->rstk,
+        .remove_start = 0u,
+        .remove_end = 0u,
+        .offset = (int32_t)plan->delta,
+        .mode = POINTER_SCAN_APPLY_SHIFT,
+    };
+    int result = scan_all_references(io, &pointer_request);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = move_nibbles(
         io, plan->new_ttop, plan->ttop, source_size);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;

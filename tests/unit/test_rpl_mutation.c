@@ -134,6 +134,9 @@ static struct hpclang_rpl_mutation_io setup(uint32_t depth)
     for (uint32_t i = ttop; i < rstk; ++i)
         memory[i] = (uint8_t)(i & 0x0fu);
 
+    /* A zero return-stack sentinel keeps reference scanning structurally valid. */
+    put_word(rstk - 5u, 5u, 0u);
+
     for (uint32_t level = 0u; level < depth; ++level)
         put_word(dstk + level * 5u, 5u, 0x82000u + level * 0x20u);
 
@@ -471,6 +474,37 @@ static void test_named_same_size_replace(void)
     hpclang_object_release(char_c);
 }
 
+
+static void test_temp_allocation_retargets_existing_reference(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct hpclang_object *object = make_char('N');
+
+    const uint32_t old_ttop = get_word(TEMPTOP, 5u);
+    const uint32_t old_temp_object = old_ttop + 0x20u;
+    put_word(old_temp_object, 5u, 0x029bfu);
+    put_word(old_temp_object + 5u, 2u, (uint32_t)'T');
+
+    const uint32_t dstk = get_word(DSKTOP, 5u);
+    put_word(dstk, 5u, old_temp_object);
+
+    const uint32_t delta = object->nibble_count + 6u;
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
+           HPCLANG_RPL_MUTATION_OK);
+
+    const uint32_t new_dstk = get_word(DSKTOP, 5u);
+    assert(new_dstk == dstk - 5u);
+    /*
+     * The pre-existing level moved from level 1 to level 2 when push inserted
+     * the new object. Its pointer must follow the old TEMP object upward.
+     */
+    assert(get_word(new_dstk + 5u, 5u) ==
+           old_temp_object + delta);
+    assert_char_at(old_temp_object + delta, 'T');
+
+    hpclang_object_release(object);
+}
+
 static void test_push_transaction(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -620,6 +654,7 @@ static void test_drop_and_replace(void)
 int main(void)
 {
     test_push_transaction();
+    test_temp_allocation_retargets_existing_reference();
     test_avmem_reservation_is_preserved();
     test_stack_reserve_blocks_last_cell();
     test_nospace_is_non_mutating();
