@@ -10,7 +10,10 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET="$1"
 
 while IFS= read -r line; do
-    export "$line"
+    env_name="${line%%=*}"
+    env_value="${line#*=}"
+    printf -v "$env_name" '%s' "$env_value"
+    export "$env_name"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
 export HPCLANG_X50NG_HARNESS=stock
