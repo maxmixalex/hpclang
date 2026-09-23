@@ -175,7 +175,7 @@ HP39 internal object access uses the private Saturn/System-RPL portal with genui
 
 The M7.3 ownership contract is frozen in [Calculator object service design](object-service.md).
 
-Canonical public objects are opaque, owned, immutable snapshots. Reading from a calculator stack or named store copies into an ARM-side snapshot; pushing/storing copies back into the calculator. M7.3 deliberately exposes no borrowed Stock-memory alias. Unknown native objects may remain semantically unclassified while still round-tripping losslessly on the same family.
+Canonical public objects are opaque, owned, immutable snapshots. Reading from a calculator stack or named store copies into an ARM-side snapshot; bounded stack push/pop/drop/replace already copies through the clean mutation layer. Named-store put/remove will use the same owned-copy rule in M7.3f. M7.3 deliberately exposes no borrowed Stock-memory alias. Unknown native objects may remain semantically unclassified while still round-tripping losslessly on the same family.
 
 Saturn nibble addresses remain an explicit **private runtime type**, never ordinary C pointers and never canonical object handles. The launch-preserved `SAT_CPU->Read[]` path already used by HP48/49/50 native fonts becomes the common private read primitive; mutation support must use the corresponding validated Stock mapping/operation rather than publishing raw `peek/poke/map_s2a` behavior.
 
@@ -225,4 +225,4 @@ device/capability facts
 + hp4950 standard stream I/O
 ```
 
-M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3 is now active and begins with the owned calculator-object snapshot/private Saturn-view boundary before stack mutation and named-object-store backends. Broad HPGCC adapters and the planned declarative UI engine remain downstream of stable clean-core services.
+M7.1 font architecture, asset curation, native-ROM census, keyboard/runtime return evidence, and validation are complete: the final bitmap catalog is **245 faces / 1,639,485 glyph mappings / 3,472 assembly sources**, Font Assets #24 is clean, Runtime #135 is fully green, and Gallery #112 is fully green. M7.2 byte-stream storage is complete with Storage #53 / Core #254. M7.3a-e now close the owned calculator-object read side, bounded stack mutation, HP39 descriptor-driven recall, and the bounded HPGCC `satdir.h` / `saturn.h` adapter baseline; Runtime #338 is fully green across all Direct and Stock families. M7.3f named-store put/remove and HP39 variable-store mutation remain before M7.3 closes. Broader HPGCC/UI work remains downstream of the clean-core parity milestones.
