@@ -17,6 +17,7 @@ add_executable(hpclang_e2e
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
+    "${HPCLANG_ROOT}/runtime/core/hp39-catalog.c"
     main.c
     cpp.cpp)
 
