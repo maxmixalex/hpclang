@@ -277,47 +277,91 @@ static void restore_hw(const struct hw_snapshot *s)
     INTMSK = s->intmsk;
 }
 
-static u32 current_pclk(void)
+static u32 normal_fclk_scaled(void)
 {
-    u32 fclk = 12000000u;
-    u32 slow = CLKSLOW;
-    u32 div = CLKDIVN;
-    if(slow & 0x10u) {
-        u32 slow_div = slow & 7u;
-        if(slow_div)
-            fclk /= slow_div << 1;
-    }
-    else {
-        u32 pll = MPLLCON;
-        u32 m = ((pll >> 12) & 0xffu) + 8u;
-        u32 p = ((pll >> 4) & 0x1fu) + 2u;
-        u32 s = pll & 3u;
-        fclk = (m * 12000000u) / (p << s);
-    }
-    if(div & 2u)
-        fclk >>= 1;
-    if(div & 1u)
-        fclk >>= 1;
-    return fclk;
+    /*
+     * Return FCLK in units of 1 MHz times the PLL denominator:
+     *   numerator = (m + 8) * 12
+     *   denominator = (p + 2) * 2^s
+     *
+     * Keeping numerator/denominator separate avoids pulling __aeabi_uidiv into
+     * this freestanding payload.
+     */
+    u32 pll = MPLLCON;
+    u32 m = ((pll >> 12) & 0xffu) + 8u;
+    return m * 12u;
+}
+
+static u32 normal_fclk_denominator(void)
+{
+    u32 pll = MPLLCON;
+    u32 p = ((pll >> 4) & 0x1fu) + 2u;
+    u32 s = pll & 3u;
+    return p << s;
+}
+
+static int pclk_at_least_20mhz(void)
+{
+    u32 numerator;
+    u32 denominator;
+    u32 pclk_div = 1u;
+
+    if(CLKSLOW & 0x10u)
+        return 0;
+
+    numerator = normal_fclk_scaled();
+    denominator = normal_fclk_denominator();
+    if(CLKDIVN & 2u)
+        pclk_div <<= 1;
+    if(CLKDIVN & 1u)
+        pclk_div <<= 1;
+
+    return numerator >= 20u * denominator * pclk_div;
 }
 
 static int prepare_usb_clock(void)
 {
+    u32 numerator;
+    u32 denominator;
+    u32 divider;
+
     /*
      * HPGCC39's CRT deliberately enters slow mode before main; its own source
      * notes a typical 3 MHz PCLK there.  The newRPL S3C2410 USB driver requires
-     * PCLK > 20 MHz.  Reuse the stock normal-mode MPLL, but choose the same
-     * 75 MHz divider policy as newRPL (HCLK=FCLK/2, PCLK=HCLK).
+     * PCLK > 20 MHz.  Use the same divider thresholds as newRPL cpu_setspeed(),
+     * but keep the stock MPLL value rather than programming a new CPU PLL.
      *
-     * Keep the LCD controller off while HCLK changes.  We restore the exact
-     * saved LCDCON1 only after the original clock state is back.
+     * Keep the LCD controller off while HCLK/PCLK changes.  We restore the
+     * exact saved LCDCON1 only after the original clock state is back.
      */
     LCDCON1 &= ~1u;
-    if(current_pclk() < 20000000u) {
-        CLKDIVN = (CLKDIVN & ~3u) | 2u;
-        CLKSLOW &= ~0x10u;
+
+    numerator = normal_fclk_scaled();
+    denominator = normal_fclk_denominator();
+
+    if(numerator <= 24u * denominator)
+        divider = 0u;
+    else if(numerator <= 48u * denominator)
+        divider = 1u;
+    else if(numerator <= 75u * denominator)
+        divider = 2u;
+    else
+        divider = 3u;
+
+    CLKDIVN = (CLKDIVN & ~3u) | divider;
+    CLKSLOW &= ~0x10u;
+
+    /*
+     * If an unexpected stock MPLL/divider combination still leaves PCLK below
+     * 20 MHz, try the least-divided safe setting.  If even FCLK itself is too
+     * low, abort and restore instead of attempting USB at an invalid clock.
+     */
+    if(!pclk_at_least_20mhz()) {
+        CLKDIVN &= ~3u;
+        if(!pclk_at_least_20mhz())
+            return 0;
     }
-    return current_pclk() >= 20000000u;
+    return 1;
 }
 
 static void usb_hwsetup(void)
