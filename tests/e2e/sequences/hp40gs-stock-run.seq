@@ -22,7 +22,17 @@
 43000 capture lazy-fetch
 44000 host-gate
 
-# Times below are relative to host-gate release, not emulator start.
-0 monitor 60000
+# Times below are relative to host-gate release, not emulator start. Kermit EOF
+# proves the bytes have arrived, but Stock can still be committing the fetched
+# aplet/library or unwinding the serial-disk UI. Retry ENTER sparsely instead
+# of guessing a fixed post-transfer delay. Once HPC1 reaches KBRD the harness
+# suppresses later sequence key-downs, so these retries cannot contaminate the
+# strict payload keyboard progression.
+0 monitor 90000
 500 capture fetch-complete
 1000 tap enter
+11000 tap enter
+21000 tap enter
+31000 tap enter
+46000 tap enter
+61000 tap enter
