@@ -37,6 +37,12 @@ jobs:
               tf.extractall(".")
           PY
 
+      - name: Setup Go for native Windows receiver
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache: false
+
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
