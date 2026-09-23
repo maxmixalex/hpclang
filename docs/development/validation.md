@@ -97,13 +97,15 @@ M7.3e compatibility-adapter validation is closed above that read core:
   stage baseline → active alias → HPC1 PASS → alias release → settled Stock
   return;
 - HP39/40 canonical Runtime similarly gates the UI on actual serial-disk
-  lazy-fetch completion. Sparse post-gate ENTER retries cover Stock's
-  asynchronous install/UI settling, and the harness suppresses later sequence
-  key-downs after KBRD. Runtime #338 therefore reaches HPC1 PASS and clean
-  return on both HP39gs and HP40gs without changing the descriptor-recall/object
-  implementation. The separate **Font Gallery #122** remains red on its HP39
-  jobs and has not yet been rerun with an equivalent final lazy-fetch/settling
-  fix; HP48gII and hp4950 Gallery jobs in that run are green.
+  lazy-fetch completion. Sparse post-gate launch-only ENTER retries cover
+  Stock's asynchronous install/UI settling; once a payload announces that it
+  has started, the harness discards only pending retry key-downs while ordinary
+  sequence input remains active. Runtime #338 therefore reaches HPC1 PASS and
+  clean return on both HP39gs and HP40gs without changing the
+  descriptor-recall/object implementation. Font Gallery #122 remains useful
+  historical evidence for the older launch race; the Gallery path now shares
+  the payload-aware retry mechanism and is revalidated by the current Gallery
+  gate.
 
 **Runtime #326 (`35739887799`)** is retained only as historical diagnostic
 evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
