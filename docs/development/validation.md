@@ -16,7 +16,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 
 Direct runtime passes on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains blocked until a trustworthy real-machine stock flash fixture exists.
 
-Current fully-green canonical runtime regression evidence is **35828142966 / #355** on the post-M7.3a-e cleanup head `8679bc94`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #355 revalidates that same cross-family runtime/return contract after the subsequent cleanup and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
+Current fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
 ## Runtime PASS contract
 
@@ -105,9 +105,10 @@ M7.3e compatibility-adapter validation is closed above that read core:
   descriptor-recall/object implementation. Font Gallery #122 remains useful
   historical evidence for the older launch race; the Gallery path now shares
   the payload-aware retry mechanism. **Gallery #127 (`35822292175`)** first
-  closes the root-cause fix, and **Gallery #128 (`35828142832`)** revalidates
-  the same all-green Direct/Stock matrix after the final report/oracle
-  dependency-filter cleanup.
+  closes the root-cause fix; **Gallery #130 (`35832611436`)** is the final
+  cleanup regression gate, revalidating the same all-green Direct/Stock matrix
+  after the report renderer was folded into `tests/e2e/report.py` and the
+  obsolete standalone renderer/path triggers were removed.
 
 **Runtime #326 (`35739887799`)** is retained only as historical diagnostic
 evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
@@ -180,7 +181,7 @@ The real HP39gs run has passed the complete canonical runtime and returned clean
 
 `Stock / hp39` boots each official 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original serial-disk path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result.
 
-Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 first froze the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family; the post-M7.3 cleanup Runtime #355 repeats the fully-green Direct/Stock regression contract.
+Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 first froze the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family; the final post-cleanup Runtime #357 repeats the fully-green Direct/Stock regression contract.
 
 ## HP48gII Direct and Stock gates
 
@@ -188,7 +189,7 @@ Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 di
 
 Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
-HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #355 is the current fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #128 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
+HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #357 is the current fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #130 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
 
 ## HP49g+/50g stream-storage and Stock gate
 
