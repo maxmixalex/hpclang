@@ -436,22 +436,29 @@ static void test_named_same_size_replace(void)
                char_b) == HPCLANG_RPL_MUTATION_OK);
     assert_char_at(object_address, 'B');
 
-    put_word(get_word(DSKTOP, 5u), 5u, object_address);
+    const uint32_t dstk = get_word(DSKTOP, 5u);
+    put_word(dstk, 5u, object_address);
     assert(hpclang_rpl_mutation_store_replace_same_size(
                &io,
                0x92000u,
                (const uint8_t *)"A",
                1u,
-               char_c) == HPCLANG_RPL_MUTATION_BUSY);
-    assert_char_at(object_address, 'B');
+               char_c) == HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(object_address, 'C');
+
+    uint32_t preserved = get_word(dstk, 5u);
+    assert(preserved != object_address);
+    assert_char_at(preserved, 'B');
 
     assert(hpclang_rpl_mutation_store_replace_same_size(
                &io,
                0x92000u,
                (const uint8_t *)"A",
                1u,
-               char_b) == HPCLANG_RPL_MUTATION_OK);
-    assert_char_at(object_address, 'B');
+               char_c) == HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(object_address, 'C');
+    assert(get_word(dstk, 5u) == preserved);
+    assert_char_at(preserved, 'B');
 
     assert(hpclang_rpl_mutation_store_replace_same_size(
                &io,
@@ -474,6 +481,29 @@ static void test_named_same_size_replace(void)
     hpclang_object_release(char_c);
 }
 
+
+
+static void test_named_reference_preservation_nospace_is_non_mutating(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    uint32_t object_address = prepare_named_char('B');
+    struct hpclang_object *char_c = make_char('C');
+
+    const uint32_t dstk = get_word(DSKTOP, 5u);
+    put_word(dstk, 5u, object_address);
+    io.temp_limit = get_word(RSKTOP, 5u) + 20u;
+
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"A",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_NOSPACE);
+    assert_char_at(object_address, 'B');
+    assert(get_word(dstk, 5u) == object_address);
+
+    hpclang_object_release(char_c);
+}
 
 static void test_temp_allocation_retargets_existing_reference(void)
 {
@@ -660,6 +690,7 @@ int main(void)
     test_nospace_is_non_mutating();
     test_drop_and_replace();
     test_named_same_size_replace();
+    test_named_reference_preservation_nospace_is_non_mutating();
     test_named_size_changing_replace();
     test_named_size_change_busy_is_non_mutating();
     test_userob_shift_roundtrip();

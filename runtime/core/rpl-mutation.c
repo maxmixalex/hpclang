@@ -537,6 +537,11 @@ static int object_reference_state(
     return scan_all_references(io, &request);
 }
 
+static int preserve_userob_references_to_temp(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end);
+
 static int store_result_to_mutation(int result)
 {
     switch (result) {
@@ -1137,7 +1142,7 @@ int hpclang_rpl_mutation_store_replace(
             return result;
 
         if (!identical) {
-            result = object_reference_state(
+            result = preserve_userob_references_to_temp(
                 io,
                 entry.object_address,
                 entry.object_address + span);
@@ -1403,6 +1408,59 @@ static int commit_temp(
 
     return write_word(
         io, RPL_AVMEM, 5u, plan->avmem - plan->temp_cost);
+}
+
+
+static int preserve_userob_references_to_temp(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    if (!io_ready(io) ||
+        start >= end ||
+        end > RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    int result = object_reference_state(io, start, end);
+    if (result == HPCLANG_RPL_MUTATION_OK)
+        return HPCLANG_RPL_MUTATION_OK;
+    if (result != HPCLANG_RPL_MUTATION_BUSY)
+        return result;
+
+    uint32_t span = end - start;
+    struct temp_plan plan;
+    result = plan_temp(io, span, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    int64_t offset_wide =
+        (int64_t)plan.object_address - (int64_t)start;
+    if (offset_wide < INT32_MIN || offset_wide > INT32_MAX)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+
+    struct pointer_scan_request pointer_request = {
+        .move_start = start,
+        .move_end = end,
+        .remove_start = 0u,
+        .remove_end = 0u,
+        .offset = (int32_t)offset_wide,
+        .mode = POINTER_SCAN_VALIDATE_SHIFT,
+    };
+    result = scan_all_references(io, &pointer_request);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = commit_temp(io, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    result = move_nibbles(
+        io, plan.object_address, start, span);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    pointer_request.mode = POINTER_SCAN_APPLY_SHIFT;
+    return scan_all_references(io, &pointer_request);
 }
 
 int hpclang_rpl_mutation_push_snapshot(
