@@ -18,7 +18,7 @@ READELF="${ARM_READELF:-$ATFE/bin/llvm-readelf}"
 NM="${ARM_NM:-$ATFE/bin/llvm-nm}"
 
 rm -rf "$OUT" "$BUILD"
-mkdir -p "$OUT/calculator" "$OUT/tools" "$BUILD"
+mkdir -p "$OUT/calculator" "$BUILD"
 
 for tool in "$CC" "$LD" "$OBJCOPY" "$READELF" "$NM" python3 cc go; do
     [[ -x "$tool" ]] || command -v "$tool" >/dev/null 2>&1 || {
@@ -70,9 +70,7 @@ if [[ -n "$("$NM" -u "$BUILD/rom-stream.elf")" ]]; then
     exit 1
 fi
 
-python3 -m py_compile \
-    "$ROOT/research/hp39gplus/rom-stream-wrap.py" \
-    "$ROOT/research/hp39gplus/receive-rom-stream.py"
+python3 -m py_compile "$ROOT/research/hp39gplus/rom-stream-wrap.py"
 
 (
     cd "$ROOT/research/hp39gplus/go-receiver"
@@ -101,9 +99,7 @@ cp "$BUILD/HPGCC000.000" "$OUT/calculator/HPGCC000.000"
 cp "$BUILD/hp39dir.000" "$OUT/calculator/HP39DIR.000"
 cp "$BUILD/hp39dir.cur" "$OUT/calculator/HP39DIR.CUR"
 cp "$BUILD/LIB275L.000" "$OUT/calculator/LIB275L.000"
-cp "$ROOT/research/hp39gplus/receive-rom-stream.py" "$OUT/tools/"
 cp "$ROOT/research/hp39gplus/ROM-STREAM-README.md" "$OUT/README.txt"
-printf 'hidapi>=0.14\n' > "$OUT/requirements-python-fallback.txt"
 
 python3 - "$OUT" "$BUILD/rom-stream.bin" <<'PY'
 import hashlib
@@ -120,7 +116,6 @@ for rel in (
     "calculator/HP39DIR.CUR",
     "calculator/LIB275L.000",
     "hp39gplus-rom-receiver.exe",
-    "tools/receive-rom-stream.py",
 ):
     p = root / rel
     files[rel] = {

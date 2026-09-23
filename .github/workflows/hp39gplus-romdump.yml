@@ -11,7 +11,7 @@ on:
       - ".github/workflows/hp39gplus-romdump.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,23 +19,10 @@ concurrency:
 
 jobs:
   build:
-    name: Build read-only HP39g+ ROM acquisition bundles
+    name: Build one-launch read-only HP39g+ ROM streamer
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
-
-      - name: Expand one-launch streamer source bootstrap
-        if: hashFiles('research/hp39gplus/romstream-bootstrap.tar.xz') != ''
-        run: |
-          echo "351aed9ca09e5908d8b9a7efa6f06c1dfb8c74eb41669cf59b18bd55e7d1242d  research/hp39gplus/romstream-bootstrap.tar.xz" | sha256sum -c -
-          python3 - <<'PY'
-          import tarfile
-          from pathlib import Path
-
-          archive = Path("research/hp39gplus/romstream-bootstrap.tar.xz")
-          with tarfile.open(archive, "r:xz") as tf:
-              tf.extractall(".")
-          PY
 
       - name: Setup Go for native Windows receiver
         uses: actions/setup-go@v6
@@ -65,22 +52,12 @@ jobs:
           chmod +x tools/bootstrap-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
 
-      - name: Test one-launch receiver protocol
+      - name: Test native Go receiver protocol
         run: |
-          python3 research/hp39gplus/test-rom-stream-receiver.py
           (
             cd research/hp39gplus/go-receiver
             go test ./...
           )
-
-      - name: Build conservative ROM-dump bundle
-        run: |
-          chmod +x research/hp39gplus/build-rom-dumper.sh
-          research/hp39gplus/build-rom-dumper.sh \
-            "$GITHUB_WORKSPACE/dist/hp39gplus-romdump"
-          printf 'commit=%s\nworkflow_run=%s\n' \
-            "$GITHUB_SHA" "$GITHUB_RUN_ID" \
-            > dist/hp39gplus-romdump/BUILD_INFO.txt
 
       - name: Build one-launch Raw HID ROM-stream bundle
         run: |
@@ -91,14 +68,6 @@ jobs:
             "$GITHUB_SHA" "$GITHUB_RUN_ID" \
             > dist/hp39gplus-romstream/BUILD_INFO.txt
 
-      - name: Upload conservative HP39g+ ROM-dump bundle
-        uses: actions/upload-artifact@v7
-        with:
-          name: hp39gplus-romdump
-          retention-days: 30
-          path: dist/hp39gplus-romdump/
-          if-no-files-found: error
-
       - name: Upload one-launch HP39g+ ROM-stream bundle
         uses: actions/upload-artifact@v7
         with:
@@ -106,26 +75,3 @@ jobs:
           retention-days: 30
           path: dist/hp39gplus-romstream/
           if-no-files-found: error
-
-      - name: Promote unpacked streamer source
-        if: github.ref == 'refs/heads/research/hp39gplus-romdump' && hashFiles('research/hp39gplus/romstream-bootstrap.tar.xz') != ''
-        continue-on-error: true
-        run: |
-          rm research/hp39gplus/romstream-bootstrap.tar.xz
-          git add \
-            research/hp39gplus/rom-stream.c \
-            research/hp39gplus/rom-stream-entry.S \
-            research/hp39gplus/rom-stream.ld \
-            research/hp39gplus/rom-stream-wrap.py \
-            research/hp39gplus/receive-rom-stream.py \
-            research/hp39gplus/build-rom-streamer.sh \
-            research/hp39gplus/ROM-STREAM-README.md \
-            research/hp39gplus/test-rom-stream-receiver.py \
-            research/hp39gplus/romstream-bootstrap.tar.xz
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "research: unpack HP39g+ ROM streamer source [skip ci]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
