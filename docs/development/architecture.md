@@ -64,11 +64,11 @@ The platform family is the implementation unit for launch and low-level integrat
 
 A model profile is narrower. It records real per-model facts such as model ID, firmware source, bootloader identity, LCD height, or stock transfer sequence. It must not create a runtime fork merely because a calculator has a different product name.
 
-HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs flash identity. Its native physical-font layout remains blocked on a trustworthy real-machine full-flash fixture.
+HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs native physical-font layout. A verified real-machine D1.55 full-NOR fixture now establishes model-1 firmware identity and boot/runtime input; the model-1 font object/page mapping remains a separate evidence task.
 
 ## Common platform services
 
-The application-facing clean core now includes device information, stock-preserving monotonic time, raw/debounced keyboard events with five-model physical key identity, opaque display/software surfaces, clipped geometry and blit, calculator-native/generated fonts, UTF-8 text, and hp4950 byte-stream stdio through picolibc.
+The application-facing clean core now includes device information, stock-preserving monotonic time, raw/debounced keyboard events with established per-model physical key identity, opaque display/software surfaces, clipped geometry and blit, calculator-native/generated fonts, UTF-8 text, and hp4950 byte-stream stdio through picolibc. HP39g+ model-1 key identity remains explicit evidence work rather than a sibling inference.
 
 These services keep platform representation and ownership below common APIs. Calculator-object/stack integration is now established through the M7.3a-e owned-object/read/stack/adapter baseline: HP39 typed objects and HP48/49/50 Saturn/RPL objects are not flattened into byte-stream files or exposed as raw stock addresses. The remaining object-service work is M7.3f named-store write/delete with the same ownership and failure-safety boundary.
 
