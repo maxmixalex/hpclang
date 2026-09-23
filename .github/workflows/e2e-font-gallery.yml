@@ -36,7 +36,6 @@ on:
       - "tools/prepare-hp48gii-nor.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
-      - "tools/pgm-to-summary.py"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
   pull_request:
@@ -70,7 +69,6 @@ on:
       - "tools/prepare-hp48gii-nor.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
-      - "tools/pgm-to-summary.py"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-font-gallery.yml"
 
