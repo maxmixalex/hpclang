@@ -23,7 +23,7 @@ The two tiers are deliberately separate. Direct runtime owns common-bootstrap ex
 
 ## Calculator-object and stack-mutation witness
 
-The canonical runtime payload now covers both read-only M7.3 observation and the bounded stack-mutation core.
+The canonical runtime payload now covers the closed M7.3a-e read/stack/adapter baseline. M7.3f named-store write/delete is not implemented yet and therefore has no write-round-trip E2E claim.
 
 - Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.
 - Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive user-visible depth after launcher-bias normalization, and snapshot only objects whose native extent is provable.
@@ -31,7 +31,7 @@ The canonical runtime payload now covers both read-only M7.3 observation and the
 - Pop snapshots before it mutates D1. Replace allocates/copies the new object before committing the target pointer. Expected capacity/level failures are planned before the first mutation.
 - No raw Saturn address or mapped ARM pointer is exposed to the E2E application.
 
-Historical read-only evidence remains **Core #285 / Runtime #232**. Launcher-bias normalization is independently closed by fully-green **Runtime #237**. The current stack-mutation focused evidence is **Core #296 (`35439583956`)** plus the successful canonical-build, Direct hp39/hp48/hp4950, Stock hp48 and Stock hp4950 jobs of **Runtime #241 (`35439583995`)**. Runtime #241's Stock hp39 job was cancelled by the subsequent conversion push and is not represented as a pass or failure of the RPL mutation path.
+Historical read-only evidence remains **Core #285 / Runtime #232**. Launcher-bias normalization is independently closed by fully-green **Runtime #237**. The stack-mutation focused evidence is **Core #296 (`35439583956`)** plus the successful canonical-build, Direct hp39/hp48/hp4950, Stock hp48 and Stock hp4950 jobs of **Runtime #241 (`35439583995`)**. M7.3d/e then add named-store reads, HP39 descriptor-driven Variable recall, and the bounded HPGCC adapters. The final read/adapter closure is **Runtime #338 (`35812005032`)**, fully green across Build, all Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication.
 
 ## Return evidence
 
@@ -58,9 +58,11 @@ HP 39gs and HP 40gs use the original serial-disk path. A headless Kermit server 
 
 The stock ROM performs the transfer/install itself.
 
-HP 48gII uses the stock Serial Kermit server to receive `L275_48.LIB` and generated `HPCLANG.HP`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`.
+HP 48gII uses the stock Serial Kermit server to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The computed transfer timeout is only a watchdog ceiling, not a guessed delay.
 
 HP 49g+ and HP 50g use an emulated SD card to install ARMToolbox and copy generated `HPCLANG.HP`. They share the same stock UI sequence while retaining their native per-model ARM bootloaders.
+
+Current E2E status is intentionally split by workflow. Canonical **Runtime #338** is fully green, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. The most recent **Font Gallery #122** is still red on its HP39gs/HP40gs jobs; its HP48gII and hp4950 jobs are green. The canonical HP39 Runtime lazy-fetch/settling fix that produced Runtime #338 has not yet been mirrored into/revalidated by the Gallery path, so Gallery #122 remains an open harness follow-up rather than a calculator-object regression.
 
 ## Target profiles
 
