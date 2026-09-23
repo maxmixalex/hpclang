@@ -17,15 +17,6 @@ KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 rm -f "$KERMIT_LOG" "$HOST_GATE"
 
-FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
-curl -fL --retry 3 \
-    "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
-    -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
-unzip -p \
-    "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
-    "$HPCLANG_E2E_MEMBER" \
-    > "$FIRMWARE"
-
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
 
@@ -90,14 +81,39 @@ python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
     > "$ROOT/build/$TARGET-kermit-gate.log" 2>&1 &
 GATE_PID=$!
 
-mkdir -p "$ROOT/build/$TARGET-state"
-timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
-    --datadir="$ROOT/build/$TARGET-state" \
-    --overwrite-config \
-    --style="$ROOT/build/x50ng/dist/style-40g.css" \
-    --flash-full \
-    --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin" \
-    --firmware="$FIRMWARE"
+STATE="$ROOT/build/$TARGET-state"
+rm -rf "$STATE"
+mkdir -p "$STATE"
+
+X50_ARGS=(
+    --datadir="$STATE"
+    --overwrite-config
+    --style="$ROOT/build/x50ng/dist/style-40g.css"
+)
+
+if [[ -n "${HPCLANG_E2E_NOR_PATH:-}" ]]; then
+    python3 "$ROOT/tools/prepare-nor-fixture.py" \
+        "$ROOT/$HPCLANG_E2E_NOR_PATH" "$STATE" \
+        --compression "$HPCLANG_E2E_NOR_COMPRESSION" \
+        --bytes "$HPCLANG_E2E_NOR_BYTES" \
+        --sha256 "$HPCLANG_E2E_NOR_SHA256"
+else
+    FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
+    curl -fL --retry 3 \
+        "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+        -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
+    unzip -p \
+        "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
+        "$HPCLANG_E2E_MEMBER" \
+        > "$FIRMWARE"
+    X50_ARGS+=(
+        --flash-full
+        --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin"
+        --firmware="$FIRMWARE"
+    )
+fi
+
+timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" "${X50_ARGS[@]}"
 
 wait "$GATE_PID"
 GATE_PID=
