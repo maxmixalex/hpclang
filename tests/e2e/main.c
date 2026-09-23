@@ -21,11 +21,6 @@
 #include <hpclang/time.h>
 
 int hpclang_e2e_cpp_test(void);
-int hpclang_object_store_replace_existing_same_size(
-    const struct hpclang_object_store *store,
-    const uint8_t *name,
-    uint32_t name_length,
-    const struct hpclang_object *object);
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_aplet_snapshot(
     const uint8_t *name,
@@ -1770,52 +1765,7 @@ static uint32_t object_store_service_test(uint32_t model)
         goto done;
     }
 
-    object_store_phase(15u); /* before same-size owned self-store */
-    if (hpclang_object_store_replace_existing_same_size(
-            home,
-            witness_name,
-            witness_name_length,
-            witness) != 0) {
-        failure = 0xcau;
-        goto done;
-    }
-
-    struct hpclang_object *roundtrip = NULL;
-    if (hpclang_object_store_get(
-            home,
-            witness_name,
-            witness_name_length,
-            &roundtrip) != 0 ||
-        roundtrip == NULL ||
-        hpclang_object_kind(roundtrip) != HPCLANG_OBJECT_STRING) {
-        hpclang_object_release(roundtrip);
-        failure = 0xcbu;
-        goto done;
-    }
-
-    size_t roundtrip_size = 0u;
-    if (hpclang_object_string_size(roundtrip, &roundtrip_size) != 0 ||
-        roundtrip_size != witness_string_size) {
-        hpclang_object_release(roundtrip);
-        failure = 0xccu;
-        goto done;
-    }
-    if (witness_string_size != 0u) {
-        uint8_t before[sizeof(hp48_witness_value) - 1u];
-        uint8_t after[sizeof(hp48_witness_value) - 1u];
-        if (witness_string_size > sizeof(before) ||
-            hpclang_object_string_copy(
-                witness, before, witness_string_size) != 0 ||
-            hpclang_object_string_copy(
-                roundtrip, after, roundtrip_size) != 0 ||
-            memcmp(before, after, witness_string_size) != 0) {
-            hpclang_object_release(roundtrip);
-            failure = 0xcdu;
-            goto done;
-        }
-    }
-    hpclang_object_release(roundtrip);
-    object_store_phase(16u); /* first USEROB write witness complete */
+    object_store_phase(15u); /* read-only object-store witness complete */
 
 done:
     hpclang_object_release(witness);

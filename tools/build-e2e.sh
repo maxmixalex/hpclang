@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|font-gallery|font-gallery-stock> [out-dir]" >&2
+    echo "usage: $0 <runtime|storage|hardware|object-mutation|font-gallery|font-gallery-stock> [out-dir]" >&2
     exit 2
 fi
 
@@ -85,6 +85,12 @@ case "$MODE" in
         )
         ;;
     hardware)
+        E2E_CMAKE_ARGS=()
+        ;;
+    object-mutation)
+        E2E_SOURCE="$ROOT/tests/e2e/object-mutation"
+        E2E_TARGET="hpclang_object_mutation_e2e"
+        E2E_ELF="hpclang-object-mutation-e2e.elf"
         E2E_CMAKE_ARGS=()
         ;;
     font-gallery)
