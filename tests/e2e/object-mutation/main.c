@@ -15,6 +15,11 @@ int hpclang_object_store_replace_existing(
     const uint8_t *name,
     uint32_t name_length,
     const struct hpclang_object *object);
+int hpclang_object_store_create_new(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object);
 
 volatile uint32_t hpclang_e2e_result;
 
@@ -83,6 +88,10 @@ int main(void)
     static const uint8_t hp4950_name[] = {
         'X', '5', '0', 'N', 'G', '-', 'V', 'V', '.', 'F', 'A', 'T'
     };
+    static const uint8_t create_name[] = {
+        'Z', 'Z', 'M', '7', 'F'
+    };
+    static const uint8_t create_value[] = "M7F";
 
     const uint8_t *name =
         boot->model == HPCLANG_MODEL_HP48GII ? hp48_name : hp4950_name;
@@ -109,6 +118,8 @@ int main(void)
     struct hpclang_object *replacement = NULL;
     struct hpclang_object *after = NULL;
     struct hpclang_object *restored = NULL;
+    struct hpclang_object *created_input = NULL;
+    struct hpclang_object *created_readback = NULL;
 
     phase(1u);
     home = hpclang_object_store_home();
@@ -233,7 +244,63 @@ int main(void)
     }
     phase(19u);
 
+    if (hpclang_object_create_string(
+            create_value,
+            sizeof(create_value) - 1u,
+            &created_input) != 0 ||
+        created_input == NULL) {
+        failure = 0xefu;
+        goto done;
+    }
+
+    phase(20u);
+    if (hpclang_object_store_create_new(
+            home,
+            create_name,
+            (uint32_t)sizeof(create_name),
+            created_input) != 0) {
+        failure = 0xf0u;
+        goto done;
+    }
+
+    phase(21u);
+    if (hpclang_object_store_get(
+            home,
+            create_name,
+            (uint32_t)sizeof(create_name),
+            &created_readback) != 0 ||
+        created_readback == NULL ||
+        hpclang_object_kind(created_readback) !=
+            HPCLANG_OBJECT_STRING) {
+        failure = 0xf1u;
+        goto done;
+    }
+
+    size_t created_size = 0u;
+    if (hpclang_object_string_size(
+            created_readback, &created_size) != 0 ||
+        created_size != sizeof(create_value) - 1u) {
+        failure = 0xf2u;
+        goto done;
+    }
+
+    uint8_t created_actual[sizeof(create_value) - 1u];
+    if (hpclang_object_string_copy(
+            created_readback,
+            created_actual,
+            created_size) != 0 ||
+        memcmp(
+            created_actual,
+            create_value,
+            created_size) != 0) {
+        failure = 0xf3u;
+        goto done;
+    }
+    phase(22u);
+
 done:
+    hpclang_object_release(created_readback);
+    hpclang_object_release(created_input);
     hpclang_object_release(restored);
     hpclang_object_release(after);
     hpclang_object_release(replacement);

@@ -415,6 +415,9 @@ static int set_mutation_errno(int result)
     case HPCLANG_RPL_MUTATION_UNSUPPORTED:
         errno = ENOTSUP;
         break;
+    case HPCLANG_RPL_MUTATION_EXISTS:
+        errno = EEXIST;
+        break;
     case HPCLANG_RPL_MUTATION_NOSPACE:
         errno = ENOSPC;
         break;
@@ -435,16 +438,14 @@ static int set_mutation_errno(int result)
     return -1;
 }
 
-static int replace_existing_prepare(
+static int mutation_prepare(
     const struct hpclang_object_store *store,
     const uint8_t *name,
     uint32_t name_length,
-    const struct hpclang_object *object,
     uint32_t *directory,
     struct hpclang_rpl_mutation_io *io)
 {
-    if (object == NULL || store == NULL ||
-        directory == NULL || io == NULL) {
+    if (store == NULL || directory == NULL || io == NULL) {
         errno = EFAULT;
         return -1;
     }
@@ -475,10 +476,15 @@ int hpclang_object_store_replace_existing(
     uint32_t name_length,
     const struct hpclang_object *object)
 {
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (replace_existing_prepare(
-            store, name, name_length, object, &directory, &io) != 0)
+    if (mutation_prepare(
+            store, name, name_length, &directory, &io) != 0)
         return -1;
 
     return set_mutation_errno(
@@ -492,14 +498,42 @@ int hpclang_object_store_replace_existing_same_size(
     uint32_t name_length,
     const struct hpclang_object *object)
 {
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (replace_existing_prepare(
-            store, name, name_length, object, &directory, &io) != 0)
+    if (mutation_prepare(
+            store, name, name_length, &directory, &io) != 0)
         return -1;
 
     return set_mutation_errno(
         hpclang_rpl_mutation_store_replace_same_size(
+            &io, directory, name, name_length, object));
+}
+
+
+int hpclang_object_store_create_new(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    if (mutation_prepare(
+            store, name, name_length, &directory, &io) != 0)
+        return -1;
+
+    return set_mutation_errno(
+        hpclang_rpl_mutation_store_create(
             &io, directory, name, name_length, object));
 }
 
