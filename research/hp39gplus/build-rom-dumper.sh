@@ -10,13 +10,15 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(realpath -m "$1")"
 BUILD="$ROOT/build/hp39gplus-romdump"
 SDK="${HP39_APLET_HOME:-$ROOT/.cache/hp39-aplet/sdk}"
-CC="${ARM_CC:-arm-none-eabi-gcc}"
-OBJCOPY="${ARM_OBJCOPY:-arm-none-eabi-objcopy}"
+ATFE="${ATFE:?set ATFE to the extracted Arm Toolchain for Embedded root}"
+CC="${ARM_CC:-$ATFE/bin/clang}"
+LD="${ARM_LD:-$ATFE/bin/ld.lld}"
+OBJCOPY="${ARM_OBJCOPY:-$ATFE/bin/llvm-objcopy}"
 
 rm -rf "$OUT" "$BUILD"
 mkdir -p "$OUT/packages" "$OUT/tools" "$BUILD"
 
-for tool in "$CC" "$OBJCOPY" python3 cc; do
+for tool in "$CC" "$LD" "$OBJCOPY" python3 cc; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "missing required tool: $tool" >&2
         exit 1
@@ -37,15 +39,14 @@ for index in $(seq 0 63); do
     package="$OUT/packages/$tag"
     mkdir -p "$work" "$package"
 
-    "$CC" -mcpu=arm920t -marm -ffreestanding -fno-pic \
-        -x assembler-with-cpp \
+    "$CC" --target=arm-none-eabi -mcpu=arm920t -marm \
+        -ffreestanding -fno-pic -x assembler-with-cpp \
         -DHP39GPLUS_DUMP_OFFSET="$offset" \
         -c "$ROOT/research/hp39gplus/rom-dump.S" \
         -o "$work/rom-dump.o"
 
-    "$CC" -mcpu=arm920t -marm -nostdlib \
-        -Wl,--build-id=none \
-        -Wl,-T,"$ROOT/research/hp39gplus/rom-dump.ld" \
+    "$LD" \
+        -T "$ROOT/research/hp39gplus/rom-dump.ld" \
         "$work/rom-dump.o" \
         -o "$work/rom-dump.elf"
 
