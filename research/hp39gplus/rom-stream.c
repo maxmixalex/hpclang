@@ -55,6 +55,7 @@ typedef unsigned int u32;
 #define EP1_FIFO            REG32(USBD_BASE + 0x1c4)
 #define EP2_FIFO            REG32(USBD_BASE + 0x1c8)
 
+#define LOCKTIME            REG32(CLK_BASE + 0x00)
 #define MPLLCON             REG32(CLK_BASE + 0x04)
 #define UPLLCON             REG32(CLK_BASE + 0x08)
 #define CLKCON              REG32(CLK_BASE + 0x0c)
@@ -63,7 +64,10 @@ typedef unsigned int u32;
 #define GPFCON              REG32(GPIO_BASE + 0x50)
 #define GPFDAT              REG32(GPIO_BASE + 0x54)
 #define MISCCR              REG32(GPIO_BASE + 0x80)
+#define EXTINT0             REG32(GPIO_BASE + 0x88)
+#define SRCPND              REG32(INT_BASE + 0x00)
 #define INTMSK              REG32(INT_BASE + 0x08)
+#define INTPND              REG32(INT_BASE + 0x10)
 #define LCDCON1             REG32(LCD_BASE + 0x00)
 
 #define EP0_OUT_PKT_RDY             0x01u
@@ -82,6 +86,7 @@ typedef unsigned int u32;
 #define EPN_OUT_CLR_DATA_TOGGLE     0x80u
 
 #define USB_RESET_BIT       0x04u
+#define IRQ_EINT1           (1u << 1)
 
 #define GET_STATUS          0u
 #define CLEAR_FEATURE       1u
@@ -106,34 +111,17 @@ typedef unsigned int u32;
 #define FNV_PRIME           16777619u
 
 struct hw_snapshot {
-    u32 clkcon;
+    u32 locktime;
+    u32 mpllcon;
     u32 upllcon;
+    u32 clkcon;
     u32 clkslow;
     u32 clkdivn;
-    u32 lcdcon1;
     u32 misccr;
     u32 intmsk;
     u32 gpfcon;
-    u32 func_addr;
-    u32 pwr;
-    u32 ep_int_en;
-    u32 usb_int_en;
-    u32 index;
-    u32 ep0_maxp;
-    u32 ep0_maxp2;
-    u32 ep0_csr;
-    u32 ep1_maxp;
-    u32 ep1_maxp2;
-    u32 ep1_in1;
-    u32 ep1_in2;
-    u32 ep1_out1;
-    u32 ep1_out2;
-    u32 ep2_maxp;
-    u32 ep2_maxp2;
-    u32 ep2_in1;
-    u32 ep2_in2;
-    u32 ep2_out1;
-    u32 ep2_out2;
+    u32 extint0;
+    u32 lcd[17];
 };
 
 static void put16(u8 *p, u16 v)
@@ -167,118 +155,110 @@ static int cable_connected(void)
     return (GPFDAT & 2u) != 0;
 }
 
-static int prepare_cable_detect(struct hw_snapshot *s)
+static int prepare_cable_detect(void)
 {
     /*
-     * GPF1 does not necessarily enter the HPGCC aplet as EINT1.  newRPL's
-     * target_39gs USB driver explicitly selects EINT1 before reading GPFDAT.
-     * Without this mux step a stock HP39g+ can keep reporting the GPIO latch
-     * value instead of the physical cable state and wait forever.
+     * Match newRPL target_39gs: GPF1/EINT1 with a falling-edge disconnect
+     * latch.  The main interrupt controller remains masked while the streamer
+     * owns the hardware, so SRCPND is safe to poll directly.
      */
-    s->gpfcon = GPFCON;
-    GPFCON = (s->gpfcon & ~0x0cu) | 0x08u;
+    GPFCON = (GPFCON & ~0x0cu) | 0x08u;
+    EXTINT0 = (EXTINT0 & ~0x70u) | 0x20u;
+    SRCPND = IRQ_EINT1;
+    INTPND = IRQ_EINT1;
     return cable_connected();
 }
 
-static void snapshot_ep(struct hw_snapshot *s, u32 ep)
+static int disconnect_seen(void)
 {
-    INDEX_REG = ep;
-    if(ep == 0) {
-        s->ep0_maxp = MAXP_REG;
-        s->ep0_maxp2 = MAXP_REG2;
-        s->ep0_csr = EP0_CSR;
-    }
-    else if(ep == 1) {
-        s->ep1_maxp = MAXP_REG;
-        s->ep1_maxp2 = MAXP_REG2;
-        s->ep1_in1 = IN_CSR1_REG;
-        s->ep1_in2 = IN_CSR2_REG;
-        s->ep1_out1 = OUT_CSR1_REG;
-        s->ep1_out2 = OUT_CSR2_REG;
-    }
-    else {
-        s->ep2_maxp = MAXP_REG;
-        s->ep2_maxp2 = MAXP_REG2;
-        s->ep2_in1 = IN_CSR1_REG;
-        s->ep2_in2 = IN_CSR2_REG;
-        s->ep2_out1 = OUT_CSR1_REG;
-        s->ep2_out2 = OUT_CSR2_REG;
-    }
+    return !cable_connected() || (SRCPND & IRQ_EINT1);
 }
 
 static void take_snapshot(struct hw_snapshot *s)
 {
-    s->clkcon = CLKCON;
+    u32 i;
+
+    s->locktime = LOCKTIME;
+    s->mpllcon = MPLLCON;
     s->upllcon = UPLLCON;
+    s->clkcon = CLKCON;
     s->clkslow = CLKSLOW;
     s->clkdivn = CLKDIVN;
-    s->lcdcon1 = LCDCON1;
     s->misccr = MISCCR;
     s->intmsk = INTMSK;
+    s->gpfcon = GPFCON;
+    s->extint0 = EXTINT0;
 
     /*
-     * This payload is entirely polled.  Keep every stock IRQ handler out while
-     * clocks and USB state are temporarily different from the OS's view.
+     * HPGCC sys_lcdsave() saves LCD registers 0..10 and 19..24.  Preserve
+     * the exact same set so the raw PrRUN payload can perform the same restore
+     * that a normal HPGCC crt0 program would get.
      */
-    INTMSK = 0xffffffffu;
+    for(i = 0; i < 11; ++i)
+        s->lcd[i] = REG32(LCD_BASE + i * 4u);
+    for(i = 0; i < 6; ++i)
+        s->lcd[11 + i] = REG32(LCD_BASE + 0x4cu + i * 4u);
 
-    /* Temporarily clock the device block so indexed register state is readable. */
-    CLKCON = (s->clkcon & ~0x40u) | 0x80u;
-    s->func_addr = FUNC_ADDR_REG;
-    s->pwr = PWR_REG;
-    s->ep_int_en = EP_INT_EN_REG;
-    s->usb_int_en = USB_INT_EN_REG;
-    s->index = INDEX_REG;
-    snapshot_ep(s, 0);
-    snapshot_ep(s, 1);
-    snapshot_ep(s, 2);
-    INDEX_REG = s->index;
-    CLKCON = s->clkcon;
+    /* Raw PrRUN has no HPGCC crt0 around us; own the interrupt mask here. */
+    INTMSK = 0xffffffffu;
 }
 
-static void restore_hw(const struct hw_snapshot *s)
+static void usb_hwshutdown(void)
 {
-    /* Restore indexed UDC configuration while its PCLK gate is open. */
-    CLKCON = (s->clkcon & ~0x40u) | 0x80u;
-    EP_INT_EN_REG = 0;
+    /*
+     * Follow newRPL usb_shutdown(): quiesce the UDC first, then remove its
+     * clocks.  No attempt is made to replay volatile endpoint status bits.
+     */
     USB_INT_EN_REG = 0;
-    EP_INT_REG = 0x1fu;
+    EP_INT_EN_REG = 0;
     USB_INT_REG = 0x07u;
+    EP_INT_REG = 0x1fu;
+    CLKSLOW |= 0x80u;   /* UPLL off */
+    CLKCON &= ~0xc0u;   /* USB host + device clocks off */
+}
 
-    INDEX_REG = 0;
-    MAXP_REG = s->ep0_maxp;
-    MAXP_REG2 = s->ep0_maxp2;
-    EP0_CSR = 0xc0u;
+static void restore_platform(const struct hw_snapshot *s)
+{
+    u32 i;
+    u32 lcd0;
 
-    INDEX_REG = 1;
-    MAXP_REG = s->ep1_maxp;
-    MAXP_REG2 = s->ep1_maxp2;
-    IN_CSR1_REG = EPN_IN_FIFO_FLUSH | EPN_IN_CLR_DATA_TOGGLE;
-    IN_CSR2_REG = s->ep1_in2;
-    OUT_CSR1_REG = EPN_OUT_FIFO_FLUSH | EPN_OUT_CLR_DATA_TOGGLE;
-    OUT_CSR2_REG = s->ep1_out2;
-
-    INDEX_REG = 2;
-    MAXP_REG = s->ep2_maxp;
-    MAXP_REG2 = s->ep2_maxp2;
-    IN_CSR1_REG = EPN_IN_FIFO_FLUSH | EPN_IN_CLR_DATA_TOGGLE;
-    IN_CSR2_REG = s->ep2_in2;
-    OUT_CSR1_REG = EPN_OUT_FIFO_FLUSH | EPN_OUT_CLR_DATA_TOGGLE;
-    OUT_CSR2_REG = s->ep2_out2;
-
-    FUNC_ADDR_REG = s->func_addr;
-    PWR_REG = s->pwr;
-    EP_INT_EN_REG = s->ep_int_en;
-    USB_INT_EN_REG = s->usb_int_en;
-    INDEX_REG = s->index;
-
+    /*
+     * Do not leak our disconnect edge into the stock firmware.  Then restore
+     * GPIO/pad state that HPGCC crt0 does not know about.
+     */
+    SRCPND = IRQ_EINT1;
+    INTPND = IRQ_EINT1;
+    EXTINT0 = s->extint0;
     GPFCON = s->gpfcon;
     MISCCR = s->misccr;
+
+    /*
+     * Exact shape of HPGCC 1.1 sys_lcdrestore(): strip live LINECNT/status
+     * bits from LCDCON1, restore registers 0..10 and 19..24, then enable LCD.
+     */
+    lcd0 = s->lcd[0] & 0x0003fffeu;
+    REG32(LCD_BASE + 0x00) = lcd0;
+    for(i = 1; i < 11; ++i)
+        REG32(LCD_BASE + i * 4u) = s->lcd[i];
+    for(i = 0; i < 6; ++i)
+        REG32(LCD_BASE + 0x4cu + i * 4u) = s->lcd[11 + i];
+    REG32(LCD_BASE + 0x00) |= 1u;
+
+    /*
+     * Exact HPGCC 1.1 sys_clkrestore() ordering.  This is deliberately not a
+     * field-by-field reverse of our setup: the historical runtime first puts
+     * CLKSLOW in its safe intermediate state, restores clock registers 0..3,
+     * then CLKDIVN, then the original CLKSLOW value.
+     */
+    CLKSLOW &= 0xffffffe0u;
+    LOCKTIME = s->locktime;
+    MPLLCON = s->mpllcon;
     UPLLCON = s->upllcon;
+    CLKCON = s->clkcon;
     CLKDIVN = s->clkdivn;
     CLKSLOW = s->clkslow;
-    CLKCON = s->clkcon;
-    LCDCON1 = s->lcdcon1;
+
+    /* Same final boundary as HPGCC sys_intOn(). */
     INTMSK = s->intmsk;
 }
 
@@ -704,17 +684,17 @@ int hp39_rom_stream_main(void)
     u32 block, sum, fnv, total_sum=0;
 
     /*
-     * Physical connect/disconnect is our safe ownership boundary.  Configure
-     * GPF1 exactly as the target_39gs USB driver does before trusting GPFDAT.
+     * Raw ARMToolbox39 PrRUN does not provide HPGCC crt0 hardware save/restore,
+     * so snapshot the complete state we own before changing cable detection.
      */
-    if(prepare_cable_detect(&saved)) {
-        GPFCON = saved.gpfcon;
+    take_snapshot(&saved);
+    if(prepare_cable_detect()) {
+        restore_platform(&saved);
         return 1;
     }
 
-    take_snapshot(&saved);
     if(!prepare_usb_clock()) {
-        restore_hw(&saved);
+        restore_platform(&saved);
         return 2;
     }
     usb_hwsetup();
@@ -772,8 +752,13 @@ retry_block:
         goto out_wait_disconnect;
 
 out_wait_disconnect:
-    /* Never hand a live, reconfigured USB controller back to the stock OS. */
-    while(cable_connected()) { }
-    restore_hw(&saved);
+    /*
+     * Keep the physical disconnect boundary, but do not rely solely on
+     * GPFDAT polling: newRPL configures EINT1 falling-edge detection for this
+     * exact event.  The edge remains latched in SRCPND while INTMSK is masked.
+     */
+    while(!disconnect_seen()) { }
+    usb_hwshutdown();
+    restore_platform(&saved);
     return 0;
 }
