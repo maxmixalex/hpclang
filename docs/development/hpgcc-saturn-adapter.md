@@ -247,8 +247,9 @@ superseded as an M7.3e closure gate. Its launcher/pre-HPC1 failures are not
 treated as adapter semantics, and no repeated workflow rerun is needed to
 replace the stronger focused evidence above.
 
-The bounded source surface is therefore frozen for M7.3. General named-object
-put/remove remains outside the HPGCC 1.1/2.0 read/search/recall parity
-baseline. Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders,
-and non-transactional stack reorders stay Migration/Internal or demand-driven
-future work rather than M7.3 backlog.
+The bounded source surface is therefore frozen for **M7.3e**. General named-object
+put/remove remains outside the HPGCC 1.1/2.0 read/search/recall adapter
+baseline, but it remains planned hpclang clean-core work in **M7.3f**.
+Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders, and
+non-transactional stack reorders stay Migration/Internal or demand-driven
+future compatibility work rather than requirements for M7.3f.
