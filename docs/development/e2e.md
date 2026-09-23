@@ -72,15 +72,16 @@ Current E2E status is intentionally split by workflow. Canonical **Runtime #357 
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
 - `lcd_height` — 64- or 80-line capture height;
-- `automated_e2e` — optional automation eligibility; it defaults to true.
+- `automated_e2e` — optional automation eligibility; it defaults to true;
+- `nor` — optional checked full-NOR fixture metadata: repository path, compression, decoded byte count, and SHA-256.
 
 Only targets distributed as per-model firmware archives add a `firmware` object. HP 39gs and HP 40gs use their hpcalc archive/member names.
 
-HP 39g+ intentionally has no `firmware` object and sets `"automated_e2e": false`. Its model/platform profile remains useful for packaging, but no trustworthy public stock ARM flash fixture has been established.
+HP 39g+ uses the verified real-hardware 1 MiB D1.55 full-NOR fixture under `tests/e2e/fixtures/hp39gplus/`; its profile records the decoded size and SHA-256 and is enabled in the automated family matrices.
 
 HP 49g+ and HP 50g share the 2.15 OS image but carry distinct `bootloader` filenames because the bootloader difference is genuine per-model metadata.
 
-HP 48gII uses a pinned full-NOR fixture rather than an update archive.
+HP 48gII also uses a pinned full-NOR fixture rather than an update archive.
 
 Profiles do not carry empty placeholder fields.
 
@@ -114,8 +115,8 @@ x50ng remains an external emulator/test dependency. None of its GPL implementati
 
 Current roles:
 
-- Direct runtime on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g;
-- stock serial-disk/APLET launch for HP 39gs/40gs;
+- Direct runtime on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g;
+- stock serial-disk/APLET launch for HP 39g+/39gs/40gs;
 - stock Serial Kermit/ARMToolbox48 launch for HP 48gII;
 - stock File Manager/ARMToolbox launch for HP 49g+/50g.
 
@@ -123,9 +124,21 @@ The x50ng preparation helper accepts the same three platform names as hpclang: `
 
 ## HP 39g+ E2E
 
-HP 39g+ remains outside the automated matrices until a real-machine stock flash dump exists. The absence of that fixture must not be hidden by reusing a sibling or foreign bootloader and calling the result native HP39g+ validation.
+HP 39g+ now participates in the automated `hp39` matrices using a complete
+1 MiB NOR image acquired from real hardware. The fixture is installed directly
+as x50ng persistent flash state and is verified against the profile's byte count
+and SHA-256 before each run. No sibling firmware archive or foreign bootloader is
+substituted.
 
-The retained HP39g+ NOR-dumper experiment is useful evidence for a transient physical-NOR mapping mechanism only. It is not evidence that HP39g+ shares HP39gs/40gs flash identity or their native-font physical offsets.
+The Stock path uses the same historical HPGCC39 APLET/ARMToolbox39 packaging
+boundary as HP39gs/40gs, but executes it against the HP39g+ D1.55 stock NOR.
+The current HP39 stock UI sequence is intentionally shared unless real-ROM E2E
+demonstrates a behavioral difference.
+
+The existence of a trustworthy full-NOR fixture closes firmware identity and
+boot/runtime validation. It does not automatically prove that HP39g+ shares the
+HP39gs/40gs physical ROM-font offsets. The native gs/40gs main/mini/EditLine
+font mapping remains excluded for model 1 until separately established.
 
 ## CI build stages
 
@@ -150,7 +163,7 @@ The current M7.2 branch goes further: the first byte-stream operation acquires t
 
 Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
 
-HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
+HP 39g+ is no longer filtered from the family matrices; fixture selection is data-driven through its `nor` target-profile object.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
 
