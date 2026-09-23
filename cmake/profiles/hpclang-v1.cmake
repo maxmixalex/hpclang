@@ -29,7 +29,6 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-catalog.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-variable-schema.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-native-directory.c"
-    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-function-fields.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hp39-portal.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-store.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-satdir.c"
