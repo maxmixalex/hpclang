@@ -17,7 +17,10 @@ case "$TARGET" in
 esac
 
 while IFS= read -r line; do
-    export "$line"
+    env_name="${line%%=*}"
+    env_value="${line#*=}"
+    printf -v "$env_name" '%s' "$env_value"
+    export "$env_name"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
 export HPCLANG_X50NG_HARNESS=gallery
@@ -103,7 +106,8 @@ case "$HPCLANG_E2E_FAMILY" in
 esac
 
 export HPCLANG_X50NG_STAGE0="${HPCLANG_GALLERY_STAGE0:-$APP_DIR/launchers/$TARGET.bin}"
-export HPCLANG_X50NG_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+HPCLANG_X50NG_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
+export HPCLANG_X50NG_RESULT_ADDR
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"

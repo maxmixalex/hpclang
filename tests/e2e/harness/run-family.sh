@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# < 3 || $# > 4 ]]; then
+if (( $# < 3 || $# > 4 )); then
     echo "usage: $0 <direct|stock> <hp39|hp48|hp4950> <build-dir> [assets-dir]" >&2
     exit 2
 fi
