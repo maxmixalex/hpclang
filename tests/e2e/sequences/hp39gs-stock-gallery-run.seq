@@ -18,24 +18,31 @@
 34000 capture lazy-fetch
 35000 host-gate
 
-# Times below are relative to host-gate release. Gallery needs the historical
-# two ENTERs: one reaches the downloaded aplet launch screen, the second enters
-# HPC1. Captures retain both sample/text states for the ROM-pixel oracle.
-0 monitor 90000
+# Times below are relative to host-gate release. Kermit EOF proves delivery but
+# Stock may still be committing the aplet/library or unwinding the serial-disk
+# UI. Use the same sparse launch-only ENTER retries as canonical Runtime. The
+# harness cancels pending retries as soon as Gallery publishes its 0x47... state,
+# so normal Gallery ENTER/DOWN/RIGHT navigation remains deterministic.
+0 monitor 115000
 500 capture fetch-complete
-1000 tap enter
-7000 tap enter
-19000 capture native-mini
-22000 tap enter
-25000 capture native-mini-other
-28000 tap down
-31000 capture native-main
-34000 tap enter
-37000 capture native-main-other
-40000 tap down
-43000 capture native-editline
-46000 tap enter
-49000 capture native-editline-other
-52000 tap right
-55000 capture generated-control
-58000 tap on
+1000 retry enter
+11000 retry enter
+21000 retry enter
+31000 retry enter
+46000 retry enter
+61000 retry enter
+
+70000 capture native-mini
+73000 tap enter
+76000 capture native-mini-other
+79000 tap down
+82000 capture native-main
+85000 tap enter
+88000 capture native-main-other
+91000 tap down
+94000 capture native-editline
+97000 tap enter
+100000 capture native-editline-other
+103000 tap right
+106000 capture generated-control
+109000 tap on
