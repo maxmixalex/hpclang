@@ -27,9 +27,12 @@ export HPCLANG_X50NG_HARNESS=stock
 export HPCLANG_X50NG_SRAM_SIZE=0x00080000
 
 TRANSFER="$ROOT/build/$TARGET-stock-gallery-transfer"
+KERMIT_LOG="$ROOT/build/$TARGET-stock-gallery-kermit-debug.log"
+HOST_GATE="$ROOT/build/$TARGET-stock-gallery-kermit-complete"
 STATE="$ROOT/build/$TARGET-stock-gallery-state"
 FIRMWARE="$ROOT/build/$TARGET-stock-gallery-2.22.bin"
 rm -rf "$TRANSFER" "$STATE"
+rm -f "$KERMIT_LOG" "$HOST_GATE"
 
 # Reuse the reviewed HPGCC39 packaging path used by canonical Stock runtime
 # E2E. The compact Gallery HPC1 differs; the stock APLET/Library transport does
@@ -59,9 +62,11 @@ socat -d -d -x -v \
 SOCAT_PID=$!
 
 cleanup() {
-    kill "${KERMIT_PID:-}" "$SOCAT_PID" 2>/dev/null || true
+    kill "${GATE_PID:-}" "${KERMIT_PID:-}" "$SOCAT_PID" 2>/dev/null || true
+    wait "${GATE_PID:-}" 2>/dev/null || true
     wait "${KERMIT_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
+    rm -f "$HOST_GATE"
 }
 trap cleanup EXIT
 
@@ -74,9 +79,15 @@ done
 bash "$ROOT/tools/run-hp39-kermit-server.sh" \
     "$KERMIT_TTY" \
     "$TRANSFER" \
-    "$ROOT/build/$TARGET-stock-gallery-kermit-debug.log" \
+    "$KERMIT_LOG" \
     > "$ROOT/build/$TARGET-stock-gallery-kermit.out" 2>&1 &
 KERMIT_PID=$!
+
+FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout "$TRANSFER")"
+X50_TIMEOUT=$((FETCH_TIMEOUT + 120))
+printf 'HP39 Stock Gallery lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
+    "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
+    "$(( $(stat -c %s "$TRANSFER/HPGCC000.000") + $(stat -c %s "$TRANSFER/LIB275L.000") ))"
 
 export HPCLANG_X50NG_UART0="$X50_TTY"
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
@@ -84,20 +95,29 @@ export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
+export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/$TARGET-stock-gallery-run.seq"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery.json"
 
+python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
+    "$KERMIT_LOG" "$TRANSFER" "$HOST_GATE" \
+    > "$ROOT/build/$TARGET-stock-gallery-kermit-gate.log" 2>&1 &
+GATE_PID=$!
+
 mkdir -p "$STATE"
-timeout 510s "$ROOT/build/x50ng/dist/x50ng" \
+timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$STATE" \
     --overwrite-config \
     --style="$ROOT/build/x50ng/dist/style-40g.css" \
     --flash-full \
     --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin" \
     --firmware="$FIRMWARE"
+
+wait "$GATE_PID"
+GATE_PID=
 
 FLASH="$STATE/flash"
 [[ -s "$FLASH" ]] || {

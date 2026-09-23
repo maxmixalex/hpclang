@@ -1,6 +1,6 @@
 # HP40gs Stock Font Gallery through the original APLET UI and serial disk.
-# HP40gs boots through the CAS front end, then follows the same lazy HPGCC
-# transfer path. Keep Gallery navigation out of the transfer window.
+# HP40gs boots through the CAS front end, then uses the same Kermit completion
+# gate as HP39gs instead of a fixed transfer-duration guess.
 2000 tap f6
 4000 tap f6
 13000 tap home
@@ -16,27 +16,25 @@
 40000 capture remote-aplet
 41500 tap enter
 43000 capture lazy-fetch
+44000 host-gate
 
-# The previous Stock Gallery failure showed that one late ENTER reaches the
-# HPGCC aplet launch screen after transfer has completed, but does not yet enter
-# HPC1. Confirm the launch with a second ENTER. On a faster run that is already
-# inside Gallery, the extra ENTER merely toggles sample/text and is harmless.
-# Capture both page states for each native face so the ROM-pixel oracle is
-# independent of that launch/toggle race.
-43500 monitor 450000
-410000 tap enter
-416000 tap enter
-428000 capture native-mini
-431000 tap enter
-434000 capture native-mini-other
-437000 tap down
-440000 capture native-main
-443000 tap enter
-446000 capture native-main-other
-449000 tap down
-452000 capture native-editline
-455000 tap enter
-458000 capture native-editline-other
-461000 tap right
-464000 capture generated-control
-467000 tap on
+# Times below are relative to host-gate release. The two ENTER launch sequence
+# is preserved; subsequent captures exercise mini/main/editline/control faces.
+0 monitor 90000
+500 capture fetch-complete
+1000 tap enter
+7000 tap enter
+19000 capture native-mini
+22000 tap enter
+25000 capture native-mini-other
+28000 tap down
+31000 capture native-main
+34000 tap enter
+37000 capture native-main-other
+40000 tap down
+43000 capture native-editline
+46000 tap enter
+49000 capture native-editline-other
+52000 tap right
+55000 capture generated-control
+58000 tap on
