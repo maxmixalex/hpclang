@@ -34,13 +34,13 @@
 # proves the bytes have arrived, but Stock can still be committing the fetched
 # aplet/library or unwinding the serial-disk UI. Retry ENTER sparsely instead
 # of guessing a fixed post-transfer delay. Once HPC1 reaches KBRD the harness
-# suppresses later sequence key-downs, so these retries cannot contaminate the
-# strict payload keyboard progression.
+# cancels pending launch-only retries, so they cannot contaminate the strict
+# payload keyboard progression while ordinary sequence keys remain available.
 0 monitor 90000
 500 capture fetch-complete
-1000 tap enter
-11000 tap enter
-21000 tap enter
-31000 tap enter
-46000 tap enter
-61000 tap enter
+1000 retry enter
+11000 retry enter
+21000 retry enter
+31000 retry enter
+46000 retry enter
+61000 retry enter
