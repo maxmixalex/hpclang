@@ -5,6 +5,7 @@
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
+#include "rpl-object-store.h"
 
 enum {
     NIBBLES = 0x100000u,
@@ -53,6 +54,44 @@ static uint32_t get_word(uint32_t address, uint32_t nibbles)
     for (uint32_t i = 0u; i < nibbles; ++i)
         value |= (uint32_t)memory[address + i] << (i * 4u);
     return value;
+}
+
+static struct hpclang_object *make_string1(uint8_t ch)
+{
+    struct hpclang_object *object =
+        malloc(sizeof(*object) + 6u);
+    assert(object != NULL);
+    object->kind = HPCLANG_OBJECT_STRING;
+    object->nibble_count = 12u;
+    object->native_prologue = 0x02a2cu;
+    memset(object->data, 0, 6u);
+
+    const uint32_t prologue = 0x02a2cu;
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint8_t nibble =
+            (uint8_t)((prologue >> (i * 4u)) & 0x0fu);
+        if ((i & 1u) == 0u)
+            object->data[i >> 1] = nibble;
+        else
+            object->data[i >> 1] |= (uint8_t)(nibble << 4);
+    }
+
+    /* DOCSTR length counts [length field + payload], excluding prologue. */
+    const uint32_t length = 7u;
+    for (uint32_t i = 0u; i < 5u; ++i) {
+        uint32_t nibble_index = 5u + i;
+        uint8_t nibble =
+            (uint8_t)((length >> (i * 4u)) & 0x0fu);
+        if ((nibble_index & 1u) == 0u)
+            object->data[nibble_index >> 1] |= nibble;
+        else
+            object->data[nibble_index >> 1] |=
+                (uint8_t)(nibble << 4);
+    }
+
+    object->data[5] =
+        (uint8_t)((ch & 0x0fu) | (uint8_t)(ch & 0xf0u));
+    return object;
 }
 
 static struct hpclang_object *make_char(uint8_t ch)
@@ -290,6 +329,95 @@ static void test_userob_shift_nospace_is_non_mutating(void)
     assert(get_word(pair.chain, 5u) == old_chain);
 }
 
+static void test_named_size_changing_replace(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    struct hpclang_object *string_b = make_string1('B');
+    struct hpclang_object *char_b = make_char('B');
+
+    uint32_t old_dstk = get_word(DSKTOP, 5u);
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+
+    assert(hpclang_rpl_mutation_store_replace(
+               &io,
+               pair.home,
+               (const uint8_t *)"B",
+               1u,
+               string_b) == HPCLANG_RPL_MUTATION_OK);
+
+    uint32_t expanded_home = get_word(USEROB, 5u);
+    assert(expanded_home == pair.home - 5u);
+    assert(get_word(DSKTOP, 5u) == old_dstk - 5u);
+    assert(get_word(AVMEM, 5u) == old_avmem - 1u);
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = read_nibble,
+        .context = NULL,
+    };
+    struct hpclang_rpl_directory_entry_view entry;
+    assert(hpclang_rpl_directory_find(
+               &reader,
+               expanded_home,
+               (const uint8_t *)"B",
+               1u,
+               &entry) == HPCLANG_RPL_STORE_OK);
+    assert(entry.object_address == pair.object_b - 5u);
+    assert(entry.prologue == 0x02a2cu);
+
+    uint32_t span = 0u;
+    assert(hpclang_rpl_object_span(
+               &reader,
+               entry.object_address,
+               NIBBLES - entry.object_address,
+               &span) == HPCLANG_RPL_SPAN_OK);
+    assert(span == string_b->nibble_count);
+    assert(entry.object_address + span == pair.link_a);
+
+    assert(hpclang_rpl_mutation_store_replace(
+               &io,
+               expanded_home,
+               (const uint8_t *)"B",
+               1u,
+               char_b) == HPCLANG_RPL_MUTATION_OK);
+
+    assert(get_word(USEROB, 5u) == pair.home);
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(AVMEM, 5u) == old_avmem);
+    assert_char_at(pair.object_b, 'B');
+
+    hpclang_object_release(string_b);
+    hpclang_object_release(char_b);
+}
+
+static void test_named_size_change_busy_is_non_mutating(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    struct hpclang_object *string_b = make_string1('B');
+
+    uint32_t old_dstk = get_word(DSKTOP, 5u);
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+    uint32_t old_home = get_word(USEROB, 5u);
+    uint32_t old_chain = get_word(pair.chain, 5u);
+
+    put_word(old_dstk, 5u, pair.object_b);
+    assert(hpclang_rpl_mutation_store_replace(
+               &io,
+               pair.home,
+               (const uint8_t *)"B",
+               1u,
+               string_b) == HPCLANG_RPL_MUTATION_BUSY);
+
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(AVMEM, 5u) == old_avmem);
+    assert(get_word(USEROB, 5u) == old_home);
+    assert(get_word(pair.chain, 5u) == old_chain);
+    assert_char_at(pair.object_b, 'B');
+
+    hpclang_object_release(string_b);
+}
+
 static void test_named_same_size_replace(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -497,6 +625,8 @@ int main(void)
     test_nospace_is_non_mutating();
     test_drop_and_replace();
     test_named_same_size_replace();
+    test_named_size_changing_replace();
+    test_named_size_change_busy_is_non_mutating();
     test_userob_shift_roundtrip();
     test_userob_shift_rejects_removed_reference();
     test_userob_shift_nospace_is_non_mutating();

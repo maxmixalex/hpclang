@@ -1053,6 +1053,146 @@ static int snapshot_matches_saturn(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+static int snapshot_preflight(
+    const struct hpclang_object *object)
+{
+    if (object == NULL || object->nibble_count == 0u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    for (uint32_t i = 0u; i < object->nibble_count; ++i) {
+        uint8_t nibble = 0u;
+        if (!hpclang_object_snapshot_read_nibble(
+                object, i, &nibble) ||
+            nibble > 0x0fu)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+static int store_replace_target(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    struct hpclang_rpl_directory_entry_view *entry,
+    uint32_t *span)
+{
+    if (!io_ready(io) ||
+        entry == NULL ||
+        span == NULL ||
+        (name == NULL && name_length != 0u))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = io->read_nibble,
+        .context = io->context,
+    };
+
+    int result = hpclang_rpl_directory_find(
+        &reader, directory, name, name_length, entry);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return store_result_to_mutation(result);
+    if (entry->prologue == RPL_DORRP)
+        return HPCLANG_RPL_MUTATION_DIRECTORY;
+
+    result = hpclang_rpl_object_span(
+        &reader,
+        entry->object_address,
+        RPL_MAIN_END - entry->object_address,
+        span);
+    return result == HPCLANG_RPL_SPAN_OK
+        ? HPCLANG_RPL_MUTATION_OK
+        : object_span_result_to_mutation(result);
+}
+
+int hpclang_rpl_mutation_store_replace(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    if (!io_ready(io) ||
+        object == NULL ||
+        object->nibble_count == 0u ||
+        (name == NULL && name_length != 0u))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    int result = snapshot_preflight(object);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    struct hpclang_rpl_directory_entry_view entry;
+    uint32_t span = 0u;
+    result = store_replace_target(
+        io, directory, name, name_length, &entry, &span);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    if (span == object->nibble_count) {
+        int identical = 0;
+        result = snapshot_matches_saturn(
+            io, entry.object_address, object, &identical);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+
+        if (!identical) {
+            result = object_reference_state(
+                io,
+                entry.object_address,
+                entry.object_address + span);
+            if (result != HPCLANG_RPL_MUTATION_OK)
+                return result;
+        }
+        return snapshot_copy_to_saturn(
+            io, entry.object_address, object);
+    }
+
+    /*
+     * Size-changing replacement moves the old USEROB prefix. Until the
+     * separate TEMPOB-preservation step is enabled, never relocate a live
+     * reference away from an object whose value is about to disappear.
+     */
+    uint32_t old_end = 0u;
+    if (!checked_add(entry.object_address, span, &old_end))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = object_reference_state(
+        io, entry.object_address, old_end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    int64_t delta_wide =
+        (int64_t)object->nibble_count - (int64_t)span;
+    if (delta_wide < INT32_MIN || delta_wide > INT32_MAX)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    int32_t delta = (int32_t)delta_wide;
+
+    int64_t new_address_wide =
+        (int64_t)entry.object_address - delta_wide;
+    if (new_address_wide < RPL_MAIN_FIRST ||
+        new_address_wide >= RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t new_address = (uint32_t)new_address_wide;
+
+    /*
+     * Preflight the complete post-shift destination while the tree is still
+     * untouched. The Saturn mapping is static for this native invocation, so
+     * a successful check removes ordinary bounds/mapping failures from the
+     * post-geometry copy.
+     */
+    if (!range_mapped(
+            io, new_address, object->nibble_count))
+        return HPCLANG_RPL_MUTATION_IO;
+
+    result = hpclang_rpl_mutation_userob_shift_before(
+        io, old_end, delta);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    return snapshot_copy_to_saturn(
+        io, new_address, object);
+}
+
 int hpclang_rpl_mutation_store_replace_same_size(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t directory,
@@ -1066,44 +1206,17 @@ int hpclang_rpl_mutation_store_replace_same_size(
         (name == NULL && name_length != 0u))
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
 
-    const struct hpclang_rpl_reader reader = {
-        .read_nibble = io->read_nibble,
-        .context = io->context,
-    };
-
     struct hpclang_rpl_directory_entry_view entry;
-    int result = hpclang_rpl_directory_find(
-        &reader, directory, name, name_length, &entry);
-    if (result != HPCLANG_RPL_STORE_OK)
-        return store_result_to_mutation(result);
-    if (entry.prologue == RPL_DORRP)
-        return HPCLANG_RPL_MUTATION_DIRECTORY;
-
     uint32_t span = 0u;
-    result = hpclang_rpl_object_span(
-        &reader,
-        entry.object_address,
-        RPL_MAIN_END - entry.object_address,
-        &span);
-    if (result != HPCLANG_RPL_SPAN_OK)
-        return object_span_result_to_mutation(result);
+    int result = store_replace_target(
+        io, directory, name, name_length, &entry, &span);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
     if (span != object->nibble_count)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
 
-    int identical = 0;
-    result = snapshot_matches_saturn(
-        io, entry.object_address, object, &identical);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-
-    if (!identical) {
-        result = object_reference_state(
-            io, entry.object_address, entry.object_address + span);
-        if (result != HPCLANG_RPL_MUTATION_OK)
-            return result;
-    }
-
-    return snapshot_copy_to_saturn(io, entry.object_address, object);
+    return hpclang_rpl_mutation_store_replace(
+        io, directory, name, name_length, object);
 }
 
 static int stack_depth(

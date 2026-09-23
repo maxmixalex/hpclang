@@ -69,11 +69,23 @@ int hpclang_rpl_mutation_replace(
     const struct hpclang_object *object);
 
 /*
- * First USEROB mutation primitive for M7.3f. Replace an existing non-directory
- * object without changing its native extent. Different content is rejected
- * with BUSY while any Stock-visible pointer still references the old object.
- * Byte-identical self-store is always safe and is used as the first live Stock
- * write witness before USEROB shifting is enabled.
+ * Replace an existing non-directory USEROB object from an owned snapshot.
+ * Same-size writes happen in place. Size-changing writes use the bounded
+ * USEROB shift primitive and currently require the old object to be
+ * unreferenced; referenced-value preservation through TEMPOB is the next
+ * M7.3f layer.
+ */
+int hpclang_rpl_mutation_store_replace(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object);
+
+/*
+ * Strict compatibility helper for the first live M7.3f witness. It rejects a
+ * different native extent even though the general replacement path can now
+ * resize an unreferenced object.
  */
 int hpclang_rpl_mutation_store_replace_same_size(
     const struct hpclang_rpl_mutation_io *io,
