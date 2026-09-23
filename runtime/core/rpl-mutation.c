@@ -1081,6 +1081,145 @@ static int snapshot_preflight(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+
+int hpclang_rpl_mutation_store_create(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    if (!io_ready(io) ||
+        object == NULL ||
+        object->nibble_count == 0u ||
+        (name == NULL && name_length != 0u) ||
+        name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    int result = snapshot_preflight(object);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = io->read_nibble,
+        .context = io->context,
+    };
+
+    struct hpclang_rpl_directory_entry_view existing;
+    result = hpclang_rpl_directory_find(
+        &reader, directory, name, name_length, &existing);
+    if (result == HPCLANG_RPL_STORE_OK)
+        return HPCLANG_RPL_MUTATION_EXISTS;
+    if (result != HPCLANG_RPL_STORE_NOT_FOUND)
+        return store_result_to_mutation(result);
+
+    struct hpclang_rpl_directory_cursor cursor;
+    result = hpclang_rpl_directory_cursor_open(
+        &reader, directory, &cursor);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return store_result_to_mutation(result);
+
+    uint32_t directory_span = 0u;
+    result = hpclang_rpl_object_span(
+        &reader,
+        directory,
+        RPL_MAIN_END - directory,
+        &directory_span);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return object_span_result_to_mutation(result);
+
+    uint32_t directory_end = 0u;
+    if (directory_span == 0u ||
+        !checked_add(directory, directory_span, &directory_end))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t item_nibbles = 2u;
+    if (name_length != 0u) {
+        if (name_length > (UINT32_MAX - 4u) / 2u)
+            return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        item_nibbles = 4u + name_length * 2u;
+    }
+
+    uint32_t entry_nibbles = 0u;
+    if (!checked_add(5u, item_nibbles, &entry_nibbles) ||
+        !checked_add(
+            entry_nibbles, object->nibble_count, &entry_nibbles) ||
+        entry_nibbles > INT32_MAX ||
+        entry_nibbles > directory_end - RPL_MAIN_FIRST)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+
+    uint32_t link = directory_end - entry_nibbles;
+    uint32_t item = link + 5u;
+    uint32_t object_address = item + item_nibbles;
+    if (object_address > directory_end ||
+        object->nibble_count != directory_end - object_address ||
+        cursor.chain < entry_nibbles)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t new_chain = cursor.chain - entry_nibbles;
+    uint32_t chain_offset = item - new_chain;
+    if (chain_offset > UINT32_C(0x000fffff))
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+
+    uint32_t link_offset = 0u;
+    if (!cursor.finished) {
+        if (cursor.item < entry_nibbles)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        uint32_t previous_item = cursor.item - entry_nibbles;
+        if (previous_item >= link)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        link_offset = link - previous_item;
+        if (link_offset > UINT32_C(0x000fffff))
+            return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    }
+
+    if (!range_mapped(io, link, entry_nibbles))
+        return HPCLANG_RPL_MUTATION_IO;
+
+    result = hpclang_rpl_mutation_userob_shift_before(
+        io, directory_end, (int32_t)entry_nibbles);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    /*
+     * Everything below remains unreachable until the final chain write.
+     * Unexpected I/O can therefore leave unused bytes in the opened gap, but
+     * not a half-visible directory entry.
+     */
+    result = write_word(io, link, 5u, link_offset);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = write_word(io, item, 2u, name_length);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    uint32_t cursor_address = item + 2u;
+    if (name_length != 0u) {
+        for (uint32_t i = 0u; i < name_length; ++i) {
+            result = write_word(
+                io, cursor_address, 2u, name[i]);
+            if (result != HPCLANG_RPL_MUTATION_OK)
+                return result;
+            cursor_address += 2u;
+        }
+        result = write_word(
+            io, cursor_address, 2u, name_length);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        cursor_address += 2u;
+    }
+    if (cursor_address != object_address)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    result = snapshot_copy_to_saturn(
+        io, object_address, object);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    return write_word(
+        io, new_chain, 5u, chain_offset);
+}
+
 static int store_replace_target(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t directory,

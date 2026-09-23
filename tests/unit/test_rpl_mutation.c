@@ -332,6 +332,79 @@ static void test_userob_shift_nospace_is_non_mutating(void)
     assert(get_word(pair.chain, 5u) == old_chain);
 }
 
+
+static void test_named_create(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    struct hpclang_object *char_c = make_char('C');
+
+    const uint32_t old_dstk = get_word(DSKTOP, 5u);
+    put_word(old_dstk, 5u, pair.object_b);
+
+    const uint32_t entry_nibbles = 18u;
+    assert(hpclang_rpl_mutation_store_create(
+               &io,
+               pair.home,
+               (const uint8_t *)"C",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_OK);
+
+    const uint32_t new_home = get_word(USEROB, 5u);
+    const uint32_t new_dstk = get_word(DSKTOP, 5u);
+    assert(new_home == pair.home - entry_nibbles);
+    assert(new_dstk == old_dstk - entry_nibbles);
+    assert(get_word(new_dstk, 5u) ==
+           pair.object_b - entry_nibbles);
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = read_nibble,
+        .context = NULL,
+    };
+    struct hpclang_rpl_directory_entry_view entry;
+    assert(hpclang_rpl_directory_find(
+               &reader,
+               new_home,
+               (const uint8_t *)"C",
+               1u,
+               &entry) == HPCLANG_RPL_STORE_OK);
+    assert(entry.prologue == 0x029bfu);
+    assert_char_at(entry.object_address, 'C');
+
+    uint32_t committed_dstk = get_word(DSKTOP, 5u);
+    assert(hpclang_rpl_mutation_store_create(
+               &io,
+               new_home,
+               (const uint8_t *)"B",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_EXISTS);
+    assert(get_word(DSKTOP, 5u) == committed_dstk);
+
+    hpclang_object_release(char_c);
+}
+
+static void test_named_create_nospace_is_non_mutating(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    struct hpclang_object *char_c = make_char('C');
+
+    const uint32_t old_dstk = get_word(DSKTOP, 5u);
+    const uint32_t old_home = get_word(USEROB, 5u);
+    io.user_limit = old_dstk - 17u;
+
+    assert(hpclang_rpl_mutation_store_create(
+               &io,
+               pair.home,
+               (const uint8_t *)"C",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(USEROB, 5u) == old_home);
+
+    hpclang_object_release(char_c);
+}
+
 static void test_named_size_changing_replace(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -702,6 +775,8 @@ int main(void)
     test_drop_and_replace();
     test_named_same_size_replace();
     test_named_reference_preservation_nospace_is_non_mutating();
+    test_named_create();
+    test_named_create_nospace_is_non_mutating();
     test_named_size_changing_replace();
     test_named_size_change_preserves_reference();
     test_userob_shift_roundtrip();

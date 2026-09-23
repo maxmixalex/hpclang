@@ -40,7 +40,8 @@ enum hpclang_rpl_mutation_result {
     HPCLANG_RPL_MUTATION_BUSY = -6,
     HPCLANG_RPL_MUTATION_NOT_FOUND = -7,
     HPCLANG_RPL_MUTATION_DIRECTORY = -8,
-    HPCLANG_RPL_MUTATION_UNSUPPORTED = -9
+    HPCLANG_RPL_MUTATION_UNSUPPORTED = -9,
+    HPCLANG_RPL_MUTATION_EXISTS = -10
 };
 
 /*
@@ -75,6 +76,18 @@ int hpclang_rpl_mutation_replace(
  * overwritten or resized.
  */
 int hpclang_rpl_mutation_store_replace(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object);
+
+/*
+ * Create one new classic-RPL directory entry. The complete new entry is
+ * written into an unreachable USEROB gap first; the directory chain pointer is
+ * the final visibility commit. Existing names return EXISTS.
+ */
+int hpclang_rpl_mutation_store_create(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t directory,
     const uint8_t *name,
