@@ -22,6 +22,8 @@
 #define PHASE_KEYBOARD_READY 0x4b425244u
 #define PHASE_KEYBOARD_ACK 0x4b410000u
 #define PHASE_OBJECT_STORE 0x4f530000u
+#define GALLERY_STATE_MASK 0xff000000u
+#define GALLERY_STATE_VALUE 0x47000000u
 #define POLL_US 20000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
@@ -50,6 +52,7 @@ struct state {
     int saw_before;
     int saw_pass;
     uint32_t object_store_phase;
+    int payload_started;
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
@@ -226,15 +229,16 @@ static void key_cb(void *arg)
 }
 
 /*
- * Stock sequence files pre-schedule sparse ENTER retries so slow serial-disk
- * transfers can still launch ARMToolbox. Once the HPC1 payload publishes KBRD,
- * those launcher retries must no longer inject key-down edges into the strict
- * 51-key payload test. Always allow key-up so a key already pressed before
- * KBRD can still be released.
+ * Serial-disk launch can remain inside Stock briefly after the host has
+ * delivered every byte. Sequence files may therefore schedule sparse
+ * launch-only retries. Once a payload announces that it has started, pending
+ * retry key-downs are discarded while ordinary sequence input remains valid.
+ * Always allow key-up so a retry pressed just before the transition is released.
  */
 struct sequence_key_event {
     struct state *state;
     const struct key_action *action;
+    int launch_retry;
 };
 
 static void sequence_key_cb(void *arg)
@@ -243,7 +247,7 @@ static void sequence_key_cb(void *arg)
     const struct key_action *action = event->action;
     struct state *s = event->state;
 
-    if (!action->down || !s->payload_keyboard_scheduled)
+    if (!action->down || !event->launch_retry || !s->payload_started)
         key_cb((void *)action);
     free(event);
 }
@@ -251,6 +255,7 @@ static void sequence_key_cb(void *arg)
 static int sequence_key(
     struct state *s,
     const struct key_action *action,
+    int launch_retry,
     int64_t us)
 {
     struct sequence_key_event *event = calloc(1, sizeof(*event));
@@ -258,6 +263,7 @@ static int sequence_key(
         return 0;
     event->state = s;
     event->action = action;
+    event->launch_retry = launch_retry;
     if (!later(sequence_key_cb, event, us)) {
         free(event);
         return 0;
@@ -271,8 +277,18 @@ static int sequence_tap(
     const struct key_action *up_action,
     int64_t us)
 {
-    return sequence_key(s, down, us) &&
-           sequence_key(s, up_action, us + KEY_HOLD_US);
+    return sequence_key(s, down, 0, us) &&
+           sequence_key(s, up_action, 0, us + KEY_HOLD_US);
+}
+
+static int sequence_retry_tap(
+    struct state *s,
+    const struct key_action *down,
+    const struct key_action *up_action,
+    int64_t us)
+{
+    return sequence_key(s, down, 1, us) &&
+           sequence_key(s, up_action, 1, us + KEY_HOLD_US);
 }
 
 static int sequence_chord(
@@ -283,10 +299,10 @@ static int sequence_chord(
     const struct key_action *mod_up,
     int64_t us)
 {
-    return sequence_key(s, mod_down, us) &&
-           sequence_key(s, key_down, us + 30000) &&
-           sequence_key(s, key_up, us + 130000) &&
-           sequence_key(s, mod_up, us + 160000);
+    return sequence_key(s, mod_down, 0, us) &&
+           sequence_key(s, key_down, 0, us + 30000) &&
+           sequence_key(s, key_up, 0, us + 130000) &&
+           sequence_key(s, mod_up, 0, us + 160000);
 }
 
 static int tap(
@@ -723,6 +739,7 @@ static void monitor(void *arg)
 
     if (!s->payload_keyboard_scheduled && readable &&
         value == PHASE_KEYBOARD_READY) {
+        s->payload_started = 1;
         if (!capture_keyboard_progress(s, 0u)) {
             fail(s, "keyboard-capture");
             return;
@@ -756,6 +773,15 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        if (!s->payload_started &&
+            (value & GALLERY_STATE_MASK) == GALLERY_STATE_VALUE) {
+            s->payload_started = 1;
+            fprintf(stderr,
+                    "stock launcher: Gallery payload started (0x%08x); "
+                    "launch retries disabled\n",
+                    value);
+        }
+
         if ((value & 0xffff0000u) == PHASE_OBJECT_STORE &&
             value != s->object_store_phase) {
             s->object_store_phase = value;
@@ -954,6 +980,10 @@ static int schedule_sequence(struct state *s, const char *path)
         if (strcmp(op, "tap") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);
             if (!key || !sequence_tap(s, key->down, key->up, us))
+                goto invalid_action;
+        } else if (strcmp(op, "retry") == 0 && fields == 3) {
+            const struct key_pair_ref *key = find_key_pair(first);
+            if (!key || !sequence_retry_tap(s, key->down, key->up, us))
                 goto invalid_action;
         } else if (strcmp(op, "chord") == 0 && fields == 4) {
             const struct key_pair_ref *mod = find_key_pair(first);
