@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
