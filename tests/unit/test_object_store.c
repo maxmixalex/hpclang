@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
 #include <hpclang/target.h>
@@ -20,6 +21,13 @@ enum {
 };
 
 static uint8_t memory[NIBBLES];
+
+static struct hpclang_rpl_memory_bounds fake_bounds = {
+    .magic = HPCLANG_RPL_BOUNDS_MAGIC,
+    .temp_limit = 0x86000u,
+    .user_limit = 0x88000u,
+    .stack_reserve_nibbles = 0u,
+};
 
 static struct hpclang_boot_info fake_boot = {
     .model = HPCLANG_MODEL_HP50G,
@@ -43,6 +51,18 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 const struct hpclang_device_info *hpclang_device_info(void)
 {
     return &fake_device;
+}
+
+int hpclang_saturn_write_nibble(
+    struct hpclang_saturn_address address,
+    uint8_t value)
+{
+    if (fake_boot.saturn_state == 0u ||
+        address.nibble >= NIBBLES ||
+        value > 0x0fu)
+        return 0;
+    memory[address.nibble] = value;
+    return 1;
 }
 
 int hpclang_saturn_read_nibble(
@@ -95,6 +115,8 @@ static void prepare_tree(void)
 
     memset(memory, 0, sizeof(memory));
     fake_boot.saturn_state = 1u;
+    fake_boot.platform_cookie =
+        (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     fake_device.model = HPCLANG_MODEL_HP50G;
     fake_device.family = HPCLANG_FAMILY_HP4950;
 
@@ -250,6 +272,8 @@ static void test_hidden_directory_logical_handle(void)
 {
     memset(memory, 0, sizeof(memory));
     fake_boot.saturn_state = 1u;
+    fake_boot.platform_cookie =
+        (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     fake_device.model = HPCLANG_MODEL_HP50G;
     fake_device.family = HPCLANG_FAMILY_HP4950;
 

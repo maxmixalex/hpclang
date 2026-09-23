@@ -36,7 +36,11 @@ enum hpclang_rpl_mutation_result {
     HPCLANG_RPL_MUTATION_MALFORMED = -2,
     HPCLANG_RPL_MUTATION_NOSPACE = -3,
     HPCLANG_RPL_MUTATION_LEVEL = -4,
-    HPCLANG_RPL_MUTATION_IO = -5
+    HPCLANG_RPL_MUTATION_IO = -5,
+    HPCLANG_RPL_MUTATION_BUSY = -6,
+    HPCLANG_RPL_MUTATION_NOT_FOUND = -7,
+    HPCLANG_RPL_MUTATION_DIRECTORY = -8,
+    HPCLANG_RPL_MUTATION_UNSUPPORTED = -9
 };
 
 /*
@@ -62,6 +66,20 @@ int hpclang_rpl_mutation_drop(
 int hpclang_rpl_mutation_replace(
     const struct hpclang_rpl_mutation_io *io,
     uint32_t level,
+    const struct hpclang_object *object);
+
+/*
+ * First USEROB mutation primitive for M7.3f. Replace an existing non-directory
+ * object without changing its native extent. Different content is rejected
+ * with BUSY while any Stock-visible pointer still references the old object.
+ * Byte-identical self-store is always safe and is used as the first live Stock
+ * write witness before USEROB shifting is enabled.
+ */
+int hpclang_rpl_mutation_store_replace_same_size(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
     const struct hpclang_object *object);
 
 #ifdef __cplusplus

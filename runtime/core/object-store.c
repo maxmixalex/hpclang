@@ -5,11 +5,13 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
 #include <hpclang/target.h>
 
 #include "object-snapshot.h"
+#include "rpl-mutation.h"
 #include "rpl-object-store.h"
 #include "saturn-view.h"
 
@@ -57,6 +59,52 @@ static int stock_read_nibble(
     (void)context;
     return hpclang_saturn_read_nibble(
         hpclang_saturn_address_make(nibble_address), value);
+}
+
+static int stock_write_nibble(
+    void *context,
+    uint32_t nibble_address,
+    uint8_t value)
+{
+    (void)context;
+    return hpclang_saturn_write_nibble(
+        hpclang_saturn_address_make(nibble_address), value);
+}
+
+static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
+{
+    if (io == NULL || !stock_store_available())
+        return 0;
+
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot == NULL ||
+        (boot->platform_cookie &
+         HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
+        return 0;
+
+    uintptr_t raw =
+        boot->platform_cookie &
+        ~(uintptr_t)HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    const struct hpclang_rpl_memory_bounds *bounds =
+        (const struct hpclang_rpl_memory_bounds *)raw;
+    if (bounds == NULL ||
+        bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+        bounds->temp_limit <= UINT32_C(0x00080000) ||
+        bounds->temp_limit > UINT32_C(0x00100000) ||
+        bounds->user_limit < UINT32_C(0x00080000) ||
+        bounds->user_limit >= UINT32_C(0x00100000) ||
+        bounds->stack_reserve_nibbles >
+            UINT32_C(0x00100000) - bounds->user_limit ||
+        (bounds->stack_reserve_nibbles % 5u) != 0u)
+        return 0;
+
+    io->read_nibble = stock_read_nibble;
+    io->write_nibble = stock_write_nibble;
+    io->context = NULL;
+    io->temp_limit = bounds->temp_limit;
+    io->user_limit = bounds->user_limit;
+    io->stack_reserve_nibbles = bounds->stack_reserve_nibbles;
+    return 1;
 }
 
 static const struct hpclang_rpl_reader stock_reader = {
@@ -347,6 +395,76 @@ int hpclang_object_store_get(
         entry.object_address,
         RPL_SPACE_NIBBLES - entry.object_address,
         object);
+}
+
+
+/*
+ * Private M7.3f bridge used by Stock E2E while the public put/remove contract
+ * is still being completed. It deliberately exposes no Saturn address and
+ * accepts only an owned snapshot.
+ */
+int hpclang_object_store_replace_existing_same_size(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    if (object == NULL || store == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!stock_store_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (!validate_name(name, name_length))
+        return -1;
+
+    uint32_t directory = 0u;
+    if (resolve_store(store, &directory) != 0)
+        return -1;
+
+    struct hpclang_rpl_mutation_io io;
+    if (!stock_mutation_io(&io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+
+    int result = hpclang_rpl_mutation_store_replace_same_size(
+        &io, directory, name, name_length, object);
+    switch (result) {
+    case HPCLANG_RPL_MUTATION_OK:
+        return 0;
+    case HPCLANG_RPL_MUTATION_BUSY:
+        errno = EBUSY;
+        break;
+    case HPCLANG_RPL_MUTATION_NOT_FOUND:
+        errno = ENOENT;
+        break;
+    case HPCLANG_RPL_MUTATION_DIRECTORY:
+        errno = EISDIR;
+        break;
+    case HPCLANG_RPL_MUTATION_UNSUPPORTED:
+        errno = ENOTSUP;
+        break;
+    case HPCLANG_RPL_MUTATION_NOSPACE:
+        errno = ENOSPC;
+        break;
+    case HPCLANG_RPL_MUTATION_MALFORMED:
+        errno = EILSEQ;
+        break;
+    case HPCLANG_RPL_MUTATION_IO:
+        errno = EIO;
+        break;
+    case HPCLANG_RPL_MUTATION_LEVEL:
+        errno = EINVAL;
+        break;
+    case HPCLANG_RPL_MUTATION_UNAVAILABLE:
+    default:
+        errno = ENOSYS;
+        break;
+    }
+    return -1;
 }
 
 struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(

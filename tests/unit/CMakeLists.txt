@@ -130,6 +130,8 @@ hpclang_unit(object_store
     test_object_store.c
     "${HPCLANG_ROOT}/runtime/core/object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_object_store PRIVATE
@@ -166,6 +168,7 @@ target_include_directories(test_object PRIVATE
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
     "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")

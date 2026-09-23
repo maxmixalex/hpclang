@@ -2,15 +2,26 @@
 #include <stdint.h>
 
 #include "rpl-mutation.h"
+#include "rpl-object-store.h"
 #include "rpl-stack-view.h"
 
 enum {
     RPL_TEMPTOP = 0x000806eeu,
     RPL_RSKTOP = 0x000806f3u,
     RPL_DSKTOP = 0x000806f8u,
+    RPL_EDITLINE = 0x000806fdu,
+    RPL_TEMPENV = 0x00080702u,
+    RPL_TOUCHTAB = 0x0008070cu,
+    RPL_FSTVGERPTR = 0x0008072fu,
+    RPL_SYSUPDSTART = 0x000806dau,
     RPL_AVMEM = 0x00080e9bu,
+    RPL_DORRP = 0x00002a96u,
     RPL_MAIN_FIRST = 0x00080000u,
-    RPL_MAIN_END = 0x00100000u
+    RPL_MAIN_END = 0x00100000u,
+    RPL_SYSUPD_SLOTS = 0x18cu,
+    RPL_REFERENCE_SLOT_LIMIT = 8192u,
+    RPL_TEMPENV_FRAME_LIMIT = 1024u,
+    RPL_VGER_GROUP_LIMIT = 256u
 };
 
 static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
@@ -171,6 +182,381 @@ static int snapshot_copy_to_saturn(
             return HPCLANG_RPL_MUTATION_IO;
     }
     return HPCLANG_RPL_MUTATION_OK;
+}
+
+
+static int pointer_hits_range(
+    uint32_t value,
+    uint32_t start,
+    uint32_t end)
+{
+    return value >= start && value < end;
+}
+
+static int scan_pointer_slot(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t slot,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t value = 0u;
+    int result = read_word(io, slot, 5u, &value);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return pointer_hits_range(value, start, end)
+        ? HPCLANG_RPL_MUTATION_BUSY
+        : HPCLANG_RPL_MUTATION_OK;
+}
+
+static int scan_data_stack_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t top = 0u;
+    uint32_t editline = 0u;
+    int result = read_word(io, RPL_DSKTOP, 5u, &top);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = read_word(io, RPL_EDITLINE, 5u, &editline);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (top < RPL_MAIN_FIRST ||
+        editline < top ||
+        editline > RPL_MAIN_END ||
+        (editline - top) % 5u != 0u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t slots = (editline - top) / 5u;
+    if (slots > RPL_REFERENCE_SLOT_LIMIT)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    for (uint32_t i = 0u; i < slots; ++i) {
+        result = scan_pointer_slot(
+            io, top + i * 5u, start, end);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+static int scan_return_stack_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t rstk = 0u;
+    int result = read_word(io, RPL_RSKTOP, 5u, &rstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (rstk < RPL_MAIN_FIRST + 5u || rstk > RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t slot = rstk - 5u;
+    for (uint32_t i = 0u; i < RPL_REFERENCE_SLOT_LIMIT; ++i) {
+        uint32_t value = 0u;
+        result = read_word(io, slot, 5u, &value);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        if ((value & ~UINT32_C(0x0000000f)) == 0u)
+            return HPCLANG_RPL_MUTATION_OK;
+        if (pointer_hits_range(value, start, end))
+            return HPCLANG_RPL_MUTATION_BUSY;
+        if (slot < RPL_MAIN_FIRST + 5u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        slot -= 5u;
+    }
+    return HPCLANG_RPL_MUTATION_MALFORMED;
+}
+
+static int scan_tempenv_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t ptr = 0u;
+    int result = read_word(io, RPL_TEMPENV, 5u, &ptr);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (ptr == 0u)
+        return HPCLANG_RPL_MUTATION_OK;
+    if (ptr < RPL_MAIN_FIRST || ptr > RPL_MAIN_END - 10u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t scanned_slots = 0u;
+    for (uint32_t frame = 0u;
+         frame < RPL_TEMPENV_FRAME_LIMIT;
+         ++frame) {
+        uint32_t count = 0u;
+        result = read_word(io, ptr, 5u, &count);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        if (ptr > RPL_MAIN_END - 10u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        ptr += 10u;
+
+        if (count > 15u) {
+            int32_t remaining = (int32_t)count - 15;
+            while (remaining > 0) {
+                if (scanned_slots > RPL_REFERENCE_SLOT_LIMIT - 2u ||
+                    ptr > RPL_MAIN_END - 10u)
+                    return HPCLANG_RPL_MUTATION_MALFORMED;
+
+                result = scan_pointer_slot(io, ptr, start, end);
+                if (result != HPCLANG_RPL_MUTATION_OK)
+                    return result;
+                ptr += 5u;
+                ++scanned_slots;
+
+                result = scan_pointer_slot(io, ptr, start, end);
+                if (result != HPCLANG_RPL_MUTATION_OK)
+                    return result;
+                ptr += 5u;
+                ++scanned_slots;
+                remaining -= 10;
+            }
+        }
+
+        if (count == 0u)
+            return HPCLANG_RPL_MUTATION_OK;
+    }
+    return HPCLANG_RPL_MUTATION_MALFORMED;
+}
+
+static int scan_touchtab_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t base = 0u;
+    int result = read_word(io, RPL_TOUCHTAB, 5u, &base);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (base == 0u)
+        return HPCLANG_RPL_MUTATION_OK;
+    if (base > RPL_MAIN_END - 3u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t ptr = base + 3u;
+    for (uint32_t i = 0u; i < RPL_REFERENCE_SLOT_LIMIT; ++i) {
+        uint32_t value = 0u;
+        result = read_word(io, ptr, 5u, &value);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+        if (value == 0u)
+            return HPCLANG_RPL_MUTATION_OK;
+        if (pointer_hits_range(value, start, end))
+            return HPCLANG_RPL_MUTATION_BUSY;
+        if (ptr > RPL_MAIN_END - 10u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        ptr += 5u;
+    }
+    return HPCLANG_RPL_MUTATION_MALFORMED;
+}
+
+static int scan_vger_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    uint32_t base = 0u;
+    int result = read_word(io, RPL_FSTVGERPTR, 5u, &base);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (base == 0u)
+        return HPCLANG_RPL_MUTATION_OK;
+    if (base > RPL_MAIN_END - 20u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t ptr = base + 15u;
+    uint32_t groups = 0u;
+    result = read_word(io, ptr, 5u, &groups);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (groups > RPL_VGER_GROUP_LIMIT)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t scanned_slots = 0u;
+    for (uint32_t group = 0u; group < groups; ++group) {
+        if (ptr > RPL_MAIN_END - 25u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        ptr += 20u;
+
+        for (;;) {
+            if (scanned_slots++ >= RPL_REFERENCE_SLOT_LIMIT)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            uint32_t value = 0u;
+            result = read_word(io, ptr, 5u, &value);
+            if (result != HPCLANG_RPL_MUTATION_OK)
+                return result;
+            if (value == 0u)
+                break;
+            if (pointer_hits_range(value, start, end))
+                return HPCLANG_RPL_MUTATION_BUSY;
+            if (ptr > RPL_MAIN_END - 10u)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            ptr += 5u;
+        }
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+static int scan_system_references(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    for (uint32_t i = 0u; i < RPL_SYSUPD_SLOTS; ++i) {
+        int result = scan_pointer_slot(
+            io, RPL_SYSUPDSTART + i * 5u, start, end);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+static int object_reference_state(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t start,
+    uint32_t end)
+{
+    if (start >= end || end > RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    int result = scan_data_stack_references(io, start, end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = scan_return_stack_references(io, start, end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = scan_tempenv_references(io, start, end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = scan_touchtab_references(io, start, end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = scan_vger_references(io, start, end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return scan_system_references(io, start, end);
+}
+
+static int store_result_to_mutation(int result)
+{
+    switch (result) {
+    case HPCLANG_RPL_STORE_OK:
+        return HPCLANG_RPL_MUTATION_OK;
+    case HPCLANG_RPL_STORE_NOT_FOUND:
+        return HPCLANG_RPL_MUTATION_NOT_FOUND;
+    case HPCLANG_RPL_STORE_NOT_DIRECTORY:
+        return HPCLANG_RPL_MUTATION_DIRECTORY;
+    case HPCLANG_RPL_STORE_UNAVAILABLE:
+        return HPCLANG_RPL_MUTATION_IO;
+    case HPCLANG_RPL_STORE_LIMIT:
+    case HPCLANG_RPL_STORE_MALFORMED:
+    default:
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+}
+
+static int object_span_result_to_mutation(int result)
+{
+    switch (result) {
+    case HPCLANG_RPL_SPAN_OK:
+        return HPCLANG_RPL_MUTATION_OK;
+    case HPCLANG_RPL_SPAN_UNAVAILABLE:
+        return HPCLANG_RPL_MUTATION_IO;
+    case HPCLANG_RPL_SPAN_UNSUPPORTED:
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    case HPCLANG_RPL_SPAN_BOUNDS:
+    case HPCLANG_RPL_SPAN_DEPTH:
+    case HPCLANG_RPL_SPAN_MALFORMED:
+    default:
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+}
+
+static int snapshot_matches_saturn(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t address,
+    const struct hpclang_object *object,
+    int *matches)
+{
+    if (object == NULL || matches == NULL)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    *matches = 0;
+
+    if (!range_mapped(io, address, object->nibble_count))
+        return HPCLANG_RPL_MUTATION_IO;
+
+    for (uint32_t i = 0u; i < object->nibble_count; ++i) {
+        uint8_t expected = 0u;
+        uint8_t actual = 0u;
+        if (!hpclang_object_snapshot_read_nibble(object, i, &expected))
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        if (!io->read_nibble(io->context, address + i, &actual))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (actual > 0x0fu)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        if (actual != expected)
+            return HPCLANG_RPL_MUTATION_OK;
+    }
+
+    *matches = 1;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_mutation_store_replace_same_size(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t directory,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    if (!io_ready(io) ||
+        object == NULL ||
+        object->nibble_count == 0u ||
+        (name == NULL && name_length != 0u))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    const struct hpclang_rpl_reader reader = {
+        .read_nibble = io->read_nibble,
+        .context = io->context,
+    };
+
+    struct hpclang_rpl_directory_entry_view entry;
+    int result = hpclang_rpl_directory_find(
+        &reader, directory, name, name_length, &entry);
+    if (result != HPCLANG_RPL_STORE_OK)
+        return store_result_to_mutation(result);
+    if (entry.prologue == RPL_DORRP)
+        return HPCLANG_RPL_MUTATION_DIRECTORY;
+
+    uint32_t span = 0u;
+    result = hpclang_rpl_object_span(
+        &reader,
+        entry.object_address,
+        RPL_MAIN_END - entry.object_address,
+        &span);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return object_span_result_to_mutation(result);
+    if (span != object->nibble_count)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+
+    int identical = 0;
+    result = snapshot_matches_saturn(
+        io, entry.object_address, object, &identical);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    if (!identical) {
+        result = object_reference_state(
+            io, entry.object_address, entry.object_address + span);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
+
+    return snapshot_copy_to_saturn(io, entry.object_address, object);
 }
 
 static int stack_depth(

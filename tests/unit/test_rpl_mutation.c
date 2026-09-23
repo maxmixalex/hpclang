@@ -12,7 +12,10 @@ enum {
     RSKTOP = 0x806f3u,
     DSKTOP = 0x806f8u,
     EDITLINE = 0x806fdu,
-    AVMEM = 0x80e9bu
+    USEROB = 0x80711u,
+    CONTEXT = 0x8071bu,
+    AVMEM = 0x80e9bu,
+    DORRP = 0x02a96u
 };
 
 static uint8_t memory[NIBBLES];
@@ -110,6 +113,82 @@ static void assert_char_at(uint32_t address, uint8_t ch)
 {
     assert(get_word(address, 5u) == 0x029bfu);
     assert(get_word(address + 5u, 2u) == ch);
+}
+
+
+static uint32_t prepare_named_char(uint8_t value)
+{
+    const uint32_t home = 0x92000u;
+    const uint32_t chain = home + 8u;
+    const uint32_t link = chain + 5u;
+    const uint32_t item = link + 5u;
+    const uint32_t object = item + 6u;
+
+    put_word(USEROB, 5u, home);
+    put_word(CONTEXT, 5u, home);
+    put_word(home, 5u, DORRP);
+    put_word(home + 5u, 3u, 0u);
+    put_word(chain, 5u, item - chain);
+    put_word(link, 5u, 0u);
+    put_word(item, 2u, 1u);
+    put_word(item + 2u, 2u, (uint32_t)'A');
+    put_word(item + 4u, 2u, 1u);
+    put_word(object, 5u, 0x029bfu);
+    put_word(object + 5u, 2u, value);
+    return object;
+}
+
+static void test_named_same_size_replace(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    uint32_t object_address = prepare_named_char('A');
+    struct hpclang_object *char_b = make_char('B');
+    struct hpclang_object *char_c = make_char('C');
+
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"A",
+               1u,
+               char_b) == HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(object_address, 'B');
+
+    put_word(get_word(DSKTOP, 5u), 5u, object_address);
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"A",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_BUSY);
+    assert_char_at(object_address, 'B');
+
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"A",
+               1u,
+               char_b) == HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(object_address, 'B');
+
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"NO",
+               2u,
+               char_b) == HPCLANG_RPL_MUTATION_NOT_FOUND);
+
+    uint32_t original_size = char_c->nibble_count;
+    char_c->nibble_count = original_size + 1u;
+    assert(hpclang_rpl_mutation_store_replace_same_size(
+               &io,
+               0x92000u,
+               (const uint8_t *)"A",
+               1u,
+               char_c) == HPCLANG_RPL_MUTATION_UNSUPPORTED);
+    char_c->nibble_count = original_size;
+
+    hpclang_object_release(char_b);
+    hpclang_object_release(char_c);
 }
 
 static void test_push_transaction(void)
@@ -265,5 +344,6 @@ int main(void)
     test_stack_reserve_blocks_last_cell();
     test_nospace_is_non_mutating();
     test_drop_and_replace();
+    test_named_same_size_replace();
     return 0;
 }
