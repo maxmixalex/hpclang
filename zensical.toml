@@ -16,6 +16,8 @@ nav = [
     "development/e2e.md",
     "development/fixtures.md",
     "development/roadmap.md",
+    "development/object-service.md",
+    "development/hpgcc-saturn-adapter.md",
     "development/history.md",
     "development/licensing.md",
     "development/experiments.md",
