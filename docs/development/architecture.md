@@ -70,7 +70,7 @@ HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs
 
 The application-facing clean core now includes device information, stock-preserving monotonic time, raw/debounced keyboard events with five-model physical key identity, opaque display/software surfaces, clipped geometry and blit, calculator-native/generated fonts, UTF-8 text, and hp4950 byte-stream stdio through picolibc.
 
-These services keep platform representation and ownership below common APIs. Calculator-object/stack integration is closed through the M7.3 owned-object/read/search/recall/stack/adapter baseline: HP39 typed objects and HP48/49/50 Saturn/RPL objects are not flattened into byte-stream files or exposed as raw stock addresses. General named-store write/delete remains a demand-driven future extension with the same ownership and failure-safety boundary, not an M7.3 parity prerequisite.
+These services keep platform representation and ownership below common APIs. Calculator-object/stack integration is now established through the M7.3a-e owned-object/read/stack/adapter baseline: HP39 typed objects and HP48/49/50 Saturn/RPL objects are not flattened into byte-stream files or exposed as raw stock addresses. The remaining object-service work is M7.3f named-store write/delete with the same ownership and failure-safety boundary.
 
 The project does not copy the historical HPGCC API surface wholesale. Historical names or services become adapters only when they describe useful source-level behavior over an already coherent hpclang core.
 
