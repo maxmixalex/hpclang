@@ -104,8 +104,10 @@ M7.3e compatibility-adapter validation is closed above that read core:
   clean return on both HP39gs and HP40gs without changing the
   descriptor-recall/object implementation. Font Gallery #122 remains useful
   historical evidence for the older launch race; the Gallery path now shares
-  the payload-aware retry mechanism, and **Gallery #127 (`35822292175`)** is
-  fully green across all Direct and Stock Gallery families.
+  the payload-aware retry mechanism. **Gallery #127 (`35822292175`)** first
+  closes the root-cause fix, and **Gallery #128 (`35828142832`)** revalidates
+  the same all-green Direct/Stock matrix after the final report/oracle
+  dependency-filter cleanup.
 
 **Runtime #326 (`35739887799`)** is retained only as historical diagnostic
 evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
