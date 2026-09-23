@@ -340,7 +340,9 @@ static int schedule_return_repaint(struct state *s)
 
     target = getenv("TARGET");
     if (target != NULL &&
-        (strcmp(target, "hp39gs") == 0 || strcmp(target, "hp40gs") == 0)) {
+        (strcmp(target, "hp39gplus") == 0 ||
+         strcmp(target, "hp39gs") == 0 ||
+         strcmp(target, "hp40gs") == 0)) {
         down_action = &aplet_down;
         up_action = &aplet_up;
         name = "APLET";
