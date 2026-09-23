@@ -104,8 +104,8 @@ M7.3e compatibility-adapter validation is closed above that read core:
   clean return on both HP39gs and HP40gs without changing the
   descriptor-recall/object implementation. Font Gallery #122 remains useful
   historical evidence for the older launch race; the Gallery path now shares
-  the payload-aware retry mechanism and is revalidated by the current Gallery
-  gate.
+  the payload-aware retry mechanism, and **Gallery #127 (`35822292175`)** is
+  fully green across all Direct and Stock Gallery families.
 
 **Runtime #326 (`35739887799`)** is retained only as historical diagnostic
 evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
@@ -129,7 +129,7 @@ Historical HPGCC calculator-native helpers resolve the minifont and bigfont thro
 
 HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock `Put3x5` / `Put5x7` ROM entries, while independent ROM analysis establishes the raster tables themselves: mini-font physical Saturn base `0x07E695` and main-font base `0x07C651`. The HP39 UI reverse-engineering workspace independently establishes a third fixed 6×10 EditLine table at legacy base `0x07D3EA`, with 20 Saturn nibbles per character. This is a distinct ROM font, not the HP48/49/50 HPGCC bigfont.
 
-The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. `platform_cookie` carries the private-window base only as an opaque launcher/runtime token.
+The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. The launch ABI keeps `platform_cookie` opaque to applications; current HP39 runtime code decodes a tagged private platform context whose validated `font_window_base` points at that window.
 
 HP39g+ is deliberately excluded from that physical layout until a real-hardware full-flash fixture establishes its own identity.
 
