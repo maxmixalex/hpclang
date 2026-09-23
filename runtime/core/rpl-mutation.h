@@ -82,6 +82,24 @@ int hpclang_rpl_mutation_store_replace_same_size(
     uint32_t name_length,
     const struct hpclang_object *object);
 
+/*
+ * Internal USEROB geometry primitive for M7.3f.
+ *
+ * delta > 0 opens delta nibbles immediately before position by moving the
+ * lower USEROB prefix toward lower addresses. delta < 0 removes -delta
+ * nibbles immediately before position and closes the gap upward. All known
+ * Stock pointer tables and classic-RPL directory relative links are validated
+ * before mutation and relocated coherently. A contraction is rejected with
+ * BUSY if any Stock-visible pointer still targets the removed interval.
+ *
+ * This does not create, encode, replace, or remove a named variable by itself;
+ * higher-level store code owns the bytes placed into/opened from the gap.
+ */
+int hpclang_rpl_mutation_userob_shift_before(
+    const struct hpclang_rpl_mutation_io *io,
+    uint32_t position,
+    int32_t delta);
+
 #ifdef __cplusplus
 }
 #endif

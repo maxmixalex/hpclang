@@ -138,6 +138,158 @@ static uint32_t prepare_named_char(uint8_t value)
     return object;
 }
 
+struct named_pair {
+    uint32_t home;
+    uint32_t chain;
+    uint32_t link_a;
+    uint32_t item_a;
+    uint32_t object_a;
+    uint32_t link_b;
+    uint32_t item_b;
+    uint32_t object_b;
+};
+
+static struct named_pair prepare_two_named_chars(void)
+{
+    const struct named_pair pair = {
+        .home = 0x92000u,
+        .chain = 0x92008u,
+        .link_b = 0x9200du,
+        .item_b = 0x92012u,
+        .object_b = 0x92018u,
+        .link_a = 0x9201fu,
+        .item_a = 0x92024u,
+        .object_a = 0x9202au,
+    };
+
+    put_word(USEROB, 5u, pair.home);
+    put_word(CONTEXT, 5u, pair.home);
+    put_word(pair.home, 5u, DORRP);
+    put_word(pair.home + 5u, 3u, 0u);
+
+    put_word(
+        pair.chain,
+        5u,
+        pair.item_a - pair.chain);
+
+    put_word(pair.link_b, 5u, 0u);
+    put_word(pair.item_b, 2u, 1u);
+    put_word(pair.item_b + 2u, 2u, (uint32_t)'B');
+    put_word(pair.item_b + 4u, 2u, 1u);
+    put_word(pair.object_b, 5u, 0x029bfu);
+    put_word(pair.object_b + 5u, 2u, (uint32_t)'B');
+
+    put_word(
+        pair.link_a,
+        5u,
+        pair.link_a - pair.item_b);
+    put_word(pair.item_a, 2u, 1u);
+    put_word(pair.item_a + 2u, 2u, (uint32_t)'A');
+    put_word(pair.item_a + 4u, 2u, 1u);
+    put_word(pair.object_a, 5u, 0x029bfu);
+    put_word(pair.object_a + 5u, 2u, (uint32_t)'A');
+
+    return pair;
+}
+
+static void test_userob_shift_roundtrip(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+
+    uint32_t old_dstk = get_word(DSKTOP, 5u);
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+    put_word(old_dstk, 5u, pair.object_b);
+
+    /*
+     * B ends exactly where A's backward-link word begins. Opening five
+     * nibbles before that boundary requires two independent relative-link
+     * corrections: HOME-chain->A and A-link->B.
+     */
+    assert(pair.object_b + 7u == pair.link_a);
+    assert(hpclang_rpl_mutation_userob_shift_before(
+               &io, pair.link_a, 5) ==
+           HPCLANG_RPL_MUTATION_OK);
+
+    assert(get_word(DSKTOP, 5u) == old_dstk - 5u);
+    assert(get_word(AVMEM, 5u) == old_avmem - 1u);
+    assert(get_word(USEROB, 5u) == pair.home - 5u);
+    assert(get_word(CONTEXT, 5u) == pair.home - 5u);
+    assert(get_word(old_dstk - 5u, 5u) == pair.object_b - 5u);
+
+    uint32_t moved_chain = pair.chain - 5u;
+    assert(get_word(moved_chain, 5u) ==
+           pair.item_a - moved_chain);
+    assert(get_word(pair.link_a, 5u) ==
+           pair.link_a - (pair.item_b - 5u));
+    assert_char_at(pair.object_b - 5u, 'B');
+    assert_char_at(pair.object_a, 'A');
+
+    /*
+     * The opened five-nibble interval is deliberately left to the higher
+     * named-store operation. Closing that untouched interval must restore the
+     * exact original geometry and pointer values.
+     */
+    assert(hpclang_rpl_mutation_userob_shift_before(
+               &io, pair.link_a, -5) ==
+           HPCLANG_RPL_MUTATION_OK);
+
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(AVMEM, 5u) == old_avmem);
+    assert(get_word(USEROB, 5u) == pair.home);
+    assert(get_word(CONTEXT, 5u) == pair.home);
+    assert(get_word(old_dstk, 5u) == pair.object_b);
+    assert(get_word(pair.chain, 5u) ==
+           pair.item_a - pair.chain);
+    assert(get_word(pair.link_a, 5u) ==
+           pair.link_a - pair.item_b);
+    assert_char_at(pair.object_b, 'B');
+    assert_char_at(pair.object_a, 'A');
+}
+
+static void test_userob_shift_rejects_removed_reference(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+
+    uint32_t old_dstk = get_word(DSKTOP, 5u);
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+    uint32_t old_home = get_word(USEROB, 5u);
+    uint32_t old_chain = get_word(pair.chain, 5u);
+    uint32_t old_link = get_word(pair.link_a, 5u);
+
+    put_word(old_dstk, 5u, pair.link_a - 1u);
+    assert(hpclang_rpl_mutation_userob_shift_before(
+               &io, pair.link_a, -2) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(AVMEM, 5u) == old_avmem);
+    assert(get_word(USEROB, 5u) == old_home);
+    assert(get_word(pair.chain, 5u) == old_chain);
+    assert(get_word(pair.link_a, 5u) == old_link);
+}
+
+static void test_userob_shift_nospace_is_non_mutating(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+
+    uint32_t old_dstk = get_word(DSKTOP, 5u);
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+    uint32_t old_home = get_word(USEROB, 5u);
+    uint32_t old_chain = get_word(pair.chain, 5u);
+    io.user_limit = old_dstk - 4u;
+
+    assert(hpclang_rpl_mutation_userob_shift_before(
+               &io, pair.link_a, 5) ==
+           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(get_word(DSKTOP, 5u) == old_dstk);
+    assert(get_word(AVMEM, 5u) == old_avmem);
+    assert(get_word(USEROB, 5u) == old_home);
+    assert(get_word(pair.chain, 5u) == old_chain);
+}
+
 static void test_named_same_size_replace(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -345,5 +497,8 @@ int main(void)
     test_nospace_is_non_mutating();
     test_drop_and_replace();
     test_named_same_size_replace();
+    test_userob_shift_roundtrip();
+    test_userob_shift_rejects_removed_reference();
+    test_userob_shift_nospace_is_non_mutating();
     return 0;
 }
