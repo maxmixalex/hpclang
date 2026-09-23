@@ -74,6 +74,14 @@ python3 -m py_compile \
     "$ROOT/research/hp39gplus/rom-stream-wrap.py" \
     "$ROOT/research/hp39gplus/receive-rom-stream.py"
 
+(
+    cd "$ROOT/research/hp39gplus/go-receiver"
+    go test ./...
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+        go build -trimpath -ldflags="-s -w" \
+        -o "$OUT/hp39gplus-rom-receiver.exe" .
+)
+
 python3 "$ROOT/research/hp39gplus/rom-stream-wrap.py" \
     "$BUILD/rom-stream.bin" "$BUILD/rom-stream.hp"
 
@@ -95,7 +103,7 @@ cp "$BUILD/hp39dir.cur" "$OUT/calculator/HP39DIR.CUR"
 cp "$BUILD/LIB275L.000" "$OUT/calculator/LIB275L.000"
 cp "$ROOT/research/hp39gplus/receive-rom-stream.py" "$OUT/tools/"
 cp "$ROOT/research/hp39gplus/ROM-STREAM-README.md" "$OUT/README.txt"
-printf 'hidapi>=0.14\n' > "$OUT/requirements.txt"
+printf 'hidapi>=0.14\n' > "$OUT/requirements-python-fallback.txt"
 
 python3 - "$OUT" "$BUILD/rom-stream.bin" <<'PY'
 import hashlib
