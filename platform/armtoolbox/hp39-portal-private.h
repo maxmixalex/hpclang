@@ -48,12 +48,27 @@
 #define HP39P_VARIABLE_SCHEMA  6
 #define HP39P_VARIABLE_VALUE   7
 #define HP39P_REFERENCE_EVAL   8
+#define HP39P_VARIABLE_STORE   9
+
+/*
+ * First M7.3f write witness: keep the owned object entirely inside the
+ * bootstrap-private Saturn staging page while Stock executes the extended-ID
+ * store protocol. Larger objects fail closed until mutation lifetime/accounting
+ * is generalized beyond this bounded bridge.
+ */
+#define HP39P_VARIABLE_STORE_MAX_NIBBLES 7000u
 
 #ifndef __ASSEMBLER__
 
 #include <stddef.h>
 #include <stdint.h>
 #include <hpclang/bootstrap.h>
+
+struct hpclang_hp39_variable_store_request {
+    uint32_t id_reference;
+    uintptr_t object_data;
+    uint32_t object_nibbles;
+};
 
 struct hpclang_hp39_portal_context {
     struct hpclang_hp39_platform_context public_context;

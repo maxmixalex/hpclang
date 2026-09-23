@@ -35,6 +35,12 @@ int hpclang_hp39_variable_value_snapshot(
     const uint8_t *name,
     size_t name_length,
     struct hpclang_object **object);
+int hpclang_hp39_variable_value_store(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    const struct hpclang_object *object);
 int hpclang_hp39_program_body_snapshot(
     const uint8_t *name,
     size_t name_length,
@@ -1940,6 +1946,93 @@ int main(void)
                 hpclang_object_release(note_text_value);
                 return finish(0xbeu, boot->model);
             }
+
+            /*
+             * M7.3f first write witness: write the exact owned NoteText value
+             * back through its genuine extended-ID descriptor, then read it
+             * again. This proves the Stock store dispatcher without changing
+             * calculator-visible content or relying on a raw Saturn address.
+             */
+            size_t note_text_size = 0u;
+            if (hpclang_object_string_size(
+                    note_text_value, &note_text_size) != 0 ||
+                note_text_size > 3000u) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                return finish(0xd7u, boot->model);
+            }
+            if (hpclang_hp39_variable_value_store(
+                    note_category,
+                    sizeof(note_category) - 1u,
+                    note_text_name,
+                    sizeof(note_text_name) - 1u,
+                    note_text_value) != 0) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                return finish(0xd8u, boot->model);
+            }
+
+            struct hpclang_object *note_text_roundtrip = NULL;
+            if (hpclang_hp39_variable_value_snapshot(
+                    note_category,
+                    sizeof(note_category) - 1u,
+                    note_text_name,
+                    sizeof(note_text_name) - 1u,
+                    &note_text_roundtrip) != 0 ||
+                note_text_roundtrip == NULL ||
+                hpclang_object_kind(note_text_roundtrip) !=
+                    HPCLANG_OBJECT_STRING) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                hpclang_object_release(note_text_roundtrip);
+                return finish(0xd9u, boot->model);
+            }
+
+            size_t roundtrip_size = 0u;
+            if (hpclang_object_string_size(
+                    note_text_roundtrip, &roundtrip_size) != 0 ||
+                roundtrip_size != note_text_size) {
+                hpclang_object_release(aplet_catalog);
+                hpclang_object_release(program_catalog);
+                hpclang_object_release(note_catalog);
+                hpclang_object_release(variable_schema);
+                hpclang_object_release(note_text_value);
+                hpclang_object_release(note_text_roundtrip);
+                return finish(0xdau, boot->model);
+            }
+
+            if (note_text_size != 0u) {
+                uint8_t *before = malloc(note_text_size);
+                uint8_t *after = malloc(note_text_size);
+                if (before == NULL || after == NULL ||
+                    hpclang_object_string_copy(
+                        note_text_value, before, note_text_size) != 0 ||
+                    hpclang_object_string_copy(
+                        note_text_roundtrip, after, note_text_size) != 0 ||
+                    memcmp(before, after, note_text_size) != 0) {
+                    free(after);
+                    free(before);
+                    hpclang_object_release(aplet_catalog);
+                    hpclang_object_release(program_catalog);
+                    hpclang_object_release(note_catalog);
+                    hpclang_object_release(variable_schema);
+                    hpclang_object_release(note_text_value);
+                    hpclang_object_release(note_text_roundtrip);
+                    return finish(0xdbu, boot->model);
+                }
+                free(after);
+                free(before);
+            }
+            hpclang_object_release(note_text_roundtrip);
             hpclang_object_release(note_text_value);
 
             uint32_t aplet_count = 0u;

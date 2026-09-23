@@ -104,9 +104,12 @@ static int hp39_portal_result(
     }
 
     size_t maximum_name_length =
-        kind == HP39P_VARIABLE_VALUE || kind == HP39P_REFERENCE_EVAL
-            ? 3u
-            : HP39_BODY_NAME_MAX;
+        kind == HP39P_VARIABLE_STORE
+            ? sizeof(struct hpclang_hp39_variable_store_request)
+            : (kind == HP39P_VARIABLE_VALUE ||
+               kind == HP39P_REFERENCE_EVAL
+                   ? 3u
+                   : HP39_BODY_NAME_MAX);
     if (name_length > maximum_name_length ||
         (name == NULL && name_length != 0u)) {
         errno = EINVAL;
@@ -446,6 +449,97 @@ int hpclang_hp39_variable_value_snapshot(
         sizeof(payload),
         0u,
         object);
+}
+
+/*
+ * Private first M7.3f witness. Keep this deliberately narrower than the future
+ * public object-store mutation API: Stock must already contain the variable and
+ * the replacement must have the same native extent. That preserves the portal's
+ * current DSKTOP accounting while proving the descriptor word-2 store dispatch
+ * without exposing raw Saturn addresses or changing Stock cwd.
+ */
+int hpclang_hp39_variable_value_store(
+    const uint8_t *category,
+    size_t category_length,
+    const uint8_t *name,
+    size_t name_length,
+    const struct hpclang_object *object)
+{
+    if (object == NULL ||
+        category == NULL || category_length == 0u ||
+        name == NULL || name_length == 0u ||
+        name_length > HP39_VARIABLE_ID_MAX - 3u) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (object->nibble_count < 5u ||
+        object->nibble_count > HP39P_VARIABLE_STORE_MAX_NIBBLES) {
+        errno = E2BIG;
+        return -1;
+    }
+
+    /*
+     * Freeze the first bridge to same-size replacement. General growth/shrink
+     * needs separate USEROB/DSKTOP lifetime accounting and is not smuggled into
+     * this descriptor-dispatch witness.
+     */
+    struct hpclang_object *current = NULL;
+    if (hpclang_hp39_variable_value_snapshot(
+            category,
+            category_length,
+            name,
+            name_length,
+            &current) != 0)
+        return -1;
+    uint32_t current_nibbles = current->nibble_count;
+    hpclang_object_release(current);
+    if (current_nibbles != object->nibble_count) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    struct hpclang_object *schema = NULL;
+    if (hpclang_hp39_variable_schema_snapshot(&schema) != 0)
+        return -1;
+
+    struct hpclang_hp39_variable_schema_match match;
+    if (hpclang_hp39_variable_schema_find_resolved(
+            schema,
+            category,
+            category_length,
+            name,
+            name_length,
+            hp39_variable_reference_resolve,
+            NULL,
+            &match) != 0) {
+        hpclang_object_release(schema);
+        return -1;
+    }
+    hpclang_object_release(schema);
+
+    if (match.source_reference == 0u) {
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    struct hpclang_hp39_variable_store_request request = {
+        .id_reference = match.source_reference,
+        .object_data = (uintptr_t)object->data,
+        .object_nibbles = object->nibble_count,
+    };
+    uint32_t marker = 0u;
+    uint32_t marker_prologue = 0u;
+    return hp39_portal_result(
+        HP39P_VARIABLE_STORE,
+        (const uint8_t *)&request,
+        sizeof(request),
+        0u,
+        &marker,
+        &marker_prologue);
 }
 
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object)
