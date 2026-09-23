@@ -211,14 +211,15 @@ M7.3e validation is layered:
    pick/pop/push, failure-safe `stdargs`, historical textual int/double push
    formatting, exact ZINT construction/exchange including `INT64_MIN` /
    `INT64_MAX`, classic REAL construction/exchange and rounding, failed-type
-   pop preservation, CHAR push, and raw-byte String construction;
-2. the unified ARM build proves the adapters and the focused calculator witness
-   link through the same hpclang v1 runtime used by real calculator payloads;
-3. calculator E2E is used when it adds platform-specific evidence. The focused
-   witness records incoming stack depth, exercises ZINT/REAL/String exchange,
-   restores the exact depth after each operation, and executes successful
-   `stdargs` only when the incoming stack is already empty. It never clears a
-   non-empty Stock stack merely to create a test fixture.
+   pop preservation, CHAR push, raw-byte String construction, and malformed /
+   truncated object extents;
+2. unified ARM builds prove the adapters and focused calculator witness link
+   through the same hpclang v1 runtime used by calculator payloads;
+3. Stock E2E adds platform-specific evidence without manufacturing a special
+   object model. The focused witness records incoming stack depth, exercises
+   ZINT/REAL/String exchange, restores the exact depth after each operation,
+   and executes successful `stdargs` only when the incoming stack is already
+   empty.
 
 Evidence progression:
 
@@ -227,16 +228,27 @@ Evidence progression:
 - Core #399: exact owned ZINT constructor and push/pop exchange;
 - Core #400: representative bundled HPGCC `stack.c` flow;
 - Core #402: REAL constructor/push plus failure-safe `stdargs` host units and
-  ARMv4T hardware-validation build are green;
-- Core #404: the focused ZINT/REAL/String/stdargs calculator payload compiles and
-  links successfully in the hardware-validation E2E build on commit
-  `7e250343`.
+  ARMv4T hardware-validation build;
+- Core #404: focused ZINT/REAL/String/stdargs calculator payload build;
+- Storage #125/#126: Stock HP49g+/HP50g remains green after the shared
+  pre-PrRUN stage-baseline teardown race is fixed.
 
-Runtime #326 and the automatically triggered later Runtime workflows are not
-used as semantic proof merely because they exist. A Stock/Direct family result
-is cited only when that family reaches the new payload; a launcher/emulator
-startup failure before HPC1 remains a launcher problem rather than evidence
-against the adapter.
+The final bounded-adapter gate is **E2E / Runtime #338
+(`35812005032`) on `ba2c0398`**. Build, Direct hp39/hp48/hp4950, Stock
+hp39, Stock hp48, Stock hp4950, and evidence publication all pass. HP48's
+successful named-object snapshot uses the bounded `ZZE2E` DOCSTR rather than
+requiring an owned copy of the roughly 74 KiB launcher. HP39/40 reaches the
+payload only after the serial-disk lazy fetch has actually completed, with
+sparse post-gate ENTER retries covering Stock's asynchronous UI/install
+settling; both models then reach HPC1 PASS and clean Stock return.
 
-General named-object put/remove remains outside the HPGCC 1.1/2.0 read/search /
-recall parity baseline.
+Runtime #326 remains useful historical diagnostic evidence, but it is
+superseded as an M7.3e closure gate. Its launcher/pre-HPC1 failures are not
+treated as adapter semantics, and no repeated workflow rerun is needed to
+replace the stronger focused evidence above.
+
+The bounded source surface is therefore frozen for M7.3. General named-object
+put/remove remains outside the HPGCC 1.1/2.0 read/search/recall parity
+baseline. Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders,
+and non-transactional stack reorders stay Migration/Internal or demand-driven
+future work rather than M7.3 backlog.

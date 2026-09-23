@@ -64,12 +64,45 @@ Named-store and HP39 native-object validation then close the M7.3d read side:
 - the HP39 side also has a strict private `HP39AscA` directory parser with unit coverage against the original HPGCC 39G-support `HP39DIR.000` / `HP39DIR.CUR` records and malformed/truncated/overflow cases. Those files remain typed transfer-protocol evidence rather than an internal HOME namespace. ROM analysis likewise keeps `DoRecv/GetOb`, `DoGetObFrSto`, `OpenIO` and `StdIOProc` classified as System-RPL/DOCOL transfer/I/O controllers rather than direct ARM object-fetch entry points;
 - no general named object-store write gate is claimed. HP48gII/49g+/50g named stores remain read-only; HP39 descriptor store-handler words are known but do not yet constitute a validated generic variable-write path. The already-validated HP48/HP4950 stack mutation witness is a separate capability.
 
-M7.3e compatibility-adapter validation has now started above that closed read core:
+M7.3e compatibility-adapter validation is closed above that read core:
 
-- **Core #396 (`35739959095`)** is fully green with the first high-level HPGCC `satdir` adapter, the first safe `saturn.h` stack/object subset, the clean calculator-String constructor, their host/unit coverage, the unified ARM runtime build, and HP39 package build;
-- **Storage #122 (`35739887793`)** is also fully green with the compatibility object helpers linked into the normal runtime, so the new adapter objects do not regress the completed M7.2 storage gate;
-- **Runtime #326 (`35739887799`) is not a fully-green M7.3e gate and is not presented as one.** Direct hp48, Direct hp4950 and Stock hp4950 succeed. Within Direct hp39, HP39gs reaches the full machine-readable PASS and 52-frame progression, while HP40gs exits after 41/52 frames. Both Stock hp39 targets fail earlier in the Stock launcher with 0/52 frames and never enter HPC1; the same launcher-level failure class is already present before these adapters in Runtime #316, so it is not evidence of an object-adapter semantic failure. Stock hp48 also remains red. The triggering `b3be6555` change only links `object-construct.c` and `hpgcc-saturn.c` into the unified runtime source list and does not modify the HP39 launcher, keyboard schedule, or E2E payload;
-- because Core #396 and Storage #122 are green and Runtime #326's HP39 Stock failures are pre-HPC1/pre-existing, no repeated Runtime rerun is used merely to manufacture a green badge. A later focused closure gate should exercise malformed-object/error handling, stack preservation and clean return once it adds new M7.3 evidence rather than simply repeating the same launcher path.
+- **Core #396 (`35739959095`)** is fully green with the first high-level
+  HPGCC `satdir` adapter, safe `saturn.h` subset, calculator-String
+  constructor, host units, unified ARM runtime build, and HP39 package build;
+- later focused Core gates add historical textual numeric pushes, the exact ZINT
+  constructor/exchange, the representative bundled HPGCC `stack.c` flow,
+  classic REAL push, and failure-safe `stdargs`. Core #399/#400/#402/#404
+  cover those steps through host units and ARMv4T hardware-validation builds;
+- host units deliberately exercise malformed/truncated/overflow object extents
+  and verify that failed ZINT/REAL typed pops and failed `stdargs` conversion
+  do not consume the calculator stack;
+- **Storage #125/#126** keep the normal Stock storage/return path green while
+  the shared ARMToolbox stage-alias teardown monitor is made race-safe by
+  recording the pre-PrRUN Stock L1 baseline;
+- the final closure gate is **E2E / Runtime #338
+  (`35812005032`) on `ba2c0398`**. Build, Direct hp39/hp48/hp4950,
+  Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass.
+  The focused Stock adapter witness preserves incoming stack depth across
+  ZINT/REAL/String exchange and runs successful `stdargs` only on an
+  initially empty stack. The existing canonical mutation witness independently
+  restores push/replace/peek/pop/drop to the original depth;
+- HP48's final successful named-store snapshot uses the bounded `ZZE2E`
+  DOCSTR with payload `HPCLANG-E2E`. The transferred launcher remains visible
+  to enumeration but is no longer used as an approximately 74 KiB owned-copy
+  stress fixture. Its host sequence is released by actual Kermit completion,
+  then proves stage baseline → active alias → HPC1 PASS → alias release →
+  settled Stock return;
+- HP39/40 similarly gates the UI on actual serial-disk lazy-fetch completion.
+  Sparse post-gate ENTER retries cover Stock's asynchronous install/UI settling,
+  and the harness suppresses later sequence key-downs after KBRD. Runtime #338
+  therefore reaches HPC1 PASS and clean return on both HP39gs and HP40gs
+  without changing the descriptor-recall/object implementation.
+
+**Runtime #326 (`35739887799`)** is retained only as historical diagnostic
+evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
+and partial keyboard run are not adapter semantics; the later focused evidence
+above resolves those harness paths instead of manufacturing success through
+repeated unchanged reruns.
 
 The mutation allocator does not trust Stock `AVMEM` as a complete physical-memory description. Stage1 maps hpclang-owned ARMToolbox pages back into the live Saturn address space and publishes conservative TEMPOB/user-stack fences through a tagged private platform cookie. Expected `ENOSPC`/invalid-level failures are checked before the first mutation. `AVMEM` is updated relative to the existing Stock reservation rather than recomputed from raw `DSKTOP-RSKTOP` geometry, so launcher/native reservations are not accidentally made available.
 
