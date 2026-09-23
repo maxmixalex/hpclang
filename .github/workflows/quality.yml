@@ -1,0 +1,91 @@
+name: Quality
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "**/*.c"
+      - "**/*.h"
+      - "**/*.cc"
+      - "**/*.cpp"
+      - "**/*.cxx"
+      - "**/*.hpp"
+      - "**/*.py"
+      - "**/*.sh"
+      - ".clang-format"
+      - "pyproject.toml"
+      - "tools/lint.sh"
+      - "tools/format.sh"
+      - ".github/workflows/quality.yml"
+  pull_request:
+    paths:
+      - "**/*.c"
+      - "**/*.h"
+      - "**/*.cc"
+      - "**/*.cpp"
+      - "**/*.cxx"
+      - "**/*.hpp"
+      - "**/*.py"
+      - "**/*.sh"
+      - ".clang-format"
+      - "pyproject.toml"
+      - "tools/lint.sh"
+      - "tools/format.sh"
+      - ".github/workflows/quality.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Ruff + ShellCheck
+    runs-on: home-docker
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install lightweight lint dependencies
+        run: |
+          set -euo pipefail
+          if ! command -v ruff >/dev/null 2>&1; then
+            python3 -m pip install --user --disable-pip-version-check 'ruff==0.13.2'
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends shellcheck
+          fi
+          ruff --version
+          shellcheck --version
+
+      - name: Lint Python and shell
+        run: bash tools/lint.sh
+
+  formatter-config:
+    name: Formatter configuration
+    runs-on: home-docker
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate formatter configuration
+        run: |
+          set -euo pipefail
+          test -s .clang-format
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          config = tomllib.loads(Path("pyproject.toml").read_text())
+          assert "ruff" in config["tool"]
+          print("formatter configuration: clang-format + Ruff")
+          PY
+
+      - name: Explain formatting boundary
+        run: |
+          echo "C/C++ formatting is configured by .clang-format."
+          echo "Python formatting is configured by Ruff in pyproject.toml."
+          echo "Run: tools/format.sh"
+          echo "Check selected files without rewriting: tools/format.sh --check <files...>"
