@@ -22,31 +22,15 @@
 12900 capture receive-serial-disk
 13300 tap enter
 
-# HP39DIR.CUR and HP39DIR.000 complete first; ENTER then lazily installs the
-# selected aplet and Library 275. ENTER does not cancel an in-progress transfer
-# (ON does), so retry periodically instead of guessing exact completion time.
+# Directory metadata loads first. This ENTER starts the selected aplet's lazy
+# HPGCC000/LIB275L fetch; host-gate then waits for Kermit to report successful
+# EOF for LIB275L, which implies both lazy files are complete.
 31000 capture remote-aplet
 32500 tap enter
 34000 capture lazy-fetch
-180000 tap enter
-190000 tap enter
-200000 tap enter
-210000 tap enter
-220000 tap enter
-230000 tap enter
-240000 tap enter
-250000 tap enter
-260000 tap enter
-270000 tap enter
-280000 tap enter
+35000 host-gate
 
-# Current x50ng evidence shows HP39gs can still be actively transferring the
-# 42,022-byte HPGCC000.000 at the old ~295 s deadline, while the sibling HP40gs
-# path has completed its larger lazy-fetch chain by roughly 371 s. Keep the
-# same bounded sparse tail as HP40gs so active Kermit progress is not classified
-# as a launcher timeout, while leaving wide gaps after a successful ENTER launch.
-310000 tap enter
-340000 tap enter
-370000 tap enter
-400000 tap enter
-34500 monitor 390000
+# Times below are relative to host-gate release, not emulator start.
+0 monitor 60000
+500 capture fetch-complete
+1000 tap enter

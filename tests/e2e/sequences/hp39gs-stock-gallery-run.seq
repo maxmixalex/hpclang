@@ -1,6 +1,6 @@
 # HP39gs Stock Font Gallery through the original APLET UI and serial disk.
-# Start the lazy HPGCC/APLET transfer early, then wait for the evidence-based
-# worst-case Kermit envelope before entering the downloaded aplet.
+# The first ENTER starts the lazy HPGCC/APLET transfer; host-gate resumes the
+# launch only after Kermit has successfully completed LIB275L.
 2000 tap f6
 4000 tap f6
 7000 tap aplet
@@ -16,28 +16,26 @@
 31000 capture remote-aplet
 32500 tap enter
 34000 capture lazy-fetch
+35000 host-gate
 
-# Monitor the result word throughout transfer and Gallery execution. The first
-# late ENTER advances the completed lazy install to the HPGCC aplet launch
-# screen; the captured failure from the previous run proved that this screen
-# then requires one more ENTER to enter HPC1. If a faster stock path has already
-# entered Gallery, that second ENTER is only the harmless sample/text toggle.
-# Capture both page states for each native face so the ROM-pixel oracle is
-# independent of that launch/toggle race.
-34500 monitor 450000
-410000 tap enter
-416000 tap enter
-428000 capture native-mini
-431000 tap enter
-434000 capture native-mini-other
-437000 tap down
-440000 capture native-main
-443000 tap enter
-446000 capture native-main-other
-449000 tap down
-452000 capture native-editline
-455000 tap enter
-458000 capture native-editline-other
-461000 tap right
-464000 capture generated-control
-467000 tap on
+# Times below are relative to host-gate release. Gallery needs the historical
+# two ENTERs: one reaches the downloaded aplet launch screen, the second enters
+# HPC1. Captures retain both sample/text states for the ROM-pixel oracle.
+0 monitor 90000
+500 capture fetch-complete
+1000 tap enter
+7000 tap enter
+19000 capture native-mini
+22000 tap enter
+25000 capture native-mini-other
+28000 tap down
+31000 capture native-main
+34000 tap enter
+37000 capture native-main-other
+40000 tap down
+43000 capture native-editline
+46000 tap enter
+49000 capture native-editline-other
+52000 tap right
+55000 capture generated-control
+58000 tap on
