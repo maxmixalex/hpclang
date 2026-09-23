@@ -16,7 +16,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 
 Direct runtime passes on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains blocked until a trustworthy real-machine stock flash fixture exists.
 
-Current fully-green canonical runtime evidence is **35298949365 / #135** on the final M7.1 head: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and the exact 52-frame keyboard progression all pass. The HP48 Stock path reaches payload PASS, restores control flow, tears down the temporary stage mapping, and reaches a settled stock-owned repaint. Runtime #122 remains the first run that closed this same contract; later intermediate runs are historical diagnostics rather than the current gate.
+Current fully-green canonical runtime regression evidence is **35828142966 / #355** on the post-M7.3a-e cleanup head `8679bc94`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #355 revalidates that same cross-family runtime/return contract after the subsequent cleanup and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
 ## Runtime PASS contract
 
@@ -180,7 +180,7 @@ The real HP39gs run has passed the complete canonical runtime and returned clean
 
 `Stock / hp39` boots each official 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original serial-disk path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result.
 
-Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 proves the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family.
+Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 first froze the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family; the post-M7.3 cleanup Runtime #355 repeats the fully-green Direct/Stock regression contract.
 
 ## HP48gII Direct and Stock gates
 
@@ -188,7 +188,7 @@ Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 di
 
 Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
-HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #135 is the current canonical fully-green witness; Gallery #112 independently validates the same settled return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
+HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #355 is the current fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #128 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
 
 ## HP49g+/50g stream-storage and Stock gate
 
@@ -218,4 +218,4 @@ The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06`; only the resu
 
 Machine-readable assertions remain the gate. Images are review/debug evidence rather than substitutes for assertions.
 
-Canonical summaries are published to `ci-evidence` and standard Actions artifacts retain per-run evidence. Keyboard progression and Font Gallery contact sheets/summaries use separate paths. Concurrent `ci-evidence` publication still needs a race-safe update strategy; an evidence-branch push conflict does not invalidate an already-uploaded Actions artifact or a passed calculator assertion.
+Canonical summaries are published to `ci-evidence` and standard Actions artifacts retain per-run evidence. Keyboard progression and Font Gallery contact sheets/summaries use separate paths. Runtime and Gallery use globally serialized publisher jobs, and cancelled runs do not enter that publisher queue; standard Actions artifacts remain the per-run fallback.
