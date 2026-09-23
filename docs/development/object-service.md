@@ -208,35 +208,63 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
 - named put/remove is **not implemented as a general M7.3 capability** and is not a prerequisite for HPGCC 1.1/2.0 capability parity. HPGCC3's later `sat3_sto*` / `sat3_purge*` family remains useful mutation evidence, but calculator-store mutation stays deferred until a concrete compatibility/application requirement justifies the additional lifecycle work. The presence of an HP39 descriptor store word is evidence about Stock's variable contract, not proof that hpclang already has a safe generic variable-write bridge.
 
-### M7.3e — HPGCC adapters and closure — first adapter slice implemented
+### M7.3e — HPGCC adapters and closure — complete at the bounded parity baseline
 
-The first source-compatibility layer is now above the clean core rather than
+The source-compatibility layer is now closed above the clean core rather than
 inside it:
 
 - high-level HPGCC 1.1/2.0 `satdir.h` C-side navigation, exact get, parent
   recall, recursive HOME search and REAL fetch are implemented on owned store
   handles/snapshots. Historical `SAT_OBJ_DSCR.addr` is deliberately an opaque
   compatibility token, not a Saturn address;
-- the first safe `saturn.h` stack/object subset implements scope init/exit,
-  depth, drop/dropn, C-string push/pick/pop, REAL pop and CHAR push through the
-  canonical object/stack service;
-- `hpclang_object_create_string()` adds the clean raw-calculator-byte DOCSTR
-  constructor needed by string push while preserving explicit-length semantics
-  in the canonical API;
-- raw Saturn address/memory functions remain Migration/Internal. They are not
-  reintroduced merely to make the historical header numerically complete;
-- `sat_stack_swap`/`sat_stack_nip` are intentionally deferred until a
-  transactional reorder primitive or equivalently failure-safe implementation
-  exists; two sequential replacements would weaken the M7.3 mutation contract;
-- Core #396 validates the code-bearing M7.3e head through host units, unified
-  ARMv4T soft-float runtime/hardware-validation build, and HP39 package build.
+- the bounded `saturn.h` layer implements scope init/exit, depth, drop/dropn,
+  String push/pick/pop, historical textual int/double pushes, exact ZINT
+  push/pop, classic REAL push/pop, CHAR push, and `stdargs` conversion;
+- `stdargs` and typed pops preflight through owned snapshots, so a type or
+  allocation failure does not consume a partially converted calculator stack;
+- the clean constructors `hpclang_object_create_string()`,
+  `hpclang_object_create_integer_i64()` and
+  `hpclang_object_create_real_f64()` provide the reusable typed side of those
+  adapters without exposing native prologues or Saturn addresses;
+- raw Saturn address/memory functions remain Migration/Internal. Native-BCD
+  complex/vector/array helpers, raw list builders, and borrowed stack
+  descriptors are not reintroduced merely to make the historical header
+  numerically complete;
+- `sat_stack_swap` / `sat_stack_nip` stay outside the bounded subset until a
+  real port justifies a transactional reorder primitive. Their omission, like
+  general named put/remove, is an explicit compatibility classification rather
+  than unfinished M7.3 core work.
 
-The precise implemented/deferred/Migration split is recorded in
-[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md).
+Validation progressed from Core #396 (first adapter slice) through Core #399
+(exact ZINT), Core #400 (the bundled HPGCC `stack.c` flow), and Core #402/#404
+(REAL, failure-safe `stdargs`, and the focused calculator witness). Storage
+#125/#126 then kept the normal Stock storage/return gate green while the shared
+stage-alias teardown race was made baseline-aware.
 
-Remaining M7.3e closure work is targeted rather than another Saturn reverse:
-add further high-value typed constructors/adapters only where the clean object
-service can preserve ownership/failure semantics, and extend Stock round-trip
-coverage for malformed objects, stack preservation and clean return. General
-named-object mutation remains separately deferred until a concrete application
-or compatibility requirement justifies it.
+The final M7.3 closure gate is **E2E / Runtime #338
+(`35812005032`) on `ba2c0398`**. Build, all three Direct families, Stock
+HP39gs/HP40gs, Stock HP48gII, Stock HP49g+/HP50g, and evidence publication all
+pass. The focused Stock witness preserves the incoming stack depth while
+round-tripping ZINT, REAL and String values and only exercises successful
+`stdargs` when the incoming stack is already empty. The canonical core witness
+also returns push/replace/peek/pop/drop mutation to the original depth.
+
+HP48 uses a deliberately small transferred `ZZE2E` DOCSTR
+(`"HPCLANG-E2E"`) for successful owned named-object snapshot validation; the
+large launcher remains enumerable but is no longer abused as a memory-stress
+fixture. HP39/40 launch timing is gated on actual lazy-fetch completion and then
+uses sparse Stock-UI ENTER retries; once the payload reaches its acknowledged
+keyboard phase, later sequence key-downs are suppressed. Those harness fixes
+close launch/return races without changing object semantics.
+
+Malformed/truncated/overflow object layouts and failed typed-pop/stdargs
+preservation remain covered by host units, while Runtime #338 supplies the
+cross-family Stock round-trip and clean-return evidence. This is sufficient to
+close **M7.3** at the intended HPGCC 1.1/2.0 read/search/recall/stack-exchange
+baseline.
+
+The precise implemented/deferred/Migration split remains recorded in
+[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md). General named
+object mutation is still separately deferred until a concrete application or
+compatibility requirement justifies its additional lifetime and failure-safety
+work.
