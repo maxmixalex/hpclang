@@ -1,0 +1,61 @@
+name: Research / HP39g+ ROM dump
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/hp39gplus/**"
+      - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/prepare-hp39-aplet.py"
+      - ".github/actions/setup-atfe/**"
+      - ".github/workflows/hp39gplus-romdump.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build read-only 1 MiB dumper bundle
+    runs-on: home-docker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Arm Toolchain for Embedded
+        uses: ./.github/actions/setup-atfe
+
+      - name: Restore prepared HPGCC39 cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
+      - name: Install HPGCC39 preparation dependency on cache miss
+        run: |
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends innoextract
+          fi
+
+      - name: Prepare HPGCC39 SDK
+        run: |
+          chmod +x tools/bootstrap-hp39-aplet.sh
+          tools/bootstrap-hp39-aplet.sh
+
+      - name: Build ROM-dump bundle
+        run: |
+          chmod +x research/hp39gplus/build-rom-dumper.sh
+          research/hp39gplus/build-rom-dumper.sh \
+            "$GITHUB_WORKSPACE/dist/hp39gplus-romdump"
+          printf 'commit=%s\nworkflow_run=%s\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+            > dist/hp39gplus-romdump/BUILD_INFO.txt
+
+      - name: Upload HP39g+ ROM-dump bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp39gplus-romdump
+          retention-days: 30
+          path: dist/hp39gplus-romdump/
+          if-no-files-found: error

@@ -47,3 +47,20 @@ gates. The current payload extracts the first 16 KiB boot block; a complete
 
 Emulator probe success is not HP39g+ firmware validation and must never be
 recorded as a native HP39g+ fixture.
+
+
+## Full real-hardware dumper
+
+Now that a real HP39g+ is available, the retained 16 KiB mapping mechanism is
+also packaged as a conservative full-flash acquisition tool:
+
+- `rom-dump.S` keeps the same 16 KiB/result-buffer geometry and changes only
+  a compile-time physical offset;
+- `build-rom-dumper.sh` builds 64 fixed-offset aplets covering the complete
+  1 MiB NOR without buffering the full image in calculator RAM;
+- `extract-rom-dump.py` validates/extracts one returned chunk;
+- `collect-rom-dump.py` requires and assembles all 64 chunks;
+- `ROM-DUMP-README.md` is the real-device operating procedure.
+
+This remains read-only research code until the first physical-machine dump is
+obtained and checked.
