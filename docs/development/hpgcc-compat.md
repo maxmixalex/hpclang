@@ -125,9 +125,9 @@ However, evidence must not be overstated: HPGCC does **not** provide the hpclang
 
 The production HP39gs/40gs implementation now exposes only the two required physical NOR pages, `0x0007e000` and `0x0007f000`, as uncached 4 KiB small pages inside the bootstrap-private prefix of hpclang's own code coarse table. Runtime receives the exact private window base only through the opaque `platform_cookie`; no physical ROM address or private mapping becomes public font ABI.
 
-This replaced an experimental long-lived high-L1 section alias. The alias mechanism itself was valid — the retained HP39g+ NOR dumper remains useful evidence for a transient `L1[A0]`/section mapping — but it was not safe as persistent runtime storage on HP39gs/40gs. Diagnostics proved that the active LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite a descriptor word during ordinary drawing. A descriptor that reads zero is therefore not necessarily a safe long-lived slot.
+This replaced an experimental long-lived high-L1 section alias. The transient `L1[A0]`/section mapping was sufficient to acquire the real HP39g+ NOR, but the one-shot dumper source has since been retired. The mechanism was not safe as persistent runtime storage on HP39gs/40gs: diagnostics proved that the active LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite a descriptor word during ordinary drawing. A descriptor that reads zero is therefore not necessarily a safe long-lived slot.
 
-The retained dumper must also not be over-interpreted as HP39g+ firmware-identity evidence. HP39g+ remains excluded from the gs/40gs physical-font layout until a trustworthy real-hardware full-flash fixture establishes its own mapping.
+The verified 1 MiB real-hardware HP39g+ full-NOR fixture now establishes model-1 firmware identity for emulator/runtime validation. It still must not be over-interpreted as proof of the gs/40gs physical-font layout: HP39g+ remains excluded from those native-font offsets until its own object/page mapping is established.
 
 Compatibility consequence:
 
