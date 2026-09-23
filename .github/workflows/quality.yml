@@ -88,6 +88,12 @@ jobs:
           print("formatter configuration: clang-format + Ruff")
           PY
 
+          if ! command -v clang-format >/dev/null 2>&1; then
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends clang-format
+          fi
+          printf 'int main(void){return 0;}\n' | clang-format --style=file >/dev/null
+
       - name: Explain formatting boundary
         run: |
           echo "C/C++ formatting is configured by .clang-format."
