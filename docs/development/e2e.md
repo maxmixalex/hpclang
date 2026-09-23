@@ -62,7 +62,7 @@ HP 48gII uses the stock Serial Kermit server to receive `L275_48.LIB`, generated
 
 HP 49g+ and HP 50g use an emulated SD card to install ARMToolbox and copy generated `HPCLANG.HP`. They share the same stock UI sequence while retaining their native per-model ARM bootloaders.
 
-Current E2E status is intentionally split by workflow. Canonical **Runtime #338** is fully green, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. The most recent **Font Gallery #122** is still red on its HP39gs/HP40gs jobs; its HP48gII and hp4950 jobs are green. The canonical HP39 Runtime lazy-fetch/settling fix that produced Runtime #338 has not yet been mirrored into/revalidated by the Gallery path, so Gallery #122 remains an open harness follow-up rather than a calculator-object regression.
+Current E2E status is intentionally split by workflow. Canonical **Runtime #354 (`35822292159`)** is fully green, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. **Font Gallery #127 (`35822292175`) is also fully green** across Direct hp39/hp48/hp4950 and Stock hp39gs/hp40gs/hp48gii/hp50g. The earlier HP39 Gallery red path had two independent harness regressions: launch/UI settling required payload-aware launch-only retries, and the Gallery application retained an obsolete direct `platform_cookie == code-window` availability check after runtime moved HP39 private state behind an opaque tagged platform context. The runtime font service now owns that private mapping decision and the independent ROM pixel oracle validates the rendered result.
 
 ## Target profiles
 
@@ -184,6 +184,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 The general TTF importer has been removed. Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained in the source package. Gallery labels/specimens were strengthened for Ark Pixel regional variants, width-sensitive Latin, digits/punctuation, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35298949457 / #112** is the current fully-green closure gate. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence.
+`E2E / Font Gallery` **#127 (`35822292175`)** is the current fully-green regression gate. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
 The font implementation/evidence slice is therefore closed. Remaining work is repository integration and bounded Stock-harness closeout, not additional font-core or Gallery implementation.
