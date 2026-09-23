@@ -10,7 +10,7 @@
 #include <hpclang/object-store.h>
 #include <hpclang/target.h>
 
-int hpclang_object_store_replace_existing_same_size(
+int hpclang_object_store_replace_existing(
     const struct hpclang_object_store *store,
     const uint8_t *name,
     uint32_t name_length,
@@ -78,6 +78,8 @@ int main(void)
 
     static const uint8_t hp48_name[] = {'Z', 'Z', 'E', '2', 'E'};
     static const uint8_t hp48_value[] = "HPCLANG-E2E";
+    static const uint8_t hp48_replacement[] = "HPCLANG-E2E!";
+    static const uint8_t hp4950_replacement[] = {'R'};
     static const uint8_t hp4950_name[] = {
         'X', '5', '0', 'N', 'G', '-', 'V', 'V', '.', 'F', 'A', 'T'
     };
@@ -92,11 +94,21 @@ int main(void)
         boot->model == HPCLANG_MODEL_HP48GII
             ? sizeof(hp48_value) - 1u
             : 0u;
+    const uint8_t *replacement_bytes =
+        boot->model == HPCLANG_MODEL_HP48GII
+            ? hp48_replacement
+            : hp4950_replacement;
+    size_t replacement_size =
+        boot->model == HPCLANG_MODEL_HP48GII
+            ? sizeof(hp48_replacement) - 1u
+            : sizeof(hp4950_replacement);
 
     uint32_t failure = 0u;
     struct hpclang_object_store *home = NULL;
     struct hpclang_object *before = NULL;
+    struct hpclang_object *replacement = NULL;
     struct hpclang_object *after = NULL;
+    struct hpclang_object *restored = NULL;
 
     phase(1u);
     home = hpclang_object_store_home();
@@ -132,10 +144,25 @@ int main(void)
         }
     }
 
-    phase(15u);
-    if (hpclang_object_store_replace_existing_same_size(
-            home, name, name_length, before) != 0) {
+    if (replacement_size != expected_size + 1u ||
+        hpclang_object_create_string(
+            replacement_bytes,
+            replacement_size,
+            &replacement) != 0 ||
+        replacement == NULL) {
         failure = 0xe6u;
+        goto done;
+    }
+
+    /*
+     * First live USEROB-resize witness. DOCSTR grows by one calculator byte,
+     * i.e. exactly two nibbles. The logical HOME handle must be resolved again
+     * after the shift; no raw Saturn address is retained across either write.
+     */
+    phase(15u);
+    if (hpclang_object_store_replace_existing(
+            home, name, name_length, replacement) != 0) {
+        failure = 0xe7u;
         goto done;
     }
 
@@ -144,28 +171,72 @@ int main(void)
             home, name, name_length, &after) != 0 ||
         after == NULL ||
         hpclang_object_kind(after) != HPCLANG_OBJECT_STRING) {
-        failure = 0xe7u;
+        failure = 0xe8u;
         goto done;
     }
 
     size_t after_size = 0u;
     if (hpclang_object_string_size(after, &after_size) != 0 ||
-        after_size != before_size) {
-        failure = 0xe8u;
+        after_size != replacement_size) {
+        failure = 0xe9u;
         goto done;
     }
 
-    if (after_size != 0u) {
-        uint8_t actual[sizeof(hp48_value) - 1u];
-        if (hpclang_object_string_copy(after, actual, after_size) != 0 ||
-            memcmp(expected, actual, after_size) != 0) {
-            failure = 0xe9u;
+    uint8_t replacement_actual[sizeof(hp48_replacement) - 1u];
+    if (replacement_size > sizeof(replacement_actual) ||
+        hpclang_object_string_copy(
+            after, replacement_actual, replacement_size) != 0 ||
+        memcmp(
+            replacement_actual,
+            replacement_bytes,
+            replacement_size) != 0) {
+        failure = 0xeau;
+        goto done;
+    }
+    hpclang_object_release(after);
+    after = NULL;
+
+    phase(17u);
+    if (hpclang_object_store_replace_existing(
+            home, name, name_length, before) != 0) {
+        failure = 0xebu;
+        goto done;
+    }
+
+    phase(18u);
+    if (hpclang_object_store_get(
+            home, name, name_length, &restored) != 0 ||
+        restored == NULL ||
+        hpclang_object_kind(restored) != HPCLANG_OBJECT_STRING) {
+        failure = 0xecu;
+        goto done;
+    }
+
+    size_t restored_size = 0u;
+    if (hpclang_object_string_size(
+            restored, &restored_size) != 0 ||
+        restored_size != before_size) {
+        failure = 0xedu;
+        goto done;
+    }
+
+    if (restored_size != 0u) {
+        uint8_t restored_actual[sizeof(hp48_value) - 1u];
+        if (restored_size > sizeof(restored_actual) ||
+            hpclang_object_string_copy(
+                restored, restored_actual, restored_size) != 0 ||
+            memcmp(
+                restored_actual, expected, restored_size) != 0) {
+            failure = 0xeeu;
             goto done;
         }
     }
+    phase(19u);
 
 done:
+    hpclang_object_release(restored);
     hpclang_object_release(after);
+    hpclang_object_release(replacement);
     hpclang_object_release(before);
     hpclang_object_store_close(home);
     return finish(failure);

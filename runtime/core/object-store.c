@@ -398,40 +398,8 @@ int hpclang_object_store_get(
 }
 
 
-/*
- * Private M7.3f bridge used by Stock E2E while the public put/remove contract
- * is still being completed. It deliberately exposes no Saturn address and
- * accepts only an owned snapshot.
- */
-int hpclang_object_store_replace_existing_same_size(
-    const struct hpclang_object_store *store,
-    const uint8_t *name,
-    uint32_t name_length,
-    const struct hpclang_object *object)
+static int set_mutation_errno(int result)
 {
-    if (object == NULL || store == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
-    if (!stock_store_available()) {
-        errno = ENOSYS;
-        return -1;
-    }
-    if (!validate_name(name, name_length))
-        return -1;
-
-    uint32_t directory = 0u;
-    if (resolve_store(store, &directory) != 0)
-        return -1;
-
-    struct hpclang_rpl_mutation_io io;
-    if (!stock_mutation_io(&io)) {
-        errno = ENOSYS;
-        return -1;
-    }
-
-    int result = hpclang_rpl_mutation_store_replace_same_size(
-        &io, directory, name, name_length, object);
     switch (result) {
     case HPCLANG_RPL_MUTATION_OK:
         return 0;
@@ -465,6 +433,74 @@ int hpclang_object_store_replace_existing_same_size(
         break;
     }
     return -1;
+}
+
+static int replace_existing_prepare(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object,
+    uint32_t *directory,
+    struct hpclang_rpl_mutation_io *io)
+{
+    if (object == NULL || store == NULL ||
+        directory == NULL || io == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!stock_store_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (!validate_name(name, name_length))
+        return -1;
+    if (resolve_store(store, directory) != 0)
+        return -1;
+    if (!stock_mutation_io(io)) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * Private M7.3f bridges used by Stock E2E while the public put/remove contract
+ * is still being completed. They expose no Saturn address and accept only an
+ * owned snapshot. Each call re-resolves the logical store handle, so USEROB
+ * movement cannot leave a stale directory address in the caller.
+ */
+int hpclang_object_store_replace_existing(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    if (replace_existing_prepare(
+            store, name, name_length, object, &directory, &io) != 0)
+        return -1;
+
+    return set_mutation_errno(
+        hpclang_rpl_mutation_store_replace(
+            &io, directory, name, name_length, object));
+}
+
+int hpclang_object_store_replace_existing_same_size(
+    const struct hpclang_object_store *store,
+    const uint8_t *name,
+    uint32_t name_length,
+    const struct hpclang_object *object)
+{
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    if (replace_existing_prepare(
+            store, name, name_length, object, &directory, &io) != 0)
+        return -1;
+
+    return set_mutation_errno(
+        hpclang_rpl_mutation_store_replace_same_size(
+            &io, directory, name, name_length, object));
 }
 
 struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
