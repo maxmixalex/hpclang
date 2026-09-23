@@ -1266,7 +1266,9 @@ static const struct expected_key_event *expected_keyboard(
     size_t *count)
 {
     *count = 51u;
-    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS)
+    if (model == HPCLANG_MODEL_HP39GPLUS ||
+        model == HPCLANG_MODEL_HP39GS ||
+        model == HPCLANG_MODEL_HP40GS)
         return hp39_keyboard;
     if (model == HPCLANG_MODEL_HP48GII)
         return hp48_keyboard;
