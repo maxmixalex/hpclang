@@ -13,7 +13,7 @@ while IFS= read -r line; do
     env_name="${line%%=*}"
     env_value="${line#*=}"
     printf -v "$env_name" '%s' "$env_value"
-    export "$env_name"
+    export "${env_name?}"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
 export HPCLANG_X50NG_HARNESS=stock
