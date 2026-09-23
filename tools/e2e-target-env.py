@@ -77,6 +77,12 @@ def main() -> int:
                 print(f"{path}: newline in nor.{key}", file=sys.stderr)
                 return 2
             print(f"HPCLANG_E2E_NOR_{key.upper()}={value}")
+        if "state_bytes" in nor:
+            value = str(nor["state_bytes"])
+            if not value or "\n" in value or "\r" in value:
+                print(f"{path}: invalid nor.state_bytes", file=sys.stderr)
+                return 2
+            print(f"HPCLANG_E2E_NOR_STATE_BYTES={value}")
 
     return 0
 

@@ -44,6 +44,7 @@ case "$HPCLANG_E2E_FAMILY" in
                 "$ROOT/$HPCLANG_E2E_NOR_PATH" "$STATE" \
                 --compression "$HPCLANG_E2E_NOR_COMPRESSION" \
                 --bytes "$HPCLANG_E2E_NOR_BYTES" \
+                --state-bytes "${HPCLANG_E2E_NOR_STATE_BYTES:-$HPCLANG_E2E_NOR_BYTES}" \
                 --sha256 "$HPCLANG_E2E_NOR_SHA256"
         else
             curl -fL --retry 3 \

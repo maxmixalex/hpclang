@@ -15,6 +15,12 @@ def main() -> None:
     parser.add_argument("state_dir", type=Path)
     parser.add_argument("--compression", choices=("none", "xz"), default="none")
     parser.add_argument("--bytes", type=int, required=True)
+    parser.add_argument(
+        "--state-bytes",
+        type=int,
+        default=None,
+        help="optional emulator backing size; bytes beyond the verified image are 0xff",
+    )
     parser.add_argument("--sha256", required=True)
     args = parser.parse_args()
 
@@ -35,10 +41,18 @@ def main() -> None:
     if data[:0x4000] == b"\xff" * 0x4000:
         raise SystemExit(f"{args.fixture}: bootloader area is blank")
 
+    state_bytes = args.state_bytes if args.state_bytes is not None else len(data)
+    if state_bytes < len(data):
+        raise SystemExit(
+            f"{args.fixture}: state backing {state_bytes} is smaller than image {len(data)}"
+        )
+    state = data + b"\xff" * (state_bytes - len(data))
+
     args.state_dir.mkdir(parents=True, exist_ok=True)
-    (args.state_dir / "flash").write_bytes(data)
+    (args.state_dir / "flash").write_bytes(state)
     print(f"flash={args.state_dir / 'flash'}")
-    print(f"bytes={len(data)}")
+    print(f"image_bytes={len(data)}")
+    print(f"state_bytes={len(state)}")
     print(f"sha256={digest}")
 
 
