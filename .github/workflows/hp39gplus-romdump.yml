@@ -60,7 +60,12 @@ jobs:
           tools/bootstrap-hp39-aplet.sh
 
       - name: Test one-launch receiver protocol
-        run: python3 research/hp39gplus/test-rom-stream-receiver.py
+        run: |
+          python3 research/hp39gplus/test-rom-stream-receiver.py
+          (
+            cd research/hp39gplus/go-receiver
+            go test ./...
+          )
 
       - name: Build conservative ROM-dump bundle
         run: |
