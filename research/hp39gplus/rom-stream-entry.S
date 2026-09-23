@@ -10,14 +10,16 @@
  * invalid before we touch them; otherwise we return without changing anything.
  *
  * The retained 16 KiB probe established L1_FLASH=0x07f00280 for virtual
- * section 0x0a. L1 descriptors are 4 bytes each, so the adjacent 0x0b..0x0e
- * aliases are +4 bytes per section.
+ * section index 0x0a0 (VA 0x0a000000).  We borrow the four adjacent L1
+ * section indices 0x0a1..0x0a4, corresponding to VA
+ * 0x0a100000..0x0a400000.  L1 descriptors are 4 bytes each, hence the +4
+ * byte stride below.
  */
 .equ L1_FLASH,       0x07f00280  /* VA 0x0a000000 */
-.equ L1_USBD,        0x07f00284  /* VA 0x0b000000 */
-.equ L1_CLK,         0x07f00288  /* VA 0x0c000000 */
-.equ L1_GPIO,        0x07f0028c  /* VA 0x0d000000 */
-.equ L1_INT,         0x07f00290  /* VA 0x0e000000 */
+.equ L1_USBD,        0x07f00284  /* VA 0x0a100000 */
+.equ L1_CLK,         0x07f00288  /* VA 0x0a200000 */
+.equ L1_GPIO,        0x07f0028c  /* VA 0x0a300000 */
+.equ L1_INT,         0x07f00290  /* VA 0x0a400000 */
 .equ SWI_VECTOR,     0x08000008
 
 .equ DESC_FLASH,     0x00000c12

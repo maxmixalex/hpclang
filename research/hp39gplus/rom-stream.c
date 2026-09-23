@@ -23,10 +23,15 @@ typedef unsigned int u32;
 #define FLASH_BYTES         0x00100000u
 #define BLOCK_BYTES         0x00004000u
 
-#define USBD_BASE           0x0b000000u
-#define CLK_BASE            0x0c000000u
-#define GPIO_BASE           0x0d000000u
-#define INT_BASE            0x0e000000u
+/*
+ * Keep all temporary aliases in the five adjacent, preflighted L1 slots
+ * 0x0a0..0x0a4.  One L1 section is 1 MiB, so adjacent aliases advance by
+ * 0x00100000, not by 0x01000000.
+ */
+#define USBD_BASE           0x0a100000u
+#define CLK_BASE            0x0a200000u
+#define GPIO_BASE           0x0a300000u
+#define INT_BASE            0x0a400000u
 /* HPGCC39 exposes the stock LCD controller at this established ARM VA. */
 #define LCD_BASE            0x07300000u
 
