@@ -27,15 +27,18 @@ printf '%s  %s\n' \
     "$NOR" | sha256sum -c -
 python3 "$ROOT/tools/prepare-hp48gii-nor.py" "$NOR" "$STATE"
 
+printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
+python3 "$ROOT/tools/hp-rpl-string-wrap.py" \
+    "$SEND/ZZE2E.txt" "$SEND/ZZE2E.HP"
 cp "$ASSETS_DIR/L275_48" "$SEND/L275_48"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
 KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
-    "$SEND/L275_48" "$SEND/HPCLANG.HP")"
+    "$SEND/ZZE2E.HP" "$SEND/L275_48" "$SEND/HPCLANG.HP")"
 EMULATOR_TIMEOUT=$((35 + KERMIT_TIMEOUT + 120))
 printf 'HP48 Stock transfer watchdog: kermit=%ss emulator=%ss bytes=%s\n' \
     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT" \
-    "$(( $(stat -c %s "$SEND/L275_48") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
+    "$(( $(stat -c %s "$SEND/ZZE2E.HP") + $(stat -c %s "$SEND/L275_48") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
@@ -85,7 +88,7 @@ X50_PID=$!
 sleep 35
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
-    L275_48=L275 HPCLANG.HP=HPCLANG \
+    ZZE2E.HP=ZZE2E L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP48 Stock Kermit completed; released host gate: %s\n' "$HOST_GATE"
