@@ -1610,8 +1610,9 @@ static uint32_t object_store_read_only_test(uint32_t model)
     }
 
     static const uint8_t hp48_witness_name[] = {
-        'H', 'P', 'C', 'L', 'A', 'N', 'G'
+        'Z', 'Z', 'E', '2', 'E'
     };
+    static const uint8_t hp48_witness_value[] = "HPCLANG-E2E";
     /*
      * x50ng's Stock VVFAT setup exposes a stable empty DOCSTR named
      * X50NG-VV.FAT in USEROB before the payload starts. HPCLANG.HP is the
@@ -1704,6 +1705,10 @@ static uint32_t object_store_read_only_test(uint32_t model)
 
     object_store_phase(12u); /* before successful named-object snapshot */
     size_t witness_string_size = 0u;
+    const size_t expected_witness_size =
+        model == HPCLANG_MODEL_HP48GII
+            ? sizeof(hp48_witness_value) - 1u
+            : 0u;
     errno = 0;
     if (hpclang_object_store_get(
             home,
@@ -1713,9 +1718,21 @@ static uint32_t object_store_read_only_test(uint32_t model)
         witness == NULL ||
         hpclang_object_kind(witness) != HPCLANG_OBJECT_STRING ||
         hpclang_object_string_size(witness, &witness_string_size) != 0 ||
-        (model != HPCLANG_MODEL_HP48GII && witness_string_size != 0u)) {
+        witness_string_size != expected_witness_size) {
         failure = 0xc9u;
         goto done;
+    }
+    if (model == HPCLANG_MODEL_HP48GII) {
+        uint8_t witness_copy[sizeof(hp48_witness_value) - 1u];
+        if (hpclang_object_string_copy(
+                witness, witness_copy, sizeof(witness_copy)) != 0 ||
+            memcmp(
+                witness_copy,
+                hp48_witness_value,
+                sizeof(witness_copy)) != 0) {
+            failure = 0xc9u;
+            goto done;
+        }
     }
 
     object_store_phase(13u); /* before ENOTDIR child-open check */
