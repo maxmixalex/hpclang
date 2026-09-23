@@ -14,7 +14,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
 | `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime passes on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ remains blocked until a trustworthy real-machine stock flash fixture exists.
+Direct runtime has established green evidence on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ now has a verified real-machine D1.55 full-NOR fixture and is wired into the same automated target matrix; its model-1 result must come from that fixture gate rather than sibling inference.
 
 Current fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
@@ -134,11 +134,11 @@ HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock 
 
 The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. The launch ABI keeps `platform_cookie` opaque to applications; current HP39 runtime code decodes a tagged private platform context whose validated `font_window_base` points at that window.
 
-HP39g+ is deliberately excluded from that physical layout until a real-hardware full-flash fixture establishes its own identity.
+HP39g+ is deliberately excluded from that physical layout even though a real-hardware full-NOR fixture now establishes its firmware identity; its own native font object/page mapping has not yet been established.
 
 ## Native ROM-font API contract
 
-Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. A new `hpclang_font_editline()` accessor is reserved for the independently established HP39gs/40gs 6×10 EditLine table and is unavailable on the HP48/49/50 family and on HP39g+ until its flash layout is verified.
+Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. A new `hpclang_font_editline()` accessor is reserved for the independently established HP39gs/40gs 6×10 EditLine table and is unavailable on the HP48/49/50 family. HP39g+ now has a full-NOR fixture, but the model-1 EditLine object/page mapping remains unverified, so the accessor stays unavailable there.
 
 The 2.22 HP39gs/40gs EditLine relocation is independently gated against stock NOR data rather than accepted from address arithmetic alone. HP39gs physical nibble `0x0FD882` and HP40gs `0x0FDA35` both match the legacy EditLine-table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`; the Direct and Stock Gallery paths also pass the independent ROM-derived 6×10 pixel oracle.
 
@@ -175,7 +175,7 @@ Use the target-specific hardware-validation artifact from `CI / HP39 package`. T
 
 Transfer library 275 and the test aplet with Conn3x/HP Connectivity Kit, launch `HPCLANG HPC1 TEST`, and expect runtime PASS. After return, press APLET. A valid return opens/redraws the normal APLET library. A stale LCD page before that stock repaint is acceptable; a frozen keyboard, reset, ADDRESS ERROR, or persistent calculator-state damage is not.
 
-The real HP39gs run has passed the complete canonical runtime and returned cleanly to the stock OS. The HP39g+ model-1 hardware package is not equivalent to native HP39g+ E2E validation.
+The real HP39gs run has passed the complete canonical runtime and returned cleanly to the stock OS. HP39g+ now has its own verified model-1 full-NOR fixture; emulator E2E against that fixture, not the earlier hardware package or sibling ROMs, is the authority for model-1 runtime validation.
 
 ## HP39gs/40gs Stock emulator gate
 
