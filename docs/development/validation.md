@@ -58,11 +58,11 @@ The stack/object evidence progressed through these stages:
 
 Named-store and HP39 native-object validation then close the M7.3d read side:
 
-- **Core #311 (`35452252332`)** and fully-green **Runtime #254 (`35452252452`)** on `9111b12` validate the HP48/HP4950 read-only named-store implementation across Direct hp39/hp48/hp4950 and Stock hp39/hp48/hp4950. Stock HP48 keeps the transferred `HPCLANG` HOME object as its witness. Stock HP49g+/50g use the real USEROB `X50NG-VV.FAT` DOCSTR rather than the SD transfer file `HPCLANG.HP`: two independent HOME iterators must find it, classify it as a non-directory string, and `hpclang_object_store_get()` must return an owned zero-length string snapshot. The same path also checks `ENOTDIR` for child-open on the string and `ENOENT` for a missing name;
+- **Core #311 (`35452252332`)** and fully-green **Runtime #254 (`35452252452`)** on `9111b12` established the HP48/HP4950 read-only named-store implementation across Direct hp39/hp48/hp4950 and Stock hp39/hp48/hp4950. HP49g+/50g use the real USEROB `X50NG-VV.FAT` DOCSTR rather than the SD transfer file `HPCLANG.HP`: two independent HOME iterators must find it, classify it as a non-directory string, and `hpclang_object_store_get()` must return an owned zero-length string snapshot. The same path also checks `ENOTDIR` for child-open on the string and `ENOENT` for a missing name. The final HP48 witness was later reduced to the small transferred `ZZE2E` DOCSTR so object-copy validation does not depend on allocating an owned copy of the roughly 74 KiB launcher;
 - HP39 Aplet-variable research after Runtime #254 recovered the current `ApletVars# = EIGHT` schema contract, preserved genuine extended-ID source references, and pinned the standard `NoteText` descriptor triple. **Runtime #304 (`35596158126`)** remains useful negative evidence: routing genuine `xNoteText #2C812` through ordinary Stock EVAL produces the same private `B9` result on HP39gs and HP40gs, proving that EVAL is not the generic descriptor-recall protocol;
 - the successful path instead quotes the genuine extended variable ID into Stock and invokes Stock `@`, so the calculator follows descriptor word 0 through its own supported recall path. The HP39 portal enters with `GETPTR`, commits the final live RPL pointers with `SAVPTR`, and restores the suspended runstream pointer before returning to ARM. The **Stock / hp39 job in Runtime #320** validates this descriptor-driven recall on both HP39gs and HP40gs using `NoteText`: both reach HPC1 PASS, `stock-hp39.json` passes, and the complete 52-frame keyboard progression returns cleanly. Runtime #304 is therefore superseded as a blocker, but retained as evidence against the discarded EVAL shortcut;
 - the HP39 side also has a strict private `HP39AscA` directory parser with unit coverage against the original HPGCC 39G-support `HP39DIR.000` / `HP39DIR.CUR` records and malformed/truncated/overflow cases. Those files remain typed transfer-protocol evidence rather than an internal HOME namespace. ROM analysis likewise keeps `DoRecv/GetOb`, `DoGetObFrSto`, `OpenIO` and `StdIOProc` classified as System-RPL/DOCOL transfer/I/O controllers rather than direct ARM object-fetch entry points;
-- no general named object-store write gate is claimed. HP48gII/49g+/50g named stores remain read-only; HP39 descriptor store-handler words are known but do not yet constitute a validated generic variable-write path. The already-validated HP48/HP4950 stack mutation witness is a separate capability.
+- no general named object-store write gate is claimed **yet**. HP48gII/49g+/50g named stores remain read-only; HP39 descriptor store-handler words are known but do not yet constitute a validated generic variable-write path. This is the planned M7.3f work item, distinct from the already-validated HP48/HP4950 stack mutation capability.
 
 M7.3e compatibility-adapter validation is closed above that read core:
 
@@ -89,14 +89,21 @@ M7.3e compatibility-adapter validation is closed above that read core:
 - HP48's final successful named-store snapshot uses the bounded `ZZE2E`
   DOCSTR with payload `HPCLANG-E2E`. The transferred launcher remains visible
   to enumeration but is no longer used as an approximately 74 KiB owned-copy
-  stress fixture. Its host sequence is released by actual Kermit completion,
-  then proves stage baseline → active alias → HPC1 PASS → alias release →
-  settled Stock return;
-- HP39/40 similarly gates the UI on actual serial-disk lazy-fetch completion.
-  Sparse post-gate ENTER retries cover Stock's asynchronous install/UI settling,
-  and the harness suppresses later sequence key-downs after KBRD. Runtime #338
-  therefore reaches HPC1 PASS and clean return on both HP39gs and HP40gs
-  without changing the descriptor-recall/object implementation.
+  stress fixture. The long-running HP48 Kermit flake is closed at its actual
+  synchronization boundary: the UI sequence now waits on a host marker written
+  only after the Kermit process completes successfully, while the calculated
+  timeout is merely a watchdog ceiling. This replaces the older fixed-delay
+  workaround and prevents transfer/UI key races. The host sequence then proves
+  stage baseline → active alias → HPC1 PASS → alias release → settled Stock
+  return;
+- HP39/40 canonical Runtime similarly gates the UI on actual serial-disk
+  lazy-fetch completion. Sparse post-gate ENTER retries cover Stock's
+  asynchronous install/UI settling, and the harness suppresses later sequence
+  key-downs after KBRD. Runtime #338 therefore reaches HPC1 PASS and clean
+  return on both HP39gs and HP40gs without changing the descriptor-recall/object
+  implementation. The separate **Font Gallery #122** remains red on its HP39
+  jobs and has not yet been rerun with an equivalent final lazy-fetch/settling
+  fix; HP48gII and hp4950 Gallery jobs in that run are green.
 
 **Runtime #326 (`35739887799`)** is retained only as historical diagnostic
 evidence and is superseded as the closure gate. Its pre-HPC1 launcher failures
