@@ -48,7 +48,6 @@ gates. The current payload extracts the first 16 KiB boot block; a complete
 Emulator probe success is not HP39g+ firmware validation and must never be
 recorded as a native HP39g+ fixture.
 
-
 ## Full real-hardware dumper
 
 Now that a real HP39g+ is available, the retained 16 KiB mapping mechanism is
@@ -64,3 +63,30 @@ also packaged as a conservative full-flash acquisition tool:
 
 This remains read-only research code until the first physical-machine dump is
 obtained and checked.
+
+## One-launch Raw HID streamer
+
+This path is still **real-hardware-unvalidated**. The first physical run must start with USB unplugged, and the cable must be unplugged again after the PC receiver reports completion before control is returned to the stock OS.
+
+The preferred real-device experiment is now the one-launch USB path:
+
+- `rom-stream-entry.S` borrows five otherwise-unused high MMU sections for
+  read-only NOR plus S3C2410 USB/clock/GPIO/interrupt-controller access;
+- `rom-stream.c` temporarily owns the USB device controller as a polled Raw HID
+  endpoint pair and streams the entire 1 MiB image without buffering it in RAM;
+- `receive-rom-stream.py` validates every 16 KiB block, requests automatic
+  retries, writes the complete image, and records SHA-256 metadata;
+- `build-rom-streamer.sh` packages one `H39 ROM USB` aplet plus the PC receiver;
+- `test-rom-stream-receiver.py` runs an offline 1 MiB protocol simulation and
+  deliberately corrupts one first-pass block to exercise retry handling;
+- `ROM-STREAM-README.md` documents the physical plug/unplug ownership boundary
+  used for the first real-hardware probe.
+
+The transport still uses 64 internal validation blocks, but the user does not
+manually transfer or launch them. The calculator is started once and the PC
+receiver drives ACK/retry automatically. Flash remains read-only; the temporary
+USB/MMU state is restored only after physical cable disconnect.
+
+Until a physical HP39g+ completes this path, CI/build success is evidence only
+for packaging, relocation safety, and host protocol behavior—not proof of stock
+HP39g+ USB compatibility.

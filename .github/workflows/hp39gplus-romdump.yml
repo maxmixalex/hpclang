@@ -10,16 +10,32 @@ on:
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/hp39gplus-romdump.yml"
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build read-only 1 MiB dumper bundle
+    name: Build read-only HP39g+ ROM acquisition bundles
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
+
+      - name: Expand one-launch streamer source bootstrap
+        if: hashFiles('research/hp39gplus/romstream-bootstrap.tar.xz') != ''
+        run: |
+          echo "351aed9ca09e5908d8b9a7efa6f06c1dfb8c74eb41669cf59b18bd55e7d1242d  research/hp39gplus/romstream-bootstrap.tar.xz" | sha256sum -c -
+          python3 - <<'PY'
+          import tarfile
+          from pathlib import Path
+
+          archive = Path("research/hp39gplus/romstream-bootstrap.tar.xz")
+          with tarfile.open(archive, "r:xz") as tf:
+              tf.extractall(".")
+          PY
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
@@ -43,7 +59,10 @@ jobs:
           chmod +x tools/bootstrap-hp39-aplet.sh
           tools/bootstrap-hp39-aplet.sh
 
-      - name: Build ROM-dump bundle
+      - name: Test one-launch receiver protocol
+        run: python3 research/hp39gplus/test-rom-stream-receiver.py
+
+      - name: Build conservative ROM-dump bundle
         run: |
           chmod +x research/hp39gplus/build-rom-dumper.sh
           research/hp39gplus/build-rom-dumper.sh \
@@ -52,10 +71,50 @@ jobs:
             "$GITHUB_SHA" "$GITHUB_RUN_ID" \
             > dist/hp39gplus-romdump/BUILD_INFO.txt
 
-      - name: Upload HP39g+ ROM-dump bundle
+      - name: Build one-launch Raw HID ROM-stream bundle
+        run: |
+          chmod +x research/hp39gplus/build-rom-streamer.sh
+          research/hp39gplus/build-rom-streamer.sh \
+            "$GITHUB_WORKSPACE/dist/hp39gplus-romstream"
+          printf 'commit=%s\nworkflow_run=%s\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+            > dist/hp39gplus-romstream/BUILD_INFO.txt
+
+      - name: Upload conservative HP39g+ ROM-dump bundle
         uses: actions/upload-artifact@v7
         with:
           name: hp39gplus-romdump
           retention-days: 30
           path: dist/hp39gplus-romdump/
           if-no-files-found: error
+
+      - name: Upload one-launch HP39g+ ROM-stream bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp39gplus-romstream
+          retention-days: 30
+          path: dist/hp39gplus-romstream/
+          if-no-files-found: error
+
+      - name: Promote unpacked streamer source
+        if: github.ref == 'refs/heads/research/hp39gplus-romdump' && hashFiles('research/hp39gplus/romstream-bootstrap.tar.xz') != ''
+        continue-on-error: true
+        run: |
+          rm research/hp39gplus/romstream-bootstrap.tar.xz
+          git add \
+            research/hp39gplus/rom-stream.c \
+            research/hp39gplus/rom-stream-entry.S \
+            research/hp39gplus/rom-stream.ld \
+            research/hp39gplus/rom-stream-wrap.py \
+            research/hp39gplus/receive-rom-stream.py \
+            research/hp39gplus/build-rom-streamer.sh \
+            research/hp39gplus/ROM-STREAM-README.md \
+            research/hp39gplus/test-rom-stream-receiver.py \
+            research/hp39gplus/romstream-bootstrap.tar.xz
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "research: unpack HP39g+ ROM streamer source [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
