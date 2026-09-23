@@ -26,3 +26,10 @@ The current documentation is an internal Development site built with Zensical:
 - API progress/parity: [`docs/development/api-reference.md`](docs/development/api-reference.md), including HPGCC 1.0.3 / 1.1 / 2.0 SP2 / HPGCC3 comparison.
 
 Historical HPGCC source is used as implementation evidence only. A normal hpclang build does not depend on GCC, historical HPGCC runtime objects, or a replacement calculator ROM.
+
+
+## Development checks
+
+Run `tools/lint.sh` for the repository lint gate: Ruff checks the Python 3.12 host tools and ShellCheck checks tracked shell scripts. C host/unit builds continue to use `-Wall -Wextra -Werror`.
+
+Run `tools/format.sh` to format tracked C/C++ and Python sources with clang-format and Ruff. `tools/format.sh --check <files...>` checks selected files without rewriting them. Formatting is configured centrally, but the repository does not yet force a one-time full-tree reformat of historical sources.
