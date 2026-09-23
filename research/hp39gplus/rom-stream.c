@@ -50,6 +50,7 @@ typedef unsigned int u32;
 #define UPLLCON             REG32(CLK_BASE + 0x08)
 #define CLKCON              REG32(CLK_BASE + 0x0c)
 #define CLKSLOW             REG32(CLK_BASE + 0x10)
+#define GPFCON              REG32(GPIO_BASE + 0x50)
 #define GPFDAT              REG32(GPIO_BASE + 0x54)
 #define MISCCR              REG32(GPIO_BASE + 0x80)
 #define INTMSK              REG32(INT_BASE + 0x08)
@@ -101,6 +102,7 @@ struct hw_snapshot {
     u32 clkslow;
     u32 misccr;
     u32 intmsk;
+    u32 gpfcon;
     u32 func_addr;
     u32 pwr;
     u32 ep_int_en;
@@ -152,6 +154,19 @@ static void zero64(u8 *p)
 static int cable_connected(void)
 {
     return (GPFDAT & 2u) != 0;
+}
+
+static int prepare_cable_detect(struct hw_snapshot *s)
+{
+    /*
+     * GPF1 does not necessarily enter the HPGCC aplet as EINT1.  newRPL's
+     * target_39gs USB driver explicitly selects EINT1 before reading GPFDAT.
+     * Without this mux step a stock HP39g+ can keep reporting the GPIO latch
+     * value instead of the physical cable state and wait forever.
+     */
+    s->gpfcon = GPFCON;
+    GPFCON = (s->gpfcon & ~0x0cu) | 0x08u;
+    return cable_connected();
 }
 
 static void snapshot_ep(struct hw_snapshot *s, u32 ep)
@@ -238,6 +253,7 @@ static void restore_hw(const struct hw_snapshot *s)
     USB_INT_EN_REG = s->usb_int_en;
     INDEX_REG = s->index;
 
+    GPFCON = s->gpfcon;
     MISCCR = s->misccr;
     UPLLCON = s->upllcon;
     CLKSLOW = s->clkslow;
@@ -581,9 +597,14 @@ int hp39_rom_stream_main(void)
     int configured=0;
     u32 block, sum, fnv, total_sum=0;
 
-    /* Physical connect/disconnect is our safe ownership boundary. */
-    if(cable_connected())
+    /*
+     * Physical connect/disconnect is our safe ownership boundary.  Configure
+     * GPF1 exactly as the target_39gs USB driver does before trusting GPFDAT.
+     */
+    if(prepare_cable_detect(&saved)) {
+        GPFCON = saved.gpfcon;
         return 1;
+    }
 
     take_snapshot(&saved);
     usb_hwsetup();

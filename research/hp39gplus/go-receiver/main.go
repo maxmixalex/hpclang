@@ -183,12 +183,12 @@ func receiveImage(dev reportDevice, progress io.Writer) ([]byte, uint32, error) 
 
 func run() (retErr error) {
 	output := "hp39gplus-flash.bin"
-	wait := 45 * time.Second
+	wait := 120 * time.Second
 	flag.StringVar(&output, "o", output, "output ROM image")
 	flag.DurationVar(&wait, "wait", wait, "time to wait for HP39g+ ROM Stream to enumerate")
 	flag.Parse()
 	if flag.NArg() > 1 {
-		return errors.New("usage: hp39gplus-rom-receiver.exe [-wait 45s] [-o image.bin] [image.bin]")
+		return errors.New("usage: hp39gplus-rom-receiver.exe [-wait 120s] [-o image.bin] [image.bin]")
 	}
 	if flag.NArg() == 1 {
 		output = flag.Arg(0)

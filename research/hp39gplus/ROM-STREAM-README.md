@@ -35,13 +35,18 @@ an extra runtime DLL.
        hp39gplus-rom-receiver.exe hp39gplus-flash.bin
 
    Leave this window running. It will wait for the calculator.
-3. With USB still unplugged, launch the aplet named **H39 ROM USB** on the
-   calculator.
-4. Plug the USB cable into the calculator.
-5. The transfer runs automatically. The PC validates each 16 KiB block and
+3. Keep USB unplugged. Press **APLET**, highlight **H39 ROM USB**, and press the
+   **START** soft key. This only enters the HPGCC aplet view; it does **not**
+   start the ARM payload yet.
+4. When the H39 ROM USB aplet view/splash is visible, press **ENTER exactly
+   once**. HPGCC39 binds ENTER to the aplet's ARM action. After ENTER the screen
+   may stop updating while the payload waits for cable insertion; do not press
+   more keys.
+5. **Now plug the USB cable into the calculator.**
+6. The transfer runs automatically. The PC validates each 16 KiB block and
    requests a retry automatically if a block fails its byte-sum/FNV checks.
-6. Wait until the PC prints **`Dump complete`**.
-7. Only after that message appears, **unplug the USB cable**. Physical disconnect
+7. Wait until the PC prints **`Dump complete`**.
+8. Only after that message appears, **unplug the USB cable**. Physical disconnect
    is the boundary that lets the aplet restore the saved USB/clock/interrupt
    state and return to the stock OS.
 
@@ -52,6 +57,17 @@ Successful output:
 
 Do not edit, pad, or otherwise transform the `.bin` before using it as the
 hpclang fixture.
+
+## Important launch detail
+
+The stock HPGCC39 aplet template has two stages: **START** enters the aplet,
+then **ENTER** executes the embedded ARM action. If ENTER is never pressed, the
+PC receiver will simply time out because no temporary USB device is created.
+
+The streamer configures GPF1 as EINT1 before reading the cable-detect bit,
+matching newRPL's target_39gs USB driver. If a cable is already connected when
+ENTER executes, the payload restores that GPIO setting and returns without
+taking USB ownership.
 
 ## Stop conditions for the first hardware test
 

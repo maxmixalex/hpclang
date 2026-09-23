@@ -42,6 +42,12 @@ ACK/retry for the full image. There is no 64-aplet/manual-chunk fallback.
 Flash remains read-only. The temporary USB/MMU state is restored only after
 physical cable disconnect.
 
-Until a physical HP39g+ completes this path, CI/build success proves packaging,
-relocation safety, Windows receiver construction, and host protocol behavior;
-it does not yet prove stock HP39g+ USB compatibility.
+The first physical attempt established the HPGCC39 launch sequence: START enters
+the aplet view and ENTER executes the ARM action. It also exposed a stock-state
+assumption in the initial streamer: cable detection read GPFDAT before selecting
+GPF1/EINT1. The streamer now configures and restores that GPIO mux exactly like
+newRPL target_39gs before trusting the cable state.
+
+Until a physical HP39g+ completes the corrected path, CI/build success proves
+packaging, relocation safety, Windows receiver construction, and host protocol
+behavior; it does not yet prove stock HP39g+ USB compatibility.
