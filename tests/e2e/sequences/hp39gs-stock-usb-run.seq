@@ -1,0 +1,29 @@
+# HP39gs stock launch through the original APLET UI and USB disk.
+# HP39/40 2.22 RECEIVE FROM order:
+#   HP39 (IrDA), HP39/40 (USB), HP39/40 (Ser),
+#   USB Disk drive, Ser. Disk drive.
+2000 tap f6
+4000 tap f6
+7000 tap aplet
+8000 capture aplet-library
+9000 tap f5
+10000 capture receive-menu
+10500 tap down
+11200 tap down
+11900 tap down
+12200 capture receive-usb-disk
+12600 tap enter
+
+31000 capture remote-aplet
+32500 tap enter
+34000 capture lazy-fetch
+35000 host-gate
+
+0 monitor 90000
+500 capture fetch-complete
+1000 retry enter
+11000 retry enter
+21000 retry enter
+31000 retry enter
+46000 retry enter
+61000 retry enter
