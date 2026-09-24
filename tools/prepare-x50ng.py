@@ -123,6 +123,38 @@ static size_t hpclang_sram_size( void )
     )
 
 
+def patch_usbdev_trace(root: Path) -> None:
+    """Add opt-in UDC register-write tracing for Stock USB bring-up."""
+    path = root / "src" / "s3c2410" / "s3c2410_usbdev.c"
+
+    replace_once(
+        path,
+        """    reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
+
+#ifdef DEBUG_S3C2410_USBDEV
+    printf( "write %s [%08x] %s [%08lx] data %08x\\n", "s3c2410-usbdev", S3C2410_USBDEV_BASE, reg->name, ( unsigned long )offset, data );
+#endif
+
+    *( reg->datap ) = data;""",
+        """    reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
+
+#ifdef DEBUG_S3C2410_USBDEV
+    printf( "write %s [%08x] %s [%08lx] data %08x\\n", "s3c2410-usbdev", S3C2410_USBDEV_BASE, reg->name, ( unsigned long )offset, data );
+#endif
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL ) {
+        fprintf(
+            stderr,
+            "hpclang-usbdev: write offset=0x%04lx reg=%s data=0x%08x\\n",
+            ( unsigned long )offset,
+            reg->name,
+            data );
+    }
+
+    *( reg->datap ) = data;""",
+        "USB device opt-in write trace",
+    )
+
+
 def patch_host_uart0(root: Path) -> None:
     path = root / "src" / "s3c2410" / "s3c2410_uart.c"
 
@@ -314,6 +346,7 @@ def main() -> None:
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
+    patch_usbdev_trace(root)
     patch_host_uart0(root)
     patch_reserved_ram(root)
 
