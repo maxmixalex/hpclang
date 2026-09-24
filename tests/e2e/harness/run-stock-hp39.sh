@@ -15,10 +15,19 @@ export TARGET
 TRANSFER="$ASSETS_DIR/$TARGET-stock-transfer"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
+TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
 rm -f "$KERMIT_LOG" "$HOST_GATE"
 
-X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
-KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
+case "$TRANSPORT" in
+    uart|usb) ;;
+    *)
+        echo "unsupported HP39 Stock transport: $TRANSPORT" >&2
+        exit 2
+        ;;
+esac
+
+X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-$TRANSPORT"
+KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-$TRANSPORT"
 
 socat -d -d -x -v \
     PTY,raw,echo=0,link="$X50_TTY" \
@@ -50,11 +59,17 @@ KERMIT_PID=$!
 
 FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout "$TRANSFER")"
 X50_TIMEOUT=$((FETCH_TIMEOUT + 90))
-printf 'HP39 Stock lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
-    "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
+printf 'HP39 Stock %s lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
+    "$TRANSPORT" "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
     "$(( $(stat -c %s "$TRANSFER/HPGCC000.000") + $(stat -c %s "$TRANSFER/LIB275L.000") ))"
 
-export HPCLANG_X50NG_UART0="$X50_TTY"
+if [[ "$TRANSPORT" == usb ]]; then
+    export HPCLANG_X50NG_USB0="$X50_TTY"
+    unset HPCLANG_X50NG_UART0 || true
+else
+    export HPCLANG_X50NG_UART0="$X50_TTY"
+    unset HPCLANG_X50NG_USB0 || true
+fi
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
@@ -64,14 +79,19 @@ export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
 HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_STOCK_RESULT_ADDR
-if [[ "$TARGET" == hp40gs ]]; then
+if [[ "$TARGET" == hp39gplus ]]; then
+    [[ "$TRANSPORT" == usb ]] || {
+        echo "HP39g+ Stock requires the USB Connectivity Kit transport" >&2
+        exit 2
+    }
+    SEQUENCE="$ROOT/tests/e2e/sequences/hp39gplus-stock-usb-run.seq"
+elif [[ "$TARGET" == hp40gs ]]; then
     SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
 else
     SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
 fi
-# Sequence timing is gated by the actual Stock serial-disk completion marker.
-# The dynamic timeout is only a watchdog ceiling for a genuinely stalled fetch;
-# normal launch no longer depends on a guessed HPGCC000 transfer duration.
+# Sequence timing is gated by actual Kermit completion. The transport may be
+# UART or USB; the watchdog is only a ceiling for a genuinely stalled fetch.
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
