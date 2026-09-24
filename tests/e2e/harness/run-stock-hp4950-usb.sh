@@ -20,13 +20,15 @@ rm -rf "$STATE" "$SEND"
 rm -f "$HOST_GATE" "$KERMIT_LOG"
 mkdir -p "$STATE" "$SEND"
 
+printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
+python3 "$ROOT/tools/hp-rpl-string-wrap.py"     "$SEND/ZZE2E.txt" "$SEND/ZZE2E.HP"
 cp "$ASSETS_DIR/hp4950/SETUP.BIN" "$SEND/SETUP.BIN"
 cp "$SEND/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
-KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py"     "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP")"
+KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py"     "$SEND/ZZE2E.HP" "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP")"
 EMULATOR_TIMEOUT=$((20 + KERMIT_TIMEOUT + 120))
-printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss bytes=%s\n'     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"     "$(( $(stat -c %s "$SEND/SETUP.BIN") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
+printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss bytes=%s\n'     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"     "$(( $(stat -c %s "$SEND/ZZE2E.HP") + $(stat -c %s "$SEND/SETUP.BIN") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-usb"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-usb"
@@ -76,7 +78,7 @@ timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS
 X50_PID=$!
 
 sleep 20
-timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
+timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP49/50 Stock USB Kermit completed; released host gate: %s\n' "$HOST_GATE"
 
