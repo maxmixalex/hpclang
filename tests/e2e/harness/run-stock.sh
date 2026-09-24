@@ -16,6 +16,11 @@ while IFS= read -r line; do
     export "${env_name?}"
 done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
 
+if [[ -n "${HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE:-}" ]]; then
+    HPCLANG_E2E_STOCK_TRANSPORT="$HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE"
+    export HPCLANG_E2E_STOCK_TRANSPORT
+fi
+
 export HPCLANG_X50NG_HARNESS=stock
 if [[ "$HPCLANG_E2E_FAMILY" == hp48 ]]; then
     export HPCLANG_X50NG_SRAM_SIZE=0x00040000
