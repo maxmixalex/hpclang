@@ -1,6 +1,7 @@
 # HP49g+/50g primary Stock launch over USB Kermit.
-# Fresh stock defaults use USB for wire I/O. RightShift+Right enters Kermit
-# server mode; the host transfers SETUP.BIN and HPCLANG.HP into HOME.
+# Fresh stock defaults use USB for wire I/O. Enter Kermit server through the
+# ordinary I/O menu; unlike the hidden RShift+Right shortcut this path is not
+# sensitive to key-down ordering in the headless harness.
 2000 tap f6
 4000 tap f6
 5000 tap mode
@@ -8,11 +9,20 @@
 6000 tap f6
 7000 capture home-rpn
 
-8000 chord rshift right
-9500 capture server-usb
-12000 host-gate
+8000 tap files
+9500 tap down
+10000 tap enter
+11500 tap down
+12500 tap down
+13500 tap down
+14500 tap down
+15500 tap down
+17000 tap enter
+19000 capture server-usb
+21000 host-gate
 
-# Install ARMToolbox/library 275 into Port 2 using the transferred SETUP program.
+# Install ARMToolbox/library 275 into Port 2 using the transferred SETUP
+# program. HPCLANG sorts before SETUP in HOME, so the VAR softkeys are F1/F2.
 1000 capture after-transfer
 2000 tap two
 2500 tap period
