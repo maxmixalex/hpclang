@@ -43,8 +43,18 @@ runs:
             -o Acquire::http::Timeout=20
             -o Acquire::https::Timeout=20
           )
-          "${apt[@]}" update -qq
-          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
+          installed=false
+          for attempt in 1 2 3; do
+            sudo -E rm -rf /var/lib/apt/lists/partial
+            if "${apt[@]}" update -qq &&
+               "${apt[@]}" install -y --no-install-recommends "${missing[@]}"; then
+              installed=true
+              break
+            fi
+            printf 'x50ng dependency install attempt %d failed; refreshing apt metadata\n' "$attempt" >&2
+            sleep $((attempt * 2))
+          done
+          "$installed"
         fi
 
     - name: Fetch and adapt pinned x50ng
@@ -91,8 +101,18 @@ runs:
             -o Acquire::http::Timeout=20
             -o Acquire::https::Timeout=20
           )
-          "${apt[@]}" update -qq
-          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
+          installed=false
+          for attempt in 1 2 3; do
+            sudo -E rm -rf /var/lib/apt/lists/partial
+            if "${apt[@]}" update -qq &&
+               "${apt[@]}" install -y --no-install-recommends "${missing[@]}"; then
+              installed=true
+              break
+            fi
+            printf 'x50ng dependency install attempt %d failed; refreshing apt metadata\n' "$attempt" >&2
+            sleep $((attempt * 2))
+          done
+          "$installed"
         fi
 
     - name: Make x50ng bundle self-contained for E2E runners
