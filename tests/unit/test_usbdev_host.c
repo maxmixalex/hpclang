@@ -79,6 +79,14 @@ int main(void)
     hpusb_tick(&u);
     assert(s.out_len==8 && !memcmp(s.out,"01234567",8));
     assert(!(u.ep[1].in_csr1&HPUSB_IN_PKTRDY));
+    /* FRAME_NUM is driven by 1 ms USB SOF, not by the faster host-I/O poll,
+     * and the USB token carries an 11-bit frame number. */
+    u.frame=0x07ffu;
+    hpusb_tick(&u); assert(u.frame==0x07ffu);
+    hpusb_sof(&u); assert(u.frame==0u);
+    hpusb_sof(&u); assert(u.frame==1u);
+    assert(hpusb_read(&u,HPUSB_FRAME1)==1u);
+    assert(hpusb_read(&u,HPUSB_FRAME2)==0u);
     /* Device reset preserves the host bridge but requires fresh enumeration. */
     hpusb_reset_device(&u);
     assert(u.connected); assert(!hpusb_is_streaming(&u));
@@ -86,6 +94,6 @@ int main(void)
     memset(&g,0,sizeof(g));
     for(int i=0;i<1000 && !hpusb_is_streaming(&u);i++){hpusb_tick(&u);fake_ep0_service(&u,&g);}
     assert(hpusb_is_streaming(&u)); assert(u.bulk_in_ep==1); assert(u.bulk_out_ep==3);
-    puts("PASS usbdev host core: enumerate + bulk IN/OUT + AUTOSET/AUTOCLR + reset/re-enumerate");
+    puts("PASS usbdev host core: enumerate + bulk IN/OUT + AUTOSET/AUTOCLR + SOF + reset/re-enumerate");
     return 0;
 }

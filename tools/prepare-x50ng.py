@@ -164,6 +164,7 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     hdw_t* hdw_state;
     int host_fd;
     hdw_timer_t* host_timer;
+    int64_t next_sof;
     enum hpusb_enum_state trace_state;
     int cable_asserted;
 } s3c2410_usbdev_t;''',
@@ -236,6 +237,19 @@ static void hpclang_usbdev_host_poll( void* opaque )
          usbdev->hdw_state->s3c2410_io_port != NULL ) {
         s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
         usbdev->cable_asserted = 1;
+    }
+
+    /*
+     * x50ng's timer clock is in microseconds.  Keep the byte-stream bridge
+     * responsive at 100 us, but advance S3C2410 FRAME_NUM only from the
+     * full-speed USB 1 ms SOF time base.
+     */
+    int64_t now = timer_get_clock();
+    if ( usbdev->next_sof == 0 )
+        usbdev->next_sof = now + 1000;
+    while ( now >= usbdev->next_sof ) {
+        hpusb_sof( &usbdev->host );
+        usbdev->next_sof += 1000;
     }
 
     hpusb_tick( &usbdev->host );
@@ -329,6 +343,7 @@ static void s3c2410_usbdev_write(
         + """
     if ( usbdev->host_fd >= 0 ) {
         hpusb_reset_device( &usbdev->host );
+        usbdev->next_sof = timer_get_clock() + 1000;
         usbdev->cable_asserted = 0;
     }
 """
@@ -366,6 +381,7 @@ static void s3c2410_usbdev_write(
             hpclang_usbdev_stream_write,
             usbdev );
         hpusb_set_connected( &usbdev->host, 1 );
+        usbdev->next_sof = timer_get_clock() + 1000;
         usbdev->trace_state = usbdev->host.enum_state;
         usbdev->host_timer =
             timer_new(

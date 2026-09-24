@@ -479,10 +479,15 @@ static void stream_tick(struct hpusb_core *u)
     }
 }
 
+void hpusb_sof(struct hpusb_core *u)
+{
+    if (!u->connected) return;
+    u->frame = (uint16_t)((u->frame + 1u) & 0x07ffu);
+}
+
 void hpusb_tick(struct hpusb_core *u)
 {
     if (!u->connected) return;
-    ++u->frame;
     if (u->enum_state != HPUSB_ENUM_STREAM) enum_tick(u);
     else stream_tick(u);
 }

@@ -129,6 +129,7 @@ void hpusb_set_connected(struct hpusb_core *u, int connected);
 void hpusb_reset_device(struct hpusb_core *u);
 uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset);
 void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data);
+void hpusb_sof(struct hpusb_core *u);
 void hpusb_tick(struct hpusb_core *u);
 int hpusb_is_streaming(const struct hpusb_core *u);
 
