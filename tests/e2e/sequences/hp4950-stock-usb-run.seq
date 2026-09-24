@@ -1,0 +1,38 @@
+# HP49g+/50g primary Stock launch over USB Kermit.
+# Fresh stock defaults use USB for wire I/O. RightShift+Right enters Kermit
+# server mode; the host transfers SETUP.BIN and HPCLANG.HP into HOME.
+2000 tap f6
+4000 tap f6
+5000 tap mode
+5500 tap neg
+6000 tap f6
+7000 capture home-rpn
+
+8000 chord rshift right
+9500 capture server-usb
+12000 host-gate
+
+# Install ARMToolbox/library 275 into Port 2 using the transferred SETUP program.
+1000 capture after-transfer
+2000 tap two
+2500 tap period
+3000 tap enter
+4000 tap var
+5000 capture vars-before-install
+6000 tap f2
+14000 capture setup-evaluated
+15000 chord on f3
+19000 capture warmstart
+
+# HPCLANG remains in HOME. Recall it, enter the installed ARMTo library, and
+# launch through PrRUN.
+20000 tap var
+21000 capture vars-after-install
+22000 tap f1
+24000 capture hpclang-stack
+26000 chord rshift two
+27500 capture lib-menu
+28500 tap f1
+30500 capture armtoolbox
+31000 monitor 65000
+31500 tap f1
