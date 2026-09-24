@@ -1,0 +1,28 @@
+{
+  "heading": "${TARGET} full original-system USB launch",
+  "files": [
+    {
+      "path": "build/${TARGET}-setup.bin",
+      "size": 7673
+    }
+  ],
+  "required_files": [
+    "build/${TARGET}-stock-setup-evaluated.pgm",
+    "build/${TARGET}-stock-armtoolbox.pgm"
+  ],
+  "captures": [
+    "build/${TARGET}-stock-home-rpn.pgm",
+    "build/${TARGET}-stock-server-usb.pgm",
+    "build/${TARGET}-stock-after-transfer.pgm",
+    "build/${TARGET}-stock-vars-before-install.pgm",
+    "build/${TARGET}-stock-setup-evaluated.pgm",
+    "build/${TARGET}-stock-warmstart.pgm",
+    "build/${TARGET}-stock-vars-after-install.pgm",
+    "build/${TARGET}-stock-hpclang-stack.pgm",
+    "build/${TARGET}-stock-lib-menu.pgm",
+    "build/${TARGET}-stock-armtoolbox.pgm"
+  ],
+  "json": [
+    "build/${TARGET}-stock.json"
+  ]
+}
