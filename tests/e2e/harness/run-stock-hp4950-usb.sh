@@ -25,7 +25,7 @@ cp "$SEND/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
 KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py"     "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP")"
-EMULATOR_TIMEOUT=$((12 + KERMIT_TIMEOUT + 120))
+EMULATOR_TIMEOUT=$((20 + KERMIT_TIMEOUT + 120))
 printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss bytes=%s\n'     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"     "$(( $(stat -c %s "$SEND/SETUP.BIN") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-usb"
@@ -75,7 +75,7 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-sleep 12
+sleep 20
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP49/50 Stock USB Kermit completed; released host gate: %s\n' "$HOST_GATE"
