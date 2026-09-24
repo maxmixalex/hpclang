@@ -240,6 +240,7 @@ jobs:
       FAMILY: hp4950
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
       HPCLANG_E2E_STORAGE_WITNESS: 1
+      HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE: sd
     steps:
       - uses: actions/checkout@v7
       - name: Download storage build
