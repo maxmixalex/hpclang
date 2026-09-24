@@ -1,0 +1,28 @@
+# HP39g+ D1.55 Stock launch through the original USB Connectivity Kit path.
+# RECEIVE FROM has three entries on D1.55: IrDA, HP39/40 (Wire), Disk drive...
+# Selecting Disk drive... enters "Preparing to get aplet"; USB/Kermit delivery
+# then runs behind the host gate exactly like the UART-backed HP39gs/40gs path.
+2000 tap f6
+4000 tap f6
+7000 tap aplet
+8000 capture aplet-library
+9000 tap f5
+10000 capture receive-menu
+10500 tap down
+11200 tap down
+11600 capture receive-usb-disk
+12100 tap enter
+12800 capture usb-preparing
+13500 host-gate
+
+# Relative to Kermit EOF. Delivery completion and Stock install settling are
+# distinct, so use sparse launch-only ENTER retries. The launcher cancels
+# retries after the runtime publishes its phase word.
+0 monitor 115000
+500 capture fetch-complete
+1000 retry enter
+11000 retry enter
+21000 retry enter
+31000 retry enter
+46000 retry enter
+61000 retry enter
