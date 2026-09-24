@@ -153,6 +153,8 @@ struct keyboard_capture_event {
 
 static const struct key_action f_down = { HP4950_KEY_F, 1 };
 static const struct key_action f_up = { HP4950_KEY_F, 0 };
+static const struct key_action home_down = { HP4950_KEY_J, 1 };
+static const struct key_action home_up = { HP4950_KEY_J, 0 };
 static const struct key_action on_down = { HP4950_KEY_ON, 1 };
 static const struct key_action on_up = { HP4950_KEY_ON, 0 };
 
@@ -818,7 +820,23 @@ static void monitor(void *arg)
             return;
         }
         s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
-        if (!tap(&on_down, &on_up, RETURN_ON_US) ||
+
+        /*
+         * HP39g+ D1.55 resumes the saved Stock PC cleanly but does not repaint
+         * its static Aplet view in response to ON alone.  A HOME key press is
+         * a model-native, non-destructive repaint request and is already
+         * covered by the validated model-1 keyboard mapping.  HP39gs/40gs and
+         * the RPL family retain the historical ON nudge.
+         */
+        const char *target = getenv("TARGET");
+        const struct key_action *return_down = &on_down;
+        const struct key_action *return_up = &on_up;
+        if (target != NULL && strcmp(target, "hp39gplus") == 0) {
+            return_down = &home_down;
+            return_up = &home_up;
+        }
+
+        if (!tap(return_down, return_up, RETURN_ON_US) ||
             !later(
                 finish_return,
                 s,
