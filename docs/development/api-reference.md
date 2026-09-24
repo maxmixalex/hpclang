@@ -70,7 +70,7 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `hpclang_keyboard_events_reset()` | ✅ | Establish current stable baseline without synthetic DOWN events. |
 | `hpclang_keyboard_events_set_timing()` | ✅ | Configure debounce and repeat timing. |
 | `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and physical key identity. |
-| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for the established HP39gs/40gs, HP48gII, HP49g+, and HP50g gates. HP39g+ now has a verified D1.55 full-NOR fixture and is enabled in the same automated model matrix; its result is recorded from real-fixture E2E rather than inferred from siblings. |
+| `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39g+/39gs/40gs, HP48gII, HP49g+, and HP50g. Model 1 passes the same strict 51-key Direct transition gate against its verified D1.55 full-NOR fixture rather than a sibling inference. |
 | `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
 

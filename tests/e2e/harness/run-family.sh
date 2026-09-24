@@ -43,19 +43,23 @@ case "$FAMILY" in
 esac
 
 mapfile -t TARGETS < <(
-    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" <<'PY'
+    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" "$MODE" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 profiles = Path(sys.argv[1])
 family = sys.argv[2]
+mode = sys.argv[3]
 targets = []
 
 for path in profiles.glob("*.json"):
     data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("family") == family and data.get("automated_e2e", True):
-        targets.append(str(data["target"]))
+    if data.get("family") != family or not data.get("automated_e2e", True):
+        continue
+    if mode == "stock" and not data.get("automated_stock_e2e", True):
+        continue
+    targets.append(str(data["target"]))
 
 for target in sorted(targets):
     print(target)

@@ -82,11 +82,11 @@ enum hpclang_keyboard_modifier {
  * layouts. Model/family-prefixed values name primary keys whose physical
  * position or label differs between calculator families.
  *
- * HP39g+ key identity is not inferred from HP39gs/40gs merely because the
- * models share the hp39 platform. A verified model-1 full-NOR fixture now
- * exists; physical key labels/identity remain UNKNOWN until the model-1
- * mapping itself is established. This layer does not perform Alpha/Shift-plane
- * or text translation.
+ * HP39g+ key identity is not inferred merely from product-family naming.
+ * Model-1 identity is established by the verified D1.55 full-NOR Direct E2E
+ * together with the shared HP39 electrical scan architecture; all 51 physical
+ * positions now pass the same strict key/modifier transition gate as HP39gs
+ * and HP40gs. This layer does not perform Alpha/Shift-plane or text translation.
  */
 enum hpclang_key {
     HPCLANG_KEY_UNKNOWN = 0,

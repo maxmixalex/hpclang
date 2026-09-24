@@ -3,6 +3,7 @@
   "family": "hp39",
   "model": 1,
   "lcd_height": 64,
+  "automated_stock_e2e": false,
   "nor": {
     "path": "tests/e2e/fixtures/hp39gplus/flash.bin.xz",
     "compression": "xz",

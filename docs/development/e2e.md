@@ -72,7 +72,8 @@ Current E2E status is intentionally split by workflow. Canonical **Runtime #357 
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
 - `lcd_height` — 64- or 80-line capture height;
-- `automated_e2e` — optional automation eligibility; it defaults to true;
+- `automated_e2e` — optional Direct/focused automation eligibility; it defaults to true;
+- `automated_stock_e2e` — optional original-Stock automation eligibility; it defaults to true and may be false when the stock host transport is not modeled;
 - `nor` — optional checked full-NOR fixture metadata: repository path, compression, decoded byte count, and SHA-256.
 
 Only targets distributed as per-model firmware archives add a `firmware` object. HP 39gs and HP 40gs use their hpcalc archive/member names.
@@ -116,7 +117,7 @@ x50ng remains an external emulator/test dependency. None of its GPL implementati
 Current roles:
 
 - Direct runtime on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g;
-- stock serial-disk/APLET launch for HP 39g+/39gs/40gs;
+- stock serial-disk/APLET launch for HP 39gs/40gs;
 - stock Serial Kermit/ARMToolbox48 launch for HP 48gII;
 - stock File Manager/ARMToolbox launch for HP 49g+/50g.
 
@@ -130,10 +131,12 @@ as x50ng persistent flash state and is verified against the profile's byte count
 and SHA-256 before each run. No sibling firmware archive or foreign bootloader is
 substituted.
 
-The Stock path uses the same historical HPGCC39 APLET/ARMToolbox39 packaging
-boundary as HP39gs/40gs, but executes it against the HP39g+ D1.55 stock NOR.
-The current HP39 stock UI sequence is intentionally shared unless real-ROM E2E
-demonstrates a behavioral difference.
+HP39g+ D1.55 does not share the HP39gs/40gs Stock host transport. Its
+`Disk drive...` path is the USB Connectivity Kit path, while the current
+x50ng HP39 Stock harness models the later UART/Kermit serial-disk transport.
+The profile therefore keeps Direct/focused automation enabled but sets
+`automated_stock_e2e: false`. This is an explicit transport capability gap,
+not a substitute firmware or inferred sibling result.
 
 The existence of a trustworthy full-NOR fixture closes firmware identity and
 boot/runtime validation. It does not automatically prove that HP39g+ shares the
@@ -163,7 +166,7 @@ The current M7.2 branch goes further: the first byte-stream operation acquires t
 
 Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
 
-HP 39g+ is no longer filtered from the family matrices; fixture selection is data-driven through its `nor` target-profile object.
+HP 39g+ participates in Direct and focused family matrices through its data-driven `nor` profile. Original-Stock family enumeration also respects `automated_stock_e2e`, so model 1 is excluded until an emulator/host USB Connectivity Kit transport exists.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
 

@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete five-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. Remaining M7 work includes M7.3f named object-store mutation, common system services, and the final parity audit.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. Remaining M7 work includes M7.3f named object-store mutation, common system services, and the final parity audit.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -52,7 +52,7 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 
 ## M3 — HP39 platform
 
-**Runtime and automated stock-launch validation complete for HP 39gs/40gs. HP 39g+ blocked on real hardware fixture.**
+**Direct runtime validation is complete for HP 39g+/39gs/40gs. Automated original-Stock launch is complete for HP 39gs/40gs; HP 39g+ D1.55 uses the USB Connectivity Kit path, which the current x50ng Stock harness does not model.**
 
 - [x] HP 39gs real-hardware canonical runtime PASS and clean return.
 - [x] HP 39gs and HP 40gs official-ROM Direct E2E.
@@ -61,11 +61,11 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 - [x] Exercise stock serial-disk transfer of `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original HP39gs/40gs ROM.
 - [x] Drive stock APLET → HPCLANG → ARMToolbox39 → HPC1 PASS → stock return on HP 39gs and HP 40gs.
 - [x] Validate a read-only HP39 flash-dump mechanism byte-for-byte against emulated physical NOR.
-- [ ] Acquire a real HP 39g+ and dump its complete stock flash.
-- [ ] Add the verified HP 39g+ flash fixture to Direct runtime E2E.
-- [ ] Automate the original-system HP 39g+ install/launch path available on real stock firmware.
+- [x] Acquire a real HP 39g+ and dump its complete 1 MiB D1.55 stock flash.
+- [x] Add the verified HP 39g+ flash fixture to Direct runtime E2E, including strict 51-key identity/modifier validation and clean return.
+- [ ] Automate the original-system HP 39g+ USB Connectivity Kit install/launch path. The current HP39 Stock harness models the later UART/Kermit serial-disk transport used by HP39gs/40gs and must not substitute it for model 1.
 
-The HP 39g+ items are **blocked**, not active research tasks. The retained NOR dumper validates a transient physical-flash mapping mechanism; it does not establish that HP39g+ shares HP39gs/40gs firmware identity or native-font offsets.
+The one-shot HP39g+ ROM dumper is retired after successful acquisition. The verified fixture establishes model-1 firmware identity and Direct execution, but does not by itself establish HP39gs/40gs native-font offsets.
 
 ## M4 — HP48 platform / HP 48gII
 
@@ -99,14 +99,14 @@ HP 49g+ and HP 50g share the `hp4950` platform, official 2.15 OS image, stock Fi
 
 ## M6 — Automated emulator E2E
 
-**Complete for five models; HP 39g+ blocked.**
+**Direct runtime complete for six models; automated original-Stock launch complete for five models.**
 
-Durable Direct and Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime **35298949365 / #135** is the final M7.1 fully-green canonical Runtime evidence across all Direct and Stock families, including HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Runtime #122 remains the first run that closed that full contract.
+Durable Direct launch evidence exists for HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Automated original-Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime **35298949365 / #135** is the final M7.1 fully-green canonical Runtime evidence across all Direct and Stock families, including HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Runtime #122 remains the first run that closed that full contract.
 
-Blocked:
+Remaining model-1 transport work:
 
-- [ ] HP 39g+ Direct runtime on a verified native stock flash fixture.
-- [ ] HP 39g+ original-system launch on that fixture.
+- [x] HP 39g+ Direct runtime on the verified native D1.55 stock flash fixture.
+- [ ] HP 39g+ original-system USB Connectivity Kit launch on that fixture; this requires an emulator/host USB transport rather than the HP39gs/40gs UART/Kermit harness.
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration.
 
@@ -140,7 +140,7 @@ See [SDK API design](sdk-design.md).
 
 ### M7.1 — Common services, display, keyboard, and fonts
 
-Device information, stock-preserving monotonic time, keyboard scanning/events, physical key identity, the C++23 wrappers, display geometry, opaque software surfaces, blitting, text rendering, and LCD ownership preservation are implemented and validated on the current five-model Direct matrix. HP39g+ key identity remains UNKNOWN until its blocked real-machine fixture exists.
+Device information, stock-preserving monotonic time, keyboard scanning/events, physical key identity, the C++23 wrappers, display geometry, opaque software surfaces, blitting, text rendering, and LCD ownership preservation are implemented and validated on the current six-model Direct matrix. HP39g+ model-1 key identity is established by the real D1.55 fixture and the same strict 51-key transition gate.
 
 The display clean-core boundary remains explicit: representation-independent circles/polygons and owned 2/4/16-level surfaces are supported; historical mutable clip/style state, PAINT/XOR, patterns, annunciator slots, XPM convenience loaders, raw framebuffer-pointer behavior, physical gray4/gray16, and page flipping remain compatibility/future work.
 

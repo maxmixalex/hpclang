@@ -30,10 +30,16 @@ The repository stores the fixture as
 expected decompressed size and SHA-256. `tools/prepare-nor-fixture.py` refuses
 to install the image into x50ng state unless both checks pass.
 
-Because this is a full NOR image, HP39g+ Direct and Stock E2E boot the fixture
-directly as x50ng persistent `flash` state. They do **not** combine an HP39g+
-OS image with the HP50g bootloader and do not reuse the HP39gs/40gs update
-archives.
+Because this is a complete 1 MiB NOR image, HP39g+ Direct/focused E2E verifies
+the raw image first and then pads the emulator backing to x50ng's fixed 2 MiB
+SST29VF160 model with erased `0xff` bytes. The verified first 1 MiB is never
+rewritten or mirrored. The target does **not** combine an HP39g+ OS image with
+the HP50g bootloader and does not reuse the HP39gs/40gs update archives.
+
+The D1.55 original-Stock PC transfer path uses the HP39g+ USB Connectivity Kit.
+The current hpclang HP39 Stock harness models the HP39gs/40gs UART/Kermit
+serial-disk path instead, so model 1 is intentionally not an automated Stock
+target until that USB host transport is modeled.
 
 The temporary ROM-dumper/boot-dump research sources were retired once the full
 fixture was obtained. Their useful result is now the fixture provenance above
