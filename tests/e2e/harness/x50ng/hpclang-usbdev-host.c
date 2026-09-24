@@ -104,8 +104,20 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
     unsigned fep = fifo_ep(offset);
     if (fep < HPUSB_EP_COUNT) {
         struct hpusb_ep *f = &u->ep[fep];
-        if (f->out_pos < f->out_count) return f->out_fifo[f->out_pos++];
-        return 0;
+        uint8_t value;
+        if (f->out_pos >= f->out_count) return 0;
+        value = f->out_fifo[f->out_pos++];
+        /*
+         * S3C2410 OUT_CSR2.AUTO_CLR retires OUT_PKT_RDY after the MCU
+         * drains the received packet from the OUT FIFO.  Stock HP49/50
+         * enables this on EP3 and does not perform an explicit CSR1 clear.
+         */
+        if (f->out_pos >= f->out_count && (f->out_csr2 & HPUSB_OUT_AUTOCLR)) {
+            f->out_count = 0;
+            f->out_pos = 0;
+            f->out_csr1 &= (uint8_t)~HPUSB_OUT_PKTRDY;
+        }
+        return value;
     }
 
     switch (offset) {
@@ -178,7 +190,17 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     unsigned fep = fifo_ep(offset);
     if (fep < HPUSB_EP_COUNT) {
         struct hpusb_ep *f = &u->ep[fep];
+        if (fep != 0u && (f->in_csr1 & HPUSB_IN_PKTRDY)) return;
         if (f->in_count < HPUSB_FIFO_CAP) f->in_fifo[f->in_count++] = data;
+        /*
+         * With IN_CSR2.AUTO_SET the controller publishes a full MAXP
+         * packet without requiring firmware to set IN_PKT_RDY explicitly.
+         * Short packets still require the ordinary CSR1 write.
+         */
+        if (fep != 0u &&
+            (f->in_csr2 & HPUSB_IN_AUTOSET) &&
+            f->in_count >= ep_maxpacket(u, fep))
+            f->in_csr1 |= HPUSB_IN_PKTRDY;
         return;
     }
 

@@ -55,10 +55,30 @@ int main(void)
     hpusb_write(&u,HPUSB_INDEX,1); hpusb_write(&u,HPUSB_CSR2,HPUSB_IN_MODEIN);
     hpusb_write(&u,HPUSB_FIFO1,'O'); hpusb_write(&u,HPUSB_FIFO1,'K'); hpusb_write(&u,HPUSB_CSR1,HPUSB_IN_PKTRDY);
     hpusb_tick(&u); assert(s.out_len==2 && !memcmp(s.out,"OK",2)); assert(!(u.ep[1].in_csr1&HPUSB_IN_PKTRDY));
-    /* host -> guest */
+    /* host -> guest: explicit OUT_PKT_RDY retirement */
     memcpy(s.in,"HI",2);s.in_len=2;hpusb_tick(&u); assert(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY);
     hpusb_write(&u,HPUSB_INDEX,3); assert(hpusb_read(&u,HPUSB_OUT_CNT1)==2); assert(hpusb_read(&u,HPUSB_FIFO3)=='H'); assert(hpusb_read(&u,HPUSB_FIFO3)=='I');
     hpusb_write(&u,HPUSB_OUT_CSR1,0); assert(!(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY));
+    /* Stock HP49/50 uses OUT_CSR2.AUTO_CLR on EP3.  Draining the FIFO must
+     * retire OUT_PKT_RDY so the next host packet can be accepted. */
+    hpusb_write(&u,HPUSB_OUT_CSR2,HPUSB_OUT_AUTOCLR);
+    memcpy(s.in+s.in_len,"BY",2);s.in_len+=2;hpusb_tick(&u);
+    assert(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY);
+    assert(hpusb_read(&u,HPUSB_OUT_CNT1)==2);
+    assert(hpusb_read(&u,HPUSB_FIFO3)=='B');
+    assert(hpusb_read(&u,HPUSB_FIFO3)=='Y');
+    assert(!(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY));
+    /* Stock HP49/50 also uses IN_CSR2.AUTO_SET on EP1.  A full MAXP packet
+     * becomes ready automatically; short packets retain explicit CSR1. */
+    s.out_len=0;
+    hpusb_write(&u,HPUSB_INDEX,1);
+    hpusb_write(&u,HPUSB_MAXP_ALT,1); /* 8 bytes */
+    hpusb_write(&u,HPUSB_CSR2,HPUSB_IN_MODEIN|HPUSB_IN_AUTOSET);
+    for(int i=0;i<8;i++)hpusb_write(&u,HPUSB_FIFO1,(uint8_t)('0'+i));
+    assert(u.ep[1].in_csr1&HPUSB_IN_PKTRDY);
+    hpusb_tick(&u);
+    assert(s.out_len==8 && !memcmp(s.out,"01234567",8));
+    assert(!(u.ep[1].in_csr1&HPUSB_IN_PKTRDY));
     /* Device reset preserves the host bridge but requires fresh enumeration. */
     hpusb_reset_device(&u);
     assert(u.connected); assert(!hpusb_is_streaming(&u));
@@ -66,6 +86,6 @@ int main(void)
     memset(&g,0,sizeof(g));
     for(int i=0;i<1000 && !hpusb_is_streaming(&u);i++){hpusb_tick(&u);fake_ep0_service(&u,&g);}
     assert(hpusb_is_streaming(&u)); assert(u.bulk_in_ep==1); assert(u.bulk_out_ep==3);
-    puts("PASS usbdev host core: enumerate + bulk IN/OUT + reset/re-enumerate");
+    puts("PASS usbdev host core: enumerate + bulk IN/OUT + AUTOSET/AUTOCLR + reset/re-enumerate");
     return 0;
 }
