@@ -262,10 +262,15 @@ static uint32_t s3c2410_usbdev_read(
     void* opaque, target_phys_addr_t offset )
 {
     s3c2410_usbdev_t* usbdev = opaque;
+    s3c2410_offset_t* reg;
     uint32_t data;
 
     if ( !S3C2410_OFFSET_OK( usbdev, offset ) )
         return ~( 0 );
+
+    reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
+    if ( usbdev->host_fd < 0 )
+        return *( reg->datap );
 
     data = hpusb_read( &usbdev->host, ( uint32_t )offset );
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
@@ -297,11 +302,40 @@ static void s3c2410_usbdev_write(
             reg->name,
             data );
 
-    hpusb_write( &usbdev->host, ( uint32_t )offset, data );
+    if ( usbdev->host_fd >= 0 )
+        hpusb_write( &usbdev->host, ( uint32_t )offset, data );
 }
 
 '''
     path.write_text(text[:read_start] + host_impl + text[load_start:])
+
+    # x50ng resets all modules after a missing/partial state file and on
+    # guest software reset. Preserve the open host bridge, but reset the UDC
+    # protocol state and re-assert cable detect after io_port is reset.
+    text = path.read_text()
+    reset_start = text.find(
+        "static int s3c2410_usbdev_reset( hdw_module_t* module, hdw_reset_t reset )"
+    )
+    readfn_start = text.find("static CPUReadMemoryFunc*", reset_start)
+    if reset_start < 0 or readfn_start < 0:
+        raise SystemExit(f"{path}: USB reset function anchors changed")
+    reset_body = text[reset_start:readfn_start]
+    needle = "\n    return 0;\n}\n"
+    pos = reset_body.rfind(needle)
+    if pos < 0:
+        raise SystemExit(f"{path}: USB reset return anchor changed")
+    reset_body = (
+        reset_body[:pos]
+        + """
+    if ( usbdev->host_fd >= 0 ) {
+        hpusb_reset_device( &usbdev->host );
+        usbdev->cable_asserted = 0;
+    }
+"""
+        + reset_body[pos:]
+    )
+    path.write_text(text[:reset_start] + reset_body + text[readfn_start:])
+    # USB host reset integration
 
     replace_once(
         path,

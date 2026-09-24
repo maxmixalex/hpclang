@@ -50,6 +50,21 @@ void hpusb_set_stream(struct hpusb_core *u, hpusb_stream_read_fn read_fn,
     u->stream_opaque = opaque;
 }
 
+void hpusb_reset_device(struct hpusb_core *u)
+{
+    hpusb_irq_fn irq = u->irq;
+    void *irq_opaque = u->irq_opaque;
+    hpusb_stream_read_fn read_fn = u->stream_read;
+    hpusb_stream_write_fn write_fn = u->stream_write;
+    void *stream_opaque = u->stream_opaque;
+    int connected = u->connected;
+
+    if (u->irq_level && irq) irq(irq_opaque, 0);
+    hpusb_init(u, irq, irq_opaque);
+    hpusb_set_stream(u, read_fn, write_fn, stream_opaque);
+    hpusb_set_connected(u, connected);
+}
+
 void hpusb_set_connected(struct hpusb_core *u, int connected)
 {
     connected = connected != 0;

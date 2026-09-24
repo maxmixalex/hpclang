@@ -123,6 +123,7 @@ void hpusb_init(struct hpusb_core *u, hpusb_irq_fn irq, void *irq_opaque);
 void hpusb_set_stream(struct hpusb_core *u, hpusb_stream_read_fn read_fn,
                       hpusb_stream_write_fn write_fn, void *opaque);
 void hpusb_set_connected(struct hpusb_core *u, int connected);
+void hpusb_reset_device(struct hpusb_core *u);
 uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset);
 void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data);
 void hpusb_tick(struct hpusb_core *u);

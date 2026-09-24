@@ -55,6 +55,13 @@ int main(void)
     memcpy(s.in,"HI",2);s.in_len=2;hpusb_tick(&u); assert(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY);
     hpusb_write(&u,HPUSB_INDEX,3); assert(hpusb_read(&u,HPUSB_OUT_CNT1)==2); assert(hpusb_read(&u,HPUSB_FIFO3)=='H'); assert(hpusb_read(&u,HPUSB_FIFO3)=='I');
     hpusb_write(&u,HPUSB_OUT_CSR1,0); assert(!(u.ep[3].out_csr1&HPUSB_OUT_PKTRDY));
-    puts("PASS usbdev host core: enumerate + bulk IN/OUT");
+    /* Device reset preserves the host bridge but requires fresh enumeration. */
+    hpusb_reset_device(&u);
+    assert(u.connected); assert(!hpusb_is_streaming(&u));
+    hpusb_write(&u,HPUSB_USB_INT_EN,HPUSB_USBINT_RESET); hpusb_write(&u,HPUSB_EP_INT_EN,0x0f);
+    memset(&g,0,sizeof(g));
+    for(int i=0;i<1000 && !hpusb_is_streaming(&u);i++){hpusb_tick(&u);fake_ep0_service(&u,&g);}
+    assert(hpusb_is_streaming(&u)); assert(u.bulk_in_ep==1); assert(u.bulk_out_ep==3);
+    puts("PASS usbdev host core: enumerate + bulk IN/OUT + reset/re-enumerate");
     return 0;
 }
