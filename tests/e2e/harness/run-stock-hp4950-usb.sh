@@ -77,7 +77,17 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-sleep 20
+SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
+for _ in $(seq 1 400); do
+    [[ -s "$SERVER_READY" ]] && break
+    kill -0 "$X50_PID" 2>/dev/null || break
+    sleep 0.1
+done
+[[ -s "$SERVER_READY" ]] || {
+    echo "HP49/50 Stock USB server-ready capture was not produced" >&2
+    exit 1
+}
+
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP49/50 Stock USB Kermit completed; released host gate: %s\n' "$HOST_GATE"
