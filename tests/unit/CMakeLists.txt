@@ -209,3 +209,9 @@ hpclang_unit(s3c2410_sdio_card
     "${HPCLANG_ROOT}/runtime/libc/s3c2410-sdio-core.c")
 target_include_directories(test_s3c2410_sdio_card PRIVATE
     "${HPCLANG_ROOT}/runtime/libc")
+
+hpclang_unit(usbdev_host
+    test_usbdev_host.c
+    "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/hpclang-usbdev-host.c")
+target_include_directories(test_usbdev_host PRIVATE
+    "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
