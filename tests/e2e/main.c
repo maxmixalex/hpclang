@@ -1611,10 +1611,10 @@ static uint32_t object_store_read_only_test(uint32_t model)
         return 0u;
     }
 
-    static const uint8_t hp48_witness_name[] = {
+    static const uint8_t e2e_witness_name[] = {
         'Z', 'Z', 'E', '2', 'E'
     };
-    static const uint8_t hp48_witness_value[] = "HPCLANG-E2E";
+    static const uint8_t e2e_witness_value[] = "HPCLANG-E2E";
     /*
      * x50ng's Stock VVFAT setup exposes a stable empty DOCSTR named
      * X50NG-VV.FAT in USEROB before the payload starts. HPCLANG.HP is the
@@ -1626,12 +1626,13 @@ static uint32_t object_store_read_only_test(uint32_t model)
     };
     const uint8_t *witness_name =
         model == HPCLANG_MODEL_HP48GII
-            ? hp48_witness_name
+            ? e2e_witness_name
             : hp4950_witness_name;
-    const uint32_t witness_name_length =
+    uint32_t witness_name_length =
         model == HPCLANG_MODEL_HP48GII
-            ? (uint32_t)sizeof(hp48_witness_name)
+            ? (uint32_t)sizeof(e2e_witness_name)
             : (uint32_t)sizeof(hp4950_witness_name);
+    int witness_has_e2e_value = model == HPCLANG_MODEL_HP48GII;
 
     static const uint8_t missing_name[] = {
         '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
@@ -1652,6 +1653,30 @@ static uint32_t object_store_read_only_test(uint32_t model)
     if (home == NULL) {
         failure = 0xc2u;
         goto done;
+    }
+
+    /*
+     * Primary HP49/50 USB Stock runs receive the same stable HOME string
+     * witness as HP48gII. The preserved SD/VVFAT secondary gate has no such
+     * HOME transfer and keeps using X50NG-VV.FAT. Prefer the stronger USB
+     * witness whenever it is present without making transport identity part
+     * of the runtime API.
+     */
+    if (model != HPCLANG_MODEL_HP48GII) {
+        struct hpclang_object *candidate = NULL;
+        errno = 0;
+        if (hpclang_object_store_get(
+                home,
+                e2e_witness_name,
+                sizeof(e2e_witness_name),
+                &candidate) == 0 &&
+            candidate != NULL &&
+            hpclang_object_kind(candidate) == HPCLANG_OBJECT_STRING) {
+            witness_name = e2e_witness_name;
+            witness_name_length = (uint32_t)sizeof(e2e_witness_name);
+            witness_has_e2e_value = 1;
+        }
+        hpclang_object_release(candidate);
     }
 
     object_store_phase(2u); /* HOME ready */
@@ -1708,8 +1733,8 @@ static uint32_t object_store_read_only_test(uint32_t model)
     object_store_phase(12u); /* before successful named-object snapshot */
     size_t witness_string_size = 0u;
     const size_t expected_witness_size =
-        model == HPCLANG_MODEL_HP48GII
-            ? sizeof(hp48_witness_value) - 1u
+        witness_has_e2e_value
+            ? sizeof(e2e_witness_value) - 1u
             : 0u;
     errno = 0;
     if (hpclang_object_store_get(
@@ -1724,13 +1749,13 @@ static uint32_t object_store_read_only_test(uint32_t model)
         failure = 0xc9u;
         goto done;
     }
-    if (model == HPCLANG_MODEL_HP48GII) {
-        uint8_t witness_copy[sizeof(hp48_witness_value) - 1u];
+    if (witness_has_e2e_value) {
+        uint8_t witness_copy[sizeof(e2e_witness_value) - 1u];
         if (hpclang_object_string_copy(
                 witness, witness_copy, sizeof(witness_copy)) != 0 ||
             memcmp(
                 witness_copy,
-                hp48_witness_value,
+                e2e_witness_value,
                 sizeof(witness_copy)) != 0) {
             failure = 0xc9u;
             goto done;
