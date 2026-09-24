@@ -37,6 +37,14 @@ def main() -> int:
             return 2
         print(f"HPCLANG_E2E_{key.upper()}={value}")
 
+    stock_transport = data.get("stock_transport")
+    if stock_transport is not None:
+        value = str(stock_transport)
+        if value not in ("uart", "usb", "sd"):
+            print(f"{path}: unsupported stock_transport {value!r}", file=sys.stderr)
+            return 2
+        print(f"HPCLANG_E2E_STOCK_TRANSPORT={value}")
+
     bootloader = data.get("bootloader")
     if bootloader is not None:
         value = str(bootloader)
