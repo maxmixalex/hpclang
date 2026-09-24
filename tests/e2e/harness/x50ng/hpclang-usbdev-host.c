@@ -73,6 +73,7 @@ void hpusb_set_connected(struct hpusb_core *u, int connected)
     u->enum_state = HPUSB_ENUM_WAIT_READY;
     u->enum_wait_ticks = 0;
     u->ctrl_active = 0;
+    u->ctrl_status_out = 0;
     u->bridge_in_pos = 0;
     u->bulk_in_ep = 0;
     u->bulk_out_ep = 0;
@@ -260,6 +261,7 @@ static void start_control(struct hpusb_core *u, uint8_t bm, uint8_t req,
     u->ctrl_active = 1;
     u->ctrl_dir_in = (bm & 0x80u) != 0u;
     u->ctrl_data_end = 0;
+    u->ctrl_status_out = 0;
     u->ctrl_wlength = length;
     u->ctrl_response_len = 0;
     u->ctrl_last_packet = 0;
@@ -277,6 +279,17 @@ static int progress_control(struct hpusb_core *u)
     }
 
     if (u->ctrl_dir_in) {
+        if (u->ctrl_status_out) {
+            if (!(ep->in_csr1 & HPUSB_EP0_OPKRDY) || u->ctrl_data_end) {
+                ep->in_csr1 &= (uint8_t)~HPUSB_EP0_OPKRDY;
+                ep->out_count = ep->out_pos = 0;
+                u->ctrl_active = 0;
+                u->ctrl_status_out = 0;
+                u->ctrl_data_end = 0;
+                return 1;
+            }
+            return 0;
+        }
         if (ep->in_csr1 & HPUSB_EP0_IPKRDY) {
             size_t room = HPUSB_CTRL_CAP - u->ctrl_response_len;
             size_t take = ep->in_count < room ? ep->in_count : room;
@@ -287,11 +300,20 @@ static int progress_control(struct hpusb_core *u)
             ep->in_csr1 &= (uint8_t)~HPUSB_EP0_IPKRDY;
             ep_irq(u, 0); /* host ACK; device may queue the next packet */
             if (u->ctrl_data_end ||
-                u->ctrl_response_len >= u->ctrl_wlength ||
                 u->ctrl_last_packet < ep_maxpacket(u, 0)) {
                 u->ctrl_active = 0;
                 u->ctrl_data_end = 0;
                 return 1;
+            }
+            if (u->ctrl_response_len >= u->ctrl_wlength) {
+                /* Exact-multiple control reads still require the host's
+                 * zero-length OUT status stage. Old HP39g+ firmware relies
+                 * on that stage rather than setting DATA_END on the final
+                 * full EP0 packet. */
+                ep->out_count = ep->out_pos = 0;
+                ep->in_csr1 |= HPUSB_EP0_OPKRDY;
+                u->ctrl_status_out = 1;
+                ep_irq(u, 0);
             }
         }
     } else if (!(ep->in_csr1 & HPUSB_EP0_OPKRDY) && u->ctrl_data_end) {

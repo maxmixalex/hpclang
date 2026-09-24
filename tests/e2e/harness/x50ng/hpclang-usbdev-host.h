@@ -108,6 +108,7 @@ struct hpusb_core {
     int ctrl_active;
     int ctrl_dir_in;
     int ctrl_data_end;
+    int ctrl_status_out;
     uint16_t ctrl_wlength;
     uint8_t ctrl_response[HPUSB_CTRL_CAP];
     size_t ctrl_response_len;

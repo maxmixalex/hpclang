@@ -20,6 +20,9 @@ static void fake_ep0_service(struct hpusb_core *u, struct fake_guest *g)
     hpusb_write(u,HPUSB_INDEX,0);
     if (hpusb_read(u,HPUSB_USB_INT)&HPUSB_USBINT_RESET) hpusb_write(u,HPUSB_USB_INT,HPUSB_USBINT_RESET);
     if ((hpusb_read(u,HPUSB_CSR1)&HPUSB_EP0_OPKRDY)!=0) {
+        if (hpusb_read(u,HPUSB_OUT_CNT1)==0) {
+            hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_SOPKRDY|HPUSB_EP0_DE);
+        } else {
         uint8_t q[8]; for(int i=0;i<8;i++)q[i]=(uint8_t)hpusb_read(u,HPUSB_FIFO0);
         hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_SOPKRDY);
         uint16_t value=q[2]|((uint16_t)q[3]<<8), wlen=q[6]|((uint16_t)q[7]<<8);
@@ -29,6 +32,7 @@ static void fake_ep0_service(struct hpusb_core *u, struct fake_guest *g)
         else if(q[1]==5){hpusb_write(u,HPUSB_FUNC_ADDR,(value&0x7f)|0x80);hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_DE);}
         else if(q[1]==9){hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_DE);}
         else {hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_SENDSTL);}
+        }
     }
     if(g->active && !(hpusb_read(u,HPUSB_CSR1)&HPUSB_EP0_IPKRDY)){
         size_t left=g->len-g->pos, n=left>8?8:left;
