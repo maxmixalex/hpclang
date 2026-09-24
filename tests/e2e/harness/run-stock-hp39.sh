@@ -86,9 +86,17 @@ if [[ "$TARGET" == hp39gplus ]]; then
     }
     SEQUENCE="$ROOT/tests/e2e/sequences/hp39gplus-stock-usb-run.seq"
 elif [[ "$TARGET" == hp40gs ]]; then
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
+    if [[ "$TRANSPORT" == usb ]]; then
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+    else
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
+    fi
 else
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
+    if [[ "$TRANSPORT" == usb ]]; then
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-usb-run.seq"
+    else
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
+    fi
 fi
 # Sequence timing is gated by actual Kermit completion. The transport may be
 # UART or USB; the watchdog is only a ceiling for a genuinely stalled fetch.
