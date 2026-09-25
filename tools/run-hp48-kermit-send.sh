@@ -32,6 +32,11 @@ commands=(
     "set send packet-length 80"
     "set file type binary"
     "set handshake none"
+    # The calculator is already in Kermit receive/server mode. C-Kermit
+    # otherwise prefixes each SEND with its remote-shell auto-upload string
+    # ("kermit -ir"), which is not protocol data and can poison the HP USB
+    # receive state when it shares one bulk OUT packet with the Send-Init.
+    "set protocol kermit {} {} {}"
     "log debug $LOG"
 )
 
