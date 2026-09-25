@@ -62,6 +62,7 @@ void hpusb_init(struct hpusb_core *u, hpusb_irq_fn irq, void *irq_opaque)
     u->irq = irq;
     u->irq_opaque = irq_opaque;
     u->enum_state = HPUSB_ENUM_WAIT_READY;
+    u->reset_recovery_ticks = 2u;
     u->ep[0].maxp = 1; /* 8 bytes */
     for (unsigned i = 1; i < HPUSB_EP_COUNT; ++i) u->ep[i].maxp = 8; /* 64 */
 }
@@ -74,6 +75,11 @@ void hpusb_set_stream(struct hpusb_core *u, hpusb_stream_read_fn read_fn,
     u->stream_opaque = opaque;
 }
 
+void hpusb_set_reset_recovery_ticks(struct hpusb_core *u, unsigned ticks)
+{
+    u->reset_recovery_ticks = ticks ? ticks : 1u;
+}
+
 void hpusb_reset_device(struct hpusb_core *u)
 {
     hpusb_irq_fn irq = u->irq;
@@ -82,10 +88,12 @@ void hpusb_reset_device(struct hpusb_core *u)
     hpusb_stream_write_fn write_fn = u->stream_write;
     void *stream_opaque = u->stream_opaque;
     int connected = u->connected;
+    unsigned reset_recovery_ticks = u->reset_recovery_ticks;
 
     if (u->irq_level && irq) irq(irq_opaque, 0);
     hpusb_init(u, irq, irq_opaque);
     hpusb_set_stream(u, read_fn, write_fn, stream_opaque);
+    hpusb_set_reset_recovery_ticks(u, reset_recovery_ticks);
     hpusb_set_connected(u, connected);
 }
 
@@ -496,7 +504,7 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_WAIT_RESET_ACK:
         if ((u->usb_int & HPUSB_USBINT_RESET) == 0u) {
-            if (++u->enum_wait_ticks >= 2u) {
+            if (++u->enum_wait_ticks >= u->reset_recovery_ticks) {
                 start_control(u, 0x80, 6, 0x0100, 0, 18);
                 u->enum_state = HPUSB_ENUM_GET_DEVICE;
             }

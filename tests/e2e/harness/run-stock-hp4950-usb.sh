@@ -55,6 +55,10 @@ export HPCLANG_X50NG_USB0="$X50_TTY"
 export HPCLANG_X50NG_USB_CONNECT_FILE="$USB_CONNECT_GATE"
 export HPCLANG_X50NG_USB_TRACE_EVENTS=1
 export HPCLANG_X50NG_USB_TRACE_STATE=1
+# Full-speed USB requires a post-reset recovery interval before control
+# traffic.  The host poll is 100 us, so 100 ticks gives Stock 10 ms to
+# settle its high-level USB state before GET_DESCRIPTOR.
+export HPCLANG_X50NG_USB_RESET_RECOVERY_TICKS=100
 unset HPCLANG_X50NG_UART0 || true
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"

@@ -601,6 +601,16 @@ static void s3c2410_usbdev_write(
     usbdev->hdw_state = module->hdw_state;
     usbdev->host_fd = -1;
     hpusb_init( &usbdev->host, hpclang_usbdev_irq, usbdev );
+    {
+        const char* recovery = getenv( "HPCLANG_X50NG_USB_RESET_RECOVERY_TICKS" );
+        if ( recovery != NULL && *recovery != '\0' ) {
+            char* end = NULL;
+            unsigned long ticks = strtoul( recovery, &end, 10 );
+            if ( end != recovery && *end == '\0' && ticks > 0ul )
+                hpusb_set_reset_recovery_ticks(
+                    &usbdev->host, ( unsigned )ticks );
+        }
+    }
 
     const char* host_path = getenv( "HPCLANG_X50NG_USB0" );
     if ( host_path && *host_path ) {
