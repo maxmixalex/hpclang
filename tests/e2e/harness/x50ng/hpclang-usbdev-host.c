@@ -16,6 +16,12 @@ static const char *hpusb_trace_target(void)
     return target != NULL && *target != '\0' ? target : "?";
 }
 
+static int hpusb_verify_configuration(void)
+{
+    const char *value = getenv("HPCLANG_X50NG_USB_VERIFY_CONFIG");
+    return value != NULL && *value != '\0';
+}
+
 static size_t ep_maxpacket(const struct hpusb_core *u, unsigned ep)
 {
     unsigned encoded = u->ep[ep].maxp & 0x0fu;
@@ -512,8 +518,29 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_SET_CONFIG:
         r = progress_control(u);
-        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
-        else if (r > 0) u->enum_state = HPUSB_ENUM_STREAM;
+        if (r < 0) {
+            u->enum_state = HPUSB_ENUM_FAILED;
+        } else if (r > 0) {
+            if (hpusb_verify_configuration()) {
+                start_control(u, 0x80, 8, 0, 0, 1);
+                u->enum_state = HPUSB_ENUM_VERIFY_CONFIG;
+            } else {
+                u->enum_state = HPUSB_ENUM_STREAM;
+            }
+        }
+        break;
+    case HPUSB_ENUM_VERIFY_CONFIG:
+        r = progress_control(u);
+        if (r < 0) {
+            u->enum_state = HPUSB_ENUM_FAILED;
+        } else if (r > 0) {
+            unsigned value =
+                u->ctrl_response_len != 0u ? u->ctrl_response[0] : 0xffu;
+            fprintf(stderr,
+                    "hpusb:%s get_configuration len=%zu value=0x%02x\n",
+                    hpusb_trace_target(), u->ctrl_response_len, value);
+            u->enum_state = HPUSB_ENUM_STREAM;
+        }
         break;
     case HPUSB_ENUM_STREAM:
     case HPUSB_ENUM_FAILED:
