@@ -53,6 +53,8 @@
 4000 tap var
 5000 capture vars-before-install
 6000 tap f2
+7500 capture setup-recalled
+8500 tap eval
 14000 capture setup-evaluated
 15000 chord on f3
 19000 capture warmstart
