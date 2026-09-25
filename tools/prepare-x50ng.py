@@ -195,6 +195,42 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
         s3c2410_intc_deassert( usbdev->hdw_state, INT_USBD );
 }
 
+static int hpclang_usbdev_trace_cpu_enabled( void )
+{
+    const char* value = getenv( "HPCLANG_X50NG_USB_TRACE_CPU" );
+    return value != NULL && *value != '\0';
+}
+
+static int hpclang_usbdev_trace_cpu_offset( target_phys_addr_t offset )
+{
+    return offset == HPUSB_EP_INT ||
+           offset == HPUSB_INDEX ||
+           offset == HPUSB_OUT_CSR1 ||
+           offset == HPUSB_OUT_CNT1 ||
+           offset == HPUSB_OUT_CNT2;
+}
+
+static void hpclang_usbdev_trace_cpu(
+    s3c2410_usbdev_t* usbdev,
+    const char* operation,
+    target_phys_addr_t offset,
+    uint32_t data )
+{
+    if ( !hpclang_usbdev_trace_cpu_enabled() ||
+         !hpclang_usbdev_trace_cpu_offset( offset ) )
+        return;
+
+    fprintf(
+        stderr,
+        "hpclang-usbdev-cpu: %s offset=0x%04lx data=0x%08x "
+        "pc=0x%08x lr=0x%08x\n",
+        operation,
+        ( unsigned long )offset,
+        data,
+        usbdev->hdw_state->cpu->regs[ 15 ],
+        usbdev->hdw_state->cpu->regs[ 14 ] );
+}
+
 static int hpclang_usbdev_stream_read(
     void* opaque, uint8_t* buffer, size_t capacity )
 {
@@ -287,6 +323,7 @@ static uint32_t s3c2410_usbdev_read(
         return *( reg->datap );
 
     data = hpusb_read( &usbdev->host, ( uint32_t )offset );
+    hpclang_usbdev_trace_cpu( usbdev, "read", offset, data );
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
         fprintf(
             stderr,
@@ -307,6 +344,7 @@ static void s3c2410_usbdev_write(
 
     reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
     *( reg->datap ) = data;
+    hpclang_usbdev_trace_cpu( usbdev, "write", offset, data );
 
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
         fprintf(
