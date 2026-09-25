@@ -822,6 +822,47 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
     )
 
 
+def patch_usb_active_store_trace(root: Path) -> None:
+    path = root / "src" / "qemu" / "softmmu_header.h"
+
+    replace_once(
+        path,
+        "/* generic store macro */\n\n"
+        "static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE v)\n"
+        "{\n"
+        "    int page_index;\n"
+        "    target_ulong addr;\n",
+        "/* generic store macro */\n\n"
+        "static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE v)\n"
+        "{\n"
+        "    int page_index;\n"
+        "    target_ulong addr;\n",
+        "USB active store trace anchor",
+    )
+
+    text = path.read_text()
+    needle = (
+        "    addr = ptr;\n"
+        "    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);\n"
+    )
+    replacement = (
+        "    addr = ptr;\n"
+        "    if (getenv(\"HPCLANG_X50NG_USB_TRACE_STATE\") != NULL &&\n"
+        "        addr <= 0x08000cf9u &&\n"
+        "        addr + DATA_SIZE > 0x08000cf9u) {\n"
+        "        fprintf(stderr,\n"
+        "                \"hpclang-usb-active-store: addr=0x%08lx size=%u value=0x%016llx \"\n"
+        "                \"pc=0x%08x lr=0x%08x\\n\",\n"
+        "                (unsigned long)addr, (unsigned)DATA_SIZE,\n"
+        "                (unsigned long long)v, env->regs[15], env->regs[14]);\n"
+        "    }\n"
+        "    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);\n"
+    )
+    if needle not in text:
+        raise SystemExit(f"{path}: active-store trace insertion anchor missing")
+    path.write_text(text.replace(needle, replacement, 1))
+
+
 def patch_reserved_ram(root: Path) -> None:
     replace_once(
         root / "src" / "module.c",
@@ -885,6 +926,7 @@ def main() -> None:
     patch_runtime_sram(root)
     patch_host_usbdev(root, args)
     patch_host_uart0(root)
+    patch_usb_active_store_trace(root)
     patch_reserved_ram(root)
 
 
