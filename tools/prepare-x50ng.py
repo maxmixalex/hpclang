@@ -331,6 +331,36 @@ static int hpclang_usbdev_connect_ready( void )
     return access( marker, F_OK ) == 0;
 }
 
+static uint32_t hpclang_usbdev_phys32( target_phys_addr_t address )
+{
+    uint32_t value = 0;
+    cpu_physical_memory_read(
+        address, ( uint8_t* )&value, sizeof( value ) );
+    return value;
+}
+
+static void hpclang_usbdev_trace_cable_irq_state(
+    const char* target,
+    const char* phase )
+{
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) == NULL )
+        return;
+
+    fprintf(
+        stderr,
+        "hpclang-usbdev-cable:%s:%s "
+        "GPFCON=%08x GPFDAT=%08x EXTINT0=%08x "
+        "SRCPND=%08x INTMSK=%08x INTPND=%08x\n",
+        target,
+        phase,
+        hpclang_usbdev_phys32( 0x56000050u ),
+        hpclang_usbdev_phys32( 0x56000054u ),
+        hpclang_usbdev_phys32( 0x56000088u ),
+        hpclang_usbdev_phys32( 0x4a000000u ),
+        hpclang_usbdev_phys32( 0x4a000008u ),
+        hpclang_usbdev_phys32( 0x4a000010u ) );
+}
+
 static void hpclang_usbdev_host_poll( void* opaque )
 {
     static int usb_active_last = -1;
@@ -356,8 +386,10 @@ static void hpclang_usbdev_host_poll( void* opaque )
             if ( hpclang_usbdev_connect_ready() &&
                  !usbdev->cable_asserted &&
                  usbdev->hdw_state->s3c2410_io_port != NULL ) {
+                hpclang_usbdev_trace_cable_irq_state( target, "before" );
                 s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
                 usbdev->cable_asserted = 1;
+                hpclang_usbdev_trace_cable_irq_state( target, "after" );
                 if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
                     fprintf(
                         stderr,
