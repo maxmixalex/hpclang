@@ -51,6 +51,9 @@ int main(void)
     hpusb_write(&u,HPUSB_USB_INT_EN,HPUSB_USBINT_RESET); hpusb_write(&u,HPUSB_EP_INT_EN,0x0f);
     for(int i=0;i<1000 && !hpusb_is_streaming(&u);i++){hpusb_tick(&u);fake_ep0_service(&u,&g);}
     assert(hpusb_is_streaming(&u)); assert(u.bulk_in_ep==1); assert(u.bulk_out_ep==3); assert(u.configuration_value==1);
+    /* FUNC_ADDR.ADDR_UPDATE is hardware-cleared when EP0 DATA_END commits
+     * SET_ADDRESS; only the assigned address remains visible. */
+    assert(u.func_addr==1);
     /* guest -> host */
     hpusb_write(&u,HPUSB_INDEX,1); hpusb_write(&u,HPUSB_CSR2,HPUSB_IN_MODEIN);
     hpusb_write(&u,HPUSB_FIFO1,'O'); hpusb_write(&u,HPUSB_FIFO1,'K'); hpusb_write(&u,HPUSB_CSR1,HPUSB_IN_PKTRDY);

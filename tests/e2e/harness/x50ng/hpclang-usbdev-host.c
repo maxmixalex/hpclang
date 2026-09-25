@@ -212,7 +212,15 @@ static void write_ep0_csr(struct hpusb_core *u, uint8_t data)
     if (data & HPUSB_EP0_SENDSTL) ep->in_csr1 |= HPUSB_EP0_SENDSTL;
     if (data & HPUSB_EP0_SSE) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SE;
     if ((data & HPUSB_EP0_SENTSTL) == 0) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SENTSTL;
-    if (data & HPUSB_EP0_DE) u->ctrl_data_end = 1;
+    if (data & HPUSB_EP0_DE) {
+        /*
+         * S3C2410 hardware clears FUNC_ADDR.ADDR_UPDATE when EP0 DATA_END
+         * commits the SET_ADDRESS request.  The function-address field
+         * itself remains intact.
+         */
+        u->func_addr &= (uint8_t)~HPUSB_FUNC_ADDR_UPDATE;
+        u->ctrl_data_end = 1;
+    }
 }
 
 static void write_in_csr1(struct hpusb_ep *ep, uint8_t data)
