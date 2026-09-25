@@ -81,25 +81,25 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-# HP49/50 Stock's connection flow explicitly displays "please plug usb
-# cable" after Start Server.  Match the real interaction: keep the virtual
-# cable detached through boot/I/O configuration, then connect only after the
-# server has entered that wait state.  This prevents stale RESET/EP0 events
-# from satisfying Stock's global USB connection state machine prematurely.
-SERVER_WAIT_USB="$ROOT/build/$TARGET-stock-server-wait-usb.pgm"
+# Keep USB detached during boot and I/O configuration, but make the cable
+# present before Start Server is entered.  Stock 2.15's server screen does
+# not actually prompt for a fresh attach; its USB-open path samples cable
+# state while arming the driver.  The host-side UDC still waits for Stock's
+# active flag before beginning bus reset/enumeration.
+SERVER_MENU="$ROOT/build/$TARGET-stock-server-menu.pgm"
 for _ in $(seq 1 400); do
-    [[ -s "$SERVER_WAIT_USB" ]] && break
+    [[ -s "$SERVER_MENU" ]] && break
     kill -0 "$X50_PID" 2>/dev/null || break
     sleep 0.1
 done
-[[ -s "$SERVER_WAIT_USB" ]] || {
-    echo "HP49/50 Stock USB cable-wait capture was not produced" >&2
+[[ -s "$SERVER_MENU" ]] || {
+    echo "HP49/50 Stock USB server-menu capture was not produced" >&2
     exit 1
 }
 : > "$USB_CONNECT_GATE"
-printf 'HP49/50 Stock USB cable connected: %s\n' "$USB_CONNECT_GATE"
+printf 'HP49/50 Stock USB cable present before Start Server: %s\n' "$USB_CONNECT_GATE"
 
-# Wait for the post-connect server state before feeding Kermit bytes.
+# Wait for the server state before feeding Kermit bytes.
 SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
 for _ in $(seq 1 100); do
     [[ -s "$SERVER_READY" ]] && break
