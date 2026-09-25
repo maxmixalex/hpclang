@@ -1,6 +1,14 @@
 #include "hpclang-usbdev-host.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+static int hpusb_trace_events(void)
+{
+    const char *value = getenv("HPCLANG_X50NG_USB_TRACE_EVENTS");
+    return value != NULL && *value != '\0';
+}
 
 static size_t ep_maxpacket(const struct hpusb_core *u, unsigned ep)
 {
@@ -22,6 +30,10 @@ static void update_irq(struct hpusb_core *u)
 static void ep_irq(struct hpusb_core *u, unsigned ep)
 {
     if (ep < HPUSB_EP_COUNT) u->ep_int |= (uint8_t)(1u << ep);
+    if (hpusb_trace_events())
+        fprintf(stderr,
+                "hpusb:event ep_irq ep=%u pending=0x%02x enable=0x%02x irq=%d\n",
+                ep, u->ep_int, u->ep_int_en, u->irq_level);
     update_irq(u);
 }
 
@@ -106,7 +118,17 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
         struct hpusb_ep *f = &u->ep[fep];
         uint8_t value;
         if (f->out_pos >= f->out_count) return 0;
-        value = f->out_fifo[f->out_pos++];
+        {
+            size_t before = f->out_pos;
+            value = f->out_fifo[f->out_pos++];
+            if (hpusb_trace_events() && fep == u->bulk_out_ep &&
+                (before == 0u || f->out_pos >= f->out_count))
+                fprintf(stderr,
+                        "hpusb:event guest_read ep=%u pos=%zu/%zu value=0x%02x "
+                        "csr1=0x%02x csr2=0x%02x\n",
+                        fep, f->out_pos, f->out_count, value,
+                        f->out_csr1, f->out_csr2);
+        }
         /*
          * S3C2410 OUT_CSR2.AUTO_CLR retires OUT_PKT_RDY after the MCU
          * drains the received packet from the OUT FIFO.  Stock HP49/50
@@ -211,6 +233,11 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         break;
     case HPUSB_EP_INT:
         u->ep_int &= (uint8_t)~data;
+        if (hpusb_trace_events())
+            fprintf(stderr,
+                    "hpusb:event clear_ep_int data=0x%02x pending=0x%02x "
+                    "enable=0x%02x\n",
+                    data, u->ep_int, u->ep_int_en);
         update_irq(u);
         break;
     case HPUSB_USB_INT:
@@ -220,6 +247,10 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         break;
     case HPUSB_EP_INT_EN:
         u->ep_int_en = data & 0x1fu;
+        if (hpusb_trace_events())
+            fprintf(stderr,
+                    "hpusb:event ep_int_en=0x%02x pending=0x%02x\n",
+                    u->ep_int_en, u->ep_int);
         update_irq(u);
         break;
     case HPUSB_USB_INT_EN:
@@ -235,16 +266,36 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         break;
     case HPUSB_CSR1:
         if (idx == 0) write_ep0_csr(u, data);
-        else write_in_csr1(ep, data);
+        else {
+            write_in_csr1(ep, data);
+            if (hpusb_trace_events() && idx == u->bulk_in_ep)
+                fprintf(stderr,
+                        "hpusb:event in_csr1 ep=%u write=0x%02x now=0x%02x "
+                        "count=%zu\n",
+                        idx, data, ep->in_csr1, ep->in_count);
+        }
         break;
     case HPUSB_CSR2:
         ep->in_csr2 = data;
+        if (hpusb_trace_events() && idx != 0u)
+            fprintf(stderr,
+                    "hpusb:event in_csr2 ep=%u value=0x%02x\n",
+                    idx, data);
         break;
     case HPUSB_OUT_CSR1:
         write_out_csr1(ep, data);
+        if (hpusb_trace_events() && idx != 0u)
+            fprintf(stderr,
+                    "hpusb:event out_csr1 ep=%u write=0x%02x now=0x%02x "
+                    "count=%zu pos=%zu\n",
+                    idx, data, ep->out_csr1, ep->out_count, ep->out_pos);
         break;
     case HPUSB_OUT_CSR2:
         ep->out_csr2 = data;
+        if (hpusb_trace_events() && idx != 0u)
+            fprintf(stderr,
+                    "hpusb:event out_csr2 ep=%u value=0x%02x\n",
+                    idx, data);
         break;
     default:
         break;
@@ -470,6 +521,12 @@ static void stream_tick(struct hpusb_core *u)
         int n = u->stream_read(u->stream_opaque, buffer, cap);
         if (n > 0) {
             if ((size_t)n > cap) n = (int)cap;
+            if (hpusb_trace_events())
+                fprintf(stderr,
+                        "hpusb:event host_to_guest ep=%u n=%d csr1=0x%02x "
+                        "csr2=0x%02x pending=0x%02x enable=0x%02x\n",
+                        u->bulk_out_ep, n, out->out_csr1, out->out_csr2,
+                        u->ep_int, u->ep_int_en);
             memcpy(out->out_fifo, buffer, (size_t)n);
             out->out_count = (size_t)n;
             out->out_pos = 0;

@@ -65,6 +65,9 @@ printf 'HP39 Stock %s lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
 
 if [[ "$TRANSPORT" == usb ]]; then
     export HPCLANG_X50NG_USB0="$X50_TTY"
+    if [[ "$TARGET" == hp39gs ]]; then
+        export HPCLANG_X50NG_USB_TRACE_EVENTS=1
+    fi
     unset HPCLANG_X50NG_UART0 || true
 else
     export HPCLANG_X50NG_UART0="$X50_TTY"
