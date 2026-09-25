@@ -325,12 +325,46 @@ static int hpclang_usbdev_stream_write(
 
 static void hpclang_usbdev_host_poll( void* opaque )
 {
+    static int usb_active_last = -1;
     s3c2410_usbdev_t* usbdev = opaque;
+    const char* target =
+        getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?";
 
     if ( !usbdev->cable_asserted &&
          usbdev->hdw_state->s3c2410_io_port != NULL ) {
         s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
         usbdev->cable_asserted = 1;
+        if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+            fprintf(
+                stderr,
+                "hpclang-usbdev-state:%s: cable GPF1 asserted "
+                "pc=0x%08x lr=0x%08x\n",
+                target,
+                usbdev->hdw_state->cpu->regs[ 15 ],
+                usbdev->hdw_state->cpu->regs[ 14 ] );
+    }
+
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL ) {
+        uint8_t usb_active = 0xffu;
+        if ( cpu_memory_rw_debug(
+                 usbdev->hdw_state->cpu,
+                 0x08000cf9u,
+                 &usb_active,
+                 sizeof( usb_active ),
+                 0 ) == 0 &&
+             usb_active_last != ( int )usb_active ) {
+            fprintf(
+                stderr,
+                "hpclang-usbdev-state:%s: active@08000cf9=%u "
+                "pc=0x%08x lr=0x%08x enum=%u pwr=0x%02x\n",
+                target,
+                ( unsigned )usb_active,
+                usbdev->hdw_state->cpu->regs[ 15 ],
+                usbdev->hdw_state->cpu->regs[ 14 ],
+                ( unsigned )usbdev->host.enum_state,
+                usbdev->host.pwr );
+            usb_active_last = ( int )usb_active;
+        }
     }
 
     /*
@@ -402,6 +436,16 @@ static void s3c2410_usbdev_write(
 
     reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
     *( reg->datap ) = data;
+    if ( offset == HPUSB_PWR &&
+         getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+        fprintf(
+            stderr,
+            "hpclang-usbdev-state:%s: PWR write=0x%08x "
+            "pc=0x%08x lr=0x%08x\n",
+            getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
+            data,
+            usbdev->hdw_state->cpu->regs[ 15 ],
+            usbdev->hdw_state->cpu->regs[ 14 ] );
     hpclang_usbdev_trace_cpu( usbdev, "write", offset, data );
 
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
