@@ -634,9 +634,12 @@ def patch_usb_receive_gate_store_trace(root: Path) -> None:
     text = header.read_text()
 
     declaration = (
+        "#ifndef HPCLANG_USB_RECEIVE_GATE_TRACE_DECL\n"
+        "#define HPCLANG_USB_RECEIVE_GATE_TRACE_DECL\n"
         "void hpclang_trace_usb_receive_gate_store(\n"
         "    target_ulong addr, unsigned data_size, unsigned long long value,\n"
-        "    target_ulong pc, target_ulong lr );\n\n"
+        "    target_ulong pc, target_ulong lr );\n"
+        "#endif\n\n"
     )
     marker = "/* generic load/store macros */\n"
     if declaration not in text:
