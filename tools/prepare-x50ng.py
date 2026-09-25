@@ -224,8 +224,9 @@ static void hpclang_usbdev_trace_cpu(
 
     fprintf(
         stderr,
-        "hpclang-usbdev-cpu: %s offset=0x%04lx data=0x%08x "
+        "hpclang-usbdev-cpu:%s: %s offset=0x%04lx data=0x%08x "
         "pc=0x%08x lr=0x%08x\n",
+        getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
         operation,
         ( unsigned long )offset,
         data,
@@ -241,28 +242,48 @@ static void hpclang_usbdev_trace_cpu(
     if ( !ep3_code_dumped &&
          strcmp( operation, "write" ) == 0 &&
          offset == HPUSB_EP_INT && ( data & 0x08u ) != 0 ) {
-        uint8_t code[ 0x300 ];
-        const target_ulong start = 0x0000e700u;
-        size_t pos;
+        static const struct {
+            target_ulong start;
+            size_t size;
+        } ranges[] = {
+            { 0x0000df80u, 0x100u },
+            { 0x0000e700u, 0x300u },
+        };
+        size_t range_index;
 
-        if ( cpu_memory_rw_debug(
-                 usbdev->hdw_state->cpu, start, code, sizeof( code ), 0 ) == 0 ) {
-            fprintf( stderr,
-                     "hpclang-usbdev-code: start=0x%08lx size=0x%zx cpsr=0x%08x\n",
-                     ( unsigned long )start, sizeof( code ),
-                     usbdev->hdw_state->cpu->uncached_cpsr );
-            for ( pos = 0; pos < sizeof( code ); pos += 16 ) {
-                size_t i;
-                fprintf( stderr, "hpclang-usbdev-code: %08lx:",
-                         ( unsigned long )( start + pos ) );
-                for ( i = 0; i < 16 && pos + i < sizeof( code ); ++i )
-                    fprintf( stderr, "%02x", code[ pos + i ] );
-                fputc( '\n', stderr );
+        for ( range_index = 0;
+              range_index < sizeof( ranges ) / sizeof( ranges[ 0 ] );
+              ++range_index ) {
+            uint8_t code[ 0x300 ];
+            target_ulong start = ranges[ range_index ].start;
+            size_t size = ranges[ range_index ].size;
+            size_t pos;
+
+            if ( cpu_memory_rw_debug(
+                     usbdev->hdw_state->cpu, start, code, size, 0 ) == 0 ) {
+                fprintf(
+                    stderr,
+                    "hpclang-usbdev-code:%s: start=0x%08lx size=0x%zx cpsr=0x%08x\n",
+                    getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
+                    ( unsigned long )start, size,
+                    usbdev->hdw_state->cpu->uncached_cpsr );
+                for ( pos = 0; pos < size; pos += 16 ) {
+                    size_t i;
+                    fprintf(
+                        stderr, "hpclang-usbdev-code:%s: %08lx:",
+                        getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
+                        ( unsigned long )( start + pos ) );
+                    for ( i = 0; i < 16 && pos + i < size; ++i )
+                        fprintf( stderr, "%02x", code[ pos + i ] );
+                    fputc( '\n', stderr );
+                }
+            } else {
+                fprintf(
+                    stderr,
+                    "hpclang-usbdev-code:%s: runtime RAM dump failed at 0x%08lx\n",
+                    getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
+                    ( unsigned long )start );
             }
-        } else {
-            fprintf( stderr,
-                     "hpclang-usbdev-code: runtime RAM dump failed at 0x%08lx\n",
-                     ( unsigned long )start );
         }
         ep3_code_dumped = 1;
     }
