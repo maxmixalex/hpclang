@@ -40,10 +40,7 @@
 29000 tap down
 30000 tap down
 30500 capture server-menu
-# The host runner makes the virtual cable present from this capture onward,
-# before Start Server samples the USB connection state.
 31500 tap enter
-32000 capture server-wait-usb
 33500 capture server-usb
 34000 host-gate
 
@@ -56,8 +53,6 @@
 4000 tap var
 5000 capture vars-before-install
 6000 tap f2
-7500 capture setup-recalled
-8500 tap eval
 14000 capture setup-evaluated
 15000 chord on f3
 19000 capture warmstart
@@ -70,7 +65,11 @@
 24000 capture hpclang-stack
 26000 chord rshift two
 27500 capture lib-menu
-28500 tap f1
-30500 capture armtoolbox
-31000 monitor 65000
-31500 tap f1
+# Fresh install exposes port selectors first. Enter port 2, where ARMToolbox
+# is the fourth library softkey in the hardware-verified Stock layout.
+28500 tap f3
+29500 capture port2
+30500 tap f4
+31500 capture armtoolbox
+32000 monitor 65000
+32500 tap f1

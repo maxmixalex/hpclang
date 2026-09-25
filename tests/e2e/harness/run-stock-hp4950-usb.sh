@@ -15,10 +15,9 @@ export TARGET
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
-USB_CONNECT_GATE="$ROOT/build/$TARGET-usb-connect"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 rm -rf "$STATE" "$SEND"
-rm -f "$HOST_GATE" "$USB_CONNECT_GATE" "$KERMIT_LOG"
+rm -f "$HOST_GATE" "$KERMIT_LOG"
 mkdir -p "$STATE" "$SEND"
 
 printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
@@ -41,7 +40,7 @@ cleanup() {
     kill "${X50_PID:-}" "$SOCAT_PID" 2>/dev/null || true
     wait "${X50_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
-    rm -f "$HOST_GATE" "$USB_CONNECT_GATE"
+    rm -f "$HOST_GATE"
 }
 trap cleanup EXIT
 
@@ -52,13 +51,8 @@ done
 [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
 
 export HPCLANG_X50NG_USB0="$X50_TTY"
-export HPCLANG_X50NG_USB_CONNECT_FILE="$USB_CONNECT_GATE"
 export HPCLANG_X50NG_USB_TRACE_EVENTS=1
-export HPCLANG_X50NG_USB_TRACE_STATE=1
-# Full-speed USB requires a post-reset recovery interval before control
-# traffic.  The host poll is 100 us, so 100 ticks gives Stock 10 ms to
-# settle its high-level USB state before GET_DESCRIPTOR.
-export HPCLANG_X50NG_USB_RESET_RECOVERY_TICKS=100
+export HPCLANG_X50NG_USB_TRACE_CPU=1
 unset HPCLANG_X50NG_UART0 || true
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
@@ -85,27 +79,12 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-# Keep USB detached during boot and I/O configuration, but make the cable
-# present before Start Server is entered.  Stock 2.15's server screen does
-# not actually prompt for a fresh attach; its USB-open path samples cable
-# state while arming the driver.  The host-side UDC still waits for Stock's
-# active flag before beginning bus reset/enumeration.
-SERVER_MENU="$ROOT/build/$TARGET-stock-server-menu.pgm"
-for _ in $(seq 1 400); do
-    [[ -s "$SERVER_MENU" ]] && break
-    kill -0 "$X50_PID" 2>/dev/null || break
-    sleep 0.1
-done
-[[ -s "$SERVER_MENU" ]] || {
-    echo "HP49/50 Stock USB server-menu capture was not produced" >&2
-    exit 1
-}
-: > "$USB_CONNECT_GATE"
-printf 'HP49/50 Stock USB cable present before Start Server: %s\n' "$USB_CONNECT_GATE"
-
-# Wait for the server state before feeding Kermit bytes.
+# Do not put protocol bytes into EP3 before Stock has entered its Kermit
+# server.  A packet delivered while the server is still in the I/O menu can
+# leave OUT_PKT_RDY latched after an otherwise harmless idle-state interrupt,
+# preventing the later retransmission from becoming a new endpoint event.
 SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
-for _ in $(seq 1 100); do
+for _ in $(seq 1 400); do
     [[ -s "$SERVER_READY" ]] && break
     kill -0 "$X50_PID" 2>/dev/null || break
     sleep 0.1

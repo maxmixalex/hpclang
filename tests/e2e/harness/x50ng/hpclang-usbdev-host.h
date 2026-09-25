@@ -109,7 +109,6 @@ struct hpusb_core {
 
     enum hpusb_enum_state enum_state;
     unsigned enum_wait_ticks;
-    unsigned reset_recovery_ticks;
     int ctrl_active;
     int ctrl_dir_in;
     int ctrl_data_end;
@@ -128,7 +127,6 @@ struct hpusb_core {
 void hpusb_init(struct hpusb_core *u, hpusb_irq_fn irq, void *irq_opaque);
 void hpusb_set_stream(struct hpusb_core *u, hpusb_stream_read_fn read_fn,
                       hpusb_stream_write_fn write_fn, void *opaque);
-void hpusb_set_reset_recovery_ticks(struct hpusb_core *u, unsigned ticks);
 void hpusb_set_connected(struct hpusb_core *u, int connected);
 void hpusb_reset_device(struct hpusb_core *u);
 uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset);

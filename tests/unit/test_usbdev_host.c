@@ -48,7 +48,6 @@ int main(void)
 {
     struct hpusb_core u; struct fake_guest g={0}; struct stream s={0};
     hpusb_init(&u,irq_cb,NULL); hpusb_set_stream(&u,sread,swrite,&s); hpusb_set_connected(&u,1);
-    assert(u.reset_recovery_ticks==2u);
     hpusb_write(&u,HPUSB_USB_INT_EN,HPUSB_USBINT_RESET); hpusb_write(&u,HPUSB_EP_INT_EN,0x0f);
     for(int i=0;i<1000 && !hpusb_is_streaming(&u);i++){hpusb_tick(&u);fake_ep0_service(&u,&g);}
     assert(hpusb_is_streaming(&u)); assert(u.bulk_in_ep==1); assert(u.bulk_out_ep==3); assert(u.configuration_value==1);
@@ -111,11 +110,8 @@ int main(void)
         assert(done.ep_int&1u);
         assert(irq_level==1);
     }
-    /* Device reset preserves both the host bridge and configured recovery
-     * window while requiring fresh enumeration. */
-    hpusb_set_reset_recovery_ticks(&u,100u);
+    /* Device reset preserves the host bridge but requires fresh enumeration. */
     hpusb_reset_device(&u);
-    assert(u.reset_recovery_ticks==100u);
     assert(u.connected); assert(!hpusb_is_streaming(&u));
     hpusb_write(&u,HPUSB_USB_INT_EN,HPUSB_USBINT_RESET); hpusb_write(&u,HPUSB_EP_INT_EN,0x0f);
     memset(&g,0,sizeof(g));
