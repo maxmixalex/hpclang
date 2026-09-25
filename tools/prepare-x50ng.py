@@ -630,13 +630,19 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
 
 
 def patch_usb_receive_gate_store_trace(root: Path) -> None:
-    path = root / "src" / "qemu" / "softmmu_header.h"
-    text = path.read_text()
+    header = root / "src" / "qemu" / "softmmu_header.h"
+    text = header.read_text()
 
-    # softmmu_header.h is instantiated multiple times for width/MMU variants.
-    # Keep the tracing dependencies self-contained in that generated header.
-    if "#include <stdio.h>\n" not in text:
-        text = "#include <stdio.h>\n#include <stdlib.h>\n" + text
+    declaration = (
+        "void hpclang_trace_usb_receive_gate_store(\n"
+        "    target_ulong addr, unsigned data_size, unsigned long long value,\n"
+        "    target_ulong pc, target_ulong lr );\n\n"
+    )
+    marker = "/* generic load/store macros */\n"
+    if declaration not in text:
+        if marker not in text:
+            raise SystemExit(f"{header}: declaration anchor missing")
+        text = text.replace(marker, declaration + marker, 1)
 
     signature = (
         "static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE v)\n"
@@ -644,10 +650,10 @@ def patch_usb_receive_gate_store_trace(root: Path) -> None:
     )
     start = text.find(signature)
     if start < 0:
-        raise SystemExit(f"{path}: store helper signature missing")
+        raise SystemExit(f"{header}: store helper signature missing")
     end = text.find("\n}\n", start)
     if end < 0:
-        raise SystemExit(f"{path}: store helper end missing")
+        raise SystemExit(f"{header}: store helper end missing")
     block = text[start:end + 3]
     needle = (
         "    addr = ptr;\n"
@@ -655,21 +661,41 @@ def patch_usb_receive_gate_store_trace(root: Path) -> None:
     )
     replacement = (
         "    addr = ptr;\n"
-        "    if (getenv(\"HPCLANG_X50NG_USB_TRACE_CPU\") != NULL &&\n"
-        "        addr <= 0x08000cf9u &&\n"
-        "        addr + DATA_SIZE > 0x08000cf9u) {\n"
-        "        fprintf(stderr,\n"
-        "                \"hpclang-usb-receive-gate-store: addr=0x%08lx size=%u \"\n"
-        "                \"value=0x%016llx pc=0x%08x lr=0x%08x\\n\",\n"
-        "                (unsigned long)addr, (unsigned)DATA_SIZE,\n"
-        "                (unsigned long long)v, env->regs[15], env->regs[14]);\n"
-        "    }\n"
+        "    if (addr <= 0x08000cf9u &&\n"
+        "        addr + DATA_SIZE > 0x08000cf9u)\n"
+        "        hpclang_trace_usb_receive_gate_store(\n"
+        "            addr, (unsigned)DATA_SIZE, (unsigned long long)v,\n"
+        "            env->regs[15], env->regs[14]);\n"
         "    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);\n"
     )
     if needle not in block:
-        raise SystemExit(f"{path}: store helper insertion anchor missing")
+        raise SystemExit(f"{header}: store helper insertion anchor missing")
     block = block.replace(needle, replacement, 1)
-    path.write_text(text[:start] + block + text[end + 3:])
+    header.write_text(text[:start] + block + text[end + 3:])
+
+    exec_c = root / "src" / "qemu" / "exec.c"
+    exec_text = exec_c.read_text()
+    helper_anchor = "//#define DEBUG_TB_INVALIDATE\n"
+    helper = (
+        "void hpclang_trace_usb_receive_gate_store(\n"
+        "    target_ulong addr, unsigned data_size, unsigned long long value,\n"
+        "    target_ulong pc, target_ulong lr )\n"
+        "{\n"
+        "    const char* trace = getenv(\"HPCLANG_X50NG_USB_TRACE_CPU\");\n"
+        "    if ( trace == NULL || *trace == '\\0' )\n"
+        "        return;\n"
+        "    fprintf( stderr,\n"
+        "             \"hpclang-usb-receive-gate-store: addr=0x%08lx size=%u \"\n"
+        "             \"value=0x%016llx pc=0x%08lx lr=0x%08lx\\n\",\n"
+        "             ( unsigned long )addr, data_size, value,\n"
+        "             ( unsigned long )pc, ( unsigned long )lr );\n"
+        "}\n\n"
+    )
+    if helper not in exec_text:
+        if helper_anchor not in exec_text:
+            raise SystemExit(f"{exec_c}: helper insertion anchor missing")
+        exec_text = exec_text.replace(helper_anchor, helper + helper_anchor, 1)
+    exec_c.write_text(exec_text)
 
 
 def patch_reserved_ram(root: Path) -> None:
