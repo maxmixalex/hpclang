@@ -77,14 +77,19 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
-for _ in $(seq 1 400); do
-    [[ -s "$SERVER_READY" ]] && break
+# HP48's stable Stock USB path has the host Kermit active before the
+# calculator launches its on-device Kermit process. Do the same here, but
+# gate on the deterministic post-I/O-configuration capture rather than a
+# guessed sleep. Starting only after "Awaiting Server Cmd." lets both peers
+# enter the initial-send state at once and they repeatedly exchange S packets.
+HOST_READY="$ROOT/build/$TARGET-stock-after-io-config.pgm"
+for _ in $(seq 1 300); do
+    [[ -s "$HOST_READY" ]] && break
     kill -0 "$X50_PID" 2>/dev/null || break
     sleep 0.1
 done
-[[ -s "$SERVER_READY" ]] || {
-    echo "HP49/50 Stock USB server-ready capture was not produced" >&2
+[[ -s "$HOST_READY" ]] || {
+    echo "HP49/50 Stock USB I/O-config capture was not produced" >&2
     exit 1
 }
 
