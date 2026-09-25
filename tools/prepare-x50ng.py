@@ -402,26 +402,30 @@ static void hpclang_usbdev_host_poll( void* opaque )
             }
 
             if ( usbdev->cable_asserted && !usbdev->host.connected ) {
-                uint8_t usb_active = 0;
-                if ( cpu_memory_rw_debug(
-                         usbdev->hdw_state->cpu,
-                         0x08000cf9u,
-                         &usb_active,
-                         sizeof( usb_active ),
-                         0 ) == 0 &&
-                     usb_active == 1u ) {
-                    hpusb_set_connected( &usbdev->host, 1 );
-                    usbdev->next_sof = timer_get_clock() + 1000;
-                    if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
-                        fprintf(
-                            stderr,
-                            "hpclang-usbdev-state:%s: Stock USB active; "
-                            "host bus connected "
-                            "pc=0x%08x lr=0x%08x\n",
-                            target,
-                            usbdev->hdw_state->cpu->regs[ 15 ],
-                            usbdev->hdw_state->cpu->regs[ 14 ] );
-                }
+                /*
+                 * Real host ordering is cable -> bus reset/enumeration ->
+                 * application/server open.  Stock's 0x08000cf9 flag gates
+                 * the EP3 receive handler and is explicitly cleared by the
+                 * USB reset routine at 0xE70C.  Waiting for that flag before
+                 * bus reset therefore inverts the hardware sequence: Start
+                 * Server sets it, then our late reset immediately clears it.
+                 *
+                 * Once the cable marker is released (before Start Server),
+                 * connect the host bus immediately so reset/enumeration can
+                 * finish first.  Stock will set the receive-active flag only
+                 * afterwards when the server is opened.
+                 */
+                hpusb_set_connected( &usbdev->host, 1 );
+                usbdev->next_sof = timer_get_clock() + 1000;
+                if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+                    fprintf(
+                        stderr,
+                        "hpclang-usbdev-state:%s: cable present; "
+                        "host bus connected before server open "
+                        "pc=0x%08x lr=0x%08x\n",
+                        target,
+                        usbdev->hdw_state->cpu->regs[ 15 ],
+                        usbdev->hdw_state->cpu->regs[ 14 ] );
             }
         } else {
             if ( !usbdev->host.connected && hpclang_usbdev_connect_ready() ) {
