@@ -537,15 +537,33 @@ static void s3c2410_usbdev_write(
     reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
     *( reg->datap ) = data;
     if ( offset == HPUSB_PWR &&
-         getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+         getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL ) {
+        uint32_t stack_words[ 8 ] = { 0 };
+        target_ulong sp = usbdev->hdw_state->cpu->regs[ 13 ];
+        int stack_ok =
+            cpu_memory_rw_debug(
+                usbdev->hdw_state->cpu,
+                sp,
+                ( uint8_t* )stack_words,
+                sizeof( stack_words ),
+                0 ) == 0;
+
         fprintf(
             stderr,
             "hpclang-usbdev-state:%s: PWR write=0x%08x "
-            "pc=0x%08x lr=0x%08x\n",
+            "pc=0x%08x lr=0x%08x sp=0x%08lx "
+            "stack=%s%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x\n",
             getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?",
             data,
             usbdev->hdw_state->cpu->regs[ 15 ],
-            usbdev->hdw_state->cpu->regs[ 14 ] );
+            usbdev->hdw_state->cpu->regs[ 14 ],
+            ( unsigned long )sp,
+            stack_ok ? "" : "unreadable:",
+            stack_words[ 0 ], stack_words[ 1 ],
+            stack_words[ 2 ], stack_words[ 3 ],
+            stack_words[ 4 ], stack_words[ 5 ],
+            stack_words[ 6 ], stack_words[ 7 ] );
+    }
     hpclang_usbdev_trace_cpu( usbdev, "write", offset, data );
 
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
