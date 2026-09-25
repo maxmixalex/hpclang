@@ -142,6 +142,7 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
         '''#include <errno.h>
 #include "../module.h"
 #include "../timer.h"
+#include "../qemu/exec-all.h"
 
 #include "s3c2410.h"
 #include "s3c2410_intc.h"
@@ -167,6 +168,7 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     int64_t next_sof;
     enum hpusb_enum_state trace_state;
     int cable_asserted;
+    CPUWatchpoint* receive_gate_watchpoint;
 } s3c2410_usbdev_t;''',
         "USB host state",
     )
@@ -186,7 +188,90 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
         raise SystemExit(f"{path}: USB read/write function anchors changed")
 
     text = path.read_text()
-    host_impl = r'''static void hpclang_usbdev_irq( void* opaque, int level )
+    host_impl = r'''static int hpclang_usbdev_trace_cpu_enabled( void );
+
+static s3c2410_usbdev_t* hpclang_usbdev_watch_owner;
+static CPUDebugExcpHandler* hpclang_usbdev_previous_debug_handler;
+
+static void hpclang_usbdev_debug_exception( CPUState* cpu )
+{
+    s3c2410_usbdev_t* usbdev = hpclang_usbdev_watch_owner;
+
+    if ( usbdev != NULL &&
+         cpu == usbdev->hdw_state->cpu &&
+         cpu->watchpoint_hit == usbdev->receive_gate_watchpoint ) {
+        uint8_t value = 0xffu;
+        target_ulong pc_after = cpu->regs[ 15 ];
+        target_ulong writer_pc =
+            pc_after - ( cpu->thumb ? 2u : 4u );
+
+        ( void )cpu_memory_rw_debug(
+            cpu, 0x08000cf9u, &value, sizeof( value ), 0 );
+        fprintf(
+            stderr,
+            "hpclang-usb-receive-gate-watch: value=%u "
+            "writer_pc=0x%08lx pc_after=0x%08lx lr=0x%08x thumb=%d\n",
+            ( unsigned )value,
+            ( unsigned long )writer_pc,
+            ( unsigned long )pc_after,
+            cpu->regs[ 14 ],
+            cpu->thumb );
+
+        cpu->watchpoint_hit->flags &= ~BP_WATCHPOINT_HIT;
+        cpu->watchpoint_hit = NULL;
+        return;
+    }
+
+    if ( hpclang_usbdev_previous_debug_handler != NULL )
+        hpclang_usbdev_previous_debug_handler( cpu );
+}
+
+static void hpclang_usbdev_install_receive_gate_watch(
+    s3c2410_usbdev_t* usbdev )
+{
+    const char* target = getenv( "TARGET" );
+
+    if ( !hpclang_usbdev_trace_cpu_enabled() ||
+         target == NULL ||
+         ( strcmp( target, "hp49gplus" ) != 0 &&
+           strcmp( target, "hp50g" ) != 0 ) )
+        return;
+
+    if ( cpu_watchpoint_insert(
+             usbdev->hdw_state->cpu,
+             0x08000cf9u,
+             1u,
+             BP_MEM_WRITE | BP_CPU,
+             &usbdev->receive_gate_watchpoint ) != 0 ) {
+        fprintf( stderr,
+                 "hpclang-usb-receive-gate-watch: install failed\n" );
+        return;
+    }
+
+    hpclang_usbdev_watch_owner = usbdev;
+    hpclang_usbdev_previous_debug_handler =
+        cpu_set_debug_excp_handler( hpclang_usbdev_debug_exception );
+}
+
+static void hpclang_usbdev_remove_receive_gate_watch(
+    s3c2410_usbdev_t* usbdev )
+{
+    if ( usbdev->receive_gate_watchpoint != NULL ) {
+        cpu_watchpoint_remove_by_ref(
+            usbdev->hdw_state->cpu,
+            usbdev->receive_gate_watchpoint );
+        usbdev->receive_gate_watchpoint = NULL;
+    }
+
+    if ( hpclang_usbdev_watch_owner == usbdev ) {
+        ( void )cpu_set_debug_excp_handler(
+            hpclang_usbdev_previous_debug_handler );
+        hpclang_usbdev_previous_debug_handler = NULL;
+        hpclang_usbdev_watch_owner = NULL;
+    }
+}
+
+static void hpclang_usbdev_irq( void* opaque, int level )
 {
     s3c2410_usbdev_t* usbdev = opaque;
     if ( level )
@@ -436,6 +521,7 @@ static void s3c2410_usbdev_write(
     usbdev->hdw_state = module->hdw_state;
     usbdev->host_fd = -1;
     hpusb_init( &usbdev->host, hpclang_usbdev_irq, usbdev );
+    hpclang_usbdev_install_receive_gate_watch( usbdev );
 
     const char* host_path = getenv( "HPCLANG_X50NG_USB0" );
     if ( host_path && *host_path ) {
@@ -482,6 +568,7 @@ static void s3c2410_usbdev_write(
     }''',
         '''    if ( module->user_data ) {
         usbdev = module->user_data;
+        hpclang_usbdev_remove_receive_gate_watch( usbdev );
         if ( usbdev->host_timer ) {
             timer_del( usbdev->host_timer );
             timer_free( usbdev->host_timer );
@@ -629,78 +716,6 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
 
 
 
-def patch_usb_receive_gate_store_trace(root: Path) -> None:
-    header = root / "src" / "qemu" / "softmmu_header.h"
-    text = header.read_text()
-
-    declaration = (
-        "#ifndef HPCLANG_USB_RECEIVE_GATE_TRACE_DECL\n"
-        "#define HPCLANG_USB_RECEIVE_GATE_TRACE_DECL\n"
-        "void hpclang_trace_usb_receive_gate_store(\n"
-        "    target_ulong addr, unsigned data_size, unsigned long long value,\n"
-        "    target_ulong pc, target_ulong lr );\n"
-        "#endif\n\n"
-    )
-    marker = "/* generic load/store macros */\n"
-    if declaration not in text:
-        if marker not in text:
-            raise SystemExit(f"{header}: declaration anchor missing")
-        text = text.replace(marker, declaration + marker, 1)
-
-    signature = (
-        "static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE v)\n"
-        "{\n"
-    )
-    start = text.find(signature)
-    if start < 0:
-        raise SystemExit(f"{header}: store helper signature missing")
-    end = text.find("\n}\n", start)
-    if end < 0:
-        raise SystemExit(f"{header}: store helper end missing")
-    block = text[start:end + 3]
-    needle = (
-        "    addr = ptr;\n"
-        "    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);\n"
-    )
-    replacement = (
-        "    addr = ptr;\n"
-        "    if (addr <= 0x08000cf9u &&\n"
-        "        addr + DATA_SIZE > 0x08000cf9u)\n"
-        "        hpclang_trace_usb_receive_gate_store(\n"
-        "            addr, (unsigned)DATA_SIZE, (unsigned long long)v,\n"
-        "            env->regs[15], env->regs[14]);\n"
-        "    page_index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);\n"
-    )
-    if needle not in block:
-        raise SystemExit(f"{header}: store helper insertion anchor missing")
-    block = block.replace(needle, replacement, 1)
-    header.write_text(text[:start] + block + text[end + 3:])
-
-    exec_c = root / "src" / "qemu" / "exec.c"
-    exec_text = exec_c.read_text()
-    helper_anchor = "//#define DEBUG_TB_INVALIDATE\n"
-    helper = (
-        "void hpclang_trace_usb_receive_gate_store(\n"
-        "    target_ulong addr, unsigned data_size, unsigned long long value,\n"
-        "    target_ulong pc, target_ulong lr )\n"
-        "{\n"
-        "    const char* trace = getenv(\"HPCLANG_X50NG_USB_TRACE_CPU\");\n"
-        "    if ( trace == NULL || *trace == '\\0' )\n"
-        "        return;\n"
-        "    fprintf( stderr,\n"
-        "             \"hpclang-usb-receive-gate-store: addr=0x%08lx size=%u \"\n"
-        "             \"value=0x%016llx pc=0x%08lx lr=0x%08lx\\n\",\n"
-        "             ( unsigned long )addr, data_size, value,\n"
-        "             ( unsigned long )pc, ( unsigned long )lr );\n"
-        "}\n\n"
-    )
-    if helper not in exec_text:
-        if helper_anchor not in exec_text:
-            raise SystemExit(f"{exec_c}: helper insertion anchor missing")
-        exec_text = exec_text.replace(helper_anchor, helper + helper_anchor, 1)
-    exec_c.write_text(exec_text)
-
-
 def patch_reserved_ram(root: Path) -> None:
     replace_once(
         root / "src" / "module.c",
@@ -764,7 +779,6 @@ def main() -> None:
     patch_runtime_sram(root)
     patch_host_usbdev(root, args)
     patch_host_uart0(root)
-    patch_usb_receive_gate_store_trace(root)
     patch_reserved_ram(root)
 
 
