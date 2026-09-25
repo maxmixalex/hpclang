@@ -27,9 +27,6 @@ cp "$SEND/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
 KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py"     "$SEND/ZZE2E.HP" "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP")"
-# Temporary control-path diagnostic: configuration-state failure happens
-# before file transfer starts, so do not spend the full transfer watchdog on it.
-KERMIT_TIMEOUT=30
 EMULATOR_TIMEOUT=$((20 + KERMIT_TIMEOUT + 120))
 printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss bytes=%s\n'     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"     "$(( $(stat -c %s "$SEND/ZZE2E.HP") + $(stat -c %s "$SEND/SETUP.BIN") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
@@ -55,8 +52,6 @@ done
 
 export HPCLANG_X50NG_USB0="$X50_TTY"
 export HPCLANG_X50NG_USB_TRACE_EVENTS=1
-export HPCLANG_X50NG_USB_TRACE=1
-export HPCLANG_X50NG_USB_VERIFY_CONFIG=1
 unset HPCLANG_X50NG_UART0 || true
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"

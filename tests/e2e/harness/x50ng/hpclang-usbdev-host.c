@@ -157,7 +157,13 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
     switch (offset) {
     case HPUSB_FUNC_ADDR: return u->func_addr;
     case HPUSB_PWR: return u->pwr;
-    case HPUSB_EP_INT: return u->ep_int;
+    case HPUSB_EP_INT:
+        if (hpusb_trace_events())
+            fprintf(stderr,
+                    "hpusb:%s ep_int_read value=0x%02x enable=0x%02x irq=%d enum=%u\n",
+                    hpusb_trace_target(), u->ep_int, u->ep_int_en,
+                    u->irq_level, (unsigned)u->enum_state);
+        return u->ep_int;
     case HPUSB_USB_INT: return u->usb_int;
     case HPUSB_EP_INT_EN: return u->ep_int_en;
     case HPUSB_USB_INT_EN: return u->usb_int_en;
@@ -177,8 +183,20 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
                     ep->out_count, ep->out_pos);
         return ep->out_csr1;
     case HPUSB_OUT_CSR2: return ep->out_csr2;
-    case HPUSB_OUT_CNT1: return (uint8_t)((ep->out_count - ep->out_pos) & 0xffu);
-    case HPUSB_OUT_CNT2: return (uint8_t)(((ep->out_count - ep->out_pos) >> 8) & 0xffu);
+    case HPUSB_OUT_CNT1:
+        if (hpusb_trace_events() && idx == u->bulk_out_ep)
+            fprintf(stderr,
+                    "hpusb:%s out_cnt1_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
+                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos,
+                    ep->out_csr1);
+        return (uint8_t)((ep->out_count - ep->out_pos) & 0xffu);
+    case HPUSB_OUT_CNT2:
+        if (hpusb_trace_events() && idx == u->bulk_out_ep)
+            fprintf(stderr,
+                    "hpusb:%s out_cnt2_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
+                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos,
+                    ep->out_csr1);
+        return (uint8_t)(((ep->out_count - ep->out_pos) >> 8) & 0xffu);
     default: return 0;
     }
 }
