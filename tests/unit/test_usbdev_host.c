@@ -90,6 +90,26 @@ int main(void)
     hpusb_sof(&u); assert(u.frame==1u);
     assert(hpusb_read(&u,HPUSB_FRAME1)==1u);
     assert(hpusb_read(&u,HPUSB_FRAME2)==0u);
+    /* Host-to-device DATA_END completion is a hardware event of its own:
+     * it commits FUNC_ADDR.ADDR_UPDATE and raises EP0 once more. */
+    {
+        struct hpusb_core done;
+        hpusb_init(&done,irq_cb,NULL);
+        hpusb_set_connected(&done,1);
+        done.enum_state=HPUSB_ENUM_SET_CONFIG;
+        done.ctrl_active=1;
+        done.ctrl_dir_in=0;
+        done.ctrl_data_end=1;
+        done.func_addr=HPUSB_FUNC_ADDR_UPDATE|1u;
+        done.ep_int_en=1u;
+        done.ep[0].in_csr1=0;
+        irq_level=0;
+        hpusb_tick(&done);
+        assert(hpusb_is_streaming(&done));
+        assert(done.func_addr==1u);
+        assert(done.ep_int&1u);
+        assert(irq_level==1);
+    }
     /* Device reset preserves the host bridge but requires fresh enumeration. */
     hpusb_reset_device(&u);
     assert(u.connected); assert(!hpusb_is_streaming(&u));

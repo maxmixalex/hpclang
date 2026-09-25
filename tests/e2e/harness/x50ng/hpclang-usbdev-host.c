@@ -212,15 +212,7 @@ static void write_ep0_csr(struct hpusb_core *u, uint8_t data)
     if (data & HPUSB_EP0_SENDSTL) ep->in_csr1 |= HPUSB_EP0_SENDSTL;
     if (data & HPUSB_EP0_SSE) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SE;
     if ((data & HPUSB_EP0_SENTSTL) == 0) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SENTSTL;
-    if (data & HPUSB_EP0_DE) {
-        /*
-         * S3C2410 hardware clears FUNC_ADDR.ADDR_UPDATE when EP0 DATA_END
-         * commits the SET_ADDRESS request.  The function-address field
-         * itself remains intact.
-         */
-        u->func_addr &= (uint8_t)~HPUSB_FUNC_ADDR_UPDATE;
-        u->ctrl_data_end = 1;
-    }
+    if (data & HPUSB_EP0_DE) u->ctrl_data_end = 1;
 }
 
 static void write_in_csr1(struct hpusb_ep *ep, uint8_t data)
@@ -452,8 +444,17 @@ static int progress_control(struct hpusb_core *u)
             }
         }
     } else if (!(ep->in_csr1 & HPUSB_EP0_OPKRDY) && u->ctrl_data_end) {
+        /*
+         * For a host-to-device control request, DATA_END is owned by the
+         * USB engine after the MCU acknowledges the setup packet.  When the
+         * status stage completes, hardware clears DATA_END, commits a pending
+         * SET_ADDRESS (ADDR_UPDATE -> 0), and raises EP0 again to report the
+         * end of the control transfer.
+         */
         u->ctrl_active = 0;
         u->ctrl_data_end = 0;
+        u->func_addr &= (uint8_t)~HPUSB_FUNC_ADDR_UPDATE;
+        ep_irq(u, 0);
         return 1;
     }
     return 0;
