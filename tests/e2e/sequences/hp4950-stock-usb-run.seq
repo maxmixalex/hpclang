@@ -41,6 +41,9 @@
 30000 tap down
 30500 capture server-menu
 31500 tap enter
+# Stock now waits for a fresh physical USB attach ("please plug usb cable").
+# The host runner watches this capture and releases HPCLANG_X50NG_USB_CONNECT_FILE.
+32000 capture server-wait-usb
 33500 capture server-usb
 34000 host-gate
 

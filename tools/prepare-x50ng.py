@@ -323,6 +323,14 @@ static int hpclang_usbdev_stream_write(
     return 0;
 }
 
+static int hpclang_usbdev_connect_ready( void )
+{
+    const char* marker = getenv( "HPCLANG_X50NG_USB_CONNECT_FILE" );
+    if ( marker == NULL || *marker == '\0' )
+        return 1;
+    return access( marker, F_OK ) == 0;
+}
+
 static void hpclang_usbdev_host_poll( void* opaque )
 {
     static int usb_active_last = -1;
@@ -330,7 +338,28 @@ static void hpclang_usbdev_host_poll( void* opaque )
     const char* target =
         getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?";
 
-    if ( !usbdev->cable_asserted &&
+    /*
+     * HP49/50 Stock explicitly asks the user to plug in the USB cable after
+     * entering Start Server.  Keep the host electrically disconnected until
+     * the harness releases that marker; otherwise RESET/enumeration events
+     * are consumed by Stock's global connection state machine long before the
+     * server starts waiting for a fresh attach.
+     */
+    if ( !usbdev->host.connected && hpclang_usbdev_connect_ready() ) {
+        hpusb_set_connected( &usbdev->host, 1 );
+        usbdev->next_sof = timer_get_clock() + 1000;
+        if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+            fprintf(
+                stderr,
+                "hpclang-usbdev-state:%s: host connected "
+                "pc=0x%08x lr=0x%08x\n",
+                target,
+                usbdev->hdw_state->cpu->regs[ 15 ],
+                usbdev->hdw_state->cpu->regs[ 14 ] );
+    }
+
+    if ( usbdev->host.connected &&
+         !usbdev->cable_asserted &&
          usbdev->hdw_state->s3c2410_io_port != NULL ) {
         s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
         usbdev->cable_asserted = 1;
@@ -342,6 +371,12 @@ static void hpclang_usbdev_host_poll( void* opaque )
                 target,
                 usbdev->hdw_state->cpu->regs[ 15 ],
                 usbdev->hdw_state->cpu->regs[ 14 ] );
+    }
+
+    if ( !usbdev->host.connected ) {
+        if ( usbdev->host_timer )
+            timer_mod( usbdev->host_timer, timer_get_clock() + 100 );
+        return;
     }
 
     if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL ) {
@@ -520,7 +555,8 @@ static void s3c2410_usbdev_write(
             hpclang_usbdev_stream_read,
             hpclang_usbdev_stream_write,
             usbdev );
-        hpusb_set_connected( &usbdev->host, 1 );
+        if ( hpclang_usbdev_connect_ready() )
+            hpusb_set_connected( &usbdev->host, 1 );
         usbdev->next_sof = timer_get_clock() + 1000;
         usbdev->trace_state = usbdev->host.enum_state;
         usbdev->host_timer =

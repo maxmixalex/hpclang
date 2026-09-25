@@ -15,9 +15,10 @@ export TARGET
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
+USB_CONNECT_GATE="$ROOT/build/$TARGET-usb-connect"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 rm -rf "$STATE" "$SEND"
-rm -f "$HOST_GATE" "$KERMIT_LOG"
+rm -f "$HOST_GATE" "$USB_CONNECT_GATE" "$KERMIT_LOG"
 mkdir -p "$STATE" "$SEND"
 
 printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
@@ -40,7 +41,7 @@ cleanup() {
     kill "${X50_PID:-}" "$SOCAT_PID" 2>/dev/null || true
     wait "${X50_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
-    rm -f "$HOST_GATE"
+    rm -f "$HOST_GATE" "$USB_CONNECT_GATE"
 }
 trap cleanup EXIT
 
@@ -51,6 +52,7 @@ done
 [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
 
 export HPCLANG_X50NG_USB0="$X50_TTY"
+export HPCLANG_X50NG_USB_CONNECT_FILE="$USB_CONNECT_GATE"
 export HPCLANG_X50NG_USB_TRACE_EVENTS=1
 export HPCLANG_X50NG_USB_TRACE_STATE=1
 unset HPCLANG_X50NG_UART0 || true
@@ -79,12 +81,27 @@ COMMON_ARGS=(
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
 
-# Do not put protocol bytes into EP3 before Stock has entered its Kermit
-# server.  A packet delivered while the server is still in the I/O menu can
-# leave OUT_PKT_RDY latched after an otherwise harmless idle-state interrupt,
-# preventing the later retransmission from becoming a new endpoint event.
-SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
+# HP49/50 Stock's connection flow explicitly displays "please plug usb
+# cable" after Start Server.  Match the real interaction: keep the virtual
+# cable detached through boot/I/O configuration, then connect only after the
+# server has entered that wait state.  This prevents stale RESET/EP0 events
+# from satisfying Stock's global USB connection state machine prematurely.
+SERVER_WAIT_USB="$ROOT/build/$TARGET-stock-server-wait-usb.pgm"
 for _ in $(seq 1 400); do
+    [[ -s "$SERVER_WAIT_USB" ]] && break
+    kill -0 "$X50_PID" 2>/dev/null || break
+    sleep 0.1
+done
+[[ -s "$SERVER_WAIT_USB" ]] || {
+    echo "HP49/50 Stock USB cable-wait capture was not produced" >&2
+    exit 1
+}
+: > "$USB_CONNECT_GATE"
+printf 'HP49/50 Stock USB cable connected: %s\n' "$USB_CONNECT_GATE"
+
+# Wait for the post-connect server state before feeding Kermit bytes.
+SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
+for _ in $(seq 1 100); do
     [[ -s "$SERVER_READY" ]] && break
     kill -0 "$X50_PID" 2>/dev/null || break
     sleep 0.1
