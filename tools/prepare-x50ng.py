@@ -339,38 +339,71 @@ static void hpclang_usbdev_host_poll( void* opaque )
         getenv( "TARGET" ) != NULL ? getenv( "TARGET" ) : "?";
 
     /*
-     * HP49/50 Stock explicitly asks the user to plug in the USB cable after
-     * entering Start Server.  Keep the host electrically disconnected until
-     * the harness releases that marker; otherwise RESET/enumeration events
-     * are consumed by Stock's global connection state machine long before the
-     * server starts waiting for a fresh attach.
+     * HP49/50 Stock treats cable insertion and host reset as two distinct
+     * events.  On real hardware GPF1/EINT1 lets Stock re-initialize the UDC
+     * before the host starts bus reset.  Do not collapse both events into the
+     * same 100-us poll: doing so lets stale endpoint-enable state trigger a
+     * reset before Stock's cable interrupt has armed the receive path.
+     *
+     * The explicit connect marker is HP49/50-only.  Other targets retain the
+     * historical immediate-connect behavior below.
      */
-    if ( !usbdev->host.connected && hpclang_usbdev_connect_ready() ) {
-        hpusb_set_connected( &usbdev->host, 1 );
-        usbdev->next_sof = timer_get_clock() + 1000;
-        if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
-            fprintf(
-                stderr,
-                "hpclang-usbdev-state:%s: host connected "
-                "pc=0x%08x lr=0x%08x\n",
-                target,
-                usbdev->hdw_state->cpu->regs[ 15 ],
-                usbdev->hdw_state->cpu->regs[ 14 ] );
-    }
+    {
+        const char* connect_marker =
+            getenv( "HPCLANG_X50NG_USB_CONNECT_FILE" );
 
-    if ( usbdev->host.connected &&
-         !usbdev->cable_asserted &&
-         usbdev->hdw_state->s3c2410_io_port != NULL ) {
-        s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
-        usbdev->cable_asserted = 1;
-        if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
-            fprintf(
-                stderr,
-                "hpclang-usbdev-state:%s: cable GPF1 asserted "
-                "pc=0x%08x lr=0x%08x\n",
-                target,
-                usbdev->hdw_state->cpu->regs[ 15 ],
-                usbdev->hdw_state->cpu->regs[ 14 ] );
+        if ( connect_marker != NULL && *connect_marker != '\0' ) {
+            if ( hpclang_usbdev_connect_ready() &&
+                 !usbdev->cable_asserted &&
+                 usbdev->hdw_state->s3c2410_io_port != NULL ) {
+                s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
+                usbdev->cable_asserted = 1;
+                if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+                    fprintf(
+                        stderr,
+                        "hpclang-usbdev-state:%s: cable GPF1 asserted; "
+                        "waiting for Stock USB active state "
+                        "pc=0x%08x lr=0x%08x\n",
+                        target,
+                        usbdev->hdw_state->cpu->regs[ 15 ],
+                        usbdev->hdw_state->cpu->regs[ 14 ] );
+            }
+
+            if ( usbdev->cable_asserted && !usbdev->host.connected ) {
+                uint8_t usb_active = 0;
+                if ( cpu_memory_rw_debug(
+                         usbdev->hdw_state->cpu,
+                         0x08000cf9u,
+                         &usb_active,
+                         sizeof( usb_active ),
+                         0 ) == 0 &&
+                     usb_active == 1u ) {
+                    hpusb_set_connected( &usbdev->host, 1 );
+                    usbdev->next_sof = timer_get_clock() + 1000;
+                    if ( getenv( "HPCLANG_X50NG_USB_TRACE_STATE" ) != NULL )
+                        fprintf(
+                            stderr,
+                            "hpclang-usbdev-state:%s: Stock USB active; "
+                            "host bus connected "
+                            "pc=0x%08x lr=0x%08x\n",
+                            target,
+                            usbdev->hdw_state->cpu->regs[ 15 ],
+                            usbdev->hdw_state->cpu->regs[ 14 ] );
+                }
+            }
+        } else {
+            if ( !usbdev->host.connected && hpclang_usbdev_connect_ready() ) {
+                hpusb_set_connected( &usbdev->host, 1 );
+                usbdev->next_sof = timer_get_clock() + 1000;
+            }
+
+            if ( usbdev->host.connected &&
+                 !usbdev->cable_asserted &&
+                 usbdev->hdw_state->s3c2410_io_port != NULL ) {
+                s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
+                usbdev->cable_asserted = 1;
+            }
+        }
     }
 
     if ( !usbdev->host.connected ) {
