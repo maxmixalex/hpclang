@@ -434,15 +434,27 @@ static void enum_tick(struct hpusb_core *u)
     case HPUSB_ENUM_WAIT_RESET_ACK:
         if ((u->usb_int & HPUSB_USBINT_RESET) == 0u) {
             if (++u->enum_wait_ticks >= 2u) {
-                start_control(u, 0x80, 6, 0x0100, 0, 18);
-                u->enum_state = HPUSB_ENUM_GET_DEVICE;
+                /*
+                 * Match normal USB host enumeration: first fetch only the
+                 * first eight device-descriptor bytes at address zero so the
+                 * host learns bMaxPacketSize0, then assign an address and
+                 * re-read the complete descriptor there.  Some Stock USB
+                 * stacks are observably more stateful than the simplified
+                 * one-shot 18-byte probe tolerated by the older harness.
+                 */
+                start_control(u, 0x80, 6, 0x0100, 0, 8);
+                u->enum_state = HPUSB_ENUM_GET_DEVICE_HEAD;
             }
         }
         break;
-    case HPUSB_ENUM_GET_DEVICE:
+    case HPUSB_ENUM_GET_DEVICE_HEAD:
         r = progress_control(u);
         if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0 && u->ctrl_response_len >= 8) {
+            unsigned maxp0 = u->ctrl_response[7];
+            if (maxp0 == 8u || maxp0 == 16u ||
+                maxp0 == 32u || maxp0 == 64u)
+                u->ep[0].maxp = (uint8_t)(maxp0 / 8u);
             start_control(u, 0x00, 5, 1, 0, 0);
             u->enum_state = HPUSB_ENUM_SET_ADDRESS;
         }
@@ -451,6 +463,14 @@ static void enum_tick(struct hpusb_core *u)
         r = progress_control(u);
         if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0) {
+            start_control(u, 0x80, 6, 0x0100, 0, 18);
+            u->enum_state = HPUSB_ENUM_GET_DEVICE_FULL;
+        }
+        break;
+    case HPUSB_ENUM_GET_DEVICE_FULL:
+        r = progress_control(u);
+        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
+        else if (r > 0 && u->ctrl_response_len >= 18) {
             start_control(u, 0x80, 6, 0x0200, 0, 9);
             u->enum_state = HPUSB_ENUM_GET_CONFIG_HEAD;
         }

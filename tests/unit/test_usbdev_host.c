@@ -27,7 +27,7 @@ static void fake_ep0_service(struct hpusb_core *u, struct fake_guest *g)
         hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_SOPKRDY);
         uint16_t value=q[2]|((uint16_t)q[3]<<8), wlen=q[6]|((uint16_t)q[7]<<8);
         g->len=g->pos=0; g->active=0;
-        if(q[1]==6 && (value>>8)==1){g->len=sizeof(dev_desc);memcpy(g->response,dev_desc,g->len);g->active=1;}
+        if(q[1]==6 && (value>>8)==1){g->len=wlen<sizeof(dev_desc)?wlen:sizeof(dev_desc);memcpy(g->response,dev_desc,g->len);g->active=1;}
         else if(q[1]==6 && (value>>8)==2){g->len=wlen<sizeof(cfg_desc)?wlen:sizeof(cfg_desc);memcpy(g->response,cfg_desc,g->len);g->active=1;}
         else if(q[1]==5){hpusb_write(u,HPUSB_FUNC_ADDR,(value&0x7f)|0x80);hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_DE);}
         else if(q[1]==9){hpusb_write(u,HPUSB_CSR1,HPUSB_EP0_DE);}
