@@ -216,6 +216,8 @@ static void hpclang_usbdev_trace_cpu(
     target_phys_addr_t offset,
     uint32_t data )
 {
+    static int ep3_code_dumped = 0;
+
     if ( !hpclang_usbdev_trace_cpu_enabled() ||
          !hpclang_usbdev_trace_cpu_offset( offset ) )
         return;
@@ -229,6 +231,41 @@ static void hpclang_usbdev_trace_cpu(
         data,
         usbdev->hdw_state->cpu->regs[ 15 ],
         usbdev->hdw_state->cpu->regs[ 14 ] );
+
+    /*
+     * The HP49/50 Stock USB ISR executes from relocated low RAM.  The
+     * packaged firmware offset is therefore not the runtime PC.  Capture the
+     * actual instructions once, at the first EP3 interrupt acknowledge, so
+     * the handler can be disassembled at its true runtime addresses.
+     */
+    if ( !ep3_code_dumped &&
+         strcmp( operation, "write" ) == 0 &&
+         offset == HPUSB_EP_INT && ( data & 0x08u ) != 0 ) {
+        uint8_t code[ 0x300 ];
+        const target_ulong start = 0x0000e700u;
+        size_t pos;
+
+        if ( cpu_memory_rw_debug(
+                 usbdev->hdw_state->cpu, start, code, sizeof( code ), 0 ) == 0 ) {
+            fprintf( stderr,
+                     "hpclang-usbdev-code: start=0x%08lx size=0x%zx cpsr=0x%08x\n",
+                     ( unsigned long )start, sizeof( code ),
+                     usbdev->hdw_state->cpu->uncached_cpsr );
+            for ( pos = 0; pos < sizeof( code ); pos += 16 ) {
+                size_t i;
+                fprintf( stderr, "hpclang-usbdev-code: %08lx:",
+                         ( unsigned long )( start + pos ) );
+                for ( i = 0; i < 16 && pos + i < sizeof( code ); ++i )
+                    fprintf( stderr, "%02x", code[ pos + i ] );
+                fputc( '\n', stderr );
+            }
+        } else {
+            fprintf( stderr,
+                     "hpclang-usbdev-code: runtime RAM dump failed at 0x%08lx\n",
+                     ( unsigned long )start );
+        }
+        ep3_code_dumped = 1;
+    }
 }
 
 static int hpclang_usbdev_stream_read(
