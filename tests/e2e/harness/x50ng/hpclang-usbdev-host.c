@@ -10,6 +10,12 @@ static int hpusb_trace_events(void)
     return value != NULL && *value != '\0';
 }
 
+static const char *hpusb_trace_target(void)
+{
+    const char *target = getenv("TARGET");
+    return target != NULL && *target != '\0' ? target : "?";
+}
+
 static size_t ep_maxpacket(const struct hpusb_core *u, unsigned ep)
 {
     unsigned encoded = u->ep[ep].maxp & 0x0fu;
@@ -156,7 +162,14 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
     case HPUSB_MAXP_ALT: return ep->maxp;
     case HPUSB_CSR1: return idx == 0 ? ep->in_csr1 : ep->in_csr1;
     case HPUSB_CSR2: return ep->in_csr2;
-    case HPUSB_OUT_CSR1: return ep->out_csr1;
+    case HPUSB_OUT_CSR1:
+        if (hpusb_trace_events() && idx == u->bulk_out_ep)
+            fprintf(stderr,
+                    "hpusb:%s out_csr1_read ep=%u value=0x%02x "
+                    "count=%zu pos=%zu\n",
+                    hpusb_trace_target(), idx, ep->out_csr1,
+                    ep->out_count, ep->out_pos);
+        return ep->out_csr1;
     case HPUSB_OUT_CSR2: return ep->out_csr2;
     case HPUSB_OUT_CNT1: return (uint8_t)((ep->out_count - ep->out_pos) & 0xffu);
     case HPUSB_OUT_CNT2: return (uint8_t)(((ep->out_count - ep->out_pos) >> 8) & 0xffu);
@@ -227,7 +240,13 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     }
 
     switch (offset) {
-    case HPUSB_FUNC_ADDR: u->func_addr = data; break;
+    case HPUSB_FUNC_ADDR:
+        if (hpusb_trace_events())
+            fprintf(stderr,
+                    "hpusb:%s func_addr write=0x%02x enum=%u\n",
+                    hpusb_trace_target(), data, (unsigned)u->enum_state);
+        u->func_addr = data;
+        break;
     case HPUSB_PWR:
         u->pwr = (uint8_t)((u->pwr & 0x08u) | (data & 0x87u));
         break;
@@ -258,6 +277,11 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         update_irq(u);
         break;
     case HPUSB_INDEX:
+        if (hpusb_trace_events() && u->index != (data & 0x07u))
+            fprintf(stderr,
+                    "hpusb:%s index %u->%u enum=%u\n",
+                    hpusb_trace_target(), u->index, data & 0x07u,
+                    (unsigned)u->enum_state);
         u->index = data & 0x07u;
         break;
     case HPUSB_MAXP0:
@@ -320,6 +344,12 @@ static void start_control(struct hpusb_core *u, uint8_t bm, uint8_t req,
                           uint16_t value, uint16_t index, uint16_t length)
 {
     struct hpusb_ep *ep = &u->ep[0];
+    if (hpusb_trace_events())
+        fprintf(stderr,
+                "hpusb:%s setup bm=0x%02x req=%u value=0x%04x "
+                "index=0x%04x len=%u enum=%u\n",
+                hpusb_trace_target(), bm, req, value, index, length,
+                (unsigned)u->enum_state);
     uint8_t setup[8] = {
         bm, req,
         (uint8_t)value, (uint8_t)(value >> 8),
