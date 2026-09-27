@@ -201,7 +201,7 @@ Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 di
 
 Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects USB wire I/O by default (UART remains an explicit fallback), starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
-HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #357 is the current fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #130 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
+HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #357 is the historical fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #130 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
 
 ## HP49g+/50g stream-storage and Stock gate
 
