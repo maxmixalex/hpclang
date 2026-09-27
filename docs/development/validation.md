@@ -18,9 +18,36 @@ Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII
 
 Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
+## Integration acceptance
+
+The `integration/stock-usb-20260927` branch preserves `main` ancestry. Its
+[Runtime #462](https://github.com/zyf722/hpclang/actions/runs/36305106569) passes,
+but [Storage #210](https://github.com/zyf722/hpclang/actions/runs/36305106546)
+timed out before HP50g payload execution and
+[Gallery #154](https://github.com/zyf722/hpclang/actions/runs/36305106549)
+failed HP50g Direct shard 14 at the pre-launch LCD capture. These failures are
+integration blockers; earlier green runs do not close them.
+
+A controlled 800 ms host pause across the HP50g Storage launch key reproduces
+the old timeout. x50ng uses host wall-clock deadlines: after a scheduling delay,
+both key-down and key-up can expire before the guest runs. The shared event
+queue preserves the minimum interval from actual delivery. The same paused
+Storage reproduction passes with that change. Direct and Stock launch capture
+also use a bounded two-second nonblank-LCD wait. This reproduces a failure
+mechanism; it does not establish the exact host scheduling history of #210.
+
+Local regression checks pass for all 30 host unit tests, the Kermit completion
+tests, all six Direct runtime targets with 52 keyboard frames each, HP39g+
+Stock USB with 52 frames and settled return, the paused HP50g Storage case,
+and HP50g Direct Gallery shard 14. These focused checks do not replace the
+complete CI matrix.
+
+Fresh formal cross-workflow acceptance is pending. Merging into `main` and
+retiring superseded branches remain open until that acceptance succeeds.
+
 ## Runtime PASS contract
 
-The current USB implementation passes all six Direct and original-Stock USB
+The pre-integration USB baseline passes all six Direct and original-Stock USB
 Runtime targets. Storage and Quality pass on the same functional head, and the
 subsequent Gallery budget-only commit passes all Gallery jobs. Gallery Stock
 still runs over UART/SD, while Storage explicitly uses SD.

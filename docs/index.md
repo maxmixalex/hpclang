@@ -17,8 +17,10 @@ This site is currently an internal Development reference. It intentionally prese
 
 HP 39g+ uses the verified real-machine D1.55 full-NOR fixture. All six
 models now pass canonical original-Stock launch over USB as well as Direct
-runtime. The separate Font Gallery and Storage regressions also pass; their
-Stock paths intentionally retain UART/SD and SD respectively. See
+runtime. Font Gallery and Storage have green pre-integration evidence, but the
+integration candidate still needs cross-workflow acceptance after harness timing
+fixes. Their Stock paths retain UART/SD and SD respectively. See
+[Validation](development/validation.md) for current integration status and
 [Stock USB transport](development/stock-usb-transport.md) for the implementation
 and transport scope. Repeated-run performance benchmarking is separate from
 functional completion.

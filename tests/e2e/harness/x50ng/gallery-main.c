@@ -10,6 +10,8 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
+#include "timed-sequence.h"
+#include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
@@ -23,14 +25,14 @@
 #define GALLERY_PREFIX 0x47000000u
 #define GALLERY_NEXT_FACE 0x00400000u
 
-#define TEST_RAM_SIZE 0x00100000u
+#define TEST_RAM_SIZE 0x00200000u
 #define TEST_PHYS 0x70000000u
-#define STAGE_PAGES 96u
+#define STAGE_PAGES 224u
 #define STAGE_PHYS TEST_PHYS
 #define STAGE_SIZE (STAGE_PAGES * 0x1000u)
 #define INJECT_L2_PHYS (TEST_PHYS + STAGE_SIZE)
 #define INJECT_PHYS (INJECT_L2_PHYS + 0x1000u)
-#define INJECT_PAGES 159u
+#define INJECT_PAGES 224u
 #define INJECT_VA 0x30000000u
 #define STAGE0_VA (INJECT_VA + 0x1000u)
 #define SYNTH_STACK_TOP \
@@ -50,6 +52,7 @@
 #define BOOT_NO_US 2000000LL
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
+#define BEFORE_CAPTURE_SETTLE_US 2000000LL
 #define POLL_US 20000LL
 #define DEADLINE_US 300000000LL
 #define KEY_HOLD_US 50000LL
@@ -87,6 +90,9 @@ struct key_release {
 
 struct state {
     hdw_t *hdw;
+    struct hpclang_timed_sequence return_keys;
+    struct hpclang_timed_sequence boot;
+    struct hpclang_ready_window before_ready;
     uint8_t *stage0;
     size_t stage0_size;
     uint32_t result_addr;
@@ -145,13 +151,23 @@ static void key_cb(void *arg)
     else release_key(a->key);
 }
 
+static int64_t timed_key_cb(void *arg)
+{
+    key_cb(arg);
+    return 0;
+}
+
 static int tap(
+    struct state *s,
     const struct key_action *down,
     const struct key_action *up,
     int64_t us)
 {
-    return later(key_cb, (void *)down, us) &&
-           later(key_cb, (void *)up, us + KEY_HOLD_US);
+    return hpclang_event_add(&s->return_keys.events, us,
+                             timed_key_cb, (void *)down) &&
+           hpclang_event_add(&s->return_keys.events, us + KEY_HOLD_US,
+                             timed_key_cb, (void *)up) &&
+           hpclang_sequence_start(&s->return_keys);
 }
 
 static void gallery_release(void *arg)
@@ -373,7 +389,11 @@ static void write_json(struct state *s, const char *status)
 static void fail(struct state *s, const char *why)
 {
     s->failed = 1;
-    fprintf(stderr, "Font Gallery E2E FAIL: %s\n", why);
+    fprintf(stderr,
+            "Font Gallery E2E FAIL: %s (pc=0x%08x lr=0x%08x "
+            "dfsr=0x%08x dfar=0x%08x)\n",
+            why, s->hdw->cpu->regs[15], s->hdw->cpu->regs[14],
+            s->hdw->cpu->cp15.c5_data, s->hdw->cpu->cp15.c6_data);
     write_json(s, why);
     hdw_stop(s->hdw);
 }
@@ -513,6 +533,11 @@ static void monitor(void *arg)
         return;
     }
 
+    if (!s->saw_pass && s->hdw->cpu->regs[15] == 0x00000010u) {
+        fail(s, "data-abort");
+        return;
+    }
+
     if (guest_read32(s->hdw, s->result_addr, &v)) {
         if ((v & 0xff000000u) == GALLERY_PREFIX && !s->saw_pass) {
             if (!drive_gallery(s, v)) {
@@ -545,7 +570,7 @@ static void monitor(void *arg)
         }
         s->return_settle_deadline =
             timer_get_clock() + RETURN_SETTLE_TIMEOUT_US;
-        if (!tap(&on_down, &on_up, RETURN_ON_US) ||
+        if (!tap(s, &on_down, &on_up, RETURN_ON_US) ||
             !later(settle_return, s, RETURN_SETTLE_FIRST_US)) {
             fail(s, "return-timer");
         }
@@ -556,22 +581,27 @@ static void monitor(void *arg)
         fail(s, "monitor-timer");
 }
 
-static void inject(void *arg)
+static int64_t inject(void *arg)
 {
     struct state *s = arg;
     CPUARMState *cpu = s->hdw->cpu;
 
+    int ready = hpclang_ready_observe(
+        &s->before_ready, timer_get_clock(), BEFORE_CAPTURE_SETTLE_US,
+        capture_lcd(s->hdw, s->before_pgm, s->lcd_height) != 0);
+    if (ready == 0)
+        return POLL_US;
+    if (ready < 0) {
+        fail(s, "before-capture");
+        return -1;
+    }
     if (!map_test_ram(s) || !build_launcher_ram(s) || !snapshot_stock(s)) {
         fail(s, "prepare");
-        return;
-    }
-    if (!capture_lcd(s->hdw, s->before_pgm, s->lcd_height)) {
-        fail(s, "before-capture");
-        return;
+        return -1;
     }
     if (!guest_write32(s->hdw, L1_INJECT_VA, INJECT_L2_PHYS | COARSE_FLAGS)) {
         fail(s, "inject-l1");
-        return;
+        return -1;
     }
     tlb_flush(cpu, 1);
     tb_flush(cpu);
@@ -579,7 +609,7 @@ static void inject(void *arg)
     if (cpu_get_phys_page_debug(cpu, STAGE0_VA) !=
         (target_phys_addr_t)(INJECT_PHYS + 0x1000u)) {
         fail(s, "inject-map");
-        return;
+        return -1;
     }
 
     uint32_t launch_cpsr =
@@ -598,6 +628,7 @@ static void inject(void *arg)
 
     if (!later(monitor, s, POLL_US))
         fail(s, "monitor-start");
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -642,9 +673,16 @@ int main(int argc, char **argv)
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!tap(&f_down, &f_up, BOOT_NO_US) ||
-        !tap(&f_down, &f_up, BOOT_OK_US) ||
-        !later(inject, &s, INJECT_US)) {
+    if (!hpclang_event_add(&s.boot.events, BOOT_NO_US,
+                           timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US,
+                           timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US,
+                           timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US,
+                           timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, INJECT_US, inject, &s) ||
+        !hpclang_sequence_start(&s.boot)) {
         fprintf(stderr, "cannot schedule boot/Gallery actions\n");
         return EXIT_FAILURE;
     }

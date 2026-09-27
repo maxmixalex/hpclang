@@ -10,6 +10,8 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
+#include "timed-sequence.h"
+#include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
@@ -57,6 +59,7 @@
 #define BOOT_NO_US 2000000LL
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
+#define BEFORE_CAPTURE_SETTLE_US 2000000LL
 #define KEY_HOLD_US 50000LL
 #define KEYBOARD_FIRST_DELAY_US 20000LL
 #define KEYBOARD_STEP_US 120000LL
@@ -109,6 +112,10 @@ struct lcd_snapshot {
 
 struct e2e {
     hdw_t *hdw;
+    struct hpclang_timed_sequence return_keys;
+    struct hpclang_timed_sequence keyboard;
+    struct hpclang_timed_sequence boot;
+    struct hpclang_ready_window before_ready;
     uint8_t *stage0;
     size_t stage0_size;
     uint32_t result_addr;
@@ -266,20 +273,21 @@ static unsigned capture_lcd(hdw_t *h, const char *path, int height)
     return nonzero;
 }
 
-static void capture_keyboard_frame(void *arg)
+static int64_t capture_keyboard_frame(void *arg)
 {
     const struct keyboard_capture_event *event = arg;
     const char *dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
     char path[512];
 
     if (dir == NULL || *dir == '\0')
-        return;
+        return 0;
     snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, event->index);
     if (!capture_lcd(
             event->state->hdw, path, event->state->lcd_height)) {
         fprintf(stderr,
                 "blank keyboard progress capture %zu\n", event->index);
     }
+    return 0;
 }
 
 static int later(timer_callback_t fn, void *arg, int64_t us)
@@ -298,13 +306,23 @@ static void key_cb(void *arg)
     else release_key(a->key);
 }
 
+static int64_t timed_key_cb(void *arg)
+{
+    key_cb(arg);
+    return 0;
+}
+
 static int tap(
+    struct e2e *s,
     const struct key_action *down,
     const struct key_action *up,
     int64_t us)
 {
-    return later(key_cb, (void *)down, us) &&
-           later(key_cb, (void *)up, us + KEY_HOLD_US);
+    return hpclang_event_add(&s->return_keys.events, us,
+                             timed_key_cb, (void *)down) &&
+           hpclang_event_add(&s->return_keys.events, us + KEY_HOLD_US,
+                             timed_key_cb, (void *)up) &&
+           hpclang_sequence_start(&s->return_keys);
 }
 
 static int schedule_payload_keyboard(struct e2e *s)
@@ -319,10 +337,8 @@ static int schedule_payload_keyboard(struct e2e *s)
     if (capture_progress) {
         keyboard_capture_events[0].state = s;
         keyboard_capture_events[0].index = 0u;
-        if (!later(
-                capture_keyboard_frame,
-                &keyboard_capture_events[0],
-                KEYBOARD_CAPTURE_DELAY_US))
+        if (!hpclang_event_add(&s->keyboard.events, KEYBOARD_CAPTURE_DELAY_US,
+                                capture_keyboard_frame, &keyboard_capture_events[0]))
             return 0;
     }
 
@@ -334,21 +350,24 @@ static int schedule_payload_keyboard(struct e2e *s)
 
         int64_t press_us = KEYBOARD_FIRST_DELAY_US +
             (int64_t)i * KEYBOARD_STEP_US;
-        if (!later(key_cb, &keyboard_down[i], press_us) ||
-            !later(key_cb, &keyboard_up[i], press_us + KEY_HOLD_US))
+        if (!hpclang_event_add(&s->keyboard.events, press_us,
+                                timed_key_cb, &keyboard_down[i]) ||
+            !hpclang_event_add(&s->keyboard.events, press_us + KEY_HOLD_US,
+                                timed_key_cb, &keyboard_up[i]))
             return 0;
 
         if (capture_progress) {
             keyboard_capture_events[i + 1u].state = s;
             keyboard_capture_events[i + 1u].index = i + 1u;
-            if (!later(
-                    capture_keyboard_frame,
-                    &keyboard_capture_events[i + 1u],
-                    press_us + KEY_HOLD_US + KEYBOARD_CAPTURE_DELAY_US))
+            if (!hpclang_event_add(&s->keyboard.events,
+                                    press_us + KEY_HOLD_US + KEYBOARD_CAPTURE_DELAY_US,
+                                    capture_keyboard_frame, &keyboard_capture_events[i + 1u]))
                 return 0;
         }
     }
 
+    if (!hpclang_sequence_start(&s->keyboard))
+        return 0;
     s->payload_keyboard_scheduled = 1;
     fprintf(stderr,
             "HPC1 keyboard phase reached; scheduled %zu keys%s\n",
@@ -836,7 +855,7 @@ static void monitor(void *arg)
             return_up = &home_up;
         }
 
-        if (!tap(return_down, return_up, RETURN_ON_US) ||
+        if (!tap(s, return_down, return_up, RETURN_ON_US) ||
             !later(
                 finish_return,
                 s,
@@ -849,28 +868,33 @@ static void monitor(void *arg)
         fail(s, "monitor-timer");
 }
 
-static void inject(void *arg)
+static int64_t inject(void *arg)
 {
     struct e2e *s = arg;
     CPUARMState *cpu = s->hdw->cpu;
 
+    int ready = hpclang_ready_observe(
+        &s->before_ready, timer_get_clock(), BEFORE_CAPTURE_SETTLE_US,
+        capture_lcd(s->hdw, s->before_pgm, s->lcd_height) != 0);
+    if (ready == 0)
+        return POLL_US;
+    if (ready < 0) {
+        fail(s, "before-capture");
+        return -1;
+    }
     if (!map_test_ram(s) ||
         !build_launcher_ram(s) ||
         !snapshot_stock(s)) {
         fail(s, "prepare");
-        return;
+        return -1;
     }
 
-    if (!capture_lcd(s->hdw, s->before_pgm, s->lcd_height)) {
-        fail(s, "before-capture");
-        return;
-    }
     if (!guest_write32(
             s->hdw,
             L1_INJECT_VA,
             INJECT_L2_PHYS | COARSE_FLAGS)) {
         fail(s, "inject-l1");
-        return;
+        return -1;
     }
     tlb_flush(cpu, 1);
     tb_flush(cpu);
@@ -878,7 +902,7 @@ static void inject(void *arg)
     if (cpu_get_phys_page_debug(cpu, STAGE0_VA) !=
         (target_phys_addr_t)(INJECT_PHYS + 0x1000u)) {
         fail(s, "inject-map");
-        return;
+        return -1;
     }
 
     /*
@@ -905,6 +929,7 @@ static void inject(void *arg)
 
     if (!later(monitor, s, POLL_US))
         fail(s, "monitor-start");
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -953,9 +978,16 @@ int main(int argc, char **argv)
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!tap(&f_down, &f_up, BOOT_NO_US) ||
-        !tap(&f_down, &f_up, BOOT_OK_US) ||
-        !later(inject, &s, INJECT_US)) {
+    if (!hpclang_event_add(&s.boot.events, BOOT_NO_US,
+                           timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US,
+                           timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US,
+                           timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US,
+                           timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, INJECT_US, inject, &s) ||
+        !hpclang_sequence_start(&s.boot)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");
         return EXIT_FAILURE;
     }

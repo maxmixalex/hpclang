@@ -159,7 +159,6 @@ jobs:
           fi
           unzip -p .cache/hpcalc/mlreg.zip SETUP.BIN \
             > build/assets/hp4950/SETUP.BIN
-          sha256sum build/assets/hp4950/SETUP.BIN
       - name: Upload HP49/50 Stock assets
         uses: actions/upload-artifact@v7
         with:

@@ -94,7 +94,7 @@ Profiles do not carry empty placeholder fields.
 Human-like stock-UI key input belongs under `tests/e2e/sequences/`. Sequence
 filenames describe the target and lifecycle step (for example
 `hp39gs-stock-run.seq`), not the historical experiment that first established
-the path. A sequence is an absolute-time script:
+the path. Offsets are nominal milliseconds from sequence start:
 
 ```text
 9200 capture files
@@ -105,11 +105,23 @@ the path. A sequence is an absolute-time script:
 
 The stock runner accepts logical key actions rather than GUI coordinates.
 
+Events execute in offset order. The gap between adjacent offsets is a minimum
+delay from actual delivery, so a host scheduling pause cannot collapse a key
+press and release into one guest-invisible callback batch. `host-gate` pauses
+the sequence until the transfer-completion marker exists; subsequent offsets
+start at zero relative to gate release. `monitor` first waits up to two seconds
+for a nonblank pre-launch LCD frame, then arms the payload deadline before
+allowing launch keys to proceed. Blank screens still fail when that bound expires.
+
 The current model-specific sequences exist because the stock user interfaces are genuinely different. They should not be unified by adding conditional logic to one large script unless that makes the behavior easier to understand.
 
 ## x50ng backend
 
-CI checks out a pinned external x50ng revision and replaces only its UI entry point with a headless test frontend from `tests/e2e/harness/x50ng/`.
+CI checks out a pinned external x50ng revision. `tools/prepare-x50ng.py` installs
+the Direct, Stock, and Gallery frontends from `tests/e2e/harness/x50ng/` and
+applies the shared flash, SRAM, reserved-RAM, USB, and UART adaptations.
+Gallery mapping sizes live in its C frontend; preparation does not rewrite
+frontend constants or add firmware-specific diagnostic probes.
 
 Tests read the emulated LCD controller and drive the calculator key matrix directly. No GTK/SDL window automation, Xvfb, mouse coordinates, or host-screen scraping is used at runtime.
 
@@ -200,6 +212,6 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 The general TTF importer has been removed. Final bitmap curation adds Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained in the source package. Gallery labels/specimens were strengthened for Ark Pixel regional variants, width-sensitive Latin, digits/punctuation, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **#130 (`35832611436`)** is the current fully-green regression gate. HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
+`E2E / Font Gallery` **#130 (`35832611436`)** is a historical fully-green regression gate. Current integration acceptance is tracked in [Validation](validation.md). HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
 The font implementation/evidence slice is therefore closed. Remaining work is repository integration and bounded Stock-harness closeout, not additional font-core or Gallery implementation.

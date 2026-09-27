@@ -107,7 +107,8 @@ Model-1 transport integration:
 
 - [x] HP 39g+ Direct runtime on the verified native D1.55 stock flash fixture.
 - [x] HP 39g+ original-system USB Connectivity Kit launch on that fixture.
-- [x] All-six-model original-Stock USB Runtime and cross-workflow Gallery/Storage/Quality regression acceptance.
+- [x] All-six-model original-Stock USB Runtime and pre-integration Gallery/Storage/Quality acceptance.
+- [ ] Close integration Storage/Gallery harness timing failures, repeat cross-workflow acceptance, then merge and retire superseded branches. See [Validation](validation.md).
 - [ ] Optional U5: quantify repeated-run USB stability and elapsed time against secondary paths; this is not a functional-completion blocker.
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration.

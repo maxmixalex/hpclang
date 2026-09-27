@@ -100,7 +100,6 @@ jobs:
 
           config = tomllib.loads(Path("pyproject.toml").read_text())
           assert "ruff" in config["tool"]
-          print("formatter configuration: clang-format + Ruff")
           PY
 
           if ! command -v clang-format >/dev/null 2>&1; then
@@ -118,10 +117,3 @@ jobs:
             "$installed"
           fi
           printf 'int main(void){return 0;}\n' | clang-format --style=file >/dev/null
-
-      - name: Explain formatting boundary
-        run: |
-          echo "C/C++ formatting is configured by .clang-format."
-          echo "Python formatting is configured by Ruff in pyproject.toml."
-          echo "Run: tools/format.sh"
-          echo "Check selected files without rewriting: tools/format.sh --check <files...>"

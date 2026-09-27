@@ -9,7 +9,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: build/x50ng/dist
-        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/prepare-x50ng-gallery.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**') }}
+        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**') }}
 
     - name: Inspect restored x50ng state
       id: x50ng-state

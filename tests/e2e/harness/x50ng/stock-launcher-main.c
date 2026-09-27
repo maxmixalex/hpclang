@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,8 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
+#include "timed-sequence.h"
+#include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "stock-return-phase.h"
@@ -41,6 +44,8 @@ enum stock_mode {
 
 struct state {
     hdw_t *hdw;
+    struct hpclang_timed_sequence return_keys;
+    struct hpclang_timed_sequence keyboard;
     enum stock_mode mode;
     const char *prefix;
     const char *json;
@@ -50,7 +55,6 @@ struct state {
     const char *runtime_json;
     uint32_t result_addr;
     struct hpclang_lcd_quiescence return_quiescence;
-    int saw_before;
     int saw_pass;
     uint32_t object_store_phase;
     int payload_started;
@@ -68,7 +72,8 @@ struct state {
     int failed;
     int lcd_height;
     int64_t deadline;
-    int64_t before_capture_deadline;
+    struct hpclang_ready_window before_ready;
+    struct hpclang_timed_sequence sequence;
     int64_t return_teardown_deadline;
     int64_t return_deadline;
 };
@@ -243,7 +248,7 @@ struct sequence_key_event {
     int launch_retry;
 };
 
-static void sequence_key_cb(void *arg)
+static int64_t sequence_key_cb(void *arg)
 {
     struct sequence_key_event *event = arg;
     const struct key_action *action = event->action;
@@ -252,6 +257,7 @@ static void sequence_key_cb(void *arg)
     if (!action->down || !event->launch_retry || !s->payload_started)
         key_cb((void *)action);
     free(event);
+    return 0;
 }
 
 static int sequence_key(
@@ -266,7 +272,7 @@ static int sequence_key(
     event->state = s;
     event->action = action;
     event->launch_retry = launch_retry;
-    if (!later(sequence_key_cb, event, us)) {
+    if (!hpclang_event_add(&s->sequence.events, us, sequence_key_cb, event)) {
         free(event);
         return 0;
     }
@@ -307,26 +313,23 @@ static int sequence_chord(
            sequence_key(s, mod_up, 0, us + 160000);
 }
 
-static int tap(
-    const struct key_action *down,
-    const struct key_action *up_action,
-    int64_t us)
+static int64_t timed_key_cb(void *arg)
 {
-    return later(key_cb, (void *)down, us) &&
-           later(key_cb, (void *)up_action, us + KEY_HOLD_US);
+    key_cb(arg);
+    return 0;
 }
 
-static int chord(
-    const struct key_action *mod_down,
-    const struct key_action *key_down,
-    const struct key_action *key_up,
-    const struct key_action *mod_up,
+static int tap(
+    struct state *s,
+    const struct key_action *down,
+    const struct key_action *up,
     int64_t us)
 {
-    return later(key_cb, (void *)mod_down, us) &&
-           later(key_cb, (void *)key_down, us + 30000) &&
-           later(key_cb, (void *)key_up, us + 130000) &&
-           later(key_cb, (void *)mod_up, us + 160000);
+    return hpclang_event_add(&s->return_keys.events, us,
+                             timed_key_cb, (void *)down) &&
+           hpclang_event_add(&s->return_keys.events, us + KEY_HOLD_US,
+                             timed_key_cb, (void *)up) &&
+           hpclang_sequence_start(&s->return_keys);
 }
 
 static int schedule_return_repaint(struct state *s)
@@ -362,7 +365,7 @@ static int schedule_return_repaint(struct state *s)
             delay = HP48_RETURN_REPAINT_DELAY_US;
     }
 
-    if (!tap(down_action, up_action, delay))
+    if (!tap(s, down_action, up_action, delay))
         return 0;
 
     s->return_repaint_scheduled = 1;
@@ -384,12 +387,12 @@ static int schedule_payload_keyboard_key(struct state *s, size_t index)
     payload_keyboard_up[index].key = payload_keyboard_codes[index];
     payload_keyboard_up[index].down = 0;
 
-    if (!later(
-            key_cb, &payload_keyboard_down[index],
-            PAYLOAD_KEY_FIRST_DELAY_US) ||
-        !later(
-            key_cb, &payload_keyboard_up[index],
-            PAYLOAD_KEY_FIRST_DELAY_US + PAYLOAD_KEY_HOLD_US))
+    if (!hpclang_event_add(&s->keyboard.events, PAYLOAD_KEY_FIRST_DELAY_US,
+                            timed_key_cb, &payload_keyboard_down[index]) ||
+        !hpclang_event_add(&s->keyboard.events,
+                            PAYLOAD_KEY_FIRST_DELAY_US + PAYLOAD_KEY_HOLD_US,
+                            timed_key_cb, &payload_keyboard_up[index]) ||
+        !hpclang_sequence_start(&s->keyboard))
         return 0;
 
     s->payload_keyboard_sent = index + 1u;
@@ -730,25 +733,6 @@ static void monitor(void *arg)
         return;
     }
 
-    if (!s->saw_before) {
-        if (s->before_capture_deadline == 0)
-            s->before_capture_deadline =
-                timer_get_clock() + BEFORE_CAPTURE_SETTLE_US;
-        if (!capture(s->hdw, s->before_pgm, s->lcd_height)) {
-            /*
-             * Kermit EOF confirms host delivery, not Stock's LCD repaint.
-             * A brief blank frame during native installation is recoverable;
-             * an LCD that stays blank still fails this witness.
-             */
-            if (timer_get_clock() >= s->before_capture_deadline)
-                fail(s, "before-capture");
-            else if (!later(monitor, s, POLL_US))
-                fail(s, "monitor-timer");
-            return;
-        }
-        s->saw_before = 1;
-    }
-
     armtoolbox_observe_stage_alias(s);
     readable = guest_read32(s->hdw, s->result_addr, &value);
 
@@ -779,7 +763,8 @@ static void monitor(void *arg)
             }
             s->payload_keyboard_captured = ack;
         }
-        if (ack == s->payload_keyboard_sent && ack < count) {
+        /* KACK can precede key-up. Finish that release before reusing the queue. */
+        if (ack == s->payload_keyboard_sent && ack < count && !s->keyboard.timer) {
             if (!schedule_payload_keyboard_key(s, ack)) {
                 fail(s, "keyboard-schedule");
                 return;
@@ -920,14 +905,15 @@ static struct seq_named_event *seq_named_event_new(
     return event;
 }
 
-static void seq_capture(void *arg)
+static int64_t seq_capture(void *arg)
 {
     struct seq_named_event *event = arg;
     capture_named(event->state, event->text);
     free(event);
+    return 0;
 }
 
-static void seq_fail(void *arg)
+static int64_t seq_fail(void *arg)
 {
     struct seq_named_event *event = arg;
     struct state *s = event->state;
@@ -935,6 +921,7 @@ static void seq_fail(void *arg)
     snprintf(why, sizeof(why), "%s", event->text);
     free(event);
     fail(s, why);
+    return -1;
 }
 
 struct seq_monitor_event {
@@ -942,20 +929,51 @@ struct seq_monitor_event {
     int64_t timeout_us;
 };
 
-static void seq_monitor(void *arg)
+static int64_t seq_monitor(void *arg)
 {
     struct seq_monitor_event *event = arg;
     struct state *s = event->state;
-
+    int ready = hpclang_ready_observe(
+        &s->before_ready, timer_get_clock(), BEFORE_CAPTURE_SETTLE_US,
+        capture(s->hdw, s->before_pgm, s->lcd_height) != 0);
+    if (ready == 0)
+        return POLL_US;
+    if (ready < 0) {
+        free(event);
+        fail(s, "before-capture");
+        return -1;
+    }
     if (!armtoolbox_capture_stage_baseline(s)) {
         free(event);
         fail(s, "stage-baseline");
-        return;
+        return -1;
     }
-
     s->deadline = timer_get_clock() + event->timeout_us;
     free(event);
     monitor(s);
+    return 0;
+}
+
+static int64_t seq_finish_install(void *arg)
+{
+    finish_install(arg);
+    return 0;
+}
+
+static int64_t seq_host_gate(void *arg)
+{
+    struct state *s = arg;
+    const char *marker = getenv("HPCLANG_E2E_HOST_GATE_FILE");
+    FILE *ready = fopen(marker, "rb");
+    if (!ready) {
+        if (errno == ENOENT)
+            return 100000LL;
+        fail(s, "host-gate-read");
+        return -1;
+    }
+    fclose(ready);
+    fprintf(stderr, "stock launcher: host gate released: %s\n", marker);
+    return 0;
 }
 
 static int schedule_sequence(struct state *s, const char *path)
@@ -963,6 +981,8 @@ static int schedule_sequence(struct state *s, const char *path)
     FILE *f = fopen(path, "r");
     char line[256];
     unsigned line_no = 0;
+    int64_t offset_base = 0;
+    int found_gate = 0;
 
     if (!f) {
         fprintf(stderr, "cannot open E2E sequence %s\n", path);
@@ -990,7 +1010,7 @@ static int schedule_sequence(struct state *s, const char *path)
             fclose(f);
             return 0;
         }
-        us = (int64_t)ms * 1000LL;
+        us = offset_base + (int64_t)ms * 1000LL;
 
         if (strcmp(op, "tap") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);
@@ -1008,13 +1028,13 @@ static int schedule_sequence(struct state *s, const char *path)
                 goto invalid_action;
         } else if (strcmp(op, "capture") == 0 && fields == 3) {
             struct seq_named_event *event = seq_named_event_new(s, first);
-            if (!event || !later(seq_capture, event, us)) {
+            if (!event || !hpclang_event_add(&s->sequence.events, us, seq_capture, event)) {
                 free(event);
                 goto invalid_action;
             }
         } else if (strcmp(op, "fail") == 0 && fields == 3) {
             struct seq_named_event *event = seq_named_event_new(s, first);
-            if (!event || !later(seq_fail, event, us)) {
+            if (!event || !hpclang_event_add(&s->sequence.events, us, seq_fail, event)) {
                 free(event);
                 goto invalid_action;
             }
@@ -1036,12 +1056,19 @@ static int schedule_sequence(struct state *s, const char *path)
                 }
                 event->timeout_us = (int64_t)timeout_ms * 1000LL;
             }
-            if (!later(seq_monitor, event, us)) {
+            if (!hpclang_event_add(&s->sequence.events, us, seq_monitor, event)) {
                 free(event);
                 goto invalid_action;
             }
+        } else if (strcmp(op, "host-gate") == 0 && fields == 2) {
+            const char *marker = getenv("HPCLANG_E2E_HOST_GATE_FILE");
+            if (found_gate || !marker || !*marker ||
+                !hpclang_event_add(&s->sequence.events, us, seq_host_gate, s))
+                goto invalid_action;
+            found_gate = 1;
+            offset_base = us;
         } else if (strcmp(op, "finish-install") == 0 && fields == 2) {
-            if (!later(finish_install, s, us))
+            if (!hpclang_event_add(&s->sequence.events, us, seq_finish_install, s))
                 goto invalid_action;
         } else {
 invalid_action:
@@ -1053,7 +1080,7 @@ invalid_action:
     }
 
     fclose(f);
-    return 1;
+    return hpclang_sequence_start(&s->sequence);
 }
 
 static int parse_address(const char *text, uint32_t *value)

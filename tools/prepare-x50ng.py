@@ -560,7 +560,7 @@ def patch_reserved_ram(root: Path) -> None:
         root / "src" / "module.c",
         "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
         "    /* hpclang E2E reserved RAM, inert unless the Direct harness maps it. */\n"
-        "    phys_ram_size += 0x00100000;\n\n"
+        "    phys_ram_size += 0x00200000;\n\n"
         "    phys_ram_base = mmap( 0, phys_ram_size, PROT_NONE,",
         "reserved E2E RAM",
     )
@@ -569,12 +569,17 @@ def patch_reserved_ram(root: Path) -> None:
 def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     copy_frontend(args.direct_frontend, root / "src" / "hpclang_direct.c", "hpclang_direct_main")
     copy_frontend(args.stock_frontend, root / "src" / "hpclang_stock.c", "hpclang_stock_main")
+    copy_frontend(args.gallery_frontend, root / "src" / "hpclang_gallery.c", "hpclang_gallery_main")
     shutil.copy2(args.selector, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
-    shutil.copy2(
-        args.stock_frontend.parent / "stock-return-phase.h",
-        root / "src" / "stock-return-phase.h",
-    )
+    for header in (
+        "stock-return-phase.h",
+        "lcd-quiescence.h",
+        "event-queue.h",
+        "timed-sequence.h",
+        "ready-window.h",
+    ):
+        shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 
     makefile = root / "Makefile"
     lines = makefile.read_text().splitlines(keepends=True)
@@ -597,6 +602,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     lines[index:index + 1] = [
         f"{leading}./src/hpclang_direct.c {continuation}\n",
         f"{leading}./src/hpclang_stock.c {continuation}\n",
+        f"{leading}./src/hpclang_gallery.c {continuation}\n",
         original,
     ]
     makefile.write_text("".join(lines))
@@ -607,6 +613,7 @@ def main() -> None:
     parser.add_argument("x50ng", type=Path)
     parser.add_argument("--direct-frontend", type=Path, required=True)
     parser.add_argument("--stock-frontend", type=Path, required=True)
+    parser.add_argument("--gallery-frontend", type=Path, required=True)
     parser.add_argument("--selector", type=Path, required=True)
     parser.add_argument("--headless-header", type=Path, required=True)
     args = parser.parse_args()

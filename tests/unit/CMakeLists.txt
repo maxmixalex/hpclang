@@ -215,3 +215,7 @@ hpclang_unit(usbdev_host
     "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/hpclang-usbdev-host.c")
 target_include_directories(test_usbdev_host PRIVATE
     "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(e2e_events test_e2e_events.c)
+target_include_directories(test_e2e_events PRIVATE
+    "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

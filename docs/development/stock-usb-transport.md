@@ -35,8 +35,9 @@ This is a headless emulator transport, not host OS USB passthrough.
 
 The common USB transport is implemented and passes canonical original-Stock
 launch on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+ and HP 50g.
-The Direct runtime, Storage, Quality and Font Gallery regression workflows also
-pass. Stock Gallery continues to exercise its dedicated UART/SD launchers, not
+The pre-integration Direct runtime, Storage, Quality and Font Gallery workflows
+have green evidence. The integration candidate still needs Storage/Gallery
+acceptance after harness timing fixes; see [Validation](validation.md). Stock Gallery continues to exercise its dedicated UART/SD launchers, not
 the USB transport. The HP39 Direct Gallery job has a 25-minute budget for its
 three sequential model sweeps; all other Direct Gallery families retain 15
 minutes.

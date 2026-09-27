@@ -253,7 +253,7 @@ PY
 )
 
 if [[ "$MODE" == font-gallery ]]; then
-    # prepare-x50ng-gallery.py expands the synthetic injection mapping to 224
+    # The Gallery frontend provides a synthetic injection mapping of 224
     # pages. The frontend reserves three of them around the stage0 image.
     gallery_launcher_limit=$(( (224 - 3) * 4096 ))
     for launcher in "$OUT"/launchers/*.bin; do
