@@ -12,6 +12,8 @@
   ],
   "captures": [
     "build/${TARGET}-stock-home-rpn.pgm",
+    "build/${TARGET}-stock-port-choices.pgm",
+    "build/${TARGET}-stock-port-configured.pgm",
     "build/${TARGET}-stock-server-usb.pgm",
     "build/${TARGET}-stock-after-transfer.pgm",
     "build/${TARGET}-stock-vars-before-install.pgm",

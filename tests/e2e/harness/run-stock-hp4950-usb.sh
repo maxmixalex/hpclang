@@ -16,8 +16,13 @@ STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
+SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
 rm -rf "$STATE" "$SEND"
-rm -f "$HOST_GATE" "$KERMIT_LOG"
+rm -f "$HOST_GATE" "$KERMIT_LOG" "$SERVER_READY"
+# A retained development build directory must not supply stale readiness or
+# screenshot/result evidence from an earlier run.
+rm -f "$ROOT/build/$TARGET-"*.pgm "$ROOT/build/$TARGET-"*.pgm.png \
+    "$ROOT/build/$TARGET-stock.json" "$ROOT/build/$TARGET-e2e.json"
 mkdir -p "$STATE" "$SEND"
 
 printf 'HPCLANG-E2E' > "$SEND/ZZE2E.txt"
@@ -51,8 +56,6 @@ done
 [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
 
 export HPCLANG_X50NG_USB0="$X50_TTY"
-export HPCLANG_X50NG_USB_TRACE_EVENTS=1
-export HPCLANG_X50NG_USB_TRACE_CPU=1
 unset HPCLANG_X50NG_UART0 || true
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
@@ -83,7 +86,6 @@ X50_PID=$!
 # server.  A packet delivered while the server is still in the I/O menu can
 # leave OUT_PKT_RDY latched after an otherwise harmless idle-state interrupt,
 # preventing the later retransmission from becoming a new endpoint event.
-SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm"
 for _ in $(seq 1 400); do
     [[ -s "$SERVER_READY" ]] && break
     kill -0 "$X50_PID" 2>/dev/null || break

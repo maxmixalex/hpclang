@@ -1,6 +1,6 @@
 # HP49g+/50g primary Stock launch over USB Kermit.
-# Do not rely on the persisted/default I/O port. Explicitly select
-# Transfer -> Port: USB / Type: Kermit, then enter Start Server.
+# The runner creates fresh Stock state, whose Transfer port is USB and type
+# is Kermit. Inspect and accept that choice before entering Start Server.
 2000 tap f6
 4000 tap f6
 5000 tap mode
@@ -21,11 +21,13 @@
 14000 tap enter
 15000 capture transfer-config
 
-# CHOOS the Port field, select USB, accept, then return HOME.
+# CHOOS already highlights USB in fresh state. Moving DOWN here wraps to
+# IRDA on HP49g+ and makes Stock close USB when starting the server.
 16000 tap up
 17000 tap f2
-18000 tap down
+17500 capture port-choices
 18500 tap enter
+19500 capture port-configured
 20000 tap enter
 21000 capture after-io-config
 
@@ -65,11 +67,9 @@
 24000 capture hpclang-stack
 26000 chord rshift two
 27500 capture lib-menu
-# Fresh install exposes port selectors first. Enter port 2, where ARMToolbox
-# is the fourth library softkey in the hardware-verified Stock layout.
-28500 tap f3
-29500 capture port2
-30500 tap f4
+# SETUP attaches ARMToolbox to HOME. After warmstart, ARMTo is the first
+# library softkey, followed by the port selectors.
+30500 tap f1
 31500 capture armtoolbox
 32000 monitor 65000
 32500 tap f1

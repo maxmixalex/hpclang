@@ -168,7 +168,6 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     int64_t next_sof;
     enum hpusb_enum_state trace_state;
     int cable_asserted;
-    CPUWatchpoint* receive_gate_watchpoint;
 } s3c2410_usbdev_t;''',
         "USB host state",
     )
@@ -188,169 +187,13 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
         raise SystemExit(f"{path}: USB read/write function anchors changed")
 
     text = path.read_text()
-    host_impl = r'''static int hpclang_usbdev_trace_cpu_enabled( void );
-
-static s3c2410_usbdev_t* hpclang_usbdev_watch_owner;
-static CPUDebugExcpHandler* hpclang_usbdev_previous_debug_handler;
-
-static void hpclang_usbdev_debug_exception( CPUState* cpu )
-{
-    s3c2410_usbdev_t* usbdev = hpclang_usbdev_watch_owner;
-
-    if ( usbdev != NULL &&
-         cpu == usbdev->hdw_state->cpu &&
-         cpu->watchpoint_hit == usbdev->receive_gate_watchpoint ) {
-        uint8_t value = 0xffu;
-        target_ulong pc_after = cpu->regs[ 15 ];
-        target_ulong writer_pc =
-            pc_after - ( cpu->thumb ? 2u : 4u );
-
-        ( void )cpu_memory_rw_debug(
-            cpu, 0x08000cf9u, &value, sizeof( value ), 0 );
-        fprintf(
-            stderr,
-            "hpclang-usb-receive-gate-watch: value=%u "
-            "writer_pc=0x%08lx pc_after=0x%08lx lr=0x%08x thumb=%d\n",
-            ( unsigned )value,
-            ( unsigned long )writer_pc,
-            ( unsigned long )pc_after,
-            cpu->regs[ 14 ],
-            cpu->thumb );
-
-        cpu->watchpoint_hit->flags &= ~BP_WATCHPOINT_HIT;
-        cpu->watchpoint_hit = NULL;
-        return;
-    }
-
-    if ( hpclang_usbdev_previous_debug_handler != NULL )
-        hpclang_usbdev_previous_debug_handler( cpu );
-}
-
-static void hpclang_usbdev_install_receive_gate_watch(
-    s3c2410_usbdev_t* usbdev )
-{
-    const char* target = getenv( "TARGET" );
-
-    if ( !hpclang_usbdev_trace_cpu_enabled() ||
-         target == NULL ||
-         ( strcmp( target, "hp49gplus" ) != 0 &&
-           strcmp( target, "hp50g" ) != 0 ) )
-        return;
-
-    if ( cpu_watchpoint_insert(
-             usbdev->hdw_state->cpu,
-             0x08000cf9u,
-             1u,
-             BP_MEM_WRITE | BP_CPU,
-             &usbdev->receive_gate_watchpoint ) != 0 ) {
-        fprintf( stderr,
-                 "hpclang-usb-receive-gate-watch: install failed\n" );
-        return;
-    }
-
-    hpclang_usbdev_watch_owner = usbdev;
-    hpclang_usbdev_previous_debug_handler =
-        cpu_set_debug_excp_handler( hpclang_usbdev_debug_exception );
-}
-
-static void hpclang_usbdev_remove_receive_gate_watch(
-    s3c2410_usbdev_t* usbdev )
-{
-    if ( usbdev->receive_gate_watchpoint != NULL ) {
-        cpu_watchpoint_remove_by_ref(
-            usbdev->hdw_state->cpu,
-            usbdev->receive_gate_watchpoint );
-        usbdev->receive_gate_watchpoint = NULL;
-    }
-
-    if ( hpclang_usbdev_watch_owner == usbdev ) {
-        ( void )cpu_set_debug_excp_handler(
-            hpclang_usbdev_previous_debug_handler );
-        hpclang_usbdev_previous_debug_handler = NULL;
-        hpclang_usbdev_watch_owner = NULL;
-    }
-}
-
-static void hpclang_usbdev_irq( void* opaque, int level )
+    host_impl = r'''static void hpclang_usbdev_irq( void* opaque, int level )
 {
     s3c2410_usbdev_t* usbdev = opaque;
     if ( level )
         s3c2410_intc_assert( usbdev->hdw_state, INT_USBD, 1 );
     else
         s3c2410_intc_deassert( usbdev->hdw_state, INT_USBD );
-}
-
-static int hpclang_usbdev_trace_cpu_enabled( void )
-{
-    const char* value = getenv( "HPCLANG_X50NG_USB_TRACE_CPU" );
-    return value != NULL && *value != '\0';
-}
-
-static int hpclang_usbdev_trace_cpu_offset( target_phys_addr_t offset )
-{
-    return offset == HPUSB_EP_INT ||
-           offset == HPUSB_INDEX ||
-           offset == HPUSB_OUT_CSR1 ||
-           offset == HPUSB_OUT_CNT1 ||
-           offset == HPUSB_OUT_CNT2;
-}
-
-static void hpclang_usbdev_trace_cpu(
-    s3c2410_usbdev_t* usbdev,
-    const char* operation,
-    target_phys_addr_t offset,
-    uint32_t data )
-{
-    static int ep3_code_dumped = 0;
-
-    if ( !hpclang_usbdev_trace_cpu_enabled() ||
-         !hpclang_usbdev_trace_cpu_offset( offset ) )
-        return;
-
-    fprintf(
-        stderr,
-        "hpclang-usbdev-cpu: %s offset=0x%04lx data=0x%08x "
-        "pc=0x%08x lr=0x%08x\n",
-        operation,
-        ( unsigned long )offset,
-        data,
-        usbdev->hdw_state->cpu->regs[ 15 ],
-        usbdev->hdw_state->cpu->regs[ 14 ] );
-
-    /*
-     * The HP49/50 Stock USB ISR executes from relocated low RAM.  The
-     * packaged firmware offset is therefore not the runtime PC.  Capture the
-     * actual instructions once, at the first EP3 interrupt acknowledge, so
-     * the handler can be disassembled at its true runtime addresses.
-     */
-    if ( !ep3_code_dumped &&
-         strcmp( operation, "write" ) == 0 &&
-         offset == HPUSB_EP_INT && ( data & 0x08u ) != 0 ) {
-        uint8_t code[ 0x300 ];
-        const target_ulong start = 0x0000e700u;
-        size_t pos;
-
-        if ( cpu_memory_rw_debug(
-                 usbdev->hdw_state->cpu, start, code, sizeof( code ), 0 ) == 0 ) {
-            fprintf( stderr,
-                     "hpclang-usbdev-code: start=0x%08lx size=0x%zx cpsr=0x%08x\n",
-                     ( unsigned long )start, sizeof( code ),
-                     usbdev->hdw_state->cpu->uncached_cpsr );
-            for ( pos = 0; pos < sizeof( code ); pos += 16 ) {
-                size_t i;
-                fprintf( stderr, "hpclang-usbdev-code: %08lx:",
-                         ( unsigned long )( start + pos ) );
-                for ( i = 0; i < 16 && pos + i < sizeof( code ); ++i )
-                    fprintf( stderr, "%02x", code[ pos + i ] );
-                fputc( '\n', stderr );
-            }
-        } else {
-            fprintf( stderr,
-                     "hpclang-usbdev-code: runtime RAM dump failed at 0x%08lx\n",
-                     ( unsigned long )start );
-        }
-        ep3_code_dumped = 1;
-    }
 }
 
 static int hpclang_usbdev_stream_read(
@@ -445,7 +288,6 @@ static uint32_t s3c2410_usbdev_read(
         return *( reg->datap );
 
     data = hpusb_read( &usbdev->host, ( uint32_t )offset );
-    hpclang_usbdev_trace_cpu( usbdev, "read", offset, data );
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
         fprintf(
             stderr,
@@ -466,7 +308,6 @@ static void s3c2410_usbdev_write(
 
     reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
     *( reg->datap ) = data;
-    hpclang_usbdev_trace_cpu( usbdev, "write", offset, data );
 
     if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
         fprintf(
@@ -521,7 +362,6 @@ static void s3c2410_usbdev_write(
     usbdev->hdw_state = module->hdw_state;
     usbdev->host_fd = -1;
     hpusb_init( &usbdev->host, hpclang_usbdev_irq, usbdev );
-    hpclang_usbdev_install_receive_gate_watch( usbdev );
 
     const char* host_path = getenv( "HPCLANG_X50NG_USB0" );
     if ( host_path && *host_path ) {
@@ -568,7 +408,6 @@ static void s3c2410_usbdev_write(
     }''',
         '''    if ( module->user_data ) {
         usbdev = module->user_data;
-        hpclang_usbdev_remove_receive_gate_watch( usbdev );
         if ( usbdev->host_timer ) {
             timer_del( usbdev->host_timer );
             timer_free( usbdev->host_timer );
