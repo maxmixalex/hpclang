@@ -52,7 +52,7 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 
 ## M3 — HP39 platform
 
-**Direct runtime and automated original-Stock USB launch have passing evidence for HP 39g+/39gs/40gs.** Runtime #458 includes HP39g+ D1.55 install, execution, and settled return.
+**Direct runtime and automated original-Stock USB launch are complete for HP 39g+/39gs/40gs.** HP39g+ uses its own verified D1.55 fixture for install, execution, and settled return.
 
 - [x] HP 39gs real-hardware canonical runtime PASS and clean return.
 - [x] HP 39gs and HP 40gs official-ROM Direct E2E.
@@ -77,7 +77,7 @@ The one-shot HP39g+ ROM dumper is retired after successful acquisition. The veri
 - [x] Establish and pin a genuine 2 MiB full-NOR fixture.
 - [x] Boot the full-NOR image with 256 KiB RAM and 131×64 LCD.
 - [x] Execute the same HPC1 runtime and validate clean return.
-- [x] Exercise the supported ARMToolbox48 calculator-side launch path through stock Serial Kermit.
+- [x] Exercise the ARMToolbox48 calculator-side launch path through Stock Kermit (USB default; UART fallback).
 
 Completion criterion:
 
@@ -99,7 +99,7 @@ HP 49g+ and HP 50g share the `hp4950` platform, official 2.15 OS image, stock Fi
 
 ## M6 — Automated emulator E2E
 
-**Direct runtime and original-Stock launch evidence exist for all six models.** Runtime #458 adds HP39g+ USB on its own D1.55 fixture. The current migration makes USB the common Stock default; historical SD/UART passes and current USB gates are distinguished in [Stock USB transport](stock-usb-transport.md).
+**Direct runtime and original-Stock USB launch are complete for all six models.** HP39g+ uses its own verified D1.55 fixture. UART and SD remain explicit secondary paths. The dedicated Gallery and Storage Stock workflows keep their separate transport choices, as described in [Stock USB transport](stock-usb-transport.md).
 
 Durable Direct launch evidence exists for HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Historical pre-USB original-Stock launch evidence covers HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime **35298949365 / #135** is the final M7.1 fully-green canonical Runtime evidence across all Direct and Stock families, including HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Runtime #122 remains the first run that closed that full contract.
 
@@ -107,13 +107,14 @@ Model-1 transport integration:
 
 - [x] HP 39g+ Direct runtime on the verified native D1.55 stock flash fixture.
 - [x] HP 39g+ original-system USB Connectivity Kit launch on that fixture.
-- [ ] Complete repeated-run USB stability comparison and remaining cross-workflow regression gates; profile defaults already select USB.
+- [x] All-six-model original-Stock USB Runtime and cross-workflow Gallery/Storage/Quality regression acceptance.
+- [ ] Optional U5: quantify repeated-run USB stability and elapsed time against secondary paths; this is not a functional-completion blocker.
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration.
 
 ## M7 — Application-facing calculator services
 
-**M7.1 and M7.2 are complete. M7.3a-e are closed; M7.3f named object-store mutation is the next object-service step before M7.4.**
+**M7.1 and M7.2 are complete. M7.3a-e are closed; M7.3f named object-store mutation has separate WIP implementation on `m7-object-parity`, not yet integrated or regression-closed.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
