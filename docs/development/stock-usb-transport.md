@@ -40,16 +40,11 @@ the incorrect UI sequence. Storage #207 passes on the same head using SD,
 so it cannot establish USB correctness. Gallery also needs a fresh regression
 run before cross-workflow closure is claimed.
 
-Local independent-container validation on 2026-09-27, after both sequence
-corrections and removal of the firmware-specific debug probes, passes
-`runtime.json` and `stock-hp4950-usb.json` on HP49g+ and HP50g. This includes
-payload PASS, the keyboard progression, and settled return to Stock.
 Formal Runtime [#459](https://github.com/zyf722/hpclang/actions/runs/36286455537)
 on `d2897cdb` is fully green: Build, universal x50ng, shared Stock assets, all
 six Direct models, all six USB Stock models, and evidence publication. Both
 HP49g+ and HP50g record `status=pass`, `saw_pass=true`, `returned=true`, and
-`return_settled=true`. A second local sweep with a freshly compiled canonical
-payload also passes all six USB Stock models.
+`return_settled=true`.
 
 Storage [#208](https://github.com/zyf722/hpclang/actions/runs/36286455562) and
 Quality [#107](https://github.com/zyf722/hpclang/actions/runs/36286455548) pass
@@ -100,9 +95,7 @@ tests/e2e/harness/run-stock.sh hp50g build/e2e-runtime build/e2e-stock-assets
 ```
 
 The runner requires the same runtime-library/tool paths and `RUNNER_TEMP` as
-CI. A retained development container may cache dependencies and build outputs;
-its contents are not inputs to CI. Local firmware disassembly and historical
-source archives remain under ignored `research/`, never in published artifacts.
+CI.
 
 ## Acceptance gates
 
