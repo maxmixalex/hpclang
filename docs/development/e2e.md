@@ -135,7 +135,7 @@ substituted.
 
 HP39g+ D1.55 uses the USB Connectivity Kit `Disk drive...` path. The common
 USB device/host bridge now supports the HP39 typed-file Kermit adapter and
-the profile enables `automated_stock_e2e`. Runtime #458 establishes Stock
+the profile enables `automated_stock_e2e`. The canonical USB Runtime gate establishes Stock
 PASS on HP39g+, HP39gs, and HP40gs. The Conn3x GUI is not a CI dependency.
 
 The existence of a trustworthy full-NOR fixture closes firmware identity and
