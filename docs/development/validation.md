@@ -14,17 +14,23 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
 | `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is now automated and passes in Runtime #458. All profiles select USB; see [Stock USB transport](stock-usb-transport.md) for current migration evidence and remaining gates.
+Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is automated. All six profiles select USB for canonical Stock Runtime. Stock Gallery retains UART/SD and Storage retains SD; see [Stock USB transport](stock-usb-transport.md) for the precise scope.
 
 Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
 ## Runtime PASS contract
 
-The USB migration is validated by fully-green Runtime
-[#459](https://github.com/zyf722/hpclang/actions/runs/36286455537) on `d2897cdb`,
-covering all six models in both Direct and original-Stock USB paths. Storage
-#208 and Quality #107 are green on the same head. See [Stock USB transport](stock-usb-transport.md)
-for the HP49/50 sequence diagnosis and the separate Gallery timeout follow-up.
+The current USB implementation passes all six Direct and original-Stock USB
+Runtime targets. Storage and Quality pass on the same functional head, and the
+subsequent Gallery budget-only commit passes all Gallery jobs. Gallery Stock
+still runs over UART/SD, while Storage explicitly uses SD.
+
+Formal evidence: [Runtime #459](https://github.com/zyf722/hpclang/actions/runs/36286455537),
+[Storage #208](https://github.com/zyf722/hpclang/actions/runs/36286455562),
+[Quality #107](https://github.com/zyf722/hpclang/actions/runs/36286455548),
+and [Gallery #151](https://github.com/zyf722/hpclang/actions/runs/36300460055).
+The final commit changes only the Gallery job-time budget and documentation;
+these are not four runs of one identical commit.
 
 The canonical runtime test validates:
 
@@ -193,7 +199,7 @@ Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as we
 
 Direct boots the verified 2 MiB full-NOR image with 256 KiB RAM and a 131×64 display and validates the same target-independent HPC1 image.
 
-Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects Serial wire I/O, starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
+Stock uses the verified NOR fixture, switches the factory-default Algebraic mode to RPN, selects USB wire I/O by default (UART remains an explicit fallback), starts the stock Kermit server, receives library 275 plus `HPCLANG.HP`, and launches through ARMToolbox48 / `PrRUN`.
 
 HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage teardown, and a genuinely stock-owned settled repaint. Runtime #122 is the first strict settled-return witness; Runtime #357 is the current fully-green cross-family regression witness after M7.3a-e cleanup, and Gallery #130 independently retains the settled HP48 return around the live native-font path. The harness still retains `return-unsettled` as a failure label so future regressions cannot be silently reclassified.
 
