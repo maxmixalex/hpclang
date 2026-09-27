@@ -16,9 +16,9 @@ All six models have Direct runtime evidence. HP 39gs also passes the canonical r
 
 HP 39g+ uses a verified real-machine D1.55 full-NOR fixture. All six models
 pass canonical original-system USB launch and Direct runtime E2E. The separate
-Storage and Font Gallery have green pre-integration evidence; their Stock tests
-retain SD and UART/SD paths. The integration candidate still needs cross-workflow
-acceptance after harness timing fixes; see [Validation](docs/development/validation.md).
+Storage and Font Gallery workflows also pass on the accepted integration head;
+their Stock tests retain SD and UART/SD paths. See
+[Validation](docs/development/validation.md) for the formal acceptance records.
 USB transport implementation is complete;
 repeated-run performance benchmarking is tracked independently in
 [Stock USB transport](docs/development/stock-usb-transport.md).

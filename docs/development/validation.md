@@ -26,7 +26,7 @@ but [Storage #210](https://github.com/zyf722/hpclang/actions/runs/36305106546)
 timed out before HP50g payload execution and
 [Gallery #154](https://github.com/zyf722/hpclang/actions/runs/36305106549)
 failed HP50g Direct shard 14 at the pre-launch LCD capture. These failures are
-integration blockers; earlier green runs do not close them.
+historical integration failures, closed by the acceptance run below.
 
 A controlled 800 ms host pause across the HP50g Storage launch key reproduces
 the old timeout. x50ng uses host wall-clock deadlines: after a scheduling delay,
@@ -42,8 +42,16 @@ Stock USB with 52 frames and settled return, the paused HP50g Storage case,
 and HP50g Direct Gallery shard 14. These focused checks do not replace the
 complete CI matrix.
 
-Fresh formal cross-workflow acceptance is pending. Merging into `main` and
-retiring superseded branches remain open until that acceptance succeeds.
+Formal cross-workflow acceptance is complete on the same functional commit
+`12631370d69196a31a107cc2a57516e5c4803970`:
+
+- [Runtime](https://github.com/zyf722/hpclang/actions/runs/36320408936): all Direct and Stock USB families pass.
+- [Storage](https://github.com/zyf722/hpclang/actions/runs/36320408957): all jobs pass, including HP50g Stock.
+- [Font Gallery](https://github.com/zyf722/hpclang/actions/runs/36320408833): the full Direct and Stock matrix passes.
+- [Core runtime](https://github.com/zyf722/hpclang/actions/runs/36320408835) and [Quality](https://github.com/zyf722/hpclang/actions/runs/36320408847): both pass.
+
+This closes the integration harness failures. It does not claim completion of
+the optional U5 repeated-run benchmark or the separate M7.3f object-store WIP.
 
 ## Runtime PASS contract
 
