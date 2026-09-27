@@ -182,7 +182,9 @@ jobs:
     name: Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
-    timeout-minutes: 15
+    # HP39 now runs three models sequentially (60 shards). Run #150 completed
+    # every model but hit the old 15-minute ceiling during final aggregation.
+    timeout-minutes: ${{ matrix.family == 'hp39' && 25 || 15 }}
     strategy:
       fail-fast: false
       matrix:

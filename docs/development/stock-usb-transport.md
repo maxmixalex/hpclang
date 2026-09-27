@@ -18,6 +18,9 @@ The intended layers are:
 
 All six target profiles already select `stock_transport: usb`. UART and
 SD/VVFAT remain explicit secondary paths; Storage overrides the default to SD.
+The separate Stock Gallery runners still use UART for HP39gs/40gs/48gII and
+SD for HP50g. Their results validate regression behavior, not USB transport;
+the profile default does not change those dedicated runners.
 Repeated-run flake-rate and wall-clock comparison remains open: selecting USB
 in the profiles is an implementation fact, not evidence that U5 is complete.
 
@@ -41,7 +44,23 @@ Local independent-container validation on 2026-09-27, after both sequence
 corrections and removal of the firmware-specific debug probes, passes
 `runtime.json` and `stock-hp4950-usb.json` on HP49g+ and HP50g. This includes
 payload PASS, the keyboard progression, and settled return to Stock.
-Formal CI validation of this correction is recorded below when available.
+Formal Runtime [#459](https://github.com/zyf722/hpclang/actions/runs/36286455537)
+on `d2897cdb` is fully green: Build, universal x50ng, shared Stock assets, all
+six Direct models, all six USB Stock models, and evidence publication. Both
+HP49g+ and HP50g record `status=pass`, `saw_pass=true`, `returned=true`, and
+`return_settled=true`. A second local sweep with a freshly compiled canonical
+payload also passes all six USB Stock models.
+
+Storage [#208](https://github.com/zyf722/hpclang/actions/runs/36286455562) and
+Quality [#107](https://github.com/zyf722/hpclang/actions/runs/36286455548) pass
+on the same head. Gallery
+[#150](https://github.com/zyf722/hpclang/actions/runs/36286481830) passes every
+Stock job and Direct hp48/hp4950. Direct hp39 logs complete PASS for HP39g+
+(247 faces / 494 captures), HP39gs and HP40gs (248 / 496 each), each across
+20/20 shards, but Actions cancels the job at the old 15-minute ceiling.
+The HP39 family now runs three models sequentially, so its orchestration
+budget is raised to 25 minutes; other families retain 15 minutes. A new
+Gallery run is required before calling that workflow fully green.
 
 ## HP49g+/50g failure diagnosis
 

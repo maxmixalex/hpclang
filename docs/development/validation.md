@@ -20,6 +20,12 @@ Historical fully-green canonical runtime regression evidence is **35832611353 / 
 
 ## Runtime PASS contract
 
+The USB migration is validated by fully-green Runtime
+[#459](https://github.com/zyf722/hpclang/actions/runs/36286455537) on `d2897cdb`,
+covering all six models in both Direct and original-Stock USB paths. Storage
+#208 and Quality #107 are green on the same head. See [Stock USB transport](stock-usb-transport.md)
+for the HP49/50 sequence diagnosis and the separate Gallery timeout follow-up.
+
 The canonical runtime test validates:
 
 - initialized globals and zeroed BSS;
