@@ -38,7 +38,7 @@ the HP50g bootloader and does not reuse the HP39gs/40gs update archives.
 
 The D1.55 original-Stock PC transfer path uses the HP39g+ USB Connectivity Kit.
 The current harness implements the shared USB byte stream and HP39 typed-file
-transfer, so model 1 is enabled in automated Stock matrices. Runtime #458
+transfer, so model 1 is enabled in automated Stock matrices. The canonical USB Runtime gate
 passes install, payload execution, and settled return on the D1.55 fixture.
 
 The temporary ROM-dumper/boot-dump research sources were retired once the full
