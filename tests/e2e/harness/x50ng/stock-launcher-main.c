@@ -25,6 +25,7 @@
 #define GALLERY_STATE_MASK 0xff000000u
 #define GALLERY_STATE_VALUE 0x47000000u
 #define POLL_US 20000LL
+#define BEFORE_CAPTURE_SETTLE_US 2000000LL
 #define DEFAULT_RUN_DEADLINE_US 10000000LL
 #define RETURN_POLL_US 50000LL
 #define RETURN_DEADLINE_US 2000000LL
@@ -67,6 +68,7 @@ struct state {
     int failed;
     int lcd_height;
     int64_t deadline;
+    int64_t before_capture_deadline;
     int64_t return_teardown_deadline;
     int64_t return_deadline;
 };
@@ -729,8 +731,19 @@ static void monitor(void *arg)
     }
 
     if (!s->saw_before) {
+        if (s->before_capture_deadline == 0)
+            s->before_capture_deadline =
+                timer_get_clock() + BEFORE_CAPTURE_SETTLE_US;
         if (!capture(s->hdw, s->before_pgm, s->lcd_height)) {
-            fail(s, "before-capture");
+            /*
+             * Kermit EOF confirms host delivery, not Stock's LCD repaint.
+             * A brief blank frame during native installation is recoverable;
+             * an LCD that stays blank still fails this witness.
+             */
+            if (timer_get_clock() >= s->before_capture_deadline)
+                fail(s, "before-capture");
+            else if (!later(monitor, s, POLL_US))
+                fail(s, "monitor-timer");
             return;
         }
         s->saw_before = 1;
