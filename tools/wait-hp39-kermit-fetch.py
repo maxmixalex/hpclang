@@ -62,7 +62,9 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
             chunk = ""
 
         if chunk:
-            buffer = (buffer + chunk)[-16384:]
+            # Search the entire newly read chunk before retaining just the tail:
+            # USB Kermit can append more than 16 KiB between polling intervals.
+            buffer += chunk
             if not saw_target:
                 index = buffer.find(open_token)
                 if index >= 0:
@@ -77,6 +79,7 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
                     flush=True,
                 )
                 return 0
+            buffer = buffer[-16384:]
 
         time.sleep(POLL_SECONDS)
 
