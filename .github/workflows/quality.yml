@@ -80,6 +80,9 @@ jobs:
       - name: Lint Python and shell
         run: bash tools/lint.sh
 
+      - name: Verify HP39 Kermit completion gate
+        run: python3 -m unittest discover -s tests/unit -p 'test_hp39_kermit_gate.py'
+
   formatter-config:
     name: Formatter configuration
     runs-on: home-docker
