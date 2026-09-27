@@ -21,6 +21,7 @@ on:
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -51,6 +52,7 @@ on:
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -176,6 +178,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Download canonical runtime build
         uses: actions/download-artifact@v7
@@ -248,6 +252,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Download canonical runtime build
         uses: actions/download-artifact@v7

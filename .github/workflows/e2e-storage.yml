@@ -21,11 +21,14 @@ on:
       - "platform/armtoolbox/**"
       - "cmake/**"
       - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/fixtures/**"
       - "tests/e2e/main.c"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/harness/run-family.sh"
       - "tests/e2e/harness/run-direct.sh"
       - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
@@ -40,6 +43,7 @@ on:
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
@@ -60,11 +64,14 @@ on:
       - "platform/armtoolbox/**"
       - "cmake/**"
       - "tests/e2e/CMakeLists.txt"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/fixtures/**"
       - "tests/e2e/main.c"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/harness/run-family.sh"
       - "tests/e2e/harness/run-direct.sh"
       - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
@@ -79,6 +86,7 @@ on:
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
@@ -175,6 +183,8 @@ jobs:
       HPCLANG_E2E_STORAGE_WITNESS: 1
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - name: Download storage build
         uses: actions/download-artifact@v7
         with:
@@ -230,6 +240,7 @@ jobs:
       FAMILY: hp4950
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
       HPCLANG_E2E_STORAGE_WITNESS: 1
+      HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE: sd
     steps:
       - uses: actions/checkout@v7
       - name: Download storage build

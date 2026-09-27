@@ -127,7 +127,7 @@ A snapshot is eight bytes: bits 0–55 are the 8×7 matrix (`column * 7 + row`),
 
 The stock-hosted backend synchronously polls GPIO and does not install a keyboard IRQ or background timer. The second layer debounces that state and emits DOWN/UP/REPEAT events with timestamp, modifiers, raw scan, and physical key identity. A freestanding backend may feed the same event contract from IRQs later.
 
-All 51 physical positions pass Direct E2E on HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ stays UNKNOWN until its real fixture exists.
+All 51 physical positions pass the established Direct E2E on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Model 1 is validated against its verified real-hardware D1.55 full-NOR fixture rather than inferred from HP39gs/40gs.
 
 The service stops at physical key identity plus modifier state. Model/UI shortcuts and text/Alpha/Shift-plane translation belong above it.
 

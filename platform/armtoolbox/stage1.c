@@ -1569,8 +1569,9 @@ int hpclang_armtoolbox_stage1(
      * Stock HP39gs/40gs 2.22 carries the reviewed native main/mini raster
      * tables in NOR pages 0x7e and 0x7f. Expose only those pages in the unused
      * prefix of hpclang's own L1[0x12] coarse table; runtime handles each
-     * model's exact nibble offset. HP39g+ remains excluded until a trustworthy
-     * real-hardware full-flash fixture establishes its layout.
+     * model's exact nibble offset. A verified real HP39g+ full-NOR fixture now
+     * exists, but its native-font object/page layout remains intentionally
+     * excluded until that mapping is independently established.
      */
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
         launch.mmu.code_window_pages = hp39_font_nor_pages;

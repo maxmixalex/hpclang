@@ -38,19 +38,28 @@ X50_ARGS=(
 
 case "$HPCLANG_E2E_FAMILY" in
     hp39)
-        curl -fL --retry 3 \
-            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
-            -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
-        unzip -p \
-            "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
-            "$HPCLANG_E2E_MEMBER" \
-            > "$ROOT/build/$TARGET-firmware.bin"
-        X50_ARGS+=(
-            --style="$ROOT/build/x50ng/dist/style-40g.css"
-            --flash-full
-            --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin"
-            --firmware="$ROOT/build/$TARGET-firmware.bin"
-        )
+        X50_ARGS+=(--style="$ROOT/build/x50ng/dist/style-40g.css")
+        if [[ -n "${HPCLANG_E2E_NOR_PATH:-}" ]]; then
+            python3 "$ROOT/tools/prepare-nor-fixture.py" \
+                "$ROOT/$HPCLANG_E2E_NOR_PATH" "$STATE" \
+                --compression "$HPCLANG_E2E_NOR_COMPRESSION" \
+                --bytes "$HPCLANG_E2E_NOR_BYTES" \
+                --state-bytes "${HPCLANG_E2E_NOR_STATE_BYTES:-$HPCLANG_E2E_NOR_BYTES}" \
+                --sha256 "$HPCLANG_E2E_NOR_SHA256"
+        else
+            curl -fL --retry 3 \
+                "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+                -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
+            unzip -p \
+                "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
+                "$HPCLANG_E2E_MEMBER" \
+                > "$ROOT/build/$TARGET-firmware.bin"
+            X50_ARGS+=(
+                --flash-full
+                --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin"
+                --firmware="$ROOT/build/$TARGET-firmware.bin"
+            )
+        fi
         ;;
     hp48)
         curl -fL --retry 3 \

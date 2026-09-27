@@ -116,7 +116,9 @@ static const uint16_t hp4950_key_map[60] = {
 
 static const uint16_t *model_specific_map(uint32_t model)
 {
-    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS)
+    if (model == HPCLANG_MODEL_HP39GPLUS ||
+        model == HPCLANG_MODEL_HP39GS ||
+        model == HPCLANG_MODEL_HP40GS)
         return hp39_key_map;
     if (model == HPCLANG_MODEL_HP48GII)
         return hp48_key_map;
@@ -163,7 +165,9 @@ uint32_t hpclang_keyboard_modifiers_from_bits(
     if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_ON)) != 0u)
         value |= HPCLANG_KEYBOARD_MOD_ON;
 
-    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
+    if (model == HPCLANG_MODEL_HP39GPLUS ||
+        model == HPCLANG_MODEL_HP39GS ||
+        model == HPCLANG_MODEL_HP40GS) {
         if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_GPF5)) != 0u)
             value |= HPCLANG_KEYBOARD_MOD_ALPHA;
         if ((bits & (UINT64_C(1) << HPCLANG_KEYBOARD_GPF6)) != 0u)

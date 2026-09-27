@@ -1,0 +1,47 @@
+# HP48gII Stock launch over the original USB/Kermit wire path.
+2000 tap f6
+4000 tap f6
+# Factory default is ALG; use RPN for the stack-based library install.
+5000 tap mode
+5500 tap neg
+6000 tap f6
+7000 capture home-rpn
+
+# Keep the factory/default wire device on USB (flag -78 clear) and start the
+# stock Kermit server through the same I/O menu path used by the UART gate.
+8000 tap files
+9500 tap down
+10000 tap enter
+11500 tap down
+12500 tap down
+13500 tap down
+14500 tap down
+15500 tap down
+17000 tap enter
+19000 capture server-usb
+
+# Host Kermit starts at t=35s. Times after host-gate are relative to successful
+# Kermit completion, not emulator start.
+35000 host-gate
+1000 capture after-transfer
+2000 tap var
+3000 capture vars-before-install
+4000 tap f2
+5000 capture l275-stack
+6000 tap zero
+7000 tap enter
+8000 capture port-zero-stack
+9000 tap sto
+11000 capture stored
+13000 chord on f3
+19000 capture after-warmstart
+20000 tap var
+21000 capture vars-after-install
+22000 tap f1
+24000 capture hpclang-stack
+26000 chord rshift two
+27500 capture lib-menu
+28500 tap f1
+30500 capture armtoolbox
+31000 monitor 60000
+31500 tap f1

@@ -36,12 +36,17 @@ cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
     "$SEND/ZZE2E.HP" "$SEND/L275_48" "$SEND/HPCLANG.HP")"
 EMULATOR_TIMEOUT=$((35 + KERMIT_TIMEOUT + 120))
-printf 'HP48 Stock transfer watchdog: kermit=%ss emulator=%ss bytes=%s\n' \
-    "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT" \
+TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
+case "$TRANSPORT" in
+    uart|usb) ;;
+    *) echo "unsupported HP48 Stock transport: $TRANSPORT" >&2; exit 2 ;;
+esac
+printf 'HP48 Stock %s transfer watchdog: kermit=%ss emulator=%ss bytes=%s\n' \
+    "$TRANSPORT" "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT" \
     "$(( $(stat -c %s "$SEND/ZZE2E.HP") + $(stat -c %s "$SEND/L275_48") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
 
-X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
-KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
+X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-$TRANSPORT"
+KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-$TRANSPORT"
 
 socat -d -d -x -v \
     PTY,raw,echo=0,link="$X50_TTY" \
@@ -63,7 +68,13 @@ for _ in $(seq 1 50); do
 done
 [[ -e "$X50_TTY" && -e "$KERMIT_TTY" ]]
 
-export HPCLANG_X50NG_UART0="$X50_TTY"
+if [[ "$TRANSPORT" == usb ]]; then
+    export HPCLANG_X50NG_USB0="$X50_TTY"
+    unset HPCLANG_X50NG_UART0 || true
+else
+    export HPCLANG_X50NG_UART0="$X50_TTY"
+    unset HPCLANG_X50NG_USB0 || true
+fi
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
@@ -71,7 +82,11 @@ export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
-export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-run.seq"
+if [[ "$TRANSPORT" == usb ]]; then
+    export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-usb-run.seq"
+else
+    export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-run.seq"
+fi
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"

@@ -23,7 +23,7 @@ The two tiers are deliberately separate. Direct runtime owns common-bootstrap ex
 
 ## Calculator-object and stack-mutation witness
 
-The canonical runtime payload now covers the closed M7.3a-e read/stack/adapter baseline. M7.3f named-store write/delete is not implemented yet and therefore has no write-round-trip E2E claim.
+The canonical runtime payload covers the closed M7.3a-e read/stack/adapter baseline. M7.3f named-store write/delete is in separate WIP development on `m7-object-parity`; it is not integrated into the canonical USB baseline and has no accepted write-round-trip E2E claim there.
 
 - Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.
 - Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive user-visible depth after launcher-bias normalization, and snapshot only objects whose native extent is provable.
@@ -49,7 +49,7 @@ use an equally harmless model-appropriate Stock-UI action.
 
 ## Stock transfer mechanisms
 
-HP 39gs and HP 40gs use the original serial-disk path. A headless Kermit server supplies:
+HP 39g+, HP 39gs, and HP 40gs use the original USB Connectivity Kit path by default. A headless Kermit server supplies the typed files:
 
 - `HP39DIR.CUR`;
 - `HP39DIR.000`;
@@ -58,11 +58,11 @@ HP 39gs and HP 40gs use the original serial-disk path. A headless Kermit server 
 
 The stock ROM performs the transfer/install itself.
 
-HP 48gII uses the stock Serial Kermit server to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The computed transfer timeout is only a watchdog ceiling, not a guessed delay.
+HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. UART remains available as an override. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The computed transfer timeout is only a watchdog ceiling, not a guessed delay.
 
-HP 49g+ and HP 50g use an emulated SD card to install ARMToolbox and copy generated `HPCLANG.HP`. They share the same stock UI sequence while retaining their native per-model ARM bootloaders.
+HP 49g+ and HP 50g transfer SETUP, generated `HPCLANG.HP`, and `ZZE2E` over USB Kermit, then install ARMToolbox into Port 2. They share the same Stock UI sequence while retaining their native per-model ARM bootloaders. An explicit SD override retains the emulated-card path used by Storage. Current migration evidence is tracked in [Stock USB transport](stock-usb-transport.md).
 
-Current E2E status is intentionally split by workflow. Canonical **Runtime #357 (`35832611353`)** is fully green on the final cleanup functional head, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. **Font Gallery #130 (`35832611436`) is also fully green** across Direct hp39/hp48/hp4950 and Stock hp39gs/hp40gs/hp48gii/hp50g. **Storage #141 (`35832611387`)** and **Quality #13 (`35832611366`)** are green on the same head. The earlier HP39 Gallery red path had two independent harness regressions: launch/UI settling required payload-aware launch-only retries, and the Gallery application retained an obsolete direct `platform_cookie == code-window` availability check after runtime moved HP39 private state behind an opaque tagged platform context. The runtime font service now owns that private mapping decision and the independent ROM pixel oracle validates the rendered result.
+The historical pre-USB cleanup baseline is retained for regression provenance. Canonical **Runtime #357 (`35832611353`)** is fully green on the final cleanup functional head, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. **Font Gallery #130 (`35832611436`) is also fully green** across Direct hp39/hp48/hp4950 and Stock hp39gs/hp40gs/hp48gii/hp50g. **Storage #141 (`35832611387`)** and **Quality #13 (`35832611366`)** are green on the same head. The earlier HP39 Gallery red path had two independent harness regressions: launch/UI settling required payload-aware launch-only retries, and the Gallery application retained an obsolete direct `platform_cookie == code-window` availability check after runtime moved HP39 private state behind an opaque tagged platform context. The runtime font service now owns that private mapping decision and the independent ROM pixel oracle validates the rendered result.
 
 ## Target profiles
 
@@ -72,15 +72,18 @@ Current E2E status is intentionally split by workflow. Canonical **Runtime #357 
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
 - `lcd_height` — 64- or 80-line capture height;
-- `automated_e2e` — optional automation eligibility; it defaults to true.
+- `automated_e2e` — optional Direct/focused automation eligibility; it defaults to true;
+- `automated_stock_e2e` — optional original-Stock automation eligibility; it defaults to true and may be false when the stock host transport is not modeled;
+- `stock_transport` — `usb`, `uart`, or `sd`; all six current profiles select USB, with `HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE` available for supported secondary paths;
+- `nor` — optional checked full-NOR fixture metadata: repository path, compression, decoded byte count, and SHA-256.
 
 Only targets distributed as per-model firmware archives add a `firmware` object. HP 39gs and HP 40gs use their hpcalc archive/member names.
 
-HP 39g+ intentionally has no `firmware` object and sets `"automated_e2e": false`. Its model/platform profile remains useful for packaging, but no trustworthy public stock ARM flash fixture has been established.
+HP 39g+ uses the verified real-hardware 1 MiB D1.55 full-NOR fixture under `tests/e2e/fixtures/hp39gplus/`; its profile records the decoded size and SHA-256 and is enabled in the automated family matrices.
 
 HP 49g+ and HP 50g share the 2.15 OS image but carry distinct `bootloader` filenames because the bootloader difference is genuine per-model metadata.
 
-HP 48gII uses a pinned full-NOR fixture rather than an update archive.
+HP 48gII also uses a pinned full-NOR fixture rather than an update archive.
 
 Profiles do not carry empty placeholder fields.
 
@@ -114,18 +117,31 @@ x50ng remains an external emulator/test dependency. None of its GPL implementati
 
 Current roles:
 
-- Direct runtime on HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g;
-- stock serial-disk/APLET launch for HP 39gs/40gs;
-- stock Serial Kermit/ARMToolbox48 launch for HP 48gII;
-- stock File Manager/ARMToolbox launch for HP 49g+/50g.
+- Direct runtime on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g;
+- Stock USB typed-file/APLET launch for HP 39g+/39gs/40gs;
+- Stock USB Kermit/ARMToolbox48 launch for HP 48gII;
+- Stock USB Kermit/ARMToolbox launch for HP 49g+/50g;
+- explicit UART and SD/VVFAT overrides for secondary regressions; Storage uses SD.
 
 The x50ng preparation helper accepts the same three platform names as hpclang: `hp39`, `hp48`, and `hp4950`. These names describe hpclang's platform grouping; they are not historical HP codenames.
 
 ## HP 39g+ E2E
 
-HP 39g+ remains outside the automated matrices until a real-machine stock flash dump exists. The absence of that fixture must not be hidden by reusing a sibling or foreign bootloader and calling the result native HP39g+ validation.
+HP 39g+ now participates in the automated `hp39` matrices using a complete
+1 MiB NOR image acquired from real hardware. The fixture is installed directly
+as x50ng persistent flash state and is verified against the profile's byte count
+and SHA-256 before each run. No sibling firmware archive or foreign bootloader is
+substituted.
 
-The retained HP39g+ NOR-dumper experiment is useful evidence for a transient physical-NOR mapping mechanism only. It is not evidence that HP39g+ shares HP39gs/40gs flash identity or their native-font physical offsets.
+HP39g+ D1.55 uses the USB Connectivity Kit `Disk drive...` path. The common
+USB device/host bridge now supports the HP39 typed-file Kermit adapter and
+the profile enables `automated_stock_e2e`. The canonical USB Runtime gate establishes Stock
+PASS on HP39g+, HP39gs, and HP40gs. The Conn3x GUI is not a CI dependency.
+
+The existence of a trustworthy full-NOR fixture closes firmware identity and
+boot/runtime validation. It does not automatically prove that HP39g+ shares the
+HP39gs/40gs physical ROM-font offsets. The native gs/40gs main/mini/EditLine
+font mapping remains excluded for model 1 until separately established.
 
 ## CI build stages
 
@@ -146,11 +162,11 @@ The same rule applies to the focused **Storage** gate. `E2E / Storage` builds th
 
 Storage #22 (`35378151818`) is the M7.2b historical closure evidence for the earlier KOS-backed stream/metadata bridge. Storage #23 then independently proved that Stock KOS syscall 19 can safely rebuild the calculator filesystem after direct ownership is released.
 
-The current M7.2 branch goes further: the first byte-stream operation acquires the process-wide SD/FAT lease, and all stdio, metadata, capacity, namespace mutation, and owned directory iteration use hpclang's S3C2410 SDI + FatFs backend until runtime shutdown. The focused payload verifies missing-file semantics, create/truncate/append, seek/tell, metadata and FAT timestamps, capacity/free space, rename/mkdir/rmdir, UTF-8 long filenames, case-insensitive lookup with preserved stored case, simultaneous independent iterators, ordinary stdio while an iterator is live, and final reopen/read before the runtime unmounts/releases the controller and invokes Stock ResetSD.
+The integrated M7.2 implementation goes further: the first byte-stream operation acquires the process-wide SD/FAT lease, and all stdio, metadata, capacity, namespace mutation, and owned directory iteration use hpclang's S3C2410 SDI + FatFs backend until runtime shutdown. The focused payload verifies missing-file semantics, create/truncate/append, seek/tell, metadata and FAT timestamps, capacity/free space, rename/mkdir/rmdir, UTF-8 long filenames, case-insensitive lookup with preserved stored case, simultaneous independent iterators, ordinary stdio while an iterator is live, and final reopen/read before the runtime unmounts/releases the controller and invokes Stock ResetSD.
 
 Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
 
-HP 39g+ is filtered out by its explicit `automated_e2e: false` profile flag rather than by a hard-coded workflow exclusion.
+HP 39g+ participates in Direct, focused, and original-Stock family matrices through its data-driven `nor` profile. All six profiles currently select `stock_transport: usb`. See [Stock USB transport](stock-usb-transport.md) for migration evidence and the distinction between implemented defaults and repeated-run stability.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
 
@@ -168,7 +184,7 @@ Font Gallery is a focused visual/sample E2E application, not part of the canonic
 
 The exhaustive Direct Gallery is family-dependent: HP39gs/40gs traverse **248 entries / 496 captures** (245 generated + three ROM fonts), while HP48gII/49g+/50g traverse **247 / 494** (245 generated + two ROM fonts). The production matrix still runs one family job for `hp39`, `hp48`, and `hp4950`, covering both 64- and 80-line display layouts. It validates generated aliases/arbitrary face selection, metrics/spacing, repertoire-sensitive specimens, deterministic pagination, PASS and settled Direct return.
 
-Native-font evidence is intentionally family-aware. The synthetic Direct launcher does not fabricate a live Saturn `Read[]` map, so exhaustive generated-font rendering is authoritative on all five targets, while HP48/49/50 native-font pixels require a real Stock logical map. Compact Stock Gallery controls close both automated live-native families: HP50g validates the hp4950 path and HP48gII independently validates the 64-line hp48 path through the original UI/ARMToolbox launch.
+Native-font evidence is intentionally family-aware. The synthetic Direct launcher does not fabricate a live Saturn `Read[]` map, so exhaustive generated-font rendering is authoritative on all six targets, while HP48/49/50 native-font pixels require a real Stock logical map. Compact Stock Gallery controls close both automated live-native families: HP50g validates the hp4950 path and HP48gII independently validates the 64-line hp48 path through the original UI/ARMToolbox launch.
 
 The compact Stock navigation remains family-aware. HP39gs/40gs use **DOWN** across minifont → main/default → EditLine, then **RIGHT** to the generated control. HP48gII/HP50g use **DOWN** across minifont → bigfont/default, then **RIGHT** to the generated control. The #112 artifacts visibly retain those distinct concrete ROM-font pages.
 

@@ -62,6 +62,7 @@ static int expect_map(
 int main(void)
 {
     const uint32_t verified[] = {
+        HPCLANG_MODEL_HP39GPLUS,
         HPCLANG_MODEL_HP39GS,
         HPCLANG_MODEL_HP40GS,
         HPCLANG_MODEL_HP48GII,
@@ -103,6 +104,10 @@ int main(void)
         {59u, HPCLANG_KEY_HP39_SHIFT},
     };
     if (!expect_map(
+            HPCLANG_MODEL_HP39GPLUS,
+            hp39,
+            sizeof(hp39) / sizeof(hp39[0])) ||
+        !expect_map(
             HPCLANG_MODEL_HP39GS,
             hp39,
             sizeof(hp39) / sizeof(hp39[0])) ||
@@ -202,13 +207,20 @@ static const struct mapping hp48[] = {
         (UINT64_C(1) << HPCLANG_KEYBOARD_GPF4) |
         (UINT64_C(1) << HPCLANG_KEYBOARD_GPF5) |
         (UINT64_C(1) << HPCLANG_KEYBOARD_GPF6);
-    uint32_t hp39_mod = hpclang_keyboard_modifiers_from_bits(
-        HPCLANG_MODEL_HP39GS, hp39_bits);
-    if (hp39_mod !=
-        (HPCLANG_KEYBOARD_MOD_ON |
-         HPCLANG_KEYBOARD_MOD_ALPHA |
-         HPCLANG_KEYBOARD_MOD_SHIFT))
-        return EXIT_FAILURE;
+    const uint32_t hp39_models[] = {
+        HPCLANG_MODEL_HP39GPLUS,
+        HPCLANG_MODEL_HP39GS,
+        HPCLANG_MODEL_HP40GS,
+    };
+    for (size_t i = 0; i < sizeof(hp39_models) / sizeof(hp39_models[0]); ++i) {
+        uint32_t hp39_mod =
+            hpclang_keyboard_modifiers_from_bits(hp39_models[i], hp39_bits);
+        if (hp39_mod !=
+            (HPCLANG_KEYBOARD_MOD_ON |
+             HPCLANG_KEYBOARD_MOD_ALPHA |
+             HPCLANG_KEYBOARD_MOD_SHIFT))
+            return EXIT_FAILURE;
+    }
 
     uint32_t hp50_mod = hpclang_keyboard_modifiers_from_bits(
         HPCLANG_MODEL_HP50G, hp39_bits);
@@ -220,9 +232,7 @@ static const struct mapping hp48[] = {
          HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT))
         return EXIT_FAILURE;
 
-    if (hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP39GPLUS, 35u) !=
-            HPCLANG_KEY_UNKNOWN ||
-        hpclang_keyboard_key_from_scan(HPCLANG_MODEL_UNKNOWN, 35u) !=
+    if (hpclang_keyboard_key_from_scan(HPCLANG_MODEL_UNKNOWN, 35u) !=
             HPCLANG_KEY_UNKNOWN ||
         hpclang_keyboard_key_from_scan(HPCLANG_MODEL_HP50G, 31u) !=
             HPCLANG_KEY_UNKNOWN ||

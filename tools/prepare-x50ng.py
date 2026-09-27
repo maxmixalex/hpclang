@@ -123,6 +123,307 @@ static size_t hpclang_sram_size( void )
     )
 
 
+def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
+    """Add the headless S3C2410 UDC + USB byte-stream host bridge."""
+    path = root / "src" / "s3c2410" / "s3c2410_usbdev.c"
+    support = args.headless_header.parent
+    shutil.copy2(
+        support / "hpclang-usbdev-host.h",
+        root / "src" / "s3c2410" / "hpclang-usbdev-host.h",
+    )
+    shutil.copy2(
+        support / "hpclang-usbdev-host.c",
+        root / "src" / "s3c2410" / "hpclang-usbdev-host.c",
+    )
+
+    replace_once(
+        path,
+        '#include "../module.h"\n\n#include "s3c2410.h"\n',
+        '''#include <errno.h>
+#include "../module.h"
+#include "../timer.h"
+#include "../qemu/exec-all.h"
+
+#include "s3c2410.h"
+#include "s3c2410_intc.h"
+#include "s3c2410_io_port.h"
+#include "hpclang-usbdev-host.h"
+#include "hpclang-usbdev-host.c"
+''',
+        "USB host includes",
+    )
+
+    replace_once(
+        path,
+        '''    unsigned int nr_regs;
+    s3c2410_offset_t* regs;
+} s3c2410_usbdev_t;''',
+        '''    unsigned int nr_regs;
+    s3c2410_offset_t* regs;
+
+    struct hpusb_core host;
+    hdw_t* hdw_state;
+    int host_fd;
+    hdw_timer_t* host_timer;
+    int64_t next_sof;
+    enum hpusb_enum_state trace_state;
+    int cable_asserted;
+} s3c2410_usbdev_t;''',
+        "USB host state",
+    )
+
+    read_start = path.read_text().find(
+        "static uint32_t s3c2410_usbdev_read( void* opaque, target_phys_addr_t offset )"
+    )
+    write_start = path.read_text().find(
+        "static void s3c2410_usbdev_write( void* opaque, target_phys_addr_t offset, uint32_t data )"
+    )
+    load_start = path.read_text().find(
+        "static int s3c2410_usbdev_load( hdw_module_t* module, GKeyFile* key )"
+    )
+    if read_start < 0 or write_start < 0 or load_start < 0 or not (
+        read_start < write_start < load_start
+    ):
+        raise SystemExit(f"{path}: USB read/write function anchors changed")
+
+    text = path.read_text()
+    host_impl = r'''static void hpclang_usbdev_irq( void* opaque, int level )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+    if ( level )
+        s3c2410_intc_assert( usbdev->hdw_state, INT_USBD, 1 );
+    else
+        s3c2410_intc_deassert( usbdev->hdw_state, INT_USBD );
+}
+
+static int hpclang_usbdev_stream_read(
+    void* opaque, uint8_t* buffer, size_t capacity )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+    ssize_t count;
+
+    if ( usbdev->host_fd < 0 )
+        return 0;
+    count = read( usbdev->host_fd, buffer, capacity );
+    if ( count > 0 )
+        return ( int )count;
+    if ( count < 0 && errno != EAGAIN && errno != EWOULDBLOCK )
+        fprintf( stderr, "hpclang-usbdev: host read failed: %s\n",
+                 strerror( errno ) );
+    return 0;
+}
+
+static int hpclang_usbdev_stream_write(
+    void* opaque, const uint8_t* buffer, size_t length )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+    ssize_t count;
+
+    if ( usbdev->host_fd < 0 )
+        return 0;
+    count = write( usbdev->host_fd, buffer, length );
+    if ( count >= 0 )
+        return ( int )count;
+    if ( errno != EAGAIN && errno != EWOULDBLOCK )
+        fprintf( stderr, "hpclang-usbdev: host write failed: %s\n",
+                 strerror( errno ) );
+    return 0;
+}
+
+static void hpclang_usbdev_host_poll( void* opaque )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+
+    if ( !usbdev->cable_asserted &&
+         usbdev->hdw_state->s3c2410_io_port != NULL ) {
+        s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 1 );
+        usbdev->cable_asserted = 1;
+    }
+
+    /*
+     * x50ng's timer clock is in microseconds.  Keep the byte-stream bridge
+     * responsive at 100 us, but advance S3C2410 FRAME_NUM only from the
+     * full-speed USB 1 ms SOF time base.
+     */
+    int64_t now = timer_get_clock();
+    if ( usbdev->next_sof == 0 )
+        usbdev->next_sof = now + 1000;
+    while ( now >= usbdev->next_sof ) {
+        hpusb_sof( &usbdev->host );
+        usbdev->next_sof += 1000;
+    }
+
+    hpusb_tick( &usbdev->host );
+
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL &&
+         usbdev->trace_state != usbdev->host.enum_state ) {
+        fprintf(
+            stderr,
+            "hpclang-usbdev: enum state %u -> %u "
+            "in=ep%u out=ep%u addr=0x%02x\n",
+            ( unsigned )usbdev->trace_state,
+            ( unsigned )usbdev->host.enum_state,
+            usbdev->host.bulk_in_ep,
+            usbdev->host.bulk_out_ep,
+            usbdev->host.func_addr );
+        usbdev->trace_state = usbdev->host.enum_state;
+    }
+
+    if ( usbdev->host_timer )
+        timer_mod( usbdev->host_timer, timer_get_clock() + 100 );
+}
+
+static uint32_t s3c2410_usbdev_read(
+    void* opaque, target_phys_addr_t offset )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+    s3c2410_offset_t* reg;
+    uint32_t data;
+
+    if ( !S3C2410_OFFSET_OK( usbdev, offset ) )
+        return ~( 0 );
+
+    reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
+    if ( usbdev->host_fd < 0 )
+        return *( reg->datap );
+
+    data = hpusb_read( &usbdev->host, ( uint32_t )offset );
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
+        fprintf(
+            stderr,
+            "hpclang-usbdev: read offset=0x%04lx data=0x%08x\n",
+            ( unsigned long )offset,
+            data );
+    return data;
+}
+
+static void s3c2410_usbdev_write(
+    void* opaque, target_phys_addr_t offset, uint32_t data )
+{
+    s3c2410_usbdev_t* usbdev = opaque;
+    s3c2410_offset_t* reg;
+
+    if ( !S3C2410_OFFSET_OK( usbdev, offset ) )
+        return;
+
+    reg = S3C2410_OFFSET_ENTRY( usbdev, offset );
+    *( reg->datap ) = data;
+
+    if ( getenv( "HPCLANG_X50NG_USB_TRACE" ) != NULL )
+        fprintf(
+            stderr,
+            "hpclang-usbdev: write offset=0x%04lx reg=%s data=0x%08x\n",
+            ( unsigned long )offset,
+            reg->name,
+            data );
+
+    if ( usbdev->host_fd >= 0 )
+        hpusb_write( &usbdev->host, ( uint32_t )offset, data );
+}
+
+'''
+    path.write_text(text[:read_start] + host_impl + text[load_start:])
+
+    # x50ng resets all modules after a missing/partial state file and on
+    # guest software reset. Preserve the open host bridge, but reset the UDC
+    # protocol state and re-assert cable detect after io_port is reset.
+    text = path.read_text()
+    reset_start = text.find(
+        "static int s3c2410_usbdev_reset( hdw_module_t* module, hdw_reset_t reset )"
+    )
+    readfn_start = text.find("static CPUReadMemoryFunc*", reset_start)
+    if reset_start < 0 or readfn_start < 0:
+        raise SystemExit(f"{path}: USB reset function anchors changed")
+    reset_body = text[reset_start:readfn_start]
+    needle = "\n    return 0;\n}\n"
+    pos = reset_body.rfind(needle)
+    if pos < 0:
+        raise SystemExit(f"{path}: USB reset return anchor changed")
+    reset_body = (
+        reset_body[:pos]
+        + """
+    if ( usbdev->host_fd >= 0 ) {
+        hpusb_reset_device( &usbdev->host );
+        usbdev->next_sof = timer_get_clock() + 1000;
+        usbdev->cable_asserted = 0;
+    }
+"""
+        + reset_body[pos:]
+    )
+    path.write_text(text[:reset_start] + reset_body + text[readfn_start:])
+    # USB host reset integration
+
+    replace_once(
+        path,
+        '''    module->user_data = usbdev;
+
+    iotype = cpu_register_io_memory''',
+        '''    module->user_data = usbdev;
+    usbdev->hdw_state = module->hdw_state;
+    usbdev->host_fd = -1;
+    hpusb_init( &usbdev->host, hpclang_usbdev_irq, usbdev );
+
+    const char* host_path = getenv( "HPCLANG_X50NG_USB0" );
+    if ( host_path && *host_path ) {
+        usbdev->host_fd =
+            open( host_path, O_RDWR | O_NONBLOCK | O_NOCTTY );
+        if ( usbdev->host_fd < 0 ) {
+            fprintf(
+                stderr,
+                "s3c2410-usbdev: cannot open host transport %s: %s\\n",
+                host_path,
+                strerror( errno ) );
+            return -errno;
+        }
+
+        hpusb_set_stream(
+            &usbdev->host,
+            hpclang_usbdev_stream_read,
+            hpclang_usbdev_stream_write,
+            usbdev );
+        hpusb_set_connected( &usbdev->host, 1 );
+        usbdev->next_sof = timer_get_clock() + 1000;
+        usbdev->trace_state = usbdev->host.enum_state;
+        usbdev->host_timer =
+            timer_new(
+                HDW_TIMER_REALTIME,
+                hpclang_usbdev_host_poll,
+                usbdev );
+        if ( usbdev->host_timer == NULL )
+            return -ENOMEM;
+        timer_mod( usbdev->host_timer, timer_get_clock() + 100 );
+    }
+
+    iotype = cpu_register_io_memory''',
+        "USB host open",
+    )
+
+    replace_once(
+        path,
+        '''    if ( module->user_data ) {
+        usbdev = module->user_data;
+        if ( usbdev->regs )
+            free( usbdev->regs );
+        free( usbdev );
+    }''',
+        '''    if ( module->user_data ) {
+        usbdev = module->user_data;
+        if ( usbdev->host_timer ) {
+            timer_del( usbdev->host_timer );
+            timer_free( usbdev->host_timer );
+        }
+        if ( usbdev->host_fd >= 0 )
+            close( usbdev->host_fd );
+        if ( usbdev->cable_asserted &&
+             usbdev->hdw_state->s3c2410_io_port != NULL )
+            s3c2410_io_port_f_set_bit( usbdev->hdw_state, 1, 0 );
+        if ( usbdev->regs )
+            free( usbdev->regs );
+        free( usbdev );
+    }''',
+        "USB host close",
+    )
+
 def patch_host_uart0(root: Path) -> None:
     path = root / "src" / "s3c2410" / "s3c2410_uart.c"
 
@@ -253,6 +554,7 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
     )
 
 
+
 def patch_reserved_ram(root: Path) -> None:
     replace_once(
         root / "src" / "module.c",
@@ -314,6 +616,7 @@ def main() -> None:
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
+    patch_host_usbdev(root, args)
     patch_host_uart0(root)
     patch_reserved_ram(root)
 

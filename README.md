@@ -12,9 +12,14 @@ Applications are packaged as model-independent HPC1 images. Calculator-specific 
 
 ## Validation
 
-HP 39gs, HP 40gs, HP 48gII, HP 49g+, and HP 50g pass Direct runtime and original-system E2E. HP 39gs also passes the canonical runtime on real hardware.
+All six models have Direct runtime evidence. HP 39gs also passes the canonical runtime on real hardware.
 
-HP 39g+ support builds, but its E2E is blocked until a real machine is available to provide a trustworthy stock flash dump.
+HP 39g+ uses a verified real-machine D1.55 full-NOR fixture. All six models
+pass canonical original-system USB launch and Direct runtime E2E. The separate
+Storage and Font Gallery workflows also pass; their Stock tests deliberately
+retain SD and UART/SD paths. USB transport implementation is complete;
+repeated-run performance benchmarking is tracked independently in
+[Stock USB transport](docs/development/stock-usb-transport.md).
 
 ## Development documentation
 

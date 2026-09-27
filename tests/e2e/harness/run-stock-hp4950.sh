@@ -10,8 +10,17 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TARGET="$1"
 APP_DIR="$(realpath "$2")"
 ASSETS_DIR="$(realpath "$3")"
+TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-sd}"
 STORAGE_WITNESS="${HPCLANG_E2E_STORAGE_WITNESS:-0}"
 export TARGET
+
+if [[ "$TRANSPORT" == usb ]]; then
+    exec "$ROOT/tests/e2e/harness/run-stock-hp4950-usb.sh" "$@"
+fi
+[[ "$TRANSPORT" == sd ]] || {
+    echo "unsupported HP49/50 Stock transport: $TRANSPORT" >&2
+    exit 2
+}
 
 case "$STORAGE_WITNESS" in
     0|1) ;;

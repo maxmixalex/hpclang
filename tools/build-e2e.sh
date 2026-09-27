@@ -213,7 +213,7 @@ EOF
 while read -r target model; do
     stage0_extra_defs=()
     if [[ "$MODE" == runtime &&
-          ( "$target" == hp39gs || "$target" == hp40gs ) ]]; then
+          ( "$target" == hp39gplus || "$target" == hp39gs || "$target" == hp40gs ) ]]; then
         # Runtime Stock E2E alone proves the HP39 ARMSYS reverse edge. Direct
         # launchers share this binary but skip the probe because their
         # synthetic ARMSYS block deliberately has no live Saturn Read[] map.
