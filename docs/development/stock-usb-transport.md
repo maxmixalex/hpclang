@@ -33,29 +33,19 @@ interrupts, EP1 IN, EP3 OUT, SOF, and a PTY byte-stream bridge. The host USB
 unit test covers enumeration, bulk transfers, AUTOSET/AUTOCLR, SOF, and reset.
 This is a headless emulator transport, not host OS USB passthrough.
 
-Runtime [#458](https://github.com/zyf722/hpclang/actions/runs/36149460082),
-at `53e2b653`, passes all Direct families and Stock HP39g+/39gs/40gs/48gII.
-Stock HP49g+/50g fails before transfer; the investigation below identifies
-the incorrect UI sequence. Storage #207 passes on the same head using SD,
-so it cannot establish USB correctness. Gallery also needs a fresh regression
-run before cross-workflow closure is claimed.
+The common USB transport is implemented and passes canonical original-Stock
+launch on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+ and HP 50g.
+The Direct runtime, Storage, Quality and Font Gallery regression workflows also
+pass. Stock Gallery continues to exercise its dedicated UART/SD launchers, not
+the USB transport. The HP39 Direct Gallery job has a 25-minute budget for its
+three sequential model sweeps; all other Direct Gallery families retain 15
+minutes.
 
-Formal Runtime [#459](https://github.com/zyf722/hpclang/actions/runs/36286455537)
-on `d2897cdb` is fully green: Build, universal x50ng, shared Stock assets, all
-six Direct models, all six USB Stock models, and evidence publication. Both
-HP49g+ and HP50g record `status=pass`, `saw_pass=true`, `returned=true`, and
-`return_settled=true`.
-
-Storage [#208](https://github.com/zyf722/hpclang/actions/runs/36286455562) and
-Quality [#107](https://github.com/zyf722/hpclang/actions/runs/36286455548) pass
-on the same head. Gallery
-[#150](https://github.com/zyf722/hpclang/actions/runs/36286481830) passes every
-Stock job and Direct hp48/hp4950. Direct hp39 logs complete PASS for HP39g+
-(247 faces / 494 captures), HP39gs and HP40gs (248 / 496 each), each across
-20/20 shards, but Actions cancels the job at the old 15-minute ceiling.
-The HP39 family now runs three models sequentially, so its orchestration
-budget is raised to 25 minutes; other families retain 15 minutes. A new
-Gallery run is required before calling that workflow fully green.
+The implementation is functionally complete. U5 is a separately tracked,
+non-blocking repeated-run reliability and wall-clock benchmark against the
+secondary transport paths, not an unfinished USB feature or a prerequisite
+for integration. The formal acceptance links are kept in
+[Validation](validation.md).
 
 ## HP49g+/50g failure diagnosis
 
@@ -106,6 +96,8 @@ real-calculator loopback is not claimed.
 U2 is closed when the host side sees a deterministic byte stream with USB packet
 boundaries hidden below the adapter.
 
-U3/U4 are protocol gates: HP39 Conn3x transfer and HP48/49/50 Kermit transfer
-must install and launch the same packaged HPC1 payload through the original
-Stock UI, then pass the existing payload, teardown and Stock-repaint witnesses.
+U3/U4 are closed protocol gates: HP39 typed-file transfer and HP48/49/50 Kermit
+over USB install and launch the same packaged HPC1 payload through the original
+Stock UI, with payload, teardown, and Stock-repaint witnesses. U5 measures
+repeatability and elapsed time separately; its open status does not imply
+unfinished USB transport implementation.
