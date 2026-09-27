@@ -15,7 +15,13 @@ This site is currently an internal Development reference. It intentionally prese
 | HP 49g+ | `hp4950` | PASS | PASS |
 | HP 50g | `hp4950` | PASS | PASS |
 
-HP 39g+ uses the verified real-machine D1.55 full-NOR fixture. Runtime #458 establishes USB Stock PASS for HP39g+/39gs/40gs and HP48gII. HP49g+/50g's earlier Stock PASS used SD; their USB migration and its current validation are tracked in [Stock USB transport](development/stock-usb-transport.md). All six profiles already select USB by default; repeated-run stability is still a separate gate.
+HP 39g+ uses the verified real-machine D1.55 full-NOR fixture. All six
+models now pass canonical original-Stock launch over USB as well as Direct
+runtime. The separate Font Gallery and Storage regressions also pass; their
+Stock paths intentionally retain UART/SD and SD respectively. See
+[Stock USB transport](development/stock-usb-transport.md) for the implementation
+and transport scope. Repeated-run performance benchmarking is separate from
+functional completion.
 
 ## Development reference
 
