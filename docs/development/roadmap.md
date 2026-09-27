@@ -52,7 +52,7 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 
 ## M3 — HP39 platform
 
-**Direct runtime validation is complete for HP 39g+/39gs/40gs. Automated original-Stock launch is complete for HP 39gs/40gs; HP 39g+ D1.55 uses the USB Connectivity Kit path, which the current x50ng Stock harness does not model.**
+**Direct runtime and automated original-Stock USB launch have passing evidence for HP 39g+/39gs/40gs.** Runtime #458 includes HP39g+ D1.55 install, execution, and settled return.
 
 - [x] HP 39gs real-hardware canonical runtime PASS and clean return.
 - [x] HP 39gs and HP 40gs official-ROM Direct E2E.
@@ -63,7 +63,7 @@ HP 39gs real hardware plus the current emulator gates validate the design. HP 39
 - [x] Validate a read-only HP39 flash-dump mechanism byte-for-byte against emulated physical NOR.
 - [x] Acquire a real HP 39g+ and dump its complete 1 MiB D1.55 stock flash.
 - [x] Add the verified HP 39g+ flash fixture to Direct runtime E2E, including strict 51-key identity/modifier validation and clean return.
-- [ ] Automate the original-system HP 39g+ USB Connectivity Kit install/launch path. The current HP39 Stock harness models the later UART/Kermit serial-disk transport used by HP39gs/40gs and must not substitute it for model 1.
+- [x] Automate the original-system HP 39g+ USB Connectivity Kit install/launch path using the shared USB bridge and HP39 typed-file Kermit adapter.
 
 The one-shot HP39g+ ROM dumper is retired after successful acquisition. The verified fixture establishes model-1 firmware identity and Direct execution, but does not by itself establish HP39gs/40gs native-font offsets.
 
@@ -99,14 +99,15 @@ HP 49g+ and HP 50g share the `hp4950` platform, official 2.15 OS image, stock Fi
 
 ## M6 — Automated emulator E2E
 
-**Direct runtime complete for six models; automated original-Stock launch complete for five models.**
+**Direct runtime and original-Stock launch evidence exist for all six models.** Runtime #458 adds HP39g+ USB on its own D1.55 fixture. The current migration makes USB the common Stock default; historical SD/UART passes and current USB gates are distinguished in [Stock USB transport](stock-usb-transport.md).
 
 Durable Direct launch evidence exists for HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Automated original-Stock launch evidence exists for HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. Control-flow return and visible stock-UI repaint remain deliberately separate gates. Runtime **35298949365 / #135** is the final M7.1 fully-green canonical Runtime evidence across all Direct and Stock families, including HP48 payload PASS, stage teardown, control-flow restoration, settled Stock repaint, and the exact 52-frame keyboard progression. Runtime #122 remains the first run that closed that full contract.
 
-Remaining model-1 transport work:
+Model-1 transport integration:
 
 - [x] HP 39g+ Direct runtime on the verified native D1.55 stock flash fixture.
-- [ ] HP 39g+ original-system USB Connectivity Kit launch on that fixture; this requires an emulator/host USB transport rather than the HP39gs/40gs UART/Kermit harness.
+- [x] HP 39g+ original-system USB Connectivity Kit launch on that fixture.
+- [ ] Complete repeated-run USB stability comparison and remaining cross-workflow regression gates; profile defaults already select USB.
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration.
 

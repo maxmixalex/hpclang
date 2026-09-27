@@ -14,9 +14,9 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
 | `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock PC transfer remains outside automation because D1.55 uses the USB Connectivity Kit while the current HP39 Stock harness models UART/Kermit.
+Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is now automated and passes in Runtime #458. All profiles select USB; see [Stock USB transport](stock-usb-transport.md) for current migration evidence and remaining gates.
 
-Current fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
+Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
 ## Runtime PASS contract
 
@@ -179,7 +179,7 @@ The real HP39gs run has passed the complete canonical runtime and returned clean
 
 ## HP39gs/40gs Stock emulator gate
 
-`Stock / hp39` boots each official 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original serial-disk path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result.
+`Stock / hp39` boots the verified HP39g+ D1.55 full-NOR fixture or the official HP39gs/40gs 2.22 ROM, transfers `HP39DIR.CUR`, `HP39DIR.000`, `HPGCC000.000`, and `LIB275L.000` through the original USB path, launches the installed aplet through ARMToolbox39, and requires the canonical HPC1 PASS result. The gs/40gs UART serial-disk path remains an explicit override.
 
 Closed-loop `KBRD -> KACK(n)` key synchronization is implemented for Stock as well as Direct. Runtime #135 first froze the exact 52-frame schedule: frame 0 is the initial state and frames 1..51 are emitted only after the preceding DOWN→UP cycle is acknowledged and the payload has accepted the key. Missing any frame fails the family; the final post-cleanup Runtime #357 repeats the fully-green Direct/Stock regression contract.
 

@@ -8,14 +8,14 @@ This site is currently an internal Development reference. It intentionally prese
 
 | Model | Platform | Direct runtime | Original-system launch |
 | --- | --- | --- | --- |
-| HP 39g+ | `hp39` | **Blocked** | **Blocked** |
+| HP 39g+ | `hp39` | PASS, verified D1.55 fixture | PASS over USB |
 | HP 39gs | `hp39` | PASS, including real hardware | PASS, including real hardware return |
 | HP 40gs | `hp39` | PASS | PASS |
 | HP 48gII | `hp48` | PASS | PASS |
 | HP 49g+ | `hp4950` | PASS | PASS |
 | HP 50g | `hp4950` | PASS | PASS |
 
-HP 39g+ support builds and the read-only flash-dump mechanism has been verified, but automated E2E requires a trustworthy stock flash image from a real HP 39g+. Further HP 39g+ E2E work is intentionally paused until that hardware is available.
+HP 39g+ uses the verified real-machine D1.55 full-NOR fixture. Runtime #458 establishes USB Stock PASS for HP39g+/39gs/40gs and HP48gII. HP49g+/50g's earlier Stock PASS used SD; their USB migration and its current validation are tracked in [Stock USB transport](development/stock-usb-transport.md). All six profiles already select USB by default; repeated-run stability is still a separate gate.
 
 ## Development reference
 

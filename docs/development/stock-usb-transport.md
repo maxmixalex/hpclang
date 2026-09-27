@@ -13,29 +13,83 @@ The intended layers are:
    behavior, endpoint/USB interrupts, EP1 bulk IN and EP3 bulk OUT;
 2. a deterministic headless host bridge that exposes a byte stream while keeping
    USB packetization inside the emulator;
-3. HP39-family Conn3x/typed-transfer adapter;
+3. HP39-family typed-file Kermit adapter (the Conn3x transfer convention);
 4. HP48gII/49g+/50g Kermit adapter over the same USB byte stream.
 
-Serial HP39/40 and SD/VVFAT gates remain useful secondary regressions. USB is
-not allowed to replace them until repeated Stock runs demonstrate lower flake
-rates and equivalent or stronger return-to-Stock evidence.
+All six target profiles already select `stock_transport: usb`. UART and
+SD/VVFAT remain explicit secondary paths; Storage overrides the default to SD.
+Repeated-run flake-rate and wall-clock comparison remains open: selecting USB
+in the profiles is an implementation fact, not evidence that U5 is complete.
 
-## Current x50ng gap
+## Implementation and evidence
 
-Pinned x50ng currently models `s3c2410_usbdev` as register storage only. It
-does not implement host-visible EP0 transactions, endpoint FIFO semantics,
-packet completion, endpoint interrupts, or a host transport.
+Upstream pinned x50ng supplies only a register stub. `tools/prepare-x50ng.py`
+now integrates `tests/e2e/harness/x50ng/hpclang-usbdev-host.c`: bus reset,
+guest-descriptor EP0 enumeration, indexed endpoint FIFO/CSR behavior, endpoint
+interrupts, EP1 IN, EP3 OUT, SOF, and a PTY byte-stream bridge. The host USB
+unit test covers enumeration, bulk transfers, AUTOSET/AUTOCLR, SOF, and reset.
+This is a headless emulator transport, not host OS USB passthrough.
 
-U1 starts by adding opt-in UDC write tracing through
-`HPCLANG_X50NG_USB_TRACE`. The trace is test-only instrumentation and is
-disabled by default. Its purpose is to record the exact Stock-ROM programming
-sequence before implementing semantics.
+Runtime [#458](https://github.com/zyf722/hpclang/actions/runs/36149460082),
+at `53e2b653`, passes all Direct families and Stock HP39g+/39gs/40gs/48gII.
+Stock HP49g+/50g fails before transfer; the investigation below identifies
+the incorrect UI sequence. Storage #207 passes on the same head using SD,
+so it cannot establish USB correctness. Gallery also needs a fresh regression
+run before cross-workflow closure is claimed.
+
+Local independent-container validation on 2026-09-27, after both sequence
+corrections and removal of the firmware-specific debug probes, passes
+`runtime.json` and `stock-hp4950-usb.json` on HP49g+ and HP50g. This includes
+payload PASS, the keyboard progression, and settled return to Stock.
+Formal CI validation of this correction is recorded below when available.
+
+## HP49g+/50g failure diagnosis
+
+There were two incorrect UI assumptions in `hp4950-stock-usb-run.seq`:
+
+1. Fresh Stock state already selects USB/Kermit. Opening CHOOS highlights USB;
+   the extra DOWN wraps to IRDA. The firmware then closes USB and opens IRDA,
+   leaving incoming host USB bytes without a Stock reader. The fix accepts
+   the existing USB selection and captures both the chooser and configured
+   port for later inspection.
+2. SETUP attaches ARMToolbox to HOME. After warmstart, the library menu exposes
+   `ARMTo` on F1, followed by the port selectors. The old F3/F4 path entered an
+   empty menu instead of ARMToolbox. The corrected sequence selects F1 and
+   then launches PrRUN.
+
+Screenshots established both mistakes. A bounded guest GDB investigation also
+observed I/O device `0x1` being closed and device `0x100` opened after the IRDA
+selection. The USB close path (`0xecbc`, caller `0x1b40c`) clears the receive
+gate at `0x08000cf9`; this was a consequence of changing ports, not proof of an
+endpoint-controller defect. No firmware-byte or runtime patch is needed.
+
+The temporary CPU tracing, ROM dump, and receive-gate watchpoint have been
+removed. Generic `HPCLANG_X50NG_USB_TRACE` and
+`HPCLANG_X50NG_USB_TRACE_EVENTS` remain opt-in diagnostics. The runner also
+removes prior target captures/results before each run so a retained build
+directory cannot supply an old server-ready image or stale evidence.
+
+## Reproduction
+
+Use the pinned x50ng and Arm toolchain from the repository CI setup actions,
+build the canonical payload with `tools/build-e2e.sh runtime`, prepare the
+shared Stock assets, then run:
+
+```sh
+tests/e2e/harness/run-stock.sh hp49gplus build/e2e-runtime build/e2e-stock-assets
+tests/e2e/harness/run-stock.sh hp50g build/e2e-runtime build/e2e-stock-assets
+```
+
+The runner requires the same runtime-library/tool paths and `RUNNER_TEMP` as
+CI. A retained development container may cache dependencies and build outputs;
+its contents are not inputs to CI. Local firmware disassembly and historical
+source archives remain under ignored `research/`, never in published artifacts.
 
 ## Acceptance gates
 
-U1 is closed only when a Stock ROM can enumerate through guest-owned descriptors
-and complete a bulk loopback over the same EP1/EP3 endpoints used by the real
-calculator.
+U1 requires guest-descriptor enumeration and bidirectional EP1/EP3 traffic.
+The host-unit test and the Stock Kermit flows exercise these layers; a separate
+real-calculator loopback is not claimed.
 
 U2 is closed when the host side sees a deterministic byte stream with USB packet
 boundaries hidden below the adapter.
