@@ -6,35 +6,35 @@
 
 #include "object-snapshot.h"
 
-enum {
-    RPL_DOINT      = 0x02614u,
-    RPL_DOLNGREAL  = 0x0263au,
-    RPL_DOLNGCMP   = 0x02660u,
-    RPL_DOMATRIX   = 0x02686u,
-    RPL_DOAPLET    = 0x026d5u,
-    RPL_DOBINT     = 0x02911u,
-    RPL_DOREAL     = 0x02933u,
-    RPL_DOEREL     = 0x02955u,
-    RPL_DOCMP      = 0x02977u,
-    RPL_DOECMP     = 0x0299du,
-    RPL_DOCHAR     = 0x029bfu,
-    RPL_DOARRY     = 0x029e8u,
-    RPL_DOLNKARRY  = 0x02a0au,
-    RPL_DOCSTR     = 0x02a2cu,
-    RPL_DOLIST     = 0x02a74u,
-    RPL_DORRP      = 0x02a96u,
-    RPL_DOSYMB     = 0x02ab8u,
-    RPL_DOEXT      = 0x02adau,
-    RPL_DOGROB     = 0x02b1eu,
-    RPL_DOLIB      = 0x02b40u,
-    RPL_DOCOL      = 0x02d9du,
-    RPL_DOCODE     = 0x02dccu,
-    RPL_DOIDNT     = 0x02e48u,
-    RPL_DOLAM      = 0x02e6du
+enum
+{
+    RPL_DOINT = 0x02614u,
+    RPL_DOLNGREAL = 0x0263au,
+    RPL_DOLNGCMP = 0x02660u,
+    RPL_DOMATRIX = 0x02686u,
+    RPL_DOAPLET = 0x026d5u,
+    RPL_DOBINT = 0x02911u,
+    RPL_DOREAL = 0x02933u,
+    RPL_DOEREL = 0x02955u,
+    RPL_DOCMP = 0x02977u,
+    RPL_DOECMP = 0x0299du,
+    RPL_DOCHAR = 0x029bfu,
+    RPL_DOARRY = 0x029e8u,
+    RPL_DOLNKARRY = 0x02a0au,
+    RPL_DOCSTR = 0x02a2cu,
+    RPL_DOLIST = 0x02a74u,
+    RPL_DORRP = 0x02a96u,
+    RPL_DOSYMB = 0x02ab8u,
+    RPL_DOEXT = 0x02adau,
+    RPL_DOGROB = 0x02b1eu,
+    RPL_DOLIB = 0x02b40u,
+    RPL_DOCOL = 0x02d9du,
+    RPL_DOCODE = 0x02dccu,
+    RPL_DOIDNT = 0x02e48u,
+    RPL_DOLAM = 0x02e6du
 };
 
-enum hpclang_object_kind hpclang_object_kind_from_native_prologue(
-    uint32_t prologue)
+enum hpclang_object_kind hpclang_object_kind_from_native_prologue(uint32_t prologue)
 {
     switch (prologue) {
     case RPL_DOINT:
@@ -80,10 +80,8 @@ enum hpclang_object_kind hpclang_object_kind_from_native_prologue(
     }
 }
 
-static int read_prologue(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t *prologue)
+static int read_prologue(const struct hpclang_rpl_reader *reader, uint32_t address,
+                         uint32_t *prologue)
 {
     if (reader == NULL || reader->read_nibble == NULL || prologue == NULL)
         return 0;
@@ -93,8 +91,7 @@ static int read_prologue(
         if (address > UINT32_MAX - i)
             return 0;
         uint8_t nibble = 0u;
-        if (!reader->read_nibble(reader->context, address + i, &nibble) ||
-            nibble > 0x0fu)
+        if (!reader->read_nibble(reader->context, address + i, &nibble) || nibble > 0x0fu)
             return 0;
         value |= (uint32_t)nibble << (i * 4u);
     }
@@ -118,11 +115,8 @@ static int span_errno(int result)
     }
 }
 
-int hpclang_object_snapshot_copy(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    struct hpclang_object **object)
+int hpclang_object_snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t limit, struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EFAULT;
@@ -149,15 +143,13 @@ int hpclang_object_snapshot_copy(
         return -1;
     }
 
-    struct hpclang_object *snapshot =
-        malloc(sizeof(*snapshot) + bytes);
+    struct hpclang_object *snapshot = malloc(sizeof(*snapshot) + bytes);
     if (snapshot == NULL) {
         errno = ENOMEM;
         return -1;
     }
 
-    snapshot->kind =
-        (uint32_t)hpclang_object_kind_from_native_prologue(prologue);
+    snapshot->kind = (uint32_t)hpclang_object_kind_from_native_prologue(prologue);
     snapshot->nibble_count = span;
     snapshot->native_prologue = prologue;
 
@@ -193,8 +185,7 @@ int hpclang_object_snapshot_copy(
     return 0;
 }
 
-enum hpclang_object_kind hpclang_object_kind(
-    const struct hpclang_object *object)
+enum hpclang_object_kind hpclang_object_kind(const struct hpclang_object *object)
 {
     if (object == NULL)
         return HPCLANG_OBJECT_UNKNOWN;
@@ -206,9 +197,7 @@ void hpclang_object_release(struct hpclang_object *object)
     free(object);
 }
 
-int hpclang_object_create_character(
-    uint8_t value,
-    struct hpclang_object **object)
+int hpclang_object_create_character(uint8_t value, struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EFAULT;
@@ -216,8 +205,7 @@ int hpclang_object_create_character(
     }
     *object = NULL;
 
-    struct hpclang_object *snapshot =
-        calloc(1u, sizeof(*snapshot) + 4u);
+    struct hpclang_object *snapshot = calloc(1u, sizeof(*snapshot) + 4u);
     if (snapshot == NULL) {
         errno = ENOMEM;
         return -1;
@@ -228,8 +216,7 @@ int hpclang_object_create_character(
     snapshot->native_prologue = RPL_DOCHAR;
 
     for (uint32_t i = 0u; i < 5u; ++i) {
-        uint8_t nibble =
-            (uint8_t)((RPL_DOCHAR >> (i * 4u)) & 0x0fu);
+        uint8_t nibble = (uint8_t)((RPL_DOCHAR >> (i * 4u)) & 0x0fu);
         if ((i & 1u) == 0u)
             snapshot->data[i >> 1] = nibble;
         else
@@ -242,22 +229,17 @@ int hpclang_object_create_character(
     return 0;
 }
 
-static int object_read_nibbles(
-    const struct hpclang_object *object,
-    uint32_t offset,
-    uint32_t count,
-    uint32_t *value)
+static int object_read_nibbles(const struct hpclang_object *object, uint32_t offset, uint32_t count,
+                               uint32_t *value)
 {
-    if (object == NULL || value == NULL || count > 8u ||
-        offset > object->nibble_count ||
+    if (object == NULL || value == NULL || count > 8u || offset > object->nibble_count ||
         count > object->nibble_count - offset)
         return 0;
 
     uint32_t out = 0u;
     for (uint32_t i = 0u; i < count; ++i) {
         uint8_t nibble = 0u;
-        if (!hpclang_object_snapshot_read_nibble(
-                object, offset + i, &nibble))
+        if (!hpclang_object_snapshot_read_nibble(object, offset + i, &nibble))
             return 0;
         out |= (uint32_t)nibble << (i * 4u);
     }
@@ -266,9 +248,7 @@ static int object_read_nibbles(
     return 1;
 }
 
-int hpclang_object_integer_i64(
-    const struct hpclang_object *object,
-    int64_t *value)
+int hpclang_object_integer_i64(const struct hpclang_object *object, int64_t *value)
 {
     if (object == NULL || value == NULL) {
         errno = EFAULT;
@@ -291,10 +271,9 @@ int hpclang_object_integer_i64(
             return -1;
         }
 
-        int32_t signed_value =
-            (raw & UINT32_C(0x00080000)) != 0u
-                ? (int32_t)(raw | UINT32_C(0xfff00000))
-                : (int32_t)raw;
+        int32_t signed_value = (raw & UINT32_C(0x00080000)) != 0u
+                                   ? (int32_t)(raw | UINT32_C(0xfff00000))
+                                   : (int32_t)raw;
         *value = (int64_t)signed_value;
         return 0;
     }
@@ -305,11 +284,8 @@ int hpclang_object_integer_i64(
     }
 
     uint32_t length = 0u;
-    if (object->nibble_count < 11u ||
-        !object_read_nibbles(object, 5u, 5u, &length) ||
-        length < 6u ||
-        length > UINT32_MAX - 5u ||
-        object->nibble_count != 5u + length) {
+    if (object->nibble_count < 11u || !object_read_nibbles(object, 5u, 5u, &length) ||
+        length < 6u || length > UINT32_MAX - 5u || object->nibble_count != 5u + length) {
         errno = EILSEQ;
         return -1;
     }
@@ -317,8 +293,7 @@ int hpclang_object_integer_i64(
     uint32_t digits = length - 6u;
     uint32_t sign_offset = 10u + digits;
     uint8_t sign = 0u;
-    if (!hpclang_object_snapshot_read_nibble(
-            object, sign_offset, &sign) ||
+    if (!hpclang_object_snapshot_read_nibble(object, sign_offset, &sign) ||
         (sign != 0u && sign != 9u)) {
         errno = EILSEQ;
         return -1;
@@ -331,9 +306,7 @@ int hpclang_object_integer_i64(
 
     for (uint32_t i = digits; i != 0u; --i) {
         uint8_t digit = 0u;
-        if (!hpclang_object_snapshot_read_nibble(
-                object, 10u + i - 1u, &digit) ||
-            digit > 9u) {
+        if (!hpclang_object_snapshot_read_nibble(object, 10u + i - 1u, &digit) || digit > 9u) {
             errno = EILSEQ;
             return -1;
         }
@@ -356,23 +329,17 @@ int hpclang_object_integer_i64(
     return 0;
 }
 
-static int object_read_bcd(
-    const struct hpclang_object *object,
-    uint32_t offset,
-    uint32_t digits,
-    uint64_t *value)
+static int object_read_bcd(const struct hpclang_object *object, uint32_t offset, uint32_t digits,
+                           uint64_t *value)
 {
-    if (object == NULL || value == NULL ||
-        offset > object->nibble_count ||
+    if (object == NULL || value == NULL || offset > object->nibble_count ||
         digits > object->nibble_count - offset)
         return 0;
 
     uint64_t out = 0u;
     for (uint32_t i = digits; i != 0u; --i) {
         uint8_t digit = 0u;
-        if (!hpclang_object_snapshot_read_nibble(
-                object, offset + i - 1u, &digit) ||
-            digit > 9u)
+        if (!hpclang_object_snapshot_read_nibble(object, offset + i - 1u, &digit) || digit > 9u)
             return 0;
 
         if (out > (UINT64_MAX - digit) / UINT64_C(10))
@@ -384,9 +351,7 @@ static int object_read_bcd(
     return 1;
 }
 
-int hpclang_object_real_f64(
-    const struct hpclang_object *object,
-    double *value)
+int hpclang_object_real_f64(const struct hpclang_object *object, double *value)
 {
     if (object == NULL || value == NULL) {
         errno = EFAULT;
@@ -414,8 +379,7 @@ int hpclang_object_real_f64(
     }
 
     uint8_t sign = 0u;
-    if (!hpclang_object_snapshot_read_nibble(object, 20u, &sign) ||
-        (sign != 0u && sign != 9u)) {
+    if (!hpclang_object_snapshot_read_nibble(object, 20u, &sign) || (sign != 0u && sign != 9u)) {
         errno = EILSEQ;
         return -1;
     }
@@ -455,9 +419,7 @@ int hpclang_object_real_f64(
     return 0;
 }
 
-static int object_string_length(
-    const struct hpclang_object *object,
-    size_t *byte_count)
+static int object_string_length(const struct hpclang_object *object, size_t *byte_count)
 {
     if (object == NULL || byte_count == NULL) {
         errno = EFAULT;
@@ -473,11 +435,8 @@ static int object_string_length(
     }
 
     uint32_t length = 0u;
-    if (object->nibble_count < 10u ||
-        !object_read_nibbles(object, 5u, 5u, &length) ||
-        length < 5u ||
-        length > UINT32_MAX - 5u ||
-        object->nibble_count != 5u + length) {
+    if (object->nibble_count < 10u || !object_read_nibbles(object, 5u, 5u, &length) ||
+        length < 5u || length > UINT32_MAX - 5u || object->nibble_count != 5u + length) {
         errno = EILSEQ;
         return -1;
     }
@@ -492,17 +451,13 @@ static int object_string_length(
     return 0;
 }
 
-int hpclang_object_string_size(
-    const struct hpclang_object *object,
-    size_t *byte_count)
+int hpclang_object_string_size(const struct hpclang_object *object, size_t *byte_count)
 {
     return object_string_length(object, byte_count);
 }
 
-int hpclang_object_string_copy(
-    const struct hpclang_object *object,
-    uint8_t *buffer,
-    size_t capacity)
+int hpclang_object_string_copy(const struct hpclang_object *object, uint8_t *buffer,
+                               size_t capacity)
 {
     size_t byte_count = 0u;
     if (object_string_length(object, &byte_count) != 0)
@@ -528,9 +483,7 @@ int hpclang_object_string_copy(
     return 0;
 }
 
-int hpclang_object_character_value(
-    const struct hpclang_object *object,
-    uint8_t *value)
+int hpclang_object_character_value(const struct hpclang_object *object, uint8_t *value)
 {
     if (object == NULL || value == NULL) {
         errno = EFAULT;
@@ -540,8 +493,7 @@ int hpclang_object_character_value(
         errno = EINVAL;
         return -1;
     }
-    if (object->nibble_count != 7u ||
-        object->native_prologue != RPL_DOCHAR) {
+    if (object->nibble_count != 7u || object->native_prologue != RPL_DOCHAR) {
         errno = EILSEQ;
         return -1;
     }
@@ -558,17 +510,13 @@ int hpclang_object_character_value(
     return 0;
 }
 
-int hpclang_object_snapshot_read_nibble(
-    const struct hpclang_object *object,
-    uint32_t offset,
-    uint8_t *value)
+int hpclang_object_snapshot_read_nibble(const struct hpclang_object *object, uint32_t offset,
+                                        uint8_t *value)
 {
     if (object == NULL || value == NULL || offset >= object->nibble_count)
         return 0;
 
     uint8_t packed = object->data[offset >> 1];
-    *value = (offset & 1u) != 0u
-        ? (uint8_t)(packed >> 4)
-        : (uint8_t)(packed & 0x0fu);
+    *value = (offset & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
     return 1;
 }

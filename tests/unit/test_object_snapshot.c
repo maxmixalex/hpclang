@@ -9,22 +9,18 @@
 
 #include "object-snapshot.h"
 
-struct image {
+struct image
+{
     uint8_t nibbles[128];
     uint32_t used;
 };
 
-static void put_nibbles(
-    struct image *image,
-    uint32_t at,
-    uint32_t value,
-    uint32_t count)
+static void put_nibbles(struct image *image, uint32_t at, uint32_t value, uint32_t count)
 {
     assert(image != NULL);
     assert(at + count <= sizeof(image->nibbles));
     for (uint32_t i = 0u; i < count; ++i)
-        image->nibbles[at + i] =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        image->nibbles[at + i] = (uint8_t)((value >> (i * 4u)) & 0x0fu);
     if (image->used < at + count)
         image->used = at + count;
 }
@@ -51,16 +47,12 @@ static struct hpclang_object *snapshot_from_image(struct image *image)
 {
     struct hpclang_rpl_reader reader = reader_for(image);
     struct hpclang_object *object = NULL;
-    assert(hpclang_object_snapshot_copy(
-               &reader, 0u, image->used, &object) == 0);
+    assert(hpclang_object_snapshot_copy(&reader, 0u, image->used, &object) == 0);
     assert(object != NULL);
     return object;
 }
 
-static void put_zint(
-    struct image *image,
-    const char *magnitude,
-    int negative)
+static void put_zint(struct image *image, const char *magnitude, int negative)
 {
     memset(image, 0, sizeof(*image));
     size_t digits = strlen(magnitude);
@@ -73,15 +65,10 @@ static void put_zint(
         assert(ch >= '0' && ch <= '9');
         put_nibbles(image, 10u + (uint32_t)i, (uint32_t)(ch - '0'), 1u);
     }
-    put_nibbles(
-        image, 10u + (uint32_t)digits, negative ? 9u : 0u, 1u);
+    put_nibbles(image, 10u + (uint32_t)digits, negative ? 9u : 0u, 1u);
 }
 
-static void put_real(
-    struct image *image,
-    int exponent,
-    uint64_t mantissa,
-    int negative)
+static void put_real(struct image *image, int exponent, uint64_t mantissa, int negative)
 {
     assert(exponent >= -500 && exponent <= 499);
     assert(mantissa <= UINT64_C(999999999999));
@@ -89,8 +76,7 @@ static void put_real(
     memset(image, 0, sizeof(*image));
     put_nibbles(image, 0u, 0x02933u, 5u);
 
-    uint32_t encoded =
-        exponent < 0 ? (uint32_t)(1000 + exponent) : (uint32_t)exponent;
+    uint32_t encoded = exponent < 0 ? (uint32_t)(1000 + exponent) : (uint32_t)exponent;
     for (uint32_t i = 0u; i < 3u; ++i) {
         put_nibbles(image, 5u + i, encoded % 10u, 1u);
         encoded /= 10u;
@@ -98,18 +84,14 @@ static void put_real(
 
     uint64_t remaining = mantissa;
     for (uint32_t i = 0u; i < 12u; ++i) {
-        put_nibbles(
-            image, 8u + i, (uint32_t)(remaining % UINT64_C(10)), 1u);
+        put_nibbles(image, 8u + i, (uint32_t)(remaining % UINT64_C(10)), 1u);
         remaining /= UINT64_C(10);
     }
     put_nibbles(image, 20u, negative ? 9u : 0u, 1u);
     image->used = 21u;
 }
 
-static void put_string(
-    struct image *image,
-    const uint8_t *bytes,
-    size_t count)
+static void put_string(struct image *image, const uint8_t *bytes, size_t count)
 {
     memset(image, 0, sizeof(*image));
     assert(count <= 50u);
@@ -117,8 +99,7 @@ static void put_string(
     put_nibbles(image, 0u, 0x02a2cu, 5u);
     put_nibbles(image, 5u, 5u + (uint32_t)(count * 2u), 5u);
     for (size_t i = 0u; i < count; ++i)
-        put_nibbles(
-            image, 10u + (uint32_t)(i * 2u), bytes[i], 2u);
+        put_nibbles(image, 10u + (uint32_t)(i * 2u), bytes[i], 2u);
 }
 
 static void test_real_snapshot(void)
@@ -131,8 +112,7 @@ static void test_real_snapshot(void)
 
     struct hpclang_rpl_reader reader = reader_for(&image);
     struct hpclang_object *object = NULL;
-    assert(hpclang_object_snapshot_copy(
-               &reader, 0u, image.used, &object) == 0);
+    assert(hpclang_object_snapshot_copy(&reader, 0u, image.used, &object) == 0);
     assert(object != NULL);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_REAL);
     assert(object->nibble_count == 21u);
@@ -144,8 +124,7 @@ static void test_real_snapshot(void)
         assert(value == image.nibbles[i]);
     }
     uint8_t value = 0u;
-    assert(!hpclang_object_snapshot_read_nibble(
-        object, image.used, &value));
+    assert(!hpclang_object_snapshot_read_nibble(object, image.used, &value));
 
     hpclang_object_release(object);
 }
@@ -159,8 +138,7 @@ static void test_odd_character_snapshot(void)
 
     struct hpclang_rpl_reader reader = reader_for(&image);
     struct hpclang_object *object = NULL;
-    assert(hpclang_object_snapshot_copy(
-               &reader, 0u, image.used, &object) == 0);
+    assert(hpclang_object_snapshot_copy(&reader, 0u, image.used, &object) == 0);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_CHARACTER);
     assert(object->nibble_count == 7u);
 
@@ -304,7 +282,7 @@ static void test_real_conversion(void)
 
 static void test_raw_string_conversions(void)
 {
-    const uint8_t expected[] = { 0x41u, 0x00u, 0xffu };
+    const uint8_t expected[] = {0x41u, 0x00u, 0xffu};
     struct image image = {0};
     put_string(&image, expected, sizeof(expected));
 
@@ -315,15 +293,13 @@ static void test_raw_string_conversions(void)
     assert(hpclang_object_string_size(object, &size) == 0);
     assert(size == sizeof(expected));
 
-    uint8_t buffer[3] = { 0x11u, 0x22u, 0x33u };
+    uint8_t buffer[3] = {0x11u, 0x22u, 0x33u};
     errno = 0;
     assert(hpclang_object_string_copy(object, buffer, 2u) == -1);
     assert(errno == ENOBUFS);
-    assert(buffer[0] == 0x11u && buffer[1] == 0x22u &&
-           buffer[2] == 0x33u);
+    assert(buffer[0] == 0x11u && buffer[1] == 0x22u && buffer[2] == 0x33u);
 
-    assert(hpclang_object_string_copy(
-               object, buffer, sizeof(buffer)) == 0);
+    assert(hpclang_object_string_copy(object, buffer, sizeof(buffer)) == 0);
     assert(memcmp(buffer, expected, sizeof(expected)) == 0);
     hpclang_object_release(object);
 
@@ -349,8 +325,7 @@ static void test_errors(void)
     put_nibbles(&image, 0u, 0x026d5u, 5u); /* Aplet: boundary unfrozen */
     image.used = 5u;
     errno = 0;
-    assert(hpclang_object_snapshot_copy(
-               &reader, 0u, image.used, &object) == -1);
+    assert(hpclang_object_snapshot_copy(&reader, 0u, image.used, &object) == -1);
     assert(object == NULL);
     assert(errno == ENOTSUP);
 
@@ -359,8 +334,7 @@ static void test_errors(void)
     put_nibbles(&image, 5u, 4u, 5u); /* invalid self-relative length */
     image.used = 10u;
     errno = 0;
-    assert(hpclang_object_snapshot_copy(
-               &reader, 0u, image.used, &object) == -1);
+    assert(hpclang_object_snapshot_copy(&reader, 0u, image.used, &object) == -1);
     assert(object == NULL);
     assert(errno == EILSEQ);
 }

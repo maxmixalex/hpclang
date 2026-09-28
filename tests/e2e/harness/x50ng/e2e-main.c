@@ -10,6 +10,8 @@
 #include "module.h"
 #include "options.h"
 #include "timer.h"
+#include "timed-sequence.h"
+#include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
@@ -21,7 +23,6 @@
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define PHASE_KEYBOARD_READY 0x4b425244u
-#define PHASE_KEYBOARD_ACK 0x4b410000u
 
 #define TEST_RAM_SIZE 0x00100000u
 #define TEST_PHYS 0x70000000u
@@ -47,10 +48,10 @@
 #define POWER_MPLLCON_VA 0x07200004u
 #define POWER_CLKSLOW_VA 0x07200010u
 #define POWER_CLKDIVN_VA 0x07200014u
-#define TIMER_TCFG0_VA   0x07600000u
-#define TIMER_TCFG1_VA   0x07600004u
-#define TIMER_TCON_VA    0x07600008u
-#define TIMER_TCNTB0_VA  0x0760000cu
+#define TIMER_TCFG0_VA 0x07600000u
+#define TIMER_TCFG1_VA 0x07600004u
+#define TIMER_TCON_VA 0x07600008u
+#define TIMER_TCNTB0_VA 0x0760000cu
 
 #define COARSE_FLAGS 0x11u
 #define SMALL_FLAGS 0x0ffeu
@@ -58,8 +59,11 @@
 #define BOOT_NO_US 2000000LL
 #define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
+#define BEFORE_CAPTURE_SETTLE_US 2000000LL
 #define KEY_HOLD_US 50000LL
 #define KEYBOARD_FIRST_DELAY_US 20000LL
+#define KEYBOARD_STEP_US 120000LL
+#define KEYBOARD_CAPTURE_DELAY_US 10000LL
 #define POLL_US 20000LL
 #define DEADLINE_US 16000000LL
 #define RETURN_ON_US 200000LL
@@ -67,12 +71,14 @@
 #define RETURN_DEADLINE_US 2000000LL
 #define RETURN_STABLE_OBSERVATIONS 4u
 
-struct key_action {
+struct key_action
+{
     int key;
     int down;
 };
 
-struct cpu_snapshot {
+struct cpu_snapshot
+{
     uint32_t regs[16];
     uint32_t cpsr;
     uint32_t spsr;
@@ -88,7 +94,8 @@ struct cpu_snapshot {
  * must leave untouched. Interrupt pending/source registers are deliberately
  * excluded because they are dynamic status rather than configuration.
  */
-struct lcd_snapshot {
+struct lcd_snapshot
+{
     uint32_t lcdcon1;
     uint32_t lcdcon2;
     uint32_t lcdcon3;
@@ -106,8 +113,13 @@ struct lcd_snapshot {
     uint32_t lpcsel;
 };
 
-struct e2e {
+struct e2e
+{
     hdw_t *hdw;
+    struct hpclang_timed_sequence return_keys;
+    struct hpclang_timed_sequence keyboard;
+    struct hpclang_timed_sequence boot;
+    struct hpclang_ready_window before_ready;
     uint8_t *stage0;
     size_t stage0_size;
     uint32_t result_addr;
@@ -138,8 +150,6 @@ struct e2e {
     uint32_t result;
     int saw_pass;
     int payload_keyboard_scheduled;
-    size_t payload_keyboard_sent;
-    size_t payload_keyboard_captured;
     int returned;
     int failed;
     int lcd_height;
@@ -147,79 +157,46 @@ struct e2e {
     int64_t return_deadline;
 };
 
-static const struct key_action f_down = { HP4950_KEY_F, 1 };
-static const struct key_action f_up = { HP4950_KEY_F, 0 };
-static const struct key_action on_down = { HP4950_KEY_ON, 1 };
-static const struct key_action on_up = { HP4950_KEY_ON, 0 };
-
-static const int keyboard_codes[] = {
-    HP4950_KEY_BACKSPACE,
-    HP4950_KEY_U,
-    HP4950_KEY_Z,
-    HP4950_KEY_MULTIPLY,
-    HP4950_KEY_MINUS,
-    HP4950_KEY_PLUS,
-    HP4950_KEY_ENTER,
-    HP4950_KEY_P,
-    HP4950_KEY_T,
-    HP4950_KEY_Y,
-    HP4950_KEY_9,
-    HP4950_KEY_6,
-    HP4950_KEY_3,
-    HP4950_KEY_SPACE,
-    HP4950_KEY_O,
-    HP4950_KEY_S,
-    HP4950_KEY_X,
-    HP4950_KEY_8,
-    HP4950_KEY_5,
-    HP4950_KEY_2,
-    HP4950_KEY_PERIOD,
-    HP4950_KEY_N,
-    HP4950_KEY_R,
-    HP4950_KEY_W,
-    HP4950_KEY_7,
-    HP4950_KEY_4,
-    HP4950_KEY_1,
-    HP4950_KEY_0,
-    HP4950_KEY_M,
-    HP4950_KEY_Q,
-    HP4950_KEY_V,
-    HP4950_KEY_A,
-    HP4950_KEY_B,
-    HP4950_KEY_C,
-    HP4950_KEY_D,
-    HP4950_KEY_E,
-    HP4950_KEY_F,
-    HP4950_KEY_G,
-    HP4950_KEY_UP,
-    HP4950_KEY_LEFT,
-    HP4950_KEY_DOWN,
-    HP4950_KEY_RIGHT,
-    HP4950_KEY_H,
-    HP4950_KEY_I,
-    HP4950_KEY_J,
-    HP4950_KEY_K,
-    HP4950_KEY_L,
-    HP4950_KEY_ON,
-    HP4950_KEY_ALPHA,
-    HP4950_KEY_LEFTSHIFT,
-    HP4950_KEY_RIGHTSHIFT,
+struct keyboard_capture_event
+{
+    struct e2e *state;
+    size_t index;
 };
 
-static struct key_action keyboard_down[
-    sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
-static struct key_action keyboard_up[
-    sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
+static const struct key_action f_down = {HP4950_KEY_F, 1};
+static const struct key_action f_up = {HP4950_KEY_F, 0};
+static const struct key_action home_down = {HP4950_KEY_J, 1};
+static const struct key_action home_up = {HP4950_KEY_J, 0};
+static const struct key_action on_down = {HP4950_KEY_ON, 1};
+static const struct key_action on_up = {HP4950_KEY_ON, 0};
+
+static const int keyboard_codes[] = {
+    HP4950_KEY_BACKSPACE, HP4950_KEY_U,         HP4950_KEY_Z,          HP4950_KEY_MULTIPLY,
+    HP4950_KEY_MINUS,     HP4950_KEY_PLUS,      HP4950_KEY_ENTER,      HP4950_KEY_P,
+    HP4950_KEY_T,         HP4950_KEY_Y,         HP4950_KEY_9,          HP4950_KEY_6,
+    HP4950_KEY_3,         HP4950_KEY_SPACE,     HP4950_KEY_O,          HP4950_KEY_S,
+    HP4950_KEY_X,         HP4950_KEY_8,         HP4950_KEY_5,          HP4950_KEY_2,
+    HP4950_KEY_PERIOD,    HP4950_KEY_N,         HP4950_KEY_R,          HP4950_KEY_W,
+    HP4950_KEY_7,         HP4950_KEY_4,         HP4950_KEY_1,          HP4950_KEY_0,
+    HP4950_KEY_M,         HP4950_KEY_Q,         HP4950_KEY_V,          HP4950_KEY_A,
+    HP4950_KEY_B,         HP4950_KEY_C,         HP4950_KEY_D,          HP4950_KEY_E,
+    HP4950_KEY_F,         HP4950_KEY_G,         HP4950_KEY_UP,         HP4950_KEY_LEFT,
+    HP4950_KEY_DOWN,      HP4950_KEY_RIGHT,     HP4950_KEY_H,          HP4950_KEY_I,
+    HP4950_KEY_J,         HP4950_KEY_K,         HP4950_KEY_L,          HP4950_KEY_ON,
+    HP4950_KEY_ALPHA,     HP4950_KEY_LEFTSHIFT, HP4950_KEY_RIGHTSHIFT,
+};
+
+static struct key_action keyboard_down[sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
+static struct key_action keyboard_up[sizeof(keyboard_codes) / sizeof(keyboard_codes[0])];
+static struct keyboard_capture_event
+    keyboard_capture_events[sizeof(keyboard_codes) / sizeof(keyboard_codes[0]) + 1u];
 
 static int guest_read32(hdw_t *h, uint32_t va, uint32_t *v)
 {
     uint8_t b[4];
     if (cpu_memory_rw_debug(h->cpu, va, b, 4, 0) != 0)
         return 0;
-    *v = (uint32_t)b[0] |
-         ((uint32_t)b[1] << 8) |
-         ((uint32_t)b[2] << 16) |
-         ((uint32_t)b[3] << 24);
+    *v = (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
     return 1;
 }
 
@@ -247,9 +224,12 @@ static unsigned capture_lcd(hdw_t *h, const char *path, int height)
         for (int x = 0; x < LCD_W; ++x) {
             int level = s3c2410_get_pixel_color(h->s3c2410_lcd, x, y);
             uint8_t pixel;
-            if (level < 0) level = 0;
-            if (level > 15) level = 15;
-            if (level) ++nonzero;
+            if (level < 0)
+                level = 0;
+            if (level > 15)
+                level = 15;
+            if (level)
+                ++nonzero;
             pixel = (uint8_t)(255 - 17 * level);
             fwrite(&pixel, 1, 1, f);
         }
@@ -258,20 +238,19 @@ static unsigned capture_lcd(hdw_t *h, const char *path, int height)
     return nonzero;
 }
 
-static int capture_keyboard_progress(struct e2e *s, size_t index)
+static int64_t capture_keyboard_frame(void *arg)
 {
+    const struct keyboard_capture_event *event = arg;
     const char *dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
     char path[512];
 
     if (dir == NULL || *dir == '\0')
-        return 1;
-    snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, index);
-    if (!capture_lcd(s->hdw, path, s->lcd_height)) {
-        fprintf(stderr,
-                "blank keyboard progress capture %zu\n", index);
         return 0;
+    snprintf(path, sizeof(path), "%s/%02zu.pgm", dir, event->index);
+    if (!capture_lcd(event->state->hdw, path, event->state->lcd_height)) {
+        fprintf(stderr, "blank keyboard progress capture %zu\n", event->index);
     }
-    return 1;
+    return 0;
 }
 
 static int later(timer_callback_t fn, void *arg, int64_t us)
@@ -286,58 +265,70 @@ static int later(timer_callback_t fn, void *arg, int64_t us)
 static void key_cb(void *arg)
 {
     const struct key_action *a = arg;
-    if (a->down) press_key(a->key);
-    else release_key(a->key);
+    if (a->down)
+        press_key(a->key);
+    else
+        release_key(a->key);
 }
 
-static int tap(
-    const struct key_action *down,
-    const struct key_action *up,
-    int64_t us)
+static int64_t timed_key_cb(void *arg)
 {
-    return later(key_cb, (void *)down, us) &&
-           later(key_cb, (void *)up, us + KEY_HOLD_US);
+    key_cb(arg);
+    return 0;
 }
 
-static int schedule_payload_keyboard_key(
-    struct e2e *s,
-    size_t index)
+static int tap(struct e2e *s, const struct key_action *down, const struct key_action *up,
+               int64_t us)
 {
-    size_t count = sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
-    if (index >= count)
-        return 0;
-
-    keyboard_down[index].key = keyboard_codes[index];
-    keyboard_down[index].down = 1;
-    keyboard_up[index].key = keyboard_codes[index];
-    keyboard_up[index].down = 0;
-
-    if (!later(
-            key_cb, &keyboard_down[index],
-            KEYBOARD_FIRST_DELAY_US) ||
-        !later(
-            key_cb, &keyboard_up[index],
-            KEYBOARD_FIRST_DELAY_US + KEY_HOLD_US))
-        return 0;
-
-    s->payload_keyboard_sent = index + 1u;
-    return 1;
+    return hpclang_event_add(&s->return_keys.events, us, timed_key_cb, (void *)down) &&
+           hpclang_event_add(&s->return_keys.events, us + KEY_HOLD_US, timed_key_cb, (void *)up) &&
+           hpclang_sequence_start(&s->return_keys);
 }
 
 static int schedule_payload_keyboard(struct e2e *s)
 {
     size_t count = sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
+    const char *keyboard_dir = getenv("HPCLANG_X50NG_KEYBOARD_DIR");
+    int capture_progress = keyboard_dir != NULL && *keyboard_dir != '\0';
 
     if (s->payload_keyboard_scheduled)
         return 1;
-    if (count == 0u || !schedule_payload_keyboard_key(s, 0u))
-        return 0;
 
+    if (capture_progress) {
+        keyboard_capture_events[0].state = s;
+        keyboard_capture_events[0].index = 0u;
+        if (!hpclang_event_add(&s->keyboard.events, KEYBOARD_CAPTURE_DELAY_US,
+                               capture_keyboard_frame, &keyboard_capture_events[0]))
+            return 0;
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+        keyboard_down[i].key = keyboard_codes[i];
+        keyboard_down[i].down = 1;
+        keyboard_up[i].key = keyboard_codes[i];
+        keyboard_up[i].down = 0;
+
+        int64_t press_us = KEYBOARD_FIRST_DELAY_US + (int64_t)i * KEYBOARD_STEP_US;
+        if (!hpclang_event_add(&s->keyboard.events, press_us, timed_key_cb, &keyboard_down[i]) ||
+            !hpclang_event_add(&s->keyboard.events, press_us + KEY_HOLD_US, timed_key_cb,
+                               &keyboard_up[i]))
+            return 0;
+
+        if (capture_progress) {
+            keyboard_capture_events[i + 1u].state = s;
+            keyboard_capture_events[i + 1u].index = i + 1u;
+            if (!hpclang_event_add(&s->keyboard.events,
+                                   press_us + KEY_HOLD_US + KEYBOARD_CAPTURE_DELAY_US,
+                                   capture_keyboard_frame, &keyboard_capture_events[i + 1u]))
+                return 0;
+        }
+    }
+
+    if (!hpclang_sequence_start(&s->keyboard))
+        return 0;
     s->payload_keyboard_scheduled = 1;
-    fprintf(stderr,
-            "HPC1 keyboard phase reached; started %zu-key "
-            "acknowledged sequence\n",
-            count);
+    fprintf(stderr, "HPC1 keyboard phase reached; scheduled %zu keys%s\n", count,
+            capture_progress ? " with merged-progress evidence" : "");
     return 1;
 }
 
@@ -371,7 +362,8 @@ static uint8_t *load_file(const char *path, size_t *size)
     uint8_t *buf;
     long n;
 
-    if (f == NULL) return NULL;
+    if (f == NULL)
+        return NULL;
     if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return NULL;
@@ -403,19 +395,13 @@ static int map_test_ram(struct e2e *s)
     if (off & 0xfffu)
         return 0;
 
-    p = mmap(
-        phys_ram_base + off,
-        TEST_RAM_SIZE,
-        PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
-        -1,
-        0);
+    p = mmap(phys_ram_base + off, TEST_RAM_SIZE, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
     if (p == MAP_FAILED)
         return 0;
 
     memset(p, 0, TEST_RAM_SIZE);
-    cpu_register_physical_memory(
-        TEST_PHYS, TEST_RAM_SIZE, (ram_addr_t)off | IO_MEM_RAM);
+    cpu_register_physical_memory(TEST_PHYS, TEST_RAM_SIZE, (ram_addr_t)off | IO_MEM_RAM);
     tb_flush(s->hdw->cpu);
     tlb_flush(s->hdw->cpu, 1);
     return 1;
@@ -424,8 +410,7 @@ static int map_test_ram(struct e2e *s)
 static int build_launcher_ram(struct e2e *s)
 {
     const uint32_t stage0_phys = INJECT_PHYS + 0x1000u;
-    const uint32_t sentinel_phys =
-        INJECT_PHYS + (INJECT_PAGES - 1u) * 0x1000u;
+    const uint32_t sentinel_phys = INJECT_PHYS + (INJECT_PAGES - 1u) * 0x1000u;
     /* Reserve page 62 for the synthetic outer-launcher stack and page 63
      * for the return sentinel. */
     const size_t max_stage0 = (INJECT_PAGES - 3u) * 0x1000u;
@@ -434,16 +419,12 @@ static int build_launcher_ram(struct e2e *s)
         return 0;
 
     for (uint32_t i = 0; i < 256u; ++i) {
-        uint32_t d = i < STAGE_PAGES
-            ? (STAGE_PHYS + i * 0x1000u) | SMALL_FLAGS
-            : 0;
+        uint32_t d = i < STAGE_PAGES ? (STAGE_PHYS + i * 0x1000u) | SMALL_FLAGS : 0;
         stl_phys(STAGE_PHYS + i * 4u, d);
     }
 
     for (uint32_t i = 0; i < 256u; ++i) {
-        uint32_t d = i < INJECT_PAGES
-            ? (INJECT_PHYS + i * 0x1000u) | SMALL_FLAGS
-            : 0;
+        uint32_t d = i < INJECT_PAGES ? (INJECT_PHYS + i * 0x1000u) | SMALL_FLAGS : 0;
         stl_phys(INJECT_L2_PHYS + i * 4u, d);
     }
 
@@ -451,8 +432,7 @@ static int build_launcher_ram(struct e2e *s)
     stl_phys(INJECT_PHYS + 0x918u, 0);
     stl_phys(INJECT_PHYS + 0x920u, STAGE_PHYS);
 
-    cpu_physical_memory_write(
-        stage0_phys, s->stage0, (int)s->stage0_size);
+    cpu_physical_memory_write(stage0_phys, s->stage0, (int)s->stage0_size);
     stl_phys(sentinel_phys, 0xeafffffeu);
     tb_flush(s->hdw->cpu);
     return 1;
@@ -461,13 +441,10 @@ static int build_launcher_ram(struct e2e *s)
 static uint32_t lcd_framebuffer_phys(struct e2e *s)
 {
     uint32_t v = ((s3c2410_lcd_t *)s->hdw->s3c2410_lcd)->lcdsaddr1;
-    return ((v << 1) & 0x7fc00000u) |
-           ((v << 1) & 0x003ffffeu);
+    return ((v << 1) & 0x7fc00000u) | ((v << 1) & 0x003ffffeu);
 }
 
-static void snapshot_lcd(
-    const s3c2410_lcd_t *lcd,
-    struct lcd_snapshot *snapshot)
+static void snapshot_lcd(const s3c2410_lcd_t *lcd, struct lcd_snapshot *snapshot)
 {
     snapshot->lcdcon1 = lcd->lcdcon1;
     snapshot->lcdcon2 = lcd->lcdcon2;
@@ -486,16 +463,15 @@ static void snapshot_lcd(
     snapshot->lpcsel = lcd->lpcsel;
 }
 
-static uint32_t lcd_diff_mask(
-    const struct lcd_snapshot *expected,
-    const struct lcd_snapshot *actual)
+static uint32_t lcd_diff_mask(const struct lcd_snapshot *expected,
+                              const struct lcd_snapshot *actual)
 {
     uint32_t mask = 0u;
 
-#define LCD_DIFF(bit, field) \
-    do { \
-        if (expected->field != actual->field) \
-            mask |= UINT32_C(1) << (bit); \
+#define LCD_DIFF(bit, field)                                                                       \
+    do {                                                                                           \
+        if (expected->field != actual->field)                                                      \
+            mask |= UINT32_C(1) << (bit);                                                          \
     } while (0)
 
     LCD_DIFF(0, lcdcon1);
@@ -522,15 +498,11 @@ static uint32_t lcd_diff_mask(
 static uint32_t check_lcd_state(struct e2e *s)
 {
     struct lcd_snapshot current;
-    snapshot_lcd(
-        (const s3c2410_lcd_t *)s->hdw->s3c2410_lcd,
-        &current);
+    snapshot_lcd((const s3c2410_lcd_t *)s->hdw->s3c2410_lcd, &current);
 
     uint32_t diff = lcd_diff_mask(&s->stock_lcd, &current);
     if (diff != 0u) {
-        fprintf(stderr,
-                "LCD configuration changed before stock restore: 0x%08x\n",
-                diff);
+        fprintf(stderr, "LCD configuration changed before stock restore: 0x%08x\n", diff);
     }
     return diff;
 }
@@ -567,13 +539,11 @@ static int snapshot_stock(struct e2e *s)
     uint32_t fb_bytes = 160u * (uint32_t)s->lcd_height / 8u;
 
     if (s->old_inject != 0u) {
-        fprintf(stderr, "synthetic L1 slot 0x300 is not empty: %08x\n",
-                s->old_inject);
+        fprintf(stderr, "synthetic L1 slot 0x300 is not empty: %08x\n", s->old_inject);
         return 0;
     }
 
-    if (inject_desc_phys + 4u > fb_phys &&
-        inject_desc_phys < fb_phys + fb_bytes) {
+    if (inject_desc_phys + 4u > fb_phys && inject_desc_phys < fb_phys + fb_bytes) {
         fprintf(stderr,
                 "synthetic L1 descriptor overlaps LCD framebuffer: "
                 "desc=%08x fb=%08x..%08x\n",
@@ -582,9 +552,7 @@ static int snapshot_stock(struct e2e *s)
     }
 
     snapshot_cpu(&s->stock, s->hdw->cpu);
-    snapshot_lcd(
-        (const s3c2410_lcd_t *)s->hdw->s3c2410_lcd,
-        &s->stock_lcd);
+    snapshot_lcd((const s3c2410_lcd_t *)s->hdw->s3c2410_lcd, &s->stock_lcd);
     s->lcd_state_diff = 0u;
     return 1;
 }
@@ -592,8 +560,7 @@ static int snapshot_stock(struct e2e *s)
 static int return_is_settled(const struct e2e *s)
 {
     return s->return_quiescence.changed_from_baseline &&
-           s->return_quiescence.stable_observations >=
-               RETURN_STABLE_OBSERVATIONS;
+           s->return_quiescence.stable_observations >= RETURN_STABLE_OBSERVATIONS;
 }
 
 static void json(struct e2e *s, const char *status)
@@ -605,7 +572,8 @@ static void json(struct e2e *s, const char *status)
     uint32_t inject = 0xffffffffu;
     uint32_t swi = 0xffffffffu;
 
-    if (f == NULL) return;
+    if (f == NULL)
+        return;
     (void)guest_read32(s->hdw, L1_DATA_VA, &data);
     (void)guest_read32(s->hdw, L1_CODE_VA, &code);
     (void)guest_read32(s->hdw, L1_STAGE_VA, &stage);
@@ -617,74 +585,52 @@ static void json(struct e2e *s, const char *status)
     uint32_t inject_phys_desc = ldl_phys(l1_phys_base + 0x0c00u);
     uint32_t lcdsaddr1 = ((s3c2410_lcd_t *)s->hdw->s3c2410_lcd)->lcdsaddr1;
     uint32_t fb_phys = lcd_framebuffer_phys(s);
-    uint32_t inject_desc_addr =
-        (s->hdw->cpu->cp15.c2_base0 & 0xffffc000u) + 0x0c00u;
+    uint32_t inject_desc_addr = (s->hdw->cpu->cp15.c2_base0 & 0xffffc000u) + 0x0c00u;
 
-    fprintf(
-        f,
-        "{\n"
-        "  \"status\":\"%s\",\n"
-        "  \"result\":\"0x%08x\",\n"
-        "  \"saw_pass\":%s,\n"
-        "  \"payload_keyboard_scheduled\":%s,\n"
-        "  \"returned\":%s,\n"
-        "  \"return_settled\":%s,\n"
-        "  \"return_observations\":%u,\n"
-        "  \"pc\":\"0x%08x\",\n"
-        "  \"saved_pc\":\"0x%08x\",\n"
-        "  \"l1_data\":\"0x%08x\",\n"
-        "  \"l1_code\":\"0x%08x\",\n"
-        "  \"l1_stage\":\"0x%08x\",\n"
-        "  \"l1_inject\":\"0x%08x\",\n"
-        "  \"swi\":\"0x%08x\",\n"
-        "  \"saved_swi\":\"0x%08x\",\n"
-        "  \"ttbr0\":\"0x%08x\",\n"
-        "  \"inject_phys_desc\":\"0x%08x\",\n"
-        "  \"cpsr\":\"0x%08x\",\n"
-        "  \"sp\":\"0x%08x\",\n"
-        "  \"lr\":\"0x%08x\",\n"
-        "  \"ifsr\":\"0x%08x\",\n"
-        "  \"ifar\":\"0x%08x\",\n"
-        "  \"lcdsaddr1\":\"0x%08x\",\n"
-        "  \"framebuffer_phys\":\"0x%08x\",\n"
-        "  \"inject_desc_phys\":\"0x%08x\",\n"
-        "  \"stock_mpllcon\":\"0x%08x\",\n"
-        "  \"stock_clkslow\":\"0x%08x\",\n"
-        "  \"stock_clkdivn\":\"0x%08x\",\n"
-        "  \"stock_tcfg0\":\"0x%08x\",\n"
-        "  \"stock_tcfg1\":\"0x%08x\",\n"
-        "  \"stock_tcon\":\"0x%08x\",\n"
-        "  \"stock_tcntb0\":\"0x%08x\",\n"
-        "  \"lcd_state_diff\":\"0x%08x\"\n"
-        "}\n",
-        status,
-        s->result,
-        s->saw_pass ? "true" : "false",
-        s->payload_keyboard_scheduled ? "true" : "false",
-        s->returned ? "true" : "false",
-        return_is_settled(s) ? "true" : "false",
-        s->return_quiescence.observations,
-        s->hdw->cpu->regs[15],
-        s->stock.regs[15],
-        data, code, stage, inject, swi, s->old_swi,
-        ttbr0,
-        inject_phys_desc,
-        cpsr_read(s->hdw->cpu),
-        s->hdw->cpu->regs[13],
-        s->hdw->cpu->regs[14],
-        s->hdw->cpu->cp15.c5_insn,
-        s->hdw->cpu->cp15.c6_insn,
-        lcdsaddr1,
-        fb_phys,
-        inject_desc_addr,
-        s->stock_mpllcon,
-        s->stock_clkslow,
-        s->stock_clkdivn,
-        s->stock_tcfg0,
-        s->stock_tcfg1,
-        s->stock_tcon,
-        s->stock_tcntb0,
-        s->lcd_state_diff);
+    fprintf(f,
+            "{\n"
+            "  \"status\":\"%s\",\n"
+            "  \"result\":\"0x%08x\",\n"
+            "  \"saw_pass\":%s,\n"
+            "  \"payload_keyboard_scheduled\":%s,\n"
+            "  \"returned\":%s,\n"
+            "  \"return_settled\":%s,\n"
+            "  \"return_observations\":%u,\n"
+            "  \"pc\":\"0x%08x\",\n"
+            "  \"saved_pc\":\"0x%08x\",\n"
+            "  \"l1_data\":\"0x%08x\",\n"
+            "  \"l1_code\":\"0x%08x\",\n"
+            "  \"l1_stage\":\"0x%08x\",\n"
+            "  \"l1_inject\":\"0x%08x\",\n"
+            "  \"swi\":\"0x%08x\",\n"
+            "  \"saved_swi\":\"0x%08x\",\n"
+            "  \"ttbr0\":\"0x%08x\",\n"
+            "  \"inject_phys_desc\":\"0x%08x\",\n"
+            "  \"cpsr\":\"0x%08x\",\n"
+            "  \"sp\":\"0x%08x\",\n"
+            "  \"lr\":\"0x%08x\",\n"
+            "  \"ifsr\":\"0x%08x\",\n"
+            "  \"ifar\":\"0x%08x\",\n"
+            "  \"lcdsaddr1\":\"0x%08x\",\n"
+            "  \"framebuffer_phys\":\"0x%08x\",\n"
+            "  \"inject_desc_phys\":\"0x%08x\",\n"
+            "  \"stock_mpllcon\":\"0x%08x\",\n"
+            "  \"stock_clkslow\":\"0x%08x\",\n"
+            "  \"stock_clkdivn\":\"0x%08x\",\n"
+            "  \"stock_tcfg0\":\"0x%08x\",\n"
+            "  \"stock_tcfg1\":\"0x%08x\",\n"
+            "  \"stock_tcon\":\"0x%08x\",\n"
+            "  \"stock_tcntb0\":\"0x%08x\",\n"
+            "  \"lcd_state_diff\":\"0x%08x\"\n"
+            "}\n",
+            status, s->result, s->saw_pass ? "true" : "false",
+            s->payload_keyboard_scheduled ? "true" : "false", s->returned ? "true" : "false",
+            return_is_settled(s) ? "true" : "false", s->return_quiescence.observations,
+            s->hdw->cpu->regs[15], s->stock.regs[15], data, code, stage, inject, swi, s->old_swi,
+            ttbr0, inject_phys_desc, cpsr_read(s->hdw->cpu), s->hdw->cpu->regs[13],
+            s->hdw->cpu->regs[14], s->hdw->cpu->cp15.c5_insn, s->hdw->cpu->cp15.c6_insn, lcdsaddr1,
+            fb_phys, inject_desc_addr, s->stock_mpllcon, s->stock_clkslow, s->stock_clkdivn,
+            s->stock_tcfg0, s->stock_tcfg1, s->stock_tcon, s->stock_tcntb0, s->lcd_state_diff);
     fclose(f);
 }
 
@@ -700,16 +646,11 @@ static int restore_stock(struct e2e *s)
 {
     uint32_t data, code, stage, swi;
 
-    if (!guest_read32(s->hdw, L1_DATA_VA, &data) ||
-        !guest_read32(s->hdw, L1_CODE_VA, &code) ||
-        !guest_read32(s->hdw, L1_STAGE_VA, &stage) ||
-        !guest_read32(s->hdw, SWI_VECTOR_VA, &swi))
+    if (!guest_read32(s->hdw, L1_DATA_VA, &data) || !guest_read32(s->hdw, L1_CODE_VA, &code) ||
+        !guest_read32(s->hdw, L1_STAGE_VA, &stage) || !guest_read32(s->hdw, SWI_VECTOR_VA, &swi))
         return 0;
 
-    if (data != s->old_data ||
-        code != s->old_code ||
-        stage != s->old_stage ||
-        swi != s->old_swi)
+    if (data != s->old_data || code != s->old_code || stage != s->old_stage || swi != s->old_swi)
         return 0;
 
     if (!guest_write32(s->hdw, L1_INJECT_VA, s->old_inject))
@@ -734,14 +675,9 @@ static void finish_return(void *arg)
         return;
     }
 
-    if (hpclang_lcd_quiescence_observe(
-            &s->return_quiescence,
-            s->hdw,
-            LCD_W,
-            s->lcd_height,
-            RETURN_STABLE_OBSERVATIONS)) {
-        unsigned pixels = capture_lcd(
-            s->hdw, s->return_pgm, s->lcd_height);
+    if (hpclang_lcd_quiescence_observe(&s->return_quiescence, s->hdw, LCD_W, s->lcd_height,
+                                       RETURN_STABLE_OBSERVATIONS)) {
+        unsigned pixels = capture_lcd(s->hdw, s->return_pgm, s->lcd_height);
         if (pixels == 0u) {
             fail(s, "stock-resume");
             return;
@@ -770,57 +706,14 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
-        size_t keyboard_count =
-            sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
-
         if (!s->payload_keyboard_scheduled && v == PHASE_KEYBOARD_READY) {
-            if (!capture_keyboard_progress(s, 0u)) {
-                fail(s, "keyboard-capture");
-                return;
-            }
             if (!schedule_payload_keyboard(s)) {
                 fail(s, "keyboard-schedule");
                 return;
             }
-        } else if (s->payload_keyboard_scheduled &&
-                   (v & 0xffff0000u) == PHASE_KEYBOARD_ACK) {
-            size_t ack = (size_t)(v & 0xffffu);
-            if (ack == 0u ||
-                ack > keyboard_count ||
-                ack > s->payload_keyboard_sent) {
-                fail(s, "keyboard-ack");
-                return;
-            }
-            if (ack > s->payload_keyboard_captured) {
-                if (!capture_keyboard_progress(s, ack)) {
-                    fail(s, "keyboard-capture");
-                    return;
-                }
-                s->payload_keyboard_captured = ack;
-            }
-            if (ack == s->payload_keyboard_sent &&
-                ack < keyboard_count) {
-                if (!schedule_payload_keyboard_key(s, ack)) {
-                    fail(s, "keyboard-schedule");
-                    return;
-                }
-            }
         } else if (!s->saw_pass && v == PASS_WORD) {
             s->result = v;
             s->saw_pass = 1;
-            /*
-             * The final UP can be followed by PASS before the monitor sees
-             * KACK(51). PASS is authoritative evidence that the payload
-             * accepted all 51 DOWN->UP pairs.
-             */
-            if (s->payload_keyboard_scheduled &&
-                s->payload_keyboard_captured < keyboard_count) {
-                if (!capture_keyboard_progress(s, keyboard_count)) {
-                    fail(s, "keyboard-capture");
-                    return;
-                }
-                s->payload_keyboard_captured = keyboard_count;
-            }
             if (!capture_lcd(s->hdw, s->pass_pgm, s->lcd_height)) {
                 fail(s, "pass-capture");
                 return;
@@ -841,18 +734,30 @@ static void monitor(void *arg)
             return;
         }
 
-        hpclang_lcd_quiescence_seed(
-            &s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
+        hpclang_lcd_quiescence_seed(&s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
         if (!restore_stock(s)) {
             fail(s, "restore");
             return;
         }
         s->return_deadline = timer_get_clock() + RETURN_DEADLINE_US;
-        if (!tap(&on_down, &on_up, RETURN_ON_US) ||
-            !later(
-                finish_return,
-                s,
-                RETURN_ON_US + KEY_HOLD_US + RETURN_POLL_US))
+
+        /*
+         * HP39g+ D1.55 resumes the saved Stock PC cleanly but does not repaint
+         * its static Aplet view in response to ON alone.  A HOME key press is
+         * a model-native, non-destructive repaint request and is already
+         * covered by the validated model-1 keyboard mapping.  HP39gs/40gs and
+         * the RPL family retain the historical ON nudge.
+         */
+        const char *target = getenv("TARGET");
+        const struct key_action *return_down = &on_down;
+        const struct key_action *return_up = &on_up;
+        if (target != NULL && strcmp(target, "hp39gplus") == 0) {
+            return_down = &home_down;
+            return_up = &home_up;
+        }
+
+        if (!tap(s, return_down, return_up, RETURN_ON_US) ||
+            !later(finish_return, s, RETURN_ON_US + KEY_HOLD_US + RETURN_POLL_US))
             fail(s, "return-timer");
         return;
     }
@@ -861,36 +766,34 @@ static void monitor(void *arg)
         fail(s, "monitor-timer");
 }
 
-static void inject(void *arg)
+static int64_t inject(void *arg)
 {
     struct e2e *s = arg;
     CPUARMState *cpu = s->hdw->cpu;
 
-    if (!map_test_ram(s) ||
-        !build_launcher_ram(s) ||
-        !snapshot_stock(s)) {
+    int ready = hpclang_ready_observe(&s->before_ready, timer_get_clock(), BEFORE_CAPTURE_SETTLE_US,
+                                      capture_lcd(s->hdw, s->before_pgm, s->lcd_height) != 0);
+    if (ready == 0)
+        return POLL_US;
+    if (ready < 0) {
+        fail(s, "before-capture");
+        return -1;
+    }
+    if (!map_test_ram(s) || !build_launcher_ram(s) || !snapshot_stock(s)) {
         fail(s, "prepare");
-        return;
+        return -1;
     }
 
-    if (!capture_lcd(s->hdw, s->before_pgm, s->lcd_height)) {
-        fail(s, "before-capture");
-        return;
-    }
-    if (!guest_write32(
-            s->hdw,
-            L1_INJECT_VA,
-            INJECT_L2_PHYS | COARSE_FLAGS)) {
+    if (!guest_write32(s->hdw, L1_INJECT_VA, INJECT_L2_PHYS | COARSE_FLAGS)) {
         fail(s, "inject-l1");
-        return;
+        return -1;
     }
     tlb_flush(cpu, 1);
     tb_flush(cpu);
 
-    if (cpu_get_phys_page_debug(cpu, STAGE0_VA) !=
-        (target_phys_addr_t)(INJECT_PHYS + 0x1000u)) {
+    if (cpu_get_phys_page_debug(cpu, STAGE0_VA) != (target_phys_addr_t)(INJECT_PHYS + 0x1000u)) {
         fail(s, "inject-map");
-        return;
+        return -1;
     }
 
     /*
@@ -902,8 +805,7 @@ static void inject(void *arg)
      * The host restores the exact stock CPU snapshot afterwards.
      */
     uint32_t launch_cpsr =
-        (s->stock.cpsr & (CPSR_NZCV | CPSR_Q | CPSR_GE)) |
-        ARM_CPU_MODE_SYS | CPSR_I | CPSR_F;
+        (s->stock.cpsr & (CPSR_NZCV | CPSR_Q | CPSR_GE)) | ARM_CPU_MODE_SYS | CPSR_I | CPSR_F;
     cpsr_write(cpu, launch_cpsr, 0xffffffffu);
     cpu->regs[13] = SYNTH_STACK_TOP;
     cpu->regs[1] = INJECT_VA;
@@ -917,6 +819,7 @@ static void inject(void *arg)
 
     if (!later(monitor, s, POLL_US))
         fail(s, "monitor-start");
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -957,17 +860,24 @@ int main(int argc, char **argv)
     s.pass_pgm = getenv("HPCLANG_X50NG_PASS_PGM");
     s.return_pgm = getenv("HPCLANG_X50NG_RETURN_PGM");
     s.json = getenv("HPCLANG_X50NG_E2E_JSON");
-    if (!s.before_pgm) s.before_pgm = "before.pgm";
-    if (!s.pass_pgm) s.pass_pgm = "pass.pgm";
-    if (!s.return_pgm) s.return_pgm = "return.pgm";
-    if (!s.json) s.json = "e2e.json";
+    if (!s.before_pgm)
+        s.before_pgm = "before.pgm";
+    if (!s.pass_pgm)
+        s.pass_pgm = "pass.pgm";
+    if (!s.return_pgm)
+        s.return_pgm = "return.pgm";
+    if (!s.json)
+        s.json = "e2e.json";
 
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!tap(&f_down, &f_up, BOOT_NO_US) ||
-        !tap(&f_down, &f_up, BOOT_OK_US) ||
-        !later(inject, &s, INJECT_US)) {
+    if (!hpclang_event_add(&s.boot.events, BOOT_NO_US, timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US, timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US, timed_key_cb, (void *)&f_down) ||
+        !hpclang_event_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US, timed_key_cb, (void *)&f_up) ||
+        !hpclang_event_add(&s.boot.events, INJECT_US, inject, &s) ||
+        !hpclang_sequence_start(&s.boot)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");
         return EXIT_FAILURE;
     }
@@ -976,8 +886,6 @@ int main(int argc, char **argv)
     exit_modules(s.hdw);
     free(s.stage0);
 
-    return (s.failed || !s.saw_pass || !s.returned ||
-            !return_is_settled(&s))
-        ? EXIT_FAILURE
-        : EXIT_SUCCESS;
+    return (s.failed || !s.saw_pass || !s.returned || !return_is_settled(&s)) ? EXIT_FAILURE
+                                                                              : EXIT_SUCCESS;
 }

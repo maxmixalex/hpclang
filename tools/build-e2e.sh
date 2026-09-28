@@ -219,7 +219,7 @@ EOF
 while read -r target model; do
     stage0_extra_defs=()
     if [[ "$MODE" == runtime &&
-          ( "$target" == hp39gs || "$target" == hp40gs ) ]]; then
+          ( "$target" == hp39gplus || "$target" == hp39gs || "$target" == hp40gs ) ]]; then
         # Runtime Stock E2E alone proves the HP39 ARMSYS reverse edge. Direct
         # launchers share this binary but skip the probe because their
         # synthetic ARMSYS block deliberately has no live Saturn Read[] map.
@@ -259,7 +259,7 @@ PY
 )
 
 if [[ "$MODE" == font-gallery ]]; then
-    # prepare-x50ng-gallery.py expands the synthetic injection mapping to 224
+    # The Gallery frontend provides a synthetic injection mapping of 224
     # pages. The frontend reserves three of them around the stage0 image.
     gallery_launcher_limit=$(( (224 - 3) * 4096 ))
     for launcher in "$OUT"/launchers/*.bin; do

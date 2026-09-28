@@ -20,10 +20,7 @@ POLL_SECONDS = 0.1
 
 
 def watchdog_seconds(directory: Path) -> int:
-    total = sum(
-        (directory / name).stat().st_size
-        for name in ("HPGCC000.000", TARGET_FILE)
-    )
+    total = sum((directory / name).stat().st_size for name in ("HPGCC000.000", TARGET_FILE))
     return (
         total + EFFECTIVE_BYTES_PER_SECOND - 1
     ) // EFFECTIVE_BYTES_PER_SECOND + WATCHDOG_MARGIN_SECONDS
@@ -42,8 +39,7 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
     marker.unlink(missing_ok=True)
 
     print(
-        f"waiting for {TARGET_FILE} completion: "
-        f"watchdog={timeout}s log={log_path}",
+        f"waiting for {TARGET_FILE} completion: watchdog={timeout}s log={log_path}",
         flush=True,
     )
 
@@ -62,27 +58,28 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
             chunk = ""
 
         if chunk:
-            buffer = (buffer + chunk)[-16384:]
+            # Search the entire newly read chunk before retaining just the tail:
+            # USB Kermit can append more than 16 KiB between polling intervals.
+            buffer += chunk
             if not saw_target:
                 index = buffer.find(open_token)
                 if index >= 0:
                     saw_target = True
-                    buffer = buffer[index + len(open_token):]
+                    buffer = buffer[index + len(open_token) :]
                     print(f"Kermit opened {TARGET_FILE}", flush=True)
             if saw_target and success_token in buffer:
                 marker.write_text("complete\n", encoding="ascii")
                 print(
-                    f"Kermit completed {TARGET_FILE}; released host gate: "
-                    f"{marker}",
+                    f"Kermit completed {TARGET_FILE}; released host gate: {marker}",
                     flush=True,
                 )
                 return 0
+            buffer = buffer[-16384:]
 
         time.sleep(POLL_SECONDS)
 
     print(
-        f"timed out waiting for successful {TARGET_FILE} EOF "
-        f"after {timeout}s",
+        f"timed out waiting for successful {TARGET_FILE} EOF after {timeout}s",
         flush=True,
     )
     return 1

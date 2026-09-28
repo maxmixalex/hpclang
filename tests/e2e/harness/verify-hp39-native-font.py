@@ -6,6 +6,7 @@ rasters directly from the packed NOR image. It does not call hpclang font code,
 so a broken runtime lookup, extended-code map, or glyph index cannot satisfy the
 check merely by producing non-empty pixels.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -80,11 +81,11 @@ def read_pgm(path: Path) -> Pgm:
         raise ValueError(f"{path}: malformed PGM raster separator")
     # The Gallery writer emits a single '\n'. Accept CRLF without consuming
     # arbitrary leading pixel values that happen to be whitespace bytes.
-    if data[pos:pos + 2] == b"\r\n":
+    if data[pos : pos + 2] == b"\r\n":
         pos += 2
     else:
         pos += 1
-    pixels = data[pos:pos + width * height]
+    pixels = data[pos : pos + width * height]
     if len(pixels) != width * height:
         raise ValueError(f"{path}: truncated PGM raster")
     return Pgm(width=width, height=height, pixels=pixels)
@@ -107,8 +108,7 @@ def saturn_byte(nor: bytes, address: int) -> int:
 
 def verify_editline_fingerprint(nor: bytes, bases: FontBases, target: str) -> None:
     payload = bytes(
-        nibble(nor, bases.editline + offset)
-        for offset in range(EDITLINE_TABLE_NIBBLES)
+        nibble(nor, bases.editline + offset) for offset in range(EDITLINE_TABLE_NIBBLES)
     )
     digest = hashlib.sha256(payload).hexdigest()
     if digest != EDITLINE_REFERENCE_SHA256:
@@ -116,10 +116,7 @@ def verify_editline_fingerprint(nor: bytes, bases: FontBases, target: str) -> No
             f"{target}: HP39 EditLine ROM fingerprint mismatch at "
             f"0x{bases.editline:x}: {digest} != {EDITLINE_REFERENCE_SHA256}"
         )
-    print(
-        f"PASS HP39 EditLine ROM fingerprint: {target} "
-        f"base=0x{bases.editline:x} sha256={digest}"
-    )
+    print(f"PASS HP39 EditLine ROM fingerprint: {target} base=0x{bases.editline:x} sha256={digest}")
 
 
 def mini_index(nor: bytes, base: int, codepoint: int) -> int:
@@ -134,7 +131,9 @@ def mini_index(nor: bytes, base: int, codepoint: int) -> int:
     return cp
 
 
-def render_specimen(nor: bytes, bases: FontBases, kind: str) -> tuple[int, int, frozenset[tuple[int, int]]]:
+def render_specimen(
+    nor: bytes, bases: FontBases, kind: str
+) -> tuple[int, int, frozenset[tuple[int, int]]]:
     points: set[tuple[int, int]] = set()
     pen_x = 0
     if kind == "mini":
@@ -142,9 +141,7 @@ def render_specimen(nor: bytes, bases: FontBases, kind: str) -> tuple[int, int, 
         for cp in SPECIMEN:
             index = mini_index(nor, bases.mini, cp)
             if index >= MINI_GLYPH_COUNT:
-                raise ValueError(
-                    f"mini map U+{cp:04X} returned out-of-atlas index {index}"
-                )
+                raise ValueError(f"mini map U+{cp:04X} returned out-of-atlas index {index}")
             record = bases.mini + index * MINI_RECORD_NIBBLES
             advance = nibble(nor, record) or 4
             for yy in range(height):
@@ -212,14 +209,10 @@ def verify_kind(
     for path in frame_paths:
         pgm = read_pgm(path)
         if pgm.width < CONTENT_LEFT + expected_width:
-            raise ValueError(
-                f"{path}: width {pgm.width} is too small for {kind} specimen"
-            )
+            raise ValueError(f"{path}: width {pgm.width} is too small for {kind} specimen")
         last_y = pgm.height - CONTENT_BOTTOM_MARGIN - expected_height
         for y in range(CONTENT_TOP, last_y + 1):
-            mismatch = mismatch_count(
-                pgm, y, expected_width, expected_height, expected
-            )
+            mismatch = mismatch_count(pgm, y, expected_width, expected_height, expected)
             if mismatch < best[0]:
                 best = (mismatch, path, y)
             if mismatch == 0:

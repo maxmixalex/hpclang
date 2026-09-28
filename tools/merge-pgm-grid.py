@@ -51,12 +51,10 @@ def main() -> None:
         for y in range(height):
             source = y * width
             destination = (y0 + y) * out_width + x0
-            canvas[destination:destination + width] = pixels[source:source + width]
+            canvas[destination : destination + width] = pixels[source : source + width]
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(
-        f"P5\n{out_width} {out_height}\n255\n".encode("ascii") + bytes(canvas)
-    )
+    args.output.write_bytes(f"P5\n{out_width} {out_height}\n255\n".encode("ascii") + bytes(canvas))
     print(f"{args.output}: {len(loaded)} frames -> {out_width}x{out_height}")
 
 

@@ -32,6 +32,7 @@ void __real_hpclang_keyboard_events_reset(void);
 int __real_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event);
 
 static int first_keyboard_read = 1;
+static int keyboard_pending_ready;
 static uint32_t keyboard_ack_count;
 static uint32_t keyboard_pending_ack;
 
@@ -42,8 +43,7 @@ void __wrap_hpclang_keyboard_read(struct hpclang_keyboard_state *state)
         return;
     }
 
-    uint64_t deadline = hpclang_time_monotonic_us() +
-        HPCLANG_E2E_LAUNCH_RELEASE_TIMEOUT_US;
+    uint64_t deadline = hpclang_time_monotonic_us() + HPCLANG_E2E_LAUNCH_RELEASE_TIMEOUT_US;
     do {
         __real_hpclang_keyboard_read(state);
         if (!hpclang_keyboard_any_is_down(state))
@@ -58,15 +58,19 @@ void __wrap_hpclang_keyboard_events_reset(void)
     __real_hpclang_keyboard_events_reset();
     keyboard_ack_count = 0u;
     keyboard_pending_ack = 0u;
-    hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_READY;
+    keyboard_pending_ready = 1;
 }
 
 int __wrap_hpclang_keyboard_event_poll(struct hpclang_keyboard_event *event)
 {
+    /* The caller has drawn the initial keyboard screen before its first poll.
+     * Publishing in reset raced the screen clear/draw with host capture. */
+    if (keyboard_pending_ready) {
+        hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_READY;
+        keyboard_pending_ready = 0;
+    }
     if (keyboard_pending_ack != 0u) {
-        hpclang_e2e_result =
-            HPCLANG_E2E_PHASE_KEYBOARD_ACK |
-            (keyboard_pending_ack & 0xffffu);
+        hpclang_e2e_result = HPCLANG_E2E_PHASE_KEYBOARD_ACK | (keyboard_pending_ack & 0xffffu);
         keyboard_pending_ack = 0u;
     }
 

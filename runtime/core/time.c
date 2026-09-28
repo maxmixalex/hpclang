@@ -7,7 +7,7 @@
 #define XTAL_HZ UINT64_C(12000000)
 #define USEC_PER_SEC UINT64_C(1000000)
 
-#define REG8(address)  (*(volatile uint8_t *)(uintptr_t)(address))
+#define REG8(address) (*(volatile uint8_t *)(uintptr_t)(address))
 #define REG16(address) (*(volatile uint16_t *)(uintptr_t)(address))
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
@@ -15,20 +15,21 @@
 #define CLKSLOW REG32(0x07200010u)
 #define CLKDIVN REG32(0x07200014u)
 
-#define TCFG0  REG32(0x07600000u)
-#define TCFG1  REG32(0x07600004u)
-#define TCON   REG32(0x07600008u)
+#define TCFG0 REG32(0x07600000u)
+#define TCFG1 REG32(0x07600004u)
+#define TCON REG32(0x07600008u)
 #define TCNTB0 REG16(0x0760000cu)
 #define TCNTO0 REG16(0x07600014u)
 
 #define RTC_SECOND REG8(0x07b00070u)
 #define RTC_MINUTE REG8(0x07b00074u)
-#define RTC_HOUR   REG8(0x07b00078u)
-#define RTC_DATE   REG8(0x07b0007cu)
-#define RTC_MONTH  REG8(0x07b00084u)
-#define RTC_YEAR   REG8(0x07b00088u)
+#define RTC_HOUR REG8(0x07b00078u)
+#define RTC_DATE REG8(0x07b0007cu)
+#define RTC_MONTH REG8(0x07b00084u)
+#define RTC_YEAR REG8(0x07b00088u)
 
-struct time_state {
+struct time_state
+{
     uint64_t origin_rtc;
     uint64_t freq_num;
     uint64_t freq_den;
@@ -66,10 +67,7 @@ static int leap_year(unsigned year)
 
 static unsigned days_in_month(unsigned year, unsigned month)
 {
-    static const uint8_t days[] = {
-        31u, 28u, 31u, 30u, 31u, 30u,
-        31u, 31u, 30u, 31u, 30u, 31u
-    };
+    static const uint8_t days[] = {31u, 28u, 31u, 30u, 31u, 30u, 31u, 31u, 30u, 31u, 30u, 31u};
 
     if (month == 2u && leap_year(year))
         return 29u;
@@ -96,10 +94,8 @@ static int rtc_seconds_once(uint64_t *value)
     int minute = bcd(minute_raw & 0x7fu);
     int second = bcd(sec_before & 0x7fu);
 
-    if (year2 < 0 || month < 1 || month > 12 ||
-        date < 1 || hour < 0 || hour > 23 ||
-        minute < 0 || minute > 59 ||
-        second < 0 || second > 59)
+    if (year2 < 0 || month < 1 || month > 12 || date < 1 || hour < 0 || hour > 23 || minute < 0 ||
+        minute > 59 || second < 0 || second > 59)
         return 0;
 
     unsigned year = 2000u + (unsigned)year2;
@@ -117,10 +113,7 @@ static int rtc_seconds_once(uint64_t *value)
     days += (unsigned)date - 1u;
 
     *value =
-        days * UINT64_C(86400) +
-        (uint64_t)hour * 3600u +
-        (uint64_t)minute * 60u +
-        (uint64_t)second;
+        days * UINT64_C(86400) + (uint64_t)hour * 3600u + (uint64_t)minute * 60u + (uint64_t)second;
     return 1;
 }
 
@@ -253,13 +246,8 @@ static int monotonic_now(uint64_t *value)
     if (!sample(&rtc, &count) || rtc < state.origin_rtc)
         return 0;
 
-    uint64_t elapsed = hpclang_time_elapsed_us(
-        rtc - state.origin_rtc,
-        state.origin_count,
-        count,
-        state.period,
-        state.freq_num,
-        state.freq_den);
+    uint64_t elapsed = hpclang_time_elapsed_us(rtc - state.origin_rtc, state.origin_count, count,
+                                               state.period, state.freq_num, state.freq_den);
 
     if (elapsed > state.last_us)
         state.last_us = elapsed;

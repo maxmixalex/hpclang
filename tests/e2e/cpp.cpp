@@ -24,8 +24,12 @@ static const char hpclang_e2e_ui_probe[] = HPCLANG_UI_TEXT("Hp");
 
 volatile int hpclang_e2e_cxx_ctor_probe;
 
-struct hpclang_e2e_probe {
-    hpclang_e2e_probe() { hpclang_e2e_cxx_ctor_probe = 42; }
+struct hpclang_e2e_probe
+{
+    hpclang_e2e_probe()
+    {
+        hpclang_e2e_cxx_ctor_probe = 42;
+    }
 };
 static hpclang_e2e_probe hpclang_e2e_global_probe;
 
@@ -34,10 +38,15 @@ concept hpclang_addable = requires(T a, T b) {
     { a + b } -> std::convertible_to<T>;
 };
 
-template <hpclang_addable T>
-constexpr T hpclang_add(T a, T b) { return a + b; }
+template <hpclang_addable T> constexpr T hpclang_add(T a, T b)
+{
+    return a + b;
+}
 
-consteval int hpclang_compile_time_answer() { return 42; }
+consteval int hpclang_compile_time_answer()
+{
+    return 42;
+}
 
 static bool hpclang_e2e_restore_stack(uint32_t before)
 {
@@ -57,12 +66,10 @@ static int hpclang_e2e_saturn_compat_test()
     if (device == nullptr)
         return 1;
 
-    const bool rpl_family =
-        device->model == HPCLANG_MODEL_HP48GII ||
-        device->model == HPCLANG_MODEL_HP49GPLUS ||
-        device->model == HPCLANG_MODEL_HP50G;
-    const bool live_stock_view =
-        rpl_family && boot != nullptr && boot->saturn_state != 0u;
+    const bool rpl_family = device->model == HPCLANG_MODEL_HP48GII ||
+                            device->model == HPCLANG_MODEL_HP49GPLUS ||
+                            device->model == HPCLANG_MODEL_HP50G;
+    const bool live_stock_view = rpl_family && boot != nullptr && boot->saturn_state != 0u;
     if (!live_stock_view)
         return 0;
 
@@ -75,8 +82,7 @@ static int hpclang_e2e_saturn_compat_test()
         return 3;
     }
     uint32_t depth = 0u;
-    if (hpclang_stack_depth(&depth) != 0 || depth != before + 1u ||
-        sat_pop_zint_llong() != 21 ||
+    if (hpclang_stack_depth(&depth) != 0 || depth != before + 1u || sat_pop_zint_llong() != 21 ||
         !hpclang_e2e_restore_stack(before)) {
         (void)hpclang_e2e_restore_stack(before);
         return 3;
@@ -87,8 +93,7 @@ static int hpclang_e2e_saturn_compat_test()
         return 4;
     }
     double real = sat_pop_real();
-    if (real < 1.49999999999 || real > 1.50000000001 ||
-        !hpclang_e2e_restore_stack(before)) {
+    if (real < 1.49999999999 || real > 1.50000000001 || !hpclang_e2e_restore_stack(before)) {
         (void)hpclang_e2e_restore_stack(before);
         return 4;
     }
@@ -98,8 +103,7 @@ static int hpclang_e2e_saturn_compat_test()
         return 5;
     }
     char string_buffer[16];
-    if (sat_pop_str(string_buffer) != string_buffer ||
-        std::strcmp(string_buffer, "compat") != 0 ||
+    if (sat_pop_str(string_buffer) != string_buffer || std::strcmp(string_buffer, "compat") != 0 ||
         !hpclang_e2e_restore_stack(before)) {
         (void)hpclang_e2e_restore_stack(before);
         return 5;
@@ -111,18 +115,15 @@ static int hpclang_e2e_saturn_compat_test()
      * non-empty Stock stack must never be cleared just to make an E2E witness.
      */
     if (before == 0u) {
-        if (sat_stack_push_string("'left'") != 1 ||
-            sat_stack_push_string("right") != 1) {
+        if (sat_stack_push_string("'left'") != 1 || sat_stack_push_string("right") != 1) {
             (void)hpclang_e2e_restore_stack(before);
             return 6;
         }
 
         char **argv = nullptr;
         int argc = sat_stack_pop_stdargs(&argv);
-        bool args_ok =
-            argc == 2 && argv != nullptr &&
-            std::strcmp(argv[0], "left") == 0 &&
-            std::strcmp(argv[1], "right") == 0;
+        bool args_ok = argc == 2 && argv != nullptr && std::strcmp(argv[0], "left") == 0 &&
+                       std::strcmp(argv[1], "right") == 0;
         if (argv != nullptr) {
             if (argc > 0)
                 std::free(argv[0]);
@@ -157,14 +158,12 @@ extern "C" int hpclang_e2e_cpp_test(void)
     for (int item : view)
         sum += item;
 
-    if (hpclang_e2e_cxx_ctor_probe != 42 ||
-        name != "hpclang" || answer.value_or(0) != 42 ||
+    if (hpclang_e2e_cxx_ctor_probe != 42 || name != "hpclang" || answer.value_or(0) != 42 ||
         sum != 100 || dynamic.size() != 4)
         return 6;
 
     auto surface = hpclang::display_surface();
-    if (surface.width() != 131u ||
-        (surface.height() != 64u && surface.height() != 80u) ||
+    if (surface.width() != 131u || (surface.height() != 64u && surface.height() != 80u) ||
         surface.levels() != 2u)
         return 1;
 
@@ -172,8 +171,7 @@ extern "C" int hpclang_e2e_cpp_test(void)
     hpclang::delay(std::chrono::microseconds{1000});
     auto after = hpclang::monotonic_time();
 
-    if (after < before ||
-        after - before < std::chrono::microseconds{1000})
+    if (after < before || after - before < std::chrono::microseconds{1000})
         return 2;
 
     /*
@@ -208,9 +206,7 @@ extern "C" int hpclang_e2e_cpp_test(void)
     }
 
     owned.clear(0u);
-    hpclang_surface_draw_text(
-        owned_raw, &hpclang_e2e_ui_font, 0, 0,
-        hpclang_e2e_ui_probe, 255u);
+    hpclang_surface_draw_text(owned_raw, &hpclang_e2e_ui_font, 0, 0, hpclang_e2e_ui_probe, 255u);
     bool generated_font_ink = false;
     for (int y = 0; y < 16 && !generated_font_ink; ++y) {
         for (int x = 0; x < 24; ++x) {
@@ -227,8 +223,7 @@ extern "C" int hpclang_e2e_cpp_test(void)
 
     owned.clear(0u);
     owned.draw_line(0, 0, 1, 1, 255u);
-    if (owned.get_pixel(0, 0) != 255u ||
-        owned.get_pixel(1, 1) != 255u) {
+    if (owned.get_pixel(0, 0) != 255u || owned.get_pixel(1, 1) != 255u) {
         hpclang_surface_destroy(owned_raw);
         return 5;
     }
@@ -241,19 +236,19 @@ extern "C" int hpclang_e2e_cpp_test(void)
 
     owned.clear(0u);
     owned.draw_circle(5, 5, 3, 255u);
-    if (owned.get_pixel(5, 2) != 255u ||
-        owned.get_pixel(5, 5) != 0u) {
+    if (owned.get_pixel(5, 2) != 255u || owned.get_pixel(5, 5) != 0u) {
         hpclang_surface_destroy(owned_raw);
         return 7;
     }
 
     constexpr std::array<hpclang_point, 3> triangle{{
-        {1, 1}, {9, 1}, {5, 9},
+        {1, 1},
+        {9, 1},
+        {5, 9},
     }};
     owned.clear(0u);
     owned.fill_polygon(triangle, 255u);
-    if (owned.get_pixel(5, 4) != 255u ||
-        owned.get_pixel(0, 10) != 0u) {
+    if (owned.get_pixel(5, 4) != 255u || owned.get_pixel(0, 10) != 0u) {
         hpclang_surface_destroy(owned_raw);
         return 7;
     }
@@ -267,11 +262,8 @@ extern "C" int hpclang_e2e_cpp_test(void)
     gray.set_pixel(1, 0, 64u);
     gray.set_pixel(2, 0, 128u);
     gray.set_pixel(3, 0, 255u);
-    if (gray.levels() != 4u ||
-        gray.get_pixel(0, 0) != 0u ||
-        gray.get_pixel(1, 0) != 85u ||
-        gray.get_pixel(2, 0) != 170u ||
-        gray.get_pixel(3, 0) != 255u) {
+    if (gray.levels() != 4u || gray.get_pixel(0, 0) != 0u || gray.get_pixel(1, 0) != 85u ||
+        gray.get_pixel(2, 0) != 170u || gray.get_pixel(3, 0) != 255u) {
         hpclang_surface_destroy(gray_raw);
         return 8;
     }

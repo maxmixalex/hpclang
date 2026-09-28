@@ -15,19 +15,19 @@ export TARGET
 TRANSFER="$ASSETS_DIR/$TARGET-stock-transfer"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
+TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
 rm -f "$KERMIT_LOG" "$HOST_GATE"
 
-FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
-curl -fL --retry 3 \
-    "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
-    -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
-unzip -p \
-    "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
-    "$HPCLANG_E2E_MEMBER" \
-    > "$FIRMWARE"
+case "$TRANSPORT" in
+    uart|usb) ;;
+    *)
+        echo "unsupported HP39 Stock transport: $TRANSPORT" >&2
+        exit 2
+        ;;
+esac
 
-X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-uart"
-KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-uart"
+X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-$TRANSPORT"
+KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-$TRANSPORT"
 
 socat -d -d -x -v \
     PTY,raw,echo=0,link="$X50_TTY" \
@@ -59,11 +59,17 @@ KERMIT_PID=$!
 
 FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout "$TRANSFER")"
 X50_TIMEOUT=$((FETCH_TIMEOUT + 90))
-printf 'HP39 Stock lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
-    "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
+printf 'HP39 Stock %s lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
+    "$TRANSPORT" "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
     "$(( $(stat -c %s "$TRANSFER/HPGCC000.000") + $(stat -c %s "$TRANSFER/LIB275L.000") ))"
 
-export HPCLANG_X50NG_UART0="$X50_TTY"
+if [[ "$TRANSPORT" == usb ]]; then
+    export HPCLANG_X50NG_USB0="$X50_TTY"
+    unset HPCLANG_X50NG_UART0 || true
+else
+    export HPCLANG_X50NG_UART0="$X50_TTY"
+    unset HPCLANG_X50NG_USB0 || true
+fi
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
@@ -73,14 +79,27 @@ export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
 HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_STOCK_RESULT_ADDR
-if [[ "$TARGET" == hp40gs ]]; then
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
+if [[ "$TARGET" == hp39gplus ]]; then
+    [[ "$TRANSPORT" == usb ]] || {
+        echo "HP39g+ Stock requires the USB Connectivity Kit transport" >&2
+        exit 2
+    }
+    SEQUENCE="$ROOT/tests/e2e/sequences/hp39gplus-stock-usb-run.seq"
+elif [[ "$TARGET" == hp40gs ]]; then
+    if [[ "$TRANSPORT" == usb ]]; then
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-usb-run.seq"
+    else
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp40gs-stock-run.seq"
+    fi
 else
-    SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
+    if [[ "$TRANSPORT" == usb ]]; then
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-usb-run.seq"
+    else
+        SEQUENCE="$ROOT/tests/e2e/sequences/hp39gs-stock-run.seq"
+    fi
 fi
-# Sequence timing is gated by the actual Stock serial-disk completion marker.
-# The dynamic timeout is only a watchdog ceiling for a genuinely stalled fetch;
-# normal launch no longer depends on a guessed HPGCC000 transfer duration.
+# Sequence timing is gated by actual Kermit completion. The transport may be
+# UART or USB; the watchdog is only a ceiling for a genuinely stalled fetch.
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
@@ -90,14 +109,40 @@ python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
     > "$ROOT/build/$TARGET-kermit-gate.log" 2>&1 &
 GATE_PID=$!
 
-mkdir -p "$ROOT/build/$TARGET-state"
-timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
-    --datadir="$ROOT/build/$TARGET-state" \
-    --overwrite-config \
-    --style="$ROOT/build/x50ng/dist/style-40g.css" \
-    --flash-full \
-    --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin" \
-    --firmware="$FIRMWARE"
+STATE="$ROOT/build/$TARGET-state"
+rm -rf "$STATE"
+mkdir -p "$STATE"
+
+X50_ARGS=(
+    --datadir="$STATE"
+    --overwrite-config
+    --style="$ROOT/build/x50ng/dist/style-40g.css"
+)
+
+if [[ -n "${HPCLANG_E2E_NOR_PATH:-}" ]]; then
+    python3 "$ROOT/tools/prepare-nor-fixture.py" \
+        "$ROOT/$HPCLANG_E2E_NOR_PATH" "$STATE" \
+        --compression "$HPCLANG_E2E_NOR_COMPRESSION" \
+        --bytes "$HPCLANG_E2E_NOR_BYTES" \
+        --state-bytes "${HPCLANG_E2E_NOR_STATE_BYTES:-$HPCLANG_E2E_NOR_BYTES}" \
+        --sha256 "$HPCLANG_E2E_NOR_SHA256"
+else
+    FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
+    curl -fL --retry 3 \
+        "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+        -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
+    unzip -p \
+        "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
+        "$HPCLANG_E2E_MEMBER" \
+        > "$FIRMWARE"
+    X50_ARGS+=(
+        --flash-full
+        --bootloader="$ROOT/build/x50ng/dist/firmware/boot-50g.bin"
+        --firmware="$FIRMWARE"
+    )
+fi
+
+timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" "${X50_ARGS[@]}"
 
 wait "$GATE_PID"
 GATE_PID=

@@ -27,12 +27,7 @@ def wrap(image: bytes) -> bytes:
     if nibbles > 0xFFFFFF:
         raise ValueError("stage0 object is too large")
 
-    return (
-        b"HPHP49-C"
-        + b"\x2c\x2a"
-        + nibbles.to_bytes(4, "little")[:3]
-        + bytes(l3)
-    )
+    return b"HPHP49-C" + b"\x2c\x2a" + nibbles.to_bytes(4, "little")[:3] + bytes(l3)
 
 
 def main() -> None:
@@ -46,10 +41,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(output)
 
-    print(
-        f"{args.output}: stage0={len(image)} bytes, "
-        f"wrapped={len(output)} bytes"
-    )
+    print(f"{args.output}: stage0={len(image)} bytes, wrapped={len(output)} bytes")
 
 
 if __name__ == "__main__":

@@ -3,5 +3,6 @@
   "family": "hp4950",
   "model": 6,
   "lcd_height": 80,
-  "bootloader": "boot-50g.bin"
+  "bootloader": "boot-50g.bin",
+  "stock_transport": "usb"
 }

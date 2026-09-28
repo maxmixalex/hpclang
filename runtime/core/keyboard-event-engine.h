@@ -5,7 +5,8 @@
 
 #include <hpclang/keyboard.h>
 
-struct hpclang_keyboard_event_engine {
+struct hpclang_keyboard_event_engine
+{
     uint64_t stable_bits;
     uint64_t candidate_bits;
     uint64_t candidate_since_us;
@@ -20,21 +21,14 @@ struct hpclang_keyboard_event_engine {
     int initialized;
 };
 
-void hpclang_keyboard_event_engine_init(
-    struct hpclang_keyboard_event_engine *engine,
-    uint64_t bits,
-    uint64_t now_us);
+void hpclang_keyboard_event_engine_init(struct hpclang_keyboard_event_engine *engine, uint64_t bits,
+                                        uint64_t now_us);
 
-void hpclang_keyboard_event_engine_set_timing(
-    struct hpclang_keyboard_event_engine *engine,
-    uint32_t debounce_us,
-    uint32_t repeat_delay_us,
-    uint32_t repeat_interval_us);
+void hpclang_keyboard_event_engine_set_timing(struct hpclang_keyboard_event_engine *engine,
+                                              uint32_t debounce_us, uint32_t repeat_delay_us,
+                                              uint32_t repeat_interval_us);
 
-int hpclang_keyboard_event_engine_step(
-    struct hpclang_keyboard_event_engine *engine,
-    uint64_t bits,
-    uint64_t now_us,
-    struct hpclang_keyboard_event *event);
+int hpclang_keyboard_event_engine_step(struct hpclang_keyboard_event_engine *engine, uint64_t bits,
+                                       uint64_t now_us, struct hpclang_keyboard_event *event);
 
 #endif

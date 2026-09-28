@@ -22,41 +22,24 @@
 
 int hpclang_e2e_cpp_test(void);
 int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
-int hpclang_hp39_aplet_snapshot(
-    const uint8_t *name,
-    size_t name_length,
-    struct hpclang_object **object);
+int hpclang_hp39_aplet_snapshot(const uint8_t *name, size_t name_length,
+                                struct hpclang_object **object);
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object);
-int hpclang_hp39_variable_value_snapshot(
-    const uint8_t *category,
-    size_t category_length,
-    const uint8_t *name,
-    size_t name_length,
-    struct hpclang_object **object);
-int hpclang_hp39_variable_value_store(
-    const uint8_t *category,
-    size_t category_length,
-    const uint8_t *name,
-    size_t name_length,
-    const struct hpclang_object *object);
-int hpclang_hp39_program_body_snapshot(
-    const uint8_t *name,
-    size_t name_length,
-    struct hpclang_object **object);
-int hpclang_hp39_note_body_snapshot(
-    const uint8_t *name,
-    size_t name_length,
-    struct hpclang_object **object);
-int hpclang_hp39_catalog_name_count(
-    const struct hpclang_object *catalog,
-    uint32_t *count);
-int hpclang_hp39_catalog_contains_name(
-    const struct hpclang_object *catalog,
-    const uint8_t *name,
-    size_t name_length,
-    int *found);
+int hpclang_hp39_variable_value_snapshot(const uint8_t *category, size_t category_length,
+                                         const uint8_t *name, size_t name_length,
+                                         struct hpclang_object **object);
+int hpclang_hp39_variable_value_store(const uint8_t *category, size_t category_length,
+                                      const uint8_t *name, size_t name_length,
+                                      const struct hpclang_object *object);
+int hpclang_hp39_program_body_snapshot(const uint8_t *name, size_t name_length,
+                                       struct hpclang_object **object);
+int hpclang_hp39_note_body_snapshot(const uint8_t *name, size_t name_length,
+                                    struct hpclang_object **object);
+int hpclang_hp39_catalog_name_count(const struct hpclang_object *catalog, uint32_t *count);
+int hpclang_hp39_catalog_contains_name(const struct hpclang_object *catalog, const uint8_t *name,
+                                       size_t name_length, int *found);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -87,99 +70,60 @@ static volatile uint64_t hpclang_u64_b = UINT64_C(1000003);
 static volatile double hpclang_double_a = 1.25;
 static volatile double hpclang_double_b = 3.5;
 
-__attribute__((constructor))
-static void hpclang_runtime_ctor(void)
+__attribute__((constructor)) static void hpclang_runtime_ctor(void)
 {
     hpclang_ctor_probe = 0xc0def00du;
 }
 
-static void text(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    const char *s)
+static void text(struct hpclang_surface *surface, int x, int y, const char *s)
 {
-    hpclang_surface_draw_text(
-        surface, hpclang_font_mini(), x, y, s, 255u);
+    hpclang_surface_draw_text(surface, hpclang_font_mini(), x, y, s, 255u);
 }
 
-static void hex2(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    uint32_t value)
+static void hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
 {
     static const char digits[] = "0123456789ABCDEF";
     const struct hpclang_font *font = hpclang_font_mini();
 
-    hpclang_surface_draw_char(
-        surface, font, x, y,
-        (uint8_t)digits[(value >> 4) & 15u], 255u);
-    hpclang_surface_draw_char(
-        surface, font, x + (int)hpclang_font_advance(font), y,
-        (uint8_t)digits[value & 15u], 255u);
+    hpclang_surface_draw_char(surface, font, x, y, (uint8_t)digits[(value >> 4) & 15u], 255u);
+    hpclang_surface_draw_char(surface, font, x + (int)hpclang_font_advance(font), y,
+                              (uint8_t)digits[value & 15u], 255u);
 }
 
-static void result_text(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    const char *s)
+static void result_text(struct hpclang_surface *surface, int x, int y, const char *s)
 {
-    hpclang_surface_draw_text(
-        surface, &hpclang_e2e_ui_font, x, y, s, 255u);
+    hpclang_surface_draw_text(surface, &hpclang_e2e_ui_font, x, y, s, 255u);
 }
 
-static void result_hex2(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    uint32_t value)
+static void result_hex2(struct hpclang_surface *surface, int x, int y, uint32_t value)
 {
     const struct hpclang_font *font = &hpclang_e2e_ui_font;
-    hpclang_surface_draw_char(
-        surface, font, x, y,
-        (uint8_t)hpclang_e2e_hex_digits[(value >> 4) & 15u], 255u);
-    hpclang_surface_draw_char(
-        surface, font, x + (int)hpclang_font_advance(font), y,
-        (uint8_t)hpclang_e2e_hex_digits[value & 15u], 255u);
+    hpclang_surface_draw_char(surface, font, x, y,
+                              (uint8_t)hpclang_e2e_hex_digits[(value >> 4) & 15u], 255u);
+    hpclang_surface_draw_char(surface, font, x + (int)hpclang_font_advance(font), y,
+                              (uint8_t)hpclang_e2e_hex_digits[value & 15u], 255u);
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
 static int keyboard_scan_passed(uint8_t scan)
 {
-    return
-        (hpclang_keyboard_passed_bits & (UINT64_C(1) << scan)) != 0u;
+    return (hpclang_keyboard_passed_bits & (UINT64_C(1) << scan)) != 0u;
 }
 
-static void keyboard_rect(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    int w,
-    int h,
-    int fill)
+static void keyboard_rect(struct hpclang_surface *surface, int x, int y, int w, int h, int fill)
 {
     for (int yy = 0; yy < h; ++yy) {
         for (int xx = 0; xx < w; ++xx) {
-            int corner =
-                (xx == 0 || xx == w - 1) &&
-                (yy == 0 || yy == h - 1);
+            int corner = (xx == 0 || xx == w - 1) && (yy == 0 || yy == h - 1);
             if (corner)
                 continue;
-            if (fill || yy == 0 || yy == h - 1 ||
-                xx == 0 || xx == w - 1)
+            if (fill || yy == 0 || yy == h - 1 || xx == 0 || xx == w - 1)
                 hpclang_surface_set_pixel(surface, x + xx, y + yy, 255u);
         }
     }
 }
 
-static void keyboard_cross(
-    struct hpclang_surface *surface,
-    int x,
-    int y,
-    int w,
-    int h)
+static void keyboard_cross(struct hpclang_surface *surface, int x, int y, int w, int h)
 {
     int cx = x + w / 2;
     int cy = y + h / 2;
@@ -190,13 +134,7 @@ static void keyboard_cross(
     }
 }
 
-static void keyboard_cell(
-    struct hpclang_surface *surface,
-    uint8_t scan,
-    int x,
-    int y,
-    int w,
-    int h)
+static void keyboard_cell(struct hpclang_surface *surface, uint8_t scan, int x, int y, int w, int h)
 {
     int passed = keyboard_scan_passed(scan);
     keyboard_rect(surface, x, y, w, h, passed);
@@ -204,11 +142,7 @@ static void keyboard_cell(
         keyboard_cross(surface, x, y, w, h);
 }
 
-static void keyboard_cursor_cell(
-    struct hpclang_surface *surface,
-    uint8_t scan,
-    int cx,
-    int cy)
+static void keyboard_cursor_cell(struct hpclang_surface *surface, uint8_t scan, int cx, int cy)
 {
     int passed = keyboard_scan_passed(scan);
 
@@ -217,11 +151,9 @@ static void keyboard_cursor_cell(
         int half_width = vertical == 3 ? 1 : vertical == 2 ? 2 : 3;
 
         for (int xx = -half_width; xx <= half_width; ++xx) {
-            int boundary =
-                vertical == 3 || xx == -half_width || xx == half_width;
+            int boundary = vertical == 3 || xx == -half_width || xx == half_width;
             if (passed || boundary)
-                hpclang_surface_set_pixel(
-                    surface, cx + xx, cy + yy, 255u);
+                hpclang_surface_set_pixel(surface, cx + xx, cy + yy, 255u);
         }
     }
 
@@ -249,21 +181,15 @@ static const uint8_t keyboard_control_scans[2][3] = {
 };
 
 static const uint8_t keyboard_main_scans[7][5] = {
-    {28u, 21u, 14u,  7u, 0u},
-    {29u, 22u, 15u,  8u, 1u},
-    {30u, 23u, 16u,  9u, 2u},
-    {57u, 24u, 17u, 10u, 3u},
-    {58u, 25u, 18u, 11u, 4u},
-    {59u, 26u, 19u, 12u, 5u},
+    {28u, 21u, 14u, 7u, 0u},  {29u, 22u, 15u, 8u, 1u},  {30u, 23u, 16u, 9u, 2u},
+    {57u, 24u, 17u, 10u, 3u}, {58u, 25u, 18u, 11u, 4u}, {59u, 26u, 19u, 12u, 5u},
     {56u, 27u, 20u, 13u, 6u},
 };
 
 static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
 {
     hpclang_surface_clear(surface, 0u);
-    hpclang_surface_draw_text(
-        surface, &hpclang_e2e_ui_font, 2, 1,
-        hpclang_e2e_font_label, 255u);
+    hpclang_surface_draw_text(surface, &hpclang_e2e_ui_font, 2, 1, hpclang_e2e_font_label, 255u);
 
     if (pass) {
         text(surface, 99, 1, "PASS 51");
@@ -272,51 +198,41 @@ static void draw_keyboard_result(struct hpclang_surface *surface, int pass)
         hex2(surface, 116, 1, hpclang_keyboard_failed_scan);
     } else {
         char progress[8];
-        (void)snprintf(
-            progress, sizeof(progress), "KEY %02u",
-            hpclang_keyboard_passed_count);
+        (void)snprintf(progress, sizeof(progress), "KEY %02u", hpclang_keyboard_passed_count);
         text(surface, 105, 1, progress);
     }
 
     for (int col = 0; col < 6; ++col)
-        keyboard_cell(
-            surface, keyboard_soft_scans[col],
-            4 + col * 21, 7, 17, 4);
+        keyboard_cell(surface, keyboard_soft_scans[col], 4 + col * 21, 7, 17, 4);
 
     for (int row = 0; row < 2; ++row) {
         for (int col = 0; col < 3; ++col)
-            keyboard_cell(
-                surface, keyboard_control_scans[row][col],
-                4 + col * 26, 13 + row * 8, 20, 5);
+            keyboard_cell(surface, keyboard_control_scans[row][col], 4 + col * 26, 13 + row * 8, 20,
+                          5);
     }
 
     keyboard_cursor_cell(surface, 42u, 105, 14);
-    keyboard_cursor_cell(surface, 43u,  96, 20);
+    keyboard_cursor_cell(surface, 43u, 96, 20);
     keyboard_cursor_cell(surface, 45u, 114, 20);
     keyboard_cursor_cell(surface, 44u, 105, 26);
 
     for (int row = 0; row < 7; ++row) {
         for (int col = 0; col < 5; ++col)
-            keyboard_cell(
-                surface, keyboard_main_scans[row][col],
-                4 + col * 26, 30 + row * 5, 19, 4);
+            keyboard_cell(surface, keyboard_main_scans[row][col], 4 + col * 26, 30 + row * 5, 19,
+                          4);
     }
 }
 #endif
 
 static int display_height(uint32_t model)
 {
-    return model == HPCLANG_MODEL_HP49GPLUS ||
-           model == HPCLANG_MODEL_HP50G
-        ? 80
-        : 64;
+    return model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G ? 80 : 64;
 }
 
 #ifdef HPCLANG_E2E_STORAGE
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
-    if (model != HPCLANG_MODEL_HP49GPLUS &&
-        model != HPCLANG_MODEL_HP50G) {
+    if (model != HPCLANG_MODEL_HP49GPLUS && model != HPCLANG_MODEL_HP50G) {
         errno = 0;
         FILE *unavailable = fopen("HPCLANG.TST", "rb");
         if (unavailable != NULL) {
@@ -328,33 +244,26 @@ static uint32_t stock_stream_storage_test(uint32_t model)
 
         struct stat unavailable_stat;
         errno = 0;
-        if (stat("HPCLANG.TST", &unavailable_stat) == 0 ||
-            errno != ENOSYS)
+        if (stat("HPCLANG.TST", &unavailable_stat) == 0 || errno != ENOSYS)
             return 0x53u;
 
         struct hpclang_stream_path_info unavailable_path;
         errno = 0;
-        if (hpclang_stream_path_query(
-                "HPCLANG.TST", &unavailable_path) == 0 ||
-            errno != ENOSYS)
+        if (hpclang_stream_path_query("HPCLANG.TST", &unavailable_path) == 0 || errno != ENOSYS)
             return 0x54u;
-
 
         struct hpclang_stream_storage_info unavailable_storage;
         errno = 0;
-        if (hpclang_stream_storage_query(&unavailable_storage) == 0 ||
-            errno != ENOSYS)
+        if (hpclang_stream_storage_query(&unavailable_storage) == 0 || errno != ENOSYS)
             return 0x55u;
 
         uint64_t unavailable_free = 0u;
         errno = 0;
-        if (hpclang_stream_storage_free_bytes(&unavailable_free) == 0 ||
-            errno != ENOSYS)
+        if (hpclang_stream_storage_free_bytes(&unavailable_free) == 0 || errno != ENOSYS)
             return 0x56u;
 
         errno = 0;
-        if (rename("HPCLANG.A", "HPCLANG.B") == 0 ||
-            errno != ENOSYS)
+        if (rename("HPCLANG.A", "HPCLANG.B") == 0 || errno != ENOSYS)
             return 0x57u;
 
         errno = 0;
@@ -362,8 +271,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             return 0x70u;
 
         errno = 0;
-        struct hpclang_stream_directory *unavailable_directory =
-            hpclang_stream_directory_open("/");
+        struct hpclang_stream_directory *unavailable_directory = hpclang_stream_directory_open("/");
         if (unavailable_directory != NULL || errno != ENOSYS) {
             if (unavailable_directory != NULL)
                 (void)hpclang_stream_directory_close(unavailable_directory);
@@ -404,26 +312,20 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (hpclang_stream_path_query("HPCLANG.TST", &path_info) != 0)
         return 0x58u;
     if (path_info.version != HPCLANG_STREAM_PATH_INFO_VERSION ||
-        path_info.size < sizeof(path_info) ||
-        path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+        path_info.size < sizeof(path_info) || path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
         path_info.byte_size != sizeof(input_expected) - 1u)
         return 0x59u;
 
     struct stat input_info;
     if (stat("HPCLANG.TST", &input_info) != 0)
         return 0x5au;
-    if (!S_ISREG(input_info.st_mode) ||
-        input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
+    if (!S_ISREG(input_info.st_mode) || input_info.st_size != (off_t)(sizeof(input_expected) - 1u))
         return 0x5bu;
 
-    if ((path_info.time_validity &
-         HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID) == 0u ||
-        path_info.last_modified.year != 2024u ||
-        path_info.last_modified.month != 1u ||
-        path_info.last_modified.day != 2u ||
-        path_info.last_modified.hour != 3u ||
-        path_info.last_modified.minute != 4u ||
-        path_info.last_modified.second != 6u)
+    if ((path_info.time_validity & HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID) == 0u ||
+        path_info.last_modified.year != 2024u || path_info.last_modified.month != 1u ||
+        path_info.last_modified.day != 2u || path_info.last_modified.hour != 3u ||
+        path_info.last_modified.minute != 4u || path_info.last_modified.second != 6u)
         return 0x69u;
 
     /*
@@ -445,8 +347,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
      * x50ng's host-directory SD fixture exposes the ordinary FAT archive bit
      * on this pre-existing file. Preserve that stable FAT metadata contract.
      */
-    if ((path_info.attributes &
-         HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
+    if ((path_info.attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) == 0u)
         return 0x67u;
 
     struct hpclang_stream_storage_info storage_info;
@@ -455,12 +356,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (storage_info.version != HPCLANG_STREAM_STORAGE_INFO_VERSION ||
         storage_info.size < sizeof(storage_info) ||
         (storage_info.flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u ||
-        (storage_info.flags &
-         HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
-        (storage_info.flags &
-         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
-        storage_info.free_bytes == 0u ||
-        storage_info.capacity_bytes == 0u)
+        (storage_info.flags & HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
+        (storage_info.flags & HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
+        storage_info.free_bytes == 0u || storage_info.capacity_bytes == 0u)
         return 0x5eu;
     if (storage_info.capacity_bytes < storage_info.free_bytes)
         return 0x5fu;
@@ -475,11 +373,9 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x33u;
 
     memset(buffer, 0, sizeof(buffer));
-    size_t got = fread(
-        buffer, 1u, sizeof(input_expected) - 1u, input);
+    size_t got = fread(buffer, 1u, sizeof(input_expected) - 1u, input);
     int input_close = fclose(input);
-    if (got != sizeof(input_expected) - 1u ||
-        input_close != 0 ||
+    if (got != sizeof(input_expected) - 1u || input_close != 0 ||
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x34u;
 
@@ -487,25 +383,20 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (output == NULL)
         return 0x35u;
 
-    size_t written = fwrite(
-        output_expected, 1u, sizeof(output_expected) - 1u, output);
-    if (written != sizeof(output_expected) - 1u ||
-        fflush(output) != 0) {
+    size_t written = fwrite(output_expected, 1u, sizeof(output_expected) - 1u, output);
+    if (written != sizeof(output_expected) - 1u || fflush(output) != 0) {
         fclose(output);
         return 0x36u;
     }
 
-    if (fseek(output, 7L, SEEK_SET) != 0 ||
-        ftell(output) != 7L) {
+    if (fseek(output, 7L, SEEK_SET) != 0 || ftell(output) != 7L) {
         fclose(output);
         return 0x37u;
     }
 
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, 5u, output);
-    if (got != 5u ||
-        memcmp(buffer, "write", 5u) != 0 ||
-        ftell(output) != 12L) {
+    if (got != 5u || memcmp(buffer, "write", 5u) != 0 || ftell(output) != 12L) {
         fclose(output);
         return 0x38u;
     }
@@ -521,8 +412,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     got = fread(buffer, 1u, sizeof(buffer), output);
     int output_close = fclose(output);
 
-    if (output_close != 0 ||
-        got != sizeof(output_expected) - 1u ||
+    if (output_close != 0 || got != sizeof(output_expected) - 1u ||
         memcmp(buffer, output_expected, sizeof(output_expected) - 1u) != 0)
         return 0x3bu;
 
@@ -555,10 +445,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     output = fopen("HPCLANG.NEW", "w+b");
     if (output == NULL)
         return 0x45u;
-    written = fwrite(
-        create_expected, 1u, sizeof(create_expected) - 1u, output);
-    if (written != sizeof(create_expected) - 1u ||
-        fclose(output) != 0)
+    written = fwrite(create_expected, 1u, sizeof(create_expected) - 1u, output);
+    if (written != sizeof(create_expected) - 1u || fclose(output) != 0)
         return 0x46u;
 
     output = fopen("HPCLANG.NEW", "rb");
@@ -567,8 +455,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(buffer), output);
     output_close = fclose(output);
-    if (output_close != 0 ||
-        got != sizeof(create_expected) - 1u ||
+    if (output_close != 0 || got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
         return 0x48u;
 
@@ -585,8 +472,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(buffer), output);
     output_close = fclose(output);
-    if (output_close != 0 ||
-        got != sizeof(create_expected) - 1u ||
+    if (output_close != 0 || got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0)
         return 0x63u;
 
@@ -595,8 +481,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (rename("HPCLANG.REN", "M7DIR/MiXeD Long Name.txt") != 0)
         return 0x65u;
 
-    struct hpclang_stream_directory *directory =
-        hpclang_stream_directory_open("M7DIR");
+    struct hpclang_stream_directory *directory = hpclang_stream_directory_open("M7DIR");
     if (directory == NULL)
         return 0x66u;
 
@@ -612,8 +497,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             break;
         if (strcmp(entry.name, "MiXeD Long Name.txt") == 0) {
             if (entry.version != HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION ||
-                entry.size < sizeof(entry) ||
-                entry.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
+                entry.size < sizeof(entry) || entry.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
                 entry.byte_size != sizeof(create_expected) - 1u) {
                 (void)hpclang_stream_directory_close(directory);
                 return 0x73u;
@@ -638,8 +522,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(buffer), output);
     output_close = fclose(output);
-    if (output_close != 0 ||
-        got != sizeof(create_expected) - 1u ||
+    if (output_close != 0 || got != sizeof(create_expected) - 1u ||
         memcmp(buffer, create_expected, sizeof(create_expected) - 1u) != 0) {
         (void)hpclang_stream_directory_close(directory);
         return 0x7fu;
@@ -649,8 +532,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
      * A second iterator has independent FatFs DIR state. Case-insensitive FAT
      * lookup must not alter the case preserved by enumeration above.
      */
-    struct hpclang_stream_directory *root_directory =
-        hpclang_stream_directory_open("/");
+    struct hpclang_stream_directory *root_directory = hpclang_stream_directory_open("/");
     if (root_directory == NULL) {
         (void)hpclang_stream_directory_close(directory);
         return 0x75u;
@@ -663,8 +545,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     }
 
     struct hpclang_stream_path_info direct_path_info;
-    if (hpclang_stream_path_query(
-            "M7DIR/mixed long name.TXT", &direct_path_info) != 0 ||
+    if (hpclang_stream_path_query("M7DIR/mixed long name.TXT", &direct_path_info) != 0 ||
         direct_path_info.type != HPCLANG_STREAM_PATH_TYPE_FILE ||
         direct_path_info.byte_size != sizeof(create_expected) - 1u) {
         (void)hpclang_stream_directory_close(directory);
@@ -673,8 +554,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
 
     struct hpclang_stream_storage_info direct_storage_info;
     if (hpclang_stream_storage_query(&direct_storage_info) != 0 ||
-        (direct_storage_info.flags &
-         HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
+        (direct_storage_info.flags & HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID) == 0u ||
         direct_storage_info.capacity_bytes == 0u ||
         direct_storage_info.capacity_bytes < direct_storage_info.free_bytes) {
         (void)hpclang_stream_directory_close(directory);
@@ -706,15 +586,13 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     output = fopen("HPCLANG.APP", "ab");
     if (output == NULL)
         return 0x4au;
-    if (fwrite("one", 1u, 3u, output) != 3u ||
-        fclose(output) != 0)
+    if (fwrite("one", 1u, 3u, output) != 3u || fclose(output) != 0)
         return 0x4bu;
 
     output = fopen("HPCLANG.APP", "ab");
     if (output == NULL)
         return 0x4cu;
-    if (fwrite("-two", 1u, 4u, output) != 4u ||
-        fclose(output) != 0)
+    if (fwrite("-two", 1u, 4u, output) != 4u || fclose(output) != 0)
         return 0x4du;
 
     output = fopen("HPCLANG.APP", "rb");
@@ -723,9 +601,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(buffer), output);
     output_close = fclose(output);
-    if (output_close != 0 ||
-        got != 7u ||
-        memcmp(buffer, "one-two", 7u) != 0)
+    if (output_close != 0 || got != 7u || memcmp(buffer, "one-two", 7u) != 0)
         return 0x4fu;
 
     if (remove("HPCLANG.APP") != 0)
@@ -742,34 +618,26 @@ static uint32_t stock_stream_storage_test(uint32_t model)
      * logical file offset. FatFs does not provide the zero-fill guarantee by
      * itself, so keep this as a direct regression for the syscall shim.
      */
-    int trunc_fd = open(
-        "HPCLANG.TRN", O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (trunc_fd < 0 ||
-        write(trunc_fd, "abc", 3u) != 3 ||
-        ftruncate(trunc_fd, 8) != 0 ||
+    int trunc_fd = open("HPCLANG.TRN", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (trunc_fd < 0 || write(trunc_fd, "abc", 3u) != 3 || ftruncate(trunc_fd, 8) != 0 ||
         lseek(trunc_fd, 0, SEEK_CUR) != 3)
         return 0x93u;
 
     if (lseek(trunc_fd, 0, SEEK_SET) != 0)
         return 0x94u;
     memset(buffer, 0xff, sizeof(buffer));
-    if (read(trunc_fd, buffer, 8u) != 8 ||
-        memcmp(buffer, "abc", 3u) != 0 ||
-        buffer[3] != 0 || buffer[4] != 0 || buffer[5] != 0 ||
-        buffer[6] != 0 || buffer[7] != 0)
+    if (read(trunc_fd, buffer, 8u) != 8 || memcmp(buffer, "abc", 3u) != 0 || buffer[3] != 0 ||
+        buffer[4] != 0 || buffer[5] != 0 || buffer[6] != 0 || buffer[7] != 0)
         return 0x95u;
 
-    if (ftruncate(trunc_fd, 2) != 0 ||
-        lseek(trunc_fd, 0, SEEK_CUR) != 8 ||
+    if (ftruncate(trunc_fd, 2) != 0 || lseek(trunc_fd, 0, SEEK_CUR) != 8 ||
         lseek(trunc_fd, 0, SEEK_SET) != 0) {
         (void)close(trunc_fd);
         return 0x96u;
     }
     memset(buffer, 0, sizeof(buffer));
-    if (read(trunc_fd, buffer, sizeof(buffer)) != 2 ||
-        memcmp(buffer, "ab", 2u) != 0 ||
-        close(trunc_fd) != 0 ||
-        remove("HPCLANG.TRN") != 0)
+    if (read(trunc_fd, buffer, sizeof(buffer)) != 2 || memcmp(buffer, "ab", 2u) != 0 ||
+        close(trunc_fd) != 0 || remove("HPCLANG.TRN") != 0)
         return 0x97u;
 
     /*
@@ -778,13 +646,11 @@ static uint32_t stock_stream_storage_test(uint32_t model)
      * on the same hpclang-owned FatFs namespace.
      */
     FS_FILE *legacy_file = NULL;
-    if (FSOpen(":3:HPCLANG.TST", FSMODE_READ, &legacy_file) != FS_OK ||
-        legacy_file == NULL)
+    if (FSOpen(":3:HPCLANG.TST", FSMODE_READ, &legacy_file) != FS_OK || legacy_file == NULL)
         return 0x80u;
 
     memset(buffer, 0, sizeof(buffer));
-    int legacy_read = FSRead(
-        buffer, (int)(sizeof(input_expected) - 1u), legacy_file);
+    int legacy_read = FSRead(buffer, (int)(sizeof(input_expected) - 1u), legacy_file);
     if (legacy_read != (int)(sizeof(input_expected) - 1u) ||
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0 ||
         FSTell(legacy_file) != (int)(sizeof(input_expected) - 1u) ||
@@ -793,38 +659,27 @@ static uint32_t stock_stream_storage_test(uint32_t model)
 
     struct tm legacy_time;
     FSGetWriteTime(legacy_file, &legacy_time);
-    if (legacy_time.tm_year != 124 ||
-        legacy_time.tm_mon != 0 ||
-        legacy_time.tm_mday != 2 ||
-        legacy_time.tm_hour != 3 ||
-        legacy_time.tm_min != 4 ||
-        legacy_time.tm_sec != 6 ||
+    if (legacy_time.tm_year != 124 || legacy_time.tm_mon != 0 || legacy_time.tm_mday != 2 ||
+        legacy_time.tm_hour != 3 || legacy_time.tm_min != 4 || legacy_time.tm_sec != 6 ||
         FSClose(legacy_file) != FS_OK)
         return 0x82u;
 
     legacy_file = NULL;
-    if (FSCreate("HPCLANG.CMP", FSATTR_ARCHIVE, &legacy_file) != FS_OK ||
-        legacy_file == NULL ||
-        FSWrite("legacy", 6, legacy_file) != 6 ||
-        FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
-        FSWrite("X", 1, legacy_file) != 1 ||
-        FSFileLength(legacy_file) != 3 ||
+    if (FSCreate("HPCLANG.CMP", FSATTR_ARCHIVE, &legacy_file) != FS_OK || legacy_file == NULL ||
+        FSWrite("legacy", 6, legacy_file) != 6 || FSSeek(legacy_file, 2, SEEK_SET) != FS_OK ||
+        FSWrite("X", 1, legacy_file) != 1 || FSFileLength(legacy_file) != 3 ||
         FSClose(legacy_file) != FS_OK)
         return 0x83u;
 
     legacy_file = NULL;
-    if (FSOpen("HPCLANG.CMP", FSMODE_READ, &legacy_file) != FS_OK ||
-        legacy_file == NULL)
+    if (FSOpen("HPCLANG.CMP", FSMODE_READ, &legacy_file) != FS_OK || legacy_file == NULL)
         return 0x84u;
     memset(buffer, 0, sizeof(buffer));
-    if (FSRead(buffer, 6, legacy_file) != 3 ||
-        memcmp(buffer, "leX", 3u) != 0 ||
-        !FSEof(legacy_file) ||
-        FSClose(legacy_file) != FS_OK)
+    if (FSRead(buffer, 6, legacy_file) != 3 || memcmp(buffer, "leX", 3u) != 0 ||
+        !FSEof(legacy_file) || FSClose(legacy_file) != FS_OK)
         return 0x85u;
 
-    if (FSMkdir("CMPDIR") != FS_OK ||
-        FSChdir("CMPDIR") != FS_OK)
+    if (FSMkdir("CMPDIR") != FS_OK || FSChdir("CMPDIR") != FS_OK)
         return 0x86u;
 
     char *legacy_cwd = FSGetcwd(0);
@@ -852,10 +707,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
             return 0x8au;
         }
 
-        if (legacy_entry.Name != NULL &&
-            strcmp(legacy_entry.Name, "Legacy Long Name.txt") == 0) {
-            if (legacy_entry.FileSize != 3u ||
-                (FSAttr(&legacy_entry) & FSATTR_DIR) != 0) {
+        if (legacy_entry.Name != NULL && strcmp(legacy_entry.Name, "Legacy Long Name.txt") == 0) {
+            if (legacy_entry.FileSize != 3u || (FSAttr(&legacy_entry) & FSATTR_DIR) != 0) {
                 FSReleaseEntry(&legacy_entry);
                 (void)FSClose(legacy_dir);
                 return 0x8bu;
@@ -869,8 +722,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x8cu;
     if (FSChdir("/") != FS_OK)
         return 0x8du;
-    if (!FSVolumeMounted(0) || FSVolumeInserted(0) != FS_OK ||
-        FSGetCurrentVolume() != 0 || FSSetCurrentVolume(1) != FS_BADVOLUME)
+    if (!FSVolumeMounted(0) || FSVolumeInserted(0) != FS_OK || FSGetCurrentVolume() != 0 ||
+        FSSetCurrentVolume(1) != FS_BADVOLUME)
         return 0x8eu;
 
     int legacy_volume_size = FSGetVolumeSize(0);
@@ -888,13 +741,11 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (hp_name < 0 ||
         (hp_name & (FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_HASPATH)) !=
             (FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_HASPATH) ||
-        (hp_name >> 16) != 1 ||
-        FSGetNameType("C:\\dir\\\\file") != FSNAME_INVALID)
+        (hp_name >> 16) != 1 || FSGetNameType("C:\\dir\\\\file") != FSNAME_INVALID)
         return 0x90u;
 
     if (FSRename("CMPDIR/Legacy Long Name.txt", "HPCLANG.CMP") != FS_OK ||
-        FSRmdir("CMPDIR") != FS_OK ||
-        fdelete("HPCLANG.CMP") != 0)
+        FSRmdir("CMPDIR") != FS_OK || fdelete("HPCLANG.CMP") != 0)
         return 0x91u;
 
     /*
@@ -908,8 +759,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     memset(buffer, 0, sizeof(buffer));
     got = fread(buffer, 1u, sizeof(input_expected) - 1u, reset_input);
     input_close = fclose(reset_input);
-    if (got != sizeof(input_expected) - 1u ||
-        input_close != 0 ||
+    if (got != sizeof(input_expected) - 1u || input_close != 0 ||
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x6eu;
 
@@ -1008,8 +858,7 @@ static int finish(uint32_t failure, uint32_t model)
 
 static int supported_model(uint32_t model)
 {
-    return model >= HPCLANG_MODEL_HP39GPLUS &&
-           model <= HPCLANG_MODEL_HP50G;
+    return model >= HPCLANG_MODEL_HP39GPLUS && model <= HPCLANG_MODEL_HP50G;
 }
 
 static uint32_t expected_family(uint32_t model)
@@ -1024,14 +873,15 @@ static uint32_t expected_family(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
-struct expected_key_event {
+struct expected_key_event
+{
     uint8_t scan;
     uint16_t key;
     uint32_t down_modifiers;
 };
 
-#define E(scan, key) { scan##u, key, 0u }
-#define EM(scan, key, mods) { scan##u, key, mods }
+#define E(scan, key) {scan##u, key, 0u}
+#define EM(scan, key, mods) {scan##u, key, mods}
 
 static const struct expected_key_event hp39_keyboard[] = {
     E(0, HPCLANG_KEY_HP39_DEL),
@@ -1137,10 +987,8 @@ static const struct expected_key_event hp48_keyboard[] = {
     E(50, HPCLANG_KEY_HP48_NXT),
     EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
     EM(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
-    EM(58, HPCLANG_KEY_LEFT_SHIFT,
-       HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
-    EM(59, HPCLANG_KEY_RIGHT_SHIFT,
-       HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+    EM(58, HPCLANG_KEY_LEFT_SHIFT, HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    EM(59, HPCLANG_KEY_RIGHT_SHIFT, HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
 };
 
 #define HP4950_SHARED(scan, key) E(scan, key)
@@ -1196,12 +1044,10 @@ static const struct expected_key_event hp49_keyboard[] = {
     HP4950_SHARED(50, HPCLANG_KEY_HP4950_NXT),
     EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
     HP4950_SHARED_MOD(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
-    HP4950_SHARED_MOD(
-        58, HPCLANG_KEY_LEFT_SHIFT,
-        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
-    HP4950_SHARED_MOD(
-        59, HPCLANG_KEY_RIGHT_SHIFT,
-        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+    HP4950_SHARED_MOD(58, HPCLANG_KEY_LEFT_SHIFT,
+                      HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    HP4950_SHARED_MOD(59, HPCLANG_KEY_RIGHT_SHIFT,
+                      HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
 };
 
 static const struct expected_key_event hp50_keyboard[] = {
@@ -1254,12 +1100,10 @@ static const struct expected_key_event hp50_keyboard[] = {
     HP4950_SHARED(50, HPCLANG_KEY_HP4950_NXT),
     EM(56, HPCLANG_KEY_ON, HPCLANG_KEYBOARD_MOD_ON),
     HP4950_SHARED_MOD(57, HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
-    HP4950_SHARED_MOD(
-        58, HPCLANG_KEY_LEFT_SHIFT,
-        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
-    HP4950_SHARED_MOD(
-        59, HPCLANG_KEY_RIGHT_SHIFT,
-        HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
+    HP4950_SHARED_MOD(58, HPCLANG_KEY_LEFT_SHIFT,
+                      HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_LEFT_SHIFT),
+    HP4950_SHARED_MOD(59, HPCLANG_KEY_RIGHT_SHIFT,
+                      HPCLANG_KEYBOARD_MOD_SHIFT | HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT),
 };
 
 #undef HP4950_SHARED_MOD
@@ -1267,12 +1111,11 @@ static const struct expected_key_event hp50_keyboard[] = {
 #undef EM
 #undef E
 
-static const struct expected_key_event *expected_keyboard(
-    uint32_t model,
-    size_t *count)
+static const struct expected_key_event *expected_keyboard(uint32_t model, size_t *count)
 {
     *count = 51u;
-    if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS)
+    if (model == HPCLANG_MODEL_HP39GPLUS || model == HPCLANG_MODEL_HP39GS ||
+        model == HPCLANG_MODEL_HP40GS)
         return hp39_keyboard;
     if (model == HPCLANG_MODEL_HP48GII)
         return hp48_keyboard;
@@ -1323,10 +1166,8 @@ static int keyboard_transition(uint32_t model)
 
         const struct expected_key_event *want = &expected[index];
         if (!awaiting_up) {
-            if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN ||
-                event.scan_code != want->scan ||
-                event.key != want->key ||
-                event.modifiers != want->down_modifiers) {
+            if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN || event.scan_code != want->scan ||
+                event.key != want->key || event.modifiers != want->down_modifiers) {
                 hpclang_keyboard_failed_scan = want->scan;
                 return 0;
             }
@@ -1335,10 +1176,8 @@ static int keyboard_transition(uint32_t model)
             continue;
         }
 
-        if (event.type != HPCLANG_KEYBOARD_EVENT_UP ||
-            event.scan_code != want->scan ||
-            event.key != want->key ||
-            event.modifiers != 0u) {
+        if (event.type != HPCLANG_KEYBOARD_EVENT_UP || event.scan_code != want->scan ||
+            event.key != want->key || event.modifiers != 0u) {
             hpclang_keyboard_failed_scan = want->scan;
             return 0;
         }
@@ -1364,12 +1203,9 @@ static int keyboard_transition(uint32_t model)
 static uint32_t object_read_only_test(uint32_t model)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    int rpl_family =
-        model == HPCLANG_MODEL_HP48GII ||
-        model == HPCLANG_MODEL_HP49GPLUS ||
-        model == HPCLANG_MODEL_HP50G;
-    int live_stock_view =
-        rpl_family && boot != NULL && boot->saturn_state != 0u;
+    int rpl_family = model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
+                     model == HPCLANG_MODEL_HP50G;
+    int live_stock_view = rpl_family && boot != NULL && boot->saturn_state != 0u;
 
     uint32_t depth = UINT32_MAX;
     errno = 0;
@@ -1412,8 +1248,7 @@ static uint32_t object_read_only_test(uint32_t model)
     if (before != UINT32_MAX) {
         struct hpclang_object *object = NULL;
         errno = 0;
-        if (hpclang_stack_peek(before + 1u, &object) != -1 ||
-            object != NULL || errno != EINVAL)
+        if (hpclang_stack_peek(before + 1u, &object) != -1 || object != NULL || errno != EINVAL)
             return 0xa5u;
     }
 
@@ -1433,10 +1268,8 @@ static uint32_t object_read_only_test(uint32_t model)
     }
 
     uint8_t character = 0u;
-    if (hpclang_object_character_value(char_a, &character) != 0 ||
-        character != 'A' ||
-        hpclang_object_character_value(char_b, &character) != 0 ||
-        character != 'B') {
+    if (hpclang_object_character_value(char_a, &character) != 0 || character != 'A' ||
+        hpclang_object_character_value(char_b, &character) != 0 || character != 'B') {
         hpclang_object_release(char_a);
         hpclang_object_release(char_b);
         return 0xa7u;
@@ -1450,8 +1283,7 @@ static uint32_t object_read_only_test(uint32_t model)
         }
 
         uint32_t mutated_depth = UINT32_MAX;
-        if (hpclang_stack_depth(&mutated_depth) != 0 ||
-            mutated_depth != before + 1u) {
+        if (hpclang_stack_depth(&mutated_depth) != 0 || mutated_depth != before + 1u) {
             (void)hpclang_stack_drop(1u);
             hpclang_object_release(char_a);
             hpclang_object_release(char_b);
@@ -1466,10 +1298,8 @@ static uint32_t object_read_only_test(uint32_t model)
         }
 
         struct hpclang_object *peek = NULL;
-        if (hpclang_stack_peek(1u, &peek) != 0 ||
-            peek == NULL ||
-            hpclang_object_character_value(peek, &character) != 0 ||
-            character != 'B') {
+        if (hpclang_stack_peek(1u, &peek) != 0 || peek == NULL ||
+            hpclang_object_character_value(peek, &character) != 0 || character != 'B') {
             hpclang_object_release(peek);
             (void)hpclang_stack_drop(1u);
             hpclang_object_release(char_a);
@@ -1485,8 +1315,7 @@ static uint32_t object_read_only_test(uint32_t model)
             return 0xacu;
         }
 
-        if (hpclang_stack_depth(&mutated_depth) != 0 ||
-            mutated_depth != before + 2u) {
+        if (hpclang_stack_depth(&mutated_depth) != 0 || mutated_depth != before + 2u) {
             (void)hpclang_stack_drop(2u);
             hpclang_object_release(char_a);
             hpclang_object_release(char_b);
@@ -1494,10 +1323,8 @@ static uint32_t object_read_only_test(uint32_t model)
         }
 
         struct hpclang_object *popped = NULL;
-        if (hpclang_stack_pop(&popped) != 0 ||
-            popped == NULL ||
-            hpclang_object_character_value(popped, &character) != 0 ||
-            character != 'A') {
+        if (hpclang_stack_pop(&popped) != 0 || popped == NULL ||
+            hpclang_object_character_value(popped, &character) != 0 || character != 'A') {
             hpclang_object_release(popped);
             (void)hpclang_stack_drop(2u);
             hpclang_object_release(char_a);
@@ -1506,10 +1333,8 @@ static uint32_t object_read_only_test(uint32_t model)
         }
         hpclang_object_release(popped);
 
-        if (hpclang_stack_depth(&mutated_depth) != 0 ||
-            mutated_depth != before + 1u ||
-            hpclang_stack_drop(1u) != 0 ||
-            hpclang_stack_depth(&mutated_depth) != 0 ||
+        if (hpclang_stack_depth(&mutated_depth) != 0 || mutated_depth != before + 1u ||
+            hpclang_stack_drop(1u) != 0 || hpclang_stack_depth(&mutated_depth) != 0 ||
             mutated_depth != before) {
             hpclang_object_release(char_a);
             hpclang_object_release(char_b);
@@ -1532,8 +1357,7 @@ static uint32_t object_read_only_test(uint32_t model)
 
         struct hpclang_object *popped = NULL;
         errno = 0;
-        if (hpclang_stack_pop(&popped) != -1 ||
-            popped != NULL || errno != ENOSYS) {
+        if (hpclang_stack_pop(&popped) != -1 || popped != NULL || errno != ENOSYS) {
             hpclang_object_release(popped);
             hpclang_object_release(char_a);
             hpclang_object_release(char_b);
@@ -1556,11 +1380,9 @@ static uint32_t object_read_only_test(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_KEYBOARD
-static int object_store_find_named(
-    struct hpclang_object_store_iterator *iterator,
-    const uint8_t *name,
-    uint32_t name_length,
-    struct hpclang_object_store_entry *found)
+static int object_store_find_named(struct hpclang_object_store_iterator *iterator,
+                                   const uint8_t *name, uint32_t name_length,
+                                   struct hpclang_object_store_entry *found)
 {
     struct hpclang_object_store_entry entry = {
         .size = sizeof(struct hpclang_object_store_entry),
@@ -1568,10 +1390,8 @@ static int object_store_find_named(
     };
 
     int result = 0;
-    while ((result = hpclang_object_store_iterator_read(
-                iterator, &entry)) > 0) {
-        if (entry.name_length == name_length &&
-            memcmp(entry.name, name, name_length) == 0) {
+    while ((result = hpclang_object_store_iterator_read(iterator, &entry)) > 0) {
+        if (entry.name_length == name_length && memcmp(entry.name, name, name_length) == 0) {
             if (found != NULL)
                 *found = entry;
             return 1;
@@ -1584,19 +1404,15 @@ static int object_store_find_named(
 
 static void object_store_phase(uint32_t step)
 {
-    hpclang_e2e_result =
-        HPCLANG_E2E_OBJECT_STORE_PHASE | (step & UINT32_C(0xffff));
+    hpclang_e2e_result = HPCLANG_E2E_OBJECT_STORE_PHASE | (step & UINT32_C(0xffff));
 }
 
 static uint32_t object_store_service_test(uint32_t model)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    int rpl_family =
-        model == HPCLANG_MODEL_HP48GII ||
-        model == HPCLANG_MODEL_HP49GPLUS ||
-        model == HPCLANG_MODEL_HP50G;
-    int live_stock_view =
-        rpl_family && boot != NULL && boot->saturn_state != 0u;
+    int rpl_family = model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
+                     model == HPCLANG_MODEL_HP50G;
+    int live_stock_view = rpl_family && boot != NULL && boot->saturn_state != 0u;
 
     if (!live_stock_view) {
         errno = 0;
@@ -1615,33 +1431,26 @@ static uint32_t object_store_service_test(uint32_t model)
         return 0u;
     }
 
-    static const uint8_t hp48_witness_name[] = {
-        'Z', 'Z', 'E', '2', 'E'
-    };
-    static const uint8_t hp48_witness_value[] = "HPCLANG-E2E";
+    static const uint8_t e2e_witness_name[] = {'Z', 'Z', 'E', '2', 'E'};
+    static const uint8_t e2e_witness_value[] = "HPCLANG-E2E";
     /*
      * x50ng's Stock VVFAT setup exposes a stable empty DOCSTR named
      * X50NG-VV.FAT in USEROB before the payload starts. HPCLANG.HP is the
      * FAT transfer/launcher file and is not a HOME variable, so it is not a
      * valid named-object-store witness on HP49g+/50g.
      */
-    static const uint8_t hp4950_witness_name[] = {
-        'X', '5', '0', 'N', 'G', '-', 'V', 'V', '.', 'F', 'A', 'T'
-    };
+    static const uint8_t hp4950_witness_name[] = {'X', '5', '0', 'N', 'G', '-',
+                                                  'V', 'V', '.', 'F', 'A', 'T'};
     const uint8_t *witness_name =
-        model == HPCLANG_MODEL_HP48GII
-            ? hp48_witness_name
-            : hp4950_witness_name;
-    const uint32_t witness_name_length =
-        model == HPCLANG_MODEL_HP48GII
-            ? (uint32_t)sizeof(hp48_witness_name)
-            : (uint32_t)sizeof(hp4950_witness_name);
+        model == HPCLANG_MODEL_HP48GII ? e2e_witness_name : hp4950_witness_name;
+    uint32_t witness_name_length = model == HPCLANG_MODEL_HP48GII
+                                       ? (uint32_t)sizeof(e2e_witness_name)
+                                       : (uint32_t)sizeof(hp4950_witness_name);
+    int witness_has_e2e_value = model == HPCLANG_MODEL_HP48GII;
 
-    static const uint8_t missing_name[] = {
-        '_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G',
-        '_', 'E', '2', 'E', '_', 'M', 'I', 'S', 'S',
-        'I', 'N', 'G', '_', '8', 'A', '1', '7', '_', '_'
-    };
+    static const uint8_t missing_name[] = {'_', '_', 'H', 'P', 'C', 'L', 'A', 'N', 'G', '_',
+                                           'E', '2', 'E', '_', 'M', 'I', 'S', 'S', 'I', 'N',
+                                           'G', '_', '8', 'A', '1', '7', '_', '_'};
 
     uint32_t failure = 0u;
     object_store_phase(1u); /* before HOME snapshot */
@@ -1656,6 +1465,26 @@ static uint32_t object_store_service_test(uint32_t model)
     if (home == NULL) {
         failure = 0xc2u;
         goto done;
+    }
+
+    /*
+     * Primary HP49/50 USB Stock runs receive the same stable HOME string
+     * witness as HP48gII. The preserved SD/VVFAT secondary gate has no such
+     * HOME transfer and keeps using X50NG-VV.FAT. Prefer the stronger USB
+     * witness whenever it is present without making transport identity part
+     * of the runtime API.
+     */
+    if (model != HPCLANG_MODEL_HP48GII) {
+        struct hpclang_object *candidate = NULL;
+        errno = 0;
+        if (hpclang_object_store_get(home, e2e_witness_name, sizeof(e2e_witness_name),
+                                     &candidate) == 0 &&
+            candidate != NULL && hpclang_object_kind(candidate) == HPCLANG_OBJECT_STRING) {
+            witness_name = e2e_witness_name;
+            witness_name_length = (uint32_t)sizeof(e2e_witness_name);
+            witness_has_e2e_value = 1;
+        }
+        hpclang_object_release(candidate);
     }
 
     object_store_phase(2u); /* HOME ready */
@@ -1690,19 +1519,16 @@ static uint32_t object_store_service_test(uint32_t model)
     struct hpclang_object_store_entry entry1;
     struct hpclang_object_store_entry entry2;
     object_store_phase(9u); /* before first independent lookup */
-    int found1 = object_store_find_named(
-        first, witness_name, witness_name_length, &entry1);
+    int found1 = object_store_find_named(first, witness_name, witness_name_length, &entry1);
     object_store_phase(10u);
-    int found2 = object_store_find_named(
-        second, witness_name, witness_name_length, &entry2);
+    int found2 = object_store_find_named(second, witness_name, witness_name_length, &entry2);
     object_store_phase(11u);
     if (found1 != 1 || found2 != 1) {
         failure = 0xc5u;
         goto done;
     }
 
-    if (entry1.kind != HPCLANG_OBJECT_STRING ||
-        entry2.kind != HPCLANG_OBJECT_STRING ||
+    if (entry1.kind != HPCLANG_OBJECT_STRING || entry2.kind != HPCLANG_OBJECT_STRING ||
         (entry1.flags & HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY) != 0u ||
         (entry2.flags & HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY) != 0u) {
         failure = 0xc6u;
@@ -1712,30 +1538,19 @@ static uint32_t object_store_service_test(uint32_t model)
     object_store_phase(12u); /* before successful named-object snapshot */
     size_t witness_string_size = 0u;
     const size_t expected_witness_size =
-        model == HPCLANG_MODEL_HP48GII
-            ? sizeof(hp48_witness_value) - 1u
-            : 0u;
+        witness_has_e2e_value ? sizeof(e2e_witness_value) - 1u : 0u;
     errno = 0;
-    if (hpclang_object_store_get(
-            home,
-            witness_name,
-            witness_name_length,
-            &witness) != 0 ||
-        witness == NULL ||
-        hpclang_object_kind(witness) != HPCLANG_OBJECT_STRING ||
+    if (hpclang_object_store_get(home, witness_name, witness_name_length, &witness) != 0 ||
+        witness == NULL || hpclang_object_kind(witness) != HPCLANG_OBJECT_STRING ||
         hpclang_object_string_size(witness, &witness_string_size) != 0 ||
         witness_string_size != expected_witness_size) {
         failure = 0xc9u;
         goto done;
     }
-    if (model == HPCLANG_MODEL_HP48GII) {
-        uint8_t witness_copy[sizeof(hp48_witness_value) - 1u];
-        if (hpclang_object_string_copy(
-                witness, witness_copy, sizeof(witness_copy)) != 0 ||
-            memcmp(
-                witness_copy,
-                hp48_witness_value,
-                sizeof(witness_copy)) != 0) {
+    if (witness_has_e2e_value) {
+        uint8_t witness_copy[sizeof(e2e_witness_value) - 1u];
+        if (hpclang_object_string_copy(witness, witness_copy, sizeof(witness_copy)) != 0 ||
+            memcmp(witness_copy, e2e_witness_value, sizeof(witness_copy)) != 0) {
             failure = 0xc9u;
             goto done;
         }
@@ -1743,8 +1558,7 @@ static uint32_t object_store_service_test(uint32_t model)
 
     object_store_phase(13u); /* before ENOTDIR child-open check */
     errno = 0;
-    child = hpclang_object_store_open_child(
-        home, witness_name, witness_name_length);
+    child = hpclang_object_store_open_child(home, witness_name, witness_name_length);
     if (child != NULL || errno != ENOTDIR) {
         failure = 0xc7u;
         goto done;
@@ -1753,13 +1567,8 @@ static uint32_t object_store_service_test(uint32_t model)
     object_store_phase(14u); /* before missing-object lookup */
     struct hpclang_object *missing = NULL;
     errno = 0;
-    if (hpclang_object_store_get(
-            home,
-            missing_name,
-            sizeof(missing_name),
-            &missing) != -1 ||
-        missing != NULL ||
-        errno != ENOENT) {
+    if (hpclang_object_store_get(home, missing_name, sizeof(missing_name), &missing) != -1 ||
+        missing != NULL || errno != ENOENT) {
         hpclang_object_release(missing);
         failure = 0xc8u;
         goto done;
@@ -1787,12 +1596,9 @@ int main(void)
         return finish(0x01, boot->model);
 
     const struct hpclang_device_info *device = hpclang_device_info();
-    if (device == NULL ||
-        device->version != HPCLANG_DEVICE_INFO_VERSION ||
-        device->size < sizeof(*device) ||
-        device->model != boot->model ||
-        device->family != expected_family(boot->model) ||
-        device->display_width != 131u ||
+    if (device == NULL || device->version != HPCLANG_DEVICE_INFO_VERSION ||
+        device->size < sizeof(*device) || device->model != boot->model ||
+        device->family != expected_family(boot->model) || device->display_width != 131u ||
         device->display_height != (uint32_t)display_height(boot->model))
         return finish(0x0e, boot->model);
 
@@ -1805,8 +1611,7 @@ int main(void)
     uint64_t time_before = hpclang_time_monotonic_us();
     hpclang_delay_us(3000u);
     uint64_t time_after = hpclang_time_monotonic_us();
-    if (time_after < time_before ||
-        time_after - time_before < 3000u ||
+    if (time_after < time_before || time_after - time_before < 3000u ||
         time_after - time_before > 200000u)
         return finish(0x0f, boot->model);
 
@@ -1818,36 +1623,23 @@ int main(void)
         return finish(object_failure, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
-    if (boot->model == HPCLANG_MODEL_HP39GS ||
-        boot->model == HPCLANG_MODEL_HP40GS) {
+    if (boot->model == HPCLANG_MODEL_HP39GS || boot->model == HPCLANG_MODEL_HP40GS) {
         errno = 0;
         struct hpclang_object *aplet_catalog = NULL;
         struct hpclang_object *program_catalog = NULL;
         struct hpclang_object *note_catalog = NULL;
         struct hpclang_object *variable_schema = NULL;
-        int aplet_result =
-            hpclang_hp39_aplet_catalog_snapshot(&aplet_catalog);
+        int aplet_result = hpclang_hp39_aplet_catalog_snapshot(&aplet_catalog);
         int program_result =
-            aplet_result == 0
-                ? hpclang_hp39_program_catalog_snapshot(&program_catalog)
-                : -1;
+            aplet_result == 0 ? hpclang_hp39_program_catalog_snapshot(&program_catalog) : -1;
         int note_result =
-            program_result == 0
-                ? hpclang_hp39_note_catalog_snapshot(&note_catalog)
-                : -1;
+            program_result == 0 ? hpclang_hp39_note_catalog_snapshot(&note_catalog) : -1;
         int schema_result =
-            note_result == 0
-                ? hpclang_hp39_variable_schema_snapshot(&variable_schema)
-                : -1;
+            note_result == 0 ? hpclang_hp39_variable_schema_snapshot(&variable_schema) : -1;
         if (boot->saturn_state != 0u) {
-            if (aplet_result != 0 ||
-                program_result != 0 ||
-                note_result != 0 ||
-                schema_result != 0 ||
-                aplet_catalog == NULL ||
-                program_catalog == NULL ||
-                note_catalog == NULL ||
-                variable_schema == NULL ||
+            if (aplet_result != 0 || program_result != 0 || note_result != 0 ||
+                schema_result != 0 || aplet_catalog == NULL || program_catalog == NULL ||
+                note_catalog == NULL || variable_schema == NULL ||
                 hpclang_object_kind(aplet_catalog) != HPCLANG_OBJECT_LIST ||
                 hpclang_object_kind(program_catalog) != HPCLANG_OBJECT_LIST ||
                 hpclang_object_kind(note_catalog) != HPCLANG_OBJECT_LIST ||
@@ -1861,13 +1653,10 @@ int main(void)
 
             static const uint8_t function_aplet_name[] = "Function";
             struct hpclang_object *function_aplet = NULL;
-            if (hpclang_hp39_aplet_snapshot(
-                    function_aplet_name,
-                    sizeof(function_aplet_name) - 1u,
-                    &function_aplet) != 0 ||
+            if (hpclang_hp39_aplet_snapshot(function_aplet_name, sizeof(function_aplet_name) - 1u,
+                                            &function_aplet) != 0 ||
                 function_aplet == NULL ||
-                hpclang_object_kind(function_aplet) !=
-                    HPCLANG_OBJECT_DIRECTORY) {
+                hpclang_object_kind(function_aplet) != HPCLANG_OBJECT_DIRECTORY) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -1882,11 +1671,8 @@ int main(void)
             struct hpclang_object *note_text_value = NULL;
             errno = 0;
             int note_text_result = hpclang_hp39_variable_value_snapshot(
-                note_category,
-                sizeof(note_category) - 1u,
-                note_text_name,
-                sizeof(note_text_name) - 1u,
-                &note_text_value);
+                note_category, sizeof(note_category) - 1u, note_text_name,
+                sizeof(note_text_name) - 1u, &note_text_value);
             if (note_text_result != 0) {
                 uint32_t code = 0xc3u;
                 if (errno == ENOENT)
@@ -1937,8 +1723,7 @@ int main(void)
                 hpclang_object_release(variable_schema);
                 return finish(0xbdu, boot->model);
             }
-            if (hpclang_object_kind(note_text_value) !=
-                HPCLANG_OBJECT_STRING) {
+            if (hpclang_object_kind(note_text_value) != HPCLANG_OBJECT_STRING) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -1954,8 +1739,7 @@ int main(void)
              * calculator-visible content or relying on a raw Saturn address.
              */
             size_t note_text_size = 0u;
-            if (hpclang_object_string_size(
-                    note_text_value, &note_text_size) != 0 ||
+            if (hpclang_object_string_size(note_text_value, &note_text_size) != 0 ||
                 note_text_size > 3000u) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
@@ -1964,12 +1748,9 @@ int main(void)
                 hpclang_object_release(note_text_value);
                 return finish(0xd7u, boot->model);
             }
-            if (hpclang_hp39_variable_value_store(
-                    note_category,
-                    sizeof(note_category) - 1u,
-                    note_text_name,
-                    sizeof(note_text_name) - 1u,
-                    note_text_value) != 0) {
+            if (hpclang_hp39_variable_value_store(note_category, sizeof(note_category) - 1u,
+                                                  note_text_name, sizeof(note_text_name) - 1u,
+                                                  note_text_value) != 0) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -1979,15 +1760,11 @@ int main(void)
             }
 
             struct hpclang_object *note_text_roundtrip = NULL;
-            if (hpclang_hp39_variable_value_snapshot(
-                    note_category,
-                    sizeof(note_category) - 1u,
-                    note_text_name,
-                    sizeof(note_text_name) - 1u,
-                    &note_text_roundtrip) != 0 ||
+            if (hpclang_hp39_variable_value_snapshot(note_category, sizeof(note_category) - 1u,
+                                                     note_text_name, sizeof(note_text_name) - 1u,
+                                                     &note_text_roundtrip) != 0 ||
                 note_text_roundtrip == NULL ||
-                hpclang_object_kind(note_text_roundtrip) !=
-                    HPCLANG_OBJECT_STRING) {
+                hpclang_object_kind(note_text_roundtrip) != HPCLANG_OBJECT_STRING) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -1998,8 +1775,7 @@ int main(void)
             }
 
             size_t roundtrip_size = 0u;
-            if (hpclang_object_string_size(
-                    note_text_roundtrip, &roundtrip_size) != 0 ||
+            if (hpclang_object_string_size(note_text_roundtrip, &roundtrip_size) != 0 ||
                 roundtrip_size != note_text_size) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
@@ -2014,10 +1790,8 @@ int main(void)
                 uint8_t *before = malloc(note_text_size);
                 uint8_t *after = malloc(note_text_size);
                 if (before == NULL || after == NULL ||
-                    hpclang_object_string_copy(
-                        note_text_value, before, note_text_size) != 0 ||
-                    hpclang_object_string_copy(
-                        note_text_roundtrip, after, note_text_size) != 0 ||
+                    hpclang_object_string_copy(note_text_value, before, note_text_size) != 0 ||
+                    hpclang_object_string_copy(note_text_roundtrip, after, note_text_size) != 0 ||
                     memcmp(before, after, note_text_size) != 0) {
                     free(after);
                     free(before);
@@ -2040,29 +1814,17 @@ int main(void)
             uint32_t note_count = 0u;
             int fixture_found = 0;
             int editline_found = 0;
-            static const uint8_t fixture_name[] =
-                "HPCLANG HPC1 TEST";
-            static const uint8_t editline_name[] =
-                "Editline";
-            if (hpclang_hp39_catalog_name_count(
-                    aplet_catalog, &aplet_count) != 0 ||
-                hpclang_hp39_catalog_name_count(
-                    program_catalog, &program_count) != 0 ||
-                hpclang_hp39_catalog_name_count(
-                    note_catalog, &note_count) != 0 ||
+            static const uint8_t fixture_name[] = "HPCLANG HPC1 TEST";
+            static const uint8_t editline_name[] = "Editline";
+            if (hpclang_hp39_catalog_name_count(aplet_catalog, &aplet_count) != 0 ||
+                hpclang_hp39_catalog_name_count(program_catalog, &program_count) != 0 ||
+                hpclang_hp39_catalog_name_count(note_catalog, &note_count) != 0 ||
                 hpclang_hp39_catalog_contains_name(
-                    aplet_catalog,
-                    fixture_name,
-                    sizeof(fixture_name) - 1u,
-                    &fixture_found) != 0 ||
-                hpclang_hp39_catalog_contains_name(
-                    program_catalog,
-                    editline_name,
-                    sizeof(editline_name) - 1u,
-                    &editline_found) != 0 ||
-                fixture_found == 0 ||
-                editline_found == 0 ||
-                aplet_count == 0u ||
+                    aplet_catalog, fixture_name, sizeof(fixture_name) - 1u, &fixture_found) != 0 ||
+                hpclang_hp39_catalog_contains_name(program_catalog, editline_name,
+                                                   sizeof(editline_name) - 1u,
+                                                   &editline_found) != 0 ||
+                fixture_found == 0 || editline_found == 0 || aplet_count == 0u ||
                 program_count == 0u) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
@@ -2073,14 +1835,11 @@ int main(void)
 
             struct hpclang_object *editline_body = NULL;
             size_t editline_size = 0u;
-            if (hpclang_hp39_program_body_snapshot(
-                    editline_name,
-                    sizeof(editline_name) - 1u,
-                    &editline_body) != 0 ||
+            if (hpclang_hp39_program_body_snapshot(editline_name, sizeof(editline_name) - 1u,
+                                                   &editline_body) != 0 ||
                 editline_body == NULL ||
                 hpclang_object_kind(editline_body) != HPCLANG_OBJECT_STRING ||
-                hpclang_object_string_size(
-                    editline_body, &editline_size) != 0) {
+                hpclang_object_string_size(editline_body, &editline_size) != 0) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -2090,30 +1849,20 @@ int main(void)
             }
             hpclang_object_release(editline_body);
 
-            static const uint8_t missing_body_name[] =
-                "HPCLANG-NO-SUCH";
+            static const uint8_t missing_body_name[] = "HPCLANG-NO-SUCH";
             struct hpclang_object *missing_program = NULL;
             struct hpclang_object *missing_note = NULL;
             errno = 0;
-            int missing_program_result =
-                hpclang_hp39_program_body_snapshot(
-                    missing_body_name,
-                    sizeof(missing_body_name) - 1u,
-                    &missing_program);
+            int missing_program_result = hpclang_hp39_program_body_snapshot(
+                missing_body_name, sizeof(missing_body_name) - 1u, &missing_program);
             int missing_program_errno = errno;
             errno = 0;
-            int missing_note_result =
-                hpclang_hp39_note_body_snapshot(
-                    missing_body_name,
-                    sizeof(missing_body_name) - 1u,
-                    &missing_note);
+            int missing_note_result = hpclang_hp39_note_body_snapshot(
+                missing_body_name, sizeof(missing_body_name) - 1u, &missing_note);
             int missing_note_errno = errno;
-            if (missing_program_result != -1 ||
-                missing_note_result != -1 ||
-                missing_program != NULL ||
-                missing_note != NULL ||
-                missing_program_errno != ENOENT ||
-                missing_note_errno != ENOENT) {
+            if (missing_program_result != -1 || missing_note_result != -1 ||
+                missing_program != NULL || missing_note != NULL ||
+                missing_program_errno != ENOENT || missing_note_errno != ENOENT) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -2132,58 +1881,39 @@ int main(void)
             hpclang_object_release(note_catalog);
             hpclang_object_release(variable_schema);
 
-            static const uint8_t missing_body_name[] =
-                "HPCLANG-NO-SUCH";
+            static const uint8_t missing_body_name[] = "HPCLANG-NO-SUCH";
             struct hpclang_object *missing_body = NULL;
             struct hpclang_object *direct_aplet = NULL;
             struct hpclang_object *direct_schema = NULL;
             struct hpclang_object *direct_value = NULL;
             errno = 0;
-            int missing_result =
-                hpclang_hp39_program_body_snapshot(
-                    missing_body_name,
-                    sizeof(missing_body_name) - 1u,
-                    &missing_body);
+            int missing_result = hpclang_hp39_program_body_snapshot(
+                missing_body_name, sizeof(missing_body_name) - 1u, &missing_body);
             int missing_errno = errno;
             errno = 0;
-            int direct_aplet_result =
-                hpclang_hp39_aplet_snapshot(
-                    (const uint8_t *)"Function",
-                    sizeof("Function") - 1u,
-                    &direct_aplet);
+            int direct_aplet_result = hpclang_hp39_aplet_snapshot(
+                (const uint8_t *)"Function", sizeof("Function") - 1u, &direct_aplet);
             int aplet_errno = errno;
             errno = 0;
-            int direct_schema_result =
-                hpclang_hp39_variable_schema_snapshot(&direct_schema);
+            int direct_schema_result = hpclang_hp39_variable_schema_snapshot(&direct_schema);
             int schema_errno = errno;
             errno = 0;
-            int direct_value_result =
-                hpclang_hp39_variable_value_snapshot(
-                    (const uint8_t *)"Note",
-                    sizeof("Note") - 1u,
-                    (const uint8_t *)"NoteText",
-                    sizeof("NoteText") - 1u,
-                    &direct_value);
+            int direct_value_result = hpclang_hp39_variable_value_snapshot(
+                (const uint8_t *)"Note", sizeof("Note") - 1u, (const uint8_t *)"NoteText",
+                sizeof("NoteText") - 1u, &direct_value);
             int value_errno = errno;
             hpclang_object_release(missing_body);
             hpclang_object_release(direct_aplet);
             hpclang_object_release(direct_schema);
             hpclang_object_release(direct_value);
-            if (aplet_result != -1 ||
-                missing_result != -1 ||
-                missing_errno != ENOSYS ||
-                direct_aplet_result != -1 ||
-                aplet_errno != ENOSYS ||
-                direct_schema_result != -1 ||
-                schema_errno != ENOSYS ||
-                direct_value_result != -1 ||
-                value_errno != ENOSYS)
+            if (aplet_result != -1 || missing_result != -1 || missing_errno != ENOSYS ||
+                direct_aplet_result != -1 || aplet_errno != ENOSYS || direct_schema_result != -1 ||
+                schema_errno != ENOSYS || direct_value_result != -1 || value_errno != ENOSYS)
                 return finish(0xb5u, boot->model);
         }
     }
 
-    uint32_t object_store_failure =
-        object_store_service_test(boot->model);
+    uint32_t object_store_failure = object_store_service_test(boot->model);
     if (object_store_failure != 0u)
         return finish(object_store_failure, boot->model);
 #endif
@@ -2209,8 +1939,7 @@ int main(void)
         return finish(0x04, boot->model);
     hpclang_tls_initialized ^= 0xffffffffu;
     hpclang_tls_zero = 0x11223344u;
-    if (hpclang_tls_initialized != 0xdb97531fu ||
-        hpclang_tls_zero != 0x11223344u)
+    if (hpclang_tls_initialized != 0xdb97531fu || hpclang_tls_zero != 0x11223344u)
         return finish(0x05, boot->model);
 
     if (hpclang_ctor_probe != 0xc0def00du)
@@ -2244,15 +1973,9 @@ int main(void)
     if (strcmp(heap, "hpclang") != 0)
         return finish(0x0c, boot->model);
     char formatted[64];
-    int n = snprintf(
-        formatted,
-        sizeof(formatted),
-        "%s:%lu:%llu",
-        copy,
-        (unsigned long)q32,
-        (unsigned long long)q64);
-    if (n <= 0 ||
-        strcmp(formatted, "hpclang:10309:1311764532170") != 0)
+    int n = snprintf(formatted, sizeof(formatted), "%s:%lu:%llu", copy, (unsigned long)q32,
+                     (unsigned long long)q64);
+    if (n <= 0 || strcmp(formatted, "hpclang:10309:1311764532170") != 0)
         return finish(0x0d, boot->model);
     free(heap);
     return finish(0, boot->model);

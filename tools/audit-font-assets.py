@@ -27,7 +27,9 @@ LOCALES = (
     "zh_hans",
     "zh_hant",
 )
-LOCALE_RE = re.compile(r"^(?P<prefix>.+)-(?P<locale>" + "|".join(LOCALES) + r")(?P<suffix>\.[^.]+)$")
+LOCALE_RE = re.compile(
+    r"^(?P<prefix>.+)-(?P<locale>" + "|".join(LOCALES) + r")(?P<suffix>\.[^.]+)$"
+)
 FOCUS_FAMILIES = {
     "ark-pixel",
     "boutique-bitmap-7x7",
@@ -292,9 +294,13 @@ def analyze_face(source_glyphs: dict[int, tuple], selector: str, family: str | N
         _xo, _yo, width, _height, advance, _stride, _bitmap = source_glyphs[cp]
         spacing_values.append(advance - width)
     spacing = {
-        "mean_advance_minus_width": round(statistics.fmean(spacing_values), 2) if spacing_values else None,
+        "mean_advance_minus_width": round(statistics.fmean(spacing_values), 2)
+        if spacing_values
+        else None,
         "median_advance_minus_width": statistics.median(spacing_values) if spacing_values else None,
-        "p90_advance_minus_width": round(percentile(spacing_values, 0.9), 2) if spacing_values else None,
+        "p90_advance_minus_width": round(percentile(spacing_values, 0.9), 2)
+        if spacing_values
+        else None,
         "max_advance_minus_width": max(spacing_values) if spacing_values else None,
     }
 
@@ -460,7 +466,9 @@ def html_report(report: dict, faces: list[dict], output: Path) -> None:
             review.append(row)
 
     def badge(signal: str) -> str:
-        severity = "bad" if signal in {"quick-overflow", "glyph-collapse", "blank-heavy"} else "warn"
+        severity = (
+            "bad" if signal in {"quick-overflow", "glyph-collapse", "blank-heavy"} else "warn"
+        )
         if signal == "user-focus":
             severity = "info"
         return f'<span class="badge {severity}">{html.escape(signal)}</span>'
@@ -469,19 +477,41 @@ def html_report(report: dict, faces: list[dict], output: Path) -> None:
     out.append("""<style>
 :root{font-family:ui-sans-serif,system-ui,sans-serif;color-scheme:light dark}body{margin:0;background:#111;color:#eee}main{max-width:1700px;margin:auto;padding:26px}h1{margin:0 0 6px}.sub{color:#aaa;line-height:1.45}.stats{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.stat{border:1px solid #333;background:#1a1a1a;border-radius:10px;padding:9px 12px}.stat b{font-size:20px}.legend{border:1px solid #333;background:#171717;padding:12px;border-radius:10px;line-height:1.55;margin-bottom:20px}table{border-collapse:collapse;width:100%;font-size:12px}th{position:sticky;top:0;background:#171717;z-index:3}th,td{border-bottom:1px solid #303030;padding:7px;vertical-align:top;text-align:left}.selector{max-width:340px;overflow-wrap:anywhere;color:#aaa}.shot{image-rendering:pixelated;background:#fff;border:1px solid #555;max-width:360px;min-height:18px}.badge{display:inline-block;margin:1px 3px 1px 0;padding:2px 5px;border-radius:5px;border:1px solid #555}.bad{color:#ffb4a9}.warn{color:#ffd28a}.info{color:#9ed0ff}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.small{color:#aaa;font-size:11px}.group{white-space:nowrap}</style><main>""")
     out.append("<h1>hpclang Font Asset Audit</h1>")
-    out.append("<div class='sub'>Canonical source → generated parity, full semantic duplicates, spacing/coverage signals, repertoire previews, and actual locale-difference glyphs. This report recommends review; it does not delete fonts.</div>")
+    out.append(
+        "<div class='sub'>Canonical source → generated parity, full semantic duplicates, spacing/coverage signals, repertoire previews, and actual locale-difference glyphs. This report recommends review; it does not delete fonts.</div>"
+    )
     stats = [
         (report["face_count"], "faces"),
         (f"{report['generated_parity']['passed']}/{report['face_count']}", "generated parity"),
         (len(report["exact_duplicate_groups"]), "exact duplicate groups"),
-        (sum(1 for face in faces if "quick-overflow" in face["visual_audit"]["signals"]), "Quick > 131px"),
-        (sum(1 for face in faces if "glyph-collapse" in face["visual_audit"]["signals"]), "glyph collapse"),
-        (sum(1 for face in faces if "blank-heavy" in face["visual_audit"]["signals"]), "blank-heavy"),
+        (
+            sum(1 for face in faces if "quick-overflow" in face["visual_audit"]["signals"]),
+            "Quick > 131px",
+        ),
+        (
+            sum(1 for face in faces if "glyph-collapse" in face["visual_audit"]["signals"]),
+            "glyph collapse",
+        ),
+        (
+            sum(1 for face in faces if "blank-heavy" in face["visual_audit"]["signals"]),
+            "blank-heavy",
+        ),
         (len(review), "review rows"),
     ]
-    out.append("<div class='stats'>" + "".join(f"<div class='stat'><b>{html.escape(str(v))}</b><br>{html.escape(k)}</div>" for v,k in stats) + "</div>")
-    out.append("<div class='legend'><b>Policy signals.</b> <span class='bad'>quick-overflow</span>: ‘Quick’ exceeds the 131px LCD. <span class='bad'>glyph-collapse</span>: ≥80% of present printable ASCII resolves to one visual glyph. <span class='bad'>blank-heavy</span>: ≥25% of present printable ASCII is blank. <span class='warn'>ascii-missing</span>: printable ASCII codepoints are absent. <span class='warn'>loose-spacing</span>: median (advance − bitmap width) ≥2px; this is diagnostic, not an automatic defect. <span class='warn'>powerline-variant</span>: Tamzen Powerline-specific asset. Locale rows render codepoints that actually differ across locale faces, rather than fixed samples.</div>")
-    out.append("<table><thead><tr><th>Face</th><th>Signals / metrics</th><th>Quick / ASCII</th><th>Distinctive repertoire</th><th>Locale differences</th><th>Source</th></tr></thead><tbody>")
+    out.append(
+        "<div class='stats'>"
+        + "".join(
+            f"<div class='stat'><b>{html.escape(str(v))}</b><br>{html.escape(k)}</div>"
+            for v, k in stats
+        )
+        + "</div>"
+    )
+    out.append(
+        "<div class='legend'><b>Policy signals.</b> <span class='bad'>quick-overflow</span>: ‘Quick’ exceeds the 131px LCD. <span class='bad'>glyph-collapse</span>: ≥80% of present printable ASCII resolves to one visual glyph. <span class='bad'>blank-heavy</span>: ≥25% of present printable ASCII is blank. <span class='warn'>ascii-missing</span>: printable ASCII codepoints are absent. <span class='warn'>loose-spacing</span>: median (advance − bitmap width) ≥2px; this is diagnostic, not an automatic defect. <span class='warn'>powerline-variant</span>: Tamzen Powerline-specific asset. Locale rows render codepoints that actually differ across locale faces, rather than fixed samples.</div>"
+    )
+    out.append(
+        "<table><thead><tr><th>Face</th><th>Signals / metrics</th><th>Quick / ASCII</th><th>Distinctive repertoire</th><th>Locale differences</th><th>Source</th></tr></thead><tbody>"
+    )
     for face in review:
         va = face["visual_audit"]
         glyphs = face["_source_glyphs"]
@@ -504,18 +534,28 @@ def html_report(report: dict, faces: list[dict], output: Path) -> None:
             f"<div>advance−width median {spacing['median_advance_minus_width']} · p90 {spacing['p90_advance_minus_width']} · max {spacing['max_advance_minus_width']}</div>"
         )
         rep = va["repertoire"]
-        rep_text = " · ".join(f"{k} {v}" for k,v in rep.items() if v)
+        rep_text = " · ".join(f"{k} {v}" for k, v in rep.items() if v)
         locale_text = ""
         if locale:
-            locale_text = f"<div>{html.escape(locale.get('classification',''))}: {locale.get('changed_count',0)} differing cps</div>"
+            locale_text = f"<div>{html.escape(locale.get('classification', ''))}: {locale.get('changed_count', 0)} differing cps</div>"
             if locale_cps:
-                locale_text += f"<div class='small mono'>{html.escape(codepoint_label(locale_cps))}</div>"
+                locale_text += (
+                    f"<div class='small mono'>{html.escape(codepoint_label(locale_cps))}</div>"
+                )
         out.append("<tr>")
-        out.append(f"<td><b>{html.escape(str(face.get('family') or ''))}</b><br>{html.escape(face['selector'].split('/')[-1])}</td>")
+        out.append(
+            f"<td><b>{html.escape(str(face.get('family') or ''))}</b><br>{html.escape(face['selector'].split('/')[-1])}</td>"
+        )
         out.append(f"<td>{signals}{metrics}</td>")
-        out.append(f"<td>{f'<img class=shot src=\"{quick}\">' if quick else '—'}<div class='small mono'>{html.escape(ASCII_TEST)}</div></td>")
-        out.append(f"<td>{f'<img class=shot src=\"{feature}\">' if feature else '—'}<div class='small'>{html.escape(rep_text)}</div><div class='small mono'>{html.escape(codepoint_label(feature_cps))}</div></td>")
-        out.append(f"<td>{f'<img class=shot src=\"{locale_img}\">' if locale_img else ''}{locale_text or '—'}</td>")
+        out.append(
+            f"<td>{f'<img class=shot src="{quick}">' if quick else '—'}<div class='small mono'>{html.escape(ASCII_TEST)}</div></td>"
+        )
+        out.append(
+            f"<td>{f'<img class=shot src="{feature}">' if feature else '—'}<div class='small'>{html.escape(rep_text)}</div><div class='small mono'>{html.escape(codepoint_label(feature_cps))}</div></td>"
+        )
+        out.append(
+            f"<td>{f'<img class=shot src="{locale_img}">' if locale_img else ''}{locale_text or '—'}</td>"
+        )
         out.append(f"<td class='selector'>{html.escape(face['selector'])}</td>")
         out.append("</tr>")
     out.append("</tbody></table></main>")
@@ -535,7 +575,9 @@ def main() -> int:
     parser.add_argument("--generated-dir", default="runtime/fonts/generated")
     parser.add_argument("--family", default=None, help="limit audit to one catalog family")
     parser.add_argument("--json", dest="json_path", default=None, help="write machine report")
-    parser.add_argument("--html", dest="html_path", default=None, help="write self-contained visual review report")
+    parser.add_argument(
+        "--html", dest="html_path", default=None, help="write self-contained visual review report"
+    )
     args = parser.parse_args()
 
     package = hf.Package(args.package)
@@ -576,7 +618,9 @@ def main() -> int:
             and metrics == generated_metrics
             and source_cps == generated_cps
             and source_hash == generated_hash
-            and not any(mismatches[name] for name in ("missing_count", "extra_count", "changed_count"))
+            and not any(
+                mismatches[name] for name in ("missing_count", "extra_count", "changed_count")
+            )
         )
         if not parity:
             failures += 1
@@ -620,12 +664,24 @@ def main() -> int:
         "exact_duplicate_groups": exact_duplicates,
         "locale_variant_groups": locale_groups,
         "visual_summary": {
-            "quick_overflow": sum(1 for face in faces if "quick-overflow" in face["visual_audit"]["signals"]),
-            "glyph_collapse": sum(1 for face in faces if "glyph-collapse" in face["visual_audit"]["signals"]),
-            "blank_heavy": sum(1 for face in faces if "blank-heavy" in face["visual_audit"]["signals"]),
-            "ascii_missing": sum(1 for face in faces if "ascii-missing" in face["visual_audit"]["signals"]),
-            "loose_spacing": sum(1 for face in faces if "loose-spacing" in face["visual_audit"]["signals"]),
-            "powerline_variant": sum(1 for face in faces if "powerline-variant" in face["visual_audit"]["signals"]),
+            "quick_overflow": sum(
+                1 for face in faces if "quick-overflow" in face["visual_audit"]["signals"]
+            ),
+            "glyph_collapse": sum(
+                1 for face in faces if "glyph-collapse" in face["visual_audit"]["signals"]
+            ),
+            "blank_heavy": sum(
+                1 for face in faces if "blank-heavy" in face["visual_audit"]["signals"]
+            ),
+            "ascii_missing": sum(
+                1 for face in faces if "ascii-missing" in face["visual_audit"]["signals"]
+            ),
+            "loose_spacing": sum(
+                1 for face in faces if "loose-spacing" in face["visual_audit"]["signals"]
+            ),
+            "powerline_variant": sum(
+                1 for face in faces if "powerline-variant" in face["visual_audit"]["signals"]
+            ),
         },
         "faces": [public_face(face) for face in faces],
     }
@@ -653,9 +709,7 @@ def main() -> int:
         )
         for subset in group["exact_duplicate_subsets"]:
             locales = [
-                face["locale"]
-                for face in group["faces"]
-                if face["selector"] in subset["selectors"]
+                face["locale"] for face in group["faces"] if face["selector"] in subset["selectors"]
             ]
             print(f"  exact subset: {', '.join(locale for locale in locales if locale)}")
     for number, group in enumerate(exact_duplicates, 1):

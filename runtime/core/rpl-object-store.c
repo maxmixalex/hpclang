@@ -4,7 +4,8 @@
 
 #include "rpl-object-store.h"
 
-enum {
+enum
+{
     RPL_DORRP = 0x02a96u,
     RPL_USEROB = 0x00080711u,
     RPL_CONTEXT = 0x0008071bu,
@@ -21,16 +22,11 @@ static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
     return 1;
 }
 
-static int read_nibbles(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t count,
-    uint32_t *value)
+static int read_nibbles(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t count,
+                        uint32_t *value)
 {
-    if (reader == NULL || reader->read_nibble == NULL ||
-        value == NULL || count == 0u || count > 8u ||
-        address >= RPL_SPACE_NIBBLES ||
-        count > RPL_SPACE_NIBBLES - address)
+    if (reader == NULL || reader->read_nibble == NULL || value == NULL || count == 0u ||
+        count > 8u || address >= RPL_SPACE_NIBBLES || count > RPL_SPACE_NIBBLES - address)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
 
     uint32_t out = 0u;
@@ -47,10 +43,7 @@ static int read_nibbles(
     return HPCLANG_RPL_STORE_OK;
 }
 
-static int read_name_byte(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint8_t *value)
+static int read_name_byte(const struct hpclang_rpl_reader *reader, uint32_t address, uint8_t *value)
 {
     uint32_t packed = 0u;
     int result = read_nibbles(reader, address, 2u, &packed);
@@ -60,9 +53,7 @@ static int read_name_byte(
     return HPCLANG_RPL_STORE_OK;
 }
 
-int hpclang_rpl_store_home_object(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t *object_address)
+int hpclang_rpl_store_home_object(const struct hpclang_rpl_reader *reader, uint32_t *object_address)
 {
     if (object_address == NULL)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
@@ -86,9 +77,8 @@ int hpclang_rpl_store_home_object(
     return HPCLANG_RPL_STORE_OK;
 }
 
-int hpclang_rpl_store_current_object(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t *object_address)
+int hpclang_rpl_store_current_object(const struct hpclang_rpl_reader *reader,
+                                     uint32_t *object_address)
 {
     if (object_address == NULL)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
@@ -112,10 +102,8 @@ int hpclang_rpl_store_current_object(
     return HPCLANG_RPL_STORE_OK;
 }
 
-static int directory_chain(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t directory_object,
-    uint32_t *chain)
+static int directory_chain(const struct hpclang_rpl_reader *reader, uint32_t directory_object,
+                           uint32_t *chain)
 {
     uint32_t prologue = 0u;
     int result = read_nibbles(reader, directory_object, 5u, &prologue);
@@ -125,8 +113,7 @@ static int directory_chain(
         return HPCLANG_RPL_STORE_NOT_DIRECTORY;
 
     uint32_t cursor = 0u;
-    if (!checked_add(directory_object, 5u, &cursor) ||
-        cursor >= RPL_SPACE_NIBBLES)
+    if (!checked_add(directory_object, 5u, &cursor) || cursor >= RPL_SPACE_NIBBLES)
         return HPCLANG_RPL_STORE_MALFORMED;
 
     uint32_t home = 0u;
@@ -144,18 +131,16 @@ static int directory_chain(
         cursor += libraries * 13u;
     }
 
-    if (!checked_add(cursor, 3u, &cursor) ||
-        cursor > RPL_SPACE_NIBBLES - 5u)
+    if (!checked_add(cursor, 3u, &cursor) || cursor > RPL_SPACE_NIBBLES - 5u)
         return HPCLANG_RPL_STORE_MALFORMED;
 
     *chain = cursor;
     return HPCLANG_RPL_STORE_OK;
 }
 
-int hpclang_rpl_directory_cursor_open(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t directory_object,
-    struct hpclang_rpl_directory_cursor *cursor)
+int hpclang_rpl_directory_cursor_open(const struct hpclang_rpl_reader *reader,
+                                      uint32_t directory_object,
+                                      struct hpclang_rpl_directory_cursor *cursor)
 {
     if (cursor == NULL)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
@@ -179,18 +164,16 @@ int hpclang_rpl_directory_cursor_open(
     }
 
     uint32_t item = 0u;
-    if (!checked_add(chain, offset, &item) ||
-        item <= chain || item >= RPL_SPACE_NIBBLES)
+    if (!checked_add(chain, offset, &item) || item <= chain || item >= RPL_SPACE_NIBBLES)
         return HPCLANG_RPL_STORE_MALFORMED;
 
     cursor->item = item;
     return HPCLANG_RPL_STORE_OK;
 }
 
-int hpclang_rpl_directory_cursor_next(
-    const struct hpclang_rpl_reader *reader,
-    struct hpclang_rpl_directory_cursor *cursor,
-    struct hpclang_rpl_directory_entry_view *entry)
+int hpclang_rpl_directory_cursor_next(const struct hpclang_rpl_reader *reader,
+                                      struct hpclang_rpl_directory_cursor *cursor,
+                                      struct hpclang_rpl_directory_entry_view *entry)
 {
     if (cursor == NULL || entry == NULL)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
@@ -220,10 +203,8 @@ int hpclang_rpl_directory_cursor_next(
      * The empty form has no trailing duplicate length and therefore starts
      * two nibbles earlier than the ordinary formula.
      */
-    uint32_t object_offset =
-        name_length == 0u ? 2u : 4u + name_nibbles;
-    if (!checked_add(item, object_offset, &object) ||
-        object > RPL_SPACE_NIBBLES - 5u)
+    uint32_t object_offset = name_length == 0u ? 2u : 4u + name_nibbles;
+    if (!checked_add(item, object_offset, &object) || object > RPL_SPACE_NIBBLES - 5u)
         return HPCLANG_RPL_STORE_MALFORMED;
 
     if (name_length != 0u) {
@@ -273,29 +254,22 @@ int hpclang_rpl_directory_cursor_next(
     return 1;
 }
 
-int hpclang_rpl_directory_find(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t directory_object,
-    const uint8_t *name,
-    uint32_t name_length,
-    struct hpclang_rpl_directory_entry_view *entry)
+int hpclang_rpl_directory_find(const struct hpclang_rpl_reader *reader, uint32_t directory_object,
+                               const uint8_t *name, uint32_t name_length,
+                               struct hpclang_rpl_directory_entry_view *entry)
 {
-    if ((name == NULL && name_length != 0u) ||
-        name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
+    if ((name == NULL && name_length != 0u) || name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
         return HPCLANG_RPL_STORE_MALFORMED;
 
     struct hpclang_rpl_directory_cursor cursor;
-    int result =
-        hpclang_rpl_directory_cursor_open(reader, directory_object, &cursor);
+    int result = hpclang_rpl_directory_cursor_open(reader, directory_object, &cursor);
     if (result != HPCLANG_RPL_STORE_OK)
         return result;
 
     struct hpclang_rpl_directory_entry_view candidate;
-    while ((result = hpclang_rpl_directory_cursor_next(
-                reader, &cursor, &candidate)) > 0) {
+    while ((result = hpclang_rpl_directory_cursor_next(reader, &cursor, &candidate)) > 0) {
         if (candidate.name_length == name_length &&
-            (name_length == 0u ||
-             memcmp(candidate.name, name, name_length) == 0)) {
+            (name_length == 0u || memcmp(candidate.name, name, name_length) == 0)) {
             if (entry != NULL)
                 *entry = candidate;
             return HPCLANG_RPL_STORE_OK;
@@ -305,7 +279,8 @@ int hpclang_rpl_directory_find(
     return result == 0 ? HPCLANG_RPL_STORE_NOT_FOUND : result;
 }
 
-struct path_search {
+struct path_search
+{
     const struct hpclang_rpl_reader *reader;
     uint32_t target;
     uint8_t *path;
@@ -315,31 +290,23 @@ struct path_search {
     uint32_t remaining_entries;
 };
 
-static int path_append_component(
-    struct path_search *search,
-    const struct hpclang_rpl_directory_entry_view *entry)
+static int path_append_component(struct path_search *search,
+                                 const struct hpclang_rpl_directory_entry_view *entry)
 {
     uint32_t needed = 1u + entry->name_length;
-    if (search->used > search->capacity ||
-        needed > search->capacity - search->used)
+    if (search->used > search->capacity || needed > search->capacity - search->used)
         return HPCLANG_RPL_STORE_LIMIT;
 
     search->path[search->used++] = (uint8_t)entry->name_length;
     if (entry->name_length != 0u) {
-        memcpy(
-            search->path + search->used,
-            entry->name,
-            entry->name_length);
+        memcpy(search->path + search->used, entry->name, entry->name_length);
         search->used += entry->name_length;
     }
     ++search->components;
     return HPCLANG_RPL_STORE_OK;
 }
 
-static int path_search_directory(
-    struct path_search *search,
-    uint32_t directory,
-    uint32_t depth)
+static int path_search_directory(struct path_search *search, uint32_t directory, uint32_t depth)
 {
     if (depth > RPL_DIRECTORY_DEPTH_LIMIT)
         return HPCLANG_RPL_STORE_LIMIT;
@@ -347,14 +314,12 @@ static int path_search_directory(
         return HPCLANG_RPL_STORE_OK;
 
     struct hpclang_rpl_directory_cursor cursor;
-    int result =
-        hpclang_rpl_directory_cursor_open(search->reader, directory, &cursor);
+    int result = hpclang_rpl_directory_cursor_open(search->reader, directory, &cursor);
     if (result != HPCLANG_RPL_STORE_OK)
         return result;
 
-    struct hpclang_rpl_directory_entry_view entry;
-    while ((result = hpclang_rpl_directory_cursor_next(
-                search->reader, &cursor, &entry)) > 0) {
+    struct hpclang_rpl_directory_entry_view entry = {0};
+    while ((result = hpclang_rpl_directory_cursor_next(search->reader, &cursor, &entry)) > 0) {
         if (search->remaining_entries == 0u)
             return HPCLANG_RPL_STORE_LIMIT;
         --search->remaining_entries;
@@ -384,8 +349,7 @@ static int path_search_directory(
         if (result != HPCLANG_RPL_STORE_OK)
             return result;
 
-        return path_search_directory(
-            search, entry.object_address, depth + 1u);
+        return path_search_directory(search, entry.object_address, depth + 1u);
     }
 
     if (result < 0)
@@ -393,16 +357,12 @@ static int path_search_directory(
     return HPCLANG_RPL_STORE_NOT_FOUND;
 }
 
-int hpclang_rpl_directory_path_to(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t target_directory,
-    uint8_t *encoded_path,
-    uint32_t capacity,
-    uint32_t *encoded_size,
-    uint32_t *component_count)
+int hpclang_rpl_directory_path_to(const struct hpclang_rpl_reader *reader,
+                                  uint32_t target_directory, uint8_t *encoded_path,
+                                  uint32_t capacity, uint32_t *encoded_size,
+                                  uint32_t *component_count)
 {
-    if (encoded_path == NULL || encoded_size == NULL ||
-        component_count == NULL)
+    if (encoded_path == NULL || encoded_size == NULL || component_count == NULL)
         return HPCLANG_RPL_STORE_UNAVAILABLE;
 
     *encoded_size = 0u;

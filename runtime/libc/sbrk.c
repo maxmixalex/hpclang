@@ -13,8 +13,7 @@ void *sbrk(intptr_t increment)
         heap_next = (uintptr_t)__bss_end;
 
     uintptr_t next = heap_next + (uintptr_t)increment;
-    uintptr_t limit =
-        HPCLANG_BOOT_BASE + (uintptr_t)boot->rw_bytes - HPCLANG_STACK_MIN;
+    uintptr_t limit = HPCLANG_BOOT_BASE + (uintptr_t)boot->rw_bytes - HPCLANG_STACK_MIN;
 
     if (next > limit)
         return (void *)-1;

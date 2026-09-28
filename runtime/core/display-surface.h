@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-struct hpclang_surface {
+struct hpclang_surface
+{
     volatile uint8_t *pixels;
     uint32_t width;
     uint32_t height;

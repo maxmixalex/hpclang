@@ -4,15 +4,9 @@
 
 #include "hp39-transfer-directory.h"
 
-static const uint8_t hp39_directory_header[] = {
-    'H', 'P', '3', '9', 'A', 's', 'c', 'A', ' '
-};
+static const uint8_t hp39_directory_header[] = {'H', 'P', '3', '9', 'A', 's', 'c', 'A', ' '};
 
-static int parse_decimal_length(
-    const uint8_t *data,
-    size_t size,
-    size_t *offset,
-    size_t *value)
+static int parse_decimal_length(const uint8_t *data, size_t size, size_t *offset, size_t *value)
 {
     if (data == NULL || offset == NULL || value == NULL || *offset >= size)
         return HPCLANG_HP39_TRANSFER_DIRECTORY_MALFORMED;
@@ -38,9 +32,7 @@ static int parse_decimal_length(
 }
 
 int hpclang_hp39_transfer_directory_cursor_open(
-    const uint8_t *data,
-    size_t size,
-    struct hpclang_hp39_transfer_directory_cursor *cursor)
+    const uint8_t *data, size_t size, struct hpclang_hp39_transfer_directory_cursor *cursor)
 {
     if (cursor == NULL || (data == NULL && size != 0u))
         return HPCLANG_HP39_TRANSFER_DIRECTORY_INVALID;
@@ -82,14 +74,12 @@ int hpclang_hp39_transfer_directory_cursor_next(
         return HPCLANG_HP39_TRANSFER_DIRECTORY_LIMIT;
 
     uint8_t subtype = cursor->data[offset++];
-    if (subtype < 'A' || subtype > 'K' ||
-        offset >= cursor->size || cursor->data[offset] != ' ')
+    if (subtype < 'A' || subtype > 'K' || offset >= cursor->size || cursor->data[offset] != ' ')
         return HPCLANG_HP39_TRANSFER_DIRECTORY_MALFORMED;
     ++offset;
 
     size_t filename_length = 0u;
-    int result = parse_decimal_length(
-        cursor->data, cursor->size, &offset, &filename_length);
+    int result = parse_decimal_length(cursor->data, cursor->size, &offset, &filename_length);
     if (result != HPCLANG_HP39_TRANSFER_DIRECTORY_OK)
         return result;
     if (filename_length > cursor->size - offset)
@@ -98,8 +88,7 @@ int hpclang_hp39_transfer_directory_cursor_next(
     offset += filename_length;
 
     size_t name_length = 0u;
-    result = parse_decimal_length(
-        cursor->data, cursor->size, &offset, &name_length);
+    result = parse_decimal_length(cursor->data, cursor->size, &offset, &name_length);
     if (result != HPCLANG_HP39_TRANSFER_DIRECTORY_OK)
         return result;
     if (name_length > cursor->size - offset)

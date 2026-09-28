@@ -130,9 +130,10 @@ name; implementation-specific record addresses remain private.
 The **contract** for a future named-store put operation is to copy from an owned
 snapshot rather than transfer the caller's handle. That contract must not be
 confused with current implementation status: M7.3 currently implements
-HP48gII/49g+/50g named stores as read-only, and HP39 has no generic named-store
-put/remove API. HP39 variable descriptors do contain native store-handler words,
-but no general Stock invocation path for those handlers has been validated.
+the public HP48gII/49g+/50g named-store API as read-only, and HP39 has no
+generic named-store put/remove API. The M7.3f work branch has private classic-RPL
+create/replace bridges and a bounded HP39 same-size descriptor-store witness;
+neither establishes a completed public mutation contract.
 This is separate from RPL stack mutation: `stack_push`, `stack_pop`,
 `stack_drop` and `stack_replace` are already implemented for the bounded
 HP48gII/49g+/50g Stock stack path.
@@ -206,7 +207,7 @@ Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future
 - HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble recall/type/store descriptor. Runtime preserves genuine schema source references (for example MiniVar's `xNoteText` at `#2C812`) and recalls values generically by quoting that genuine extended ID into Stock and invoking Stock `@`, which follows descriptor word 0 including the supported-entry path. The portal enters through `GETPTR`, commits the final live RPL pointers through Stock `SAVPTR`, and restores the suspended `#8076B` runstream pointer before returning to ARM. Runtime #320 validates this path on both HP39gs and HP40gs: `NoteText` passes as the standard witness, each model reaches HPC1 PASS, `stock-hp39.json` passes, and the complete 52-frame keyboard progression returns cleanly;
 - no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store entry points remain `ENOSYS` where the Stock model has no matching namespace;
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
-- named put/remove is **not implemented yet**. It is not required to close the HPGCC 1.1/2.0 read/search/recall adapter baseline, but it remains planned M7 work in M7.3f. HP48gII/49g+/50g need failure-safe named put/remove above explicit logical store handles; HP39 needs a validated generic descriptor-store invocation path for Aplet variables. HPGCC3's later `sat3_sto*` / `sat3_purge*` family and the recovered HP39 descriptor store word are implementation evidence, not permission to expose their raw address/lifetime model.
+- public named put/remove is **not implemented yet**. It is not required to close the HPGCC 1.1/2.0 read/search/recall adapter baseline, but it remains planned M7 work in M7.3f. HP48gII/49g+/50g need failure-safe named put/remove above explicit logical store handles; HP39 needs a validated generic descriptor-store invocation path for Aplet variables. HPGCC3's later `sat3_sto*` / `sat3_purge*` family and the recovered HP39 descriptor store word are implementation evidence, not permission to expose their raw address/lifetime model.
 
 ### M7.3e — HPGCC adapters and closure — complete at the bounded parity baseline
 
@@ -265,7 +266,7 @@ cross-family Stock round-trip and clean-return evidence. This closes
 **M7.3a-e** at the intended HPGCC 1.1/2.0 read/search/recall/stack-exchange
 baseline.
 
-### M7.3f — named object-store mutation — planned
+### M7.3f — named object-store mutation — resumed, not accepted
 
 M7.3f finishes the write side that was intentionally left out while the read
 model and compatibility boundary were being proven:
@@ -278,6 +279,62 @@ model and compatibility boundary were being proven:
 - make create/replace/remove failure-safe, with bounded allocation/lifetime
   handling and original-Stock round-trip evidence;
 - keep raw Saturn addresses and HPGCC3 native mutation descriptors private.
+
+#### Restart review (2026-09-28)
+
+`m7-object-parity` incorporates accepted main `8cdaf130`.
+The existing ownership and namespace direction remains the intended design;
+the private mutation implementation still needs lifecycle and failure evidence.
+
+Current implementation and evidence have different scopes:
+
+- Classic-RPL private bridges can create and replace named entries, including
+  size changes. The lower-level remove primitive has host-unit coverage, but
+  no object-store remove bridge or Stock deletion witness exists yet.
+- The Stock mutation payload grows and restores an existing string, then
+  creates `ZZM7F`. It does not remove that new entry. A payload PASS therefore
+  proves neither a complete create/remove round trip nor clean Stock teardown.
+- HP39gs/40gs have a private same-size descriptor-store bridge, using an owned
+  snapshot staged in the portal page. Historical Runtime #358 validated the
+  bounded `NoteText` witness; general size-changing writes remain unproven.
+  This does not establish HP39g+ descriptor compatibility.
+- Historical Object mutation #12 reached payload PASS on HP48gII but failed
+  return teardown; canonical Runtime #371 regressed HP39gs/40gs before keyboard
+  progression. These are unresolved historical symptoms, not diagnoses of the
+  synchronized branch. Fresh CI must establish which remain reproducible.
+- The old mutation test assumed the SD-created `X50NG-VV.FAT` entry on HP49/50.
+  It now uses the shared USB harness's explicit `ZZE2E` string on all three
+  classic-RPL models. Main's input timing, capture and USB launch code is kept.
+
+Work proceeds in this order:
+
+1. Establish the synchronized baseline with canonical Runtime and the focused
+   Object mutation workflow. Keep payload success, return control/state and
+   visible Stock recovery as separate mandatory checks.
+2. Audit USEROB movement, TEMPOB allocation, live reference relocation and
+   launcher accounting against original HPGCC source evidence. The current
+   manual relocation algorithm is a candidate implementation, not a frozen
+   architecture. A missed reference root or unsupported object layout must
+   fail before memory moves. newRPL can inform design but cannot prove Stock
+   layout or calling conventions.
+3. Close failure semantics before publishing API: current commit paths perform
+   multiple writes and can return I/O errors after earlier writes succeeded.
+   Preflight/ENOSPC unit coverage does not prove rollback after a late write
+   failure. Establish a non-failing commit boundary or recoverable transaction,
+   and test nested directories, retained references and rejected mutations.
+4. Complete the named remove bridge and Stock create/read/replace/remove
+   round trip, checking absence after deletion, existing-object restoration,
+   unchanged cwd and owned-input lifetime. Preserve the failing teardown gate;
+   do not relax it to accept payload PASS alone.
+5. Generalize HP39 variable writes only after descriptor, context and allocation
+   lifetime are established. Then freeze the clean public put/remove contract
+   and remove obsolete same-size/probe-only bridges where no longer needed.
+
+The focused mutation workflow is justified by its destructive object lifecycle
+and lack of keyboard interaction. It shares the normal build entry, Stock asset
+preparation, target profiles, USB runners and strict return verification.
+Canonical Runtime remains the independent regression gate; the focused workflow
+must not become a fork of the transport or a substitute for full Runtime.
 
 The precise adapter/Migration split remains recorded in
 [HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md). M7.3 as a whole

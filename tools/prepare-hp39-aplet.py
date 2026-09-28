@@ -53,8 +53,7 @@ def normalize_hp2aplet(source: str) -> str:
 
     text = text.replace(
         "\tfclose(inputFile); //clean up\n\tfclose(outputFile);",
-        "\tfclose(inputFile); //clean up\n"
-        "\t/* outputFile is already closed by the writer. */",
+        "\tfclose(inputFile); //clean up\n\t/* outputFile is already closed by the writer. */",
         1,
     )
 

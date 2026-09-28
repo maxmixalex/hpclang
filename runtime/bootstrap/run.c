@@ -2,9 +2,7 @@
 
 #include <hpclang/bootstrap.h>
 
-void hpclang_mmu_sync(
-    volatile uint32_t *l2_workspace,
-    volatile uint32_t *l1);
+void hpclang_mmu_sync(volatile uint32_t *l2_workspace, volatile uint32_t *l1);
 uint32_t hpclang_irq_save_disable(void);
 void hpclang_irq_restore(uint32_t cpsr);
 int hpclang_enter(uintptr_t entry, uintptr_t stack_top);
@@ -26,8 +24,7 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     hpclang_mmu_install(&launch->mmu, &saved);
     hpclang_mmu_sync(launch->mmu.l2_workspace, launch->mmu.l1);
 
-    struct hpclang_boot_info *boot =
-        (struct hpclang_boot_info *)(uintptr_t)HPCLANG_BOOT_BASE;
+    struct hpclang_boot_info *boot = (struct hpclang_boot_info *)(uintptr_t)HPCLANG_BOOT_BASE;
 
     boot->model = launch->model;
     boot->rw_bytes = launch->mmu.rw_page_count * HPCLANG_PAGE_SIZE;
@@ -35,9 +32,7 @@ int hpclang_bootstrap_run(const struct hpclang_launch_context *launch)
     boot->platform_cookie = launch->platform_cookie;
 
     uintptr_t entry = HPCLANG_CODE_BASE + launch->entry_offset;
-    uintptr_t stack_top =
-        HPCLANG_BOOT_BASE +
-        launch->mmu.rw_page_count * HPCLANG_PAGE_SIZE;
+    uintptr_t stack_top = HPCLANG_BOOT_BASE + launch->mmu.rw_page_count * HPCLANG_PAGE_SIZE;
 
     int result = hpclang_enter(entry, stack_top);
 

@@ -3,5 +3,12 @@
   "family": "hp39",
   "model": 1,
   "lcd_height": 64,
-  "automated_e2e": false
+  "nor": {
+    "path": "tests/e2e/fixtures/hp39gplus/flash.bin.xz",
+    "compression": "xz",
+    "bytes": 1048576,
+    "sha256": "95920417d4dee311e6113f11720de11018da166a8a777d9255fbff2dd6433f67",
+    "state_bytes": 2097152
+  },
+  "stock_transport": "usb"
 }

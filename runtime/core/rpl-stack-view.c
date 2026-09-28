@@ -3,7 +3,8 @@
 
 #include "rpl-stack-view.h"
 
-enum {
+enum
+{
     RPL_SATURN_MAX = 0x000fffffu,
     RPL_DSKTOP = 0x000806f8u,
     RPL_EDITLINE = 0x000806fdu
@@ -17,10 +18,7 @@ static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
     return 1;
 }
 
-static int read_word5(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t *value)
+static int read_word5(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t *value)
 {
     if (reader == NULL || reader->read_nibble == NULL || value == NULL)
         return HPCLANG_RPL_STACK_UNAVAILABLE;
@@ -41,10 +39,7 @@ static int read_word5(
     return HPCLANG_RPL_STACK_OK;
 }
 
-static int stack_bounds(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t *top,
-    uint32_t *depth)
+static int stack_bounds(const struct hpclang_rpl_reader *reader, uint32_t *top, uint32_t *depth)
 {
     uint32_t top_value = 0u;
     uint32_t editline_value = 0u;
@@ -56,9 +51,7 @@ static int stack_bounds(
     if (result != HPCLANG_RPL_STACK_OK)
         return result;
 
-    if (top_value > RPL_SATURN_MAX ||
-        editline_value > RPL_SATURN_MAX ||
-        editline_value < top_value)
+    if (top_value > RPL_SATURN_MAX || editline_value > RPL_SATURN_MAX || editline_value < top_value)
         return HPCLANG_RPL_STACK_MALFORMED;
 
     uint32_t delta = editline_value - top_value;
@@ -76,9 +69,7 @@ static int stack_bounds(
     return HPCLANG_RPL_STACK_OK;
 }
 
-int hpclang_rpl_stack_depth(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t *depth)
+int hpclang_rpl_stack_depth(const struct hpclang_rpl_reader *reader, uint32_t *depth)
 {
     if (depth == NULL)
         return HPCLANG_RPL_STACK_UNAVAILABLE;
@@ -87,10 +78,8 @@ int hpclang_rpl_stack_depth(
     return stack_bounds(reader, NULL, depth);
 }
 
-int hpclang_rpl_stack_object_address(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t level,
-    uint32_t *object_address)
+int hpclang_rpl_stack_object_address(const struct hpclang_rpl_reader *reader, uint32_t level,
+                                     uint32_t *object_address)
 {
     if (object_address == NULL)
         return HPCLANG_RPL_STACK_UNAVAILABLE;

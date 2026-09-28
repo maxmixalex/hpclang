@@ -2,5 +2,6 @@
   "target": "hp48gii",
   "family": "hp48",
   "model": 4,
-  "lcd_height": 64
+  "lcd_height": 64,
+  "stock_transport": "usb"
 }

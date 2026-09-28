@@ -1,0 +1,34 @@
+# HP39gs stock launch through the original APLET UI and USB disk.
+# HP39/40 2.22 RECEIVE FROM order:
+#   HP39 (IrDA), HP39/40 (USB), HP39/40 (Ser),
+#   USB Disk drive, Ser. Disk drive.
+2000 tap f6
+4000 tap f6
+
+# With the USB cable asserted during boot, HP39gs can still be settling its
+# startup state when the historical 7s APLET tap arrives.  Enter HOME first,
+# matching the already-stable HP40gs Stock choreography, then open APLET.
+13000 tap home
+15000 tap aplet
+16000 capture aplet-library
+17000 tap f5
+18000 capture receive-menu
+18500 tap down
+19200 tap down
+19900 tap down
+20200 capture receive-usb-disk
+20600 tap enter
+
+40000 capture remote-aplet
+41500 tap enter
+43000 capture lazy-fetch
+44000 host-gate
+
+0 monitor 90000
+500 capture fetch-complete
+1000 retry enter
+11000 retry enter
+21000 retry enter
+31000 retry enter
+46000 retry enter
+61000 retry enter

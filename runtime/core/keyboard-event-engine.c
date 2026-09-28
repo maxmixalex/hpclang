@@ -11,12 +11,8 @@ static int first_set(uint64_t bits)
     return -1;
 }
 
-static void fill_event(
-    struct hpclang_keyboard_event *event,
-    uint64_t timestamp_us,
-    uint64_t state_bits,
-    unsigned type,
-    unsigned scan_code)
+static void fill_event(struct hpclang_keyboard_event *event, uint64_t timestamp_us,
+                       uint64_t state_bits, unsigned type, unsigned scan_code)
 {
     event->timestamp_us = timestamp_us;
     (void)state_bits;
@@ -26,10 +22,8 @@ static void fill_event(
     event->key = HPCLANG_KEY_UNKNOWN;
 }
 
-void hpclang_keyboard_event_engine_init(
-    struct hpclang_keyboard_event_engine *engine,
-    uint64_t bits,
-    uint64_t now_us)
+void hpclang_keyboard_event_engine_init(struct hpclang_keyboard_event_engine *engine, uint64_t bits,
+                                        uint64_t now_us)
 {
     engine->stable_bits = bits;
     engine->candidate_bits = bits;
@@ -45,11 +39,9 @@ void hpclang_keyboard_event_engine_init(
     engine->initialized = 1;
 }
 
-void hpclang_keyboard_event_engine_set_timing(
-    struct hpclang_keyboard_event_engine *engine,
-    uint32_t debounce_us,
-    uint32_t repeat_delay_us,
-    uint32_t repeat_interval_us)
+void hpclang_keyboard_event_engine_set_timing(struct hpclang_keyboard_event_engine *engine,
+                                              uint32_t debounce_us, uint32_t repeat_delay_us,
+                                              uint32_t repeat_interval_us)
 {
     engine->debounce_us = debounce_us;
     engine->repeat_delay_us = repeat_delay_us;
@@ -58,9 +50,8 @@ void hpclang_keyboard_event_engine_set_timing(
     engine->repeat_due_us = 0u;
 }
 
-static int emit_pending(
-    struct hpclang_keyboard_event_engine *engine,
-    struct hpclang_keyboard_event *event)
+static int emit_pending(struct hpclang_keyboard_event_engine *engine,
+                        struct hpclang_keyboard_event *event)
 {
     int scan_code = first_set(engine->pending_up);
     if (scan_code >= 0) {
@@ -69,12 +60,8 @@ static int emit_pending(
             engine->repeat_scan_code = -1;
             engine->repeat_due_us = 0u;
         }
-        fill_event(
-            event,
-            engine->pending_timestamp_us,
-            engine->stable_bits,
-            HPCLANG_KEYBOARD_EVENT_UP,
-            (unsigned)scan_code);
+        fill_event(event, engine->pending_timestamp_us, engine->stable_bits,
+                   HPCLANG_KEYBOARD_EVENT_UP, (unsigned)scan_code);
         return 1;
     }
 
@@ -83,26 +70,18 @@ static int emit_pending(
         engine->pending_down &= ~(UINT64_C(1) << (unsigned)scan_code);
         if ((unsigned)scan_code < MATRIX_KEY_COUNT) {
             engine->repeat_scan_code = scan_code;
-            engine->repeat_due_us =
-                engine->pending_timestamp_us + engine->repeat_delay_us;
+            engine->repeat_due_us = engine->pending_timestamp_us + engine->repeat_delay_us;
         }
-        fill_event(
-            event,
-            engine->pending_timestamp_us,
-            engine->stable_bits,
-            HPCLANG_KEYBOARD_EVENT_DOWN,
-            (unsigned)scan_code);
+        fill_event(event, engine->pending_timestamp_us, engine->stable_bits,
+                   HPCLANG_KEYBOARD_EVENT_DOWN, (unsigned)scan_code);
         return 1;
     }
 
     return 0;
 }
 
-int hpclang_keyboard_event_engine_step(
-    struct hpclang_keyboard_event_engine *engine,
-    uint64_t bits,
-    uint64_t now_us,
-    struct hpclang_keyboard_event *event)
+int hpclang_keyboard_event_engine_step(struct hpclang_keyboard_event_engine *engine, uint64_t bits,
+                                       uint64_t now_us, struct hpclang_keyboard_event *event)
 {
     if (!engine->initialized) {
         hpclang_keyboard_event_engine_init(engine, bits, now_us);
@@ -138,16 +117,10 @@ int hpclang_keyboard_event_engine_step(
             return 1;
     }
 
-    if (engine->repeat_scan_code >= 0 &&
-        engine->repeat_interval_us != 0u &&
+    if (engine->repeat_scan_code >= 0 && engine->repeat_interval_us != 0u &&
         now_us >= engine->repeat_due_us) {
         unsigned scan_code = (unsigned)engine->repeat_scan_code;
-        fill_event(
-            event,
-            now_us,
-            engine->stable_bits,
-            HPCLANG_KEYBOARD_EVENT_REPEAT,
-            scan_code);
+        fill_event(event, now_us, engine->stable_bits, HPCLANG_KEYBOARD_EVENT_REPEAT, scan_code);
         engine->repeat_due_us = now_us + engine->repeat_interval_us;
         return 1;
     }

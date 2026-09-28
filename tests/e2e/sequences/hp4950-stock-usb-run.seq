@@ -1,0 +1,74 @@
+# HP49g+/50g primary Stock launch over USB Kermit.
+# The runner creates fresh Stock state, whose Transfer port is USB and type
+# is Kermit. Inspect and accept that choice before entering Start Server.
+2000 tap f6
+4000 tap f6
+7000 capture home
+
+# I/O -> Transfer...
+8000 tap files
+9500 tap down
+10000 tap enter
+10500 capture io-menu-a
+11500 tap down
+12000 tap down
+12500 tap down
+13000 tap down
+13500 capture io-menu-transfer
+14000 tap enter
+15000 capture transfer-config
+
+# CHOOS already highlights USB in fresh state. Moving DOWN here wraps to
+# IRDA on HP49g+ and makes Stock close USB when starting the server.
+16000 tap up
+17000 tap f2
+17500 capture port-choices
+18500 tap enter
+19500 capture port-configured
+20000 tap enter
+21000 capture after-io-config
+
+# I/O -> Start Server.
+22000 tap files
+23500 tap down
+24500 tap enter
+25000 capture io-menu-server
+26000 tap down
+27000 tap down
+28000 tap down
+29000 tap down
+30000 tap down
+30500 capture server-menu
+31500 tap enter
+33500 capture server-usb
+34000 host-gate
+
+# The host explicitly clears documented system flag -95 (RPN mode) through
+# Stock Kermit before releasing this gate; no timing-sensitive MODE toggle.
+# Install ARMToolbox/library 275 into Port 2 using the transferred SETUP
+# program. HPCLANG sorts before SETUP in HOME, so the VAR softkeys are F1/F2.
+1000 capture after-transfer
+2000 tap two
+2500 tap period
+3000 tap enter
+4000 tap var
+5000 capture vars-before-install
+6000 tap f2
+14000 capture setup-evaluated
+15000 chord on f3
+19000 capture warmstart
+
+# HPCLANG remains in HOME. Recall it, enter the installed ARMTo library, and
+# launch through PrRUN.
+20000 tap var
+21000 capture vars-after-install
+22000 tap f1
+24000 capture hpclang-stack
+26000 chord rshift two
+27500 capture lib-menu
+# SETUP attaches ARMToolbox to HOME. After warmstart, ARMTo is the first
+# library softkey, followed by the port selectors.
+30500 tap f1
+31500 capture armtoolbox
+32000 monitor 65000
+32500 tap f1

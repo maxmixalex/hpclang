@@ -4,7 +4,8 @@
 
 #include "rpl-object-store.h"
 
-enum {
+enum
+{
     NIBBLES = 0x100000u,
     USEROB = 0x80711u,
     CONTEXT = 0x8071bu,
@@ -33,14 +34,10 @@ static void put_nibbles(uint32_t address, uint32_t value, uint32_t count)
 {
     assert(address + count <= NIBBLES);
     for (uint32_t i = 0u; i < count; ++i)
-        memory[address + i] =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        memory[address + i] = (uint8_t)((value >> (i * 4u)) & 0x0fu);
 }
 
-static uint32_t put_item(
-    uint32_t item,
-    const char *name,
-    uint32_t prologue)
+static uint32_t put_item(uint32_t item, const char *name, uint32_t prologue)
 {
     uint32_t length = (uint32_t)strlen(name);
     assert(length < 256u);
@@ -95,20 +92,17 @@ static void test_home_and_current(void)
     prepare_tree();
 
     uint32_t object = 0u;
-    assert(hpclang_rpl_store_home_object(&reader, &object) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_store_home_object(&reader, &object) == HPCLANG_RPL_STORE_OK);
     assert(object == 0x82000u);
 
-    assert(hpclang_rpl_store_current_object(&reader, &object) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_store_current_object(&reader, &object) == HPCLANG_RPL_STORE_OK);
     assert(object == 0x8210au);
 
     uint8_t path[64];
     uint32_t bytes = 0u;
     uint32_t components = 0u;
-    assert(hpclang_rpl_directory_path_to(
-               &reader, object, path, sizeof(path), &bytes, &components) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_path_to(&reader, object, path, sizeof(path), &bytes,
+                                         &components) == HPCLANG_RPL_STORE_OK);
     assert(components == 1u);
     assert(bytes == 4u);
     assert(path[0] == 3u);
@@ -120,35 +114,26 @@ static void test_enumeration_and_find(void)
     prepare_tree();
 
     struct hpclang_rpl_directory_cursor cursor;
-    assert(hpclang_rpl_directory_cursor_open(
-               &reader, 0x82000u, &cursor) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_cursor_open(&reader, 0x82000u, &cursor) == HPCLANG_RPL_STORE_OK);
 
     struct hpclang_rpl_directory_entry_view entry;
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 1);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 1);
     assert(entry.name_length == 1u);
     assert(entry.name[0] == 'A');
     assert(entry.prologue == DOCHAR);
 
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 1);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 1);
     assert(entry.name_length == 3u);
     assert(memcmp(entry.name, "SUB", 3u) == 0);
     assert(entry.prologue == DORRP);
 
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 0);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 0);
 
-    assert(hpclang_rpl_directory_find(
-               &reader, 0x82000u,
-               (const uint8_t *)"SUB", 3u, &entry) ==
+    assert(hpclang_rpl_directory_find(&reader, 0x82000u, (const uint8_t *)"SUB", 3u, &entry) ==
            HPCLANG_RPL_STORE_OK);
     assert(entry.object_address == 0x8210au);
 
-    assert(hpclang_rpl_directory_find(
-               &reader, 0x82000u,
-               (const uint8_t *)"NO", 2u, &entry) ==
+    assert(hpclang_rpl_directory_find(&reader, 0x82000u, (const uint8_t *)"NO", 2u, &entry) ==
            HPCLANG_RPL_STORE_NOT_FOUND);
 }
 
@@ -158,8 +143,7 @@ static void test_home_library_table_skip(void)
 
     const uint32_t home = 0x82000u;
     const uint32_t library_count = 2u;
-    const uint32_t chain =
-        home + 5u + library_count * 13u + 3u;
+    const uint32_t chain = home + 5u + library_count * 13u + 3u;
     const uint32_t item = 0x82200u;
 
     put_nibbles(USEROB, home, 5u);
@@ -171,18 +155,14 @@ static void test_home_library_table_skip(void)
     put_nibbles(item - 5u, 0u, 5u);
 
     struct hpclang_rpl_directory_cursor cursor;
-    assert(hpclang_rpl_directory_cursor_open(
-               &reader, home, &cursor) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_cursor_open(&reader, home, &cursor) == HPCLANG_RPL_STORE_OK);
 
     struct hpclang_rpl_directory_entry_view entry;
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 1);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 1);
     assert(entry.name_length == 1u);
     assert(entry.name[0] == 'A');
     assert(entry.prologue == DOCHAR);
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 0);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 0);
 }
 
 static void test_current_path_skips_unrelated_higher_directory(void)
@@ -200,16 +180,14 @@ static void test_current_path_skips_unrelated_higher_directory(void)
     put_nibbles(object_a + 8u, 0xfffffu, 5u);
 
     uint32_t current = 0u;
-    assert(hpclang_rpl_store_current_object(&reader, &current) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_store_current_object(&reader, &current) == HPCLANG_RPL_STORE_OK);
     assert(current == 0x8210au);
 
-    uint8_t path[16] = { 0u };
+    uint8_t path[16] = {0u};
     uint32_t bytes = 0u;
     uint32_t components = 0u;
-    assert(hpclang_rpl_directory_path_to(
-               &reader, current, path, sizeof(path),
-               &bytes, &components) == HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_path_to(&reader, current, path, sizeof(path), &bytes,
+                                         &components) == HPCLANG_RPL_STORE_OK);
     assert(bytes == 4u);
     assert(components == 1u);
     assert(path[0] == 3u);
@@ -236,32 +214,25 @@ static void test_null_named_hidden_directory(void)
     put_nibbles(hidden + 8u, 0u, 5u); /* empty Hidden directory */
 
     struct hpclang_rpl_directory_cursor cursor;
-    assert(hpclang_rpl_directory_cursor_open(
-               &reader, home, &cursor) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_cursor_open(&reader, home, &cursor) == HPCLANG_RPL_STORE_OK);
 
     struct hpclang_rpl_directory_entry_view entry;
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 1);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 1);
     assert(entry.name_length == 0u);
     assert(entry.object_address == hidden);
     assert(entry.prologue == DORRP);
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) == 0);
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) == 0);
 
-    uint8_t path[8] = { 0xffu };
+    uint8_t path[8] = {0xffu};
     uint32_t bytes = 0u;
     uint32_t components = 0u;
-    assert(hpclang_rpl_directory_path_to(
-               &reader, hidden, path, sizeof(path),
-               &bytes, &components) == HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_path_to(&reader, hidden, path, sizeof(path), &bytes,
+                                         &components) == HPCLANG_RPL_STORE_OK);
     assert(bytes == 1u);
     assert(components == 1u);
     assert(path[0] == 0u);
 
-    assert(hpclang_rpl_directory_find(
-               &reader, home, NULL, 0u, &entry) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_find(&reader, home, NULL, 0u, &entry) == HPCLANG_RPL_STORE_OK);
     assert(entry.object_address == hidden);
 }
 
@@ -273,13 +244,10 @@ static void test_malformed_chain(void)
     put_nibbles(0x82200u - 5u, 0x82200u, 5u);
 
     struct hpclang_rpl_directory_cursor cursor;
-    assert(hpclang_rpl_directory_cursor_open(
-               &reader, 0x82000u, &cursor) ==
-           HPCLANG_RPL_STORE_OK);
+    assert(hpclang_rpl_directory_cursor_open(&reader, 0x82000u, &cursor) == HPCLANG_RPL_STORE_OK);
 
     struct hpclang_rpl_directory_entry_view entry;
-    assert(hpclang_rpl_directory_cursor_next(
-               &reader, &cursor, &entry) ==
+    assert(hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry) ==
            HPCLANG_RPL_STORE_MALFORMED);
 }
 

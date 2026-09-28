@@ -8,14 +8,26 @@ This site is currently an internal Development reference. It intentionally prese
 
 | Model | Platform | Direct runtime | Original-system launch |
 | --- | --- | --- | --- |
-| HP 39g+ | `hp39` | **Blocked** | **Blocked** |
+| HP 39g+ | `hp39` | PASS, verified D1.55 fixture | PASS over USB |
 | HP 39gs | `hp39` | PASS, including real hardware | PASS, including real hardware return |
 | HP 40gs | `hp39` | PASS | PASS |
 | HP 48gII | `hp48` | PASS | PASS |
 | HP 49g+ | `hp4950` | PASS | PASS |
 | HP 50g | `hp4950` | PASS | PASS |
 
-HP 39g+ support builds and the read-only flash-dump mechanism has been verified, but automated E2E requires a trustworthy stock flash image from a real HP 39g+. Further HP 39g+ E2E work is intentionally paused until that hardware is available.
+HP 39g+ uses the verified real-machine D1.55 full-NOR fixture. All six
+models now pass canonical original-Stock launch over USB as well as Direct
+runtime. Font Gallery, Storage, Core, and Quality also pass on the accepted
+functional head `fdcd38b7`. Gallery and Storage Stock paths retain UART/SD
+and SD respectively. See [Validation](development/validation.md) for formal
+acceptance records and
+[Stock USB transport](development/stock-usb-transport.md) for the implementation
+and transport scope. Repeated-run performance benchmarking is separate from
+functional completion.
+
+The ALG/RPN setup correction, keyboard readiness synchronization, and full
+Quality gates are included in this accepted head; see
+[Validation](development/validation.md).
 
 ## Development reference
 

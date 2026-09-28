@@ -42,10 +42,7 @@ COMMON_DIFF_TEXT = (
     "你我他她它的是不了在有这這中来來个個们們到说說和地也子时時道出而要于於"
     "就下得可年生自会會那后後能对對着著事其里裡所去行过過家用发發天方然作成"
     "开開面无無小心前本见見经經头頭樣样只种種学學书書文文字体體门門国國臺台"
-    "湾灣汉漢龙龍马馬风風云雲广廣东東乐樂长長"
-    + CJK_PUNCT_TEXT
-    + JAPANESE_TEXT
-    + KOREAN_TEXT
+    "湾灣汉漢龙龍马馬风風云雲广廣东東乐樂长長" + CJK_PUNCT_TEXT + JAPANESE_TEXT + KOREAN_TEXT
 )
 ACCENT_TEXT = "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿŒœ"
 SYMBOL_TEXT = "←↑→↓↔ ±×÷≠≤≥≈∞√ ∑∏∆Ωαβπλ μ°©®€£¥"
@@ -109,7 +106,10 @@ def render_cps(font, cps, *, scale=3, cell_mode=False, max_cps=None):
         return None
     max_h = max((max(1, glyph.height) for _cp, glyph in items if glyph is not None), default=1)
     if cell_mode:
-        max_w = max((max(1, glyph.width, glyph.advance) for _cp, glyph in items if glyph is not None), default=1)
+        max_w = max(
+            (max(1, glyph.width, glyph.advance) for _cp, glyph in items if glyph is not None),
+            default=1,
+        )
         cell_w = max_w + 3
         cols = min(24, max(1, len(items)))
         rows = (len(items) + cols - 1) // cols
@@ -291,7 +291,9 @@ def render_specimens(font):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Render a human-oriented Chinese hpclang font review report.")
+    ap = argparse.ArgumentParser(
+        description="Render a human-oriented Chinese hpclang font review report."
+    )
     ap.add_argument("--package", default="runtime/fonts/fonts.zip")
     ap.add_argument("--generated-dir", default="runtime/fonts/generated")
     ap.add_argument("--audit-json", default="build/font-audit/all-fonts.json")
@@ -320,7 +322,8 @@ def main():
 
     summary = audit.get("visual_summary", {})
     face_count = len(rows)
-    out = ["""<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+    out = [
+        """<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 <title>hpclang 字体人工审阅报告</title>
 <style>
 :root{font-family:Inter,"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;color-scheme:dark}
@@ -340,7 +343,8 @@ details{border:1px solid #30343c;border-radius:12px;background:#15171b;margin:12
 summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;margin-top:10px}
 .tag{display:inline-block;border:1px solid #404650;border-radius:6px;padding:2px 6px;margin-right:5px;font-size:12px;color:#cad0da}
 .source{font-size:11px;color:#777f8d;overflow-wrap:anywhere;margin-top:8px}
-</style><main>"""]
+</style><main>"""
+    ]
     out.append("<h1>hpclang 字体人工审阅报告</h1>")
     out.append(
         "<p class='lead'>这份报告只解决一个问题：<b>这些字体实际长什么样，哪些值得留下。</b>"
@@ -353,9 +357,15 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
     out.append(f"<div class='card'><strong>{face_count}</strong><br>当前 face 总数</div>")
     if audit:
         parity = audit.get("generated_parity", {})
-        out.append(f"<div class='card'><strong>{parity.get('passed','—')}/{face_count}</strong><br>源字体与生成结果一致</div>")
-        out.append(f"<div class='card'><strong>{summary.get('quick_overflow',0)}</strong><br>仍然过大</div>")
-        out.append(f"<div class='card'><strong>{summary.get('powerline_variant',0)}</strong><br>仍然是 Powerline</div>")
+        out.append(
+            f"<div class='card'><strong>{parity.get('passed', '—')}/{face_count}</strong><br>源字体与生成结果一致</div>"
+        )
+        out.append(
+            f"<div class='card'><strong>{summary.get('quick_overflow', 0)}</strong><br>仍然过大</div>"
+        )
+        out.append(
+            f"<div class='card'><strong>{summary.get('powerline_variant', 0)}</strong><br>仍然是 Powerline</div>"
+        )
     out.append("</div>")
     out.append(
         "<div class='notice'><b>删除标准：</b>Dina OEM、Powerline、以及 “Quick” 在 131px 屏幕上都放不下的 face "
@@ -381,9 +391,13 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
             f"共 {len(changed)} 个字符存在地区差异，本页只展示常用字符表实际命中的 {len(common)} 个差异字符</summary>"
         )
         if common:
-            out.append(f"<div class='chars' style='font-size:16px;margin:10px 0'>本组对比字符：{html.escape(common_chars)}</div>")
+            out.append(
+                f"<div class='chars' style='font-size:16px;margin:10px 0'>本组对比字符：{html.escape(common_chars)}</div>"
+            )
         else:
-            out.append("<div class='notice'>这一组虽然存在字形差异，但在当前常用字符优先表中没有命中；不拿生僻字冒充“常用差异”。</div>")
+            out.append(
+                "<div class='notice'>这一组虽然存在字形差异，但在当前常用字符优先表中没有命中；不拿生僻字冒充“常用差异”。</div>"
+            )
         out.append("<div class='locale-grid'>")
         for row, font, meta in group:
             out.append("<div class='locale'>")
@@ -401,7 +415,9 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
     )
     for family in sorted(review_families):
         faces = sorted(review_families[family], key=lambda item: item[0]["selector"])
-        out.append(f"<details open><summary>{html.escape(family)} — {len(faces)} 个 face</summary><div class='grid'>")
+        out.append(
+            f"<details open><summary>{html.escape(family)} — {len(faces)} 个 face</summary><div class='grid'>"
+        )
         for row, font in faces:
             basic, extras = render_specimens(font)
             audit_face = audit_by_selector.get(row["selector"], {})
@@ -412,7 +428,7 @@ summary{cursor:pointer;font-weight:700}.locale-grid{display:grid;grid-template-c
             out.append(
                 f"<div><span class='tag'>字形 {len(font.glyphs)}</span>"
                 f"<span class='tag'>行高 {font.line_height}px</span>"
-                f"<span class='tag'>ASCII 缺 {ascii_info.get('missing','—')}</span></div>"
+                f"<span class='tag'>ASCII 缺 {ascii_info.get('missing', '—')}</span></div>"
             )
             out.append(basic)
             if extras:

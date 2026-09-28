@@ -11,10 +11,10 @@
 #include "saturn-view.h"
 
 /* Internal kinds are intentionally outside the checked-in package ABI. */
-#define FONT_KIND_HP39_MINI     0x1001u
-#define FONT_KIND_HP39_MAIN     0x1002u
-#define FONT_KIND_HP4950_MINI   0x1003u
-#define FONT_KIND_HP4950_BIG    0x1004u
+#define FONT_KIND_HP39_MINI 0x1001u
+#define FONT_KIND_HP39_MAIN 0x1002u
+#define FONT_KIND_HP4950_MINI 0x1003u
+#define FONT_KIND_HP4950_BIG 0x1004u
 #define FONT_KIND_HP39_EDITLINE 0x1005u
 
 /*
@@ -25,90 +25,69 @@
  * consecutively at HPCLANG_CODE_WINDOW_BASE; runtime translates legacy atlas
  * coordinates to the evidenced model-specific window coordinates.
  */
-#define HP39_FONT_WINDOW_PAGE_BYTES   0x00001000u
+#define HP39_FONT_WINDOW_PAGE_BYTES 0x00001000u
 #define HP39_FONT_WINDOW_PAGE_NIBBLES (HP39_FONT_WINDOW_PAGE_BYTES * 2u)
-#define HP39_FONT_WINDOW_BYTES        0x00002000u
-#define HP39_FONT_WINDOW_NIBBLES      (HP39_FONT_WINDOW_BYTES * 2u)
+#define HP39_FONT_WINDOW_BYTES 0x00002000u
+#define HP39_FONT_WINDOW_NIBBLES (HP39_FONT_WINDOW_BYTES * 2u)
 
-#define HP39_MAIN_FIRST_NIBBLE       0x0007c651u
-#define HP39_MAIN_LAST_NIBBLE        (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
-#define HP39_EDITLINE_FIRST_NIBBLE   0x0007d3eau
+#define HP39_MAIN_FIRST_NIBBLE 0x0007c651u
+#define HP39_MAIN_LAST_NIBBLE (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
+#define HP39_EDITLINE_FIRST_NIBBLE 0x0007d3eau
 #define HP39_EDITLINE_RECORD_NIBBLES 20u
-#define HP39_EDITLINE_LAST_NIBBLE    \
-    (HP39_EDITLINE_FIRST_NIBBLE + 255u * HP39_EDITLINE_RECORD_NIBBLES + \
+#define HP39_EDITLINE_LAST_NIBBLE                                                                  \
+    (HP39_EDITLINE_FIRST_NIBBLE + 255u * HP39_EDITLINE_RECORD_NIBBLES +                            \
      HP39_EDITLINE_RECORD_NIBBLES - 1u)
-#define HP39_MINI_FIRST_NIBBLE       0x0007e695u
-#define HP39_MINI_GLYPH_COUNT       155u
-#define HP39_MINI_RECORD_NIBBLES    11u
-#define HP39_MINI_MAP_FIRST_CODE    0xa0u
-#define HP39_MINI_MAP_COUNT         96u
-#define HP39_MINI_MAP_FIRST_NIBBLE  \
+#define HP39_MINI_FIRST_NIBBLE 0x0007e695u
+#define HP39_MINI_GLYPH_COUNT 155u
+#define HP39_MINI_RECORD_NIBBLES 11u
+#define HP39_MINI_MAP_FIRST_CODE 0xa0u
+#define HP39_MINI_MAP_COUNT 96u
+#define HP39_MINI_MAP_FIRST_NIBBLE                                                                 \
     (HP39_MINI_FIRST_NIBBLE + HP39_MINI_GLYPH_COUNT * HP39_MINI_RECORD_NIBBLES)
-#define HP39_MINI_LAST_NIBBLE       \
-    (HP39_MINI_MAP_FIRST_NIBBLE + HP39_MINI_MAP_COUNT * 2u - 1u)
+#define HP39_MINI_LAST_NIBBLE (HP39_MINI_MAP_FIRST_NIBBLE + HP39_MINI_MAP_COUNT * 2u - 1u)
 
 /* HP39gs 2.22: main @ NOR 0x7e574 high nibble, EditLine candidate @
  * NOR 0x7ec41 low nibble, mini @ 0x7f596 high. The EditLine relocation is
  * independently gated against stock NOR by verify-hp39-native-font.py. */
-#define HP39GS_MAIN_WINDOW_FIRST_NIBBLE     0x00000ae9u
+#define HP39GS_MAIN_WINDOW_FIRST_NIBBLE 0x00000ae9u
 #define HP39GS_EDITLINE_WINDOW_FIRST_NIBBLE 0x00001882u
-#define HP39GS_MINI_WINDOW_FIRST_NIBBLE \
-    (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000b2du)
+#define HP39GS_MINI_WINDOW_FIRST_NIBBLE (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000b2du)
 
 /* HP40gs 2.22: main @ NOR 0x7e64e low nibble, EditLine candidate @
  * NOR 0x7ed1a high nibble, mini @ 0x7f670 low. */
-#define HP40GS_MAIN_WINDOW_FIRST_NIBBLE     0x00000c9cu
+#define HP40GS_MAIN_WINDOW_FIRST_NIBBLE 0x00000c9cu
 #define HP40GS_EDITLINE_WINDOW_FIRST_NIBBLE 0x00001a35u
-#define HP40GS_MINI_WINDOW_FIRST_NIBBLE \
-    (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000ce0u)
+#define HP40GS_MINI_WINDOW_FIRST_NIBBLE (HP39_FONT_WINDOW_PAGE_NIBBLES + 0x00000ce0u)
 
-#define HP39_MAIN_SPAN_NIBBLES \
-    (HP39_MAIN_LAST_NIBBLE - HP39_MAIN_FIRST_NIBBLE)
-#define HP39_EDITLINE_SPAN_NIBBLES \
-    (HP39_EDITLINE_LAST_NIBBLE - HP39_EDITLINE_FIRST_NIBBLE)
-#define HP39_MINI_SPAN_NIBBLES \
-    (HP39_MINI_LAST_NIBBLE - HP39_MINI_FIRST_NIBBLE)
+#define HP39_MAIN_SPAN_NIBBLES (HP39_MAIN_LAST_NIBBLE - HP39_MAIN_FIRST_NIBBLE)
+#define HP39_EDITLINE_SPAN_NIBBLES (HP39_EDITLINE_LAST_NIBBLE - HP39_EDITLINE_FIRST_NIBBLE)
+#define HP39_MINI_SPAN_NIBBLES (HP39_MINI_LAST_NIBBLE - HP39_MINI_FIRST_NIBBLE)
 
-_Static_assert(
-    HP39GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_PAGE_NIBBLES,
-    "HP39gs main font must fit inside first private window page");
-_Static_assert(
-    HP40GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_PAGE_NIBBLES,
-    "HP40gs main font must fit inside first private window page");
-_Static_assert(
-    HP39GS_EDITLINE_WINDOW_FIRST_NIBBLE + HP39_EDITLINE_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_NIBBLES,
-    "HP39gs EditLine font must fit inside private window");
-_Static_assert(
-    HP40GS_EDITLINE_WINDOW_FIRST_NIBBLE + HP39_EDITLINE_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_NIBBLES,
-    "HP40gs EditLine font must fit inside private window");
-_Static_assert(
-    HP39GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_NIBBLES,
-    "HP39gs mini font must fit inside second private window page");
-_Static_assert(
-    HP40GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES <
-        HP39_FONT_WINDOW_NIBBLES,
-    "HP40gs mini font must fit inside second private window page");
+_Static_assert(HP39GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_PAGE_NIBBLES,
+               "HP39gs main font must fit inside first private window page");
+_Static_assert(HP40GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_PAGE_NIBBLES,
+               "HP40gs main font must fit inside first private window page");
+_Static_assert(HP39GS_EDITLINE_WINDOW_FIRST_NIBBLE + HP39_EDITLINE_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_NIBBLES,
+               "HP39gs EditLine font must fit inside private window");
+_Static_assert(HP40GS_EDITLINE_WINDOW_FIRST_NIBBLE + HP39_EDITLINE_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_NIBBLES,
+               "HP40gs EditLine font must fit inside private window");
+_Static_assert(HP39GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES < HP39_FONT_WINDOW_NIBBLES,
+               "HP39gs mini font must fit inside second private window page");
+_Static_assert(HP40GS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES < HP39_FONT_WINDOW_NIBBLES,
+               "HP40gs mini font must fit inside second private window page");
 
-static const struct hpclang_font hp39_mini = {
-    HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL
-};
-static const struct hpclang_font hp39_main = {
-    HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MAIN, NULL
-};
-static const struct hpclang_font hp39_editline = {
-    HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_EDITLINE, NULL
-};
-static const struct hpclang_font hp4950_mini = {
-    HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP4950_MINI, NULL
-};
-static const struct hpclang_font hp4950_big = {
-    HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP4950_BIG, NULL
-};
+static const struct hpclang_font hp39_mini = {HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MINI, NULL};
+static const struct hpclang_font hp39_main = {HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_MAIN, NULL};
+static const struct hpclang_font hp39_editline = {HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP39_EDITLINE,
+                                                  NULL};
+static const struct hpclang_font hp4950_mini = {HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP4950_MINI,
+                                                NULL};
+static const struct hpclang_font hp4950_big = {HPCLANG_FONT_PACKAGE_ABI, FONT_KIND_HP4950_BIG,
+                                               NULL};
 
 static uint32_t active_model(void)
 {
@@ -118,8 +97,7 @@ static uint32_t active_model(void)
 
 static int hp39_family(uint32_t model)
 {
-    return model == HPCLANG_MODEL_HP39GPLUS ||
-           model == HPCLANG_MODEL_HP39GS ||
+    return model == HPCLANG_MODEL_HP39GPLUS || model == HPCLANG_MODEL_HP39GS ||
            model == HPCLANG_MODEL_HP40GS;
 }
 
@@ -136,9 +114,7 @@ const struct hpclang_font *hpclang_font_big(void)
 const struct hpclang_font *hpclang_font_editline(void)
 {
     uint32_t model = active_model();
-    return model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS
-        ? &hp39_editline
-        : NULL;
+    return model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS ? &hp39_editline : NULL;
 }
 
 const struct hpclang_font *hpclang_font_default(void)
@@ -146,11 +122,9 @@ const struct hpclang_font *hpclang_font_default(void)
     return hp39_family(active_model()) ? &hp39_main : &hp4950_big;
 }
 
-static const struct hpclang_bitmap_font_data *bitmap_data(
-    const struct hpclang_font *font)
+static const struct hpclang_bitmap_font_data *bitmap_data(const struct hpclang_font *font)
 {
-    if (font == NULL ||
-        font->abi != HPCLANG_FONT_PACKAGE_ABI ||
+    if (font == NULL || font->abi != HPCLANG_FONT_PACKAGE_ABI ||
         font->kind != HPCLANG_FONT_PACKAGE_KIND_BITMAP)
         return NULL;
     return (const struct hpclang_bitmap_font_data *)font->data;
@@ -167,8 +141,7 @@ uint32_t hpclang_font_height(const struct hpclang_font *font)
         return 5u;
     if (font->kind == FONT_KIND_HP4950_MINI)
         return 6u;
-    if (font->kind == FONT_KIND_HP39_MAIN ||
-        font->kind == FONT_KIND_HP4950_BIG)
+    if (font->kind == FONT_KIND_HP39_MAIN || font->kind == FONT_KIND_HP4950_BIG)
         return 8u;
     if (font->kind == FONT_KIND_HP39_EDITLINE)
         return 10u;
@@ -182,11 +155,9 @@ uint32_t hpclang_font_advance(const struct hpclang_font *font)
         return bitmap->nominal_advance;
     if (font == NULL || font->abi != HPCLANG_FONT_PACKAGE_ABI)
         return 0u;
-    if (font->kind == FONT_KIND_HP39_MINI ||
-        font->kind == FONT_KIND_HP4950_MINI)
+    if (font->kind == FONT_KIND_HP39_MINI || font->kind == FONT_KIND_HP4950_MINI)
         return 4u;
-    if (font->kind == FONT_KIND_HP39_MAIN ||
-        font->kind == FONT_KIND_HP4950_BIG ||
+    if (font->kind == FONT_KIND_HP39_MAIN || font->kind == FONT_KIND_HP4950_BIG ||
         font->kind == FONT_KIND_HP39_EDITLINE)
         return 6u;
     return 0u;
@@ -195,16 +166,14 @@ uint32_t hpclang_font_advance(const struct hpclang_font *font)
 static uint8_t saturn_nibble(uint32_t address)
 {
     uint8_t value = 0u;
-    (void)hpclang_saturn_read_nibble(
-        hpclang_saturn_address_make(address), &value);
+    (void)hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), &value);
     return value;
 }
 
 static uint8_t saturn_byte(uint32_t address)
 {
     uint8_t value = 0u;
-    (void)hpclang_saturn_read_byte(
-        hpclang_saturn_address_make(address), &value);
+    (void)hpclang_saturn_read_byte(hpclang_saturn_address_make(address), &value);
     return value;
 }
 
@@ -212,29 +181,24 @@ static uintptr_t hp39_font_window_base(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (boot == NULL ||
-        (boot->model != HPCLANG_MODEL_HP39GS &&
-         boot->model != HPCLANG_MODEL_HP40GS))
+        (boot->model != HPCLANG_MODEL_HP39GS && boot->model != HPCLANG_MODEL_HP40GS))
         return 0u;
 
     if (boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE)
         return boot->platform_cookie;
 
-    if ((boot->platform_cookie & (uintptr_t)3u) !=
-        HPCLANG_PLATFORM_COOKIE_HP39_TAG)
+    if ((boot->platform_cookie & (uintptr_t)3u) != HPCLANG_PLATFORM_COOKIE_HP39_TAG)
         return 0u;
 
     const struct hpclang_hp39_platform_context *context =
-        (const struct hpclang_hp39_platform_context *)(
-            boot->platform_cookie & ~(uintptr_t)3u);
+        (const struct hpclang_hp39_platform_context *)(boot->platform_cookie & ~(uintptr_t)3u);
     return context->magic == HPCLANG_HP39_PLATFORM_MAGIC &&
-           context->font_window_base == (uintptr_t)HPCLANG_CODE_WINDOW_BASE
-        ? context->font_window_base
-        : 0u;
+                   context->font_window_base == (uintptr_t)HPCLANG_CODE_WINDOW_BASE
+               ? context->font_window_base
+               : 0u;
 }
 
-static uint32_t hp39_window_font_first_nibble(
-    uint32_t model,
-    uint32_t logical_first)
+static uint32_t hp39_window_font_first_nibble(uint32_t model, uint32_t logical_first)
 {
     if (model == HPCLANG_MODEL_HP39GS) {
         if (logical_first == HP39_MAIN_FIRST_NIBBLE)
@@ -255,9 +219,7 @@ static uint32_t hp39_window_font_first_nibble(
     return UINT32_MAX;
 }
 
-static uint8_t hp39_font_nibble(
-    uint32_t logical_first,
-    uint32_t address)
+static uint8_t hp39_font_nibble(uint32_t logical_first, uint32_t address)
 {
     uint32_t model = active_model();
 
@@ -275,8 +237,7 @@ static uint8_t hp39_font_nibble(
         return 0u;
 
     uintptr_t window_base = hp39_font_window_base();
-    uint32_t window_first =
-        hp39_window_font_first_nibble(model, logical_first);
+    uint32_t window_first = hp39_window_font_first_nibble(model, logical_first);
     if (window_base == 0u || window_first == UINT32_MAX)
         return 0u;
 
@@ -284,20 +245,16 @@ static uint8_t hp39_font_nibble(
     if (window_nibble >= HP39_FONT_WINDOW_NIBBLES)
         return 0u;
 
-    const volatile uint8_t *p = (const volatile uint8_t *)(
-        window_base + (uintptr_t)(window_nibble >> 1));
+    const volatile uint8_t *p =
+        (const volatile uint8_t *)(window_base + (uintptr_t)(window_nibble >> 1));
     uint8_t value = *p;
-    return (window_nibble & 1u) != 0u ? (uint8_t)(value >> 4) :
-                                        (uint8_t)(value & 0x0fu);
+    return (window_nibble & 1u) != 0u ? (uint8_t)(value >> 4) : (uint8_t)(value & 0x0fu);
 }
 
-static uint8_t hp39_font_byte(
-    uint32_t logical_first,
-    uint32_t address)
+static uint8_t hp39_font_byte(uint32_t logical_first, uint32_t address)
 {
     return (uint8_t)(hp39_font_nibble(logical_first, address) |
-                     (uint8_t)(
-                         hp39_font_nibble(logical_first, address + 1u) << 4));
+                     (uint8_t)(hp39_font_nibble(logical_first, address + 1u) << 4));
 }
 
 static uint32_t native_byte_codepoint(uint32_t codepoint)
@@ -317,9 +274,7 @@ static uint32_t hp39_mini_index(uint32_t codepoint)
         return codepoint - (uint32_t)('a' - 'A');
     if (codepoint >= HP39_MINI_MAP_FIRST_CODE) {
         uint32_t offset = codepoint - HP39_MINI_MAP_FIRST_CODE;
-        return hp39_font_byte(
-            HP39_MINI_FIRST_NIBBLE,
-            HP39_MINI_MAP_FIRST_NIBBLE + offset * 2u);
+        return hp39_font_byte(HP39_MINI_FIRST_NIBBLE, HP39_MINI_MAP_FIRST_NIBBLE + offset * 2u);
     }
     if (codepoint >= 0x7bu)
         return codepoint - 0x1au;
@@ -329,15 +284,13 @@ static uint32_t hp39_mini_index(uint32_t codepoint)
 static uint32_t hp39_mini_advance(uint32_t codepoint)
 {
     uint32_t index = hp39_mini_index(codepoint);
-    uint32_t advance = hp39_font_nibble(
-        HP39_MINI_FIRST_NIBBLE,
-        HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES);
+    uint32_t advance = hp39_font_nibble(HP39_MINI_FIRST_NIBBLE,
+                                        HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES);
     return advance != 0u ? advance : 4u;
 }
 
-static const struct hpclang_bitmap_glyph *bitmap_glyph(
-    const struct hpclang_bitmap_font_data *font,
-    uint32_t codepoint)
+static const struct hpclang_bitmap_glyph *bitmap_glyph(const struct hpclang_bitmap_font_data *font,
+                                                       uint32_t codepoint)
 {
     if (font == NULL || font->glyphs == NULL || font->glyph_count == 0u)
         return NULL;
@@ -352,8 +305,7 @@ static const struct hpclang_bitmap_glyph *bitmap_glyph(
         else
             hi = mid;
     }
-    if (lo < font->glyph_count &&
-        font->glyphs[lo]->codepoint == codepoint)
+    if (lo < font->glyph_count && font->glyphs[lo]->codepoint == codepoint)
         return font->glyphs[lo];
 
     if (codepoint == font->fallback_codepoint)
@@ -369,20 +321,16 @@ static const struct hpclang_bitmap_glyph *bitmap_glyph(
         else
             hi = mid;
     }
-    return lo < font->glyph_count &&
-           font->glyphs[lo]->codepoint == font->fallback_codepoint
-        ? font->glyphs[lo]
-        : NULL;
+    return lo < font->glyph_count && font->glyphs[lo]->codepoint == font->fallback_codepoint
+               ? font->glyphs[lo]
+               : NULL;
 }
 
-uint32_t hpclang_font_codepoint_advance(
-    const struct hpclang_font *font,
-    uint32_t codepoint)
+uint32_t hpclang_font_codepoint_advance(const struct hpclang_font *font, uint32_t codepoint)
 {
     const struct hpclang_bitmap_font_data *bitmap = bitmap_data(font);
     if (bitmap != NULL) {
-        const struct hpclang_bitmap_glyph *glyph =
-            bitmap_glyph(bitmap, codepoint);
+        const struct hpclang_bitmap_glyph *glyph = bitmap_glyph(bitmap, codepoint);
         return glyph != NULL ? glyph->advance : bitmap->nominal_advance;
     }
     if (font != NULL && font->kind == FONT_KIND_HP39_MINI)
@@ -390,74 +338,50 @@ uint32_t hpclang_font_codepoint_advance(
     return hpclang_font_advance(font);
 }
 
-static void draw_hp39_mini(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_hp39_mini(struct hpclang_surface *surface, int32_t x, int32_t y,
+                           uint32_t codepoint, uint8_t intensity)
 {
     uint32_t index = hp39_mini_index(codepoint);
-    uint32_t record =
-        HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES;
+    uint32_t record = HP39_MINI_FIRST_NIBBLE + index * HP39_MINI_RECORD_NIBBLES;
     for (uint32_t yy = 0u; yy < 5u; ++yy) {
-        uint8_t row =
-            hp39_font_byte(HP39_MINI_FIRST_NIBBLE, record + 1u + yy * 2u);
+        uint8_t row = hp39_font_byte(HP39_MINI_FIRST_NIBBLE, record + 1u + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
-                hpclang_surface_set_pixel(
-                    surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
+                hpclang_surface_set_pixel(surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
         }
     }
 }
 
-static void draw_hp39_main(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_hp39_main(struct hpclang_surface *surface, int32_t x, int32_t y,
+                           uint32_t codepoint, uint8_t intensity)
 {
     uint32_t index = native_byte_codepoint(codepoint);
     uint32_t record = HP39_MAIN_FIRST_NIBBLE + index * 16u;
     for (uint32_t yy = 0u; yy < 8u; ++yy) {
-        uint8_t row =
-            hp39_font_byte(HP39_MAIN_FIRST_NIBBLE, record + yy * 2u);
+        uint8_t row = hp39_font_byte(HP39_MAIN_FIRST_NIBBLE, record + yy * 2u);
         for (uint32_t xx = 0u; xx < 5u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
-                hpclang_surface_set_pixel(
-                    surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
+                hpclang_surface_set_pixel(surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
         }
     }
 }
 
-static void draw_hp39_editline(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_hp39_editline(struct hpclang_surface *surface, int32_t x, int32_t y,
+                               uint32_t codepoint, uint8_t intensity)
 {
     uint32_t index = native_byte_codepoint(codepoint);
-    uint32_t record =
-        HP39_EDITLINE_FIRST_NIBBLE + index * HP39_EDITLINE_RECORD_NIBBLES;
+    uint32_t record = HP39_EDITLINE_FIRST_NIBBLE + index * HP39_EDITLINE_RECORD_NIBBLES;
     for (uint32_t yy = 0u; yy < 10u; ++yy) {
-        uint8_t row =
-            hp39_font_byte(HP39_EDITLINE_FIRST_NIBBLE, record + yy * 2u);
+        uint8_t row = hp39_font_byte(HP39_EDITLINE_FIRST_NIBBLE, record + yy * 2u);
         for (uint32_t xx = 0u; xx < 6u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
-                hpclang_surface_set_pixel(
-                    surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
+                hpclang_surface_set_pixel(surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
         }
     }
 }
 
-static void draw_hp4950_mini(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_hp4950_mini(struct hpclang_surface *surface, int32_t x, int32_t y,
+                             uint32_t codepoint, uint8_t intensity)
 {
     uint32_t index = native_byte_codepoint(codepoint);
     uint32_t record = 0x0812c8u + 7u + index * 6u;
@@ -465,8 +389,7 @@ static void draw_hp4950_mini(
         uint8_t row = saturn_nibble(record + yy);
         for (uint32_t xx = 0u; xx < 4u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
-                hpclang_surface_set_pixel(
-                    surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
+                hpclang_surface_set_pixel(surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
         }
     }
 }
@@ -482,12 +405,8 @@ static uint32_t hp4950_big_bitmap_base(void)
     return object + skip_bytes * 2u;
 }
 
-static void draw_hp4950_big(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_hp4950_big(struct hpclang_surface *surface, int32_t x, int32_t y,
+                            uint32_t codepoint, uint8_t intensity)
 {
     uint32_t index = native_byte_codepoint(codepoint);
     uint32_t record = hp4950_big_bitmap_base() + index * 16u;
@@ -495,52 +414,37 @@ static void draw_hp4950_big(
         uint8_t row = saturn_byte(record + yy * 2u);
         for (uint32_t xx = 0u; xx < 8u; ++xx) {
             if ((row & (uint8_t)(1u << xx)) != 0u)
-                hpclang_surface_set_pixel(
-                    surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
+                hpclang_surface_set_pixel(surface, x + (int32_t)xx, y + (int32_t)yy, intensity);
         }
     }
 }
 
-static void draw_bitmap_glyph(
-    struct hpclang_surface *surface,
-    const struct hpclang_bitmap_font_data *font,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+static void draw_bitmap_glyph(struct hpclang_surface *surface,
+                              const struct hpclang_bitmap_font_data *font, int32_t x, int32_t y,
+                              uint32_t codepoint, uint8_t intensity)
 {
     const struct hpclang_bitmap_glyph *glyph = bitmap_glyph(font, codepoint);
     if (glyph == NULL || glyph->bitmap == NULL || glyph->stride == 0u)
         return;
 
     int32_t left = x + glyph->x_offset;
-    int32_t top = y + (int32_t)font->ascent -
-                  (int32_t)glyph->y_offset - (int32_t)glyph->height;
+    int32_t top = y + (int32_t)font->ascent - (int32_t)glyph->y_offset - (int32_t)glyph->height;
 
     for (uint32_t yy = 0u; yy < glyph->height; ++yy) {
         const uint8_t *row = glyph->bitmap + yy * glyph->stride;
         for (uint32_t xx = 0u; xx < glyph->width; ++xx) {
-            if ((row[xx >> 3] &
-                 (uint8_t)(0x80u >> (xx & 7u))) != 0u)
-                hpclang_surface_set_pixel(
-                    surface,
-                    left + (int32_t)xx,
-                    top + (int32_t)yy,
-                    intensity);
+            if ((row[xx >> 3] & (uint8_t)(0x80u >> (xx & 7u))) != 0u)
+                hpclang_surface_set_pixel(surface, left + (int32_t)xx, top + (int32_t)yy,
+                                          intensity);
         }
     }
 }
 
-void hpclang_surface_draw_codepoint(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t x,
-    int32_t y,
-    uint32_t codepoint,
-    uint8_t intensity)
+void hpclang_surface_draw_codepoint(struct hpclang_surface *surface,
+                                    const struct hpclang_font *font, int32_t x, int32_t y,
+                                    uint32_t codepoint, uint8_t intensity)
 {
-    if (surface == NULL || font == NULL ||
-        font->abi != HPCLANG_FONT_PACKAGE_ABI)
+    if (surface == NULL || font == NULL || font->abi != HPCLANG_FONT_PACKAGE_ABI)
         return;
 
     const struct hpclang_bitmap_font_data *bitmap = bitmap_data(font);
@@ -570,16 +474,10 @@ void hpclang_surface_draw_codepoint(
     }
 }
 
-void hpclang_surface_draw_char(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t x,
-    int32_t y,
-    uint8_t character,
-    uint8_t intensity)
+void hpclang_surface_draw_char(struct hpclang_surface *surface, const struct hpclang_font *font,
+                               int32_t x, int32_t y, uint8_t character, uint8_t intensity)
 {
-    hpclang_surface_draw_codepoint(
-        surface, font, x, y, character, intensity);
+    hpclang_surface_draw_codepoint(surface, font, x, y, character, intensity);
 }
 
 static uint32_t utf8_next(const char **cursor)
@@ -620,8 +518,7 @@ static uint32_t utf8_next(const char **cursor)
         value = (value << 6) | (uint32_t)(p[i] & 0x3fu);
     }
 
-    if (value < minimum || value > 0x10ffffu ||
-        (value >= 0xd800u && value <= 0xdfffu)) {
+    if (value < minimum || value > 0x10ffffu || (value >= 0xd800u && value <= 0xdfffu)) {
         *cursor = (const char *)s;
         return 0xfffdu;
     }
@@ -630,13 +527,8 @@ static uint32_t utf8_next(const char **cursor)
     return value;
 }
 
-void hpclang_surface_draw_utf8(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t x,
-    int32_t y,
-    const char *text,
-    uint8_t intensity)
+void hpclang_surface_draw_utf8(struct hpclang_surface *surface, const struct hpclang_font *font,
+                               int32_t x, int32_t y, const char *text, uint8_t intensity)
 {
     if (surface == NULL || font == NULL || text == NULL)
         return;
@@ -649,19 +541,13 @@ void hpclang_surface_draw_utf8(
             y += (int32_t)hpclang_font_height(font);
             continue;
         }
-        hpclang_surface_draw_codepoint(
-            surface, font, x, y, codepoint, intensity);
+        hpclang_surface_draw_codepoint(surface, font, x, y, codepoint, intensity);
         x += (int32_t)hpclang_font_codepoint_advance(font, codepoint);
     }
 }
 
-void hpclang_surface_draw_text(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t x,
-    int32_t y,
-    const char *text,
-    uint8_t intensity)
+void hpclang_surface_draw_text(struct hpclang_surface *surface, const struct hpclang_font *font,
+                               int32_t x, int32_t y, const char *text, uint8_t intensity)
 {
     hpclang_surface_draw_utf8(surface, font, x, y, text, intensity);
 }

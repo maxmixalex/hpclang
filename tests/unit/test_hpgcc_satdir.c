@@ -9,13 +9,15 @@
 
 struct fake_entry;
 
-struct fake_node {
+struct fake_node
+{
     const char *name;
     const struct fake_entry *entries;
     size_t count;
 };
 
-struct fake_entry {
+struct fake_entry
+{
     const char *name;
     int is_directory;
     double value;
@@ -53,28 +55,28 @@ static const struct fake_node home = {
     3u,
 };
 
-struct hpclang_object_store {
+struct hpclang_object_store
+{
     const struct fake_node *node;
 };
 
-struct hpclang_object_store_iterator {
+struct hpclang_object_store_iterator
+{
     const struct fake_node *node;
     size_t index;
 };
 
-struct hpclang_object {
+struct hpclang_object
+{
     double value;
 };
 
-static const struct fake_entry *find_entry(
-    const struct fake_node *node,
-    const uint8_t *name,
-    uint32_t name_length)
+static const struct fake_entry *find_entry(const struct fake_node *node, const uint8_t *name,
+                                           uint32_t name_length)
 {
     for (size_t index = 0u; index < node->count; ++index) {
         const struct fake_entry *entry = &node->entries[index];
-        if (strlen(entry->name) == name_length &&
-            memcmp(entry->name, name, name_length) == 0) {
+        if (strlen(entry->name) == name_length && memcmp(entry->name, name, name_length) == 0) {
             return entry;
         }
     }
@@ -89,13 +91,11 @@ struct hpclang_object_store *hpclang_object_store_home(void)
     return store;
 }
 
-struct hpclang_object_store *hpclang_object_store_open_child(
-    const struct hpclang_object_store *parent,
-    const uint8_t *name,
-    uint32_t name_length)
+struct hpclang_object_store *
+hpclang_object_store_open_child(const struct hpclang_object_store *parent, const uint8_t *name,
+                                uint32_t name_length)
 {
-    const struct fake_entry *entry =
-        find_entry(parent->node, name, name_length);
+    const struct fake_entry *entry = find_entry(parent->node, name, name_length);
     if (entry == NULL) {
         errno = ENOENT;
         return NULL;
@@ -116,14 +116,10 @@ void hpclang_object_store_close(struct hpclang_object_store *store)
     free(store);
 }
 
-int hpclang_object_store_get(
-    const struct hpclang_object_store *store,
-    const uint8_t *name,
-    uint32_t name_length,
-    struct hpclang_object **object)
+int hpclang_object_store_get(const struct hpclang_object_store *store, const uint8_t *name,
+                             uint32_t name_length, struct hpclang_object **object)
 {
-    const struct fake_entry *entry =
-        find_entry(store->node, name, name_length);
+    const struct fake_entry *entry = find_entry(store->node, name, name_length);
     if (entry == NULL) {
         errno = ENOENT;
         return -1;
@@ -139,8 +135,8 @@ int hpclang_object_store_get(
     return 0;
 }
 
-struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
-    const struct hpclang_object_store *store)
+struct hpclang_object_store_iterator *
+hpclang_object_store_iterator_open(const struct hpclang_object_store *store)
 {
     struct hpclang_object_store_iterator *iterator = malloc(sizeof(*iterator));
     assert(iterator != NULL);
@@ -149,32 +145,26 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
     return iterator;
 }
 
-int hpclang_object_store_iterator_read(
-    struct hpclang_object_store_iterator *iterator,
-    struct hpclang_object_store_entry *out)
+int hpclang_object_store_iterator_read(struct hpclang_object_store_iterator *iterator,
+                                       struct hpclang_object_store_entry *out)
 {
     if (iterator->index >= iterator->node->count)
         return 0;
 
-    const struct fake_entry *entry =
-        &iterator->node->entries[iterator->index++];
+    const struct fake_entry *entry = &iterator->node->entries[iterator->index++];
     out->name_length = (uint32_t)strlen(entry->name);
     memcpy(out->name, entry->name, out->name_length);
-    out->flags = entry->is_directory ?
-        HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY : 0u;
-    out->kind = entry->is_directory ?
-        HPCLANG_OBJECT_DIRECTORY : HPCLANG_OBJECT_REAL;
+    out->flags = entry->is_directory ? HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY : 0u;
+    out->kind = entry->is_directory ? HPCLANG_OBJECT_DIRECTORY : HPCLANG_OBJECT_REAL;
     return 1;
 }
 
-void hpclang_object_store_iterator_close(
-    struct hpclang_object_store_iterator *iterator)
+void hpclang_object_store_iterator_close(struct hpclang_object_store_iterator *iterator)
 {
     free(iterator);
 }
 
-enum hpclang_object_kind hpclang_object_kind(
-    const struct hpclang_object *object)
+enum hpclang_object_kind hpclang_object_kind(const struct hpclang_object *object)
 {
     (void)object;
     return HPCLANG_OBJECT_REAL;
@@ -185,9 +175,7 @@ void hpclang_object_release(struct hpclang_object *object)
     free(object);
 }
 
-int hpclang_object_real_f64(
-    const struct hpclang_object *object,
-    double *value)
+int hpclang_object_real_f64(const struct hpclang_object *object, double *value)
 {
     *value = object->value;
     return 0;

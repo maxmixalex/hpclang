@@ -11,14 +11,16 @@
 
 #include "object-snapshot.h"
 
-enum { STACK_CAPACITY = 16 };
+enum
+{
+    STACK_CAPACITY = 16
+};
 
 static struct hpclang_object *stack_items[STACK_CAPACITY];
 static uint32_t stack_depth_value;
 static uint32_t last_drop_count;
 
-static struct hpclang_object *clone_object(
-    const struct hpclang_object *object)
+static struct hpclang_object *clone_object(const struct hpclang_object *object)
 {
     size_t bytes = ((size_t)object->nibble_count + 1u) / 2u;
     struct hpclang_object *copy = malloc(sizeof(*copy) + bytes);
@@ -33,9 +35,7 @@ int hpclang_stack_depth(uint32_t *depth)
     return 0;
 }
 
-int hpclang_stack_peek(
-    uint32_t level,
-    struct hpclang_object **object)
+int hpclang_stack_peek(uint32_t level, struct hpclang_object **object)
 {
     if (level == 0u || level > stack_depth_value)
         return -1;
@@ -50,10 +50,7 @@ int hpclang_stack_drop(uint32_t count)
     last_drop_count = count;
     for (uint32_t i = 0u; i < count; ++i)
         hpclang_object_release(stack_items[i]);
-    memmove(
-        stack_items,
-        stack_items + count,
-        (stack_depth_value - count) * sizeof(stack_items[0]));
+    memmove(stack_items, stack_items + count, (stack_depth_value - count) * sizeof(stack_items[0]));
     stack_depth_value -= count;
     return 0;
 }
@@ -62,10 +59,7 @@ int hpclang_stack_push(const struct hpclang_object *object)
 {
     if (stack_depth_value == STACK_CAPACITY)
         return -1;
-    memmove(
-        stack_items + 1u,
-        stack_items,
-        stack_depth_value * sizeof(stack_items[0]));
+    memmove(stack_items + 1u, stack_items, stack_depth_value * sizeof(stack_items[0]));
     stack_items[0] = clone_object(object);
     ++stack_depth_value;
     return 0;

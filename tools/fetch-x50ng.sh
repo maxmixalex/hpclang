@@ -51,19 +51,7 @@ fi
 python3 "$ROOT/tools/prepare-x50ng.py" \
     "$DEST" \
     --direct-frontend "$ROOT/tests/e2e/harness/x50ng/e2e-main.c" \
-    --stock-frontend "$ROOT/tests/e2e/harness/x50ng/stock-launcher-gated-main.c" \
+    --stock-frontend "$ROOT/tests/e2e/harness/x50ng/stock-launcher-main.c" \
+    --gallery-frontend "$ROOT/tests/e2e/harness/x50ng/gallery-main.c" \
     --selector "$ROOT/tests/e2e/harness/x50ng/main.c" \
     --headless-header "$ROOT/tests/e2e/harness/x50ng/headless-ui-init.h"
-
-# The gated frontend includes the canonical Stock implementation so the gate
-# cannot fork launcher/return behavior. Keep that implementation beside the
-# prepared frontend in x50ng's source directory.
-cp "$ROOT/tests/e2e/harness/x50ng/stock-launcher-main.c" \
-   "$DEST/src/stock-launcher-main-base.c"
-
-python3 "$ROOT/tools/prepare-x50ng-gallery.py" \
-    "$DEST" \
-    --gallery-frontend "$ROOT/tests/e2e/harness/x50ng/gallery-main.c"
-
-cp "$ROOT/tests/e2e/harness/x50ng/lcd-quiescence.h" \
-   "$DEST/src/lcd-quiescence.h"

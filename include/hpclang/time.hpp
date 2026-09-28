@@ -12,8 +12,7 @@ using microseconds = std::chrono::microseconds;
 
 [[nodiscard]] inline microseconds monotonic_time() noexcept
 {
-    return microseconds{
-        static_cast<microseconds::rep>(::hpclang_time_monotonic_us())};
+    return microseconds{static_cast<microseconds::rep>(::hpclang_time_monotonic_us())};
 }
 
 inline void delay(microseconds duration) noexcept

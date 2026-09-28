@@ -17,8 +17,7 @@ static struct hpclang_surface display;
 struct hpclang_surface *hpclang_display_surface(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    uintptr_t pixels =
-        ((LCDSADDR1 & UINT32_C(0xffff)) * 2u) + LCD_RAM_BASE;
+    uintptr_t pixels = ((LCDSADDR1 & UINT32_C(0xffff)) * 2u) + LCD_RAM_BASE;
 
     display.pixels = (volatile uint8_t *)pixels;
     display.width = device->display_width;

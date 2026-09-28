@@ -14,9 +14,13 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -37,9 +41,13 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -59,27 +67,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Verify GitHub-hosted runner baseline
-        run: |
-          missing=()
-          for tool in git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout; do
-            command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
-          done
-          if (( ${#missing[@]} )); then
-            printf 'Missing GitHub-hosted baseline tools: %s\n' "${missing[*]}" >&2
-            exit 1
-          fi
-
       - name: Run unit tests
         run: |
           cmake -S tests/unit -B build/unit
           cmake --build build/unit -j2
           ctest --test-dir build/unit --output-on-failure
-
-      - name: Verify font selection modes
-        run: |
-          cmake -S tests/font-cmake -B build/font-cmake \
-            -DHPCLANG_ROOT="$GITHUB_WORKSPACE"
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
@@ -124,8 +116,7 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
 
       - name: Prepare hardware-validation packages

@@ -13,22 +13,43 @@ Pinned x50ng still supplies the generic bootloader mechanism used for these upda
 
 ## HP 39g+
 
-There is no trustworthy public stock HP39g+ ARM firmware/full-flash fixture comparable to the HP39gs/40gs update archives.
+The HP39g+ fixture is a complete 1 MiB NOR image acquired from real hardware in
+September 2026. The read-only one-launch acquisition path streamed the physical
+flash in bounded blocks and the host reconstructed an exact 1,048,576-byte image.
 
-The retained `research/hp39gplus/` dumper is deliberately read-only. The verified 16 KiB mechanism:
+Verified raw-image identity:
 
-1. receives a result buffer from historical ARMToolbox39 `PrRUN`;
-2. temporarily maps physical NOR address 0 through an unused ARM section;
-3. copies the first 16 KiB using byte accesses;
-4. restores the original mapping;
-5. marks the returned object with `H39BOOT1`, length, and PASS;
-6. cleans the returned range from D-cache before returning to the stock environment.
+- size: `0x100000` bytes;
+- SHA-256: `95920417d4dee311e6113f11720de11018da166a8a777d9255fbff2dd6433f67`;
+- firmware-identifying string present in the image: `Version HP39-D1.55,*0`;
+- ARM vector/boot area is nonblank and the image ends in a normal erased-`0xff`
+  flash region.
 
-It never issues a flash erase/program command.
+The repository stores the fixture as
+`tests/e2e/fixtures/hp39gplus/flash.bin.xz`. The target profile records the
+expected decompressed size and SHA-256. `tools/prepare-nor-fixture.py` refuses
+to install the image into x50ng state unless both checks pass.
 
-The emulator mechanism probe matched the loaded physical NOR byte-for-byte and was removed from CI after that result was established. This proves the dump method, not HP39g+ firmware identity.
+Because this is a complete 1 MiB NOR image, HP39g+ Direct/focused E2E verifies
+the raw image first and then pads the emulator backing to x50ng's fixed 2 MiB
+SST29VF160 model with erased `0xff` bytes. The verified first 1 MiB is never
+rewritten or mirrored. The target does **not** combine an HP39g+ OS image with
+the HP50g bootloader and does not reuse the HP39gs/40gs update archives.
 
-When a real HP 39g+ is acquired, obtain and verify its complete 1 MiB stock flash in bounded chunks rather than attempting to buffer the full image in the calculator's RAM. That verified image will become the missing Direct/stock E2E fixture.
+The D1.55 original-Stock PC transfer path uses the HP39g+ USB Connectivity Kit.
+The current harness implements the shared USB byte stream and HP39 typed-file
+transfer, so model 1 is enabled in automated Stock matrices. The canonical USB Runtime gate
+passes install, payload execution, and settled return on the D1.55 fixture.
+
+The temporary ROM-dumper/boot-dump research sources were retired once the full
+fixture was obtained. Their useful result is now the fixture provenance above
+and repository history, not a maintained extraction subsystem.
+
+The full fixture establishes HP39g+ firmware identity and makes native runtime
+E2E possible. It does **not** by itself establish that HP39g+ uses the same
+physical ROM-font object/page layout as HP39gs/40gs. That mapping remains a
+separate evidence task, so the gs/40gs-only native EditLine/font offsets are not
+silently promoted to HP39g+.
 
 ## HP 48gII
 

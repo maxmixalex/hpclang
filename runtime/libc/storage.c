@@ -21,22 +21,20 @@
  * taking direct controller ownership, then ResetSD after releasing it.
  */
 
-enum {
+enum
+{
     KOS_SYSCALL_GET_FUNC_ENTRY = 218u,
     KOS_MODULE_FILESYSTEM = 1u,
     KOS_FUNC_CHECKINSERT = 17u,
     KOS_FUNC_CHECKPROTECT = 18u
 };
 
-uint32_t hpclang_kos_swi3(
-    uint32_t index,
-    uint32_t arg1,
-    uint32_t arg2,
-    uint32_t arg3);
+uint32_t hpclang_kos_swi3(uint32_t index, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 typedef uint32_t (*kos_fn0)(void);
 
-enum stream_media_presence_state {
+enum stream_media_presence_state
+{
     STREAM_MEDIA_PRESENCE_UNKNOWN = 0,
     STREAM_MEDIA_PRESENCE_ABSENT = 1,
     STREAM_MEDIA_PRESENCE_PRESENT = 2
@@ -63,11 +61,8 @@ static uintptr_t kos_entry(uint32_t index)
     if (!stream_storage_available())
         return 0u;
 
-    return (uintptr_t)hpclang_kos_swi3(
-        KOS_SYSCALL_GET_FUNC_ENTRY,
-        KOS_MODULE_FILESYSTEM,
-        index,
-        0u);
+    return (uintptr_t)hpclang_kos_swi3(KOS_SYSCALL_GET_FUNC_ENTRY, KOS_MODULE_FILESYSTEM, index,
+                                       0u);
 }
 
 static int stock_media_presence_query(void)
@@ -88,9 +83,7 @@ static int stock_media_presence_query(void)
     }
 
     stream_media_presence =
-        result != 0
-            ? STREAM_MEDIA_PRESENCE_PRESENT
-            : STREAM_MEDIA_PRESENCE_ABSENT;
+        result != 0 ? STREAM_MEDIA_PRESENCE_PRESENT : STREAM_MEDIA_PRESENCE_ABSENT;
     return result != 0;
 }
 
@@ -189,9 +182,7 @@ int unlink(const char *path)
     return hpclang_namespace_unlink(path);
 }
 
-int hpclang_stream_path_query(
-    const char *path,
-    struct hpclang_stream_path_info *info)
+int hpclang_stream_path_query(const char *path, struct hpclang_stream_path_info *info)
 {
     if (!stream_storage_available())
         return unsupported();
@@ -216,8 +207,7 @@ int stat(const char *path, struct stat *info)
         info->st_mode = S_IFREG;
 
     info->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
-    if ((path_info.attributes &
-         HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY) == 0u)
+    if ((path_info.attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY) == 0u)
         info->st_mode |= S_IWUSR;
 
     info->st_nlink = 1;
@@ -247,8 +237,7 @@ int rmdir(const char *path)
     return hpclang_namespace_rmdir(path);
 }
 
-int hpclang_stream_storage_query(
-    struct hpclang_stream_storage_info *info)
+int hpclang_stream_storage_query(struct hpclang_stream_storage_info *info)
 {
     if (!stream_storage_available())
         return unsupported();

@@ -14,8 +14,8 @@
  */
 
 #define D_SIGN UINT64_C(0x8000000000000000)
-#define D_ABS  UINT64_C(0x7fffffffffffffff)
-#define D_INF  UINT64_C(0x7ff0000000000000)
+#define D_ABS UINT64_C(0x7fffffffffffffff)
+#define D_INF UINT64_C(0x7ff0000000000000)
 #define D_QNAN UINT64_C(0x7ff8000000000000)
 #define D_QUIET UINT64_C(0x0008000000000000)
 #define D_SIG_MASK UINT64_C(0x000fffffffffffff)
@@ -25,19 +25,21 @@
 
 static uint64_t to_bits(double value)
 {
-    union {
+    union
+    {
         double d;
         uint64_t u;
-    } rep = { .d = value };
+    } rep = {.d = value};
     return rep.u;
 }
 
 static double from_bits(uint64_t bits)
 {
-    union {
+    union
+    {
         double d;
         uint64_t u;
-    } rep = { .u = bits };
+    } rep = {.u = bits};
     return rep.d;
 }
 
@@ -56,11 +58,7 @@ static int normalize(uint64_t *significand)
     return 1 - shift;
 }
 
-static void wide_multiply(
-    uint64_t a,
-    uint64_t b,
-    uint64_t *high,
-    uint64_t *low)
+static void wide_multiply(uint64_t a, uint64_t b, uint64_t *high, uint64_t *low)
 {
     const uint32_t a0 = (uint32_t)a;
     const uint32_t a1 = (uint32_t)(a >> 32);
@@ -73,8 +71,7 @@ static void wide_multiply(
     const uint64_t p11 = (uint64_t)a1 * b1;
 
     const uint64_t r0 = (uint32_t)p00;
-    const uint64_t r1 =
-        (p00 >> 32) + (uint32_t)p01 + (uint32_t)p10;
+    const uint64_t r1 = (p00 >> 32) + (uint32_t)p01 + (uint32_t)p10;
 
     *low = r0 + (r1 << 32);
     *high = (p01 >> 32) + (p10 >> 32) + (r1 >> 32) + p11;
@@ -92,8 +89,7 @@ double hpclang_soft_dmul(double a, double b)
     uint64_t b_sig = b_rep & D_SIG_MASK;
     int scale = 0;
 
-    if (a_exp - 1u >= D_MAX_EXP - 1u ||
-        b_exp - 1u >= D_MAX_EXP - 1u) {
+    if (a_exp - 1u >= D_MAX_EXP - 1u || b_exp - 1u >= D_MAX_EXP - 1u) {
         const uint64_t a_abs = a_rep & D_ABS;
         const uint64_t b_abs = b_rep & D_ABS;
 
@@ -141,8 +137,7 @@ double hpclang_soft_dmul(double a, double b)
             return from_bits(sign);
 
         const bool sticky = (product_lo << (64 - shift)) != 0;
-        product_lo =
-            (product_hi << (64 - shift)) | (product_lo >> shift) | sticky;
+        product_lo = (product_hi << (64 - shift)) | (product_lo >> shift) | sticky;
         product_hi >>= shift;
     } else {
         product_hi &= D_SIG_MASK;
@@ -166,8 +161,7 @@ double hpclang_soft_dadd(double a, double b)
     uint64_t a_abs = a_rep & D_ABS;
     uint64_t b_abs = b_rep & D_ABS;
 
-    if (a_abs - 1u >= D_INF - 1u ||
-        b_abs - 1u >= D_INF - 1u) {
+    if (a_abs - 1u >= D_INF - 1u || b_abs - 1u >= D_INF - 1u) {
         if (a_abs > D_INF)
             return from_bits(a_rep | D_QUIET);
         if (b_abs > D_INF)
@@ -194,9 +188,6 @@ double hpclang_soft_dadd(double a, double b)
         uint64_t tmp = a_rep;
         a_rep = b_rep;
         b_rep = tmp;
-        tmp = a_abs;
-        a_abs = b_abs;
-        b_abs = tmp;
     }
 
     int a_exp = (int)((a_rep >> 52) & D_MAX_EXP);
@@ -231,8 +222,7 @@ double hpclang_soft_dadd(double a, double b)
             return from_bits(0);
 
         if (a_sig < (D_IMPLICIT << 3)) {
-            const int shift =
-                clz64_nonzero(a_sig) - clz64_nonzero(D_IMPLICIT << 3);
+            const int shift = clz64_nonzero(a_sig) - clz64_nonzero(D_IMPLICIT << 3);
             a_sig <<= shift;
             a_exp -= shift;
         }

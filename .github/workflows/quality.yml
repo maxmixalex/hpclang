@@ -6,31 +6,35 @@ on:
     paths:
       - "**/*.c"
       - "**/*.h"
-      - "**/*.cc"
       - "**/*.cpp"
+      - "**/*.cc"
       - "**/*.cxx"
       - "**/*.hpp"
       - "**/*.py"
       - "**/*.sh"
+      - "**/CMakeLists.txt"
+      - "cmake/**"
       - ".clang-format"
       - "pyproject.toml"
-      - "tools/lint.sh"
-      - "tools/format.sh"
+      - "tools/requirements-quality.txt"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/quality.yml"
   pull_request:
     paths:
       - "**/*.c"
       - "**/*.h"
-      - "**/*.cc"
       - "**/*.cpp"
+      - "**/*.cc"
       - "**/*.cxx"
       - "**/*.hpp"
       - "**/*.py"
       - "**/*.sh"
+      - "**/CMakeLists.txt"
+      - "cmake/**"
       - ".clang-format"
       - "pyproject.toml"
-      - "tools/lint.sh"
-      - "tools/format.sh"
+      - "tools/requirements-quality.txt"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/quality.yml"
 
 concurrency:
@@ -38,65 +42,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Ruff + ShellCheck
+  quality:
+    name: Lint, format, and Clang analysis
     runs-on: home-docker
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install lightweight lint dependencies
+      - uses: ./.github/actions/setup-atfe
+      - name: Install quality tools
         run: |
-          set -euo pipefail
-          if ! command -v ruff >/dev/null 2>&1; then
-            if ! python3 -m venv build/quality-venv; then
-              sudo -E apt-get update -qq
-              sudo -E apt-get install -y --no-install-recommends python3-venv
-              python3 -m venv build/quality-venv
-            fi
-            build/quality-venv/bin/pip install --disable-pip-version-check 'ruff==0.13.2'
-            echo "$GITHUB_WORKSPACE/build/quality-venv/bin" >> "$GITHUB_PATH"
-            export PATH="$GITHUB_WORKSPACE/build/quality-venv/bin:$PATH"
-          fi
-          if ! command -v shellcheck >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends shellcheck
-          fi
-          ruff --version
-          shellcheck --version
-
+          bash tools/install-ci-packages.sh python3-venv shellcheck
+          python3 -m venv build/quality-venv
+          build/quality-venv/bin/pip install --disable-pip-version-check -r tools/requirements-quality.txt
+          echo "$GITHUB_WORKSPACE/build/quality-venv/bin" >> "$GITHUB_PATH"
+          echo "$ATFE/bin" >> "$GITHUB_PATH"
       - name: Lint Python and shell
         run: bash tools/lint.sh
-
-  formatter-config:
-    name: Formatter configuration
-    runs-on: home-docker
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Validate formatter configuration
-        run: |
-          set -euo pipefail
-          test -s .clang-format
-          python3 - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          config = tomllib.loads(Path("pyproject.toml").read_text())
-          assert "ruff" in config["tool"]
-          print("formatter configuration: clang-format + Ruff")
-          PY
-
-          if ! command -v clang-format >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends clang-format
-          fi
-          printf 'int main(void){return 0;}\n' | clang-format --style=file >/dev/null
-
-      - name: Explain formatting boundary
-        run: |
-          echo "C/C++ formatting is configured by .clang-format."
-          echo "Python formatting is configured by Ruff in pyproject.toml."
-          echo "Run: tools/format.sh"
-          echo "Check selected files without rewriting: tools/format.sh --check <files...>"
+      - name: Check source formatting
+        run: bash tools/format.sh --check
+      - name: Analyze host and ARM C/C++
+        run: bash tools/analyze.sh

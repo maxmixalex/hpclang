@@ -17,12 +17,7 @@ def wrap_docstr(payload: bytes) -> bytes:
     # field on nibble boundaries. The length therefore starts in the high
     # nibble of the third byte.
     encoded_length = length_nibbles << 4
-    return (
-        b"HPHP49-C"
-        + b"\x2c\x2a"
-        + encoded_length.to_bytes(4, "little")[:3]
-        + payload
-    )
+    return b"HPHP49-C" + b"\x2c\x2a" + encoded_length.to_bytes(4, "little")[:3] + payload
 
 
 def main() -> None:

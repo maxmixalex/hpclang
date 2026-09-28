@@ -6,7 +6,7 @@ hpclang supports six ARM calculator model profiles through three platform famili
 
 | Model | Model ID | Platform | Runtime validation | Stock launcher validation |
 | --- | ---: | --- | --- | --- |
-| HP 39g+ | 1 | `hp39` | package builds; real stock fixture blocked | blocked on real stock fixture |
+| HP 39g+ | 1 | `hp39` | verified D1.55 full-NOR emulator PASS | USB APLET/ARMToolbox39 PASS |
 | HP 39gs | 2 | `hp39` | real hardware PASS; emulator PASS | real hardware return PASS; stock emulator PASS |
 | HP 40gs | 3 | `hp39` | official-ROM emulator PASS | stock emulator PASS |
 | HP 48gII | 4 | `hp48` | verified full-NOR emulator PASS | ARMToolbox48/PrRUN E2E PASS; payload, control-flow return, and settled Stock UI repaint are all witnessed |
@@ -21,7 +21,7 @@ The `hp39` platform uses the HP39 aplet/container path and ARMToolbox39/library 
 
 The common runtime is validated on HP 39gs hardware and on official HP 39gs/40gs ROMs in the ARM emulator. The same historical HPGCC39 aplet/library boundary also produces a model-1 HP 39g+ hardware-validation package.
 
-HP 39g+ remains blocked because no trustworthy public stock ARM flash fixture has been established. The compiler, runtime, stage0, HP39 package path, and read-only flash-dump mechanism already exist. Resume E2E only after a real HP 39g+ is available and its stock flash has been dumped and verified.
+HP 39g+ now uses a verified 1 MiB D1.55 full-NOR dump from real hardware. Direct runtime and the original-Stock USB install/launch path pass against that fixture. Its native ROM-font offsets remain a separate evidence task; sibling font layouts are not inferred.
 
 The preferred HP39/40 stock fixture path uses the original ROM's own transfer/install logic. Direct SRAM or flash patching is only a fallback. The obsolete Conn3x GUI is not part of the emulator regression contract.
 
@@ -31,7 +31,7 @@ Historical HPGCC 1.x contains a dedicated ARMToolbox48 path. Important differenc
 
 The `hp48` platform feeds the same common bootstrap and HPC1 image on a genuine HP48gII full-NOR fixture. Direct runtime passes and returns cleanly.
 
-The full Stock gate transfers ARMToolbox48 and `HPCLANG.HP` through the calculator's original Serial Kermit path, installs library 275 into Port 0, warmstarts, launches `ARMTo` / `PrRUN`, and reaches the same HPC1 PASS result. Runtime #122 first closed the full return path; the final M7.1 head repeats that closure in Runtime #135 (`35298949365`), with payload PASS, control-flow restoration, stage-window teardown, exact keyboard progression, and a settled stock-owned repaint all green. Gallery #112 (`35298949457`) independently repeats the settled HP48 return around the live native-font path.
+The full Stock gate transfers ARMToolbox48 and `HPCLANG.HP` through Kermit, installs library 275 into Port 0, warmstarts, launches `ARMTo` / `PrRUN`, and reaches the same HPC1 PASS result. The current default is USB, and canonical six-model USB Stock Runtime passes; UART remains an explicit override. Historically, Runtime #122 first closed the full serial return path, and Runtime #135 (`35298949365`) repeated payload PASS, control-flow restoration, stage-window teardown, exact keyboard progression, and settled Stock repaint. Gallery #112 (`35298949457`) independently established the settled HP48 return around the live native-font path.
 
 The architecture criterion is met: HP48gII executes the same HPC1 image and common bootstrap without a distinct application ABI. Payload correctness, control-flow restoration, and visible Stock UI restoration remain separate evidence dimensions, but all three now have passing automated witnesses.
 
@@ -39,7 +39,7 @@ The architecture criterion is met: HP48gII executes the same HPC1 image and comm
 
 HP 49g+ and HP 50g share the standard ARMToolbox lineage, the `hp4950` platform implementation, the official 2.15 OS image, the stock File Manager/ARMToolbox sequences, and the HPC1 ABI.
 
-Their original-system path is:
+Their established SD original-system path is shown below. USB is now the profile default and transfers SETUP/HPCLANG through Kermit before installing library 275 into Port 2; see [USB migration evidence](stock-usb-transport.md). Storage explicitly retains the SD/VVFAT path.
 
 ```text
 model-specific ARM bootloader + shared official 2.15 OS

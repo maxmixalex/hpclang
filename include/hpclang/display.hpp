@@ -9,9 +9,8 @@
 namespace hpclang {
 
 class surface_ref {
-public:
-    explicit surface_ref(hpclang_surface *surface) noexcept
-        : surface_(surface)
+  public:
+    explicit surface_ref(hpclang_surface *surface) noexcept : surface_(surface)
     {
     }
 
@@ -35,107 +34,69 @@ public:
         ::hpclang_surface_clear(surface_, intensity);
     }
 
-    [[nodiscard]] std::uint8_t get_pixel(
-        std::int32_t x,
-        std::int32_t y) const noexcept
+    [[nodiscard]] std::uint8_t get_pixel(std::int32_t x, std::int32_t y) const noexcept
     {
         return ::hpclang_surface_get_pixel(surface_, x, y);
     }
 
-    void set_pixel(
-        std::int32_t x,
-        std::int32_t y,
-        std::uint8_t intensity) const noexcept
+    void set_pixel(std::int32_t x, std::int32_t y, std::uint8_t intensity) const noexcept
     {
         ::hpclang_surface_set_pixel(surface_, x, y, intensity);
     }
 
-    void draw_line(
-        std::int32_t x0,
-        std::int32_t y0,
-        std::int32_t x1,
-        std::int32_t y1,
-        std::uint8_t intensity) const noexcept
+    void draw_line(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
+                   std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_draw_line(
-            surface_, x0, y0, x1, y1, intensity);
+        ::hpclang_surface_draw_line(surface_, x0, y0, x1, y1, intensity);
     }
 
-    void draw_rect(
-        std::int32_t x,
-        std::int32_t y,
-        std::int32_t width,
-        std::int32_t height,
-        std::uint8_t intensity) const noexcept
+    void draw_rect(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height,
+                   std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_draw_rect(
-            surface_, x, y, width, height, intensity);
+        ::hpclang_surface_draw_rect(surface_, x, y, width, height, intensity);
     }
 
-    void draw_circle(
-        std::int32_t center_x,
-        std::int32_t center_y,
-        std::int32_t radius,
-        std::uint8_t intensity) const noexcept
+    void draw_circle(std::int32_t center_x, std::int32_t center_y, std::int32_t radius,
+                     std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_draw_circle(
-            surface_, center_x, center_y, radius, intensity);
+        ::hpclang_surface_draw_circle(surface_, center_x, center_y, radius, intensity);
     }
 
-    void fill_circle(
-        std::int32_t center_x,
-        std::int32_t center_y,
-        std::int32_t radius,
-        std::uint8_t intensity) const noexcept
+    void fill_circle(std::int32_t center_x, std::int32_t center_y, std::int32_t radius,
+                     std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_fill_circle(
-            surface_, center_x, center_y, radius, intensity);
+        ::hpclang_surface_fill_circle(surface_, center_x, center_y, radius, intensity);
     }
 
-    void draw_polygon(
-        std::span<const ::hpclang_point> points,
-        std::uint8_t intensity) const noexcept
+    void draw_polygon(std::span<const ::hpclang_point> points,
+                      std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_draw_polygon(
-            surface_, points.data(),
-            static_cast<std::uint32_t>(points.size()), intensity);
+        ::hpclang_surface_draw_polygon(surface_, points.data(),
+                                       static_cast<std::uint32_t>(points.size()), intensity);
     }
 
-    void fill_polygon(
-        std::span<const ::hpclang_point> points,
-        std::uint8_t intensity) const noexcept
+    void fill_polygon(std::span<const ::hpclang_point> points,
+                      std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_fill_polygon(
-            surface_, points.data(),
-            static_cast<std::uint32_t>(points.size()), intensity);
+        ::hpclang_surface_fill_polygon(surface_, points.data(),
+                                       static_cast<std::uint32_t>(points.size()), intensity);
     }
 
-    void blit_from(
-        surface_ref source,
-        std::int32_t destination_x,
-        std::int32_t destination_y,
-        std::int32_t source_x,
-        std::int32_t source_y,
-        std::int32_t width,
-        std::int32_t height) const noexcept
+    void blit_from(surface_ref source, std::int32_t destination_x, std::int32_t destination_y,
+                   std::int32_t source_x, std::int32_t source_y, std::int32_t width,
+                   std::int32_t height) const noexcept
     {
-        ::hpclang_surface_blit(
-            surface_, destination_x, destination_y,
-            source.surface_, source_x, source_y, width, height);
+        ::hpclang_surface_blit(surface_, destination_x, destination_y, source.surface_, source_x,
+                               source_y, width, height);
     }
 
-    void fill_rect(
-        std::int32_t x,
-        std::int32_t y,
-        std::int32_t width,
-        std::int32_t height,
-        std::uint8_t intensity) const noexcept
+    void fill_rect(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height,
+                   std::uint8_t intensity) const noexcept
     {
-        ::hpclang_surface_fill_rect(
-            surface_, x, y, width, height, intensity);
+        ::hpclang_surface_fill_rect(surface_, x, y, width, height, intensity);
     }
 
-private:
+  private:
     hpclang_surface *surface_;
 };
 

@@ -14,17 +14,16 @@ on:
       - "cmake/fonts.cmake"
       - "cmake/ui-text.cmake"
       - "tests/e2e/font-gallery/**"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
-      - "tests/e2e/harness/x50ng/stock-launcher-main.c"
-      - "tests/e2e/harness/x50ng/stock-launcher-gated-main.c"
-      - "tests/e2e/harness/x50ng/stock-return-phase.h"
-      - "tests/e2e/harness/x50ng/lcd-quiescence.h"
+      - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
       - "tests/e2e/specs/font-gallery-stock.json"
       - "tests/e2e/report.py"
       - "tests/e2e/harness/verify-hp39-native-font.py"
-      - "tools/prepare-x50ng-gallery.py"
+      - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp39-kermit-server.sh"
@@ -34,6 +33,7 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
       - ".github/actions/setup-x50ng/**"
@@ -47,17 +47,16 @@ on:
       - "cmake/fonts.cmake"
       - "cmake/ui-text.cmake"
       - "tests/e2e/font-gallery/**"
+      - "tests/e2e/targets/**"
+      - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
-      - "tests/e2e/harness/x50ng/stock-launcher-main.c"
-      - "tests/e2e/harness/x50ng/stock-launcher-gated-main.c"
-      - "tests/e2e/harness/x50ng/stock-return-phase.h"
-      - "tests/e2e/harness/x50ng/lcd-quiescence.h"
+      - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
       - "tests/e2e/specs/font-gallery-stock.json"
       - "tests/e2e/report.py"
       - "tests/e2e/harness/verify-hp39-native-font.py"
-      - "tools/prepare-x50ng-gallery.py"
+      - "tools/prepare-x50ng.py"
       - "tools/fetch-x50ng.sh"
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp39-kermit-server.sh"
@@ -67,6 +66,7 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/e2e-target-env.py"
       - "tools/merge-pgm-grid.py"
       - ".github/actions/setup-x50ng/**"
@@ -92,9 +92,7 @@ jobs:
           mkdir -p build
           chmod +x tools/build-e2e.sh
           {
-            echo '=== exhaustive Direct Gallery ==='
             tools/build-e2e.sh font-gallery "$GITHUB_WORKSPACE/build/e2e-font-gallery-full"
-            echo '=== compact Stock Gallery ==='
             tools/build-e2e.sh font-gallery-stock "$GITHUB_WORKSPACE/build/e2e-font-gallery-stock"
           } 2>&1 | tee build/e2e-font-gallery-build.log
 
@@ -176,7 +174,9 @@ jobs:
     name: Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
-    timeout-minutes: 15
+    # HP39 now runs three models sequentially (60 shards). Run #150 completed
+    # every model but hit the old 15-minute ceiling during final aggregation.
+    timeout-minutes: ${{ matrix.family == 'hp39' && 25 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -186,6 +186,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Download exhaustive Direct Gallery build
         uses: actions/download-artifact@v7
@@ -318,8 +320,7 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
 
       - name: Prepare ARMToolbox48 library
@@ -328,7 +329,6 @@ jobs:
           bash tools/bootstrap-hp39-aplet.sh >/dev/null
           mkdir -p build/assets
           cp .cache/hp39-aplet/raw/app/ARMToolbox/L275_48.LIB build/assets/L275_48
-          sha256sum build/assets/L275_48
 
       - name: Prepare Stock platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"

@@ -7,64 +7,50 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "runtime/core/object-store.c"
-      - "runtime/core/rpl-object-store.c"
-      - "runtime/core/rpl-object-store.h"
-      - "runtime/core/rpl-mutation.c"
-      - "runtime/core/rpl-mutation.h"
-      - "runtime/core/object-snapshot.c"
-      - "runtime/core/object-snapshot.h"
-      - "runtime/core/rpl-object-span.c"
-      - "include/hpclang/object-store.h"
-      - "include/hpclang/object.h"
-      - "runtime/bootstrap/**"
+      - "runtime/**"
       - "platform/armtoolbox/**"
+      - "include/**"
       - "cmake/**"
-      - "tests/e2e/object-mutation/**"
-      - "tests/e2e/harness/**"
-      - "tests/e2e/specs/object-mutation.json"
+      - "tests/e2e/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
+      - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/hp48-kermit-watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
       - ".github/workflows/e2e-object-mutation.yml"
   pull_request:
     paths:
-      - "runtime/core/object-store.c"
-      - "runtime/core/rpl-object-store.c"
-      - "runtime/core/rpl-object-store.h"
-      - "runtime/core/rpl-mutation.c"
-      - "runtime/core/rpl-mutation.h"
-      - "runtime/core/object-snapshot.c"
-      - "runtime/core/object-snapshot.h"
-      - "runtime/core/rpl-object-span.c"
-      - "include/hpclang/object-store.h"
-      - "include/hpclang/object.h"
-      - "runtime/bootstrap/**"
+      - "runtime/**"
       - "platform/armtoolbox/**"
+      - "include/**"
       - "cmake/**"
-      - "tests/e2e/object-mutation/**"
-      - "tests/e2e/harness/**"
-      - "tests/e2e/specs/object-mutation.json"
+      - "tests/e2e/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
+      - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/hp48-kermit-watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tools/bootstrap-hp39-aplet.sh"
+      - "tools/package-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
       - ".github/actions/setup-atfe/**"
       - ".github/actions/setup-x50ng/**"
@@ -141,11 +127,10 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
-      - name: Prepare HP48/4950 Stock assets
-        run: bash tests/e2e/harness/prepare-stock-assets.sh build/e2e build/assets hp48,hp4950
+      - name: Prepare Stock assets
+        run: bash tests/e2e/harness/prepare-stock-assets.sh build/e2e build/assets
       - name: Upload object Stock assets
         uses: actions/upload-artifact@v7
         with:

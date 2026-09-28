@@ -3,46 +3,48 @@
 
 #include "rpl-object-span.h"
 
-enum {
-    RPL_DOINT     = 0x02614u,
+enum
+{
+    RPL_DOINT = 0x02614u,
     RPL_DOLNGREAL = 0x0263au,
-    RPL_DOLNGCMP  = 0x02660u,
-    RPL_DOMATRIX  = 0x02686u,
-    RPL_DOFLASHP  = 0x026acu,
-    RPL_DOAPLET   = 0x026d5u,
+    RPL_DOLNGCMP = 0x02660u,
+    RPL_DOMATRIX = 0x02686u,
+    RPL_DOFLASHP = 0x026acu,
+    RPL_DOAPLET = 0x026d5u,
     RPL_DOMINIFONT = 0x026feu,
-    RPL_DOBINT    = 0x02911u,
-    RPL_DOREAL    = 0x02933u,
-    RPL_DOEREL    = 0x02955u,
-    RPL_DOCMP     = 0x02977u,
-    RPL_DOECMP    = 0x0299du,
-    RPL_DOCHAR    = 0x029bfu,
-    RPL_DOARRY    = 0x029e8u,
+    RPL_DOBINT = 0x02911u,
+    RPL_DOREAL = 0x02933u,
+    RPL_DOEREL = 0x02955u,
+    RPL_DOCMP = 0x02977u,
+    RPL_DOECMP = 0x0299du,
+    RPL_DOCHAR = 0x029bfu,
+    RPL_DOARRY = 0x029e8u,
     RPL_DOLNKARRY = 0x02a0au,
-    RPL_DOCSTR    = 0x02a2cu,
-    RPL_DOHSTR    = 0x02a4eu,
-    RPL_DOLIST    = 0x02a74u,
-    RPL_DORRP     = 0x02a96u,
-    RPL_DOSYMB    = 0x02ab8u,
-    RPL_DOEXT     = 0x02adau,
-    RPL_DOTAG     = 0x02afcu,
-    RPL_DOGROB    = 0x02b1eu,
-    RPL_DOLIB     = 0x02b40u,
-    RPL_DOBAK     = 0x02b62u,
-    RPL_DOEXT0    = 0x02b88u,
-    RPL_DOACPTR   = 0x02baau,
-    RPL_DOEXT2    = 0x02bccu,
-    RPL_DOEXT3    = 0x02beeu,
-    RPL_DOEXT4    = 0x02c10u,
-    RPL_DOCOL     = 0x02d9du,
-    RPL_DOCODE    = 0x02dccu,
-    RPL_DOIDNT    = 0x02e48u,
-    RPL_DOLAM     = 0x02e6du,
-    RPL_DOROMP    = 0x02e92u,
-    RPL_SEMI      = 0x0312bu
+    RPL_DOCSTR = 0x02a2cu,
+    RPL_DOHSTR = 0x02a4eu,
+    RPL_DOLIST = 0x02a74u,
+    RPL_DORRP = 0x02a96u,
+    RPL_DOSYMB = 0x02ab8u,
+    RPL_DOEXT = 0x02adau,
+    RPL_DOTAG = 0x02afcu,
+    RPL_DOGROB = 0x02b1eu,
+    RPL_DOLIB = 0x02b40u,
+    RPL_DOBAK = 0x02b62u,
+    RPL_DOEXT0 = 0x02b88u,
+    RPL_DOACPTR = 0x02baau,
+    RPL_DOEXT2 = 0x02bccu,
+    RPL_DOEXT3 = 0x02beeu,
+    RPL_DOEXT4 = 0x02c10u,
+    RPL_DOCOL = 0x02d9du,
+    RPL_DOCODE = 0x02dccu,
+    RPL_DOIDNT = 0x02e48u,
+    RPL_DOLAM = 0x02e6du,
+    RPL_DOROMP = 0x02e92u,
+    RPL_SEMI = 0x0312bu
 };
 
-enum {
+enum
+{
     RPL_MAX_RECURSION = 32u,
     RPL_USEROB = 0x00080711u
 };
@@ -55,12 +57,8 @@ static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
     return 1;
 }
 
-static int address_at_offset(
-    uint32_t address,
-    uint32_t offset,
-    uint32_t limit,
-    uint32_t *current,
-    uint32_t *remaining)
+static int address_at_offset(uint32_t address, uint32_t offset, uint32_t limit, uint32_t *current,
+                             uint32_t *remaining)
 {
     if (offset > limit || !checked_add(address, offset, current))
         return 0;
@@ -69,12 +67,8 @@ static int address_at_offset(
     return 1;
 }
 
-static int read_nibbles(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t count,
-    uint32_t limit,
-    uint32_t *value)
+static int read_nibbles(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t count,
+                        uint32_t limit, uint32_t *value)
 {
     if (reader == NULL || reader->read_nibble == NULL || value == NULL)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
@@ -108,11 +102,8 @@ static int fixed_span(uint32_t size, uint32_t limit, uint32_t *span)
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int length_prefixed_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t *span)
+static int length_prefixed_span(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                uint32_t limit, uint32_t *span)
 {
     if (limit < 10u)
         return HPCLANG_RPL_SPAN_BOUNDS;
@@ -123,8 +114,7 @@ static int length_prefixed_span(
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t length = 0u;
-    int result = read_nibbles(
-        reader, field_address, 5u, field_limit, &length);
+    int result = read_nibbles(reader, field_address, 5u, field_limit, &length);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -144,11 +134,8 @@ static int length_prefixed_span(
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int name_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t *span)
+static int name_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                     uint32_t *span)
 {
     if (limit < 7u)
         return HPCLANG_RPL_SPAN_BOUNDS;
@@ -159,8 +146,7 @@ static int name_span(
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t characters = 0u;
-    int result = read_nibbles(
-        reader, field_address, 2u, field_limit, &characters);
+    int result = read_nibbles(reader, field_address, 2u, field_limit, &characters);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -177,22 +163,14 @@ static int name_span(
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int parse_object(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t depth,
-    uint32_t *span);
+static int parse_object(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                        uint32_t depth, uint32_t *span);
 
-static int library_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t *span)
+static int library_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                        uint32_t *span)
 {
     uint32_t without_crc = 0u;
-    int result = length_prefixed_span(
-        reader, address, limit, &without_crc);
+    int result = length_prefixed_span(reader, address, limit, &without_crc);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -204,26 +182,19 @@ static int library_span(
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int long_number_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t component_count,
-    uint32_t *span)
+static int long_number_span(const struct hpclang_rpl_reader *reader, uint32_t address,
+                            uint32_t limit, uint32_t component_count, uint32_t *span)
 {
     uint32_t offset = 5u;
 
     for (uint32_t component = 0u; component < component_count; ++component) {
         uint32_t current = 0u;
         uint32_t remaining = 0u;
-        if (!address_at_offset(
-                address, offset, limit, &current, &remaining) ||
-            remaining < 5u)
+        if (!address_at_offset(address, offset, limit, &current, &remaining) || remaining < 5u)
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         uint32_t component_size = 0u;
-        int result = read_nibbles(
-            reader, current, 5u, remaining, &component_size);
+        int result = read_nibbles(reader, current, 5u, remaining, &component_size);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
 
@@ -233,8 +204,7 @@ static int long_number_span(
          */
         if (component_size < 6u)
             return HPCLANG_RPL_SPAN_MALFORMED;
-        if (component_size > remaining ||
-            !checked_add(offset, component_size, &offset))
+        if (component_size > remaining || !checked_add(offset, component_size, &offset))
             return HPCLANG_RPL_SPAN_BOUNDS;
     }
 
@@ -244,12 +214,8 @@ static int long_number_span(
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int tagged_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t depth,
-    uint32_t *span)
+static int tagged_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                       uint32_t depth, uint32_t *span)
 {
     if (depth >= RPL_MAX_RECURSION)
         return HPCLANG_RPL_SPAN_DEPTH;
@@ -258,13 +224,11 @@ static int tagged_span(
 
     uint32_t tag_address = 0u;
     uint32_t tag_limit = 0u;
-    if (!address_at_offset(
-            address, 5u, limit, &tag_address, &tag_limit))
+    if (!address_at_offset(address, 5u, limit, &tag_address, &tag_limit))
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t characters = 0u;
-    int result = read_nibbles(
-        reader, tag_address, 2u, tag_limit, &characters);
+    int result = read_nibbles(reader, tag_address, 2u, tag_limit, &characters);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -274,15 +238,12 @@ static int tagged_span(
     uint32_t object_offset = 7u + characters * 2u;
     uint32_t object_address = 0u;
     uint32_t object_limit = 0u;
-    if (!address_at_offset(
-            address, object_offset, limit,
-            &object_address, &object_limit) ||
+    if (!address_at_offset(address, object_offset, limit, &object_address, &object_limit) ||
         object_limit < 5u)
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t nested = 0u;
-    result = parse_object(
-        reader, object_address, object_limit, depth + 1u, &nested);
+    result = parse_object(reader, object_address, object_limit, depth + 1u, &nested);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -301,12 +262,8 @@ static int tagged_span(
  * native layout used by HP39's Hidden directory and by the generic store
  * walker: [len=0][object], with no duplicate trailing length field.
  */
-static int directory_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t depth,
-    uint32_t *span)
+static int directory_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                          uint32_t depth, uint32_t *span)
 {
     if (depth >= RPL_MAX_RECURSION)
         return HPCLANG_RPL_SPAN_DEPTH;
@@ -322,15 +279,12 @@ static int directory_span(
     if (address == home) {
         uint32_t count_address = 0u;
         uint32_t count_limit = 0u;
-        if (!address_at_offset(
-                address, chain_offset, limit,
-                &count_address, &count_limit) ||
+        if (!address_at_offset(address, chain_offset, limit, &count_address, &count_limit) ||
             count_limit < 3u)
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         uint32_t libraries = 0u;
-        result = read_nibbles(
-            reader, count_address, 3u, count_limit, &libraries);
+        result = read_nibbles(reader, count_address, 3u, count_limit, &libraries);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
         if (libraries > (UINT32_MAX - chain_offset) / 13u)
@@ -338,20 +292,17 @@ static int directory_span(
         chain_offset += libraries * 13u;
     }
 
-    if (!checked_add(chain_offset, 3u, &chain_offset) ||
-        chain_offset > limit || limit - chain_offset < 5u)
+    if (!checked_add(chain_offset, 3u, &chain_offset) || chain_offset > limit ||
+        limit - chain_offset < 5u)
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t chain_address = 0u;
     uint32_t chain_limit = 0u;
-    if (!address_at_offset(
-            address, chain_offset, limit,
-            &chain_address, &chain_limit))
+    if (!address_at_offset(address, chain_offset, limit, &chain_address, &chain_limit))
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t newest_offset = 0u;
-    result = read_nibbles(
-        reader, chain_address, 5u, chain_limit, &newest_offset);
+    result = read_nibbles(reader, chain_address, 5u, chain_limit, &newest_offset);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -362,20 +313,17 @@ static int directory_span(
     }
 
     uint32_t item_offset = 0u;
-    if (!checked_add(chain_offset, newest_offset, &item_offset) ||
-        item_offset > limit || limit - item_offset < 2u)
+    if (!checked_add(chain_offset, newest_offset, &item_offset) || item_offset > limit ||
+        limit - item_offset < 2u)
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t item_address = 0u;
     uint32_t item_limit = 0u;
-    if (!address_at_offset(
-            address, item_offset, limit,
-            &item_address, &item_limit))
+    if (!address_at_offset(address, item_offset, limit, &item_address, &item_limit))
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t name_length = 0u;
-    result = read_nibbles(
-        reader, item_address, 2u, item_limit, &name_length);
+    result = read_nibbles(reader, item_address, 2u, item_limit, &name_length);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
 
@@ -387,24 +335,20 @@ static int directory_span(
         if (name_length > (UINT32_MAX - 4u) / 2u)
             return HPCLANG_RPL_SPAN_BOUNDS;
         uint32_t item_object_offset = 4u + name_length * 2u;
-        if (!checked_add(
-                item_offset, item_object_offset, &object_offset))
+        if (!checked_add(item_offset, item_object_offset, &object_offset))
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         if (object_offset > limit || object_offset < 2u)
             return HPCLANG_RPL_SPAN_BOUNDS;
         uint32_t trailing_address = 0u;
         uint32_t trailing_limit = 0u;
-        if (!address_at_offset(
-                address, object_offset - 2u, limit,
-                &trailing_address, &trailing_limit) ||
+        if (!address_at_offset(address, object_offset - 2u, limit, &trailing_address,
+                               &trailing_limit) ||
             trailing_limit < 2u)
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         uint32_t trailing_length = 0u;
-        result = read_nibbles(
-            reader, trailing_address, 2u,
-            trailing_limit, &trailing_length);
+        result = read_nibbles(reader, trailing_address, 2u, trailing_limit, &trailing_length);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
         if (trailing_length != name_length)
@@ -416,14 +360,11 @@ static int directory_span(
 
     uint32_t object_address = 0u;
     uint32_t object_limit = 0u;
-    if (!address_at_offset(
-            address, object_offset, limit,
-            &object_address, &object_limit))
+    if (!address_at_offset(address, object_offset, limit, &object_address, &object_limit))
         return HPCLANG_RPL_SPAN_BOUNDS;
 
     uint32_t nested = 0u;
-    result = parse_object(
-        reader, object_address, object_limit, depth + 1u, &nested);
+    result = parse_object(reader, object_address, object_limit, depth + 1u, &nested);
     if (result != HPCLANG_RPL_SPAN_OK)
         return result;
     if (nested == 0u || nested > object_limit)
@@ -478,12 +419,8 @@ static int recognized_prologue(uint32_t prologue)
     }
 }
 
-static int composite_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t depth,
-    uint32_t *span)
+static int composite_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                          uint32_t depth, uint32_t *span)
 {
     if (depth >= RPL_MAX_RECURSION)
         return HPCLANG_RPL_SPAN_DEPTH;
@@ -494,14 +431,11 @@ static int composite_span(
     for (;;) {
         uint32_t current = 0u;
         uint32_t remaining = 0u;
-        if (!address_at_offset(
-                address, offset, limit, &current, &remaining) ||
-            remaining < 5u)
+        if (!address_at_offset(address, offset, limit, &current, &remaining) || remaining < 5u)
             return HPCLANG_RPL_SPAN_BOUNDS;
 
         uint32_t word = 0u;
-        int result = read_nibbles(
-            reader, current, 5u, remaining, &word);
+        int result = read_nibbles(reader, current, 5u, remaining, &word);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
 
@@ -524,8 +458,7 @@ static int composite_span(
         }
 
         uint32_t nested = 0u;
-        result = parse_object(
-            reader, current, remaining, depth + 1u, &nested);
+        result = parse_object(reader, current, remaining, depth + 1u, &nested);
         if (result != HPCLANG_RPL_SPAN_OK)
             return result;
         if (nested == 0u || nested > remaining)
@@ -535,12 +468,8 @@ static int composite_span(
     }
 }
 
-static int parse_object(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t depth,
-    uint32_t *span)
+static int parse_object(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                        uint32_t depth, uint32_t *span)
 {
     if (span == NULL)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
@@ -624,11 +553,8 @@ static int parse_object(
     }
 }
 
-int hpclang_rpl_object_span(
-    const struct hpclang_rpl_reader *reader,
-    uint32_t address,
-    uint32_t limit,
-    uint32_t *span)
+int hpclang_rpl_object_span(const struct hpclang_rpl_reader *reader, uint32_t address,
+                            uint32_t limit, uint32_t *span)
 {
     if (span == NULL)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;

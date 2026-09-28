@@ -11,7 +11,8 @@
 
 #include "saturn-view.h"
 
-enum {
+enum
+{
     NIBBLES = 0x100000u,
     USEROB = 0x80711u,
     CONTEXT = 0x8071bu,
@@ -53,25 +54,17 @@ const struct hpclang_device_info *hpclang_device_info(void)
     return &fake_device;
 }
 
-int hpclang_saturn_write_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t value)
+int hpclang_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
 {
-    if (fake_boot.saturn_state == 0u ||
-        address.nibble >= NIBBLES ||
-        value > 0x0fu)
+    if (fake_boot.saturn_state == 0u || address.nibble >= NIBBLES || value > 0x0fu)
         return 0;
     memory[address.nibble] = value;
     return 1;
 }
 
-int hpclang_saturn_read_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t *value)
+int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *value)
 {
-    if (value == NULL ||
-        fake_boot.saturn_state == 0u ||
-        address.nibble >= NIBBLES)
+    if (value == NULL || fake_boot.saturn_state == 0u || address.nibble >= NIBBLES)
         return 0;
     *value = memory[address.nibble] & 0x0fu;
     return 1;
@@ -81,15 +74,11 @@ static void put_nibbles(uint32_t address, uint32_t value, uint32_t count)
 {
     assert(address + count <= NIBBLES);
     for (uint32_t i = 0u; i < count; ++i)
-        memory[address + i] =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        memory[address + i] = (uint8_t)((value >> (i * 4u)) & 0x0fu);
 }
 
-static uint32_t put_item(
-    uint32_t item,
-    const uint8_t *name,
-    uint32_t name_length,
-    uint32_t prologue)
+static uint32_t put_item(uint32_t item, const uint8_t *name, uint32_t name_length,
+                         uint32_t prologue)
 {
     assert((name != NULL || name_length == 0u) && name_length < 256u);
 
@@ -109,14 +98,13 @@ static uint32_t put_item(
 
 static void prepare_tree(void)
 {
-    static const uint8_t name_a[] = { 'A' };
-    static const uint8_t name_sub[] = { 'S', 'U', 'B' };
-    static const uint8_t name_txt[] = { 'T', 'X', 'T' };
+    static const uint8_t name_a[] = {'A'};
+    static const uint8_t name_sub[] = {'S', 'U', 'B'};
+    static const uint8_t name_txt[] = {'T', 'X', 'T'};
 
     memset(memory, 0, sizeof(memory));
     fake_boot.saturn_state = 1u;
-    fake_boot.platform_cookie =
-        (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    fake_boot.platform_cookie = (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     fake_device.model = HPCLANG_MODEL_HP50G;
     fake_device.family = HPCLANG_FAMILY_HP4950;
 
@@ -130,13 +118,11 @@ static void prepare_tree(void)
     put_nibbles(home + 5u, 0u, 3u);
     put_nibbles(home_chain, item_a - home_chain, 5u);
 
-    uint32_t object_a =
-        put_item(item_a, name_a, sizeof(name_a), DOCHAR);
+    uint32_t object_a = put_item(item_a, name_a, sizeof(name_a), DOCHAR);
     put_nibbles(object_a + 5u, 'Z', 2u);
     put_nibbles(item_a - 5u, item_a - item_sub - 5u, 5u);
 
-    uint32_t object_sub =
-        put_item(item_sub, name_sub, sizeof(name_sub), DORRP);
+    uint32_t object_sub = put_item(item_sub, name_sub, sizeof(name_sub), DORRP);
     put_nibbles(item_sub - 5u, 0u, 5u);
     put_nibbles(CONTEXT, object_sub, 5u);
 
@@ -144,8 +130,7 @@ static void prepare_tree(void)
     const uint32_t item_txt = 0x82180u;
     put_nibbles(sub_chain, item_txt - sub_chain, 5u);
 
-    uint32_t object_txt =
-        put_item(item_txt, name_txt, sizeof(name_txt), DOCSTR);
+    uint32_t object_txt = put_item(item_txt, name_txt, sizeof(name_txt), DOCSTR);
     put_nibbles(object_txt + 5u, 9u, 5u);
     put_nibbles(object_txt + 10u, 'O', 2u);
     put_nibbles(object_txt + 12u, 'K', 2u);
@@ -169,8 +154,7 @@ static void test_home_lookup_and_child(void)
     assert(home != NULL);
 
     struct hpclang_object *object = NULL;
-    assert(hpclang_object_store_get(
-               home, (const uint8_t *)"A", 1u, &object) == 0);
+    assert(hpclang_object_store_get(home, (const uint8_t *)"A", 1u, &object) == 0);
     assert(object != NULL);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_CHARACTER);
     uint8_t value = 0u;
@@ -179,31 +163,27 @@ static void test_home_lookup_and_child(void)
     hpclang_object_release(object);
 
     errno = 0;
-    assert(hpclang_object_store_get(
-               home, (const uint8_t *)"SUB", 3u, &object) == -1);
+    assert(hpclang_object_store_get(home, (const uint8_t *)"SUB", 3u, &object) == -1);
     assert(object == NULL);
     assert(errno == EISDIR);
 
     struct hpclang_object_store *sub =
-        hpclang_object_store_open_child(
-            home, (const uint8_t *)"SUB", 3u);
+        hpclang_object_store_open_child(home, (const uint8_t *)"SUB", 3u);
     assert(sub != NULL);
 
-    assert(hpclang_object_store_get(
-               sub, (const uint8_t *)"TXT", 3u, &object) == 0);
+    assert(hpclang_object_store_get(sub, (const uint8_t *)"TXT", 3u, &object) == 0);
     assert(object != NULL);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_STRING);
     size_t length = 0u;
     assert(hpclang_object_string_size(object, &length) == 0);
     assert(length == 2u);
-    uint8_t text[2] = { 0u, 0u };
+    uint8_t text[2] = {0u, 0u};
     assert(hpclang_object_string_copy(object, text, sizeof(text)) == 0);
     assert(text[0] == 'O' && text[1] == 'K');
     hpclang_object_release(object);
 
     errno = 0;
-    assert(hpclang_object_store_get(
-               sub, (const uint8_t *)"NO", 2u, &object) == -1);
+    assert(hpclang_object_store_get(sub, (const uint8_t *)"NO", 2u, &object) == -1);
     assert(object == NULL);
     assert(errno == ENOENT);
 
@@ -215,15 +195,13 @@ static void test_current_is_logical_path_snapshot(void)
 {
     prepare_tree();
 
-    struct hpclang_object_store *current =
-        hpclang_object_store_current();
+    struct hpclang_object_store *current = hpclang_object_store_current();
     assert(current != NULL);
 
     /* Change Stock cwd after the handle exists. The handle stays at /SUB. */
     put_nibbles(CONTEXT, 0x82000u, 5u);
 
-    struct hpclang_object_store_iterator *iterator =
-        hpclang_object_store_iterator_open(current);
+    struct hpclang_object_store_iterator *iterator = hpclang_object_store_iterator_open(current);
     assert(iterator != NULL);
 
     struct hpclang_object_store_entry entry = blank_entry();
@@ -244,8 +222,7 @@ static void test_iterator_snapshots_metadata(void)
 
     struct hpclang_object_store *home = hpclang_object_store_home();
     assert(home != NULL);
-    struct hpclang_object_store_iterator *iterator =
-        hpclang_object_store_iterator_open(home);
+    struct hpclang_object_store_iterator *iterator = hpclang_object_store_iterator_open(home);
     assert(iterator != NULL);
 
     /* The iterator owns an ARM-side snapshot; mutate the live first name. */
@@ -272,8 +249,7 @@ static void test_hidden_directory_logical_handle(void)
 {
     memset(memory, 0, sizeof(memory));
     fake_boot.saturn_state = 1u;
-    fake_boot.platform_cookie =
-        (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    fake_boot.platform_cookie = (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     fake_device.model = HPCLANG_MODEL_HP50G;
     fake_device.family = HPCLANG_FAMILY_HP4950;
 
@@ -292,14 +268,12 @@ static void test_hidden_directory_logical_handle(void)
     put_nibbles(hidden + 8u, 0u, 5u);
     put_nibbles(CONTEXT, hidden, 5u);
 
-    struct hpclang_object_store *current =
-        hpclang_object_store_current();
+    struct hpclang_object_store *current = hpclang_object_store_current();
     assert(current != NULL);
 
     /* The logical path must resolve its zero-length component later. */
     put_nibbles(CONTEXT, home, 5u);
-    struct hpclang_object_store_iterator *iterator =
-        hpclang_object_store_iterator_open(current);
+    struct hpclang_object_store_iterator *iterator = hpclang_object_store_iterator_open(current);
     assert(iterator != NULL);
 
     struct hpclang_object_store_entry entry = blank_entry();
@@ -308,8 +282,7 @@ static void test_hidden_directory_logical_handle(void)
     hpclang_object_store_iterator_close(iterator);
     hpclang_object_store_close(current);
 
-    struct hpclang_object_store *home_store =
-        hpclang_object_store_home();
+    struct hpclang_object_store *home_store = hpclang_object_store_home();
     assert(home_store != NULL);
     struct hpclang_object_store *hidden_store =
         hpclang_object_store_open_child(home_store, NULL, 0u);

@@ -9,12 +9,14 @@
 #include <hpclang/object.h>
 #include <satdir.h>
 
-enum {
+enum
+{
     SATDIR_PATH_CAPACITY = 256,
     SATDIR_MAX_DEPTH = 64
 };
 
-struct sat_compat_object {
+struct sat_compat_object
+{
     SAT_OBJ_DSCR descriptor;
     struct hpclang_object *snapshot;
     char *path;
@@ -51,10 +53,7 @@ static int satdir_pop_component(char *path)
     return 0;
 }
 
-static int satdir_append_component(
-    char *path,
-    const char *component,
-    size_t length)
+static int satdir_append_component(char *path, const char *component, size_t length)
 {
     size_t used = strlen(path);
     if (length == 0u)
@@ -123,12 +122,10 @@ static int satdir_normalize_directory(const char *path, char *out)
     return 0;
 }
 
-static struct hpclang_object_store *satdir_resolve_directory(
-    const char *normalized)
+static struct hpclang_object_store *satdir_resolve_directory(const char *normalized)
 {
     if (normalized == NULL ||
-        (strcmp(normalized, "HOME") != 0 &&
-         strncmp(normalized, "HOME/", 5u) != 0)) {
+        (strcmp(normalized, "HOME") != 0 && strncmp(normalized, "HOME/", 5u) != 0)) {
         errno = EINVAL;
         return NULL;
     }
@@ -152,10 +149,8 @@ static struct hpclang_object_store *satdir_resolve_directory(
             return NULL;
         }
 
-        struct hpclang_object_store *next = hpclang_object_store_open_child(
-            store,
-            (const uint8_t *)start,
-            (uint32_t)length);
+        struct hpclang_object_store *next =
+            hpclang_object_store_open_child(store, (const uint8_t *)start, (uint32_t)length);
         hpclang_object_store_close(store);
         if (next == NULL)
             return NULL;
@@ -166,14 +161,10 @@ static struct hpclang_object_store *satdir_resolve_directory(
     return store;
 }
 
-static int satdir_split_object_path(
-    const char *path,
-    char *directory,
-    const char **base,
-    size_t *base_length)
+static int satdir_split_object_path(const char *path, char *directory, const char **base,
+                                    size_t *base_length)
 {
-    if (path == NULL || directory == NULL ||
-        base == NULL || base_length == NULL) {
+    if (path == NULL || directory == NULL || base == NULL || base_length == NULL) {
         errno = EFAULT;
         return -1;
     }
@@ -221,20 +212,15 @@ static int satdir_split_object_path(
 
 static struct sat_compat_object *satdir_find_cached(const char *path)
 {
-    for (struct sat_compat_object *item = satdir_objects;
-         item != NULL;
-         item = item->next) {
+    for (struct sat_compat_object *item = satdir_objects; item != NULL; item = item->next) {
         if (strcmp(item->path, path) == 0)
             return item;
     }
     return NULL;
 }
 
-static SAT_OBJ_DSCR *satdir_cache_object(
-    const char *directory,
-    const char *name,
-    size_t name_length,
-    struct hpclang_object *snapshot)
+static SAT_OBJ_DSCR *satdir_cache_object(const char *directory, const char *name,
+                                         size_t name_length, struct hpclang_object *snapshot)
 {
     char full_path[SATDIR_PATH_CAPACITY];
     size_t dir_length = strlen(directory);
@@ -278,8 +264,7 @@ static SAT_OBJ_DSCR *satdir_cache_object(
      * that borrowed address public. Use a conspicuously non-Saturn token so
      * accidental raw-address mixing fails instead of appearing to work.
      */
-    item->descriptor.addr =
-        0xf0000000u | (satdir_next_token++ & 0x0fffffffu);
+    item->descriptor.addr = 0xf0000000u | (satdir_next_token++ & 0x0fffffffu);
     if ((item->descriptor.addr & 0x0fffffffu) == 0u)
         item->descriptor.addr = 0xf0000001u;
 
@@ -289,10 +274,8 @@ static SAT_OBJ_DSCR *satdir_cache_object(
     return &item->descriptor;
 }
 
-static SAT_OBJ_DSCR *satdir_get_from_directory(
-    const char *directory,
-    const char *name,
-    size_t name_length)
+static SAT_OBJ_DSCR *satdir_get_from_directory(const char *directory, const char *name,
+                                               size_t name_length)
 {
     if (name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
         errno = ENAMETOOLONG;
@@ -319,11 +302,8 @@ static SAT_OBJ_DSCR *satdir_get_from_directory(
         return NULL;
 
     struct hpclang_object *object = NULL;
-    int result = hpclang_object_store_get(
-        store,
-        (const uint8_t *)name,
-        (uint32_t)name_length,
-        &object);
+    int result =
+        hpclang_object_store_get(store, (const uint8_t *)name, (uint32_t)name_length, &object);
     hpclang_object_store_close(store);
     if (result != 0)
         return NULL;
@@ -331,12 +311,9 @@ static SAT_OBJ_DSCR *satdir_get_from_directory(
     return satdir_cache_object(directory, name, name_length, object);
 }
 
-static struct sat_compat_object *satdir_private_object(
-    SAT_OBJ_DSCR *descriptor)
+static struct sat_compat_object *satdir_private_object(SAT_OBJ_DSCR *descriptor)
 {
-    for (struct sat_compat_object *item = satdir_objects;
-         item != NULL;
-         item = item->next) {
+    for (struct sat_compat_object *item = satdir_objects; item != NULL; item = item->next) {
         if (&item->descriptor == descriptor)
             return item;
     }
@@ -382,8 +359,7 @@ int sat_dir_chdir(char *path)
     if (satdir_normalize_directory(path, normalized) != 0)
         return -1;
 
-    struct hpclang_object_store *store =
-        satdir_resolve_directory(normalized);
+    struct hpclang_object_store *store = satdir_resolve_directory(normalized);
     if (store == NULL)
         return -1;
     hpclang_object_store_close(store);
@@ -397,11 +373,7 @@ SAT_OBJ_DSCR *sat_dir_getobject(char *path)
     char directory[SATDIR_PATH_CAPACITY];
     const char *base = NULL;
     size_t base_length = 0u;
-    if (satdir_split_object_path(
-            path,
-            directory,
-            &base,
-            &base_length) != 0) {
+    if (satdir_split_object_path(path, directory, &base, &base_length) != 0) {
         return NULL;
     }
     return satdir_get_from_directory(directory, base, base_length);
@@ -414,25 +386,19 @@ SAT_OBJ_DSCR *sat_dir_rclobject(char *path)
         return NULL;
     }
 
-    if (*path == '/' || strcmp(path, "HOME") == 0 ||
-        strncmp(path, "HOME/", 5u) == 0) {
+    if (*path == '/' || strcmp(path, "HOME") == 0 || strncmp(path, "HOME/", 5u) == 0) {
         return sat_dir_getobject(path);
     }
 
     char directory[SATDIR_PATH_CAPACITY];
     const char *base = NULL;
     size_t base_length = 0u;
-    if (satdir_split_object_path(
-            path,
-            directory,
-            &base,
-            &base_length) != 0) {
+    if (satdir_split_object_path(path, directory, &base, &base_length) != 0) {
         return NULL;
     }
 
     for (;;) {
-        SAT_OBJ_DSCR *object =
-            satdir_get_from_directory(directory, base, base_length);
+        SAT_OBJ_DSCR *object = satdir_get_from_directory(directory, base, base_length);
         if (object != NULL)
             return object;
         if (errno != ENOENT && errno != EISDIR)
@@ -444,13 +410,10 @@ SAT_OBJ_DSCR *sat_dir_rclobject(char *path)
     }
 }
 
-static int satdir_entry_text_name(
-    const struct hpclang_object_store_entry *entry,
-    const char **name,
-    size_t *length)
+static int satdir_entry_text_name(const struct hpclang_object_store_entry *entry, const char **name,
+                                  size_t *length)
 {
-    if (entry->name_length == 0u ||
-        entry->name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
+    if (entry->name_length == 0u || entry->name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
         return 0;
     }
     if (memchr(entry->name, '\0', entry->name_length) != NULL ||
@@ -462,25 +425,19 @@ static int satdir_entry_text_name(
     return 1;
 }
 
-static int satdir_search_directory(
-    const char *directory,
-    const char *target,
-    size_t target_length,
-    SAT_DIR_SLIST **result,
-    unsigned depth)
+static int satdir_search_directory(const char *directory, const char *target, size_t target_length,
+                                   SAT_DIR_SLIST **result, unsigned depth)
 {
     if (depth > SATDIR_MAX_DEPTH) {
         errno = ELOOP;
         return -1;
     }
 
-    struct hpclang_object_store *store =
-        satdir_resolve_directory(directory);
+    struct hpclang_object_store *store = satdir_resolve_directory(directory);
     if (store == NULL)
         return -1;
 
-    struct hpclang_object_store_iterator *iterator =
-        hpclang_object_store_iterator_open(store);
+    struct hpclang_object_store_iterator *iterator = hpclang_object_store_iterator_open(store);
     hpclang_object_store_close(store);
     if (iterator == NULL)
         return -1;
@@ -512,18 +469,10 @@ static int satdir_search_directory(
                 continue;
             memcpy(child, directory, dir_length);
             child[dir_length] = '/';
-            memcpy(
-                child + dir_length + 1u,
-                entry_name,
-                entry_length);
+            memcpy(child + dir_length + 1u, entry_name, entry_length);
             child[dir_length + 1u + entry_length] = '\0';
 
-            int nested = satdir_search_directory(
-                child,
-                target,
-                target_length,
-                result,
-                depth + 1u);
+            int nested = satdir_search_directory(child, target, target_length, result, depth + 1u);
             if (nested < 0) {
                 hpclang_object_store_iterator_close(iterator);
                 return -1;
@@ -537,8 +486,7 @@ static int satdir_search_directory(
             continue;
         }
 
-        if (entry_length == target_length &&
-            memcmp(entry_name, target, target_length) == 0) {
+        if (entry_length == target_length && memcmp(entry_name, target, target_length) == 0) {
             size_t dir_length = strlen(directory);
             if (dir_length + 1u + entry_length >= SATDIR_PATH_CAPACITY)
                 continue;
@@ -549,8 +497,7 @@ static int satdir_search_directory(
                 errno = ENOMEM;
                 return -1;
             }
-            node->str =
-                malloc(dir_length + 1u + entry_length + 1u);
+            node->str = malloc(dir_length + 1u + entry_length + 1u);
             if (node->str == NULL) {
                 free(node);
                 hpclang_object_store_iterator_close(iterator);
@@ -559,10 +506,7 @@ static int satdir_search_directory(
             }
             memcpy(node->str, directory, dir_length);
             node->str[dir_length] = '/';
-            memcpy(
-                node->str + dir_length + 1u,
-                entry_name,
-                entry_length);
+            memcpy(node->str + dir_length + 1u, entry_name, entry_length);
             node->str[dir_length + 1u + entry_length] = '\0';
             node->next = *result;
             *result = node;
@@ -593,19 +537,12 @@ int sat_dir_searchobject(char *name, SAT_DIR_SLIST **path_list)
     *path_list = NULL;
 
     size_t length = strlen(name);
-    if (length == 0u ||
-        length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY ||
-        strchr(name, '/') != NULL) {
+    if (length == 0u || length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY || strchr(name, '/') != NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    int result = satdir_search_directory(
-        "HOME",
-        name,
-        length,
-        path_list,
-        0u);
+    int result = satdir_search_directory("HOME", name, length, path_list, 0u);
     if (result < 0) {
         _sat_dir_destroy_slist(*path_list);
         *path_list = NULL;
@@ -616,8 +553,7 @@ int sat_dir_searchobject(char *name, SAT_DIR_SLIST **path_list)
 int sat_obj_is_real(SAT_OBJ_DSCR *obj)
 {
     struct sat_compat_object *item = satdir_private_object(obj);
-    return item != NULL &&
-        hpclang_object_kind(item->snapshot) == HPCLANG_OBJECT_REAL;
+    return item != NULL && hpclang_object_kind(item->snapshot) == HPCLANG_OBJECT_REAL;
 }
 
 double _sat_dir_fetchreal(char *path, double defval, char *mode)
@@ -625,11 +561,9 @@ double _sat_dir_fetchreal(char *path, double defval, char *mode)
     if (mode == NULL)
         return defval;
 
-    SAT_OBJ_DSCR *descriptor =
-        *mode == 'r' ? sat_dir_rclobject(path) : sat_dir_getobject(path);
+    SAT_OBJ_DSCR *descriptor = *mode == 'r' ? sat_dir_rclobject(path) : sat_dir_getobject(path);
     struct sat_compat_object *item = satdir_private_object(descriptor);
-    if (item == NULL ||
-        hpclang_object_kind(item->snapshot) != HPCLANG_OBJECT_REAL) {
+    if (item == NULL || hpclang_object_kind(item->snapshot) != HPCLANG_OBJECT_REAL) {
         return defval;
     }
 

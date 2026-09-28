@@ -6,26 +6,27 @@
 #include "hp4950-fatfs-diskio.h"
 #include "s3c2410-sdio-card.h"
 
-#define REG8(address)  (*(volatile uint8_t *)(uintptr_t)(address))
+#define REG8(address) (*(volatile uint8_t *)(uintptr_t)(address))
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 #define MPLLCON REG32(UINT32_C(0x07200004))
-#define CLKCON  REG32(UINT32_C(0x0720000c))
+#define CLKCON REG32(UINT32_C(0x0720000c))
 #define CLKSLOW REG32(UINT32_C(0x07200010))
 #define CLKDIVN REG32(UINT32_C(0x07200014))
 
 #define RTC_SECOND REG8(UINT32_C(0x07b00070))
 #define RTC_MINUTE REG8(UINT32_C(0x07b00074))
-#define RTC_HOUR   REG8(UINT32_C(0x07b00078))
-#define RTC_DATE   REG8(UINT32_C(0x07b0007c))
-#define RTC_MONTH  REG8(UINT32_C(0x07b00084))
-#define RTC_YEAR   REG8(UINT32_C(0x07b00088))
+#define RTC_HOUR REG8(UINT32_C(0x07b00078))
+#define RTC_DATE REG8(UINT32_C(0x07b0007c))
+#define RTC_MONTH REG8(UINT32_C(0x07b00084))
+#define RTC_YEAR REG8(UINT32_C(0x07b00088))
 
 #define SDI_BASE UINT32_C(0x07e00000)
 #define CLKCON_SDI (UINT32_C(1) << 9)
 #define XTAL_HZ UINT32_C(12000000)
 
-struct hp4950_fatfs_state {
+struct hp4950_fatfs_state
+{
     struct hpclang_s3c2410_sdio_card card;
     uint32_t saved_clkcon;
     uint8_t owned;
@@ -126,8 +127,7 @@ DSTATUS disk_initialize(BYTE pdrv)
         .write32 = mmio_write32,
         .context = 0,
     };
-    if (hpclang_s3c2410_sdio_card_open(&state.card, &bus, pclk_hz) !=
-        HPCLANG_SDIO_OK)
+    if (hpclang_s3c2410_sdio_card_open(&state.card, &bus, pclk_hz) != HPCLANG_SDIO_OK)
         return STA_NOINIT;
 
     state.initialized = 1u;
@@ -152,9 +152,8 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
         uint64_t current = (uint64_t)sector + i;
         if (current > UINT32_MAX)
             return RES_PARERR;
-        if (hpclang_s3c2410_sdio_read_sector(
-                &state.card, (uint32_t)current, buff + (size_t)i * 512u) !=
-            HPCLANG_SDIO_OK)
+        if (hpclang_s3c2410_sdio_read_sector(&state.card, (uint32_t)current,
+                                             buff + (size_t)i * 512u) != HPCLANG_SDIO_OK)
             return RES_ERROR;
     }
     return RES_OK;
@@ -174,9 +173,8 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
         uint64_t current = (uint64_t)sector + i;
         if (current > UINT32_MAX)
             return RES_PARERR;
-        if (hpclang_s3c2410_sdio_write_sector(
-                &state.card, (uint32_t)current, buff + (size_t)i * 512u) !=
-            HPCLANG_SDIO_OK)
+        if (hpclang_s3c2410_sdio_write_sector(&state.card, (uint32_t)current,
+                                              buff + (size_t)i * 512u) != HPCLANG_SDIO_OK)
             return RES_ERROR;
     }
     return RES_OK;
@@ -242,25 +240,18 @@ DWORD get_fattime(void)
         int minute = bcd_value(minute_raw & 0x7fu);
         int second = bcd_value(before & 0x7fu);
 
-        if (year < 0 || month < 1 || month > 12 || day < 1 || day > 31 ||
-            hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
-            second < 0 || second > 59)
+        if (year < 0 || month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 ||
+            minute < 0 || minute > 59 || second < 0 || second > 59)
             break;
 
         unsigned full_year = 2000u + (unsigned)year;
-        return ((DWORD)(full_year - 1980u) << 25) |
-               ((DWORD)month << 21) |
-               ((DWORD)day << 16) |
-               ((DWORD)hour << 11) |
-               ((DWORD)minute << 5) |
-               ((DWORD)second >> 1);
+        return ((DWORD)(full_year - 1980u) << 25) | ((DWORD)month << 21) | ((DWORD)day << 16) |
+               ((DWORD)hour << 11) | ((DWORD)minute << 5) | ((DWORD)second >> 1);
     }
 
     /*
      * A corrupt/uninitialized RTC must not prevent a FAT update. This value is
      * only the invalid-RTC fallback; normal writes use the calculator RTC.
      */
-    return ((DWORD)(2026u - 1980u) << 25) |
-           ((DWORD)1u << 21) |
-           ((DWORD)1u << 16);
+    return ((DWORD)(2026u - 1980u) << 25) | ((DWORD)1u << 21) | ((DWORD)1u << 16);
 }

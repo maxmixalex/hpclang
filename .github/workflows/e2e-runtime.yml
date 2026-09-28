@@ -18,11 +18,13 @@ on:
       - "!tests/e2e/object-mutation/**"
       - "!tests/e2e/specs/object-mutation.json"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -50,11 +52,13 @@ on:
       - "!tests/e2e/object-mutation/**"
       - "!tests/e2e/specs/object-mutation.json"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
+      - "tools/prepare-nor-fixture.py"
       - "tools/fetch-x50ng.sh"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -151,8 +155,7 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
 
       - name: Prepare shared Stock assets
@@ -180,6 +183,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Download canonical runtime build
         uses: actions/download-artifact@v7
@@ -252,6 +257,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Download canonical runtime build
         uses: actions/download-artifact@v7

@@ -9,7 +9,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: build/x50ng/dist
-        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-v3-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/prepare-x50ng-gallery.py', 'tools/fetch-x50ng.sh', 'tests/e2e/harness/x50ng/**') }}
+        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tools/install-ci-packages.sh', 'tests/e2e/harness/x50ng/**') }}
 
     - name: Inspect restored x50ng state
       id: x50ng-state
@@ -30,22 +30,7 @@ runs:
       if: steps.x50ng-state.outputs.binary != 'true'
       shell: bash
       run: |
-        packages=(git-lfs libglib2.0-dev liblua5.4-dev libgtk-4-dev libncurses-dev)
-        missing=()
-        for package in "${packages[@]}"; do
-          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
-            grep -q 'ok installed' || missing+=("$package")
-        done
-        if (( ${#missing[@]} )); then
-          apt=(
-            sudo -E apt-get
-            -o Acquire::Retries=4
-            -o Acquire::http::Timeout=20
-            -o Acquire::https::Timeout=20
-          )
-          "${apt[@]}" update -qq
-          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
-        fi
+        bash tools/install-ci-packages.sh git-lfs libglib2.0-dev liblua5.4-dev libgtk-4-dev libncurses-dev
 
     - name: Fetch and adapt pinned x50ng
       if: steps.x50ng-state.outputs.binary != 'true'
@@ -78,22 +63,7 @@ runs:
       if: steps.x50ng-state.outputs.portable != 'true'
       shell: bash
       run: |
-        packages=(libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 ckermit socat)
-        missing=()
-        for package in "${packages[@]}"; do
-          dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
-            grep -q 'ok installed' || missing+=("$package")
-        done
-        if (( ${#missing[@]} )); then
-          apt=(
-            sudo -E apt-get
-            -o Acquire::Retries=4
-            -o Acquire::http::Timeout=20
-            -o Acquire::https::Timeout=20
-          )
-          "${apt[@]}" update -qq
-          "${apt[@]}" install -y --no-install-recommends "${missing[@]}"
-        fi
+        bash tools/install-ci-packages.sh libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 ckermit socat
 
     - name: Make x50ng bundle self-contained for E2E runners
       if: steps.x50ng-state.outputs.portable != 'true'

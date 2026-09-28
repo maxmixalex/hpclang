@@ -12,7 +12,8 @@
 #include <fsystem.h>
 #include <hpclang/storage.h>
 
-enum {
+enum
+{
     HPCLANG_HPGCC_FS_FILE = 1,
     HPCLANG_HPGCC_FS_DIRECTORY = 2,
     HPCLANG_HPGCC_FS_ENTRY = 3
@@ -78,8 +79,7 @@ static char compat_cwd[HPCLANG_STREAM_NAME_CAPACITY] = "/";
 
 static int valid_volume_char(char value)
 {
-    return (value >= '3' && value <= '6') ||
-           (value >= 'C' && value <= 'F') ||
+    return (value >= '3' && value <= '6') || (value >= 'C' && value <= 'F') ||
            (value >= 'c' && value <= 'f');
 }
 
@@ -134,20 +134,15 @@ static int pop_component(char *path, size_t *length)
     return 0;
 }
 
-static int append_component(
-    char *path,
-    size_t *length,
-    size_t capacity,
-    const char *component,
-    size_t component_length)
+static int append_component(char *path, size_t *length, size_t capacity, const char *component,
+                            size_t component_length)
 {
     if (component_length == 0u)
         return 0;
 
     if (component_length == 1u && component[0] == '.')
         return 0;
-    if (component_length == 2u &&
-        component[0] == '.' && component[1] == '.')
+    if (component_length == 2u && component[0] == '.' && component[1] == '.')
         return pop_component(path, length);
 
     size_t need_separator = *length > 1u ? 1u : 0u;
@@ -202,9 +197,8 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
         char ch = *p;
         int separator = ch == '/' || ch == '\\';
 
-        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
-            ch == '<' || ch == '>' || ch == '|' ||
-            ((unsigned char)ch < 0x20u && ch != '\0')) {
+        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>' ||
+            ch == '|' || ((unsigned char)ch < 0x20u && ch != '\0')) {
             errno = EINVAL;
             return -1;
         }
@@ -217,8 +211,7 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
                 return -1;
             }
 
-            if (append_component(
-                    dest, &out, capacity, component, component_length) != 0)
+            if (append_component(dest, &out, capacity, component, component_length) != 0)
                 return -1;
 
             if (ch == '\0')
@@ -262,10 +255,8 @@ static unsigned compat_attrs(uint32_t type, uint32_t attributes)
     return result;
 }
 
-static void compat_time(
-    FS_FILE *file,
-    const struct hpclang_stream_civil_datetime *time,
-    uint32_t validity)
+static void compat_time(FS_FILE *file, const struct hpclang_stream_civil_datetime *time,
+                        uint32_t validity)
 {
     file->_hpclang_write_time_valid = 0u;
     memset(&file->_hpclang_write_tm, 0, sizeof(file->_hpclang_write_tm));
@@ -284,13 +275,9 @@ static void compat_time(
 
     if (time->year >= 1980u && time->year <= 2107u) {
         uint16_t date =
-            (uint16_t)(((time->year - 1980u) << 9) |
-                       ((uint16_t)time->month << 5) |
-                       time->day);
-        uint16_t clock =
-            (uint16_t)(((uint16_t)time->hour << 11) |
-                       ((uint16_t)time->minute << 5) |
-                       (time->second / 2u));
+            (uint16_t)(((time->year - 1980u) << 9) | ((uint16_t)time->month << 5) | time->day);
+        uint16_t clock = (uint16_t)(((uint16_t)time->hour << 11) | ((uint16_t)time->minute << 5) |
+                                    (time->second / 2u));
         file->WriteTimeDate = ((uint32_t)date << 16) | clock;
     }
 }
@@ -305,8 +292,7 @@ static int refresh_file_metadata(FS_FILE *file)
         return compat_error();
 
     file->Attr = compat_attrs(info.type, info.attributes);
-    file->FileSize =
-        info.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)info.byte_size;
+    file->FileSize = info.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)info.byte_size;
     compat_time(file, &info.last_modified, info.time_validity);
     return FS_OK;
 }
@@ -374,11 +360,12 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
 
     file->_hpclang_kind = HPCLANG_HPGCC_FS_FILE;
     file->_hpclang_fd = fd;
-    if (refresh_file_metadata(file) != FS_OK) {
+    int metadata_error = refresh_file_metadata(file);
+    if (metadata_error != FS_OK) {
         (void)close(fd);
         free(file->Name);
         free(file);
-        return compat_error();
+        return metadata_error;
     }
 
     if ((mode & FSMODE_APPEND) != 0) {
@@ -393,8 +380,7 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
 
 int FSCreate(char *name, int attr, FS_FILE **fileptr)
 {
-    if ((attr & (FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM |
-                 FSATTR_DIR | FSATTR_VOLUME)) != 0)
+    if ((attr & (FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM | FSATTR_DIR | FSATTR_VOLUME)) != 0)
         return FS_CANTWRITE;
     if (fileptr == NULL)
         return FS_BADNAME;
@@ -450,8 +436,7 @@ int FSClose(FS_FILE *file)
 
 int FSCloseAndDelete(FS_FILE *file)
 {
-    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE ||
-        file->Name == NULL)
+    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE || file->Name == NULL)
         return FS_INVHANDLE;
 
     char path[HPCLANG_STREAM_NAME_CAPACITY];
@@ -468,8 +453,8 @@ int FSCloseAndDelete(FS_FILE *file)
 
 int FSRead(char *buffer, int nbytes, FS_FILE *file)
 {
-    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE ||
-        nbytes < 0 || (buffer == NULL && nbytes != 0))
+    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE || nbytes < 0 ||
+        (buffer == NULL && nbytes != 0))
         return 0;
 
     ssize_t got = read(file->_hpclang_fd, buffer, (size_t)nbytes);
@@ -485,18 +470,16 @@ int FSRead(char *buffer, int nbytes, FS_FILE *file)
 
 int FSWrite(char *buffer, int nbytes, FS_FILE *file)
 {
-    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE ||
-        nbytes < 0 || (buffer == NULL && nbytes != 0))
+    if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE || nbytes < 0 ||
+        (buffer == NULL && nbytes != 0))
         return 0;
     if ((file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY)) == 0)
         return 0;
     if ((file->Mode & FSMODE_NOGROW) != 0 &&
-        (uint64_t)file->CurrentOffset + (uint64_t)(unsigned)nbytes >
-            file->FileSize)
+        (uint64_t)file->CurrentOffset + (uint64_t)(unsigned)nbytes > file->FileSize)
         return 0;
 
-    int base_mode =
-        file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY);
+    int base_mode = file->Mode & (FSMODE_WRITE | FSMODE_APPEND | FSMODE_MODIFY);
 
     /*
      * Historical MODIFY preserves the original extent. Cap the request at EOF
@@ -578,8 +561,7 @@ int FSEof(FS_FILE *file)
 {
     if (file == NULL || file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE)
         return 1;
-    return file->_hpclang_eof != 0u ||
-           file->CurrentOffset >= file->FileSize;
+    return file->_hpclang_eof != 0u || file->CurrentOffset >= file->FileSize;
 }
 
 int FSDelete(char *name)
@@ -661,8 +643,7 @@ int FSOpenDir(char *name, FS_FILE **fileptr)
     if (normalize_path(name, path, sizeof(path)) != 0)
         return compat_error();
 
-    struct hpclang_stream_directory *directory =
-        hpclang_stream_directory_open(path);
+    struct hpclang_stream_directory *directory = hpclang_stream_directory_open(path);
     if (directory == NULL)
         return compat_error();
 
@@ -681,8 +662,7 @@ int FSOpenDir(char *name, FS_FILE **fileptr)
 
 int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
 {
-    if (entry == NULL || dir == NULL ||
-        dir->_hpclang_kind != HPCLANG_HPGCC_FS_DIRECTORY ||
+    if (entry == NULL || dir == NULL || dir->_hpclang_kind != HPCLANG_HPGCC_FS_DIRECTORY ||
         dir->_hpclang_directory == NULL)
         return FS_INVHANDLE;
 
@@ -696,8 +676,7 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
 
     struct hpclang_stream_directory_entry raw;
     int result = hpclang_stream_directory_read(
-        (struct hpclang_stream_directory *)dir->_hpclang_directory,
-        &raw);
+        (struct hpclang_stream_directory *)dir->_hpclang_directory, &raw);
     if (result < 0)
         return compat_error();
     if (result == 0)
@@ -711,8 +690,7 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
     entry->Volume = 0u;
     entry->Mode = FSMODE_READ;
     entry->Attr = compat_attrs(raw.type, raw.attributes);
-    entry->FileSize =
-        raw.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)raw.byte_size;
+    entry->FileSize = raw.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)raw.byte_size;
     entry->_hpclang_kind = HPCLANG_HPGCC_FS_ENTRY;
     compat_time(entry, &raw.last_modified, raw.time_validity);
     return FS_OK;
@@ -753,9 +731,7 @@ void FSGetWriteTime(FS_FILE *file, struct tm *timedate)
         *timedate = file->_hpclang_write_tm;
 }
 
-static int volume_info(
-    int volume,
-    struct hpclang_stream_storage_info *info)
+static int volume_info(int volume, struct hpclang_stream_storage_info *info)
 {
     if (volume != 0)
         return FS_BADVOLUME;
@@ -806,8 +782,7 @@ int FSGetVolumeFree(int volume)
     int result = volume_info(volume, &info);
     if (result != FS_OK)
         return result;
-    if ((info.flags & HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u ||
-        info.free_bytes > INT_MAX)
+    if ((info.flags & HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID) == 0u || info.free_bytes > INT_MAX)
         return FS_ERROR;
     return (int)info.free_bytes;
 }
@@ -890,9 +865,8 @@ int FSGetNameType(char *name)
         unsigned char ch = (unsigned char)*q;
         int separator = ch == '/' || ch == '\\';
 
-        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
-            ch == '<' || ch == '>' || ch == '|' ||
-            (ch < 0x20u && ch != 0u))
+        if (ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>' ||
+            ch == '|' || (ch < 0x20u && ch != 0u))
             return FSNAME_INVALID;
 
         if (separator || ch == 0u) {
@@ -909,8 +883,7 @@ int FSGetNameType(char *name)
             }
 
             if (ch == 0u) {
-                trailing_separator = q != p &&
-                    (q[-1] == '/' || q[-1] == '\\');
+                trailing_separator = q != p && (q[-1] == '/' || q[-1] == '\\');
                 break;
             }
 
@@ -948,16 +921,14 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
     char relative[HPCLANG_STREAM_NAME_CAPACITY];
     const char *body = source;
 
-    if ((pathflags & FSNAME_HASPATH) == 0 &&
-        (pathflags & FSNAME_ABSPATH) == 0) {
+    if ((pathflags & FSNAME_HASPATH) == 0 && (pathflags & FSNAME_ABSPATH) == 0) {
         const char *slash = strrchr(source, '/');
         if (slash != NULL)
             body = slash + 1;
     } else if ((pathflags & FSNAME_ABSPATH) == 0) {
         size_t cwd_length = strlen(compat_cwd);
         if (strncmp(source, compat_cwd, cwd_length) == 0 &&
-            (compat_cwd[cwd_length - 1u] == '/' ||
-             source[cwd_length] == '/' ||
+            (compat_cwd[cwd_length - 1u] == '/' || source[cwd_length] == '/' ||
              source[cwd_length] == '\0')) {
             body = source + cwd_length;
             if (*body == '/')
@@ -967,19 +938,16 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
 
     size_t prefix = 0u;
     if ((pathflags & FSNAME_HASVOL) != 0) {
-        const char *volume =
-            (pathflags & FSNAME_VOLHP) != 0 ? ":3:" : "C:";
+        const char *volume = (pathflags & FSNAME_VOLHP) != 0 ? ":3:" : "C:";
         prefix = strlen(volume);
         memcpy(relative, volume, prefix);
     }
 
     size_t body_length = strlen(body);
     int need_absolute_slash =
-        (pathflags & FSNAME_ABSPATH) != 0 &&
-        (body_length == 0u || body[0] != '/');
+        (pathflags & FSNAME_ABSPATH) != 0 && (body_length == 0u || body[0] != '/');
 
-    if (prefix + (size_t)need_absolute_slash + body_length + 2u >
-        sizeof(relative))
+    if (prefix + (size_t)need_absolute_slash + body_length + 2u > sizeof(relative))
         return NULL;
 
     size_t out = prefix;
@@ -988,8 +956,7 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
     memcpy(relative + out, body, body_length);
     out += body_length;
 
-    if ((pathflags & FSNAME_ENDSLASH) != 0 &&
-        (file->Attr & FSATTR_DIR) != 0 &&
+    if ((pathflags & FSNAME_ENDSLASH) != 0 && (file->Attr & FSATTR_DIR) != 0 &&
         (out == 0u || relative[out - 1u] != '/'))
         relative[out++] = '/';
 
@@ -1000,21 +967,36 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
 char *FSGetErrorMsg(int errornum)
 {
     switch (errornum) {
-    case FS_OK: return "No error";
-    case FS_ERROR: return "Filesystem error";
-    case FS_EOF: return "End of file";
-    case FS_BADNAME: return "Invalid file name";
-    case FS_BADVOLUME: return "Invalid volume";
-    case FS_NOTFOUND: return "File not found";
-    case FS_CANTWRITE: return "Write failed";
-    case FS_NOCARD: return "No card";
-    case FS_CHANGED: return "Media changed";
-    case FS_MAXFILES: return "Too many open files";
-    case FS_USED: return "File or directory in use";
-    case FS_DISKFULL: return "Disk full";
-    case FS_EXIST: return "File already exists";
-    case FS_INVHANDLE: return "Invalid handle";
-    default: return "Unknown filesystem error";
+    case FS_OK:
+        return "No error";
+    case FS_ERROR:
+        return "Filesystem error";
+    case FS_EOF:
+        return "End of file";
+    case FS_BADNAME:
+        return "Invalid file name";
+    case FS_BADVOLUME:
+        return "Invalid volume";
+    case FS_NOTFOUND:
+        return "File not found";
+    case FS_CANTWRITE:
+        return "Write failed";
+    case FS_NOCARD:
+        return "No card";
+    case FS_CHANGED:
+        return "Media changed";
+    case FS_MAXFILES:
+        return "Too many open files";
+    case FS_USED:
+        return "File or directory in use";
+    case FS_DISKFULL:
+        return "Disk full";
+    case FS_EXIST:
+        return "File already exists";
+    case FS_INVHANDLE:
+        return "Invalid handle";
+    default:
+        return "Unknown filesystem error";
     }
 }
 

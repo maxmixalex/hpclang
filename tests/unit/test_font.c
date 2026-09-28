@@ -36,20 +36,34 @@ static const uint8_t glyph_omega_bitmap[] = {
 };
 
 static const struct hpclang_bitmap_glyph glyph_question = {
-    .codepoint = '?', .bitmap = glyph_question_bitmap,
-    .width = 3u, .height = 5u, .advance = 4u, .stride = 1u,
+    .codepoint = '?',
+    .bitmap = glyph_question_bitmap,
+    .width = 3u,
+    .height = 5u,
+    .advance = 4u,
+    .stride = 1u,
 };
 static const struct hpclang_bitmap_glyph glyph_a = {
-    .codepoint = 'A', .bitmap = glyph_a_bitmap,
-    .width = 3u, .height = 5u, .advance = 5u, .stride = 1u,
+    .codepoint = 'A',
+    .bitmap = glyph_a_bitmap,
+    .width = 3u,
+    .height = 5u,
+    .advance = 5u,
+    .stride = 1u,
 };
 static const struct hpclang_bitmap_glyph glyph_omega = {
-    .codepoint = 0x03a9u, .bitmap = glyph_omega_bitmap,
-    .width = 5u, .height = 5u, .advance = 6u, .stride = 1u,
+    .codepoint = 0x03a9u,
+    .bitmap = glyph_omega_bitmap,
+    .width = 5u,
+    .height = 5u,
+    .advance = 6u,
+    .stride = 1u,
 };
 
 static const struct hpclang_bitmap_glyph *const test_glyphs[] = {
-    &glyph_question, &glyph_a, &glyph_omega,
+    &glyph_question,
+    &glyph_a,
+    &glyph_omega,
 };
 static const struct hpclang_bitmap_font_data test_data = {
     .glyphs = test_glyphs,
@@ -62,11 +76,8 @@ static const struct hpclang_bitmap_font_data test_data = {
 };
 static const struct hpclang_font test_font = HPCLANG_BITMAP_FONT(test_data);
 
-static void expect_pixel(
-    const struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint8_t expected)
+static void expect_pixel(const struct hpclang_surface *surface, int32_t x, int32_t y,
+                         uint8_t expected)
 {
     if (hpclang_surface_get_pixel(surface, x, y) != expected)
         fail("pixel mismatch");
@@ -77,11 +88,8 @@ int main(void)
     const struct hpclang_font *mini = hpclang_font_mini();
     const struct hpclang_font *big = hpclang_font_big();
     const struct hpclang_font *editline = hpclang_font_editline();
-    if (hpclang_font_default() != big ||
-        editline != NULL ||
-        hpclang_font_height(mini) != 6u ||
-        hpclang_font_advance(mini) != 4u ||
-        hpclang_font_height(big) != 8u ||
+    if (hpclang_font_default() != big || editline != NULL || hpclang_font_height(mini) != 6u ||
+        hpclang_font_advance(mini) != 4u || hpclang_font_height(big) != 8u ||
         hpclang_font_advance(big) != 6u)
         fail("HP50 native font metrics");
 
@@ -90,20 +98,14 @@ int main(void)
     big = hpclang_font_big();
     editline = hpclang_font_editline();
     const struct hpclang_font *main_font = hpclang_font_default();
-    if (big != NULL ||
-        editline == NULL ||
-        main_font == NULL ||
-        hpclang_font_height(mini) != 5u ||
-        hpclang_font_advance(mini) != 4u ||
-        hpclang_font_height(main_font) != 8u ||
-        hpclang_font_advance(main_font) != 6u ||
-        hpclang_font_height(editline) != 10u ||
+    if (big != NULL || editline == NULL || main_font == NULL || hpclang_font_height(mini) != 5u ||
+        hpclang_font_advance(mini) != 4u || hpclang_font_height(main_font) != 8u ||
+        hpclang_font_advance(main_font) != 6u || hpclang_font_height(editline) != 10u ||
         hpclang_font_advance(editline) != 6u)
         fail("HP39 native font metrics");
 
     fake_boot.model = HPCLANG_MODEL_HP39GPLUS;
-    if (hpclang_font_big() != NULL ||
-        hpclang_font_editline() != NULL ||
+    if (hpclang_font_big() != NULL || hpclang_font_editline() != NULL ||
         hpclang_font_default() == NULL)
         fail("HP39g+ native font availability");
     fake_boot.model = HPCLANG_MODEL_HP39GS;
@@ -122,8 +124,7 @@ int main(void)
         fail("HP39 retired section-alias cookie");
     fake_boot.platform_cookie = 0u;
 
-    if (hpclang_font_height(&test_font) != 6u ||
-        hpclang_font_advance(&test_font) != 4u ||
+    if (hpclang_font_height(&test_font) != 6u || hpclang_font_advance(&test_font) != 4u ||
         hpclang_font_codepoint_advance(&test_font, 'A') != 5u ||
         hpclang_font_codepoint_advance(&test_font, 0x03a9u) != 6u ||
         hpclang_font_codepoint_advance(&test_font, 'Z') != 4u)
