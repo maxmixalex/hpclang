@@ -569,10 +569,31 @@ def patch_reserved_ram(root: Path) -> None:
     )
 
 
+def patch_optional_state_logging(root: Path) -> None:
+    path = root / "src" / "module.c"
+    old = '        fprintf( stderr, "%s: %s:%u: key \\"%s\\" not found\\n", module->name, __func__, __LINE__, name );'
+    new = """        /* A fresh E2E state uses the register reset defaults. Missing
+           optional keys/groups are diagnostic detail, not startup errors. */
+        if ( ui4x_config.verbose ||
+             !( g_error_matches( gerror, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_KEY_NOT_FOUND ) ||
+                g_error_matches( gerror, G_KEY_FILE_ERROR, G_KEY_FILE_ERROR_GROUP_NOT_FOUND ) ) )
+            fprintf( stderr, "%s: state key \\"%s\\": %s\\n", module->name, name,
+                     gerror ? gerror->message : "lookup failed" );
+        g_clear_error( &gerror );"""
+    if path.read_text().count(old) != 2:
+        raise SystemExit(f"{path}: expected the integer and string state lookup diagnostics")
+    for kind in ("integer", "string"):
+        replace_once(path, old, new, f"optional {kind} state logging")
+
+
 def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     copy_frontend(args.direct_frontend, root / "src" / "hpclang_direct.c", "hpclang_direct_main")
     copy_frontend(args.stock_frontend, root / "src" / "hpclang_stock.c", "hpclang_stock_main")
-    copy_frontend(args.gallery_frontend, root / "src" / "hpclang_gallery.c", "hpclang_gallery_main")
+    copy_frontend(
+        args.gallery_frontend,
+        root / "src" / "hpclang_gallery.c",
+        "hpclang_gallery_main",
+    )
     shutil.copy2(args.selector, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
     for header in (
@@ -627,6 +648,7 @@ def main() -> None:
     patch_host_usbdev(root, args)
     patch_host_uart0(root)
     patch_reserved_ram(root)
+    patch_optional_state_logging(root)
 
 
 if __name__ == "__main__":
