@@ -5,22 +5,20 @@
 
 #include "rpl-object-span.h"
 
-enum {
+enum
+{
     TEST_RPL_USEROB = 0x00080711u
 };
 
-struct image {
+struct image
+{
     uint8_t nibbles[512];
     uint32_t used;
     uint32_t home;
     int expose_home;
 };
 
-static void put_nibbles(
-    struct image *image,
-    uint32_t at,
-    uint32_t value,
-    uint32_t count)
+static void put_nibbles(struct image *image, uint32_t at, uint32_t value, uint32_t count)
 {
     assert(image != NULL);
     assert(at + count <= sizeof(image->nibbles));
@@ -36,9 +34,7 @@ static int read_nibble(void *context, uint32_t address, uint8_t *value)
     if (image == NULL || value == NULL)
         return 0;
 
-    if (image->expose_home &&
-        address >= TEST_RPL_USEROB &&
-        address < TEST_RPL_USEROB + 5u) {
+    if (image->expose_home && address >= TEST_RPL_USEROB && address < TEST_RPL_USEROB + 5u) {
         uint32_t shift = (address - TEST_RPL_USEROB) * 4u;
         *value = (uint8_t)((image->home >> shift) & 0x0fu);
         return 1;
@@ -77,9 +73,7 @@ static void test_address_overflow_is_bounded(void)
     };
     uint32_t span = 99u;
 
-    assert(hpclang_rpl_object_span(
-               &reader, UINT32_MAX - 2u, 5u, &span) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_object_span(&reader, UINT32_MAX - 2u, 5u, &span) == HPCLANG_RPL_SPAN_BOUNDS);
     assert(span == 0u);
 }
 
@@ -91,20 +85,17 @@ static void test_fixed_objects(void)
 
     put_nibbles(&image, 0u, 0x02933u, 5u);
     image.used = 21u;
-    assert(hpclang_rpl_object_span(&reader, 0u, 21u, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, 21u, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 21u);
 
     put_nibbles(&image, 0u, 0x02977u, 5u);
     image.used = 37u;
-    assert(hpclang_rpl_object_span(&reader, 0u, 37u, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, 37u, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 37u);
 
     put_nibbles(&image, 0u, 0x029bfu, 5u);
     image.used = 7u;
-    assert(hpclang_rpl_object_span(&reader, 0u, 7u, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, 7u, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 7u);
 }
 
@@ -119,18 +110,14 @@ static void test_length_prefixed(void)
     put_nibbles(&image, 5u, 9u, 5u);
     put_nibbles(&image, 10u, 0x50u, 2u);
     put_nibbles(&image, 12u, 0x48u, 2u);
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 14u);
 
-    assert(hpclang_rpl_object_span(&reader, 0u, 13u, &span) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_object_span(&reader, 0u, 13u, &span) == HPCLANG_RPL_SPAN_BOUNDS);
 
     put_nibbles(&image, 5u, 4u, 5u);
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_MALFORMED);
 }
-
 
 static void test_hp49_extended_formats(void)
 {
@@ -142,30 +129,26 @@ static void test_hp49_extended_formats(void)
     put_nibbles(&image, 0u, 0x02614u, 5u);
     put_nibbles(&image, 5u, 7u, 5u);
     image.used = 12u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 12u);
 
     memset(&image, 0, sizeof(image));
     put_nibbles(&image, 0u, 0x026acu, 5u); /* Flash pointer */
     image.used = 12u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 12u);
 
     memset(&image, 0, sizeof(image));
     put_nibbles(&image, 0u, 0x02baau, 5u); /* Extended pointer */
     image.used = 15u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 15u);
 
     memset(&image, 0, sizeof(image));
     put_nibbles(&image, 0u, 0x026feu, 5u); /* Minifont */
     put_nibbles(&image, 5u, 8u, 5u);
     image.used = 13u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 13u);
 }
 
@@ -182,11 +165,9 @@ static void test_library_crc_extent(void)
     put_nibbles(&image, 0u, 0x02b40u, 5u);
     put_nibbles(&image, 5u, 9u, 5u);
     image.used = 18u; /* 5 + 9 + 4 */
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 18u);
-    assert(hpclang_rpl_object_span(&reader, 0u, 17u, &span) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_object_span(&reader, 0u, 17u, &span) == HPCLANG_RPL_SPAN_BOUNDS);
 }
 
 static void test_long_numbers(void)
@@ -200,8 +181,7 @@ static void test_long_numbers(void)
     put_nibbles(&image, 5u, 6u, 5u);
     put_nibbles(&image, 11u, 7u, 5u);
     image.used = 18u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 18u);
 
     /* Long complex has four such components. */
@@ -213,13 +193,11 @@ static void test_long_numbers(void)
         at += 6u;
     }
     image.used = at;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == at);
 
     put_nibbles(&image, 5u, 5u, 5u);
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_MALFORMED);
 }
 
 static void test_tagged_and_symbolic_matrix(void)
@@ -236,8 +214,7 @@ static void test_tagged_and_symbolic_matrix(void)
     put_nibbles(&image, 11u, 0x029bfu, 5u);
     put_nibbles(&image, 16u, 0x43u, 2u);
     image.used = 18u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 18u);
 
     /* Symbolic matrix is a SEMI-terminated composite runstream. */
@@ -246,8 +223,7 @@ static void test_tagged_and_symbolic_matrix(void)
     put_nibbles(&image, 5u, 0x12345u, 5u);
     put_nibbles(&image, 10u, 0x0312bu, 5u);
     image.used = 15u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 15u);
 }
 
@@ -260,13 +236,11 @@ static void test_names(void)
     put_nibbles(&image, 0u, 0x02e48u, 5u);
     put_nibbles(&image, 5u, 4u, 2u);
     image.used = 15u;
-    assert(hpclang_rpl_object_span(&reader, 0u, 15u, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, 15u, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 15u);
 
     put_nibbles(&image, 0u, 0x02e6du, 5u);
-    assert(hpclang_rpl_object_span(&reader, 0u, 14u, &span) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_object_span(&reader, 0u, 14u, &span) == HPCLANG_RPL_SPAN_BOUNDS);
 }
 
 static void test_composite_with_reference_and_nested_object(void)
@@ -294,8 +268,7 @@ static void test_composite_with_reference_and_nested_object(void)
     at += 5u;
     image.used = at;
 
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == image.used);
 }
 
@@ -313,11 +286,9 @@ static void test_nested_composite(void)
     put_nibbles(&image, 20u, 0x0312bu, 5u);
     image.used = 25u;
 
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 25u);
 }
-
 
 static void test_directory_spans(void)
 {
@@ -331,8 +302,7 @@ static void test_directory_spans(void)
     put_nibbles(&image, 0u, 0x02a96u, 5u);
     put_nibbles(&image, 8u, 0u, 5u);
     image.used = 13u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 13u);
 
     /*
@@ -351,11 +321,9 @@ static void test_directory_spans(void)
     put_nibbles(&image, 24u, 0x029bfu, 5u);
     put_nibbles(&image, 29u, 0x42u, 2u);
     image.used = 31u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 31u);
-    assert(hpclang_rpl_object_span(&reader, 0u, 30u, &span) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_object_span(&reader, 0u, 30u, &span) == HPCLANG_RPL_SPAN_BOUNDS);
 
     /*
      * Real HP39's HOME Hidden entry proves len=0 has no duplicate trailing
@@ -371,8 +339,7 @@ static void test_directory_spans(void)
     put_nibbles(&image, 20u, 0x029bfu, 5u);
     put_nibbles(&image, 25u, 0x43u, 2u);
     image.used = 27u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 27u);
 
     /* The newest object may itself be a directory; recurse to its exact end. */
@@ -388,8 +355,7 @@ static void test_directory_spans(void)
     put_nibbles(&image, 24u, 0x02a96u, 5u);
     put_nibbles(&image, 32u, 0u, 5u);
     image.used = 37u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 37u);
 
     /* HOME inserts 13 nibbles per attached library before the 3-nibble header. */
@@ -400,8 +366,7 @@ static void test_directory_spans(void)
     put_nibbles(&image, 5u, 2u, 3u);
     put_nibbles(&image, 34u, 0u, 5u);
     image.used = 39u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_OK);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 39u);
 
     /* A non-empty name must repeat its length immediately before the object. */
@@ -417,15 +382,13 @@ static void test_directory_spans(void)
     put_nibbles(&image, 24u, 0x029bfu, 5u);
     put_nibbles(&image, 29u, 0x42u, 2u);
     image.used = 31u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_MALFORMED);
 
     /* Boundary parsing stays fail-closed on an unfrozen newest object. */
     put_nibbles(&image, 22u, 1u, 2u);
     put_nibbles(&image, 24u, 0x026d5u, 5u);
     image.used = 29u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
 static void test_unfrozen_inline_prologue_is_not_a_reference(void)
@@ -440,8 +403,7 @@ static void test_unfrozen_inline_prologue_is_not_a_reference(void)
     put_nibbles(&image, 10u, 0x0312bu, 5u);
     image.used = 15u;
 
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
 static void test_unknown_and_unfrozen_objects(void)
@@ -452,16 +414,13 @@ static void test_unknown_and_unfrozen_objects(void)
 
     put_nibbles(&image, 0u, 0x54321u, 5u);
     image.used = 5u;
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(span == 0u);
 
     put_nibbles(&image, 0u, 0x02beeu, 5u); /* reserved EXT3 */
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     put_nibbles(&image, 0u, 0x02c10u, 5u); /* reserved EXT4 */
-    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
 int main(void)

@@ -6,7 +6,8 @@
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
 
-enum {
+enum
+{
     NIBBLES = 0x100000u,
     TEMPTOP = 0x806eeu,
     RSKTOP = 0x806f3u,
@@ -39,8 +40,7 @@ static void put_word(uint32_t address, uint32_t nibbles, uint32_t value)
 {
     assert(address + nibbles <= NIBBLES);
     for (uint32_t i = 0u; i < nibbles; ++i)
-        memory[address + i] =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        memory[address + i] = (uint8_t)((value >> (i * 4u)) & 0x0fu);
 }
 
 static uint32_t get_word(uint32_t address, uint32_t nibbles)
@@ -54,8 +54,7 @@ static uint32_t get_word(uint32_t address, uint32_t nibbles)
 
 static struct hpclang_object *make_char(uint8_t ch)
 {
-    struct hpclang_object *object =
-        malloc(sizeof(*object) + 4u);
+    struct hpclang_object *object = malloc(sizeof(*object) + 4u);
     assert(object != NULL);
     object->kind = HPCLANG_OBJECT_CHARACTER;
     object->nibble_count = 7u;
@@ -120,8 +119,7 @@ static void test_push_transaction(void)
     uint8_t original[0x1000];
     memcpy(original, &memory[0x84000u], sizeof(original));
 
-    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
-           HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_OK);
 
     const uint32_t delta = object->nibble_count + 6u;
     const uint32_t object_address = 0x84001u;
@@ -136,8 +134,7 @@ static void test_push_transaction(void)
     for (uint32_t i = 0u; i < sizeof(original); ++i)
         assert(memory[0x84000u + delta + i] == original[i]);
 
-    assert(get_word(AVMEM, 5u) ==
-           (0x8fffbu - (0x85000u + delta)) / 5u);
+    assert(get_word(AVMEM, 5u) == (0x8fffbu - (0x85000u + delta)) / 5u);
 
     hpclang_object_release(object);
 }
@@ -157,10 +154,8 @@ static void test_avmem_reservation_is_preserved(void)
     uint32_t new_cells = (dstk - (rstk + delta)) / 5u;
     uint32_t temp_cost = old_cells - new_cells;
 
-    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
-           HPCLANG_RPL_MUTATION_OK);
-    assert(get_word(AVMEM, 5u) ==
-           old_avmem - temp_cost - 1u);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(AVMEM, 5u) == old_avmem - temp_cost - 1u);
 
     io = setup(1u);
     old_avmem = get_word(AVMEM, 5u) - 9u;
@@ -171,10 +166,8 @@ static void test_avmem_reservation_is_preserved(void)
     new_cells = (dstk - (rstk + delta)) / 5u;
     temp_cost = old_cells - new_cells;
 
-    assert(hpclang_rpl_mutation_replace(&io, 1u, object) ==
-           HPCLANG_RPL_MUTATION_OK);
-    assert(get_word(AVMEM, 5u) ==
-           old_avmem - temp_cost);
+    assert(hpclang_rpl_mutation_replace(&io, 1u, object) == HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(AVMEM, 5u) == old_avmem - temp_cost);
 
     hpclang_object_release(object);
 }
@@ -191,8 +184,7 @@ static void test_stack_reserve_blocks_last_cell(void)
     uint32_t before_ttop = get_word(TEMPTOP, 5u);
     uint32_t before_rstk = get_word(RSKTOP, 5u);
     uint32_t before_dstk = get_word(DSKTOP, 5u);
-    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
-           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_NOSPACE);
     assert(get_word(TEMPTOP, 5u) == before_ttop);
     assert(get_word(RSKTOP, 5u) == before_rstk);
     assert(get_word(DSKTOP, 5u) == before_dstk);
@@ -211,8 +203,7 @@ static void test_nospace_is_non_mutating(void)
     uint32_t dstk = get_word(DSKTOP, 5u);
     uint32_t avmem = get_word(AVMEM, 5u);
 
-    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
-           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_NOSPACE);
     assert(get_word(TEMPTOP, 5u) == ttop);
     assert(get_word(RSKTOP, 5u) == rstk);
     assert(get_word(DSKTOP, 5u) == dstk);
@@ -222,8 +213,7 @@ static void test_nospace_is_non_mutating(void)
     io.user_limit = 0x8fffcu;
     ttop = get_word(TEMPTOP, 5u);
     rstk = get_word(RSKTOP, 5u);
-    assert(hpclang_rpl_mutation_push_snapshot(&io, object) ==
-           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_NOSPACE);
     assert(get_word(TEMPTOP, 5u) == ttop);
     assert(get_word(RSKTOP, 5u) == rstk);
 
@@ -236,8 +226,7 @@ static void test_drop_and_replace(void)
     struct hpclang_object *object = make_char('C');
 
     uint32_t old_top = get_word(DSKTOP, 5u);
-    assert(hpclang_rpl_mutation_replace(&io, 2u, object) ==
-           HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_replace(&io, 2u, object) == HPCLANG_RPL_MUTATION_OK);
     assert(get_word(DSKTOP, 5u) == old_top);
 
     uint32_t replacement = get_word(old_top + 5u, 5u);
@@ -245,14 +234,12 @@ static void test_drop_and_replace(void)
     assert_char_at(replacement, 'C');
 
     uint32_t avmem = get_word(AVMEM, 5u);
-    assert(hpclang_rpl_mutation_drop(&io, 2u) ==
-           HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_drop(&io, 2u) == HPCLANG_RPL_MUTATION_OK);
     assert(get_word(DSKTOP, 5u) == old_top + 10u);
     assert(get_word(AVMEM, 5u) == avmem + 2u);
 
     uint32_t before = get_word(DSKTOP, 5u);
-    assert(hpclang_rpl_mutation_drop(&io, 1u) ==
-           HPCLANG_RPL_MUTATION_LEVEL);
+    assert(hpclang_rpl_mutation_drop(&io, 1u) == HPCLANG_RPL_MUTATION_LEVEL);
     assert(get_word(DSKTOP, 5u) == before);
 
     hpclang_object_release(object);

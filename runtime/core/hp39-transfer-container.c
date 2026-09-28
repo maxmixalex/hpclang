@@ -4,14 +4,10 @@
 
 #include "hp39-transfer-container.h"
 
-static const uint8_t hp39_binary_magic[] = {
-    'H', 'P', '3', '9', 'B', 'i', 'n'
-};
+static const uint8_t hp39_binary_magic[] = {'H', 'P', '3', '9', 'B', 'i', 'n'};
 
-int hpclang_hp39_transfer_container_parse(
-    const uint8_t *data,
-    size_t size,
-    struct hpclang_hp39_transfer_container_view *view)
+int hpclang_hp39_transfer_container_parse(const uint8_t *data, size_t size,
+                                          struct hpclang_hp39_transfer_container_view *view)
 {
     if (view == NULL || (data == NULL && size != 0u))
         return HPCLANG_HP39_TRANSFER_CONTAINER_INVALID;

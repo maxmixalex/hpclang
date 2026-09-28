@@ -81,13 +81,10 @@ int main(void)
     assert(object == NULL);
     assert(errno == EDOM);
 
-    const uint8_t expected[] = { 0x41u, 0x00u, 0xffu };
+    const uint8_t expected[] = {0x41u, 0x00u, 0xffu};
     object = NULL;
 
-    assert(hpclang_object_create_string(
-               expected,
-               sizeof(expected),
-               &object) == 0);
+    assert(hpclang_object_create_string(expected, sizeof(expected), &object) == 0);
     assert(object != NULL);
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_STRING);
     assert(object->native_prologue == 0x02a2cu);
@@ -98,10 +95,7 @@ int main(void)
     assert(size == sizeof(expected));
 
     uint8_t copied[sizeof(expected)] = {0};
-    assert(hpclang_object_string_copy(
-               object,
-               copied,
-               sizeof(copied)) == 0);
+    assert(hpclang_object_string_copy(object, copied, sizeof(copied)) == 0);
     assert(memcmp(copied, expected, sizeof(expected)) == 0);
     hpclang_object_release(object);
 

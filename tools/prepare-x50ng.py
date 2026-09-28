@@ -44,10 +44,10 @@ def patch_universal_flash(root: Path) -> None:
     replace_once(
         root / "src" / "flash.c",
         'memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0',
-        '''memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
+        """memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOUPDATEIMAGE", 16 ) != 0 &&
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP39G+IMAGE", 16 ) != 0 &&
                          memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP40G+IMAGE", 16 ) != 0 &&
-                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP48GIIMAGE", 16 ) != 0''',
+                         memcmp( phys_ram_base + flash->offset + BOOT_SIZE, "KINPOHP48GIIMAGE", 16 ) != 0""",
         "universal HP39/40/48 firmware headers",
     )
 
@@ -58,7 +58,7 @@ def patch_runtime_sram(root: Path) -> None:
     replace_once(
         path,
         "#define S3C2410_SRAM_SIZE 0x00080000\n",
-        '''#define S3C2410_SRAM_DEFAULT_SIZE 0x00080000
+        """#define S3C2410_SRAM_DEFAULT_SIZE 0x00080000
 #define S3C2410_SRAM_HP48_SIZE 0x00040000
 
 static size_t hpclang_sram_size( void )
@@ -84,7 +84,7 @@ static size_t hpclang_sram_size( void )
 
     return ( size_t )value;
 }
-''',
+""",
         "runtime SRAM selector",
     )
     replace_once(
@@ -95,7 +95,7 @@ static size_t hpclang_sram_size( void )
     )
     replace_once(
         path,
-        '''    sram->data = ( void* )-1;
+        """    sram->data = ( void* )-1;
     sram->shadow = ( void* )-1;
     sram->offset = phys_ram_size;
     phys_ram_size += S3C2410_SRAM_SIZE;
@@ -103,8 +103,8 @@ static size_t hpclang_sram_size( void )
 
     cpu_register_physical_memory( S3C2410_SRAM_BASE, S3C2410_SRAM_SIZE, sram->offset | IO_MEM_RAM );
     cpu_register_physical_memory( S3C2410_SRAM_BASE + S3C2410_SRAM_SIZE, S3C2410_SRAM_SIZE,
-                                  ( sram->offset + S3C2410_SRAM_SIZE ) | IO_MEM_RAM );''',
-        '''    sram->data = ( void* )-1;
+                                  ( sram->offset + S3C2410_SRAM_SIZE ) | IO_MEM_RAM );""",
+        """    sram->data = ( void* )-1;
     sram->shadow = ( void* )-1;
     sram->size = hpclang_sram_size();
     if ( sram->size == 0 ) {
@@ -118,7 +118,7 @@ static size_t hpclang_sram_size( void )
 
     cpu_register_physical_memory( S3C2410_SRAM_BASE, sram->size, sram->offset | IO_MEM_RAM );
     cpu_register_physical_memory( S3C2410_SRAM_BASE + sram->size, sram->size,
-                                  ( sram->offset + sram->size ) | IO_MEM_RAM );''',
+                                  ( sram->offset + sram->size ) | IO_MEM_RAM );""",
         "runtime SRAM map size",
     )
 
@@ -139,7 +139,7 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     replace_once(
         path,
         '#include "../module.h"\n\n#include "s3c2410.h"\n',
-        '''#include <errno.h>
+        """#include <errno.h>
 #include "../module.h"
 #include "../timer.h"
 #include "../qemu/exec-all.h"
@@ -149,16 +149,16 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
 #include "s3c2410_io_port.h"
 #include "hpclang-usbdev-host.h"
 #include "hpclang-usbdev-host.c"
-''',
+""",
         "USB host includes",
     )
 
     replace_once(
         path,
-        '''    unsigned int nr_regs;
+        """    unsigned int nr_regs;
     s3c2410_offset_t* regs;
-} s3c2410_usbdev_t;''',
-        '''    unsigned int nr_regs;
+} s3c2410_usbdev_t;""",
+        """    unsigned int nr_regs;
     s3c2410_offset_t* regs;
 
     struct hpusb_core host;
@@ -168,7 +168,7 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     int64_t next_sof;
     enum hpusb_enum_state trace_state;
     int cable_asserted;
-} s3c2410_usbdev_t;''',
+} s3c2410_usbdev_t;""",
         "USB host state",
     )
 
@@ -181,13 +181,16 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     load_start = path.read_text().find(
         "static int s3c2410_usbdev_load( hdw_module_t* module, GKeyFile* key )"
     )
-    if read_start < 0 or write_start < 0 or load_start < 0 or not (
-        read_start < write_start < load_start
+    if (
+        read_start < 0
+        or write_start < 0
+        or load_start < 0
+        or not (read_start < write_start < load_start)
     ):
         raise SystemExit(f"{path}: USB read/write function anchors changed")
 
     text = path.read_text()
-    host_impl = r'''static void hpclang_usbdev_irq( void* opaque, int level )
+    host_impl = r"""static void hpclang_usbdev_irq( void* opaque, int level )
 {
     s3c2410_usbdev_t* usbdev = opaque;
     if ( level )
@@ -321,7 +324,7 @@ static void s3c2410_usbdev_write(
         hpusb_write( &usbdev->host, ( uint32_t )offset, data );
 }
 
-'''
+"""
     path.write_text(text[:read_start] + host_impl + text[load_start:])
 
     # x50ng resets all modules after a missing/partial state file and on
@@ -355,10 +358,10 @@ static void s3c2410_usbdev_write(
 
     replace_once(
         path,
-        '''    module->user_data = usbdev;
+        """    module->user_data = usbdev;
 
-    iotype = cpu_register_io_memory''',
-        '''    module->user_data = usbdev;
+    iotype = cpu_register_io_memory""",
+        """    module->user_data = usbdev;
     usbdev->hdw_state = module->hdw_state;
     usbdev->host_fd = -1;
     hpusb_init( &usbdev->host, hpclang_usbdev_irq, usbdev );
@@ -394,19 +397,19 @@ static void s3c2410_usbdev_write(
         timer_mod( usbdev->host_timer, timer_get_clock() + 100 );
     }
 
-    iotype = cpu_register_io_memory''',
+    iotype = cpu_register_io_memory""",
         "USB host open",
     )
 
     replace_once(
         path,
-        '''    if ( module->user_data ) {
+        """    if ( module->user_data ) {
         usbdev = module->user_data;
         if ( usbdev->regs )
             free( usbdev->regs );
         free( usbdev );
-    }''',
-        '''    if ( module->user_data ) {
+    }""",
+        """    if ( module->user_data ) {
         usbdev = module->user_data;
         if ( usbdev->host_timer ) {
             timer_del( usbdev->host_timer );
@@ -420,9 +423,10 @@ static void s3c2410_usbdev_write(
         if ( usbdev->regs )
             free( usbdev->regs );
         free( usbdev );
-    }''',
+    }""",
         "USB host close",
     )
+
 
 def patch_host_uart0(root: Path) -> None:
     path = root / "src" / "s3c2410" / "s3c2410_uart.c"
@@ -554,7 +558,6 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
     )
 
 
-
 def patch_reserved_ram(root: Path) -> None:
     replace_once(
         root / "src" / "module.c",
@@ -591,15 +594,13 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         if logical.endswith("src/main.c"):
             matches.append(index)
     if len(matches) != 1:
-        raise SystemExit(
-            f"{makefile}: expected one src/main.c source line, found {len(matches)}"
-        )
+        raise SystemExit(f"{makefile}: expected one src/main.c source line, found {len(matches)}")
 
     index = matches[0]
     original = lines[index]
     leading = original[: len(original) - len(original.lstrip())]
     continuation = chr(92)
-    lines[index:index + 1] = [
+    lines[index : index + 1] = [
         f"{leading}./src/hpclang_direct.c {continuation}\n",
         f"{leading}./src/hpclang_stock.c {continuation}\n",
         f"{leading}./src/hpclang_gallery.c {continuation}\n",

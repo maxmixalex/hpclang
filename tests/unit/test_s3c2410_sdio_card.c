@@ -4,17 +4,18 @@
 
 #include "s3c2410-sdio-card.h"
 
-#define CMDSTAT_RSPFIN     (UINT32_C(1) << 9)
-#define CMDSTAT_TIMEOUT    (UINT32_C(1) << 10)
-#define CMDSTAT_CMDSENT    (UINT32_C(1) << 11)
-#define CMD_WAITRSP        (UINT32_C(1) << 9)
-#define DATA_RXSTART       (UINT32_C(2) << 12)
-#define DATA_TXSTART       (UINT32_C(3) << 12)
-#define DATA_MODE_MASK     (UINT32_C(3) << 12)
-#define DATA_XFERFINISH    (UINT32_C(1) << 4)
-#define FIFO_TFEMPTY       (UINT32_C(1) << 10)
+#define CMDSTAT_RSPFIN (UINT32_C(1) << 9)
+#define CMDSTAT_TIMEOUT (UINT32_C(1) << 10)
+#define CMDSTAT_CMDSENT (UINT32_C(1) << 11)
+#define CMD_WAITRSP (UINT32_C(1) << 9)
+#define DATA_RXSTART (UINT32_C(2) << 12)
+#define DATA_TXSTART (UINT32_C(3) << 12)
+#define DATA_MODE_MASK (UINT32_C(3) << 12)
+#define DATA_XFERFINISH (UINT32_C(1) << 4)
+#define FIFO_TFEMPTY (UINT32_C(1) << 10)
 
-struct fake_sdi {
+struct fake_sdi
+{
     uint32_t regs[17];
     uint8_t media[4][512];
     uint32_t read_offset;
@@ -39,14 +40,11 @@ static void fake_set_csd(struct fake_sdi *fake)
         uint32_t read_bl_len = 9u;
         uint32_t c_size_mult = 7u;
         fake->response[0] = UINT32_C(0x000f005a);
-        fake->response[1] = UINT32_C(0x0f508000) |
-            ((c_size & UINT32_C(0xffc)) >> 2) |
-            (read_bl_len << 16);
-        fake->response[2] = UINT32_C(0x2dd47c1f) |
-            ((c_size & UINT32_C(0x003)) << 30) |
-            (c_size_mult << 15);
-        fake->response[3] = UINT32_C(0x8a0040ff) |
-            (read_bl_len << 22);
+        fake->response[1] =
+            UINT32_C(0x0f508000) | ((c_size & UINT32_C(0xffc)) >> 2) | (read_bl_len << 16);
+        fake->response[2] =
+            UINT32_C(0x2dd47c1f) | ((c_size & UINT32_C(0x003)) << 30) | (c_size_mult << 15);
+        fake->response[3] = UINT32_C(0x8a0040ff) | (read_bl_len << 22);
         return;
     }
 
@@ -70,8 +68,7 @@ static void fake_command(struct fake_sdi *fake, uint32_t control)
         if (fake->high_capacity) {
             fake->response[0] = UINT32_C(0x1aa);
         } else {
-            fake->regs[reg_index(HPCLANG_S3C2410_SDICMDSTAT)] =
-                CMDSTAT_TIMEOUT;
+            fake->regs[reg_index(HPCLANG_S3C2410_SDICMDSTAT)] = CMDSTAT_TIMEOUT;
         }
         break;
     case 41u:
@@ -115,17 +112,14 @@ static uint32_t fake_read32(void *context, uint32_t offset)
 
     if (offset == HPCLANG_S3C2410_SDIFSTA) {
         if (fake->reading && fake->data_index < 512u)
-            return (512u - fake->data_index) > 127u
-                ? 127u
-                : 512u - fake->data_index;
+            return (512u - fake->data_index) > 127u ? 127u : 512u - fake->data_index;
         if (fake->writing)
             return FIFO_TFEMPTY;
         return 0u;
     }
 
     if (offset == HPCLANG_S3C2410_SDIDSTA) {
-        uint32_t mode =
-            fake->regs[reg_index(HPCLANG_S3C2410_SDIDCON)] & DATA_MODE_MASK;
+        uint32_t mode = fake->regs[reg_index(HPCLANG_S3C2410_SDIDCON)] & DATA_MODE_MASK;
         if ((fake->reading || fake->writing) && fake->data_index >= 512u)
             return DATA_XFERFINISH;
         if (fake->reading && mode == DATA_RXSTART)
@@ -141,11 +135,8 @@ static uint32_t fake_read32(void *context, uint32_t offset)
         if (!fake->reading || sector >= 4u || index + 4u > 512u)
             return 0u;
         uint8_t *p = &fake->media[sector][index];
-        uint32_t word =
-            (uint32_t)p[0] |
-            ((uint32_t)p[1] << 8) |
-            ((uint32_t)p[2] << 16) |
-            ((uint32_t)p[3] << 24);
+        uint32_t word = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+                        ((uint32_t)p[3] << 24);
         fake->data_index += 4u;
         return word;
     }
@@ -204,11 +195,9 @@ static int exercise_card(int high_capacity)
     };
     struct hpclang_s3c2410_sdio_card card;
 
-    if (hpclang_s3c2410_sdio_card_open(&card, &bus, 66000000u) !=
-        HPCLANG_SDIO_OK)
+    if (hpclang_s3c2410_sdio_card_open(&card, &bus, 66000000u) != HPCLANG_SDIO_OK)
         return 0;
-    if (card.rca != UINT32_C(0x1234) ||
-        card.high_capacity != (uint8_t)(high_capacity != 0))
+    if (card.rca != UINT32_C(0x1234) || card.high_capacity != (uint8_t)(high_capacity != 0))
         return 0;
     if ((!high_capacity && card.sector_count != UINT32_C(2097152)) ||
         (high_capacity && card.sector_count != UINT32_C(4096)))
@@ -216,8 +205,7 @@ static int exercise_card(int high_capacity)
 
     uint8_t buffer[512];
     memset(buffer, 0, sizeof(buffer));
-    if (hpclang_s3c2410_sdio_read_sector(&card, 1u, buffer) !=
-        HPCLANG_SDIO_OK)
+    if (hpclang_s3c2410_sdio_read_sector(&card, 1u, buffer) != HPCLANG_SDIO_OK)
         return 0;
     if (memcmp(buffer, fake.media[1], sizeof(buffer)) != 0)
         return 0;
@@ -226,16 +214,15 @@ static int exercise_card(int high_capacity)
 
     for (uint32_t i = 0u; i < 512u; ++i)
         buffer[i] = (uint8_t)(255u - i);
-    if (hpclang_s3c2410_sdio_write_sector(&card, 2u, buffer) !=
-        HPCLANG_SDIO_OK)
+    if (hpclang_s3c2410_sdio_write_sector(&card, 2u, buffer) != HPCLANG_SDIO_OK)
         return 0;
     if (memcmp(buffer, fake.media[2], sizeof(buffer)) != 0)
         return 0;
     if (fake.last_data_arg != (high_capacity ? 2u : 1024u))
         return 0;
 
-    if (hpclang_s3c2410_sdio_read_sector(
-            &card, card.sector_count, buffer) != HPCLANG_SDIO_RANGE_ERROR)
+    if (hpclang_s3c2410_sdio_read_sector(&card, card.sector_count, buffer) !=
+        HPCLANG_SDIO_RANGE_ERROR)
         return 0;
 
     hpclang_s3c2410_sdio_card_close(&card);
@@ -244,7 +231,5 @@ static int exercise_card(int high_capacity)
 
 int main(void)
 {
-    return exercise_card(0) && exercise_card(1)
-        ? EXIT_SUCCESS
-        : EXIT_FAILURE;
+    return exercise_card(0) && exercise_card(1) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

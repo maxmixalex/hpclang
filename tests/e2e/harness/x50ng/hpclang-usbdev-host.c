@@ -26,26 +26,28 @@ static size_t ep_maxpacket(const struct hpusb_core *u, unsigned ep)
 {
     unsigned encoded = u->ep[ep].maxp & 0x0fu;
     size_t bytes = encoded ? (size_t)encoded * 8u : (ep == 0 ? 8u : 64u);
-    if (bytes > HPUSB_FIFO_CAP) bytes = HPUSB_FIFO_CAP;
+    if (bytes > HPUSB_FIFO_CAP)
+        bytes = HPUSB_FIFO_CAP;
     return bytes;
 }
 
 static void update_irq(struct hpusb_core *u)
 {
-    int level = ((u->usb_int & u->usb_int_en) != 0u) ||
-                ((u->ep_int & u->ep_int_en) != 0u);
-    if (level == u->irq_level) return;
+    int level = ((u->usb_int & u->usb_int_en) != 0u) || ((u->ep_int & u->ep_int_en) != 0u);
+    if (level == u->irq_level)
+        return;
     u->irq_level = level;
-    if (u->irq) u->irq(u->irq_opaque, level);
+    if (u->irq)
+        u->irq(u->irq_opaque, level);
 }
 
 static void ep_irq(struct hpusb_core *u, unsigned ep)
 {
-    if (ep < HPUSB_EP_COUNT) u->ep_int |= (uint8_t)(1u << ep);
+    if (ep < HPUSB_EP_COUNT)
+        u->ep_int |= (uint8_t)(1u << ep);
     if (hpusb_trace_events())
-        fprintf(stderr,
-                "hpusb:event ep_irq ep=%u pending=0x%02x enable=0x%02x irq=%d\n",
-                ep, u->ep_int, u->ep_int_en, u->irq_level);
+        fprintf(stderr, "hpusb:event ep_irq ep=%u pending=0x%02x enable=0x%02x irq=%d\n", ep,
+                u->ep_int, u->ep_int_en, u->irq_level);
     update_irq(u);
 }
 
@@ -63,7 +65,8 @@ void hpusb_init(struct hpusb_core *u, hpusb_irq_fn irq, void *irq_opaque)
     u->irq_opaque = irq_opaque;
     u->enum_state = HPUSB_ENUM_WAIT_READY;
     u->ep[0].maxp = 1; /* 8 bytes */
-    for (unsigned i = 1; i < HPUSB_EP_COUNT; ++i) u->ep[i].maxp = 8; /* 64 */
+    for (unsigned i = 1; i < HPUSB_EP_COUNT; ++i)
+        u->ep[i].maxp = 8; /* 64 */
 }
 
 void hpusb_set_stream(struct hpusb_core *u, hpusb_stream_read_fn read_fn,
@@ -83,7 +86,8 @@ void hpusb_reset_device(struct hpusb_core *u)
     void *stream_opaque = u->stream_opaque;
     int connected = u->connected;
 
-    if (u->irq_level && irq) irq(irq_opaque, 0);
+    if (u->irq_level && irq)
+        irq(irq_opaque, 0);
     hpusb_init(u, irq, irq_opaque);
     hpusb_set_stream(u, read_fn, write_fn, stream_opaque);
     hpusb_set_connected(u, connected);
@@ -92,7 +96,8 @@ void hpusb_reset_device(struct hpusb_core *u)
 void hpusb_set_connected(struct hpusb_core *u, int connected)
 {
     connected = connected != 0;
-    if (connected == u->connected) return;
+    if (connected == u->connected)
+        return;
     u->connected = connected;
     u->enum_state = HPUSB_ENUM_WAIT_READY;
     u->enum_wait_ticks = 0;
@@ -116,8 +121,10 @@ void hpusb_set_connected(struct hpusb_core *u, int connected)
 
 static unsigned fifo_ep(uint32_t offset)
 {
-    if (offset < HPUSB_FIFO0 || offset > HPUSB_FIFO4) return HPUSB_EP_COUNT;
-    if (((offset - HPUSB_FIFO0) & 3u) != 0u) return HPUSB_EP_COUNT;
+    if (offset < HPUSB_FIFO0 || offset > HPUSB_FIFO4)
+        return HPUSB_EP_COUNT;
+    if (((offset - HPUSB_FIFO0) & 3u) != 0u)
+        return HPUSB_EP_COUNT;
     return (unsigned)((offset - HPUSB_FIFO0) >> 2);
 }
 
@@ -129,7 +136,8 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
     if (fep < HPUSB_EP_COUNT) {
         struct hpusb_ep *f = &u->ep[fep];
         uint8_t value;
-        if (f->out_pos >= f->out_count) return 0;
+        if (f->out_pos >= f->out_count)
+            return 0;
         {
             size_t before = f->out_pos;
             value = f->out_fifo[f->out_pos++];
@@ -138,8 +146,7 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
                 fprintf(stderr,
                         "hpusb:event guest_read ep=%u pos=%zu/%zu value=0x%02x "
                         "csr1=0x%02x csr2=0x%02x\n",
-                        fep, f->out_pos, f->out_count, value,
-                        f->out_csr1, f->out_csr2);
+                        fep, f->out_pos, f->out_count, value, f->out_csr1, f->out_csr2);
         }
         /*
          * S3C2410 OUT_CSR2.AUTO_CLR retires OUT_PKT_RDY after the MCU
@@ -155,49 +162,56 @@ uint32_t hpusb_read(struct hpusb_core *u, uint32_t offset)
     }
 
     switch (offset) {
-    case HPUSB_FUNC_ADDR: return u->func_addr;
-    case HPUSB_PWR: return u->pwr;
+    case HPUSB_FUNC_ADDR:
+        return u->func_addr;
+    case HPUSB_PWR:
+        return u->pwr;
     case HPUSB_EP_INT:
         if (hpusb_trace_events())
-            fprintf(stderr,
-                    "hpusb:%s ep_int_read value=0x%02x enable=0x%02x irq=%d enum=%u\n",
-                    hpusb_trace_target(), u->ep_int, u->ep_int_en,
-                    u->irq_level, (unsigned)u->enum_state);
+            fprintf(stderr, "hpusb:%s ep_int_read value=0x%02x enable=0x%02x irq=%d enum=%u\n",
+                    hpusb_trace_target(), u->ep_int, u->ep_int_en, u->irq_level,
+                    (unsigned)u->enum_state);
         return u->ep_int;
-    case HPUSB_USB_INT: return u->usb_int;
-    case HPUSB_EP_INT_EN: return u->ep_int_en;
-    case HPUSB_USB_INT_EN: return u->usb_int_en;
-    case HPUSB_FRAME1: return (uint8_t)(u->frame & 0xffu);
-    case HPUSB_FRAME2: return (uint8_t)(u->frame >> 8);
-    case HPUSB_INDEX: return u->index;
+    case HPUSB_USB_INT:
+        return u->usb_int;
+    case HPUSB_EP_INT_EN:
+        return u->ep_int_en;
+    case HPUSB_USB_INT_EN:
+        return u->usb_int_en;
+    case HPUSB_FRAME1:
+        return (uint8_t)(u->frame & 0xffu);
+    case HPUSB_FRAME2:
+        return (uint8_t)(u->frame >> 8);
+    case HPUSB_INDEX:
+        return u->index;
     case HPUSB_MAXP0:
-    case HPUSB_MAXP_ALT: return ep->maxp;
-    case HPUSB_CSR1: return idx == 0 ? ep->in_csr1 : ep->in_csr1;
-    case HPUSB_CSR2: return ep->in_csr2;
+    case HPUSB_MAXP_ALT:
+        return ep->maxp;
+    case HPUSB_CSR1:
+        return idx == 0 ? ep->in_csr1 : ep->in_csr1;
+    case HPUSB_CSR2:
+        return ep->in_csr2;
     case HPUSB_OUT_CSR1:
         if (hpusb_trace_events() && idx == u->bulk_out_ep)
             fprintf(stderr,
                     "hpusb:%s out_csr1_read ep=%u value=0x%02x "
                     "count=%zu pos=%zu\n",
-                    hpusb_trace_target(), idx, ep->out_csr1,
-                    ep->out_count, ep->out_pos);
+                    hpusb_trace_target(), idx, ep->out_csr1, ep->out_count, ep->out_pos);
         return ep->out_csr1;
-    case HPUSB_OUT_CSR2: return ep->out_csr2;
+    case HPUSB_OUT_CSR2:
+        return ep->out_csr2;
     case HPUSB_OUT_CNT1:
         if (hpusb_trace_events() && idx == u->bulk_out_ep)
-            fprintf(stderr,
-                    "hpusb:%s out_cnt1_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
-                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos,
-                    ep->out_csr1);
+            fprintf(stderr, "hpusb:%s out_cnt1_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
+                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos, ep->out_csr1);
         return (uint8_t)((ep->out_count - ep->out_pos) & 0xffu);
     case HPUSB_OUT_CNT2:
         if (hpusb_trace_events() && idx == u->bulk_out_ep)
-            fprintf(stderr,
-                    "hpusb:%s out_cnt2_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
-                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos,
-                    ep->out_csr1);
+            fprintf(stderr, "hpusb:%s out_cnt2_read ep=%u count=%zu pos=%zu csr1=0x%02x\n",
+                    hpusb_trace_target(), idx, ep->out_count, ep->out_pos, ep->out_csr1);
         return (uint8_t)(((ep->out_count - ep->out_pos) >> 8) & 0xffu);
-    default: return 0;
+    default:
+        return 0;
     }
 }
 
@@ -208,21 +222,32 @@ static void write_ep0_csr(struct hpusb_core *u, uint8_t data)
         ep->in_csr1 &= (uint8_t)~HPUSB_EP0_OPKRDY;
         ep->out_count = ep->out_pos = 0;
     }
-    if (data & HPUSB_EP0_IPKRDY) ep->in_csr1 |= HPUSB_EP0_IPKRDY;
-    if (data & HPUSB_EP0_SENDSTL) ep->in_csr1 |= HPUSB_EP0_SENDSTL;
-    if (data & HPUSB_EP0_SSE) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SE;
-    if ((data & HPUSB_EP0_SENTSTL) == 0) ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SENTSTL;
-    if (data & HPUSB_EP0_DE) u->ctrl_data_end = 1;
+    if (data & HPUSB_EP0_IPKRDY)
+        ep->in_csr1 |= HPUSB_EP0_IPKRDY;
+    if (data & HPUSB_EP0_SENDSTL)
+        ep->in_csr1 |= HPUSB_EP0_SENDSTL;
+    if (data & HPUSB_EP0_SSE)
+        ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SE;
+    if ((data & HPUSB_EP0_SENTSTL) == 0)
+        ep->in_csr1 &= (uint8_t)~HPUSB_EP0_SENTSTL;
+    if (data & HPUSB_EP0_DE)
+        u->ctrl_data_end = 1;
 }
 
 static void write_in_csr1(struct hpusb_ep *ep, uint8_t data)
 {
-    if (data & HPUSB_IN_FFLUSH) ep->in_count = 0;
-    if (data & HPUSB_IN_PKTRDY) ep->in_csr1 |= HPUSB_IN_PKTRDY;
-    if (data & HPUSB_IN_SENDSTL) ep->in_csr1 |= HPUSB_IN_SENDSTL;
-    else ep->in_csr1 &= (uint8_t)~HPUSB_IN_SENDSTL;
-    if ((data & HPUSB_IN_SENTSTL) == 0) ep->in_csr1 &= (uint8_t)~HPUSB_IN_SENTSTL;
-    if ((data & HPUSB_IN_UNDRUN) == 0) ep->in_csr1 &= (uint8_t)~HPUSB_IN_UNDRUN;
+    if (data & HPUSB_IN_FFLUSH)
+        ep->in_count = 0;
+    if (data & HPUSB_IN_PKTRDY)
+        ep->in_csr1 |= HPUSB_IN_PKTRDY;
+    if (data & HPUSB_IN_SENDSTL)
+        ep->in_csr1 |= HPUSB_IN_SENDSTL;
+    else
+        ep->in_csr1 &= (uint8_t)~HPUSB_IN_SENDSTL;
+    if ((data & HPUSB_IN_SENTSTL) == 0)
+        ep->in_csr1 &= (uint8_t)~HPUSB_IN_SENTSTL;
+    if ((data & HPUSB_IN_UNDRUN) == 0)
+        ep->in_csr1 &= (uint8_t)~HPUSB_IN_UNDRUN;
 }
 
 static void write_out_csr1(struct hpusb_ep *ep, uint8_t data)
@@ -235,10 +260,14 @@ static void write_out_csr1(struct hpusb_ep *ep, uint8_t data)
         ep->out_count = ep->out_pos = 0;
         ep->out_csr1 &= (uint8_t)~HPUSB_OUT_PKTRDY;
     }
-    if (data & HPUSB_OUT_SENDSTL) ep->out_csr1 |= HPUSB_OUT_SENDSTL;
-    else ep->out_csr1 &= (uint8_t)~HPUSB_OUT_SENDSTL;
-    if ((data & HPUSB_OUT_SENTSTL) == 0) ep->out_csr1 &= (uint8_t)~HPUSB_OUT_SENTSTL;
-    if ((data & HPUSB_OUT_OVRRUN) == 0) ep->out_csr1 &= (uint8_t)~HPUSB_OUT_OVRRUN;
+    if (data & HPUSB_OUT_SENDSTL)
+        ep->out_csr1 |= HPUSB_OUT_SENDSTL;
+    else
+        ep->out_csr1 &= (uint8_t)~HPUSB_OUT_SENDSTL;
+    if ((data & HPUSB_OUT_SENTSTL) == 0)
+        ep->out_csr1 &= (uint8_t)~HPUSB_OUT_SENTSTL;
+    if ((data & HPUSB_OUT_OVRRUN) == 0)
+        ep->out_csr1 &= (uint8_t)~HPUSB_OUT_OVRRUN;
 }
 
 void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
@@ -249,16 +278,16 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     unsigned fep = fifo_ep(offset);
     if (fep < HPUSB_EP_COUNT) {
         struct hpusb_ep *f = &u->ep[fep];
-        if (fep != 0u && (f->in_csr1 & HPUSB_IN_PKTRDY)) return;
-        if (f->in_count < HPUSB_FIFO_CAP) f->in_fifo[f->in_count++] = data;
+        if (fep != 0u && (f->in_csr1 & HPUSB_IN_PKTRDY))
+            return;
+        if (f->in_count < HPUSB_FIFO_CAP)
+            f->in_fifo[f->in_count++] = data;
         /*
          * With IN_CSR2.AUTO_SET the controller publishes a full MAXP
          * packet without requiring firmware to set IN_PKT_RDY explicitly.
          * Short packets still require the ordinary CSR1 write.
          */
-        if (fep != 0u &&
-            (f->in_csr2 & HPUSB_IN_AUTOSET) &&
-            f->in_count >= ep_maxpacket(u, fep))
+        if (fep != 0u && (f->in_csr2 & HPUSB_IN_AUTOSET) && f->in_count >= ep_maxpacket(u, fep))
             f->in_csr1 |= HPUSB_IN_PKTRDY;
         return;
     }
@@ -266,9 +295,8 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     switch (offset) {
     case HPUSB_FUNC_ADDR:
         if (hpusb_trace_events())
-            fprintf(stderr,
-                    "hpusb:%s func_addr write=0x%02x enum=%u\n",
-                    hpusb_trace_target(), data, (unsigned)u->enum_state);
+            fprintf(stderr, "hpusb:%s func_addr write=0x%02x enum=%u\n", hpusb_trace_target(), data,
+                    (unsigned)u->enum_state);
         u->func_addr = data;
         break;
     case HPUSB_PWR:
@@ -285,15 +313,15 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         break;
     case HPUSB_USB_INT:
         u->usb_int &= (uint8_t)~data;
-        if ((data & HPUSB_USBINT_RESET) != 0u) u->pwr &= (uint8_t)~0x08u;
+        if ((data & HPUSB_USBINT_RESET) != 0u)
+            u->pwr &= (uint8_t)~0x08u;
         update_irq(u);
         break;
     case HPUSB_EP_INT_EN:
         u->ep_int_en = data & 0x1fu;
         if (hpusb_trace_events())
-            fprintf(stderr,
-                    "hpusb:event ep_int_en=0x%02x pending=0x%02x\n",
-                    u->ep_int_en, u->ep_int);
+            fprintf(stderr, "hpusb:event ep_int_en=0x%02x pending=0x%02x\n", u->ep_int_en,
+                    u->ep_int);
         update_irq(u);
         break;
     case HPUSB_USB_INT_EN:
@@ -302,10 +330,8 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         break;
     case HPUSB_INDEX:
         if (hpusb_trace_events() && u->index != (data & 0x07u))
-            fprintf(stderr,
-                    "hpusb:%s index %u->%u enum=%u\n",
-                    hpusb_trace_target(), u->index, data & 0x07u,
-                    (unsigned)u->enum_state);
+            fprintf(stderr, "hpusb:%s index %u->%u enum=%u\n", hpusb_trace_target(), u->index,
+                    data & 0x07u, (unsigned)u->enum_state);
         u->index = data & 0x07u;
         break;
     case HPUSB_MAXP0:
@@ -313,7 +339,8 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
         ep->maxp = data & 0x0fu;
         break;
     case HPUSB_CSR1:
-        if (idx == 0) write_ep0_csr(u, data);
+        if (idx == 0)
+            write_ep0_csr(u, data);
         else {
             write_in_csr1(ep, data);
             if (hpusb_trace_events() && idx == u->bulk_in_ep)
@@ -326,9 +353,7 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     case HPUSB_CSR2:
         ep->in_csr2 = data;
         if (hpusb_trace_events() && idx != 0u)
-            fprintf(stderr,
-                    "hpusb:event in_csr2 ep=%u value=0x%02x\n",
-                    idx, data);
+            fprintf(stderr, "hpusb:event in_csr2 ep=%u value=0x%02x\n", idx, data);
         break;
     case HPUSB_OUT_CSR1:
         write_out_csr1(ep, data);
@@ -341,9 +366,7 @@ void hpusb_write(struct hpusb_core *u, uint32_t offset, uint32_t data32)
     case HPUSB_OUT_CSR2:
         ep->out_csr2 = data;
         if (hpusb_trace_events() && idx != 0u)
-            fprintf(stderr,
-                    "hpusb:event out_csr2 ep=%u value=0x%02x\n",
-                    idx, data);
+            fprintf(stderr, "hpusb:event out_csr2 ep=%u value=0x%02x\n", idx, data);
         break;
     default:
         break;
@@ -364,21 +387,24 @@ static void bus_reset(struct hpusb_core *u)
     update_irq(u);
 }
 
-static void start_control(struct hpusb_core *u, uint8_t bm, uint8_t req,
-                          uint16_t value, uint16_t index, uint16_t length)
+static void start_control(struct hpusb_core *u, uint8_t bm, uint8_t req, uint16_t value,
+                          uint16_t index, uint16_t length)
 {
     struct hpusb_ep *ep = &u->ep[0];
     if (hpusb_trace_events())
         fprintf(stderr,
                 "hpusb:%s setup bm=0x%02x req=%u value=0x%04x "
                 "index=0x%04x len=%u enum=%u\n",
-                hpusb_trace_target(), bm, req, value, index, length,
-                (unsigned)u->enum_state);
+                hpusb_trace_target(), bm, req, value, index, length, (unsigned)u->enum_state);
     uint8_t setup[8] = {
-        bm, req,
-        (uint8_t)value, (uint8_t)(value >> 8),
-        (uint8_t)index, (uint8_t)(index >> 8),
-        (uint8_t)length, (uint8_t)(length >> 8),
+        bm,
+        req,
+        (uint8_t)value,
+        (uint8_t)(value >> 8),
+        (uint8_t)index,
+        (uint8_t)(index >> 8),
+        (uint8_t)length,
+        (uint8_t)(length >> 8),
     };
     clear_ep_fifos(ep);
     memcpy(ep->out_fifo, setup, sizeof(setup));
@@ -399,7 +425,8 @@ static void start_control(struct hpusb_core *u, uint8_t bm, uint8_t req,
 static int progress_control(struct hpusb_core *u)
 {
     struct hpusb_ep *ep = &u->ep[0];
-    if (!u->ctrl_active) return 1;
+    if (!u->ctrl_active)
+        return 1;
     if (ep->in_csr1 & HPUSB_EP0_SENDSTL) {
         u->ctrl_active = 0;
         return -1;
@@ -420,14 +447,14 @@ static int progress_control(struct hpusb_core *u)
         if (ep->in_csr1 & HPUSB_EP0_IPKRDY) {
             size_t room = HPUSB_CTRL_CAP - u->ctrl_response_len;
             size_t take = ep->in_count < room ? ep->in_count : room;
-            if (take) memcpy(u->ctrl_response + u->ctrl_response_len, ep->in_fifo, take);
+            if (take)
+                memcpy(u->ctrl_response + u->ctrl_response_len, ep->in_fifo, take);
             u->ctrl_response_len += take;
             u->ctrl_last_packet = ep->in_count;
             ep->in_count = 0;
             ep->in_csr1 &= (uint8_t)~HPUSB_EP0_IPKRDY;
             ep_irq(u, 0); /* host ACK; device may queue the next packet */
-            if (u->ctrl_data_end ||
-                u->ctrl_last_packet < ep_maxpacket(u, 0)) {
+            if (u->ctrl_data_end || u->ctrl_last_packet < ep_maxpacket(u, 0)) {
                 u->ctrl_active = 0;
                 u->ctrl_data_end = 0;
                 return 1;
@@ -468,14 +495,21 @@ static int parse_config(struct hpusb_core *u)
     while (p + 2 <= u->ctrl_response_len) {
         uint8_t len = u->ctrl_response[p];
         uint8_t type = u->ctrl_response[p + 1];
-        if (len < 2 || p + len > u->ctrl_response_len) break;
-        if (type == 2 && len >= 6) u->configuration_value = u->ctrl_response[p + 5];
+        if (len < 2 || p + len > u->ctrl_response_len)
+            break;
+        if (type == 2 && len >= 6)
+            u->configuration_value = u->ctrl_response[p + 5];
         if (type == 5 && len >= 7 && (u->ctrl_response[p + 3] & 3u) == 2u) {
             uint8_t addr = u->ctrl_response[p + 2];
             uint8_t ep = addr & 0x0fu;
             if (ep < HPUSB_EP_COUNT) {
-                if (addr & 0x80u) { if (!u->bulk_in_ep) u->bulk_in_ep = ep; }
-                else { if (!u->bulk_out_ep) u->bulk_out_ep = ep; }
+                if (addr & 0x80u) {
+                    if (!u->bulk_in_ep)
+                        u->bulk_in_ep = ep;
+                } else {
+                    if (!u->bulk_out_ep)
+                        u->bulk_out_ep = ep;
+                }
             }
         }
         p += len;
@@ -504,7 +538,8 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_GET_DEVICE:
         r = progress_control(u);
-        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
+        if (r < 0)
+            u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0 && u->ctrl_response_len >= 8) {
             start_control(u, 0x00, 5, 1, 0, 0);
             u->enum_state = HPUSB_ENUM_SET_ADDRESS;
@@ -512,7 +547,8 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_SET_ADDRESS:
         r = progress_control(u);
-        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
+        if (r < 0)
+            u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0) {
             start_control(u, 0x80, 6, 0x0200, 0, 9);
             u->enum_state = HPUSB_ENUM_GET_CONFIG_HEAD;
@@ -520,10 +556,11 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_GET_CONFIG_HEAD:
         r = progress_control(u);
-        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
+        if (r < 0)
+            u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0 && u->ctrl_response_len >= 9) {
-            u->config_total_length = (uint16_t)u->ctrl_response[2] |
-                                     ((uint16_t)u->ctrl_response[3] << 8);
+            u->config_total_length =
+                (uint16_t)u->ctrl_response[2] | ((uint16_t)u->ctrl_response[3] << 8);
             if (u->config_total_length < 9 || u->config_total_length > HPUSB_CTRL_CAP) {
                 u->enum_state = HPUSB_ENUM_FAILED;
             } else {
@@ -534,9 +571,11 @@ static void enum_tick(struct hpusb_core *u)
         break;
     case HPUSB_ENUM_GET_CONFIG_FULL:
         r = progress_control(u);
-        if (r < 0) u->enum_state = HPUSB_ENUM_FAILED;
+        if (r < 0)
+            u->enum_state = HPUSB_ENUM_FAILED;
         else if (r > 0) {
-            if (!parse_config(u)) u->enum_state = HPUSB_ENUM_FAILED;
+            if (!parse_config(u))
+                u->enum_state = HPUSB_ENUM_FAILED;
             else {
                 start_control(u, 0x00, 9, u->configuration_value, 0, 0);
                 u->enum_state = HPUSB_ENUM_SET_CONFIG;
@@ -561,10 +600,8 @@ static void enum_tick(struct hpusb_core *u)
         if (r < 0) {
             u->enum_state = HPUSB_ENUM_FAILED;
         } else if (r > 0) {
-            unsigned value =
-                u->ctrl_response_len != 0u ? u->ctrl_response[0] : 0xffu;
-            fprintf(stderr,
-                    "hpusb:%s get_configuration len=%zu value=0x%02x\n",
+            unsigned value = u->ctrl_response_len != 0u ? u->ctrl_response[0] : 0xffu;
+            fprintf(stderr, "hpusb:%s get_configuration len=%zu value=0x%02x\n",
                     hpusb_trace_target(), u->ctrl_response_len, value);
             u->enum_state = HPUSB_ENUM_STREAM;
         }
@@ -579,18 +616,19 @@ static void stream_tick(struct hpusb_core *u)
 {
     struct hpusb_ep *in;
     struct hpusb_ep *out;
-    if (!u->stream_read || !u->stream_write ||
-        !u->bulk_in_ep || !u->bulk_out_ep) return;
+    if (!u->stream_read || !u->stream_write || !u->bulk_in_ep || !u->bulk_out_ep)
+        return;
     in = &u->ep[u->bulk_in_ep];
     out = &u->ep[u->bulk_out_ep];
 
     if (in->in_csr1 & HPUSB_IN_PKTRDY) {
         int n;
-        if (u->bridge_in_pos > in->in_count) u->bridge_in_pos = 0;
-        n = u->stream_write(u->stream_opaque,
-                            in->in_fifo + u->bridge_in_pos,
+        if (u->bridge_in_pos > in->in_count)
+            u->bridge_in_pos = 0;
+        n = u->stream_write(u->stream_opaque, in->in_fifo + u->bridge_in_pos,
                             in->in_count - u->bridge_in_pos);
-        if (n > 0) u->bridge_in_pos += (size_t)n;
+        if (n > 0)
+            u->bridge_in_pos += (size_t)n;
         if (u->bridge_in_pos >= in->in_count) {
             in->in_count = 0;
             u->bridge_in_pos = 0;
@@ -604,13 +642,13 @@ static void stream_tick(struct hpusb_core *u)
         size_t cap = ep_maxpacket(u, u->bulk_out_ep);
         int n = u->stream_read(u->stream_opaque, buffer, cap);
         if (n > 0) {
-            if ((size_t)n > cap) n = (int)cap;
+            if ((size_t)n > cap)
+                n = (int)cap;
             if (hpusb_trace_events())
                 fprintf(stderr,
                         "hpusb:event host_to_guest ep=%u n=%d csr1=0x%02x "
                         "csr2=0x%02x pending=0x%02x enable=0x%02x\n",
-                        u->bulk_out_ep, n, out->out_csr1, out->out_csr2,
-                        u->ep_int, u->ep_int_en);
+                        u->bulk_out_ep, n, out->out_csr1, out->out_csr2, u->ep_int, u->ep_int_en);
             memcpy(out->out_fifo, buffer, (size_t)n);
             out->out_count = (size_t)n;
             out->out_pos = 0;
@@ -622,15 +660,19 @@ static void stream_tick(struct hpusb_core *u)
 
 void hpusb_sof(struct hpusb_core *u)
 {
-    if (!u->connected) return;
+    if (!u->connected)
+        return;
     u->frame = (uint16_t)((u->frame + 1u) & 0x07ffu);
 }
 
 void hpusb_tick(struct hpusb_core *u)
 {
-    if (!u->connected) return;
-    if (u->enum_state != HPUSB_ENUM_STREAM) enum_tick(u);
-    else stream_tick(u);
+    if (!u->connected)
+        return;
+    if (u->enum_state != HPUSB_ENUM_STREAM)
+        enum_tick(u);
+    else
+        stream_tick(u);
 }
 
 int hpusb_is_streaming(const struct hpusb_core *u)

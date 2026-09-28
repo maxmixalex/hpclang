@@ -90,9 +90,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
 
 DWORD get_fattime(void)
 {
-    return ((DWORD)(2026u - 1980u) << 25) |
-           ((DWORD)1u << 21) |
-           ((DWORD)1u << 16);
+    return ((DWORD)(2026u - 1980u) << 25) | ((DWORD)1u << 21) | ((DWORD)1u << 16);
 }
 
 int main(void)

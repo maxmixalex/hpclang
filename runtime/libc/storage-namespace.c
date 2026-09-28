@@ -16,28 +16,27 @@
 #include "storage-namespace-lease.h"
 #include "storage-namespace.h"
 
-enum {
+enum
+{
     KOS_SYSCALL_RESET_SD = 19u
 };
 
-uint32_t hpclang_kos_swi3(
-    uint32_t index,
-    uint32_t arg1,
-    uint32_t arg2,
-    uint32_t arg3);
+uint32_t hpclang_kos_swi3(uint32_t index, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 #define FAT_ATTRIBUTE_VOLUME UINT8_C(0x08)
 
-struct hpclang_stream_directory {
+struct hpclang_stream_directory
+{
     DIR fatfs;
     uint32_t magic;
 };
 
 #define DIRECTORY_MAGIC UINT32_C(0x48445031)
-#define DIRECT_FD_BASE  UINT32_C(0x4000)
+#define DIRECT_FD_BASE UINT32_C(0x4000)
 #define DIRECT_FD_SLOTS 8u
 
-struct direct_fd_state {
+struct direct_fd_state
+{
     FIL file;
     uint32_t position;
     uint8_t used;
@@ -128,8 +127,7 @@ static int lease_stock_idle(void *context)
 static int lease_direct_acquire(void *context)
 {
     (void)context;
-    return hpclang_hp4950_fatfs_controller_acquire(
-        namespace_media_read_only != 0u);
+    return hpclang_hp4950_fatfs_controller_acquire(namespace_media_read_only != 0u);
 }
 
 static int lease_direct_mount(void *context)
@@ -231,18 +229,15 @@ static int namespace_acquire(void)
 
 int hpclang_namespace_direct_active(void)
 {
-    return namespace_ready &&
-           namespace_lease.state == HPCLANG_NAMESPACE_DIRECT;
+    return namespace_ready && namespace_lease.state == HPCLANG_NAMESPACE_DIRECT;
 }
 
 static struct direct_fd_state *direct_fd_from_number(int fd)
 {
-    if (fd < (int)DIRECT_FD_BASE ||
-        fd >= (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS))
+    if (fd < (int)DIRECT_FD_BASE || fd >= (int)(DIRECT_FD_BASE + DIRECT_FD_SLOTS))
         return NULL;
 
-    struct direct_fd_state *slot =
-        &direct_fds[(uint32_t)fd - DIRECT_FD_BASE];
+    struct direct_fd_state *slot = &direct_fds[(uint32_t)fd - DIRECT_FD_BASE];
     return slot->used ? slot : NULL;
 }
 
@@ -410,9 +405,7 @@ ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count)
     if (count == 0u)
         return 0;
 
-    uint32_t target = slot->append
-        ? (uint32_t)f_size(&slot->file)
-        : slot->position;
+    uint32_t target = slot->append ? (uint32_t)f_size(&slot->file) : slot->position;
     FRESULT fr = f_lseek(&slot->file, target);
     if (fr != FR_OK)
         return set_fatfs_errno(fr);
@@ -466,7 +459,7 @@ off_t hpclang_namespace_lseek(int fd, off_t offset, int whence)
 
 int hpclang_namespace_ftruncate(int fd, off_t length)
 {
-    static const BYTE zeroes[512] = { 0 };
+    static const BYTE zeroes[512] = {0};
 
     struct direct_fd_state *slot = direct_fd_from_number(fd);
     if (slot == NULL) {
@@ -503,9 +496,7 @@ int hpclang_namespace_ftruncate(int fd, off_t length)
 
         FSIZE_t remaining = target - original_size;
         while (remaining != 0u) {
-            UINT chunk = remaining > sizeof(zeroes)
-                ? (UINT)sizeof(zeroes)
-                : (UINT)remaining;
+            UINT chunk = remaining > sizeof(zeroes) ? (UINT)sizeof(zeroes) : (UINT)remaining;
             UINT written = 0u;
             fr = f_write(&slot->file, zeroes, chunk, &written);
             if (fr != FR_OK || written != chunk) {
@@ -531,11 +522,7 @@ int hpclang_namespace_ftruncate(int fd, off_t length)
     return 0;
 }
 
-
-static void export_fat_time(
-    struct hpclang_stream_civil_datetime *dst,
-    WORD date,
-    WORD time)
+static void export_fat_time(struct hpclang_stream_civil_datetime *dst, WORD date, WORD time)
 {
     memset(dst, 0, sizeof(*dst));
     dst->year = (uint16_t)(1980u + ((date >> 9) & 0x7fu));
@@ -569,9 +556,7 @@ static uint32_t export_type(BYTE attributes)
     return HPCLANG_STREAM_PATH_TYPE_FILE;
 }
 
-static void export_info(
-    struct hpclang_stream_path_info *dst,
-    const FILINFO *src)
+static void export_info(struct hpclang_stream_path_info *dst, const FILINFO *src)
 {
     memset(dst, 0, sizeof(*dst));
     dst->size = sizeof(*dst);
@@ -590,9 +575,7 @@ static int one_shot_begin(const char *path)
     return namespace_acquire();
 }
 
-int hpclang_namespace_path_query(
-    const char *path,
-    struct hpclang_stream_path_info *info)
+int hpclang_namespace_path_query(const char *path, struct hpclang_stream_path_info *info)
 {
     if (info == NULL) {
         errno = EFAULT;
@@ -620,8 +603,7 @@ int hpclang_namespace_path_query(
     return result;
 }
 
-int hpclang_namespace_storage_query(
-    struct hpclang_stream_storage_info *info)
+int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
 {
     if (info == NULL) {
         errno = EFAULT;
@@ -648,8 +630,7 @@ int hpclang_namespace_storage_query(
         errno = EIO;
         result = -1;
     } else {
-        info->free_bytes =
-            (uint64_t)free_clusters * (uint64_t)fs->csize * UINT64_C(512);
+        info->free_bytes = (uint64_t)free_clusters * (uint64_t)fs->csize * UINT64_C(512);
         info->flags |= HPCLANG_STREAM_STORAGE_FREE_BYTES_VALID;
 
         /*
@@ -658,14 +639,10 @@ int hpclang_namespace_storage_query(
          * count after mount. Reconstruct the addressable volume sectors from
          * those fields so a partitioned card does not inflate FSGetVolumeSize.
          */
-        if (fs->n_fatent >= 2u && fs->csize != 0u &&
-            fs->database >= fs->volbase) {
-            uint64_t metadata_sectors =
-                (uint64_t)(fs->database - fs->volbase);
-            uint64_t data_sectors =
-                (uint64_t)(fs->n_fatent - 2u) * (uint64_t)fs->csize;
-            info->capacity_bytes =
-                (metadata_sectors + data_sectors) * UINT64_C(512);
+        if (fs->n_fatent >= 2u && fs->csize != 0u && fs->database >= fs->volbase) {
+            uint64_t metadata_sectors = (uint64_t)(fs->database - fs->volbase);
+            uint64_t data_sectors = (uint64_t)(fs->n_fatent - 2u) * (uint64_t)fs->csize;
+            info->capacity_bytes = (metadata_sectors + data_sectors) * UINT64_C(512);
             info->flags |= HPCLANG_STREAM_STORAGE_CAPACITY_BYTES_VALID;
         }
     }
@@ -731,16 +708,14 @@ int hpclang_namespace_rename(const char *old_path, const char *new_path)
     return result;
 }
 
-struct hpclang_stream_directory *hpclang_stream_directory_open(
-    const char *path)
+struct hpclang_stream_directory *hpclang_stream_directory_open(const char *path)
 {
     if (!path_valid(path))
         return NULL;
     if (namespace_acquire() != 0)
         return NULL;
 
-    struct hpclang_stream_directory *directory =
-        malloc(sizeof(*directory));
+    struct hpclang_stream_directory *directory = malloc(sizeof(*directory));
     if (directory == NULL) {
         errno = ENOMEM;
         return NULL;
@@ -758,9 +733,8 @@ struct hpclang_stream_directory *hpclang_stream_directory_open(
     return directory;
 }
 
-int hpclang_stream_directory_read(
-    struct hpclang_stream_directory *directory,
-    struct hpclang_stream_directory_entry *entry)
+int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
+                                  struct hpclang_stream_directory_entry *entry)
 {
     if (directory == NULL || entry == NULL) {
         errno = EFAULT;
@@ -796,8 +770,7 @@ int hpclang_stream_directory_read(
     return 1;
 }
 
-int hpclang_stream_directory_close(
-    struct hpclang_stream_directory *directory)
+int hpclang_stream_directory_close(struct hpclang_stream_directory *directory)
 {
     if (directory == NULL) {
         errno = EFAULT;
@@ -817,8 +790,7 @@ int hpclang_stream_directory_close(
 
 void hpclang_storage_shutdown(void)
 {
-    if (!namespace_ready ||
-        namespace_lease.state != HPCLANG_NAMESPACE_DIRECT)
+    if (!namespace_ready || namespace_lease.state != HPCLANG_NAMESPACE_DIRECT)
         return;
 
     for (uint32_t i = 0u; i < DIRECT_FD_SLOTS; ++i) {

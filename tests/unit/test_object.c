@@ -12,7 +12,8 @@
 
 #include "saturn-view.h"
 
-enum {
+enum
+{
     TEMPTOP = 0x806eeu,
     RSKTOP = 0x806f3u,
     DSKTOP = 0x806f8u,
@@ -54,25 +55,17 @@ const struct hpclang_device_info *hpclang_device_info(void)
     return &fake_device;
 }
 
-int hpclang_saturn_read_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t *value)
+int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *value)
 {
-    if (value == NULL ||
-        fake_boot.saturn_state == 0u ||
-        address.nibble >= SATURN_NIBBLES)
+    if (value == NULL || fake_boot.saturn_state == 0u || address.nibble >= SATURN_NIBBLES)
         return 0;
     *value = saturn[address.nibble];
     return 1;
 }
 
-int hpclang_saturn_write_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t value)
+int hpclang_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
 {
-    if (fake_boot.saturn_state == 0u ||
-        address.nibble >= SATURN_NIBBLES ||
-        value > 0x0fu)
+    if (fake_boot.saturn_state == 0u || address.nibble >= SATURN_NIBBLES || value > 0x0fu)
         return 0;
     saturn[address.nibble] = value;
     return 1;
@@ -80,9 +73,7 @@ int hpclang_saturn_write_nibble(
 
 static void enable_mutation(void)
 {
-    fake_boot.platform_cookie =
-        (uintptr_t)&fake_bounds |
-        HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    fake_boot.platform_cookie = (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
 }
 
 static void put_word5(uint32_t at, uint32_t value)

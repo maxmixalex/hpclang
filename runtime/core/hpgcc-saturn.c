@@ -7,7 +7,8 @@
 #include <hpclang/object.h>
 #include <saturn.h>
 
-enum {
+enum
+{
     SAT_STACK_SCOPE_TOKEN = 0x48504331u
 };
 
@@ -79,10 +80,7 @@ char *sat_pick_str(int level, char *buf)
 
     size_t byte_count = 0u;
     if (hpclang_object_string_size(object, &byte_count) != 0 ||
-        hpclang_object_string_copy(
-            object,
-            (uint8_t *)buf,
-            byte_count) != 0) {
+        hpclang_object_string_copy(object, (uint8_t *)buf, byte_count) != 0) {
         hpclang_object_release(object);
         return NULL;
     }
@@ -102,8 +100,7 @@ char *sat_pick_str_alloc(int level)
         return NULL;
 
     size_t byte_count = 0u;
-    if (hpclang_object_string_size(object, &byte_count) != 0 ||
-        byte_count == SIZE_MAX) {
+    if (hpclang_object_string_size(object, &byte_count) != 0 || byte_count == SIZE_MAX) {
         hpclang_object_release(object);
         return NULL;
     }
@@ -113,10 +110,7 @@ char *sat_pick_str_alloc(int level)
         hpclang_object_release(object);
         return NULL;
     }
-    if (hpclang_object_string_copy(
-            object,
-            (uint8_t *)buf,
-            byte_count) != 0) {
+    if (hpclang_object_string_copy(object, (uint8_t *)buf, byte_count) != 0) {
         free(buf);
         hpclang_object_release(object);
         return NULL;
@@ -222,10 +216,7 @@ int sat_stack_push_string(const char *str)
         return 0;
 
     struct hpclang_object *object = NULL;
-    if (hpclang_object_create_string(
-            (const uint8_t *)str,
-            strlen(str),
-            &object) != 0) {
+    if (hpclang_object_create_string((const uint8_t *)str, strlen(str), &object) != 0) {
         return 0;
     }
 

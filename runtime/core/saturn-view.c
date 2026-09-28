@@ -20,14 +20,11 @@ static uintptr_t saturn_page_base(struct hpclang_saturn_address address)
      * not advertise a fake map. Each Read[] entry is the ARM byte base for one
      * 0x1000-nibble Saturn page.
      */
-    const uint32_t *read_map =
-        (const uint32_t *)(uintptr_t)boot->saturn_state;
+    const uint32_t *read_map = (const uint32_t *)(uintptr_t)boot->saturn_state;
     return (uintptr_t)read_map[address.nibble >> 12];
 }
 
-int hpclang_saturn_read_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t *value)
+int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *value)
 {
     if (value == NULL)
         return 0;
@@ -37,18 +34,13 @@ int hpclang_saturn_read_nibble(
         return 0;
 
     const volatile uint8_t *p =
-        (const volatile uint8_t *)(
-            base + ((address.nibble & UINT32_C(0x0fff)) >> 1));
+        (const volatile uint8_t *)(base + ((address.nibble & UINT32_C(0x0fff)) >> 1));
     uint8_t packed = *p;
-    *value = (address.nibble & 1u) != 0u
-        ? (uint8_t)(packed >> 4)
-        : (uint8_t)(packed & 0x0fu);
+    *value = (address.nibble & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
     return 1;
 }
 
-int hpclang_saturn_read_byte(
-    struct hpclang_saturn_address address,
-    uint8_t *value)
+int hpclang_saturn_read_byte(struct hpclang_saturn_address address, uint8_t *value)
 {
     if (value == NULL)
         return 0;
@@ -56,17 +48,14 @@ int hpclang_saturn_read_byte(
     uint8_t low = 0u;
     uint8_t high = 0u;
     if (!hpclang_saturn_read_nibble(address, &low) ||
-        !hpclang_saturn_read_nibble(
-            hpclang_saturn_address_add(address, 1u), &high))
+        !hpclang_saturn_read_nibble(hpclang_saturn_address_add(address, 1u), &high))
         return 0;
 
     *value = (uint8_t)(low | (uint8_t)(high << 4));
     return 1;
 }
 
-int hpclang_saturn_write_nibble(
-    struct hpclang_saturn_address address,
-    uint8_t value)
+int hpclang_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
 {
     if (value > 0x0fu)
         return 0;
@@ -75,9 +64,7 @@ int hpclang_saturn_write_nibble(
     if (base == 0u)
         return 0;
 
-    volatile uint8_t *p =
-        (volatile uint8_t *)(
-            base + ((address.nibble & UINT32_C(0x0fff)) >> 1));
+    volatile uint8_t *p = (volatile uint8_t *)(base + ((address.nibble & UINT32_C(0x0fff)) >> 1));
     uint8_t packed = *p;
     if ((address.nibble & 1u) != 0u)
         packed = (uint8_t)((packed & 0x0fu) | (uint8_t)(value << 4));

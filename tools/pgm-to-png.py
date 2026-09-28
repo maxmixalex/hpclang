@@ -44,17 +44,14 @@ def read_pgm(path: Path) -> tuple[int, int, bytes]:
 
     while pos < len(data) and data[pos] in b" \t\r\n":
         pos += 1
-    pixels = data[pos:pos + width * height]
+    pixels = data[pos : pos + width * height]
     if len(pixels) != width * height:
         raise ValueError("truncated PGM pixels")
     return width, height, pixels
 
 
 def write_png(path: Path, width: int, height: int, pixels: bytes) -> None:
-    scanlines = b"".join(
-        b"\x00" + pixels[y * width:(y + 1) * width]
-        for y in range(height)
-    )
+    scanlines = b"".join(b"\x00" + pixels[y * width : (y + 1) * width] for y in range(height))
     png = bytearray(b"\x89PNG\r\n\x1a\n")
     png += chunk(
         b"IHDR",

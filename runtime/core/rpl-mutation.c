@@ -4,7 +4,8 @@
 #include "rpl-mutation.h"
 #include "rpl-stack-view.h"
 
-enum {
+enum
+{
     RPL_TEMPTOP = 0x000806eeu,
     RPL_RSKTOP = 0x000806f3u,
     RPL_DSKTOP = 0x000806f8u,
@@ -23,22 +24,15 @@ static int checked_add(uint32_t a, uint32_t b, uint32_t *out)
 
 static int io_ready(const struct hpclang_rpl_mutation_io *io)
 {
-    return io != NULL &&
-           io->read_nibble != NULL &&
-           io->write_nibble != NULL &&
-           io->temp_limit > RPL_MAIN_FIRST &&
-           io->temp_limit <= RPL_MAIN_END &&
-           io->user_limit >= RPL_MAIN_FIRST &&
-           io->user_limit < RPL_MAIN_END &&
+    return io != NULL && io->read_nibble != NULL && io->write_nibble != NULL &&
+           io->temp_limit > RPL_MAIN_FIRST && io->temp_limit <= RPL_MAIN_END &&
+           io->user_limit >= RPL_MAIN_FIRST && io->user_limit < RPL_MAIN_END &&
            io->stack_reserve_nibbles <= RPL_MAIN_END - io->user_limit &&
            (io->stack_reserve_nibbles % 5u) == 0u;
 }
 
-static int read_word(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t address,
-    uint32_t nibbles,
-    uint32_t *value)
+static int read_word(const struct hpclang_rpl_mutation_io *io, uint32_t address, uint32_t nibbles,
+                     uint32_t *value)
 {
     if (!io_ready(io) || value == NULL || nibbles == 0u || nibbles > 8u ||
         address > RPL_MAIN_END - nibbles)
@@ -58,14 +52,10 @@ static int read_word(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-static int write_word(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t address,
-    uint32_t nibbles,
-    uint32_t value)
+static int write_word(const struct hpclang_rpl_mutation_io *io, uint32_t address, uint32_t nibbles,
+                      uint32_t value)
 {
-    if (!io_ready(io) || nibbles == 0u || nibbles > 8u ||
-        address > RPL_MAIN_END - nibbles)
+    if (!io_ready(io) || nibbles == 0u || nibbles > 8u || address > RPL_MAIN_END - nibbles)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
 
     for (uint32_t i = 0u; i < nibbles; ++i) {
@@ -76,18 +66,14 @@ static int write_word(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-static int range_mapped(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t address,
-    uint32_t nibbles)
+static int range_mapped(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                        uint32_t nibbles)
 {
     if (!io_ready(io))
         return 0;
     if (nibbles == 0u)
         return 1;
-    if (address < RPL_MAIN_FIRST ||
-        address >= RPL_MAIN_END ||
-        nibbles > RPL_MAIN_END - address)
+    if (address < RPL_MAIN_FIRST || address >= RPL_MAIN_END || nibbles > RPL_MAIN_END - address)
         return 0;
 
     uint32_t end = address + nibbles;
@@ -107,17 +93,13 @@ static int range_mapped(
     return io->read_nibble(io->context, end - 1u, &ignored);
 }
 
-static int move_nibbles(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t destination,
-    uint32_t source,
-    uint32_t nibbles)
+static int move_nibbles(const struct hpclang_rpl_mutation_io *io, uint32_t destination,
+                        uint32_t source, uint32_t nibbles)
 {
     if (nibbles == 0u || destination == source)
         return HPCLANG_RPL_MUTATION_OK;
 
-    if (!range_mapped(io, source, nibbles) ||
-        !range_mapped(io, destination, nibbles))
+    if (!range_mapped(io, source, nibbles) || !range_mapped(io, destination, nibbles))
         return HPCLANG_RPL_MUTATION_IO;
 
     if (destination > source) {
@@ -153,10 +135,8 @@ static int move_nibbles(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-static int snapshot_copy_to_saturn(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t destination,
-    const struct hpclang_object *object)
+static int snapshot_copy_to_saturn(const struct hpclang_rpl_mutation_io *io, uint32_t destination,
+                                   const struct hpclang_object *object)
 {
     if (object == NULL || object->nibble_count == 0u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -173,9 +153,7 @@ static int snapshot_copy_to_saturn(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-static int stack_depth(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t *depth)
+static int stack_depth(const struct hpclang_rpl_mutation_io *io, uint32_t *depth)
 {
     const struct hpclang_rpl_reader reader = {
         .read_nibble = io->read_nibble,
@@ -193,7 +171,8 @@ static int stack_depth(
     }
 }
 
-struct temp_plan {
+struct temp_plan
+{
     uint32_t ttop;
     uint32_t rstk;
     uint32_t dstk;
@@ -205,10 +184,8 @@ struct temp_plan {
     uint32_t object_address;
 };
 
-static int plan_temp(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t object_nibbles,
-    struct temp_plan *plan)
+static int plan_temp(const struct hpclang_rpl_mutation_io *io, uint32_t object_nibbles,
+                     struct temp_plan *plan)
 {
     if (plan == NULL || object_nibbles == 0u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -231,10 +208,7 @@ static int plan_temp(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    if (ttop < RPL_MAIN_FIRST ||
-        rstk < ttop ||
-        dstk <= rstk ||
-        dstk > RPL_MAIN_END ||
+    if (ttop < RPL_MAIN_FIRST || rstk < ttop || dstk <= rstk || dstk > RPL_MAIN_END ||
         rstk > io->temp_limit)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
@@ -242,8 +216,7 @@ static int plan_temp(
      * Keep the HPGCC 2/3 five-nibble guard after the six-nibble TEMPOB block
      * overhead. temp_limit is already tightened around hpclang native pages.
      */
-    if (io->temp_limit - rstk <= 11u ||
-        object_nibbles > io->temp_limit - rstk - 11u)
+    if (io->temp_limit - rstk <= 11u || object_nibbles > io->temp_limit - rstk - 11u)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
     uint32_t delta = 0u;
@@ -252,10 +225,8 @@ static int plan_temp(
 
     uint32_t new_rstk = 0u;
     uint32_t new_ttop = 0u;
-    if (!checked_add(rstk, delta, &new_rstk) ||
-        !checked_add(ttop, delta, &new_ttop) ||
-        new_rstk > io->temp_limit ||
-        new_rstk > dstk)
+    if (!checked_add(rstk, delta, &new_rstk) || !checked_add(ttop, delta, &new_ttop) ||
+        new_rstk > io->temp_limit || new_rstk > dstk)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
     /*
@@ -271,8 +242,7 @@ static int plan_temp(
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
     uint32_t source_size = rstk - ttop;
-    if (!range_mapped(io, ttop, source_size) ||
-        !range_mapped(io, new_ttop, source_size) ||
+    if (!range_mapped(io, ttop, source_size) || !range_mapped(io, new_ttop, source_size) ||
         !range_mapped(io, ttop, delta))
         return HPCLANG_RPL_MUTATION_IO;
 
@@ -288,16 +258,13 @@ static int plan_temp(
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-static int commit_temp(
-    const struct hpclang_rpl_mutation_io *io,
-    const struct temp_plan *plan)
+static int commit_temp(const struct hpclang_rpl_mutation_io *io, const struct temp_plan *plan)
 {
     if (plan == NULL)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     uint32_t source_size = plan->rstk - plan->ttop;
-    int result = move_nibbles(
-        io, plan->new_ttop, plan->ttop, source_size);
+    int result = move_nibbles(io, plan->new_ttop, plan->ttop, source_size);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -314,13 +281,11 @@ static int commit_temp(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    return write_word(
-        io, RPL_AVMEM, 5u, plan->avmem - plan->temp_cost);
+    return write_word(io, RPL_AVMEM, 5u, plan->avmem - plan->temp_cost);
 }
 
-int hpclang_rpl_mutation_push_snapshot(
-    const struct hpclang_rpl_mutation_io *io,
-    const struct hpclang_object *object)
+int hpclang_rpl_mutation_push_snapshot(const struct hpclang_rpl_mutation_io *io,
+                                       const struct hpclang_object *object)
 {
     if (!io_ready(io) || object == NULL || object->nibble_count == 0u)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -335,13 +300,8 @@ int hpclang_rpl_mutation_push_snapshot(
     uint32_t slot = plan.dstk - 5u;
 
     uint32_t stack_floor = 0u;
-    if (!checked_add(
-            io->user_limit,
-            io->stack_reserve_nibbles,
-            &stack_floor) ||
-        slot < stack_floor ||
-        plan.temp_cost == UINT32_MAX ||
-        plan.avmem < plan.temp_cost + 1u)
+    if (!checked_add(io->user_limit, io->stack_reserve_nibbles, &stack_floor) ||
+        slot < stack_floor || plan.temp_cost == UINT32_MAX || plan.avmem < plan.temp_cost + 1u)
         return HPCLANG_RPL_MUTATION_NOSPACE;
 
     result = commit_temp(io, &plan);
@@ -360,14 +320,10 @@ int hpclang_rpl_mutation_push_snapshot(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    return write_word(
-        io, RPL_AVMEM, 5u,
-        plan.avmem - plan.temp_cost - 1u);
+    return write_word(io, RPL_AVMEM, 5u, plan.avmem - plan.temp_cost - 1u);
 }
 
-int hpclang_rpl_mutation_drop(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t count)
+int hpclang_rpl_mutation_drop(const struct hpclang_rpl_mutation_io *io, uint32_t count)
 {
     if (!io_ready(io))
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -390,13 +346,11 @@ int hpclang_rpl_mutation_drop(
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    if (count > UINT32_MAX / 5u ||
-        avmem > UINT32_MAX - count)
+    if (count > UINT32_MAX / 5u || avmem > UINT32_MAX - count)
         return HPCLANG_RPL_MUTATION_LEVEL;
     uint32_t delta = count * 5u;
     uint32_t new_dstk = 0u;
-    if (!checked_add(dstk, delta, &new_dstk) ||
-        new_dstk > RPL_MAIN_END)
+    if (!checked_add(dstk, delta, &new_dstk) || new_dstk > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     /*
@@ -411,10 +365,8 @@ int hpclang_rpl_mutation_drop(
     return write_word(io, RPL_AVMEM, 5u, avmem + count);
 }
 
-int hpclang_rpl_mutation_replace(
-    const struct hpclang_rpl_mutation_io *io,
-    uint32_t level,
-    const struct hpclang_object *object)
+int hpclang_rpl_mutation_replace(const struct hpclang_rpl_mutation_io *io, uint32_t level,
+                                 const struct hpclang_object *object)
 {
     if (!io_ready(io) || object == NULL || object->nibble_count == 0u)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -438,8 +390,7 @@ int hpclang_rpl_mutation_replace(
         return HPCLANG_RPL_MUTATION_LEVEL;
     uint32_t offset = zero_based * 5u;
     uint32_t slot = 0u;
-    if (!checked_add(dstk, offset, &slot) ||
-        slot > RPL_MAIN_END - 5u)
+    if (!checked_add(dstk, offset, &slot) || slot > RPL_MAIN_END - 5u)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     struct temp_plan plan;

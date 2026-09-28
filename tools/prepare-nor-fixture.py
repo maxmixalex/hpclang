@@ -34,9 +34,7 @@ def main() -> None:
 
     digest = hashlib.sha256(data).hexdigest()
     if digest.lower() != args.sha256.lower():
-        raise SystemExit(
-            f"{args.fixture}: SHA-256 mismatch: {digest} != {args.sha256.lower()}"
-        )
+        raise SystemExit(f"{args.fixture}: SHA-256 mismatch: {digest} != {args.sha256.lower()}")
 
     if data[:0x4000] == b"\xff" * 0x4000:
         raise SystemExit(f"{args.fixture}: bootloader area is blank")

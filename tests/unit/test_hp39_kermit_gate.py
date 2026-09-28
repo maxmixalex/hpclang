@@ -32,17 +32,14 @@ class KermitFetchGateTests(unittest.TestCase):
 
     def test_open_marker_survives_large_log_read(self) -> None:
         self.check_log(
-            "openi name[LIB275L.000]\n"
-            + ("packet diagnostics\n" * 2500)
-            + "<sseof>Y success=1\n",
+            "openi name[LIB275L.000]\n" + ("packet diagnostics\n" * 2500) + "<sseof>Y success=1\n",
             0,
         )
 
     def test_prior_file_eof_does_not_release_gate(self) -> None:
         self.check_log(
             "openi name[HPGCC000.000]\n<sseof>Y success=1\n"
-            "openi name[LIB275L.000]\n"
-            + ("packet diagnostics\n" * 2500),
+            "openi name[LIB275L.000]\n" + ("packet diagnostics\n" * 2500),
             1,
         )
 

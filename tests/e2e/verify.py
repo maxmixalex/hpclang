@@ -33,9 +33,7 @@ def main() -> int:
             size = path.stat().st_size
             expected = int(entry["size"])
             if size != expected:
-                failures.append(
-                    f"{path}: size {size}, expected {expected}"
-                )
+                failures.append(f"{path}: size {size}, expected {expected}")
 
     for entry in spec.get("logs", []):
         path = Path(expand(entry["path"]))

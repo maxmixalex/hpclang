@@ -3,7 +3,8 @@
 
 #include "storage-namespace-lease.h"
 
-struct fake_context {
+struct fake_context
+{
     char log[32];
     unsigned used;
     int idle;
@@ -84,23 +85,18 @@ static int success_path(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    if (hpclang_namespace_lease_acquire(&lease) !=
-        HPCLANG_NAMESPACE_LEASE_OK)
+    if (hpclang_namespace_lease_acquire(&lease) != HPCLANG_NAMESPACE_LEASE_OK)
         return 0;
-    if (lease.state != HPCLANG_NAMESPACE_DIRECT ||
+    if (lease.state != HPCLANG_NAMESPACE_DIRECT || !expect_log(&ctx, "IAM"))
+        return 0;
+
+    if (hpclang_namespace_lease_acquire(&lease) != HPCLANG_NAMESPACE_LEASE_BUSY ||
         !expect_log(&ctx, "IAM"))
         return 0;
 
-    if (hpclang_namespace_lease_acquire(&lease) !=
-        HPCLANG_NAMESPACE_LEASE_BUSY ||
-        !expect_log(&ctx, "IAM"))
+    if (hpclang_namespace_lease_release(&lease) != HPCLANG_NAMESPACE_LEASE_OK)
         return 0;
-
-    if (hpclang_namespace_lease_release(&lease) !=
-        HPCLANG_NAMESPACE_LEASE_OK)
-        return 0;
-    return lease.state == HPCLANG_NAMESPACE_STOCK &&
-           expect_log(&ctx, "IAMURS");
+    return lease.state == HPCLANG_NAMESPACE_STOCK && expect_log(&ctx, "IAMURS");
 }
 
 static int busy_preflight(void)
@@ -109,10 +105,8 @@ static int busy_preflight(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    return hpclang_namespace_lease_acquire(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_BUSY &&
-           lease.state == HPCLANG_NAMESPACE_STOCK &&
-           expect_log(&ctx, "I");
+    return hpclang_namespace_lease_acquire(&lease) == HPCLANG_NAMESPACE_LEASE_BUSY &&
+           lease.state == HPCLANG_NAMESPACE_STOCK && expect_log(&ctx, "I");
 }
 
 static int mount_failure_restores_stock(void)
@@ -121,10 +115,8 @@ static int mount_failure_restores_stock(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    return hpclang_namespace_lease_acquire(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_MOUNT_FAILED &&
-           lease.state == HPCLANG_NAMESPACE_STOCK &&
-           expect_log(&ctx, "IAMRS");
+    return hpclang_namespace_lease_acquire(&lease) == HPCLANG_NAMESPACE_LEASE_MOUNT_FAILED &&
+           lease.state == HPCLANG_NAMESPACE_STOCK && expect_log(&ctx, "IAMRS");
 }
 
 static int failed_cleanup_breaks_lease(void)
@@ -137,12 +129,9 @@ static int failed_cleanup_breaks_lease(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    return hpclang_namespace_lease_acquire(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_RELEASE_FAILED &&
-           lease.state == HPCLANG_NAMESPACE_BROKEN &&
-           expect_log(&ctx, "IAMRS") &&
-           hpclang_namespace_lease_acquire(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_BAD_STATE;
+    return hpclang_namespace_lease_acquire(&lease) == HPCLANG_NAMESPACE_LEASE_RELEASE_FAILED &&
+           lease.state == HPCLANG_NAMESPACE_BROKEN && expect_log(&ctx, "IAMRS") &&
+           hpclang_namespace_lease_acquire(&lease) == HPCLANG_NAMESPACE_LEASE_BAD_STATE;
 }
 
 static int release_is_best_effort(void)
@@ -151,14 +140,11 @@ static int release_is_best_effort(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    if (hpclang_namespace_lease_acquire(&lease) !=
-        HPCLANG_NAMESPACE_LEASE_OK)
+    if (hpclang_namespace_lease_acquire(&lease) != HPCLANG_NAMESPACE_LEASE_OK)
         return 0;
 
-    return hpclang_namespace_lease_release(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_UNMOUNT_FAILED &&
-           lease.state == HPCLANG_NAMESPACE_BROKEN &&
-           expect_log(&ctx, "IAMURS");
+    return hpclang_namespace_lease_release(&lease) == HPCLANG_NAMESPACE_LEASE_UNMOUNT_FAILED &&
+           lease.state == HPCLANG_NAMESPACE_BROKEN && expect_log(&ctx, "IAMURS");
 }
 
 static int reinit_failure_breaks_lease(void)
@@ -167,23 +153,17 @@ static int reinit_failure_breaks_lease(void)
     struct hpclang_namespace_lease lease;
     hpclang_namespace_lease_init(&lease, &ops, &ctx);
 
-    if (hpclang_namespace_lease_acquire(&lease) !=
-        HPCLANG_NAMESPACE_LEASE_OK)
+    if (hpclang_namespace_lease_acquire(&lease) != HPCLANG_NAMESPACE_LEASE_OK)
         return 0;
 
-    return hpclang_namespace_lease_release(&lease) ==
-               HPCLANG_NAMESPACE_LEASE_STOCK_REINIT_FAILED &&
-           lease.state == HPCLANG_NAMESPACE_BROKEN &&
-           expect_log(&ctx, "IAMURS");
+    return hpclang_namespace_lease_release(&lease) == HPCLANG_NAMESPACE_LEASE_STOCK_REINIT_FAILED &&
+           lease.state == HPCLANG_NAMESPACE_BROKEN && expect_log(&ctx, "IAMURS");
 }
 
 int main(void)
 {
-    if (!success_path() ||
-        !busy_preflight() ||
-        !mount_failure_restores_stock() ||
-        !failed_cleanup_breaks_lease() ||
-        !release_is_best_effort() ||
+    if (!success_path() || !busy_preflight() || !mount_failure_restores_stock() ||
+        !failed_cleanup_breaks_lease() || !release_is_best_effort() ||
         !reinit_failure_breaks_lease())
         return EXIT_FAILURE;
 

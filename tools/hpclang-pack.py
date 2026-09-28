@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Pack a linked hpclang v1 ELF into the model-independent HPC1 image."""
+
 from __future__ import annotations
 
 import argparse
@@ -52,13 +53,11 @@ def parse_elf32(path: Path) -> tuple[bytes, int, list[Segment]]:
     segments: list[Segment] = []
     for i in range(phnum):
         off = phoff + i * phentsize
-        p_type, p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags, _ = (
-            struct.unpack_from("<IIIIIIII", blob, off)
+        p_type, p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags, _ = struct.unpack_from(
+            "<IIIIIIII", blob, off
         )
         if p_type == PT_LOAD:
-            segments.append(
-                Segment(p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags)
-            )
+            segments.append(Segment(p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags))
 
     return blob, entry, segments
 
@@ -102,10 +101,7 @@ def pack(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(header + image)
 
-    print(
-        f"{dst}: payload={len(image)} bytes "
-        f"entry=0x{entry:08x} rw_static={rw_static_size} bytes"
-    )
+    print(f"{dst}: payload={len(image)} bytes entry=0x{entry:08x} rw_static={rw_static_size} bytes")
 
 
 def main() -> None:

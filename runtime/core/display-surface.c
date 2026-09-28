@@ -6,7 +6,8 @@
 
 #include "display-surface.h"
 
-enum clip_code {
+enum clip_code
+{
     CLIP_LEFT = 1u << 0,
     CLIP_RIGHT = 1u << 1,
     CLIP_TOP = 1u << 2,
@@ -66,10 +67,7 @@ static uint64_t magnitude(int64_t value)
  * All three inputs originate from differences of int32_t drawing coordinates,
  * so their magnitudes fit uint32_t and the unsigned product fits uint64_t.
  */
-static int64_t scaled_delta(
-    int64_t delta,
-    int64_t numerator,
-    int64_t denominator)
+static int64_t scaled_delta(int64_t delta, int64_t numerator, int64_t denominator)
 {
     int negative = 0;
 
@@ -85,10 +83,7 @@ static int64_t scaled_delta(
     return negative ? -(int64_t)quotient : (int64_t)quotient;
 }
 
-static unsigned clip_code_for(
-    const struct hpclang_surface *surface,
-    int64_t x,
-    int64_t y)
+static unsigned clip_code_for(const struct hpclang_surface *surface, int64_t x, int64_t y)
 {
     unsigned code = 0u;
 
@@ -105,12 +100,8 @@ static unsigned clip_code_for(
     return code;
 }
 
-static int clip_line(
-    const struct hpclang_surface *surface,
-    int64_t *x0,
-    int64_t *y0,
-    int64_t *x1,
-    int64_t *y1)
+static int clip_line(const struct hpclang_surface *surface, int64_t *x0, int64_t *y0, int64_t *x1,
+                     int64_t *y1)
 {
     if (surface->width == 0u || surface->height == 0u)
         return 0;
@@ -133,20 +124,16 @@ static int clip_line(
 
         if ((code & CLIP_TOP) != 0u) {
             y = 0;
-            x = *x0 + scaled_delta(
-                *x1 - *x0, -*y0, *y1 - *y0);
+            x = *x0 + scaled_delta(*x1 - *x0, -*y0, *y1 - *y0);
         } else if ((code & CLIP_BOTTOM) != 0u) {
             y = ymax;
-            x = *x0 + scaled_delta(
-                *x1 - *x0, ymax - *y0, *y1 - *y0);
+            x = *x0 + scaled_delta(*x1 - *x0, ymax - *y0, *y1 - *y0);
         } else if ((code & CLIP_RIGHT) != 0u) {
             x = xmax;
-            y = *y0 + scaled_delta(
-                *y1 - *y0, xmax - *x0, *x1 - *x0);
+            y = *y0 + scaled_delta(*y1 - *y0, xmax - *x0, *x1 - *x0);
         } else {
             x = 0;
-            y = *y0 + scaled_delta(
-                *y1 - *y0, -*x0, *x1 - *x0);
+            y = *y0 + scaled_delta(*y1 - *y0, -*x0, *x1 - *x0);
         }
 
         if (code == code0) {
@@ -159,10 +146,7 @@ static int clip_line(
     }
 }
 
-struct hpclang_surface *hpclang_surface_create(
-    uint32_t width,
-    uint32_t height,
-    uint32_t levels)
+struct hpclang_surface *hpclang_surface_create(uint32_t width, uint32_t height, uint32_t levels)
 {
     uint32_t bits = bits_per_pixel(levels);
     if (width == 0u || height == 0u || bits == 0u)
@@ -197,9 +181,7 @@ struct hpclang_surface *hpclang_surface_create(
     return surface;
 }
 
-struct hpclang_surface *hpclang_surface_create_mono(
-    uint32_t width,
-    uint32_t height)
+struct hpclang_surface *hpclang_surface_create_mono(uint32_t width, uint32_t height)
 {
     return hpclang_surface_create(width, height, 2u);
 }
@@ -228,9 +210,7 @@ uint32_t hpclang_surface_levels(const struct hpclang_surface *surface)
     return surface->levels;
 }
 
-void hpclang_surface_clear(
-    struct hpclang_surface *surface,
-    uint8_t intensity)
+void hpclang_surface_clear(struct hpclang_surface *surface, uint8_t intensity)
 {
     uint32_t bits = bits_per_pixel(surface->levels);
     if (bits == 0u)
@@ -239,8 +219,7 @@ void hpclang_surface_clear(
     uint64_t visible_bits = (uint64_t)surface->width * bits;
     uint32_t full_bytes = (uint32_t)(visible_bits >> 3);
     uint32_t tail_bits = (uint32_t)(visible_bits & 7u);
-    uint8_t value = repeated_pixel_byte(
-        quantize_intensity(intensity, bits), bits);
+    uint8_t value = repeated_pixel_byte(quantize_intensity(intensity, bits), bits);
 
     for (uint32_t y = 0u; y < surface->height; ++y) {
         volatile uint8_t *row = surface->pixels + y * surface->stride;
@@ -250,21 +229,14 @@ void hpclang_surface_clear(
 
         if (tail_bits != 0u) {
             uint8_t mask = (uint8_t)((1u << tail_bits) - 1u);
-            row[full_bytes] =
-                (uint8_t)((row[full_bytes] & (uint8_t)~mask) |
-                          (value & mask));
+            row[full_bytes] = (uint8_t)((row[full_bytes] & (uint8_t)~mask) | (value & mask));
         }
     }
 }
 
-uint8_t hpclang_surface_get_pixel(
-    const struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y)
+uint8_t hpclang_surface_get_pixel(const struct hpclang_surface *surface, int32_t x, int32_t y)
 {
-    if (x < 0 || y < 0 ||
-        (uint32_t)x >= surface->width ||
-        (uint32_t)y >= surface->height)
+    if (x < 0 || y < 0 || (uint32_t)x >= surface->width || (uint32_t)y >= surface->height)
         return 0u;
 
     uint32_t bits = bits_per_pixel(surface->levels);
@@ -273,23 +245,17 @@ uint8_t hpclang_surface_get_pixel(
 
     uint64_t bit_index = (uint64_t)(uint32_t)x * bits;
     const volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride +
-        (size_t)(bit_index >> 3);
+        surface->pixels + (uint32_t)y * surface->stride + (size_t)(bit_index >> 3);
     uint32_t shift = (uint32_t)(bit_index & 7u);
     uint8_t mask = (uint8_t)((1u << bits) - 1u);
     uint8_t value = (uint8_t)((*pixel >> shift) & mask);
     return expand_intensity(value, bits);
 }
 
-void hpclang_surface_set_pixel(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    uint8_t intensity)
+void hpclang_surface_set_pixel(struct hpclang_surface *surface, int32_t x, int32_t y,
+                               uint8_t intensity)
 {
-    if (x < 0 || y < 0 ||
-        (uint32_t)x >= surface->width ||
-        (uint32_t)y >= surface->height)
+    if (x < 0 || y < 0 || (uint32_t)x >= surface->width || (uint32_t)y >= surface->height)
         return;
 
     uint32_t bits = bits_per_pixel(surface->levels);
@@ -298,25 +264,16 @@ void hpclang_surface_set_pixel(
 
     uint64_t bit_index = (uint64_t)(uint32_t)x * bits;
     volatile uint8_t *pixel =
-        surface->pixels + (uint32_t)y * surface->stride +
-        (size_t)(bit_index >> 3);
+        surface->pixels + (uint32_t)y * surface->stride + (size_t)(bit_index >> 3);
     uint32_t shift = (uint32_t)(bit_index & 7u);
-    uint8_t field_mask =
-        (uint8_t)(((1u << bits) - 1u) << shift);
-    uint8_t value =
-        (uint8_t)(quantize_intensity(intensity, bits) << shift);
+    uint8_t field_mask = (uint8_t)(((1u << bits) - 1u) << shift);
+    uint8_t value = (uint8_t)(quantize_intensity(intensity, bits) << shift);
 
-    *pixel = (uint8_t)((*pixel & (uint8_t)~field_mask) |
-                       (value & field_mask));
+    *pixel = (uint8_t)((*pixel & (uint8_t)~field_mask) | (value & field_mask));
 }
 
-static void draw_line(
-    struct hpclang_surface *surface,
-    int64_t x0,
-    int64_t y0,
-    int64_t x1,
-    int64_t y1,
-    uint8_t intensity)
+static void draw_line(struct hpclang_surface *surface, int64_t x0, int64_t y0, int64_t x1,
+                      int64_t y1, uint8_t intensity)
 {
     if (!clip_line(surface, &x0, &y0, &x1, &y1))
         return;
@@ -329,8 +286,7 @@ static void draw_line(
     int64_t error = dx + dy;
 
     for (;;) {
-        hpclang_surface_set_pixel(
-            surface, (int32_t)x0, (int32_t)y0, intensity);
+        hpclang_surface_set_pixel(surface, (int32_t)x0, (int32_t)y0, intensity);
         if (x0 == x1 && y0 == y1)
             return;
 
@@ -346,24 +302,14 @@ static void draw_line(
     }
 }
 
-void hpclang_surface_draw_line(
-    struct hpclang_surface *surface,
-    int32_t x0,
-    int32_t y0,
-    int32_t x1,
-    int32_t y1,
-    uint8_t intensity)
+void hpclang_surface_draw_line(struct hpclang_surface *surface, int32_t x0, int32_t y0, int32_t x1,
+                               int32_t y1, uint8_t intensity)
 {
     draw_line(surface, x0, y0, x1, y1, intensity);
 }
 
-void hpclang_surface_draw_rect(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    int32_t width,
-    int32_t height,
-    uint8_t intensity)
+void hpclang_surface_draw_rect(struct hpclang_surface *surface, int32_t x, int32_t y, int32_t width,
+                               int32_t height, uint8_t intensity)
 {
     if (width <= 0 || height <= 0)
         return;
@@ -381,7 +327,6 @@ void hpclang_surface_draw_rect(
     if (right != left)
         draw_line(surface, right, top, right, bottom, intensity);
 }
-
 
 static uint32_t integer_sqrt(uint64_t value)
 {
@@ -408,23 +353,16 @@ static int64_t accessible_max(uint32_t extent)
 {
     if (extent == 0u)
         return -1;
-    return extent - 1u > (uint32_t)INT32_MAX
-        ? INT32_MAX
-        : (int64_t)extent - 1;
+    return extent - 1u > (uint32_t)INT32_MAX ? INT32_MAX : (int64_t)extent - 1;
 }
 
-static void fill_span(
-    struct hpclang_surface *surface,
-    int64_t x0,
-    int64_t x1,
-    int64_t y,
-    uint8_t intensity)
+static void fill_span(struct hpclang_surface *surface, int64_t x0, int64_t x1, int64_t y,
+                      uint8_t intensity)
 {
     int64_t xmax = accessible_max(surface->width);
     int64_t ymax = accessible_max(surface->height);
 
-    if (xmax < 0 || ymax < 0 || y < 0 || y > ymax ||
-        x1 < 0 || x0 > xmax)
+    if (xmax < 0 || ymax < 0 || y < 0 || y > ymax || x1 < 0 || x0 > xmax)
         return;
 
     if (x0 < 0)
@@ -433,19 +371,12 @@ static void fill_span(
         x1 = xmax;
 
     for (int64_t x = x0; x <= x1; ++x)
-        hpclang_surface_set_pixel(
-            surface, (int32_t)x, (int32_t)y, intensity);
+        hpclang_surface_set_pixel(surface, (int32_t)x, (int32_t)y, intensity);
 }
 
-static int circle_bounds(
-    const struct hpclang_surface *surface,
-    int32_t center_x,
-    int32_t center_y,
-    int32_t radius,
-    int64_t *left,
-    int64_t *top,
-    int64_t *right,
-    int64_t *bottom)
+static int circle_bounds(const struct hpclang_surface *surface, int32_t center_x, int32_t center_y,
+                         int32_t radius, int64_t *left, int64_t *top, int64_t *right,
+                         int64_t *bottom)
 {
     if (radius < 0)
         return 0;
@@ -461,8 +392,7 @@ static int circle_bounds(
     int64_t raw_right = (int64_t)center_x + r;
     int64_t raw_bottom = (int64_t)center_y + r;
 
-    if (raw_right < 0 || raw_bottom < 0 ||
-        raw_left > xmax || raw_top > ymax)
+    if (raw_right < 0 || raw_bottom < 0 || raw_left > xmax || raw_top > ymax)
         return 0;
 
     *left = raw_left < 0 ? 0 : raw_left;
@@ -472,21 +402,15 @@ static int circle_bounds(
     return 1;
 }
 
-void hpclang_surface_draw_circle(
-    struct hpclang_surface *surface,
-    int32_t center_x,
-    int32_t center_y,
-    int32_t radius,
-    uint8_t intensity)
+void hpclang_surface_draw_circle(struct hpclang_surface *surface, int32_t center_x,
+                                 int32_t center_y, int32_t radius, uint8_t intensity)
 {
     int64_t left;
     int64_t top;
     int64_t right;
     int64_t bottom;
 
-    if (!circle_bounds(
-            surface, center_x, center_y, radius,
-            &left, &top, &right, &bottom))
+    if (!circle_bounds(surface, center_x, center_y, radius, &left, &top, &right, &bottom))
         return;
 
     uint64_t r = (uint32_t)radius;
@@ -499,11 +423,9 @@ void hpclang_surface_draw_circle(
         int64_t x1 = (int64_t)center_x + (int64_t)dx;
 
         if (x0 >= left && x0 <= right)
-            hpclang_surface_set_pixel(
-                surface, (int32_t)x0, (int32_t)y, intensity);
+            hpclang_surface_set_pixel(surface, (int32_t)x0, (int32_t)y, intensity);
         if (x1 != x0 && x1 >= left && x1 <= right)
-            hpclang_surface_set_pixel(
-                surface, (int32_t)x1, (int32_t)y, intensity);
+            hpclang_surface_set_pixel(surface, (int32_t)x1, (int32_t)y, intensity);
     }
 
     for (int64_t x = left; x <= right; ++x) {
@@ -513,29 +435,21 @@ void hpclang_surface_draw_circle(
         int64_t y1 = (int64_t)center_y + (int64_t)dy;
 
         if (y0 >= top && y0 <= bottom)
-            hpclang_surface_set_pixel(
-                surface, (int32_t)x, (int32_t)y0, intensity);
+            hpclang_surface_set_pixel(surface, (int32_t)x, (int32_t)y0, intensity);
         if (y1 != y0 && y1 >= top && y1 <= bottom)
-            hpclang_surface_set_pixel(
-                surface, (int32_t)x, (int32_t)y1, intensity);
+            hpclang_surface_set_pixel(surface, (int32_t)x, (int32_t)y1, intensity);
     }
 }
 
-void hpclang_surface_fill_circle(
-    struct hpclang_surface *surface,
-    int32_t center_x,
-    int32_t center_y,
-    int32_t radius,
-    uint8_t intensity)
+void hpclang_surface_fill_circle(struct hpclang_surface *surface, int32_t center_x,
+                                 int32_t center_y, int32_t radius, uint8_t intensity)
 {
     int64_t left;
     int64_t top;
     int64_t right;
     int64_t bottom;
 
-    if (!circle_bounds(
-            surface, center_x, center_y, radius,
-            &left, &top, &right, &bottom))
+    if (!circle_bounds(surface, center_x, center_y, radius, &left, &top, &right, &bottom))
         return;
 
     (void)left;
@@ -547,47 +461,31 @@ void hpclang_surface_fill_circle(
     for (int64_t y = top; y <= bottom; ++y) {
         uint64_t dy = magnitude(y - center_y);
         uint64_t dx = integer_sqrt(radius_squared - dy * dy);
-        fill_span(
-            surface,
-            (int64_t)center_x - (int64_t)dx,
-            (int64_t)center_x + (int64_t)dx,
-            y,
-            intensity);
+        fill_span(surface, (int64_t)center_x - (int64_t)dx, (int64_t)center_x + (int64_t)dx, y,
+                  intensity);
     }
 }
 
-void hpclang_surface_draw_polygon(
-    struct hpclang_surface *surface,
-    const struct hpclang_point *points,
-    uint32_t point_count,
-    uint8_t intensity)
+void hpclang_surface_draw_polygon(struct hpclang_surface *surface,
+                                  const struct hpclang_point *points, uint32_t point_count,
+                                  uint8_t intensity)
 {
     if (points == NULL || point_count == 0u)
         return;
 
     if (point_count == 1u) {
-        hpclang_surface_set_pixel(
-            surface, points[0].x, points[0].y, intensity);
+        hpclang_surface_set_pixel(surface, points[0].x, points[0].y, intensity);
         return;
     }
 
     for (uint32_t i = 0u; i < point_count; ++i) {
         uint32_t next = i + 1u == point_count ? 0u : i + 1u;
-        draw_line(
-            surface,
-            points[i].x,
-            points[i].y,
-            points[next].x,
-            points[next].y,
-            intensity);
+        draw_line(surface, points[i].x, points[i].y, points[next].x, points[next].y, intensity);
     }
 }
 
-static int polygon_contains(
-    const struct hpclang_point *points,
-    uint32_t point_count,
-    int64_t x,
-    int64_t y)
+static int polygon_contains(const struct hpclang_point *points, uint32_t point_count, int64_t x,
+                            int64_t y)
 {
     int inside = 0;
     uint32_t previous = point_count - 1u;
@@ -599,8 +497,7 @@ static int polygon_contains(
         int64_t y1 = points[current].y;
 
         if ((y0 > y) != (y1 > y)) {
-            int64_t intersection = x0 + scaled_delta(
-                x1 - x0, y - y0, y1 - y0);
+            int64_t intersection = x0 + scaled_delta(x1 - x0, y - y0, y1 - y0);
             if (x < intersection)
                 inside = !inside;
         }
@@ -611,18 +508,15 @@ static int polygon_contains(
     return inside;
 }
 
-void hpclang_surface_fill_polygon(
-    struct hpclang_surface *surface,
-    const struct hpclang_point *points,
-    uint32_t point_count,
-    uint8_t intensity)
+void hpclang_surface_fill_polygon(struct hpclang_surface *surface,
+                                  const struct hpclang_point *points, uint32_t point_count,
+                                  uint8_t intensity)
 {
     if (points == NULL || point_count == 0u)
         return;
 
     if (point_count < 3u) {
-        hpclang_surface_draw_polygon(
-            surface, points, point_count, intensity);
+        hpclang_surface_draw_polygon(surface, points, point_count, intensity);
         return;
     }
 
@@ -644,8 +538,7 @@ void hpclang_surface_fill_polygon(
 
     int64_t xmax = accessible_max(surface->width);
     int64_t ymax = accessible_max(surface->height);
-    if (xmax < 0 || ymax < 0 ||
-        max_x < 0 || max_y < 0 || min_x > xmax || min_y > ymax)
+    if (xmax < 0 || ymax < 0 || max_x < 0 || max_y < 0 || min_x > xmax || min_y > ymax)
         return;
 
     if (min_x < 0)
@@ -660,25 +553,17 @@ void hpclang_surface_fill_polygon(
     for (int64_t y = min_y; y <= max_y; ++y) {
         for (int64_t x = min_x; x <= max_x; ++x) {
             if (polygon_contains(points, point_count, x, y))
-                hpclang_surface_set_pixel(
-                    surface, (int32_t)x, (int32_t)y, intensity);
+                hpclang_surface_set_pixel(surface, (int32_t)x, (int32_t)y, intensity);
         }
     }
 
     /* Boundary pixels are part of a filled polygon. */
-    hpclang_surface_draw_polygon(
-        surface, points, point_count, intensity);
+    hpclang_surface_draw_polygon(surface, points, point_count, intensity);
 }
 
-void hpclang_surface_blit(
-    struct hpclang_surface *destination,
-    int32_t destination_x,
-    int32_t destination_y,
-    const struct hpclang_surface *source,
-    int32_t source_x,
-    int32_t source_y,
-    int32_t width,
-    int32_t height)
+void hpclang_surface_blit(struct hpclang_surface *destination, int32_t destination_x,
+                          int32_t destination_y, const struct hpclang_surface *source,
+                          int32_t source_x, int32_t source_y, int32_t width, int32_t height)
 {
     if (width <= 0 || height <= 0)
         return;
@@ -698,11 +583,9 @@ void hpclang_surface_blit(
         y0 = -(int64_t)destination_y;
 
     int64_t source_right = (int64_t)source->width - source_x;
-    int64_t destination_right =
-        (int64_t)destination->width - destination_x;
+    int64_t destination_right = (int64_t)destination->width - destination_x;
     int64_t source_bottom = (int64_t)source->height - source_y;
-    int64_t destination_bottom =
-        (int64_t)destination->height - destination_y;
+    int64_t destination_bottom = (int64_t)destination->height - destination_y;
 
     if (source_right < x1)
         x1 = source_right;
@@ -716,12 +599,8 @@ void hpclang_surface_blit(
     if (x0 >= x1 || y0 >= y1)
         return;
 
-    int reverse_y =
-        source == destination && destination_y > source_y;
-    int reverse_x =
-        source == destination &&
-        destination_y == source_y &&
-        destination_x > source_x;
+    int reverse_y = source == destination && destination_y > source_y;
+    int reverse_x = source == destination && destination_y == source_y && destination_x > source_x;
 
     int64_t y = reverse_y ? y1 - 1 : y0;
     int64_t y_end = reverse_y ? y0 - 1 : y1;
@@ -733,26 +612,16 @@ void hpclang_surface_blit(
         int64_t x_step = reverse_x ? -1 : 1;
 
         for (; x != x_end; x += x_step) {
-            uint8_t intensity = hpclang_surface_get_pixel(
-                source,
-                (int32_t)((int64_t)source_x + x),
-                (int32_t)((int64_t)source_y + y));
-            hpclang_surface_set_pixel(
-                destination,
-                (int32_t)((int64_t)destination_x + x),
-                (int32_t)((int64_t)destination_y + y),
-                intensity);
+            uint8_t intensity = hpclang_surface_get_pixel(source, (int32_t)((int64_t)source_x + x),
+                                                          (int32_t)((int64_t)source_y + y));
+            hpclang_surface_set_pixel(destination, (int32_t)((int64_t)destination_x + x),
+                                      (int32_t)((int64_t)destination_y + y), intensity);
         }
     }
 }
 
-void hpclang_surface_fill_rect(
-    struct hpclang_surface *surface,
-    int32_t x,
-    int32_t y,
-    int32_t width,
-    int32_t height,
-    uint8_t intensity)
+void hpclang_surface_fill_rect(struct hpclang_surface *surface, int32_t x, int32_t y, int32_t width,
+                               int32_t height, uint8_t intensity)
 {
     if (width <= 0 || height <= 0)
         return;
@@ -765,8 +634,7 @@ void hpclang_surface_fill_rect(
         height += y;
         y = 0;
     }
-    if (width <= 0 || height <= 0 ||
-        (uint32_t)x >= surface->width ||
+    if (width <= 0 || height <= 0 || (uint32_t)x >= surface->width ||
         (uint32_t)y >= surface->height)
         return;
 
@@ -777,6 +645,5 @@ void hpclang_surface_fill_rect(
 
     for (int32_t yy = 0; yy < height; ++yy)
         for (int32_t xx = 0; xx < width; ++xx)
-            hpclang_surface_set_pixel(
-                surface, x + xx, y + yy, intensity);
+            hpclang_surface_set_pixel(surface, x + xx, y + yy, intensity);
 }

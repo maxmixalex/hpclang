@@ -33,7 +33,8 @@ static const uint32_t native_specimen[] = {
     163u, 165u, 169u, 176u, 177u, 181u, 215u, 247u,
 };
 
-enum specimen_profile {
+enum specimen_profile
+{
     SPECIMEN_GENERIC = 0,
     SPECIMEN_JA = 1,
     SPECIMEN_KO = 2,
@@ -43,7 +44,8 @@ enum specimen_profile {
     SPECIMEN_ZH_TW = 6,
 };
 
-struct gallery_view {
+struct gallery_view
+{
     const char *family;
     const char *face;
     const struct hpclang_font *font;
@@ -83,23 +85,30 @@ static struct gallery_view gallery_at(uint32_t index)
 {
     if (index == 0u) {
         const struct gallery_view view = {
-            "Native", "calculator minifont", hpclang_font_mini(),
+            "Native",
+            "calculator minifont",
+            hpclang_font_mini(),
             native_specimen,
             (uint32_t)(sizeof(native_specimen) / sizeof(native_specimen[0])),
-            1u, SPECIMEN_GENERIC, 1u,
+            1u,
+            SPECIMEN_GENERIC,
+            1u,
         };
         return view;
     }
     if (index == 1u) {
         const struct hpclang_font *font = hpclang_font_default();
-        const char *name = hpclang_font_big() == font
-            ? "calculator bigfont"
-            : "calculator main font";
+        const char *name =
+            hpclang_font_big() == font ? "calculator bigfont" : "calculator main font";
         const struct gallery_view view = {
-            "Native", name, font,
+            "Native",
+            name,
+            font,
             native_specimen,
             (uint32_t)(sizeof(native_specimen) / sizeof(native_specimen[0])),
-            1u, SPECIMEN_GENERIC, 1u,
+            1u,
+            SPECIMEN_GENERIC,
+            1u,
         };
         return view;
     }
@@ -107,17 +116,20 @@ static struct gallery_view gallery_at(uint32_t index)
     const struct hpclang_font *editline = hpclang_font_editline();
     if (index == 2u && editline != NULL) {
         const struct gallery_view view = {
-            "Native", "calculator EditLine font", editline,
+            "Native",
+            "calculator EditLine font",
+            editline,
             native_specimen,
             (uint32_t)(sizeof(native_specimen) / sizeof(native_specimen[0])),
-            1u, SPECIMEN_GENERIC, 1u,
+            1u,
+            SPECIMEN_GENERIC,
+            1u,
         };
         return view;
     }
 
     uint32_t native_count = editline != NULL ? 3u : 2u;
-    const struct hpclang_gallery_face *face =
-        &hpclang_gallery_faces[index - native_count];
+    const struct hpclang_gallery_face *face = &hpclang_gallery_faces[index - native_count];
     const struct gallery_view view = {
         face->family,
         face->face,
@@ -185,9 +197,8 @@ static uint32_t previous_family_first(uint32_t index, uint32_t count)
 static uint32_t step_family(uint32_t index, uint32_t count, int forward)
 {
     remember_face(index);
-    uint32_t first = forward
-        ? next_family_first(index, count)
-        : previous_family_first(index, count);
+    uint32_t first =
+        forward ? next_family_first(index, count) : previous_family_first(index, count);
     return restore_face(first, count);
 }
 
@@ -212,13 +223,8 @@ static int32_t text_width(const struct hpclang_font *font, const char *text)
     return width;
 }
 
-static void draw_ascii_clipped(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t x,
-    int32_t y,
-    int32_t right,
-    const char *text)
+static void draw_ascii_clipped(struct hpclang_surface *surface, const struct hpclang_font *font,
+                               int32_t x, int32_t y, int32_t right, const char *text)
 {
     for (const unsigned char *p = (const unsigned char *)text; *p != 0u; ++p) {
         uint32_t advance = hpclang_font_codepoint_advance(font, *p);
@@ -229,11 +235,8 @@ static void draw_ascii_clipped(
     }
 }
 
-static void draw_centered_ascii(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t y,
-    const char *text)
+static void draw_centered_ascii(struct hpclang_surface *surface, const struct hpclang_font *font,
+                                int32_t y, const char *text)
 {
     int32_t width = text_width(font, text);
     int32_t span = CONTENT_RIGHT - CONTENT_LEFT + 1;
@@ -243,14 +246,9 @@ static void draw_centered_ascii(
     draw_ascii_clipped(surface, font, x, y, CONTENT_RIGHT + 1, text);
 }
 
-static int32_t draw_codepoint_rows(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    const uint32_t *codepoints,
-    uint32_t count,
-    int32_t y,
-    int32_t bottom,
-    uint32_t max_glyphs)
+static int32_t draw_codepoint_rows(struct hpclang_surface *surface, const struct hpclang_font *font,
+                                   const uint32_t *codepoints, uint32_t count, int32_t y,
+                                   int32_t bottom, uint32_t max_glyphs)
 {
     uint32_t line_height = hpclang_font_height(font);
     if (line_height == 0u || codepoints == NULL || count == 0u)
@@ -276,12 +274,8 @@ static int32_t draw_codepoint_rows(
     return drawn != 0u ? y + (int32_t)line_height : y;
 }
 
-static int32_t draw_words(
-    struct hpclang_surface *surface,
-    const struct hpclang_font *font,
-    int32_t y,
-    int32_t bottom,
-    const char *text)
+static int32_t draw_words(struct hpclang_surface *surface, const struct hpclang_font *font,
+                          int32_t y, int32_t bottom, const char *text)
 {
     uint32_t line_height = hpclang_font_height(font);
     if (line_height == 0u)
@@ -303,14 +297,12 @@ static int32_t draw_words(
         size_t word_len = 0u;
         int32_t word_width = 0;
         while (p[word_len] != '\0' && p[word_len] != ' ') {
-            word_width += (int32_t)hpclang_font_codepoint_advance(
-                font, (uint8_t)p[word_len]);
+            word_width += (int32_t)hpclang_font_codepoint_advance(font, (uint8_t)p[word_len]);
             ++word_len;
         }
 
-        int32_t space_width = used != 0u
-            ? (int32_t)hpclang_font_codepoint_advance(font, (uint32_t)' ')
-            : 0;
+        int32_t space_width =
+            used != 0u ? (int32_t)hpclang_font_codepoint_advance(font, (uint32_t)' ') : 0;
         if (used != 0u && width + space_width + word_width > max_width) {
             line[used] = '\0';
             draw_centered_ascii(surface, font, y, line);
@@ -338,8 +330,7 @@ static int32_t draw_words(
     return y;
 }
 
-static void draw_nav_triangle(
-    struct hpclang_surface *surface, int right, int32_t center_y)
+static void draw_nav_triangle(struct hpclang_surface *surface, int right, int32_t center_y)
 {
     for (int32_t d = 0; d < 3; ++d) {
         int32_t x = right ? 127 - d : 3 + d;
@@ -348,10 +339,8 @@ static void draw_nav_triangle(
     }
 }
 
-static void draw_chrome(
-    struct hpclang_surface *surface,
-    const struct gallery_view *view,
-    uint32_t height)
+static void draw_chrome(struct hpclang_surface *surface, const struct gallery_view *view,
+                        uint32_t height)
 {
     gallery_chrome_text(surface, CHROME_LEFT, 1, CHROME_RIGHT, view->family);
     gallery_chrome_text(surface, CHROME_LEFT, 8, CHROME_RIGHT, view->face);
@@ -371,8 +360,7 @@ static int native_raster_available(const struct hpclang_device_info *device)
      * The independent stock-ROM pixel oracle below validates the actual
      * rendered raster, so a broken/private mapping still fails the E2E.
      */
-    if (device->model == HPCLANG_MODEL_HP39GS ||
-        device->model == HPCLANG_MODEL_HP40GS)
+    if (device->model == HPCLANG_MODEL_HP39GS || device->model == HPCLANG_MODEL_HP40GS)
         return 1;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -388,11 +376,8 @@ static uint32_t content_rows(const struct hpclang_font *font, uint32_t height)
     return (uint32_t)((bottom - CONTENT_TOP) / (int32_t)line_height);
 }
 
-static void draw_nontext_page(
-    struct hpclang_surface *surface,
-    const struct gallery_view *view,
-    uint32_t height,
-    uint32_t page)
+static void draw_nontext_page(struct hpclang_surface *surface, const struct gallery_view *view,
+                              uint32_t height, uint32_t page)
 {
     const int32_t bottom = (int32_t)height - CONTENT_BOTTOM_MARGIN;
     uint32_t offset = 0u;
@@ -400,20 +385,12 @@ static void draw_nontext_page(
         offset = 18u;
     if (offset >= view->specimen_count)
         offset = 0u;
-    (void)draw_codepoint_rows(
-        surface,
-        view->font,
-        view->specimen_codepoints + offset,
-        view->specimen_count - offset,
-        CONTENT_TOP,
-        bottom,
-        18u);
+    (void)draw_codepoint_rows(surface, view->font, view->specimen_codepoints + offset,
+                              view->specimen_count - offset, CONTENT_TOP, bottom, 18u);
 }
 
-static void draw_basic_page(
-    struct hpclang_surface *surface,
-    const struct gallery_view *view,
-    uint32_t height)
+static void draw_basic_page(struct hpclang_surface *surface, const struct gallery_view *view,
+                            uint32_t height)
 {
     const struct hpclang_font *font = view->font;
     const int32_t bottom = (int32_t)height - CONTENT_BOTTOM_MARGIN;
@@ -445,21 +422,13 @@ static void draw_basic_page(
     }
 
     if (view->specimen_count != 0u && y + (int32_t)line_height <= bottom) {
-        (void)draw_codepoint_rows(
-            surface,
-            font,
-            view->specimen_codepoints,
-            view->specimen_count,
-            y,
-            bottom,
-            height == 64u ? 12u : 20u);
+        (void)draw_codepoint_rows(surface, font, view->specimen_codepoints, view->specimen_count, y,
+                                  bottom, height == 64u ? 12u : 20u);
     }
 }
 
-static void draw_paragraph_page(
-    struct hpclang_surface *surface,
-    const struct gallery_view *view,
-    uint32_t height)
+static void draw_paragraph_page(struct hpclang_surface *surface, const struct gallery_view *view,
+                                uint32_t height)
 {
     const struct hpclang_font *font = view->font;
     const int32_t bottom = (int32_t)height - CONTENT_BOTTOM_MARGIN;
@@ -473,50 +442,28 @@ static void draw_paragraph_page(
         return;
     }
 
-    if (view->specimen_profile != SPECIMEN_GENERIC &&
-        view->specimen_count != 0u) {
-        y = draw_codepoint_rows(
-            surface,
-            font,
-            view->specimen_codepoints,
-            view->specimen_count,
-            y,
-            bottom,
-            height == 64u ? 12u : 18u);
+    if (view->specimen_profile != SPECIMEN_GENERIC && view->specimen_count != 0u) {
+        y = draw_codepoint_rows(surface, font, view->specimen_codepoints, view->specimen_count, y,
+                                bottom, height == 64u ? 12u : 18u);
         if (y < bottom) {
-            (void)draw_words(
-                surface,
-                font,
-                y,
-                bottom,
-                "Sphinx black quartz. Pack five dozen jugs.");
+            (void)draw_words(surface, font, y, bottom,
+                             "Sphinx black quartz. Pack five dozen jugs.");
         }
         return;
     }
 
     int32_t text_bottom = bottom;
-    if (view->specimen_count != 0u &&
-        y + (int32_t)(2u * line_height) <= bottom)
+    if (view->specimen_count != 0u && y + (int32_t)(2u * line_height) <= bottom)
         text_bottom -= (int32_t)line_height;
 
-    y = draw_words(
-        surface,
-        font,
-        y,
-        text_bottom,
-        "Sphinx of black quartz, judge my vow! "
-        "Pack my box with five dozen liquor jugs. "
-        "AV To rn m w MW 0123456789 @&%#?.,:; []{}<> /\\ _-+=*");
+    y = draw_words(surface, font, y, text_bottom,
+                   "Sphinx of black quartz, judge my vow! "
+                   "Pack my box with five dozen liquor jugs. "
+                   "AV To rn m w MW 0123456789 @&%#?.,:; []{}<> /\\ _-+=*");
 
     if (view->specimen_count != 0u && y < bottom) {
-        (void)draw_codepoint_rows(
-            surface,
-            font,
-            view->specimen_codepoints,
-            view->specimen_count,
-            y,
-            bottom,
-            height == 64u ? 10u : 16u);
+        (void)draw_codepoint_rows(surface, font, view->specimen_codepoints, view->specimen_count, y,
+                                  bottom, height == 64u ? 10u : 16u);
     }
 }
 
@@ -531,24 +478,17 @@ static int next_is_same_family(uint32_t index, uint32_t count)
 
 static void publish_state(uint32_t index, uint32_t count, uint32_t page)
 {
-    hpclang_e2e_result = HPCLANG_GALLERY_STATE |
-        ((page & 1u) << 23) |
-        (next_is_same_family(index, count) ? HPCLANG_GALLERY_NEXT_FACE : 0u) |
-        ((count & HPCLANG_GALLERY_COUNT_MAX) << 12) |
-        (index & HPCLANG_GALLERY_INDEX_MAX);
+    hpclang_e2e_result = HPCLANG_GALLERY_STATE | ((page & 1u) << 23) |
+                         (next_is_same_family(index, count) ? HPCLANG_GALLERY_NEXT_FACE : 0u) |
+                         ((count & HPCLANG_GALLERY_COUNT_MAX) << 12) |
+                         (index & HPCLANG_GALLERY_INDEX_MAX);
 }
 
-static int redraw(
-    struct hpclang_surface *surface,
-    const struct hpclang_device_info *device,
-    uint32_t index,
-    uint32_t count,
-    uint32_t page,
-    uint32_t height)
+static int redraw(struct hpclang_surface *surface, const struct hpclang_device_info *device,
+                  uint32_t index, uint32_t count, uint32_t page, uint32_t height)
 {
     struct gallery_view view = gallery_at(index);
-    if (view.font == NULL ||
-        hpclang_font_height(view.font) == 0u ||
+    if (view.font == NULL || hpclang_font_height(view.font) == 0u ||
         hpclang_font_advance(view.font) == 0u)
         return 0;
 
@@ -556,8 +496,7 @@ static int redraw(
     draw_chrome(surface, &view, height);
 
     if (view.native && !native_raster_available(device)) {
-        gallery_chrome_status_centered(
-            surface, (int32_t)height / 2, "NATIVE MAP UNAVAILABLE");
+        gallery_chrome_status_centered(surface, (int32_t)height / 2, "NATIVE MAP UNAVAILABLE");
         publish_state(index, count, page);
         return 1;
     }
@@ -573,8 +512,7 @@ static int redraw(
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    if (device == NULL ||
-        device->version != HPCLANG_DEVICE_INFO_VERSION ||
+    if (device == NULL || device->version != HPCLANG_DEVICE_INFO_VERSION ||
         device->display_width != GALLERY_LCD_WIDTH ||
         (device->display_height != 64u && device->display_height != 80u))
         return fail(1);
@@ -617,19 +555,16 @@ int main(void)
         } else if (event.key == HPCLANG_KEY_DOWN) {
             index = step_face(index, count, 1);
             changed = 1;
-        } else if (event.key == HPCLANG_KEY_ENTER &&
-                   event.type == HPCLANG_KEYBOARD_EVENT_DOWN) {
+        } else if (event.key == HPCLANG_KEY_ENTER && event.type == HPCLANG_KEYBOARD_EVENT_DOWN) {
             page ^= 1u;
             changed = 1;
-        } else if (event.key == HPCLANG_KEY_ON &&
-                   event.type == HPCLANG_KEYBOARD_EVENT_DOWN) {
+        } else if (event.key == HPCLANG_KEY_ON && event.type == HPCLANG_KEYBOARD_EVENT_DOWN) {
             hpclang_e2e_result = HPCLANG_E2E_PASS;
             hold_result();
             return 0;
         }
 
-        if (changed &&
-            !redraw(surface, device, index, count, page, device->display_height))
+        if (changed && !redraw(surface, device, index, count, page, device->display_height))
             return fail(5);
     }
 }

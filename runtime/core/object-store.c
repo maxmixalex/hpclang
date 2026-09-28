@@ -13,25 +13,29 @@
 #include "rpl-object-store.h"
 #include "saturn-view.h"
 
-enum {
+enum
+{
     RPL_DORRP = 0x02a96u,
     RPL_SPACE_NIBBLES = 0x00100000u
 };
 
-struct hpclang_object_store {
+struct hpclang_object_store
+{
     uint32_t component_count;
     uint32_t encoded_size;
     uint8_t encoded_path[];
 };
 
-struct object_store_iterator_entry {
+struct object_store_iterator_entry
+{
     uint32_t kind;
     uint32_t flags;
     uint32_t name_length;
     uint8_t name[HPCLANG_OBJECT_STORE_NAME_CAPACITY];
 };
 
-struct hpclang_object_store_iterator {
+struct hpclang_object_store_iterator
+{
     uint32_t count;
     uint32_t index;
     struct object_store_iterator_entry entries[];
@@ -41,22 +45,17 @@ static int stock_store_available(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
     if (device == NULL ||
-        (device->family != HPCLANG_FAMILY_HP48 &&
-         device->family != HPCLANG_FAMILY_HP4950))
+        (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950))
         return 0;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     return boot != NULL && boot->saturn_state != 0u;
 }
 
-static int stock_read_nibble(
-    void *context,
-    uint32_t nibble_address,
-    uint8_t *value)
+static int stock_read_nibble(void *context, uint32_t nibble_address, uint8_t *value)
 {
     (void)context;
-    return hpclang_saturn_read_nibble(
-        hpclang_saturn_address_make(nibble_address), value);
+    return hpclang_saturn_read_nibble(hpclang_saturn_address_make(nibble_address), value);
 }
 
 static const struct hpclang_rpl_reader stock_reader = {
@@ -87,18 +86,15 @@ static int set_store_errno(int result)
     return -1;
 }
 
-static struct hpclang_object_store *alloc_store(
-    const uint8_t *encoded_path,
-    uint32_t encoded_size,
-    uint32_t component_count)
+static struct hpclang_object_store *alloc_store(const uint8_t *encoded_path, uint32_t encoded_size,
+                                                uint32_t component_count)
 {
     if (encoded_size > HPCLANG_RPL_STORE_PATH_CAPACITY) {
         errno = ENAMETOOLONG;
         return NULL;
     }
 
-    struct hpclang_object_store *store =
-        malloc(sizeof(*store) + (size_t)encoded_size);
+    struct hpclang_object_store *store = malloc(sizeof(*store) + (size_t)encoded_size);
     if (store == NULL) {
         errno = ENOMEM;
         return NULL;
@@ -118,17 +114,14 @@ static int validate_name(const uint8_t *name, uint32_t name_length)
      * null-named variables use it. NULL is therefore valid exactly when the
      * explicit length is zero.
      */
-    if ((name == NULL && name_length != 0u) ||
-        name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
+    if ((name == NULL && name_length != 0u) || name_length >= HPCLANG_OBJECT_STORE_NAME_CAPACITY) {
         errno = EINVAL;
         return 0;
     }
     return 1;
 }
 
-static int resolve_store(
-    const struct hpclang_object_store *store,
-    uint32_t *directory)
+static int resolve_store(const struct hpclang_object_store *store, uint32_t *directory)
 {
     if (store == NULL || directory == NULL) {
         errno = EFAULT;
@@ -150,12 +143,8 @@ static int resolve_store(
         }
 
         struct hpclang_rpl_directory_entry_view entry;
-        result = hpclang_rpl_directory_find(
-            &stock_reader,
-            current,
-            store->encoded_path + offset,
-            length,
-            &entry);
+        result = hpclang_rpl_directory_find(&stock_reader, current, store->encoded_path + offset,
+                                            length, &entry);
         if (result != HPCLANG_RPL_STORE_OK)
             return set_store_errno(result);
         if (entry.prologue != RPL_DORRP) {
@@ -168,8 +157,7 @@ static int resolve_store(
         ++components;
     }
 
-    if (offset != store->encoded_size ||
-        components != store->component_count) {
+    if (offset != store->encoded_size || components != store->component_count) {
         errno = EILSEQ;
         return -1;
     }
@@ -217,29 +205,23 @@ struct hpclang_object_store *hpclang_object_store_current(void)
 
     uint32_t encoded_size = 0u;
     uint32_t component_count = 0u;
-    result = hpclang_rpl_directory_path_to(
-        &stock_reader,
-        current,
-        path,
-        HPCLANG_RPL_STORE_PATH_CAPACITY,
-        &encoded_size,
-        &component_count);
+    result =
+        hpclang_rpl_directory_path_to(&stock_reader, current, path, HPCLANG_RPL_STORE_PATH_CAPACITY,
+                                      &encoded_size, &component_count);
     if (result != HPCLANG_RPL_STORE_OK) {
         free(path);
         set_store_errno(result);
         return NULL;
     }
 
-    struct hpclang_object_store *store =
-        alloc_store(path, encoded_size, component_count);
+    struct hpclang_object_store *store = alloc_store(path, encoded_size, component_count);
     free(path);
     return store;
 }
 
-struct hpclang_object_store *hpclang_object_store_open_child(
-    const struct hpclang_object_store *parent,
-    const uint8_t *name,
-    uint32_t name_length)
+struct hpclang_object_store *
+hpclang_object_store_open_child(const struct hpclang_object_store *parent, const uint8_t *name,
+                                uint32_t name_length)
 {
     if (!stock_store_available()) {
         errno = ENOSYS;
@@ -257,8 +239,7 @@ struct hpclang_object_store *hpclang_object_store_open_child(
         return NULL;
 
     struct hpclang_rpl_directory_entry_view entry;
-    int result = hpclang_rpl_directory_find(
-        &stock_reader, directory, name, name_length, &entry);
+    int result = hpclang_rpl_directory_find(&stock_reader, directory, name, name_length, &entry);
     if (result != HPCLANG_RPL_STORE_OK) {
         set_store_errno(result);
         return NULL;
@@ -288,10 +269,7 @@ struct hpclang_object_store *hpclang_object_store_open_child(
         memcpy(path, parent->encoded_path, parent->encoded_size);
     path[parent->encoded_size] = (uint8_t)name_length;
     if (name_length != 0u) {
-        memcpy(
-            path + parent->encoded_size + 1u,
-            name,
-            name_length);
+        memcpy(path + parent->encoded_size + 1u, name, name_length);
     }
 
     struct hpclang_object_store *child =
@@ -305,11 +283,8 @@ void hpclang_object_store_close(struct hpclang_object_store *store)
     free(store);
 }
 
-int hpclang_object_store_get(
-    const struct hpclang_object_store *store,
-    const uint8_t *name,
-    uint32_t name_length,
-    struct hpclang_object **object)
+int hpclang_object_store_get(const struct hpclang_object_store *store, const uint8_t *name,
+                             uint32_t name_length, struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EFAULT;
@@ -329,8 +304,7 @@ int hpclang_object_store_get(
         return -1;
 
     struct hpclang_rpl_directory_entry_view entry;
-    int result = hpclang_rpl_directory_find(
-        &stock_reader, directory, name, name_length, &entry);
+    int result = hpclang_rpl_directory_find(&stock_reader, directory, name, name_length, &entry);
     if (result != HPCLANG_RPL_STORE_OK)
         return set_store_errno(result);
     if (entry.prologue == RPL_DORRP) {
@@ -342,15 +316,12 @@ int hpclang_object_store_get(
         return -1;
     }
 
-    return hpclang_object_snapshot_copy(
-        &stock_reader,
-        entry.object_address,
-        RPL_SPACE_NIBBLES - entry.object_address,
-        object);
+    return hpclang_object_snapshot_copy(&stock_reader, entry.object_address,
+                                        RPL_SPACE_NIBBLES - entry.object_address, object);
 }
 
-struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
-    const struct hpclang_object_store *store)
+struct hpclang_object_store_iterator *
+hpclang_object_store_iterator_open(const struct hpclang_object_store *store)
 {
     if (!stock_store_available()) {
         errno = ENOSYS;
@@ -362,8 +333,7 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
         return NULL;
 
     struct hpclang_rpl_directory_cursor cursor;
-    int result =
-        hpclang_rpl_directory_cursor_open(&stock_reader, directory, &cursor);
+    int result = hpclang_rpl_directory_cursor_open(&stock_reader, directory, &cursor);
     if (result != HPCLANG_RPL_STORE_OK) {
         set_store_errno(result);
         return NULL;
@@ -371,8 +341,7 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
 
     uint32_t count = 0u;
     struct hpclang_rpl_directory_entry_view view;
-    while ((result = hpclang_rpl_directory_cursor_next(
-                &stock_reader, &cursor, &view)) > 0) {
+    while ((result = hpclang_rpl_directory_cursor_next(&stock_reader, &cursor, &view)) > 0) {
         if (count == UINT32_MAX) {
             errno = ENOMEM;
             return NULL;
@@ -399,8 +368,7 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
     iterator->count = count;
     iterator->index = 0u;
 
-    result =
-        hpclang_rpl_directory_cursor_open(&stock_reader, directory, &cursor);
+    result = hpclang_rpl_directory_cursor_open(&stock_reader, directory, &cursor);
     if (result != HPCLANG_RPL_STORE_OK) {
         free(iterator);
         set_store_errno(result);
@@ -408,8 +376,7 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
     }
 
     uint32_t index = 0u;
-    while ((result = hpclang_rpl_directory_cursor_next(
-                &stock_reader, &cursor, &view)) > 0) {
+    while ((result = hpclang_rpl_directory_cursor_next(&stock_reader, &cursor, &view)) > 0) {
         if (index >= count) {
             free(iterator);
             errno = EBUSY;
@@ -417,12 +384,8 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
         }
         struct object_store_iterator_entry *dst = &iterator->entries[index++];
         memset(dst, 0, sizeof(*dst));
-        dst->kind = (uint32_t)
-            hpclang_object_kind_from_native_prologue(view.prologue);
-        dst->flags =
-            view.prologue == RPL_DORRP
-                ? HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY
-                : 0u;
+        dst->kind = (uint32_t)hpclang_object_kind_from_native_prologue(view.prologue);
+        dst->flags = view.prologue == RPL_DORRP ? HPCLANG_OBJECT_STORE_ENTRY_DIRECTORY : 0u;
         dst->name_length = view.name_length;
         memcpy(dst->name, view.name, view.name_length);
     }
@@ -438,24 +401,21 @@ struct hpclang_object_store_iterator *hpclang_object_store_iterator_open(
     return iterator;
 }
 
-int hpclang_object_store_iterator_read(
-    struct hpclang_object_store_iterator *iterator,
-    struct hpclang_object_store_entry *entry)
+int hpclang_object_store_iterator_read(struct hpclang_object_store_iterator *iterator,
+                                       struct hpclang_object_store_entry *entry)
 {
     if (iterator == NULL || entry == NULL) {
         errno = EFAULT;
         return -1;
     }
-    if (entry->size < sizeof(*entry) ||
-        entry->version != HPCLANG_OBJECT_STORE_ENTRY_VERSION) {
+    if (entry->size < sizeof(*entry) || entry->version != HPCLANG_OBJECT_STORE_ENTRY_VERSION) {
         errno = EINVAL;
         return -1;
     }
     if (iterator->index >= iterator->count)
         return 0;
 
-    const struct object_store_iterator_entry *src =
-        &iterator->entries[iterator->index++];
+    const struct object_store_iterator_entry *src = &iterator->entries[iterator->index++];
     uint32_t size = entry->size;
     uint32_t version = entry->version;
     memset(entry, 0, sizeof(*entry));
@@ -468,8 +428,7 @@ int hpclang_object_store_iterator_read(
     return 1;
 }
 
-void hpclang_object_store_iterator_close(
-    struct hpclang_object_store_iterator *iterator)
+void hpclang_object_store_iterator_close(struct hpclang_object_store_iterator *iterator)
 {
     free(iterator);
 }

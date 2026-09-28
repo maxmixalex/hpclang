@@ -9,17 +9,15 @@
 #include "hp39-catalog.h"
 #include "object-snapshot.h"
 
-enum {
+enum
+{
     RPL_DOLIST = 0x02a74u,
     RPL_DOCSTR = 0x02a2cu,
     RPL_DOIDNT = 0x02e48u,
     RPL_SEMI = 0x0312bu
 };
 
-static void put_nibble(
-    struct hpclang_object *object,
-    uint32_t offset,
-    uint8_t value)
+static void put_nibble(struct hpclang_object *object, uint32_t offset, uint8_t value)
 {
     assert(object != NULL);
     assert(offset < object->nibble_count);
@@ -31,30 +29,18 @@ static void put_nibble(
         *byte = (uint8_t)((*byte & 0xf0u) | value);
 }
 
-static void put_word(
-    struct hpclang_object *object,
-    uint32_t offset,
-    uint32_t nibbles,
-    uint32_t value)
+static void put_word(struct hpclang_object *object, uint32_t offset, uint32_t nibbles,
+                     uint32_t value)
 {
     for (uint32_t i = 0u; i < nibbles; ++i)
-        put_nibble(
-            object, offset + i,
-            (uint8_t)((value >> (4u * i)) & 0x0fu));
+        put_nibble(object, offset + i, (uint8_t)((value >> (4u * i)) & 0x0fu));
 }
 
-static void put_bytes(
-    struct hpclang_object *object,
-    uint32_t offset,
-    const char *text)
+static void put_bytes(struct hpclang_object *object, uint32_t offset, const char *text)
 {
     size_t length = strlen(text);
     for (size_t i = 0u; i < length; ++i)
-        put_word(
-            object,
-            offset + (uint32_t)(i * 2u),
-            2u,
-            (uint8_t)text[i]);
+        put_word(object, offset + (uint32_t)(i * 2u), 2u, (uint8_t)text[i]);
 }
 
 static struct hpclang_object *make_catalog(void)
@@ -62,8 +48,7 @@ static struct hpclang_object *make_catalog(void)
     /* DOLIST + ID("ABC") + CSTR("Test") + SEMI = 41 nibbles. */
     const uint32_t nibbles = 41u;
     size_t bytes = (nibbles + 1u) / 2u;
-    struct hpclang_object *object =
-        calloc(1u, sizeof(*object) + bytes);
+    struct hpclang_object *object = calloc(1u, sizeof(*object) + bytes);
     assert(object != NULL);
     object->kind = HPCLANG_OBJECT_LIST;
     object->nibble_count = nibbles;
@@ -96,16 +81,14 @@ static void test_inline_catalog_names(void)
     assert(count == 2u);
 
     int found = 0;
-    assert(hpclang_hp39_catalog_contains_name(
-               catalog, (const uint8_t *)"ABC", 3u, &found) == 0);
+    assert(hpclang_hp39_catalog_contains_name(catalog, (const uint8_t *)"ABC", 3u, &found) == 0);
     assert(found == 1);
 
-    assert(hpclang_hp39_catalog_contains_name(
-               catalog, (const uint8_t *)"Test", 4u, &found) == 0);
+    assert(hpclang_hp39_catalog_contains_name(catalog, (const uint8_t *)"Test", 4u, &found) == 0);
     assert(found == 1);
 
-    assert(hpclang_hp39_catalog_contains_name(
-               catalog, (const uint8_t *)"Missing", 7u, &found) == 0);
+    assert(hpclang_hp39_catalog_contains_name(catalog, (const uint8_t *)"Missing", 7u, &found) ==
+           0);
     assert(found == 0);
 
     free(catalog);
@@ -114,8 +97,7 @@ static void test_inline_catalog_names(void)
 static void test_reference_entry_is_rejected(void)
 {
     const uint32_t nibbles = 15u;
-    struct hpclang_object *catalog =
-        calloc(1u, sizeof(*catalog) + (nibbles + 1u) / 2u);
+    struct hpclang_object *catalog = calloc(1u, sizeof(*catalog) + (nibbles + 1u) / 2u);
     assert(catalog != NULL);
     catalog->kind = HPCLANG_OBJECT_LIST;
     catalog->nibble_count = nibbles;

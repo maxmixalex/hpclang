@@ -30,9 +30,7 @@ void hpclang_keyboard_read(struct hpclang_keyboard_state *state)
          * transient stock-OS GPG0..7 state; the complete original GPGCON is
          * restored after the scan.
          */
-        GPGCON =
-            GPG_SCAN_LOW_CONFIG |
-            (UINT32_C(1) << ((column + 8u) * 2u));
+        GPGCON = GPG_SCAN_LOW_CONFIG | (UINT32_C(1) << ((column + 8u) * 2u));
         settle();
 
         uint32_t rows = ((~GPGDAT) >> 1u) & MATRIX_ROWS_MASK;
@@ -61,31 +59,25 @@ void hpclang_keyboard_read(struct hpclang_keyboard_state *state)
     state->bits = bits;
 }
 
-int hpclang_keyboard_any_is_down(
-    const struct hpclang_keyboard_state *state)
+int hpclang_keyboard_any_is_down(const struct hpclang_keyboard_state *state)
 {
     return state->bits != 0u;
 }
 
-int hpclang_keyboard_matrix_is_down(
-    const struct hpclang_keyboard_state *state,
-    unsigned column,
-    unsigned row)
+int hpclang_keyboard_matrix_is_down(const struct hpclang_keyboard_state *state, unsigned column,
+                                    unsigned row)
 {
-    if (column >= HPCLANG_KEYBOARD_COLUMNS ||
-        row >= HPCLANG_KEYBOARD_ROWS)
+    if (column >= HPCLANG_KEYBOARD_COLUMNS || row >= HPCLANG_KEYBOARD_ROWS)
         return 0;
 
     unsigned bit = column * HPCLANG_KEYBOARD_ROWS + row;
     return (int)((state->bits >> bit) & UINT64_C(1));
 }
 
-int hpclang_keyboard_dedicated_is_down(
-    const struct hpclang_keyboard_state *state,
-    enum hpclang_keyboard_dedicated_key key)
+int hpclang_keyboard_dedicated_is_down(const struct hpclang_keyboard_state *state,
+                                       enum hpclang_keyboard_dedicated_key key)
 {
-    if ((unsigned)key < HPCLANG_KEYBOARD_ON ||
-        (unsigned)key > HPCLANG_KEYBOARD_GPF6)
+    if ((unsigned)key < HPCLANG_KEYBOARD_ON || (unsigned)key > HPCLANG_KEYBOARD_GPF6)
         return 0;
 
     return (int)((state->bits >> (unsigned)key) & UINT64_C(1));

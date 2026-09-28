@@ -214,7 +214,9 @@ def write_index(path: Path, records: list[dict]) -> None:
         print("", file=out)
         for number, record in enumerate(records):
             ident = record["id"]
-            print(f"set(HPCLANG_FONT_{ident}_SELECTOR \"{cmake_quote(record['selector'])}\")", file=out)
+            print(
+                f'set(HPCLANG_FONT_{ident}_SELECTOR "{cmake_quote(record["selector"])}")', file=out
+            )
             print(f"set(HPCLANG_FONT_{ident}_SOURCES", file=out)
             for source in record["sources"]:
                 print(f'    "${{CMAKE_CURRENT_LIST_DIR}}/{cmake_quote(source)}"', file=out)
@@ -222,7 +224,9 @@ def write_index(path: Path, records: list[dict]) -> None:
             print(f"set(HPCLANG_FONT_{ident}_ASCENT {record['ascent']})", file=out)
             print(f"set(HPCLANG_FONT_{ident}_DESCENT {record['descent']})", file=out)
             print(f"set(HPCLANG_FONT_{ident}_LINE_HEIGHT {record['line_height']})", file=out)
-            print(f"set(HPCLANG_FONT_{ident}_NOMINAL_ADVANCE {record['nominal_advance']})", file=out)
+            print(
+                f"set(HPCLANG_FONT_{ident}_NOMINAL_ADVANCE {record['nominal_advance']})", file=out
+            )
             print(
                 f'set(HPCLANG_FONT_{ident}_CODEPOINTS_FILE "${{CMAKE_CURRENT_LIST_DIR}}/{ident}.codepoints.cmake")',
                 file=out,
@@ -250,8 +254,12 @@ def main() -> int:
     parser.add_argument("--package", default="runtime/fonts/fonts.zip")
     parser.add_argument("--output-dir", default="runtime/fonts/generated")
     parser.add_argument("--chunk-glyphs", type=int, default=512)
-    parser.add_argument("--selector", action="append", default=[], help="limit generation to exact selectors")
-    parser.add_argument("--keep-stale", action="store_true", help="do not remove old generated assets first")
+    parser.add_argument(
+        "--selector", action="append", default=[], help="limit generation to exact selectors"
+    )
+    parser.add_argument(
+        "--keep-stale", action="store_true", help="do not remove old generated assets first"
+    )
     args = parser.parse_args()
 
     if args.chunk_glyphs <= 0:

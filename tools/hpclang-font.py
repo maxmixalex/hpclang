@@ -45,7 +45,6 @@ def _num(s: str) -> int:
     return int(s, 0)
 
 
-
 class Package:
     """Read either the canonical raw fonts/ ZIP or an older manifest package."""
 
@@ -59,10 +58,7 @@ class Package:
         if "fonts/manifest.json" in self._name_set:
             self.manifest = json.loads(self.z.read("fonts/manifest.json"))
         else:
-            if not any(
-                name.startswith(self.root) and not name.endswith("/")
-                for name in names
-            ):
+            if not any(name.startswith(self.root) and not name.endswith("/") for name in names):
                 raise ValueError("font package has no fonts/ source tree")
 
             entries = []
@@ -71,9 +67,7 @@ class Package:
                     continue
                 logical = name[len(self.root) :]
                 ext = Path(logical).suffix.lower()
-                sibling_txt = str(Path(logical).with_suffix(".txt")).replace(
-                    "\\", "/"
-                )
+                sibling_txt = str(Path(logical).with_suffix(".txt")).replace("\\", "/")
                 is_font = ext in {".bdf", ".fon"} or (
                     ext == ".bmp" and self.root + sibling_txt in self._name_set
                 )
@@ -213,9 +207,7 @@ def parse_bdf(data: bytes, source: str) -> Font:
     if descent is None:
         descent = max((max(0, -g.y_offset) for g in glyphs.values()), default=0)
     line = max(1, ascent + descent)
-    nominal = (
-        round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
-    )
+    nominal = round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
     return Font(source, glyphs, ascent, descent, line, nominal, "bdf")
 
 
@@ -289,9 +281,7 @@ def parse_newrpl_bmp(pkg: Package, path: str) -> Font:
     txtpath = os.path.splitext(path)[0] + ".txt"
     cp_to_index, _ = parse_map(pkg.data(txtpath))
     if cp_to_index and max(cp_to_index.values()) >= len(offsets):
-        raise ValueError(
-            f"{path}: mapping references glyph beyond {len(offsets)} bitmap runs"
-        )
+        raise ValueError(f"{path}: mapping references glyph beyond {len(offsets)} bitmap runs")
 
     glyphs = {}
     for cp, idx in cp_to_index.items():
@@ -306,9 +296,7 @@ def parse_newrpl_bmp(pkg: Package, path: str) -> Font:
                     bits[yy * stride + (xx >> 3)] |= 0x80 >> (xx & 7)
         glyphs[cp] = Glyph(cp, gw, h, gw, 0, 0, bytes(bits), stride)
 
-    nominal = (
-        round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
-    )
+    nominal = round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
     return Font(path, glyphs, h, 0, h, nominal, "bmp")
 
 
@@ -316,7 +304,6 @@ def _pillow_font(data: bytes, size: int, index: int = 0):
     from PIL import ImageFont
 
     return ImageFont.truetype(io.BytesIO(data), size=size, index=index)
-
 
 
 def raster_pillow_bitmap(
@@ -349,8 +336,7 @@ def raster_pillow_bitmap(
         raw = bytes(mask)
         if len(raw) != gw * gh:
             raise ValueError(
-                f"{source}: U+{cp:04X}: Pillow mask bytes {len(raw)} "
-                f"!= geometry {gw}x{gh}"
+                f"{source}: U+{cp:04X}: Pillow mask bytes {len(raw)} != geometry {gw}x{gh}"
             )
         bits = bytearray(stride * gh)
         for y in range(gh):
@@ -368,9 +354,7 @@ def raster_pillow_bitmap(
             stride,
         )
 
-    nominal = (
-        round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
-    )
+    nominal = round(sum(g.advance for g in glyphs.values()) / len(glyphs)) if glyphs else 0
     return Font(source, glyphs, asc, desc, asc + desc, nominal, fmt, face)
 
 
@@ -452,8 +436,7 @@ def load_selected(
                     break
             if match is None:
                 raise ValueError(
-                    f"{path}: unknown FON face {face!r}; "
-                    "use #0/#1/#2 or #6x10/#7x13/#8x16"
+                    f"{path}: unknown FON face {face!r}; use #0/#1/#2 or #6x10/#7x13/#8x16"
                 )
             idx, size, label = match
         chosen = (
@@ -495,8 +478,7 @@ def emit_c(font: Font, symbol: str, out):
         print(f"static const uint8_t {bitmap_name}[] = {{ {data} }};", file=out)
         print(f"static const struct hpclang_bitmap_glyph {glyph_name} = {{", file=out)
         print(
-            f"    0x{glyph.codepoint:08x}u, {bitmap_name}, "
-            f"{glyph.x_offset}, {glyph.y_offset},",
+            f"    0x{glyph.codepoint:08x}u, {bitmap_name}, {glyph.x_offset}, {glyph.y_offset},",
             file=out,
         )
         print(
@@ -520,8 +502,7 @@ def emit_c(font: Font, symbol: str, out):
         file=out,
     )
     print(
-        f"    {font.ascent}, {font.descent}, "
-        f"{font.line_height}u, {font.nominal_advance}u",
+        f"    {font.ascent}, {font.descent}, {font.line_height}u, {font.nominal_advance}u",
         file=out,
     )
     print("};", file=out)
@@ -669,9 +650,7 @@ def main():
         for text in args.text:
             requested.update(ord(ch) for ch in text)
         for file_path in args.charset_file:
-            requested.update(
-                ord(ch) for ch in Path(file_path).read_text(encoding="utf-8")
-            )
+            requested.update(ord(ch) for ch in Path(file_path).read_text(encoding="utf-8"))
         if args.mode == "STATIC_EXPLICIT" and not requested:
             parser.error("STATIC_EXPLICIT compile requires --text or --charset-file")
         font = load_selected(pkg, args.font, args.mode, requested)

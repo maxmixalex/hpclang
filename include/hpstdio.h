@@ -11,10 +11,11 @@
 #include <stdio.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-int fdelete(char *filename);
+    int fdelete(char *filename);
 
 #ifdef __cplusplus
 }

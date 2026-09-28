@@ -61,7 +61,8 @@ typedef void (*hpusb_irq_fn)(void *opaque, int level);
 typedef int (*hpusb_stream_read_fn)(void *opaque, uint8_t *buffer, size_t cap);
 typedef int (*hpusb_stream_write_fn)(void *opaque, const uint8_t *buffer, size_t len);
 
-struct hpusb_ep {
+struct hpusb_ep
+{
     uint8_t maxp;
     uint8_t in_csr1;
     uint8_t in_csr2;
@@ -74,7 +75,8 @@ struct hpusb_ep {
     size_t out_pos;
 };
 
-enum hpusb_enum_state {
+enum hpusb_enum_state
+{
     HPUSB_ENUM_WAIT_READY = 0,
     HPUSB_ENUM_WAIT_RESET_ACK,
     HPUSB_ENUM_GET_DEVICE,
@@ -87,7 +89,8 @@ enum hpusb_enum_state {
     HPUSB_ENUM_FAILED,
 };
 
-struct hpusb_core {
+struct hpusb_core
+{
     uint8_t func_addr;
     uint8_t pwr;
     uint8_t ep_int;

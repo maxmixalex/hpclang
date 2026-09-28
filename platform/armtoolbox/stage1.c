@@ -7,39 +7,38 @@
 
 #include "hp39-portal-private.h"
 
-#define STAGE_WINDOW_BASE   0x09000000u
-#define STAGE_CODE_OFFSET   0x00000400u
-#define STAGE_STACK_PAGES   2u
+#define STAGE_WINDOW_BASE 0x09000000u
+#define STAGE_CODE_OFFSET 0x00000400u
+#define STAGE_STACK_PAGES 2u
 
-#define ARMSYS_PAGE_COUNT   0x914u
-#define ARMSYS_L2_PHYS      0x920u
-#define ARMSYS_C_LO         0x91cu
-#define COARSE_L1_FLAGS     0x0011u
+#define ARMSYS_PAGE_COUNT 0x914u
+#define ARMSYS_L2_PHYS 0x920u
+#define ARMSYS_C_LO 0x91cu
+#define COARSE_L1_FLAGS 0x0011u
 
-#define RPL_RSKTOP           0x000806f3u
-#define RPL_DSKTOP           0x000806f8u
-#define RPL_INTRPPTR         0x0008076bu
-#define RPL_AVMEM            0x00080e9bu
-#define RPL_DOCSTR           0x00002a2cu
-#define RPL_MAIN_FIRST       0x00080000u
-#define RPL_MAIN_END         0x00100000u
+#define RPL_RSKTOP 0x000806f3u
+#define RPL_DSKTOP 0x000806f8u
+#define RPL_INTRPPTR 0x0008076bu
+#define RPL_AVMEM 0x00080e9bu
+#define RPL_DOCSTR 0x00002a2cu
+#define RPL_MAIN_FIRST 0x00080000u
+#define RPL_MAIN_END 0x00100000u
 #define RPL_PHYS_PAGE_NIBBLES 0x00002000u
 
-#define HP39_MAIN_FIRST_NIBBLE   0x0007c651u
-#define HP39_MAIN_LAST_NIBBLE    (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
-#define HP39_MINI_FIRST_NIBBLE   0x0007e695u
-#define HP39_MINI_LAST_NIBBLE    (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
+#define HP39_MAIN_FIRST_NIBBLE 0x0007c651u
+#define HP39_MAIN_LAST_NIBBLE (HP39_MAIN_FIRST_NIBBLE + 255u * 16u + 15u)
+#define HP39_MINI_FIRST_NIBBLE 0x0007e695u
+#define HP39_MINI_LAST_NIBBLE (HP39_MINI_FIRST_NIBBLE + 255u * 11u + 10u)
 #define HP4950_MINI_FIRST_NIBBLE 0x000812c8u
-#define HP4950_MINI_LAST_NIBBLE  (HP4950_MINI_FIRST_NIBBLE + 7u + 255u * 6u + 5u)
+#define HP4950_MINI_LAST_NIBBLE (HP4950_MINI_FIRST_NIBBLE + 7u + 255u * 6u + 5u)
 #define HP4950_BIG_OBJECT_NIBBLE 0x00084d82u
 /* get_bigfont() skips either 8 bytes or 9 + name_length bytes before the
    256-record, 16-nibble raster. Require the worst-case name length so every
    Read[] page the runtime may dereference is present before publishing the
    Saturn state. */
 #define HP4950_BIG_MAX_NAME_BYTES 255u
-#define HP4950_BIG_LAST_NIBBLE \
-    (HP4950_BIG_OBJECT_NIBBLE + \
-     2u * (9u + HP4950_BIG_MAX_NAME_BYTES) + 255u * 16u + 15u)
+#define HP4950_BIG_LAST_NIBBLE                                                                     \
+    (HP4950_BIG_OBJECT_NIBBLE + 2u * (9u + HP4950_BIG_MAX_NAME_BYTES) + 255u * 16u + 15u)
 
 /*
  * The official HP39gs/40gs 2.22 update images both contain the exact reviewed
@@ -54,26 +53,24 @@ static const uint32_t hp39_font_nor_pages[] = {
     0x0007f000u,
 };
 
-_Static_assert(
-    sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]) <=
-        HPCLANG_CODE_WINDOW_PAGE_CAPACITY,
-    "HP39 native font window must fit before HPCLANG_CODE_BASE");
+_Static_assert(sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]) <=
+                   HPCLANG_CODE_WINDOW_PAGE_CAPACITY,
+               "HP39 native font window must fit before HPCLANG_CODE_BASE");
 
 void hpclang_cache_clean(const void *start, uint32_t size);
-void hpclang_mmu_sync(
-    volatile uint32_t *l2_workspace,
-    volatile uint32_t *l1);
+void hpclang_mmu_sync(volatile uint32_t *l2_workspace, volatile uint32_t *l1);
 uint32_t hpclang_irq_save_disable(void);
 void hpclang_irq_restore(uint32_t cpsr);
 
 struct hpclang_hp39_portal_context hpclang_hp39_portal_context
     __attribute__((section(".data.hp39.portal"), aligned(8))) = {
-        .public_context = {
-            .magic = HPCLANG_HP39_PLATFORM_MAGIC,
-            .font_window_base = 0u,
-            .portal_entry = 0u,
-        },
-    };
+        .public_context =
+            {
+                .magic = HPCLANG_HP39_PLATFORM_MAGIC,
+                .font_window_base = 0u,
+                .portal_entry = 0u,
+            },
+};
 
 /*
  * Keep the evaluator portal on its own 512-byte page sub-boundary. The ARM
@@ -108,7 +105,8 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
 static uint8_t hp39_saturn_portal_thunk[512]
     __attribute__((section(".data.hp39.thunk"), aligned(512)));
 
-enum {
+enum
+{
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
     HP39P_ARG_NIBBLE = 33u,
@@ -133,37 +131,32 @@ enum {
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
     HP39P_VARIABLE_RECALL_NIBBLE = 755u,
     HP39P_VARIABLE_RECALL_NIBBLES = 35u,
-    HP39P_STATIC_NIBBLES =
-        HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
+    HP39P_STATIC_NIBBLES = HP39P_VARIABLE_RECALL_NIBBLE + HP39P_VARIABLE_RECALL_NIBBLES,
     HP39P_DOCODE_MACHINE_NIBBLES = 43u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
-_Static_assert(
-    HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
-    HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
-    HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
-        HP39P_REFERENCE_LIST_NIBBLE &&
-    HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES <=
-        HP39P_VARIABLE_RECALL_NIBBLE &&
-    HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
-    "HP39 Saturn portal request helpers must fit its private buffer");
-_Static_assert(
-    HPCLANG_PAGE_SIZE % sizeof(hp39_saturn_portal_thunk) == 0u,
-    "HP39 portal thunk alignment must partition a 4 KiB page");
+_Static_assert(HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
+                   HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
+                   HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
+                       HP39P_REFERENCE_LIST_NIBBLE &&
+                   HP39P_REFERENCE_LIST_NIBBLE + HP39P_REFERENCE_LIST_NIBBLES <=
+                       HP39P_VARIABLE_RECALL_NIBBLE &&
+                   HP39P_STATIC_NIBBLES <= sizeof(hp39_saturn_portal_thunk) * 2u,
+               "HP39 Saturn portal request helpers must fit its private buffer");
+_Static_assert(HPCLANG_PAGE_SIZE % sizeof(hp39_saturn_portal_thunk) == 0u,
+               "HP39 portal thunk alignment must partition a 4 KiB page");
 
-struct hp39_saturn_builder {
+struct hp39_saturn_builder
+{
     uint8_t *bytes;
     uint32_t capacity_nibbles;
     uint32_t nibbles;
 };
 
-static int hp39_saturn_put_nibble(
-    struct hp39_saturn_builder *builder,
-    uint8_t nibble)
+static int hp39_saturn_put_nibble(struct hp39_saturn_builder *builder, uint8_t nibble)
 {
-    if (builder == NULL || nibble > 0x0fu ||
-        builder->nibbles >= builder->capacity_nibbles)
+    if (builder == NULL || nibble > 0x0fu || builder->nibbles >= builder->capacity_nibbles)
         return 0;
 
     uint32_t offset = builder->nibbles++;
@@ -175,38 +168,28 @@ static int hp39_saturn_put_nibble(
     return 1;
 }
 
-static int hp39_saturn_put_word5(
-    struct hp39_saturn_builder *builder,
-    uint32_t value)
+static int hp39_saturn_put_word5(struct hp39_saturn_builder *builder, uint32_t value)
 {
     if (value >= UINT32_C(0x00100000))
         return 0;
     for (uint32_t i = 0u; i < 5u; ++i) {
-        if (!hp39_saturn_put_nibble(
-                builder,
-                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+        if (!hp39_saturn_put_nibble(builder, (uint8_t)((value >> (i * 4u)) & 0x0fu)))
             return 0;
     }
     return 1;
 }
 
-static int hp39_saturn_put_u32(
-    struct hp39_saturn_builder *builder,
-    uint32_t value)
+static int hp39_saturn_put_u32(struct hp39_saturn_builder *builder, uint32_t value)
 {
     for (uint32_t i = 0u; i < 8u; ++i) {
-        if (!hp39_saturn_put_nibble(
-                builder,
-                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+        if (!hp39_saturn_put_nibble(builder, (uint8_t)((value >> (i * 4u)) & 0x0fu)))
             return 0;
     }
     return 1;
 }
 
-static int hp39_saturn_put_sequence(
-    struct hp39_saturn_builder *builder,
-    const uint8_t *nibbles,
-    uint32_t count)
+static int hp39_saturn_put_sequence(struct hp39_saturn_builder *builder, const uint8_t *nibbles,
+                                    uint32_t count)
 {
     if (nibbles == NULL && count != 0u)
         return 0;
@@ -217,21 +200,14 @@ static int hp39_saturn_put_sequence(
     return 1;
 }
 
-static uint8_t hp39_saturn_buffer_nibble(
-    const uint8_t *bytes,
-    uint32_t nibble)
+static uint8_t hp39_saturn_buffer_nibble(const uint8_t *bytes, uint32_t nibble)
 {
     uint8_t packed = bytes[nibble >> 1];
-    return (nibble & 1u) != 0u
-        ? (uint8_t)(packed >> 4)
-        : (uint8_t)(packed & 0x0fu);
+    return (nibble & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
 }
 
-static int hp39_saturn_buffer_store_nibble(
-    uint8_t *bytes,
-    uint32_t capacity_nibbles,
-    uint32_t offset,
-    uint8_t value)
+static int hp39_saturn_buffer_store_nibble(uint8_t *bytes, uint32_t capacity_nibbles,
+                                           uint32_t offset, uint8_t value)
 {
     if (bytes == NULL || value > 0x0fu || offset >= capacity_nibbles)
         return 0;
@@ -244,21 +220,16 @@ static int hp39_saturn_buffer_store_nibble(
     return 1;
 }
 
-static int hp39_saturn_buffer_store_word5(
-    uint8_t *bytes,
-    uint32_t capacity_nibbles,
-    uint32_t offset,
-    uint32_t value)
+static int hp39_saturn_buffer_store_word5(uint8_t *bytes, uint32_t capacity_nibbles,
+                                          uint32_t offset, uint32_t value)
 {
-    if (bytes == NULL || value >= UINT32_C(0x00100000) ||
-        offset > capacity_nibbles ||
+    if (bytes == NULL || value >= UINT32_C(0x00100000) || offset > capacity_nibbles ||
         capacity_nibbles - offset < 5u)
         return 0;
 
     for (uint32_t i = 0u; i < 5u; ++i) {
         uint32_t nibble = offset + i;
-        uint8_t value_nibble =
-            (uint8_t)((value >> (i * 4u)) & 0x0fu);
+        uint8_t value_nibble = (uint8_t)((value >> (i * 4u)) & 0x0fu);
         uint8_t *packed = &bytes[nibble >> 1];
         if ((nibble & 1u) != 0u)
             *packed = (uint8_t)((*packed & 0x0fu) | (value_nibble << 4));
@@ -268,34 +239,23 @@ static int hp39_saturn_buffer_store_word5(
     return 1;
 }
 
-static int hp39_request_words(
-    uint32_t kind,
-    uint32_t name_length,
-    uint32_t saturn_base,
-    uint32_t *arg,
-    uint32_t *operation,
-    uint32_t *pack,
-    uint32_t *normalize,
-    uint32_t *finalize,
-    uint32_t *expected_prologue)
+static int hp39_request_words(uint32_t kind, uint32_t name_length, uint32_t saturn_base,
+                              uint32_t *arg, uint32_t *operation, uint32_t *pack,
+                              uint32_t *normalize, uint32_t *finalize, uint32_t *expected_prologue)
 {
-    if (arg == NULL || operation == NULL || pack == NULL ||
-        normalize == NULL || finalize == NULL ||
+    if (arg == NULL || operation == NULL || pack == NULL || normalize == NULL || finalize == NULL ||
         expected_prologue == NULL)
         return 0;
 
     const uint32_t nop = UINT32_C(0x0000765c);
     *finalize = nop;
 
-    if (kind == HP39P_CATALOG_APLET ||
-        kind == HP39P_CATALOG_PROGRAM ||
+    if (kind == HP39P_CATALOG_APLET || kind == HP39P_CATALOG_PROGRAM ||
         kind == HP39P_CATALOG_NOTE) {
         if (name_length != 0u)
             return 0;
         *arg = nop;
-        *pack = kind == HP39P_CATALOG_APLET
-            ? nop
-            : UINT32_C(0x00005c12); /* {}N */
+        *pack = kind == HP39P_CATALOG_APLET ? nop : UINT32_C(0x00005c12); /* {}N */
         *normalize = nop;
         *expected_prologue = UINT32_C(0x00002a74); /* DOLIST */
         if (kind == HP39P_CATALOG_APLET)
@@ -348,13 +308,10 @@ static int hp39_request_words(
         return 1;
     }
 
-    if ((kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) &&
-        name_length != 0u &&
+    if ((kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) && name_length != 0u &&
         name_length <= HP39P_BODY_NAME_MAX_BYTES) {
         *arg = saturn_base + HP39P_NAME_NIBBLE;
-        *operation = kind == HP39P_BODY_PROGRAM
-            ? UINT32_C(0x00027f6d)
-            : UINT32_C(0x000280f0);
+        *operation = kind == HP39P_BODY_PROGRAM ? UINT32_C(0x00027f6d) : UINT32_C(0x000280f0);
         *pack = UINT32_C(0x00007903); /* ?SKIP */
         *normalize = saturn_base + HP39P_MISS_NIBBLE;
         *expected_prologue = UINT32_C(0x00002a2c); /* DOCSTR */
@@ -364,14 +321,10 @@ static int hp39_request_words(
     return 0;
 }
 
-static int hp39_store_request_name(
-    uint32_t kind,
-    uint32_t name_length,
-    const uint8_t *name)
+static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const uint8_t *name)
 {
 
-    const int body_request =
-        kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
+    const int body_request = kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
     const int variable_request = kind == HP39P_VARIABLE_VALUE;
     const int reference_request = kind == HP39P_REFERENCE_EVAL;
     if (!body_request && !variable_request && !reference_request)
@@ -381,28 +334,21 @@ static int hp39_store_request_name(
         if (name == NULL || name_length != 3u)
             return 0;
         uint32_t reference =
-            (uint32_t)name[0] |
-            ((uint32_t)name[1] << 8u) |
-            ((uint32_t)name[2] << 16u);
+            (uint32_t)name[0] | ((uint32_t)name[1] << 8u) | ((uint32_t)name[2] << 16u);
         if (reference == 0u || reference >= UINT32_C(0x00100000))
             return 0;
         uint32_t patch = HP39P_REFERENCE_LIST_NIBBLE + 5u;
-        return hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            patch,
-            reference);
+        return hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                              (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                              patch, reference);
     }
 
     if (variable_request) {
         if (name == NULL || name_length != 3u)
             return 0;
         uint32_t id_reference =
-            (uint32_t)name[0] |
-            ((uint32_t)name[1] << 8u) |
-            ((uint32_t)name[2] << 16u);
-        if (id_reference == 0u ||
-            id_reference >= UINT32_C(0x00100000))
+            (uint32_t)name[0] | ((uint32_t)name[1] << 8u) | ((uint32_t)name[2] << 16u);
+        if (id_reference == 0u || id_reference >= UINT32_C(0x00100000))
             return 0;
 
         /*
@@ -410,74 +356,49 @@ static int hp39_store_request_name(
          * Stock's own DummyVarProc uses exactly this form (`' DummyVar`);
          * no temporary list/component extraction is needed before @.
          */
-        return hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_VARIABLE_RECALL_NIBBLE + 10u,
-            id_reference);
+        return hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                              (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                              HP39P_VARIABLE_RECALL_NIBBLE + 10u, id_reference);
     }
 
     uint32_t maximum = HP39P_BODY_NAME_MAX_BYTES;
     if (name == NULL || name_length == 0u || name_length > maximum)
         return 0;
 
-    if (!hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_NAME_NIBBLE,
-            UINT32_C(0x00002e48))) /* DOIDNT */
+    if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_NAME_NIBBLE, UINT32_C(0x00002e48))) /* DOIDNT */
         return 0;
 
     uint32_t length_offset = HP39P_NAME_NIBBLE + 5u;
-    if (!hp39_saturn_buffer_store_nibble(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            length_offset,
-            (uint8_t)(name_length & 0x0fu)) ||
-        !hp39_saturn_buffer_store_nibble(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            length_offset + 1u,
-            (uint8_t)((name_length >> 4) & 0x0fu)))
+    if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
+                                         (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                         length_offset, (uint8_t)(name_length & 0x0fu)) ||
+        !hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
+                                         (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                         length_offset + 1u, (uint8_t)((name_length >> 4) & 0x0fu)))
         return 0;
 
     uint32_t payload = HP39P_NAME_NIBBLE + 7u;
     for (uint32_t i = 0u; i < name_length; ++i) {
-        if (!hp39_saturn_buffer_store_nibble(
-                hp39_saturn_portal_thunk,
-                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                payload + i * 2u,
-                (uint8_t)(name[i] & 0x0fu)) ||
-            !hp39_saturn_buffer_store_nibble(
-                hp39_saturn_portal_thunk,
-                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                payload + i * 2u + 1u,
-                (uint8_t)(name[i] >> 4)))
+        if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
+                                             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                             payload + i * 2u, (uint8_t)(name[i] & 0x0fu)) ||
+            !hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
+                                             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                             payload + i * 2u + 1u, (uint8_t)(name[i] >> 4)))
             return 0;
     }
     return 1;
 }
 
-static int stage_saturn_read_nibble(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint8_t *value);
-static int stage_saturn_read_word5(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint32_t *value);
-static int stage_saturn_write_word5(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint32_t value);
-static int stage_phys_page_saturn_start(
-    const uint32_t *read_map,
-    uint32_t phys_page,
-    uint32_t *saturn_start);
+static int stage_saturn_read_nibble(const uint32_t *read_map, uint32_t address, uint8_t *value);
+static int stage_saturn_read_word5(const uint32_t *read_map, uint32_t address, uint32_t *value);
+static int stage_saturn_write_word5(const uint32_t *read_map, uint32_t address, uint32_t value);
+static int stage_phys_page_saturn_start(const uint32_t *read_map, uint32_t phys_page,
+                                        uint32_t *saturn_start);
 
-static int hp39_portal_prepare_thunk(
-    void *saturn_state,
-    struct hpclang_hp39_portal_context *portal)
+static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_portal_context *portal)
 {
     /*
      * These machine encodings are fixed by the HP39 Saturn ISA and are also
@@ -492,27 +413,22 @@ static int hp39_portal_prepare_thunk(
      *   1567      C=DAT0 W
      *   80BFE     ARMSYS
      */
-    static const uint8_t getptr[] = {
-        0x8u, 0xfu, 0xcu, 0x0u, 0x3u, 0xfu, 0x0u
-    };
-    static const uint8_t savptr[] = {
-        0x8u, 0xfu, 0x3u, 0x7u, 0xfu, 0x6u, 0x0u
-    };
-    static const uint8_t d0_imm[] = { 0x1u, 0xbu };
-    static const uint8_t ad0ex[] = { 0x1u, 0x3u, 0x2u };
-    static const uint8_t pc_indirect[] = { 0x8u, 0x0u, 0x8u, 0xcu };
-    static const uint8_t c_dat0_a[] = { 0x1u, 0x4u, 0x6u };
-    static const uint8_t dat0_c_a[] = { 0x1u, 0x4u, 0x4u };
-    static const uint8_t c_dat0_w[] = { 0x1u, 0x5u, 0x6u, 0x7u };
-    static const uint8_t armsys[] = { 0x8u, 0x0u, 0xbu, 0xfu, 0xeu };
+    static const uint8_t getptr[] = {0x8u, 0xfu, 0xcu, 0x0u, 0x3u, 0xfu, 0x0u};
+    static const uint8_t savptr[] = {0x8u, 0xfu, 0x3u, 0x7u, 0xfu, 0x6u, 0x0u};
+    static const uint8_t d0_imm[] = {0x1u, 0xbu};
+    static const uint8_t ad0ex[] = {0x1u, 0x3u, 0x2u};
+    static const uint8_t pc_indirect[] = {0x8u, 0x0u, 0x8u, 0xcu};
+    static const uint8_t c_dat0_a[] = {0x1u, 0x4u, 0x6u};
+    static const uint8_t dat0_c_a[] = {0x1u, 0x4u, 0x4u};
+    static const uint8_t c_dat0_w[] = {0x1u, 0x5u, 0x6u, 0x7u};
+    static const uint8_t armsys[] = {0x8u, 0x0u, 0xbu, 0xfu, 0xeu};
 
     if (saturn_state == NULL || portal == NULL)
         return 0;
 
     uintptr_t thunk_address = (uintptr_t)hp39_saturn_portal_thunk;
     uintptr_t stage_limit =
-        (uintptr_t)STAGE_WINDOW_BASE +
-        (uintptr_t)HPCLANG_L2_ENTRIES * HPCLANG_PAGE_SIZE;
+        (uintptr_t)STAGE_WINDOW_BASE + (uintptr_t)HPCLANG_L2_ENTRIES * HPCLANG_PAGE_SIZE;
     if (thunk_address < (uintptr_t)STAGE_WINDOW_BASE ||
         thunk_address > stage_limit - sizeof(hp39_saturn_portal_thunk))
         return 0;
@@ -524,13 +440,10 @@ static int hp39_portal_prepare_thunk(
         byte_offset > HPCLANG_PAGE_SIZE - sizeof(hp39_saturn_portal_thunk))
         return 0;
 
-    const volatile uint32_t *stage_l2 =
-        (const volatile uint32_t *)(uintptr_t)STAGE_WINDOW_BASE;
+    const volatile uint32_t *stage_l2 = (const volatile uint32_t *)(uintptr_t)STAGE_WINDOW_BASE;
     uint32_t saturn_page = 0u;
-    if (!stage_phys_page_saturn_start(
-            (const uint32_t *)saturn_state,
-            stage_l2[page_index] & UINT32_C(0xfffff000),
-            &saturn_page))
+    if (!stage_phys_page_saturn_start((const uint32_t *)saturn_state,
+                                      stage_l2[page_index] & UINT32_C(0xfffff000), &saturn_page))
         return 0;
 
     uint32_t saturn_base = saturn_page + byte_offset * 2u;
@@ -545,24 +458,18 @@ static int hp39_portal_prepare_thunk(
 
     struct hp39_saturn_builder builder = {
         .bytes = hp39_saturn_portal_thunk,
-        .capacity_nibbles =
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+        .capacity_nibbles = (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
         .nibbles = 0u,
     };
 
     /* Machine entry: restore interpreter state and enter synthetic DOCOL. */
-    if (!hp39_saturn_put_sequence(
-            &builder, getptr, (uint32_t)sizeof(getptr)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+    if (!hp39_saturn_put_sequence(&builder, getptr, (uint32_t)sizeof(getptr)) ||
+        !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, colon) ||
-        !hp39_saturn_put_sequence(
-            &builder, ad0ex, (uint32_t)sizeof(ad0ex)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_sequence(&builder, ad0ex, (uint32_t)sizeof(ad0ex)) ||
+        !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, return_stream) ||
-        !hp39_saturn_put_sequence(
-            &builder, pc_indirect, (uint32_t)sizeof(pc_indirect)) ||
+        !hp39_saturn_put_sequence(&builder, pc_indirect, (uint32_t)sizeof(pc_indirect)) ||
         builder.nibbles != HP39P_COLON_NIBBLE)
         return 0;
 
@@ -581,8 +488,7 @@ static int hp39_portal_prepare_thunk(
         return 0;
 
     /* SEMI returns here and executes the synthetic DOCODE object. */
-    if (!hp39_saturn_put_word5(&builder, docode) ||
-        builder.nibbles != HP39P_DOCODE_NIBBLE)
+    if (!hp39_saturn_put_word5(&builder, docode) || builder.nibbles != HP39P_DOCODE_NIBBLE)
         return 0;
 
     /*
@@ -595,25 +501,17 @@ static int hp39_portal_prepare_thunk(
      */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002dcc)) ||
         !hp39_saturn_put_word5(&builder, HP39P_DOCODE_SIZE_NIBBLES) ||
-        !hp39_saturn_put_sequence(
-            &builder, savptr, (uint32_t)sizeof(savptr)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_sequence(&builder, savptr, (uint32_t)sizeof(savptr)) ||
+        !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, saved_intrpptr) ||
-        !hp39_saturn_put_sequence(
-            &builder, c_dat0_a, (uint32_t)sizeof(c_dat0_a)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_sequence(&builder, c_dat0_a, (uint32_t)sizeof(c_dat0_a)) ||
+        !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, RPL_INTRPPTR) ||
-        !hp39_saturn_put_sequence(
-            &builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
-        !hp39_saturn_put_sequence(
-            &builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
+        !hp39_saturn_put_sequence(&builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
+        !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, c_template) ||
-        !hp39_saturn_put_sequence(
-            &builder, c_dat0_w, (uint32_t)sizeof(c_dat0_w)) ||
-        !hp39_saturn_put_sequence(
-            &builder, armsys, (uint32_t)sizeof(armsys)) ||
+        !hp39_saturn_put_sequence(&builder, c_dat0_w, (uint32_t)sizeof(c_dat0_w)) ||
+        !hp39_saturn_put_sequence(&builder, armsys, (uint32_t)sizeof(armsys)) ||
         builder.nibbles != HP39P_C_TEMPLATE_NIBBLE)
         return 0;
 
@@ -623,25 +521,16 @@ static int hp39_portal_prepare_thunk(
      * resume stub in the low half. ARMSYS_L2_PHYS and C.HI intentionally share
      * offset 0x920 in the historical HPGCC39 ARMSYS block.
      */
-    uint32_t c_hi =
-        *(const volatile uint32_t *)(
-            (const uint8_t *)saturn_state + ARMSYS_L2_PHYS);
-    if (!hp39_saturn_put_u32(
-            &builder,
-            (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
-        !hp39_saturn_put_u32(&builder, c_hi) ||
-        !hp39_saturn_put_word5(&builder, 0u) ||
+    uint32_t c_hi = *(const volatile uint32_t *)((const uint8_t *)saturn_state + ARMSYS_L2_PHYS);
+    if (!hp39_saturn_put_u32(&builder, (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume) ||
+        !hp39_saturn_put_u32(&builder, c_hi) || !hp39_saturn_put_word5(&builder, 0u) ||
         builder.nibbles != HP39P_EXEC_NIBBLES ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_MISS_NIBBLE,
-            UINT32_C(0x00002a2c)) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_MISS_NIBBLE + 5u,
-            5u))
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_MISS_NIBBLE, UINT32_C(0x00002a2c)) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_MISS_NIBBLE + 5u, 5u))
         return 0;
 
     /*
@@ -669,15 +558,11 @@ static int hp39_portal_prepare_thunk(
         UINT32_C(0x0000775c), /* EVAL */
         UINT32_C(0x0000312b), /* SEMI */
     };
-    for (uint32_t i = 0u;
-         i < (uint32_t)(sizeof(aplet_vars_words) /
-                        sizeof(aplet_vars_words[0]));
+    for (uint32_t i = 0u; i < (uint32_t)(sizeof(aplet_vars_words) / sizeof(aplet_vars_words[0]));
          ++i) {
-        if (!hp39_saturn_buffer_store_word5(
-                hp39_saturn_portal_thunk,
-                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_APLETVARS_NIBBLE + i * 5u,
-                aplet_vars_words[i]))
+        if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                            HP39P_APLETVARS_NIBBLE + i * 5u, aplet_vars_words[i]))
             return 0;
     }
 
@@ -685,20 +570,14 @@ static int hp39_portal_prepare_thunk(
      * Supported-entry reference container used only by REFERENCE_EVAL.
      */
     if (!hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE,
-            UINT32_C(0x00002a74)) || /* DOLIST */
+            hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE, UINT32_C(0x00002a74)) || /* DOLIST */
         !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 5u,
-            UINT32_C(0x00004053)) || /* safe placeholder: ONE */
+            hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 5u, UINT32_C(0x00004053)) || /* safe placeholder: ONE */
         !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_REFERENCE_LIST_NIBBLE + 10u,
-            UINT32_C(0x0000312b)))   /* SEMI */
+            hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+            HP39P_REFERENCE_LIST_NIBBLE + 10u, UINT32_C(0x0000312b))) /* SEMI */
         return 0;
 
     /*
@@ -722,20 +601,14 @@ static int hp39_portal_prepare_thunk(
         UINT32_C(0x0000312b), /* SEMI */
     };
     for (uint32_t i = 0u;
-         i < (uint32_t)(sizeof(variable_recall_words) /
-                        sizeof(variable_recall_words[0]));
-         ++i) {
+         i < (uint32_t)(sizeof(variable_recall_words) / sizeof(variable_recall_words[0])); ++i) {
         if (!hp39_saturn_buffer_store_word5(
-                hp39_saturn_portal_thunk,
-                (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_VARIABLE_RECALL_NIBBLE + i * 5u,
-                variable_recall_words[i]))
+                hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                HP39P_VARIABLE_RECALL_NIBBLE + i * 5u, variable_recall_words[i]))
             return 0;
     }
 
-    hpclang_cache_clean(
-        hp39_saturn_portal_thunk,
-        (uint32_t)sizeof(hp39_saturn_portal_thunk));
+    hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     /*
      * Prove the complete generated stream through the Saturn alias before the
@@ -744,12 +617,8 @@ static int hp39_portal_prepare_thunk(
      */
     for (uint32_t i = 0u; i < HP39P_STATIC_NIBBLES; ++i) {
         uint8_t nibble = 0u;
-        if (!stage_saturn_read_nibble(
-                (const uint32_t *)saturn_state,
-                saturn_base + i,
-                &nibble) ||
-            nibble != hp39_saturn_buffer_nibble(
-                hp39_saturn_portal_thunk, i))
+        if (!stage_saturn_read_nibble((const uint32_t *)saturn_state, saturn_base + i, &nibble) ||
+            nibble != hp39_saturn_buffer_nibble(hp39_saturn_portal_thunk, i))
             return 0;
     }
 
@@ -767,21 +636,14 @@ static void store32(void *base, uint32_t offset, uint32_t value)
     *(volatile uint32_t *)((uint8_t *)base + offset) = value;
 }
 
-static void hp39_portal_configure(
-    const struct hpclang_launch_context *launch,
-    void *saturn_state,
-    uint32_t model,
-    uint32_t saturn_pc,
-    uintptr_t emulator_lr,
-    uint32_t stock_cpsr,
-    uintptr_t stock_frame)
+static void hp39_portal_configure(const struct hpclang_launch_context *launch, void *saturn_state,
+                                  uint32_t model, uint32_t saturn_pc, uintptr_t emulator_lr,
+                                  uint32_t stock_cpsr, uintptr_t stock_frame)
 {
-    struct hpclang_hp39_portal_context *portal =
-        &hpclang_hp39_portal_context;
+    struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
 
     portal->public_context.magic = HPCLANG_HP39_PLATFORM_MAGIC;
-    portal->public_context.font_window_base =
-        (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
+    portal->public_context.font_window_base = (uintptr_t)HPCLANG_CODE_WINDOW_BASE;
     portal->public_context.portal_entry = 0u;
     portal->saturn_state = (uintptr_t)saturn_state;
     portal->emulator_lr = emulator_lr;
@@ -790,15 +652,10 @@ static void hp39_portal_configure(
     portal->stock_cpsr = stock_cpsr;
     portal->l1 = (uintptr_t)launch->mmu.l1;
     portal->l2_workspace = (uintptr_t)launch->mmu.l2_workspace;
-    portal->stock_data_l1 =
-        launch->mmu.l1[HPCLANG_L1_DATA_INDEX];
-    portal->stock_code_l1 =
-        launch->mmu.l1[HPCLANG_L1_CODE_INDEX];
-    portal->hpc_data_l1 =
-        launch->mmu.l2_workspace_phys | COARSE_L1_FLAGS;
-    portal->hpc_code_l1 =
-        (launch->mmu.l2_workspace_phys + HPCLANG_L2_BYTES) |
-        COARSE_L1_FLAGS;
+    portal->stock_data_l1 = launch->mmu.l1[HPCLANG_L1_DATA_INDEX];
+    portal->stock_code_l1 = launch->mmu.l1[HPCLANG_L1_CODE_INDEX];
+    portal->hpc_data_l1 = launch->mmu.l2_workspace_phys | COARSE_L1_FLAGS;
+    portal->hpc_code_l1 = (launch->mmu.l2_workspace_phys + HPCLANG_L2_BYTES) | COARSE_L1_FLAGS;
     portal->stock_frame = stock_frame;
     portal->stock_sp = stock_frame + 14u * sizeof(uint32_t);
     portal->active = 0u;
@@ -813,44 +670,33 @@ static void hp39_portal_configure(
     portal->expected_prologue = UINT32_C(0x00002a74);
 
     if (stock_frame != 0u) {
-        const volatile uint32_t *saved =
-            (const volatile uint32_t *)stock_frame;
+        const volatile uint32_t *saved = (const volatile uint32_t *)stock_frame;
         for (uint32_t i = 0u; i < 14u; ++i)
             portal->stock_regs[i] = saved[i];
         for (uint32_t i = 0u; i < 8u; ++i)
             portal->emulator_regs[i] = saved[i + 4u];
     }
 
-    if ((model == HPCLANG_MODEL_HP39GS ||
-         model == HPCLANG_MODEL_HP40GS) &&
-        launch->saturn_state != 0u &&
-        saturn_pc >= 5u &&
-        emulator_lr != 0u &&
-        stock_frame != 0u) {
-        portal->armsys_target =
-            load32(saturn_state, ARMSYS_C_LO);
+    if ((model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) &&
+        launch->saturn_state != 0u && saturn_pc >= 5u && emulator_lr != 0u && stock_frame != 0u) {
+        portal->armsys_target = load32(saturn_state, ARMSYS_C_LO);
         if (hp39_portal_prepare_thunk(saturn_state, portal)) {
-            portal->public_context.portal_entry =
-                (uintptr_t)&hpclang_hp39_portal_enter;
+            portal->public_context.portal_entry = (uintptr_t)&hpclang_hp39_portal_enter;
         }
     }
 }
 
 int hpclang_hp39_portal_prepare_stock(void)
 {
-    struct hpclang_hp39_portal_context *portal =
-        &hpclang_hp39_portal_context;
-    volatile uint32_t *l1 =
-        (volatile uint32_t *)portal->l1;
-    const uint32_t *read_map =
-        (const uint32_t *)portal->saturn_state;
+    struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
+    volatile uint32_t *l1 = (volatile uint32_t *)portal->l1;
+    const uint32_t *read_map = (const uint32_t *)portal->saturn_state;
 
     uint32_t dsktop = 0u;
     uint32_t intrpptr = 0u;
     if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        !stage_saturn_read_word5(read_map, RPL_INTRPPTR, &intrpptr) ||
-        dsktop < 5u || dsktop > RPL_MAIN_END ||
-        intrpptr >= RPL_MAIN_END) {
+        !stage_saturn_read_word5(read_map, RPL_INTRPPTR, &intrpptr) || dsktop < 5u ||
+        dsktop > RPL_MAIN_END || intrpptr >= RPL_MAIN_END) {
         portal->pre_dsktop = 0u;
         return -3;
     }
@@ -865,140 +711,86 @@ int hpclang_hp39_portal_prepare_stock(void)
     uint32_t normalize = 0u;
     uint32_t finalize = 0u;
     uint32_t expected_prologue = 0u;
-    if (!hp39_request_words(
-            portal->request_kind,
-            portal->request_name_length,
-            portal->saturn_entry,
-            &arg,
-            &operation,
-            &pack,
-            &normalize,
-            &finalize,
-            &expected_prologue) ||
-        !hp39_store_request_name(
-            portal->request_kind,
-            portal->request_name_length,
-            (const uint8_t *)(uintptr_t)portal->request_name) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_ARG_NIBBLE,
-            arg) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_OPERATION_NIBBLE,
-            operation) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_PACK_NIBBLE,
-            pack) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_NORMALIZE_NIBBLE,
-            normalize) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_FINALIZE_NIBBLE,
-            finalize) ||
-        !hp39_saturn_buffer_store_word5(
-            hp39_saturn_portal_thunk,
-            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-            HP39P_SAVED_INTRPPTR_NIBBLE,
-            intrpptr))
+    if (!hp39_request_words(portal->request_kind, portal->request_name_length, portal->saturn_entry,
+                            &arg, &operation, &pack, &normalize, &finalize, &expected_prologue) ||
+        !hp39_store_request_name(portal->request_kind, portal->request_name_length,
+                                 (const uint8_t *)(uintptr_t)portal->request_name) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_ARG_NIBBLE, arg) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_OPERATION_NIBBLE, operation) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_PACK_NIBBLE, pack) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_NORMALIZE_NIBBLE, normalize) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_FINALIZE_NIBBLE, finalize) ||
+        !hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                        HP39P_SAVED_INTRPPTR_NIBBLE, intrpptr))
         return -7;
 
     portal->expected_prologue = expected_prologue;
-    hpclang_cache_clean(
-        hp39_saturn_portal_thunk,
-        (uint32_t)sizeof(hp39_saturn_portal_thunk));
+    hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     uint32_t observed = 0u;
     const uint32_t offsets[5] = {
-        HP39P_ARG_NIBBLE,
-        HP39P_OPERATION_NIBBLE,
-        HP39P_PACK_NIBBLE,
-        HP39P_NORMALIZE_NIBBLE,
-        HP39P_FINALIZE_NIBBLE,
+        HP39P_ARG_NIBBLE,       HP39P_OPERATION_NIBBLE, HP39P_PACK_NIBBLE,
+        HP39P_NORMALIZE_NIBBLE, HP39P_FINALIZE_NIBBLE,
     };
-    const uint32_t expected[5] = {
-        arg, operation, pack, normalize, finalize
-    };
+    const uint32_t expected[5] = {arg, operation, pack, normalize, finalize};
     for (uint32_t i = 0u; i < 5u; ++i) {
-        if (!stage_saturn_read_word5(
-                read_map,
-                portal->saturn_entry + offsets[i],
-                &observed) ||
+        if (!stage_saturn_read_word5(read_map, portal->saturn_entry + offsets[i], &observed) ||
             observed != expected[i])
             return -7;
     }
-    if (!stage_saturn_read_word5(
-            read_map,
-            portal->saturn_entry + HP39P_SAVED_INTRPPTR_NIBBLE,
-            &observed) ||
+    if (!stage_saturn_read_word5(read_map, portal->saturn_entry + HP39P_SAVED_INTRPPTR_NIBBLE,
+                                 &observed) ||
         observed != intrpptr)
         return -7;
 
     const uint32_t kind = portal->request_kind;
     const uint32_t name_length = portal->request_name_length;
-    if (kind == HP39P_BODY_PROGRAM ||
-        kind == HP39P_BODY_NOTE) {
-        uint32_t name_end =
-            HP39P_NAME_NIBBLE + 7u + name_length * 2u;
+    if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
+        uint32_t name_end = HP39P_NAME_NIBBLE + 7u + name_length * 2u;
         for (uint32_t i = HP39P_NAME_NIBBLE; i < name_end; ++i) {
             uint8_t nibble = 0u;
-            if (!stage_saturn_read_nibble(
-                    read_map,
-                    portal->saturn_entry + i,
-                    &nibble) ||
-                nibble != hp39_saturn_buffer_nibble(
-                    hp39_saturn_portal_thunk, i))
+            if (!stage_saturn_read_nibble(read_map, portal->saturn_entry + i, &nibble) ||
+                nibble != hp39_saturn_buffer_nibble(hp39_saturn_portal_thunk, i))
                 return -7;
         }
     } else if (kind == HP39P_VARIABLE_VALUE) {
-        const uint8_t *request =
-            (const uint8_t *)(uintptr_t)portal->request_name;
+        const uint8_t *request = (const uint8_t *)(uintptr_t)portal->request_name;
         uint32_t expected_id =
-            (uint32_t)request[0] |
-            ((uint32_t)request[1] << 8u) |
-            ((uint32_t)request[2] << 16u);
+            (uint32_t)request[0] | ((uint32_t)request[1] << 8u) | ((uint32_t)request[2] << 16u);
         uint32_t observed_id = 0u;
-        if (!stage_saturn_read_word5(
-                read_map,
-                portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
-                &observed_id) ||
+        if (!stage_saturn_read_word5(read_map,
+                                     portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
+                                     &observed_id) ||
             observed_id != expected_id)
             return -7;
     } else if (kind == HP39P_REFERENCE_EVAL) {
-        const uint8_t *request =
-            (const uint8_t *)(uintptr_t)portal->request_name;
+        const uint8_t *request = (const uint8_t *)(uintptr_t)portal->request_name;
         uint32_t expected_reference =
-            (uint32_t)request[0] |
-            ((uint32_t)request[1] << 8u) |
-            ((uint32_t)request[2] << 16u);
+            (uint32_t)request[0] | ((uint32_t)request[1] << 8u) | ((uint32_t)request[2] << 16u);
         uint32_t patch = HP39P_REFERENCE_LIST_NIBBLE + 5u;
         uint32_t observed_reference = 0u;
-        if (!stage_saturn_read_word5(
-                read_map,
-                portal->saturn_entry + patch,
-                &observed_reference) ||
+        if (!stage_saturn_read_word5(read_map, portal->saturn_entry + patch, &observed_reference) ||
             observed_reference != expected_reference)
             return -7;
     }
 
-    store32(
-        (void *)portal->saturn_state,
-        ARMSYS_C_LO,
-        (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume);
+    store32((void *)portal->saturn_state, ARMSYS_C_LO,
+            (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume);
 
     l1[HPCLANG_L1_DATA_INDEX] = portal->stock_data_l1;
     l1[HPCLANG_L1_CODE_INDEX] = portal->stock_code_l1;
-    hpclang_mmu_sync(
-        (volatile uint32_t *)portal->l2_workspace,
-        l1);
+    hpclang_mmu_sync((volatile uint32_t *)portal->l2_workspace, l1);
 
     hpclang_irq_restore(portal->stock_cpsr);
     return 0;
@@ -1006,22 +798,18 @@ int hpclang_hp39_portal_prepare_stock(void)
 
 int hpclang_hp39_portal_restore_hpc(void)
 {
-    struct hpclang_hp39_portal_context *portal =
-        &hpclang_hp39_portal_context;
-    volatile uint32_t *l1 =
-        (volatile uint32_t *)portal->l1;
+    struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
+    volatile uint32_t *l1 = (volatile uint32_t *)portal->l1;
 
     portal->last_cpsr = hpclang_irq_save_disable();
 
     int result = 0;
-    const uint32_t *read_map =
-        (const uint32_t *)portal->saturn_state;
+    const uint32_t *read_map = (const uint32_t *)portal->saturn_state;
     uint32_t post_dsktop = 0u;
     uint32_t object = 0u;
     uint32_t prologue = 0u;
 
-    if (portal->pre_dsktop < 5u ||
-        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
+    if (portal->pre_dsktop < 5u || !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
         result = -4;
     } else {
         /*
@@ -1030,36 +818,29 @@ int hpclang_hp39_portal_restore_hpc(void)
          * newly-pushed object (post DSKTOP = pre DSKTOP - 5).
          */
         if (post_dsktop == portal->pre_dsktop) {
-            result = -8;  /* Stock returned no stack object. */
+            result = -8; /* Stock returned no stack object. */
         } else if (post_dsktop + 10u == portal->pre_dsktop) {
-            result = -9;  /* Stock returned two stack objects. */
+            result = -9; /* Stock returned two stack objects. */
         } else if (post_dsktop + 5u != portal->pre_dsktop) {
             result = -10; /* Other stack-depth delta. */
-        } else if (!stage_saturn_read_word5(
-                       read_map, post_dsktop, &object)) {
+        } else if (!stage_saturn_read_word5(read_map, post_dsktop, &object)) {
             result = -11; /* Result stack cell unreadable. */
         }
 
         if (result == 0 && object > RPL_MAIN_END - 5u) {
             result = -12; /* Result object pointer outside Saturn main. */
-        } else if (result == 0 &&
-                   !stage_saturn_read_word5(
-                       read_map, object, &prologue)) {
+        } else if (result == 0 && !stage_saturn_read_word5(read_map, object, &prologue)) {
             result = -13; /* Result prologue unreadable. */
-        } else if (result == 0 &&
-                   portal->expected_prologue != 0u &&
+        } else if (result == 0 && portal->expected_prologue != 0u &&
                    prologue != portal->expected_prologue) {
             result = -14; /* Result type violates request contract. */
         }
 
         if (result == 0) {
             const uint32_t kind = portal->request_kind;
-            const int miss_request =
-                kind == HP39P_BODY_PROGRAM ||
-                kind == HP39P_BODY_NOTE ||
-                kind == HP39P_VARIABLE_VALUE;
-            const uint32_t miss_object =
-                portal->saturn_entry + HP39P_MISS_NIBBLE;
+            const int miss_request = kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE ||
+                                     kind == HP39P_VARIABLE_VALUE;
+            const uint32_t miss_object = portal->saturn_entry + HP39P_MISS_NIBBLE;
             if (miss_request && object == miss_object) {
                 /*
                  * Keep semantic miss distinct from an existing empty body.
@@ -1084,33 +865,25 @@ int hpclang_hp39_portal_restore_hpc(void)
         uint32_t avmem = 0u;
         if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
             avmem >= UINT32_C(0x000fffff) ||
-            !stage_saturn_write_word5(
-                read_map, RPL_DSKTOP, portal->pre_dsktop) ||
-            !stage_saturn_write_word5(
-                read_map, RPL_AVMEM, avmem + 1u))
+            !stage_saturn_write_word5(read_map, RPL_DSKTOP, portal->pre_dsktop) ||
+            !stage_saturn_write_word5(read_map, RPL_AVMEM, avmem + 1u))
             result = -6;
     }
 
-    store32(
-        (void *)portal->saturn_state,
-        ARMSYS_C_LO,
-        portal->armsys_target);
+    store32((void *)portal->saturn_state, ARMSYS_C_LO, portal->armsys_target);
 
     /*
      * The emulator may have reused the original stage0 save slots while Stock
      * mappings/SP were active. Rebuild them from the immutable first-entry
      * copy so final stage0 teardown still restores the true launcher caller.
      */
-    volatile uint32_t *saved =
-        (volatile uint32_t *)portal->stock_frame;
+    volatile uint32_t *saved = (volatile uint32_t *)portal->stock_frame;
     for (uint32_t i = 0u; i < 14u; ++i)
         saved[i] = portal->stock_regs[i];
 
     l1[HPCLANG_L1_DATA_INDEX] = portal->hpc_data_l1;
     l1[HPCLANG_L1_CODE_INDEX] = portal->hpc_code_l1;
-    hpclang_mmu_sync(
-        (volatile uint32_t *)portal->l2_workspace,
-        l1);
+    hpclang_mmu_sync((volatile uint32_t *)portal->l2_workspace, l1);
 
     ++portal->trips;
     portal->active = 0u;
@@ -1119,16 +892,12 @@ int hpclang_hp39_portal_restore_hpc(void)
 
 static int hpc1_header_ok(const struct hpclang_image_header *header)
 {
-    return header->magic[0] == 'H' &&
-           header->magic[1] == 'P' &&
-           header->magic[2] == 'C' &&
+    return header->magic[0] == 'H' && header->magic[1] == 'P' && header->magic[2] == 'C' &&
            header->magic[3] == '1';
 }
 
-static int saturn_read_range_present(
-    const void *saturn_state,
-    uint32_t first_nibble,
-    uint32_t last_nibble)
+static int saturn_read_range_present(const void *saturn_state, uint32_t first_nibble,
+                                     uint32_t last_nibble)
 {
     if (saturn_state == NULL || last_nibble < first_nibble)
         return 0;
@@ -1147,10 +916,7 @@ static int saturn_read_range_present(
     return 1;
 }
 
-static int stage_saturn_read_nibble(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint8_t *value)
+static int stage_saturn_read_nibble(const uint32_t *read_map, uint32_t address, uint8_t *value)
 {
     if (read_map == NULL || value == NULL || address >= RPL_MAIN_END)
         return 0;
@@ -1160,19 +926,13 @@ static int stage_saturn_read_nibble(
         return 0;
 
     const volatile uint8_t *p =
-        (const volatile uint8_t *)(uintptr_t)(
-            base + ((address & UINT32_C(0x0fff)) >> 1));
+        (const volatile uint8_t *)(uintptr_t)(base + ((address & UINT32_C(0x0fff)) >> 1));
     uint8_t packed = *p;
-    *value = (address & 1u) != 0u
-        ? (uint8_t)(packed >> 4)
-        : (uint8_t)(packed & 0x0fu);
+    *value = (address & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
     return 1;
 }
 
-static int stage_saturn_read_word5(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint32_t *value)
+static int stage_saturn_read_word5(const uint32_t *read_map, uint32_t address, uint32_t *value)
 {
     if (value == NULL || address > RPL_MAIN_END - 5u)
         return 0;
@@ -1188,10 +948,7 @@ static int stage_saturn_read_word5(
     return 1;
 }
 
-static int stage_saturn_write_nibble(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint8_t value)
+static int stage_saturn_write_nibble(const uint32_t *read_map, uint32_t address, uint8_t value)
 {
     if (read_map == NULL || value > 0x0fu || address >= RPL_MAIN_END)
         return 0;
@@ -1201,8 +958,7 @@ static int stage_saturn_write_nibble(
         return 0;
 
     volatile uint8_t *p =
-        (volatile uint8_t *)(uintptr_t)(
-            base + ((address & UINT32_C(0x0fff)) >> 1));
+        (volatile uint8_t *)(uintptr_t)(base + ((address & UINT32_C(0x0fff)) >> 1));
     uint8_t packed = *p;
     if ((address & 1u) != 0u)
         packed = (uint8_t)((packed & 0x0fu) | (uint8_t)(value << 4));
@@ -1212,10 +968,7 @@ static int stage_saturn_write_nibble(
     return 1;
 }
 
-static int stage_saturn_write_word5(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint32_t value)
+static int stage_saturn_write_word5(const uint32_t *read_map, uint32_t address, uint32_t value)
 {
     if (address > RPL_MAIN_END - 5u)
         return 0;
@@ -1228,19 +981,14 @@ static int stage_saturn_write_word5(
     }
 
     for (uint32_t i = 0u; i < 5u; ++i) {
-        if (!stage_saturn_write_nibble(
-                read_map,
-                address + i,
-                (uint8_t)((value >> (i * 4u)) & 0x0fu)))
+        if (!stage_saturn_write_nibble(read_map, address + i,
+                                       (uint8_t)((value >> (i * 4u)) & 0x0fu)))
             return 0;
     }
     return 1;
 }
 
-static int stage_saturn_read_byte(
-    const uint32_t *read_map,
-    uint32_t address,
-    uint8_t *value)
+static int stage_saturn_read_byte(const uint32_t *read_map, uint32_t address, uint8_t *value)
 {
     if (value == NULL)
         return 0;
@@ -1255,18 +1003,15 @@ static int stage_saturn_read_byte(
     return 1;
 }
 
-struct stage_launcher_bias {
+struct stage_launcher_bias
+{
     uint32_t object;
     uint32_t active;
 };
 
-static int stage_hide_launcher_bias(
-    const void *saturn_state,
-    struct stage_launcher_bias *bias)
+static int stage_hide_launcher_bias(const void *saturn_state, struct stage_launcher_bias *bias)
 {
-    static const uint8_t launcher_magic[] = {
-        0x4cu, 0xb3u, 0x80u, 0x41u, 0x3eu, 0x43u, 0x50u
-    };
+    static const uint8_t launcher_magic[] = {0x4cu, 0xb3u, 0x80u, 0x41u, 0x3eu, 0x43u, 0x50u};
 
     if (saturn_state == NULL || bias == NULL)
         return 0;
@@ -1280,22 +1025,15 @@ static int stage_hide_launcher_bias(
     uint32_t prologue = 0u;
     uint32_t length = 0u;
 
-    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        dsktop > RPL_MAIN_END - 5u ||
-        !stage_saturn_read_word5(read_map, dsktop, &object) ||
-        object > RPL_MAIN_END - 24u ||
-        !stage_saturn_read_word5(read_map, object, &prologue) ||
-        prologue != RPL_DOCSTR ||
-        !stage_saturn_read_word5(read_map, object + 5u, &length) ||
-        length < 19u)
+    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || dsktop > RPL_MAIN_END - 5u ||
+        !stage_saturn_read_word5(read_map, dsktop, &object) || object > RPL_MAIN_END - 24u ||
+        !stage_saturn_read_word5(read_map, object, &prologue) || prologue != RPL_DOCSTR ||
+        !stage_saturn_read_word5(read_map, object + 5u, &length) || length < 19u)
         return 0;
 
-    for (uint32_t i = 0u;
-         i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0]));
-         ++i) {
+    for (uint32_t i = 0u; i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0])); ++i) {
         uint8_t byte = 0u;
-        if (!stage_saturn_read_byte(
-                read_map, object + 10u + i * 2u, &byte) ||
+        if (!stage_saturn_read_byte(read_map, object + 10u + i * 2u, &byte) ||
             byte != launcher_magic[i])
             return 0;
     }
@@ -1313,9 +1051,8 @@ static int stage_hide_launcher_bias(
     return 1;
 }
 
-static int stage_restore_launcher_bias(
-    const void *saturn_state,
-    const struct stage_launcher_bias *bias)
+static int stage_restore_launcher_bias(const void *saturn_state,
+                                       const struct stage_launcher_bias *bias)
 {
     if (bias == NULL || bias->active == 0u)
         return 1;
@@ -1324,8 +1061,7 @@ static int stage_restore_launcher_bias(
 
     const uint32_t *read_map = (const uint32_t *)saturn_state;
     uint32_t dsktop = 0u;
-    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        dsktop < RPL_MAIN_FIRST + 5u)
+    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || dsktop < RPL_MAIN_FIRST + 5u)
         return 0;
 
     uint32_t slot = dsktop - 5u;
@@ -1339,18 +1075,14 @@ static int stage_restore_launcher_bias(
  * Saturn-nibble interval by using Stock SAT_CPU.Read[] as the authority.
  * Two consecutive 0x1000-nibble Saturn pages normally share one ARM page.
  */
-static int stage_phys_page_saturn_start(
-    const uint32_t *read_map,
-    uint32_t phys_page,
-    uint32_t *saturn_start)
+static int stage_phys_page_saturn_start(const uint32_t *read_map, uint32_t phys_page,
+                                        uint32_t *saturn_start)
 {
     if (read_map == NULL || saturn_start == NULL)
         return 0;
 
     phys_page &= UINT32_C(0xfffff000);
-    for (uint32_t page = RPL_MAIN_FIRST >> 12;
-         page < RPL_MAIN_END >> 12;
-         ++page) {
+    for (uint32_t page = RPL_MAIN_FIRST >> 12; page < RPL_MAIN_END >> 12; ++page) {
         uint32_t base = read_map[page];
         if (base < phys_page || base >= phys_page + HPCLANG_PAGE_SIZE)
             continue;
@@ -1362,8 +1094,7 @@ static int stage_phys_page_saturn_start(
             continue;
 
         uint32_t candidate = page_nibble - nibble_offset;
-        if (candidate < RPL_MAIN_FIRST ||
-            candidate > RPL_MAIN_END - RPL_PHYS_PAGE_NIBBLES)
+        if (candidate < RPL_MAIN_FIRST || candidate > RPL_MAIN_END - RPL_PHYS_PAGE_NIBBLES)
             continue;
 
         *saturn_start = candidate;
@@ -1372,11 +1103,8 @@ static int stage_phys_page_saturn_start(
     return 0;
 }
 
-static int stage_rpl_memory_bounds(
-    const void *saturn_state,
-    volatile const uint32_t *pool_l2,
-    uint32_t pool_pages,
-    struct hpclang_rpl_memory_bounds *bounds)
+static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint32_t *pool_l2,
+                                   uint32_t pool_pages, struct hpclang_rpl_memory_bounds *bounds)
 {
     if (saturn_state == NULL || pool_l2 == NULL || bounds == NULL)
         return 0;
@@ -1385,9 +1113,8 @@ static int stage_rpl_memory_bounds(
     uint32_t rsktop = 0u;
     uint32_t dsktop = 0u;
     if (!stage_saturn_read_word5(read_map, RPL_RSKTOP, &rsktop) ||
-        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
-        rsktop < RPL_MAIN_FIRST || dsktop > RPL_MAIN_END ||
-        rsktop >= dsktop)
+        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || rsktop < RPL_MAIN_FIRST ||
+        dsktop > RPL_MAIN_END || rsktop >= dsktop)
         return 0;
 
     /*
@@ -1401,15 +1128,13 @@ static int stage_rpl_memory_bounds(
 
     for (uint32_t i = 0u; i < pool_pages; ++i) {
         uint32_t sat_start = 0u;
-        if (!stage_phys_page_saturn_start(
-                read_map, pool_l2[i] & UINT32_C(0xfffff000), &sat_start))
+        if (!stage_phys_page_saturn_start(read_map, pool_l2[i] & UINT32_C(0xfffff000), &sat_start))
             continue;
 
         uint32_t sat_end = sat_start + RPL_PHYS_PAGE_NIBBLES;
 
         /* A native page must not already overlap a live RPL stack boundary. */
-        if ((sat_start < rsktop && sat_end > rsktop) ||
-            (sat_start < dsktop && sat_end > dsktop))
+        if ((sat_start < rsktop && sat_end > rsktop) || (sat_start < dsktop && sat_end > dsktop))
             return 0;
 
         if (sat_start >= rsktop && sat_start < temp_limit)
@@ -1438,30 +1163,22 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
     case HPCLANG_MODEL_HP39GPLUS:
     case HPCLANG_MODEL_HP39GS:
     case HPCLANG_MODEL_HP40GS:
-        return saturn_read_range_present(
-                   saturn_state,
-                   HP39_MAIN_FIRST_NIBBLE,
-                   HP39_MAIN_LAST_NIBBLE) &&
-               saturn_read_range_present(
-                   saturn_state,
-                   HP39_MINI_FIRST_NIBBLE,
-                   HP39_MINI_LAST_NIBBLE)
-            ? (uintptr_t)saturn_state
-            : 0u;
+        return saturn_read_range_present(saturn_state, HP39_MAIN_FIRST_NIBBLE,
+                                         HP39_MAIN_LAST_NIBBLE) &&
+                       saturn_read_range_present(saturn_state, HP39_MINI_FIRST_NIBBLE,
+                                                 HP39_MINI_LAST_NIBBLE)
+                   ? (uintptr_t)saturn_state
+                   : 0u;
 
     case HPCLANG_MODEL_HP48GII:
     case HPCLANG_MODEL_HP49GPLUS:
     case HPCLANG_MODEL_HP50G:
-        return saturn_read_range_present(
-                   saturn_state,
-                   HP4950_MINI_FIRST_NIBBLE,
-                   HP4950_MINI_LAST_NIBBLE) &&
-               saturn_read_range_present(
-                   saturn_state,
-                   HP4950_BIG_OBJECT_NIBBLE,
-                   HP4950_BIG_LAST_NIBBLE)
-            ? (uintptr_t)saturn_state
-            : 0u;
+        return saturn_read_range_present(saturn_state, HP4950_MINI_FIRST_NIBBLE,
+                                         HP4950_MINI_LAST_NIBBLE) &&
+                       saturn_read_range_present(saturn_state, HP4950_BIG_OBJECT_NIBBLE,
+                                                 HP4950_BIG_LAST_NIBBLE)
+                   ? (uintptr_t)saturn_state
+                   : 0u;
 
     default:
         return 0u;
@@ -1476,29 +1193,20 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
  * the temporary 0x09000000 window. We use that pool only as startup storage;
  * HPC1 itself sees the normal hpclang v1 fixed layout.
  */
-int hpclang_armtoolbox_stage1(
-    void *saturn_state,
-    const struct hpclang_image_header *hpc1,
-    uint32_t stage1_size,
-    uint32_t model,
-    uint32_t saturn_pc,
-    uintptr_t emulator_lr,
-    uint32_t stock_cpsr,
-    uintptr_t stock_frame)
+int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_header *hpc1,
+                              uint32_t stage1_size, uint32_t model, uint32_t saturn_pc,
+                              uintptr_t emulator_lr, uint32_t stock_cpsr, uintptr_t stock_frame)
 {
     if (!hpc1_header_ok(hpc1))
         return -1;
 
     uint32_t total_pages = load32(saturn_state, ARMSYS_PAGE_COUNT);
     uint32_t old_l2_phys = load32(saturn_state, ARMSYS_L2_PHYS);
-    volatile uint32_t *old_l2 =
-        (volatile uint32_t *)(uintptr_t)STAGE_WINDOW_BASE;
+    volatile uint32_t *old_l2 = (volatile uint32_t *)(uintptr_t)STAGE_WINDOW_BASE;
 
     uint32_t stage_pages =
-        (STAGE_CODE_OFFSET + stage1_size + HPCLANG_PAGE_SIZE - 1u) /
-        HPCLANG_PAGE_SIZE;
-    uint32_t code_count =
-        (hpc1->image_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
+        (STAGE_CODE_OFFSET + stage1_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
+    uint32_t code_count = (hpc1->image_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
 
     uint32_t workspace_page = stage_pages;
     uint32_t code_first = workspace_page + 1u;
@@ -1510,10 +1218,8 @@ int hpclang_armtoolbox_stage1(
         return -3;
 
     uint32_t rw_count = total_pages - STAGE_STACK_PAGES - rw_first;
-    uint32_t rw_needed =
-        1u +
-        (hpc1->rw_static_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE +
-        HPCLANG_STACK_MIN / HPCLANG_PAGE_SIZE;
+    uint32_t rw_needed = 1u + (hpc1->rw_static_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE +
+                         HPCLANG_STACK_MIN / HPCLANG_PAGE_SIZE;
 
     if (rw_count < rw_needed || rw_count > HPCLANG_RW_PAGE_CAPACITY)
         return -4;
@@ -1531,8 +1237,9 @@ int hpclang_armtoolbox_stage1(
     uint32_t left = hpc1->image_size;
 
     for (uint32_t i = 0; i < code_count; ++i) {
-        volatile uint8_t *dst = (volatile uint8_t *)(uintptr_t)(
-            STAGE_WINDOW_BASE + (code_first + i) * HPCLANG_PAGE_SIZE);
+        volatile uint8_t *dst =
+            (volatile uint8_t *)(uintptr_t)(STAGE_WINDOW_BASE +
+                                            (code_first + i) * HPCLANG_PAGE_SIZE);
         uint32_t n = left < HPCLANG_PAGE_SIZE ? left : HPCLANG_PAGE_SIZE;
 
         for (uint32_t j = 0; j < n; ++j)
@@ -1545,19 +1252,17 @@ int hpclang_armtoolbox_stage1(
     }
 
     hpclang_cache_clean(
-        (const void *)(uintptr_t)(
-            STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
+        (const void *)(uintptr_t)(STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
         code_count * HPCLANG_PAGE_SIZE);
 
     struct hpclang_launch_context launch;
-    struct hpclang_rpl_memory_bounds rpl_bounds = { 0u, 0u, 0u, 0u };
-    struct stage_launcher_bias launcher_bias = { 0u, 0u };
+    struct hpclang_rpl_memory_bounds rpl_bounds = {0u, 0u, 0u, 0u};
+    struct stage_launcher_bias launcher_bias = {0u, 0u};
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
-    launch.mmu.l2_workspace = (volatile uint32_t *)(uintptr_t)(
-        STAGE_WINDOW_BASE + workspace_page * HPCLANG_PAGE_SIZE);
-    launch.mmu.l2_workspace_phys =
-        old_l2[workspace_page] & 0xfffff000u;
+    launch.mmu.l2_workspace =
+        (volatile uint32_t *)(uintptr_t)(STAGE_WINDOW_BASE + workspace_page * HPCLANG_PAGE_SIZE);
+    launch.mmu.l2_workspace_phys = old_l2[workspace_page] & 0xfffff000u;
     launch.mmu.rw_pages = rw_pages;
     launch.mmu.rw_page_count = rw_count;
     launch.mmu.code_pages = code_pages;
@@ -1576,8 +1281,7 @@ int hpclang_armtoolbox_stage1(
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
         launch.mmu.code_window_pages = hp39_font_nor_pages;
         launch.mmu.code_window_page_count =
-            (uint32_t)(sizeof(hp39_font_nor_pages) /
-                       sizeof(hp39_font_nor_pages[0]));
+            (uint32_t)(sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]));
     }
 
     launch.model = model;
@@ -1594,44 +1298,31 @@ int hpclang_armtoolbox_stage1(
      * the actual object instead of hard-coding launcher version/model policy.
      */
     if (launch.saturn_state != 0u) {
-        int bias_status =
-            stage_hide_launcher_bias(saturn_state, &launcher_bias);
+        int bias_status = stage_hide_launcher_bias(saturn_state, &launcher_bias);
         if (bias_status < 0)
             return -5;
     }
     if (launch.mmu.code_window_page_count != 0u) {
-        hp39_portal_configure(
-            &launch,
-            saturn_state,
-            model,
-            saturn_pc,
-            emulator_lr,
-            stock_cpsr,
-            stock_frame);
-        launch.platform_cookie =
-            (uintptr_t)&hpclang_hp39_portal_context.public_context |
-            HPCLANG_PLATFORM_COOKIE_HP39_TAG;
-    } else if (
-        launch.saturn_state != 0u &&
-        (model == HPCLANG_MODEL_HP48GII ||
-         model == HPCLANG_MODEL_HP49GPLUS ||
-         model == HPCLANG_MODEL_HP50G) &&
-        stage_rpl_memory_bounds(
-            saturn_state, old_l2, total_pages, &rpl_bounds)) {
+        hp39_portal_configure(&launch, saturn_state, model, saturn_pc, emulator_lr, stock_cpsr,
+                              stock_frame);
+        launch.platform_cookie = (uintptr_t)&hpclang_hp39_portal_context.public_context |
+                                 HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+    } else if (launch.saturn_state != 0u &&
+               (model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
+                model == HPCLANG_MODEL_HP50G) &&
+               stage_rpl_memory_bounds(saturn_state, old_l2, total_pages, &rpl_bounds)) {
         /*
          * A hidden HPGCC-1.1-style Launcher-V3 pointer needs one physical
          * stack cell when stage1 restores it after HPC1 returns. init/exit do
          * not expose that reservation through AVMEM, so carry it explicitly.
          */
-        rpl_bounds.stack_reserve_nibbles =
-            launcher_bias.active != 0u ? 5u : 0u;
+        rpl_bounds.stack_reserve_nibbles = launcher_bias.active != 0u ? 5u : 0u;
 
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window
          * remains mapped for the complete hpclang_bootstrap_run() call.
          */
-        launch.platform_cookie =
-            (uintptr_t)&rpl_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+        launch.platform_cookie = (uintptr_t)&rpl_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
     } else {
         /* No mutation fence: read-only Saturn services may still be available. */
         launch.platform_cookie = old_l2_phys;

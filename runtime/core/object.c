@@ -13,7 +13,8 @@
 #include "rpl-stack-view.h"
 #include "saturn-view.h"
 
-enum {
+enum
+{
     SATURN_SPACE_NIBBLES = 0x00100000u
 };
 
@@ -21,32 +22,23 @@ static int stack_family_available(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
     if (device == NULL ||
-        (device->family != HPCLANG_FAMILY_HP48 &&
-         device->family != HPCLANG_FAMILY_HP4950))
+        (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950))
         return 0;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     return boot != NULL && boot->saturn_state != 0u;
 }
 
-static int stock_read_nibble(
-    void *context,
-    uint32_t nibble_address,
-    uint8_t *value)
+static int stock_read_nibble(void *context, uint32_t nibble_address, uint8_t *value)
 {
     (void)context;
-    return hpclang_saturn_read_nibble(
-        hpclang_saturn_address_make(nibble_address), value);
+    return hpclang_saturn_read_nibble(hpclang_saturn_address_make(nibble_address), value);
 }
 
-static int stock_write_nibble(
-    void *context,
-    uint32_t nibble_address,
-    uint8_t value)
+static int stock_write_nibble(void *context, uint32_t nibble_address, uint8_t value)
 {
     (void)context;
-    return hpclang_saturn_write_nibble(
-        hpclang_saturn_address_make(nibble_address), value);
+    return hpclang_saturn_write_nibble(hpclang_saturn_address_make(nibble_address), value);
 }
 
 static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
@@ -55,25 +47,16 @@ static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
         return 0;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (boot == NULL ||
-        (boot->platform_cookie &
-         HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
+    if (boot == NULL || (boot->platform_cookie & HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
         return 0;
 
-    uintptr_t raw =
-        boot->platform_cookie &
-        ~(uintptr_t)HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
-    const struct hpclang_rpl_memory_bounds *bounds =
-        (const struct hpclang_rpl_memory_bounds *)raw;
+    uintptr_t raw = boot->platform_cookie & ~(uintptr_t)HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    const struct hpclang_rpl_memory_bounds *bounds = (const struct hpclang_rpl_memory_bounds *)raw;
 
-    if (bounds == NULL ||
-        bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
-        bounds->temp_limit <= UINT32_C(0x00080000) ||
-        bounds->temp_limit > UINT32_C(0x00100000) ||
-        bounds->user_limit < UINT32_C(0x00080000) ||
-        bounds->user_limit >= UINT32_C(0x00100000) ||
-        bounds->stack_reserve_nibbles >
-            UINT32_C(0x00100000) - bounds->user_limit ||
+    if (bounds == NULL || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+        bounds->temp_limit <= UINT32_C(0x00080000) || bounds->temp_limit > UINT32_C(0x00100000) ||
+        bounds->user_limit < UINT32_C(0x00080000) || bounds->user_limit >= UINT32_C(0x00100000) ||
+        bounds->stack_reserve_nibbles > UINT32_C(0x00100000) - bounds->user_limit ||
         (bounds->stack_reserve_nibbles % 5u) != 0u)
         return 0;
 
@@ -148,9 +131,7 @@ int hpclang_stack_depth(uint32_t *depth)
     return result == HPCLANG_RPL_STACK_OK ? 0 : set_stack_errno(result);
 }
 
-int hpclang_stack_peek(
-    uint32_t level,
-    struct hpclang_object **object)
+int hpclang_stack_peek(uint32_t level, struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EFAULT;
@@ -164,8 +145,7 @@ int hpclang_stack_peek(
     }
 
     uint32_t address = 0u;
-    int result =
-        hpclang_rpl_stack_object_address(&stock_reader, level, &address);
+    int result = hpclang_rpl_stack_object_address(&stock_reader, level, &address);
     if (result != HPCLANG_RPL_STACK_OK)
         return set_stack_errno(result);
     if (address >= SATURN_SPACE_NIBBLES) {
@@ -173,11 +153,8 @@ int hpclang_stack_peek(
         return -1;
     }
 
-    return hpclang_object_snapshot_copy(
-        &stock_reader,
-        address,
-        SATURN_SPACE_NIBBLES - address,
-        object);
+    return hpclang_object_snapshot_copy(&stock_reader, address, SATURN_SPACE_NIBBLES - address,
+                                        object);
 }
 
 int hpclang_stack_drop(uint32_t count)
@@ -189,9 +166,7 @@ int hpclang_stack_drop(uint32_t count)
     }
 
     int result = hpclang_rpl_mutation_drop(&io, count);
-    return result == HPCLANG_RPL_MUTATION_OK
-        ? 0
-        : set_mutation_errno(result);
+    return result == HPCLANG_RPL_MUTATION_OK ? 0 : set_mutation_errno(result);
 }
 
 int hpclang_stack_pop(struct hpclang_object **object)
@@ -236,14 +211,10 @@ int hpclang_stack_push(const struct hpclang_object *object)
     }
 
     int result = hpclang_rpl_mutation_push_snapshot(&io, object);
-    return result == HPCLANG_RPL_MUTATION_OK
-        ? 0
-        : set_mutation_errno(result);
+    return result == HPCLANG_RPL_MUTATION_OK ? 0 : set_mutation_errno(result);
 }
 
-int hpclang_stack_replace(
-    uint32_t level,
-    const struct hpclang_object *object)
+int hpclang_stack_replace(uint32_t level, const struct hpclang_object *object)
 {
     if (object == NULL) {
         errno = EFAULT;
@@ -257,7 +228,5 @@ int hpclang_stack_replace(
     }
 
     int result = hpclang_rpl_mutation_replace(&io, level, object);
-    return result == HPCLANG_RPL_MUTATION_OK
-        ? 0
-        : set_mutation_errno(result);
+    return result == HPCLANG_RPL_MUTATION_OK ? 0 : set_mutation_errno(result);
 }

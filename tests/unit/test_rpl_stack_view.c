@@ -5,7 +5,8 @@
 
 #include "rpl-stack-view.h"
 
-enum {
+enum
+{
     IMAGE_NIBBLES = 0x81000u,
     DSKTOP = 0x806f8u,
     EDITLINE = 0x806fdu
@@ -49,13 +50,11 @@ static void test_empty_stack(void)
 {
     uint32_t depth = 99u;
     reset_stack(0x70000u, 0u);
-    assert(hpclang_rpl_stack_depth(&reader, &depth) ==
-           HPCLANG_RPL_STACK_OK);
+    assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_OK);
     assert(depth == 0u);
 
     uint32_t object = 99u;
-    assert(hpclang_rpl_stack_object_address(&reader, 1u, &object) ==
-           HPCLANG_RPL_STACK_LEVEL);
+    assert(hpclang_rpl_stack_object_address(&reader, 1u, &object) == HPCLANG_RPL_STACK_LEVEL);
     assert(object == 0u);
 }
 
@@ -67,25 +66,19 @@ static void test_levels(void)
     put_word5(0x7000au, 0x34567u);
 
     uint32_t depth = 0u;
-    assert(hpclang_rpl_stack_depth(&reader, &depth) ==
-           HPCLANG_RPL_STACK_OK);
+    assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_OK);
     assert(depth == 3u);
 
     uint32_t object = 0u;
-    assert(hpclang_rpl_stack_object_address(&reader, 1u, &object) ==
-           HPCLANG_RPL_STACK_OK);
+    assert(hpclang_rpl_stack_object_address(&reader, 1u, &object) == HPCLANG_RPL_STACK_OK);
     assert(object == 0x12345u);
-    assert(hpclang_rpl_stack_object_address(&reader, 2u, &object) ==
-           HPCLANG_RPL_STACK_OK);
+    assert(hpclang_rpl_stack_object_address(&reader, 2u, &object) == HPCLANG_RPL_STACK_OK);
     assert(object == 0x23456u);
-    assert(hpclang_rpl_stack_object_address(&reader, 3u, &object) ==
-           HPCLANG_RPL_STACK_OK);
+    assert(hpclang_rpl_stack_object_address(&reader, 3u, &object) == HPCLANG_RPL_STACK_OK);
     assert(object == 0x34567u);
 
-    assert(hpclang_rpl_stack_object_address(&reader, 0u, &object) ==
-           HPCLANG_RPL_STACK_LEVEL);
-    assert(hpclang_rpl_stack_object_address(&reader, 4u, &object) ==
-           HPCLANG_RPL_STACK_LEVEL);
+    assert(hpclang_rpl_stack_object_address(&reader, 0u, &object) == HPCLANG_RPL_STACK_LEVEL);
+    assert(hpclang_rpl_stack_object_address(&reader, 4u, &object) == HPCLANG_RPL_STACK_LEVEL);
 }
 
 static void test_malformed_bounds(void)
@@ -95,17 +88,14 @@ static void test_malformed_bounds(void)
     memset(image, 0, sizeof(image));
     put_word5(DSKTOP, 0x70000u);
     put_word5(EDITLINE, 0x6ffffu);
-    assert(hpclang_rpl_stack_depth(&reader, &depth) ==
-           HPCLANG_RPL_STACK_MALFORMED);
+    assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_MALFORMED);
 
     put_word5(EDITLINE, 0x70006u);
-    assert(hpclang_rpl_stack_depth(&reader, &depth) ==
-           HPCLANG_RPL_STACK_MALFORMED);
+    assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_MALFORMED);
 
     put_word5(DSKTOP, 0xffffdu);
     put_word5(EDITLINE, 0xfffffu);
-    assert(hpclang_rpl_stack_depth(&reader, &depth) ==
-           HPCLANG_RPL_STACK_MALFORMED);
+    assert(hpclang_rpl_stack_depth(&reader, &depth) == HPCLANG_RPL_STACK_MALFORMED);
 }
 
 int main(void)

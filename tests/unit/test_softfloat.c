@@ -14,7 +14,11 @@ int hpclang_soft_dcmpun(double, double);
 
 static uint64_t bits(double x)
 {
-    union { double d; uint64_t u; } r = { .d = x };
+    union
+    {
+        double d;
+        uint64_t u;
+    } r = {.d = x};
     return r.u;
 }
 

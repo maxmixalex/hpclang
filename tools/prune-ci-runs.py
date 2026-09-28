@@ -59,23 +59,16 @@ current_paths: set[str] = set()
 for branch in branch_names:
     ref = urllib.parse.quote(branch, safe="")
     try:
-        entries = request(
-            f"{api}/repos/{repo}/contents/.github/workflows?ref={ref}"
-        )
+        entries = request(f"{api}/repos/{repo}/contents/.github/workflows?ref={ref}")
     except urllib.error.HTTPError as error:
         if error.code == 404:
             continue
         raise
     if not isinstance(entries, list):
         continue
-    current_paths.update(
-        item["path"] for item in entries if item.get("type") == "file"
-    )
+    current_paths.update(item["path"] for item in entries if item.get("type") == "file")
 
-print(
-    f"found {len(current_paths)} workflow path(s) across "
-    f"{len(branch_names)} live branch(es)"
-)
+print(f"found {len(current_paths)} workflow path(s) across {len(branch_names)} live branch(es)")
 
 by_workflow: dict[int, list[dict]] = defaultdict(list)
 for run in runs:

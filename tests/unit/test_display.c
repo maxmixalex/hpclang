@@ -14,12 +14,7 @@
 static uint8_t pixels[HEIGHT * STRIDE];
 
 static struct hpclang_surface surface = {
-    .pixels = pixels,
-    .width = WIDTH,
-    .height = HEIGHT,
-    .stride = STRIDE,
-    .levels = 2u
-};
+    .pixels = pixels, .width = WIDTH, .height = HEIGHT, .stride = STRIDE, .levels = 2u};
 
 static void fail(const char *message)
 {
@@ -43,23 +38,20 @@ static void expect_row(unsigned y, uint16_t bits)
 
 int main(void)
 {
-    if (hpclang_surface_width(&surface) != WIDTH ||
-        hpclang_surface_height(&surface) != HEIGHT ||
+    if (hpclang_surface_width(&surface) != WIDTH || hpclang_surface_height(&surface) != HEIGHT ||
         hpclang_surface_levels(&surface) != 2u)
         fail("geometry");
 
     memset(pixels, 0xa5, sizeof(pixels));
     hpclang_surface_clear(&surface, 0u);
     for (unsigned y = 0u; y < HEIGHT; ++y) {
-        if (pixels[y * STRIDE] != 0u ||
-            pixels[y * STRIDE + 1u] != 0xa4u)
+        if (pixels[y * STRIDE] != 0u || pixels[y * STRIDE + 1u] != 0xa4u)
             fail("white clear or padding preservation");
     }
 
     hpclang_surface_clear(&surface, 255u);
     for (unsigned y = 0u; y < HEIGHT; ++y) {
-        if (pixels[y * STRIDE] != 0xffu ||
-            pixels[y * STRIDE + 1u] != 0xa7u)
+        if (pixels[y * STRIDE] != 0xffu || pixels[y * STRIDE + 1u] != 0xa7u)
             fail("black clear or padding preservation");
     }
 
@@ -92,17 +84,14 @@ int main(void)
      * pre-refactor implementation would iterate the whole span.
      */
     hpclang_surface_clear(&surface, 0u);
-    hpclang_surface_draw_line(
-        &surface, -1000000000, 1, 1000000000, 1, 255u);
+    hpclang_surface_draw_line(&surface, -1000000000, 1, 1000000000, 1, 255u);
     expect_row(0u, 0u);
     expect_row(1u, 0x3ffu);
     expect_row(2u, 0u);
     expect_row(3u, 0u);
 
     hpclang_surface_clear(&surface, 0u);
-    hpclang_surface_draw_line(
-        &surface, -1000000000, -1000000000,
-        1000000000, 1000000000, 255u);
+    hpclang_surface_draw_line(&surface, -1000000000, -1000000000, 1000000000, 1000000000, 255u);
     expect_row(0u, 1u << 0);
     expect_row(1u, 1u << 1);
     expect_row(2u, 1u << 2);
@@ -116,8 +105,7 @@ int main(void)
     expect_row(2u, 0x007u);
     expect_row(3u, 0u);
 
-    hpclang_surface_draw_rect(
-        &surface, INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX, 255u);
+    hpclang_surface_draw_rect(&surface, INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX, 255u);
     expect_row(0u, 1u << 2);
     expect_row(1u, 1u << 2);
     expect_row(2u, 0x007u);
@@ -143,16 +131,16 @@ int main(void)
         fail("circle fill");
 
     hpclang_surface_clear(shapes, 0u);
-    hpclang_surface_draw_circle(
-        shapes, 0, 0, INT32_MAX, 255u);
+    hpclang_surface_draw_circle(shapes, 0, 0, INT32_MAX, 255u);
     if (hpclang_surface_get_pixel(shapes, 0, 0) != 0u)
         fail("extreme circle clipping");
 
     static const struct hpclang_point triangle[] = {
-        {1, 1}, {9, 1}, {5, 9},
+        {1, 1},
+        {9, 1},
+        {5, 9},
     };
-    hpclang_surface_draw_polygon(
-        shapes, triangle, 3u, 255u);
+    hpclang_surface_draw_polygon(shapes, triangle, 3u, 255u);
     if (hpclang_surface_get_pixel(shapes, 1, 1) != 255u ||
         hpclang_surface_get_pixel(shapes, 9, 1) != 255u ||
         hpclang_surface_get_pixel(shapes, 5, 9) != 255u ||
@@ -160,8 +148,7 @@ int main(void)
         fail("polygon outline");
 
     hpclang_surface_clear(shapes, 0u);
-    hpclang_surface_fill_polygon(
-        shapes, triangle, 3u, 255u);
+    hpclang_surface_fill_polygon(shapes, triangle, 3u, 255u);
     if (hpclang_surface_get_pixel(shapes, 5, 4) != 255u ||
         hpclang_surface_get_pixel(shapes, 0, 10) != 0u)
         fail("polygon fill");
@@ -173,8 +160,7 @@ int main(void)
 
     struct hpclang_surface *gray4 = hpclang_surface_create(5u, 2u, 4u);
     struct hpclang_surface *gray16 = hpclang_surface_create(5u, 2u, 16u);
-    if (gray4 == NULL || gray16 == NULL ||
-        hpclang_surface_levels(gray4) != 4u ||
+    if (gray4 == NULL || gray16 == NULL || hpclang_surface_levels(gray4) != 4u ||
         hpclang_surface_levels(gray16) != 16u)
         fail("software grayscale surface allocation");
 
@@ -203,10 +189,8 @@ int main(void)
     hpclang_surface_destroy(gray16);
 
     struct hpclang_surface *owned = hpclang_surface_create_mono(10u, 4u);
-    if (owned == NULL ||
-        hpclang_surface_width(owned) != 10u ||
-        hpclang_surface_height(owned) != 4u ||
-        hpclang_surface_levels(owned) != 2u ||
+    if (owned == NULL || hpclang_surface_width(owned) != 10u ||
+        hpclang_surface_height(owned) != 4u || hpclang_surface_levels(owned) != 2u ||
         hpclang_surface_get_pixel(owned, 0, 0) != 0u)
         fail("owned mono surface");
 
