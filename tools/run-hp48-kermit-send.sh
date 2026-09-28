@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-    echo "usage: $0 <tty> <send-directory> <debug-log> <file> [file ...]" >&2
+    echo "usage: $0 <tty> <send-directory> <debug-log> [--remote-host <RPL>] <file> [file ...]" >&2
     exit 2
 fi
 
@@ -10,6 +10,16 @@ TTY="$1"
 SEND_DIR="$(realpath "$2")"
 LOG="$(realpath -m "$3")"
 shift 3
+
+remote_commands=()
+while [[ "${1:-}" == --remote-host ]]; do
+    [[ $# -ge 3 && -n "$2" && "$2" != *,* ]] || {
+        echo "--remote-host requires a comma-free RPL command and at least one file" >&2
+        exit 2
+    }
+    remote_commands+=("$2")
+    shift 2
+done
 
 if command -v ckermit >/dev/null 2>&1; then
     KERMIT="$(command -v ckermit)"
@@ -61,9 +71,13 @@ for spec in "$@"; do
     else
         commands+=("send $file")
     fi
+    commands+=("if failure exit 1")
 done
 
-commands+=("finish" "exit")
+for command in "${remote_commands[@]}"; do
+    commands+=("remote host $command" "if failure exit 1")
+done
+commands+=("finish" "if failure exit 1" "exit 0")
 command_list="$(IFS=,; echo "${commands[*]}")"
 
 exec "$KERMIT" \

@@ -14,9 +14,13 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -37,9 +41,13 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/phase.c"
+      - "tests/e2e/harness/x50ng/**"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tests/e2e/cpp.cpp"
       - "tests/e2e/targets/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/prepare-hp39-aplet.py"
@@ -108,8 +116,7 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
 
       - name: Prepare hardware-validation packages

@@ -18,6 +18,61 @@ Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII
 
 Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
+## Main follow-up
+
+[Main Runtime](https://github.com/zyf722/hpclang/actions/runs/36322508885) at
+`53856bc7` exposed another Stock HP50g launch failure after the integration
+acceptance below. Its early captures already show ALG mode: the UI sequence
+assumed a MODE toggle had succeeded, so subsequent RPN installation actions
+could not work. The follow-up sets RPN explicitly through Stock Kermit's remote
+command, clears documented system flag -95, and queries its cleared state before
+releasing the host gate. The calculator executes the command; no RAM/ROM state
+is patched. See HP's [system flag reference](https://hpcc.org/calculators/hp50g/hp50g_aur.pdf).
+
+Local follow-up also exposed a separate keyboard capture race: reset published
+KBRD before the caller drew its initial frame. KBRD now publishes on the first
+poll after drawing, matching the existing post-draw KACK contract. A host test
+checks both publication boundaries. Local verification passes 32 unit tests,
+Clang analysis across the three compilation databases, full formatting/lint,
+HP49g+/HP50g Stock USB with 52 frames each, HP39-family Direct with 52 frames
+each, and HP50g Gallery shard 14. Formal follow-up acceptance remains pending;
+branch retirement remains blocked until main is accepted.
+
+## Quality and workflow responsibilities
+
+Quality runs three real gates: Ruff/ShellCheck, full owned-source formatting,
+and Clang static analysis. Formatting uses the pinned ATfE clang-format plus
+pinned Ruff. It never rewrites sources in CI. Vendor and generated font sources
+are excluded because their upstream/generation tools own their formatting.
+
+Clang analysis reads CMake compilation databases, rather than inventing include
+paths, defines, or an ARM target. Host target detection comes from the compiler
+recorded by CMake. The toolchain's own `clang-check --analyze` supports ATfE's
+multilib layout; a generic clang-tidy package did not understand that layout even
+with a matching major version. Analysis findings fail the job. The fixed-address
+heuristic alone is disabled because this SDK intentionally accesses MMIO and ROM,
+including runtime sources compiled in host tests. Null, bounds, lifetime, errno,
+and dead-store analysis remain enabled. Assembly, generated sources, and external
+x50ng build units are outside these compilation databases; their build/E2E gates
+remain necessary. Static analysis is not a substitute for those tests.
+
+| Workflow | Separate responsibility |
+| --- | --- |
+| Quality | Source lint, formatting, Clang analysis |
+| Core | C and discovered Python unit tests, ARM build and hardware package |
+| Runtime | Canonical ABI, keyboard, and original-system USB launch |
+| Storage | Storage-enabled payload, filesystem fixtures, and SD regression |
+| Font Gallery | Exhaustive font rendering and live Stock font controls |
+| Font Assets / FatFs | Regeneration drift and vendor provenance |
+| Documentation / Maintenance | Published documentation and evidence retention |
+
+These gates retain distinct payloads and assertions. Their OS package installation
+uses `tools/install-ci-packages.sh`; ATfE and x50ng setup remain shared actions.
+Python semantic regressions belong to Core discovery, not one special named
+Quality step. Model-specific UI sequences remain necessary where the real
+calculators differ; required state must be established or witnessed rather than
+inferred from an elapsed delay or a capture filename.
+
 ## Integration acceptance
 
 The `integration/stock-usb-20260927` branch preserves `main` ancestry. Its

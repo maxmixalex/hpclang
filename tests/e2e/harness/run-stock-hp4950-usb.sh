@@ -96,7 +96,7 @@ done
     exit 1
 }
 
-timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
+timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     --remote-host "-95 CF -95 FC?" ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP49/50 Stock USB Kermit completed; released host gate: %s\n' "$HOST_GATE"
 

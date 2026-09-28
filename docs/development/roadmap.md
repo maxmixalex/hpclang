@@ -109,6 +109,7 @@ Model-1 transport integration:
 - [x] HP 39g+ original-system USB Connectivity Kit launch on that fixture.
 - [x] All-six-model original-Stock USB Runtime and pre-integration Gallery/Storage/Quality acceptance.
 - [x] Close integration Storage/Gallery harness timing failures and repeat cross-workflow acceptance on `12631370`. See [Validation](validation.md).
+- [ ] Accept the main follow-up for explicit RPN setup, keyboard frame readiness, and full Quality gates before branch retirement.
 - [ ] Optional U5: quantify repeated-run USB stability and elapsed time against secondary paths; this is not a functional-completion blocker.
 
 Direct runtime owns common-bootstrap execution and return correctness. Stock-launch gates own calculator-side package/menu/launcher integration.

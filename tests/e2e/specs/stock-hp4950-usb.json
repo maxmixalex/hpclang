@@ -11,7 +11,7 @@
     "build/${TARGET}-stock-armtoolbox.pgm"
   ],
   "captures": [
-    "build/${TARGET}-stock-home-rpn.pgm",
+    "build/${TARGET}-stock-home.pgm",
     "build/${TARGET}-stock-port-choices.pgm",
     "build/${TARGET}-stock-port-configured.pgm",
     "build/${TARGET}-stock-server-usb.pgm",

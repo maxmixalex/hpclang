@@ -50,6 +50,15 @@ for integration. The formal acceptance links are kept in
 
 ## HP49g+/50g failure diagnosis
 
+A later main regression exposed a third assumption: a timed MODE/NEG/F6
+sequence could leave Stock in ALG mode while the harness continued as if RPN
+were selected. The USB runner now explicitly executes `-95 CF -95 FC?` through
+Stock Kermit after transfer. This configures the documented system flag and
+returns its cleared-state witness. Remote-command and transfer errors fail the
+sender before releasing the gate. UI package installation and PrRUN remain the
+original Stock path.
+
+
 There were two incorrect UI assumptions in `hp4950-stock-usb-run.seq`:
 
 1. Fresh Stock state already selects USB/Kermit. Opening CHOOS highlights USB;

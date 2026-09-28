@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(hpclang_unit_tests LANGUAGES C)
 enable_testing()
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME python_tools
+    COMMAND "${Python3_EXECUTABLE}" -m unittest discover
+        -s "${CMAKE_CURRENT_LIST_DIR}" -p "test_*.py")
 get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 
 function(hpclang_unit name)
@@ -219,3 +223,6 @@ target_include_directories(test_usbdev_host PRIVATE
 hpclang_unit(e2e_events test_e2e_events.c)
 target_include_directories(test_e2e_events PRIVATE
     "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(e2e_phase test_e2e_phase.c "${HPCLANG_ROOT}/tests/e2e/phase.c")
+target_include_directories(test_e2e_phase PRIVATE "${HPCLANG_ROOT}/include")

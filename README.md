@@ -23,6 +23,9 @@ USB transport implementation is complete;
 repeated-run performance benchmarking is tracked independently in
 [Stock USB transport](docs/development/stock-usb-transport.md).
 
+A subsequent main Runtime run exposed an ALG/RPN setup assumption and a keyboard
+readiness race; follow-up acceptance is tracked in [Validation](docs/development/validation.md).
+
 ## Development documentation
 
 The current documentation is an internal Development site built with Zensical:
@@ -39,4 +42,8 @@ Historical HPGCC source is used as implementation evidence only. A normal hpclan
 
 Run `tools/lint.sh` for the repository lint gate: Ruff checks the Python 3.12 host tools and ShellCheck checks tracked shell scripts. C host/unit builds continue to use `-Wall -Wextra -Werror`.
 
-Run `tools/format.sh` to format tracked C/C++ and Python sources with clang-format and Ruff. `tools/format.sh --check <files...>` checks selected files without rewriting them. Formatting is configured centrally, but the repository does not yet force a one-time full-tree reformat of historical sources.
+Run `tools/format.sh` to format tracked C/C++ and Python sources with clang-format and Ruff. `tools/format.sh --check <files...>` checks selected files without rewriting them. Quality checks all owned C/C++ and Python sources against the committed format baseline. Third-party and generated font sources are excluded. Use clang-format from the pinned ATfE toolchain and Ruff from `tools/requirements-quality.txt`.
+
+Run `ATFE=/path/to/atfe tools/analyze.sh` for Clang static analysis using the
+CMake compilation databases for host unit tests and ARM runtime/Gallery builds.
+See [Validation](docs/development/validation.md) for scope and CI responsibilities.

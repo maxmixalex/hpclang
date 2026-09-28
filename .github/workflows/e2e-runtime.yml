@@ -16,6 +16,7 @@ on:
       - "cmake/**"
       - "tests/e2e/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
@@ -47,6 +48,7 @@ on:
       - "cmake/**"
       - "tests/e2e/**"
       - "tools/build-e2e.sh"
+      - "tools/install-ci-packages.sh"
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
@@ -149,8 +151,7 @@ jobs:
         run: |
           if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
              ! command -v innoextract >/dev/null 2>&1; then
-            sudo -E apt-get update -qq
-            sudo -E apt-get install -y --no-install-recommends innoextract
+            bash tools/install-ci-packages.sh innoextract
           fi
 
       - name: Prepare shared Stock assets

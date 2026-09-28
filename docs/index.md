@@ -25,6 +25,10 @@ acceptance records and
 and transport scope. Repeated-run performance benchmarking is separate from
 functional completion.
 
+A later main Runtime run exposed an ALG/RPN setup assumption. Its correction,
+keyboard readiness synchronization, and stronger Quality gates are awaiting
+formal follow-up acceptance; see [Validation](development/validation.md).
+
 ## Development reference
 
 - [Architecture](development/architecture.md) — supported build model, runtime responsibilities, platform responsibilities, and rejected legacy execution models.

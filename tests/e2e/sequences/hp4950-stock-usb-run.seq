@@ -3,10 +3,7 @@
 # is Kermit. Inspect and accept that choice before entering Start Server.
 2000 tap f6
 4000 tap f6
-5000 tap mode
-5500 tap neg
-6000 tap f6
-7000 capture home-rpn
+7000 capture home
 
 # I/O -> Transfer...
 8000 tap files
@@ -46,6 +43,8 @@
 33500 capture server-usb
 34000 host-gate
 
+# The host explicitly clears documented system flag -95 (RPN mode) through
+# Stock Kermit before releasing this gate; no timing-sensitive MODE toggle.
 # Install ARMToolbox/library 275 into Port 2 using the transferred SETUP
 # program. HPCLANG sorts before SETUP in HOME, so the VAR softkeys are F1/F2.
 1000 capture after-transfer

@@ -6,31 +6,35 @@ on:
     paths:
       - "**/*.c"
       - "**/*.h"
-      - "**/*.cc"
       - "**/*.cpp"
+      - "**/*.cc"
       - "**/*.cxx"
       - "**/*.hpp"
       - "**/*.py"
       - "**/*.sh"
+      - "**/CMakeLists.txt"
+      - "cmake/**"
       - ".clang-format"
       - "pyproject.toml"
-      - "tools/lint.sh"
-      - "tools/format.sh"
+      - "tools/requirements-quality.txt"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/quality.yml"
   pull_request:
     paths:
       - "**/*.c"
       - "**/*.h"
-      - "**/*.cc"
       - "**/*.cpp"
+      - "**/*.cc"
       - "**/*.cxx"
       - "**/*.hpp"
       - "**/*.py"
       - "**/*.sh"
+      - "**/CMakeLists.txt"
+      - "cmake/**"
       - ".clang-format"
       - "pyproject.toml"
-      - "tools/lint.sh"
-      - "tools/format.sh"
+      - "tools/requirements-quality.txt"
+      - ".github/actions/setup-atfe/**"
       - ".github/workflows/quality.yml"
 
 concurrency:
@@ -38,82 +42,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Ruff + ShellCheck
+  quality:
+    name: Lint, format, and Clang analysis
     runs-on: home-docker
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install lightweight lint dependencies
+      - uses: ./.github/actions/setup-atfe
+      - name: Install quality tools
         run: |
-          set -euo pipefail
-          apt_install() {
-            local installed=false
-            for attempt in 1 2 3; do
-              sudo -E rm -rf /var/lib/apt/lists/partial
-              if sudo -E apt-get -o Acquire::Retries=4 update -qq &&
-                 sudo -E apt-get -o Acquire::Retries=4 install -y --no-install-recommends "$@"; then
-                installed=true
-                break
-              fi
-              printf 'quality apt install attempt %d failed; refreshing metadata\n' "$attempt" >&2
-              sleep $((attempt * 2))
-            done
-            "$installed"
-          }
-          if ! command -v ruff >/dev/null 2>&1; then
-            if ! python3 -m venv build/quality-venv; then
-              apt_install python3-venv
-              python3 -m venv build/quality-venv
-            fi
-            build/quality-venv/bin/pip install --disable-pip-version-check 'ruff==0.13.2'
-            echo "$GITHUB_WORKSPACE/build/quality-venv/bin" >> "$GITHUB_PATH"
-            export PATH="$GITHUB_WORKSPACE/build/quality-venv/bin:$PATH"
-          fi
-          if ! command -v shellcheck >/dev/null 2>&1; then
-            apt_install shellcheck
-          fi
-          ruff --version
-          shellcheck --version
-
+          bash tools/install-ci-packages.sh python3-venv shellcheck
+          python3 -m venv build/quality-venv
+          build/quality-venv/bin/pip install --disable-pip-version-check -r tools/requirements-quality.txt
+          echo "$GITHUB_WORKSPACE/build/quality-venv/bin" >> "$GITHUB_PATH"
+          echo "$ATFE/bin" >> "$GITHUB_PATH"
       - name: Lint Python and shell
         run: bash tools/lint.sh
-
-      - name: Verify HP39 Kermit completion gate
-        run: python3 -m unittest discover -s tests/unit -p 'test_hp39_kermit_gate.py'
-
-  formatter-config:
-    name: Formatter configuration
-    runs-on: home-docker
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Validate formatter configuration
-        run: |
-          set -euo pipefail
-          test -s .clang-format
-          python3 - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          config = tomllib.loads(Path("pyproject.toml").read_text())
-          assert "ruff" in config["tool"]
-          PY
-
-          if ! command -v clang-format >/dev/null 2>&1; then
-            installed=false
-            for attempt in 1 2 3; do
-              sudo -E rm -rf /var/lib/apt/lists/partial
-              if sudo -E apt-get -o Acquire::Retries=4 update -qq &&
-                 sudo -E apt-get -o Acquire::Retries=4 install -y --no-install-recommends clang-format; then
-                installed=true
-                break
-              fi
-              printf 'quality clang-format install attempt %d failed; refreshing metadata\n' "$attempt" >&2
-              sleep $((attempt * 2))
-            done
-            "$installed"
-          fi
-          printf 'int main(void){return 0;}\n' | clang-format --style=file >/dev/null
+      - name: Check source formatting
+        run: bash tools/format.sh --check
+      - name: Analyze host and ARM C/C++
+        run: bash tools/analyze.sh
