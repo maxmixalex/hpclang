@@ -35,8 +35,16 @@ poll after drawing, matching the existing post-draw KACK contract. A host test
 checks both publication boundaries. Local verification passes 32 unit tests,
 Clang analysis across the three compilation databases, full formatting/lint,
 HP49g+/HP50g Stock USB with 52 frames each, HP39-family Direct with 52 frames
-each, and HP50g Gallery shard 14. Formal follow-up acceptance remains pending;
-branch retirement remains blocked until main is accepted.
+each, and HP50g Gallery shard 14.
+
+Formal follow-up acceptance is complete on `fdcd38b78bac143aaff4ac76ed8845787cc18848`:
+
+- [Runtime](https://github.com/zyf722/hpclang/actions/runs/36367636757), [Storage](https://github.com/zyf722/hpclang/actions/runs/36367636735), and [Font Gallery](https://github.com/zyf722/hpclang/actions/runs/36367636734) all pass.
+- [Core](https://github.com/zyf722/hpclang/actions/runs/36367636756) passes.
+- [Quality](https://github.com/zyf722/hpclang/actions/runs/36367636714) passes with lint, actual source formatting, and host/ARM Clang analysis all executed successfully.
+
+This supersedes the main Runtime failure above. Branch retirement follows
+validation of the fast-forwarded main head.
 
 ## Quality and workflow responsibilities
 

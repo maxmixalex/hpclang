@@ -23,8 +23,9 @@ USB transport implementation is complete;
 repeated-run performance benchmarking is tracked independently in
 [Stock USB transport](docs/development/stock-usb-transport.md).
 
-A subsequent main Runtime run exposed an ALG/RPN setup assumption and a keyboard
-readiness race; follow-up acceptance is tracked in [Validation](docs/development/validation.md).
+The ALG/RPN setup and keyboard readiness corrections, together with the full
+Quality gates, pass formal acceptance on `fdcd38b7`; see
+[Validation](docs/development/validation.md).
 
 ## Development documentation
 
