@@ -20,7 +20,7 @@
 17000 tap enter
 19000 capture server-usb
 
-# Host Kermit starts at t=35s. Times after host-gate are relative to successful
+# Host Kermit waits for the server capture. Times after host-gate are relative to successful
 # Kermit completion, not emulator start.
 35000 host-gate
 1000 capture after-transfer

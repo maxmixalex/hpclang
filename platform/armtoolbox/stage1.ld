@@ -6,7 +6,8 @@ SECTIONS
 {
     . = 0x09000400;
 
-    .text : AT(0)
+    /* The raw image is copied at this VMA; preserve section alignment gaps. */
+    .text :
     {
         KEEP(*(.text.stage1.entry))
         *(.text .text.*)
@@ -14,9 +15,16 @@ SECTIONS
         . = ALIGN(4);
     }
 
-    .data : AT(SIZEOF(.text))
+    .data :
     {
         *(.data .data.*)
+        . = ALIGN(8);
+    }
+
+    .bss (NOLOAD) :
+    {
+        *(.bss .bss.*)
+        *(COMMON)
         . = ALIGN(8);
     }
 

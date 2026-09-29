@@ -62,6 +62,8 @@ void hpclang_mmu_sync(volatile uint32_t *l2_workspace, volatile uint32_t *l1);
 uint32_t hpclang_irq_save_disable(void);
 void hpclang_irq_restore(uint32_t cpsr);
 
+uintptr_t hpclang_stage0_resume_target __attribute__((section(".data.stage0.resume"))) = 0u;
+
 struct hpclang_hp39_portal_context hpclang_hp39_portal_context
     __attribute__((section(".data.hp39.portal"), aligned(8))) = {
         .public_context =
@@ -103,7 +105,7 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * DSKTOP back to the pre-call value.
  */
 static uint8_t hp39_saturn_portal_thunk[HPCLANG_PAGE_SIZE]
-    __attribute__((section(".data.hp39.thunk"), aligned(HPCLANG_PAGE_SIZE)));
+    __attribute__((section(".bss.hp39.thunk"), aligned(HPCLANG_PAGE_SIZE)));
 
 enum
 {
@@ -1264,6 +1266,8 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     bounds->temp_limit = temp_limit;
     bounds->user_limit = user_limit;
     bounds->stack_reserve_nibbles = 0u;
+    bounds->native_roots = NULL;
+    bounds->native_root_count = 0u;
     return 1;
 }
 
@@ -1305,7 +1309,8 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
  */
 int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_header *hpc1,
                               uint32_t stage1_size, uint32_t model, uint32_t saturn_pc,
-                              uintptr_t emulator_lr, uint32_t stock_cpsr, uintptr_t stock_frame)
+                              uintptr_t emulator_lr, uint32_t stock_cpsr, uintptr_t stock_frame,
+                              uintptr_t stage0_code, uint32_t stage0_size)
 {
     if (!hpc1_header_ok(hpc1))
         return -1;
@@ -1318,7 +1323,16 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         (STAGE_CODE_OFFSET + stage1_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
     uint32_t code_count = (hpc1->image_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
 
-    uint32_t workspace_page = stage_pages;
+    uintptr_t live_state = live_saturn_state(saturn_state, model);
+    int preserve_stage0 =
+        live_state != 0u && (model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
+                             model == HPCLANG_MODEL_HP50G);
+    /* One separately fenced native page holds the PIC return path. */
+    if (preserve_stage0 && (stage0_size == 0u || stage0_size > HPCLANG_PAGE_SIZE ||
+                            hpclang_stage0_resume_target < stage0_code ||
+                            hpclang_stage0_resume_target - stage0_code >= stage0_size))
+        return -5;
+    uint32_t workspace_page = stage_pages + (preserve_stage0 ? 1u : 0u);
     uint32_t code_first = workspace_page + 1u;
     uint32_t rw_first = code_first + code_count;
 
@@ -1333,6 +1347,27 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
 
     if (rw_count < rw_needed || rw_count > HPCLANG_RW_PAGE_CAPACITY)
         return -4;
+
+    if (preserve_stage0) {
+        uint32_t page = old_l2[stage_pages] & UINT32_C(0xfffff000);
+        /* Native pool pages may be system RAM outside Saturn Read[]. Prove
+           the Stock identity section from its live ARM page table instead. */
+        volatile const uint32_t *stock_l1 = (volatile const uint32_t *)(uintptr_t)0x07f00000u;
+        uint32_t descriptor = stock_l1[page >> 20];
+        if ((descriptor & 3u) != 2u ||
+            (descriptor & UINT32_C(0xfff00000)) != (page & UINT32_C(0xfff00000)))
+            return -6;
+        uintptr_t stock_alias = page;
+        volatile uint8_t *copy =
+            (volatile uint8_t *)(uintptr_t)(STAGE_WINDOW_BASE + stage_pages * HPCLANG_PAGE_SIZE);
+        const uint8_t *source = (const uint8_t *)stage0_code;
+        for (uint32_t i = 0u; i < stage0_size; ++i)
+            copy[i] = source[i];
+        hpclang_cache_clean((const void *)copy, stage0_size);
+        /* bootstrap MMU publication invalidates I-cache before this is used.
+           The Stock alias remains valid after stage0 removes L1[0x90]. */
+        hpclang_stage0_resume_target = stock_alias + (hpclang_stage0_resume_target - stage0_code);
+    }
 
     uint32_t code_pages[HPCLANG_CODE_PAGE_CAPACITY];
     uint32_t rw_pages[HPCLANG_RW_PAGE_CAPACITY];
@@ -1366,8 +1401,9 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         code_count * HPCLANG_PAGE_SIZE);
 
     struct hpclang_launch_context launch;
-    struct hpclang_rpl_memory_bounds rpl_bounds = {0u, 0u, 0u, 0u};
+    struct hpclang_rpl_memory_bounds rpl_bounds;
     struct stage_launcher_bias launcher_bias = {0u, 0u};
+    uint32_t *native_roots[] = {&launcher_bias.object, (uint32_t *)stock_frame};
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace =
@@ -1399,7 +1435,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     /* Only advertise a Saturn state when its Read[] map contains every ROM
        page the current native-font runtime may dereference. This keeps Direct
        E2E's synthetic allocator block from masquerading as a live stock map. */
-    launch.saturn_state = live_saturn_state(saturn_state, model);
+    launch.saturn_state = live_state;
 
     /*
      * Our Launcher-V3 wrapper is a DOCSTR whose payload starts with
@@ -1427,6 +1463,10 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
          * not expose that reservation through AVMEM, so carry it explicitly.
          */
         rpl_bounds.stack_reserve_nibbles = launcher_bias.active != 0u ? 5u : 0u;
+        /* Hidden launcher value and saved post-ARMSYS Saturn PC are live
+           roots even though neither is in a Stock-visible pointer table. */
+        rpl_bounds.native_roots = native_roots;
+        rpl_bounds.native_root_count = sizeof(native_roots) / sizeof(native_roots[0]);
 
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window

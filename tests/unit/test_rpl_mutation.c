@@ -227,6 +227,12 @@ static void test_userob_shift_roundtrip(void)
     struct hpclang_rpl_mutation_io io = setup(1u);
     struct named_pair pair = prepare_two_named_chars();
 
+    uint32_t native_moving = pair.object_b;
+    uint32_t native_fixed = pair.object_a;
+    uint32_t *native_roots[] = {&native_moving, &native_fixed};
+    io.native_roots = native_roots;
+    io.native_root_count = 2u;
+
     uint32_t old_dstk = get_word(DSKTOP, 5u);
     uint32_t old_avmem = get_word(AVMEM, 5u);
     put_word(old_dstk, 5u, pair.object_b);
@@ -240,6 +246,8 @@ static void test_userob_shift_roundtrip(void)
     assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, 5) ==
            HPCLANG_RPL_MUTATION_OK);
 
+    assert(native_moving == pair.object_b - 5u);
+    assert(native_fixed == pair.object_a);
     assert(get_word(DSKTOP, 5u) == old_dstk - 5u);
     assert(get_word(AVMEM, 5u) == old_avmem - 1u);
     assert(get_word(USEROB, 5u) == pair.home - 5u);
@@ -260,6 +268,8 @@ static void test_userob_shift_roundtrip(void)
     assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -5) ==
            HPCLANG_RPL_MUTATION_OK);
 
+    assert(native_moving == pair.object_b);
+    assert(native_fixed == pair.object_a);
     assert(get_word(DSKTOP, 5u) == old_dstk);
     assert(get_word(AVMEM, 5u) == old_avmem);
     assert(get_word(USEROB, 5u) == pair.home);
@@ -285,6 +295,17 @@ static void test_userob_shift_rejects_removed_reference(void)
     put_word(old_dstk, 5u, pair.link_a - 1u);
     assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -2) ==
            HPCLANG_RPL_MUTATION_BUSY);
+
+    /* An ARM-held launcher root must veto the same removal even when the
+       ordinary data-stack reference points elsewhere. */
+    put_word(old_dstk, 5u, pair.object_a);
+    uint32_t native_root = pair.link_a - 1u;
+    uint32_t *native_roots[] = {&native_root};
+    io.native_roots = native_roots;
+    io.native_root_count = 1u;
+    assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -2) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(native_root == pair.link_a - 1u);
 
     assert(get_word(DSKTOP, 5u) == old_dstk);
     assert(get_word(AVMEM, 5u) == old_avmem);

@@ -55,7 +55,8 @@ static int io_ready(const struct hpclang_rpl_mutation_io *io)
            io->temp_limit > RPL_MAIN_FIRST && io->temp_limit <= RPL_MAIN_END &&
            io->user_limit >= RPL_MAIN_FIRST && io->user_limit < RPL_MAIN_END &&
            io->stack_reserve_nibbles <= RPL_MAIN_END - io->user_limit &&
-           (io->stack_reserve_nibbles % 5u) == 0u;
+           (io->stack_reserve_nibbles % 5u) == 0u &&
+           (io->native_root_count == 0u || io->native_roots != NULL);
 }
 
 static int read_word(const struct hpclang_rpl_mutation_io *io, uint32_t address, uint32_t nibbles,
@@ -203,7 +204,8 @@ struct pointer_scan_request
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
-                                 uint32_t value, const struct pointer_scan_request *request)
+                                 uint32_t value, const struct pointer_scan_request *request,
+                                 uint32_t *native_slot)
 {
     if (request == NULL)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -231,6 +233,10 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
     if (request->mode != POINTER_SCAN_APPLY_SHIFT)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
+    if (native_slot != NULL) {
+        *native_slot = shifted;
+        return HPCLANG_RPL_MUTATION_OK;
+    }
     return write_word(io, slot, 5u, shifted);
 }
 
@@ -241,7 +247,7 @@ static int scan_pointer_slot(const struct hpclang_rpl_mutation_io *io, uint32_t 
     int result = read_word(io, slot, 5u, &value);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
-    return inspect_pointer_value(io, slot, value, request);
+    return inspect_pointer_value(io, slot, value, request, NULL);
 }
 
 static int scan_data_stack_references(const struct hpclang_rpl_mutation_io *io,
@@ -290,7 +296,7 @@ static int scan_return_stack_references(const struct hpclang_rpl_mutation_io *io
         if ((value & ~UINT32_C(0x0000000f)) == 0u)
             return HPCLANG_RPL_MUTATION_OK;
 
-        result = inspect_pointer_value(io, slot, value, request);
+        result = inspect_pointer_value(io, slot, value, request, NULL);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
 
@@ -371,7 +377,7 @@ static int scan_touchtab_references(const struct hpclang_rpl_mutation_io *io,
         if (value == 0u)
             return HPCLANG_RPL_MUTATION_OK;
 
-        result = inspect_pointer_value(io, ptr, value, request);
+        result = inspect_pointer_value(io, ptr, value, request, NULL);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
 
@@ -424,7 +430,7 @@ static int scan_vger_references(const struct hpclang_rpl_mutation_io *io,
             if (value == 0u)
                 break;
 
-            result = inspect_pointer_value(io, ptr, value, request);
+            result = inspect_pointer_value(io, ptr, value, request, NULL);
             if (result != HPCLANG_RPL_MUTATION_OK)
                 return result;
 
@@ -450,6 +456,14 @@ static int scan_system_references(const struct hpclang_rpl_mutation_io *io,
 static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
                                const struct pointer_scan_request *request)
 {
+    for (uint32_t i = 0u; i < io->native_root_count; ++i) {
+        uint32_t *root = io->native_roots[i];
+        if (root == NULL)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        int result = inspect_pointer_value(io, 0u, *root, request, root);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
     int result = scan_data_stack_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;

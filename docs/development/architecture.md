@@ -54,6 +54,23 @@ HP39gs/40gs native-font access uses this mechanism: only physical NOR pages `0x0
 
 Calculator-model policy must not leak into application code unless an actual user-visible hardware difference requires it. Platform differences remain below the HPC1 boundary; model identity is passed separately in the boot record. `platform_cookie` remains an opaque launcher/runtime token and does not expose the private code window as application ABI.
 
+### Launcher storage and return lifetime
+
+Stage1 distinguishes file bytes from its full in-memory extent. The packed image
+preserves initialized-section alignment; stage0 zeros the trailing BSS and
+reserves pages for the complete extent. In particular, the page-aligned HP39
+portal staging buffer consumes runtime RAM without also occupying the
+transferred calculator object as several kilobytes of zeros.
+
+Classic-RPL named writes may move the USEROB object containing stage0. Before
+exposing mutation, stage1 copies the position-independent stage0 code into a
+reserved native pool page and validates its Stock identity mapping. Return uses
+that protected copy, including the final removal of the temporary stage alias.
+The hidden launcher object and saved post-ARMSYS Saturn PC are explicit private
+relocation roots. They move with USEROB/TEMPOB references rather than retaining
+addresses into relocated data. The private bounds record uses the `RPL2` magic
+so an older record cannot be mistaken for one containing native roots.
+
 ## Platform families and model profiles
 
 The platform family is the implementation unit for launch and low-level integration:

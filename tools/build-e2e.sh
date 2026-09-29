@@ -197,12 +197,22 @@ if "$NM" -u "$OUT/stage1.elf" | grep .; then
 fi
 "$ATFE/bin/llvm-objcopy" -O binary "$OUT/stage1.elf" "$OUT/stage1.bin"
 
+stage1_memory_size="$("$NM" "$OUT/stage1.elf" |
+    awk '$3 == "__stage1_size" {print "0x"$1}')"
+[[ "$stage1_memory_size" =~ ^0x[0-9a-fA-F]+$ ]]
+if (( $(stat -c '%s' "$OUT/stage1.bin") > stage1_memory_size )); then
+    echo "stage1 file exceeds its reserved memory extent" >&2
+    exit 1
+fi
+
 cat > "$OUT/stage0-bundle.S" <<EOF
 .section .rodata.hpclang.bundle,"a",%progbits
 .align 2
 .global __stage1_blob_start
 .global __stage1_blob_end
 .global __stage1_blob_size
+.global __stage1_memory_size
+.set __stage1_memory_size, $stage1_memory_size
 .global __hpc1_blob_start
 .global __hpc1_blob_end
 __stage1_blob_start:

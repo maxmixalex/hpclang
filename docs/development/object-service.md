@@ -306,6 +306,21 @@ Current implementation and evidence have different scopes:
   It now uses the shared USB harness's explicit `ZZE2E` string on all three
   classic-RPL models. Main's input timing, capture and USB launch code is kept.
 
+The resumed baseline at `0d16cd2a` reproduced both failures: Runtime
+[36388263936](https://github.com/zyf722/hpclang/actions/runs/36388263936)
+failed all three HP39 Stock models before keyboard progression; Object mutation
+[36388264008](https://github.com/zyf722/hpclang/actions/runs/36388264008)
+reached payload PASS on HP48/49/50 but failed return. The follow-up separates
+stage1 file bytes from its zero-initialized memory extent, moves the classic-RPL
+stage0 return path into protected native storage, and registers launcher-held
+Saturn addresses as relocation roots. Formal acceptance of these changes is
+still pending. Local verification passed Stock Object mutation on HP48gII,
+HP49g+ and HP50g with strict return checks, Runtime on all three HP39 Stock
+models and the HP39 Direct family, and all 32 host unit tests. The HP48 runner
+now starts from fresh emulator state and waits for the server-ready capture
+before sending bytes. This does not close the missing remove bridge or general
+failure transaction semantics listed below.
+
 Work proceeds in this order:
 
 1. Establish the synchronized baseline with canonical Runtime and the focused

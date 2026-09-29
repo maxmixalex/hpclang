@@ -15,6 +15,8 @@ SECTIONS
     {
         KEEP(*(.text.stage0.entry))
         *(.text .text.*)
+        . = ALIGN(4);
+        __stage0_code_size = .;
         *(.rodata .rodata.*)
         KEEP(*(.rodata.hpclang.bundle))
         . = ALIGN(4);

@@ -31,7 +31,7 @@
 30000 tap down
 31500 tap enter
 33500 capture server-serial
-# The host starts Kermit at t=35s. Do not guess how long the transfer takes:
+# The host waits for the server capture. Do not guess how long the transfer takes:
 # pause all following sequence actions until the host reports successful Kermit
 # completion through HPCLANG_E2E_HOST_GATE_FILE. Times below are relative to
 # that release, not to emulator start.

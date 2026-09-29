@@ -8,6 +8,15 @@ on:
   push:
     paths:
       - "runtime/core/font.c"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/abi.h"
+      - "include/hpclang/bootstrap.h"
+      - "cmake/toolchains/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - ".github/actions/setup-atfe/**"
       - "runtime/fonts/generated/**"
       - "include/hpclang/font.h"
       - "include/hpclang/font-package.h"
@@ -41,6 +50,15 @@ on:
   pull_request:
     paths:
       - "runtime/core/font.c"
+      - "runtime/bootstrap/**"
+      - "platform/armtoolbox/**"
+      - "include/hpclang/abi.h"
+      - "include/hpclang/bootstrap.h"
+      - "cmake/toolchains/**"
+      - "tools/build-e2e.sh"
+      - "tools/hpclang-pack.py"
+      - "tools/armtoolbox-wrap.py"
+      - ".github/actions/setup-atfe/**"
       - "runtime/fonts/generated/**"
       - "include/hpclang/font.h"
       - "include/hpclang/font-package.h"

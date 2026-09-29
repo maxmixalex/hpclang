@@ -115,6 +115,14 @@ allowing launch keys to proceed. Blank screens still fail when that bound expire
 
 The current model-specific sequences exist because the stock user interfaces are genuinely different. They should not be unified by adding conditional logic to one large script unless that makes the behavior easier to understand.
 
+## Workflow path selection
+
+Push filters compare the branch's previous head with the new head. Merging main
+into an older work branch therefore includes the incoming main changes, even
+when those changes were already tested on main. Gallery runs for font changes
+and its shared bootstrap, launcher, compiler setup and emulator dependencies;
+an isolated object-store implementation change does not select Gallery.
+
 ## x50ng backend
 
 CI checks out a pinned external x50ng revision. `tools/prepare-x50ng.py` installs
@@ -124,6 +132,10 @@ Gallery mapping sizes live in its C frontend; preparation does not rewrite
 frontend constants or add firmware-specific diagnostic probes.
 
 Tests read the emulated LCD controller and drive the calculator key matrix directly. No GTK/SDL window automation, Xvfb, mouse coordinates, or host-screen scraping is used at runtime.
+
+Fresh-state missing register keys/groups use reset defaults silently. Pass
+x50ng `--verbose` to inspect those optional state lookups. Other state lookup
+errors still print normally; this does not filter or discard emulator stderr.
 
 x50ng remains an external emulator/test dependency. None of its GPL implementation is copied into hpclang's production runtime.
 

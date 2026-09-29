@@ -81,7 +81,7 @@ extern "C"
  * the live Read[] map and publishes this short-lived structure through the
  * opaque platform_cookie. Applications must never inspect it.
  */
-#define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x314c5052) /* "RPL1" */
+#define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x324c5052) /* "RPL2" */
 #define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
     struct hpclang_rpl_memory_bounds
@@ -90,6 +90,8 @@ extern "C"
         uint32_t temp_limit;            /* exclusive upper bound for RSKTOP/TEMPOB growth */
         uint32_t user_limit;            /* lower native-page fence for DSKTOP growth */
         uint32_t stack_reserve_nibbles; /* launcher-private cells below user D1 */
+        uint32_t **native_roots;        /* private ARM-held Saturn addresses */
+        uint32_t native_root_count;
     };
 
 /*

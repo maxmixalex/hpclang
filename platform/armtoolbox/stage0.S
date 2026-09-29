@@ -111,13 +111,25 @@ hpclang_armtoolbox_stage0:
     bne     1b
 
 2:
+    /* The aligned zero-initialized tail occupies pages, not transfer bytes. */
+    ldr     r2, =__stage1_memory_size
+    sub     r2, r2, r6
+    mov     r3, #0
+.Lclear_stage1:
+    cmp     r2, #0
+    beq     .Lstage1_ready
+    strb    r3, [r1], #1
+    subs    r2, r2, #1
+    bne     .Lclear_stage1
+.Lstage1_ready:
     mov     r0, r4
-    mov     r1, r6
+    ldr     r1, =__stage1_memory_size
     bl      .Lpublish_stage_code
 
     /*
      * stage1(saturn_state, hpc1, stage1_size, model,
-     *        saturn_pc, emulator_lr, stock_cpsr, stock_frame)
+     *        saturn_pc, emulator_lr, stock_cpsr, stock_frame,
+     *        stage0_code, stage0_size)
      *
      * Copy the HP39 portal seed out of the original ARMSYS call frame before
      * stage1 can temporarily hand execution back to the Stock emulator.
@@ -125,20 +137,23 @@ hpclang_armtoolbox_stage0:
     ldr     r11, [sp]                 /* saved r0-r12/lr Stock frame */
     ldr     r5, [r11, #0]            /* post-ARMSYS Saturn PC */
     ldr     r12, [r11, #52]          /* emulator continuation LR */
-    sub     sp, sp, #16
+    sub     sp, sp, #24
     str     r5, [sp, #0]
     str     r12, [sp, #4]
     str     r9, [sp, #8]             /* caller CPSR before stage0 masking */
     str     r11, [sp, #12]
+    str     r8, [sp, #16]            /* original PIC stage0 code */
+    ldr     r5, =__stage0_code_size
+    str     r5, [sp, #20]
 
     mov     r0, r10
     mov     r1, r7
-    mov     r2, r6
+    ldr     r2, =__stage1_memory_size
     ldr     r3, =HPCLANG_STAGE0_MODEL
     ldr     r4, =STAGE1_BASE
     mov     lr, pc
     bx      r4
-    add     sp, sp, #16
+    add     sp, sp, #24
 
     /* Restore the original stock-launcher stack. */
     ldr     sp, [sp]

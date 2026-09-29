@@ -66,6 +66,8 @@ static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
     io->temp_limit = bounds->temp_limit;
     io->user_limit = bounds->user_limit;
     io->stack_reserve_nibbles = bounds->stack_reserve_nibbles;
+    io->native_roots = bounds->native_roots;
+    io->native_root_count = bounds->native_root_count;
     return 1;
 }
 

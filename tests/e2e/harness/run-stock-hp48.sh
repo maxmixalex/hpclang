@@ -16,8 +16,12 @@ NOR="$ROOT/build/$TARGET-nor.bin"
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
+# Each launch starts from the NOR fixture, never a previous emulator snapshot.
+rm -rf "$STATE" "$SEND"
 mkdir -p "$SEND"
 rm -f "$HOST_GATE"
+rm -f "$ROOT/build/$TARGET-"*.pgm "$ROOT/build/$TARGET-"*.pgm.png \
+    "$ROOT/build/$TARGET-stock.json" "$ROOT/build/$TARGET-e2e.json"
 
 curl -fL --retry 3 \
     https://blog.lyc8503.net/en/post/hp39gs-modify/48gii.bin \
@@ -38,7 +42,8 @@ KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
 EMULATOR_TIMEOUT=$((35 + KERMIT_TIMEOUT + 120))
 TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
 case "$TRANSPORT" in
-    uart|usb) ;;
+    uart) SERVER_READY="$ROOT/build/$TARGET-stock-server-serial.pgm" ;;
+    usb) SERVER_READY="$ROOT/build/$TARGET-stock-server-usb.pgm" ;;
     *) echo "unsupported HP48 Stock transport: $TRANSPORT" >&2; exit 2 ;;
 esac
 printf 'HP48 Stock %s transfer watchdog: kermit=%ss emulator=%ss bytes=%s\n' \
@@ -101,7 +106,15 @@ timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
     --style="$ROOT/build/x50ng/dist/style-40g.css" &
 X50_PID=$!
 
-sleep 35
+# Wait for the emulator's server milestone, not elapsed host time. Early USB
+# bytes can latch EP3 before Stock starts receiving when emulation is slow.
+while [[ ! -s "$SERVER_READY" ]] && kill -0 "$X50_PID" 2>/dev/null; do
+    sleep 0.1
+done
+[[ -s "$SERVER_READY" ]] || {
+    echo "HP48 Stock server-ready capture was not produced" >&2
+    exit 1
+}
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
     ZZE2E.HP=ZZE2E L275_48=L275 HPCLANG.HP=HPCLANG \
