@@ -82,6 +82,7 @@ jobs:
             build/e2e-object/e2e.result-address
             build/e2e-object/launchers/*.bin
             build/e2e-object/launchers/*.hp
+            build/e2e-object/stock-fixtures/*.hp
           if-no-files-found: error
 
   x50ng:

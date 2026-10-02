@@ -201,6 +201,7 @@ struct pointer_scan_request
     uint32_t remove_end;
     int32_t offset;
     enum pointer_scan_mode mode;
+    int *busy_found; /* validation accumulates BUSY without hiding later errors */
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
@@ -211,14 +212,23 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     if (request->mode == POINTER_SCAN_REJECT) {
-        return pointer_hits_range(value, request->move_start, request->move_end)
-                   ? HPCLANG_RPL_MUTATION_BUSY
-                   : HPCLANG_RPL_MUTATION_OK;
+        if (!pointer_hits_range(value, request->move_start, request->move_end))
+            return HPCLANG_RPL_MUTATION_OK;
+        if (request->busy_found != NULL) {
+            *request->busy_found = 1;
+            return HPCLANG_RPL_MUTATION_OK;
+        }
+        return HPCLANG_RPL_MUTATION_BUSY;
     }
 
     if (request->remove_start < request->remove_end &&
-        pointer_hits_range(value, request->remove_start, request->remove_end))
+        pointer_hits_range(value, request->remove_start, request->remove_end)) {
+        if (request->busy_found != NULL) {
+            *request->busy_found = 1;
+            return HPCLANG_RPL_MUTATION_OK;
+        }
         return HPCLANG_RPL_MUTATION_BUSY;
+    }
 
     if (!pointer_hits_range(value, request->move_start, request->move_end))
         return HPCLANG_RPL_MUTATION_OK;
@@ -488,6 +498,7 @@ static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint
     if (start >= end || end > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
+    int busy = 0;
     const struct pointer_scan_request request = {
         .move_start = start,
         .move_end = end,
@@ -495,13 +506,18 @@ static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint
         .remove_end = 0u,
         .offset = 0,
         .mode = POINTER_SCAN_REJECT,
+        .busy_found = &busy,
     };
-    return scan_all_references(io, &request);
+    int result = scan_all_references(io, &request);
+    return result == HPCLANG_RPL_MUTATION_OK && busy ? HPCLANG_RPL_MUTATION_BUSY : result;
 }
+
+struct userob_shift_geometry;
 
 static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_io *io,
                                               uint32_t start, uint32_t end,
-                                              int32_t future_user_delta);
+                                              int32_t future_user_delta,
+                                              struct userob_shift_geometry *future_geometry);
 
 static int store_result_to_mutation(int result)
 {
@@ -545,7 +561,6 @@ struct userob_shift_geometry
     uint32_t move_end;
     uint32_t remove_start;
     uint32_t remove_end;
-    uint32_t old_avmem;
     uint32_t new_avmem;
     uint32_t home;
     uint32_t home_end;
@@ -815,8 +830,9 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
 {
     if (!io_ready(io) || geometry == NULL || directory_plan == NULL)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    /* No-op requests are handled by callers; success here must yield a plan. */
     if (delta == 0)
-        return HPCLANG_RPL_MUTATION_OK;
+        return HPCLANG_RPL_MUTATION_MALFORMED;
 
     uint32_t old_dstk = 0u;
     uint32_t rstk = 0u;
@@ -912,7 +928,6 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
         .move_end = move_end,
         .remove_start = remove_start,
         .remove_end = remove_end,
-        .old_avmem = avmem,
         .new_avmem = new_avmem,
         .home = home,
         .home_end = home_end,
@@ -922,8 +937,7 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
     /*
      * Prove directory geometry before reference state. A BUSY result can then
      * be treated by higher-level replace/remove as the only remaining blocker,
-     * preserved through TEMPOB, and retried without discovering a structural
-     * directory error after the first mutation.
+     * preserved through TEMPOB, then committed with this validated plan.
      */
     directory_plan->count = 0u;
     directory_plan->remaining_entries = RPL_DIRECTORY_ENTRY_LIMIT;
@@ -934,6 +948,7 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
+    int busy = 0;
     const struct pointer_scan_request pointer_request = {
         .move_start = old_dstk,
         .move_end = move_end,
@@ -941,8 +956,10 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
         .remove_end = remove_end,
         .offset = geometry->pointer_offset,
         .mode = POINTER_SCAN_VALIDATE_SHIFT,
+        .busy_found = &busy,
     };
-    return scan_all_references(io, &pointer_request);
+    result = scan_all_references(io, &pointer_request);
+    return result == HPCLANG_RPL_MUTATION_OK && busy ? HPCLANG_RPL_MUTATION_BUSY : result;
 }
 
 static int commit_userob_shift(const struct hpclang_rpl_mutation_io *io,
@@ -1210,7 +1227,7 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
 
         if (!identical) {
             result = preserve_userob_references_to_temp(io, entry.object_address,
-                                                        entry.object_address + span, 0);
+                                                        entry.object_address + span, 0, NULL);
             if (result != HPCLANG_RPL_MUTATION_OK)
                 return result;
         }
@@ -1252,12 +1269,13 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
         return result;
 
     if (reference_state == HPCLANG_RPL_MUTATION_BUSY) {
-        result = preserve_userob_references_to_temp(io, entry.object_address, old_end, delta);
+        result = preserve_userob_references_to_temp(io, entry.object_address, old_end, delta,
+                                                    &shift_geometry);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
     }
 
-    result = hpclang_rpl_mutation_userob_shift_before(io, old_end, delta);
+    result = commit_userob_shift(io, &shift_geometry, &shift_directory_plan);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -1321,17 +1339,10 @@ int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, 
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     if (reference_state == HPCLANG_RPL_MUTATION_BUSY) {
-        result = preserve_userob_references_to_temp(io, entry.object_address, object_end, delta);
+        result = preserve_userob_references_to_temp(io, entry.object_address, object_end, delta,
+                                                    &geometry);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
-
-        delete_context.found = 0u;
-        result =
-            plan_userob_shift(io, object_end, delta, &geometry, &directory_plan, &delete_context);
-        if (result != HPCLANG_RPL_MUTATION_OK)
-            return result;
-        if (delete_context.found == 0u)
-            return HPCLANG_RPL_MUTATION_MALFORMED;
     }
 
     return commit_userob_shift(io, &geometry, &directory_plan);
@@ -1531,7 +1542,8 @@ static int commit_temp(const struct hpclang_rpl_mutation_io *io, const struct te
 
 static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_io *io,
                                               uint32_t start, uint32_t end,
-                                              int32_t future_user_delta)
+                                              int32_t future_user_delta,
+                                              struct userob_shift_geometry *future_geometry)
 {
     if (!io_ready(io) || start >= end || end > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -1575,6 +1587,19 @@ static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_
             uint32_t gain = final_cells - old_cells;
             if (plan.avmem > UINT32_MAX - gain)
                 return HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+        /* TEMP allocation changes the accounting, not USEROB positions or
+           directory links. Finish the already-validated USEROB plan now;
+           never discover a new planning error after the first write. */
+        if (future_geometry != NULL) {
+            uint32_t after_temp_cells = (plan.dstk - plan.new_rstk) / 5u;
+            uint32_t after_temp_avmem = plan.avmem - plan.temp_cost;
+            uint32_t final_avmem = final_cells < after_temp_cells
+                                       ? after_temp_avmem - (after_temp_cells - final_cells)
+                                       : after_temp_avmem + (final_cells - after_temp_cells);
+            if (final_avmem > 0xfffffu)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            future_geometry->new_avmem = final_avmem;
         }
     }
 

@@ -284,6 +284,10 @@ if [[ "$MODE" == font-gallery ]]; then
         > "$OUT/e2e.gallery-shard"
 fi
 
+if [[ "$MODE" == object-mutation ]]; then
+    python3 "$ROOT/tests/e2e/object-mutation/fixtures.py" "$OUT/stock-fixtures"
+fi
+
 if (( WRAP_LAUNCHERS )); then
     printf 'PASS: %s E2E application and wrapped target launchers built.\n' "$MODE"
 else

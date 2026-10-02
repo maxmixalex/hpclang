@@ -12,10 +12,11 @@ add_executable(hpclang_object_mutation_e2e
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
-    main.c)
+    main.c
+    nested.c)
 
 target_include_directories(
-    hpclang_object_mutation_e2e PRIVATE "${HPCLANG_ROOT}/include")
+    hpclang_object_mutation_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_compile_features(hpclang_object_mutation_e2e PRIVATE c_std_11)
 target_compile_options(hpclang_object_mutation_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables

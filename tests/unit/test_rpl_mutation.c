@@ -314,6 +314,32 @@ static void test_userob_shift_rejects_removed_reference(void)
     assert(get_word(pair.link_a, 5u) == old_link);
 }
 
+static void test_retained_reference_does_not_hide_invalid_root(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    uint32_t retained = pair.object_b;
+    uint32_t *roots[] = {&retained, NULL};
+    io.native_roots = roots;
+    io.native_root_count = 2u;
+    uint8_t *before = malloc(sizeof(memory));
+    assert(before != NULL);
+    memcpy(before, memory, sizeof(memory));
+    struct hpclang_object *value = make_string1('X');
+    retained = pair.link_a - 1u;
+    assert(hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a, -2) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    retained = pair.object_b;
+    assert(hpclang_rpl_mutation_store_replace(&io, pair.home, (const uint8_t *)"B", 1u, value) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(hpclang_rpl_mutation_store_remove(&io, pair.home, (const uint8_t *)"B", 1u) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(memcmp(before, memory, sizeof(memory)) == 0);
+    assert(retained == pair.object_b);
+    free(value);
+    free(before);
+}
+
 static void test_userob_shift_nospace_is_non_mutating(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -708,6 +734,32 @@ static void test_push_transaction(void)
     hpclang_object_release(object);
 }
 
+static void test_named_preservation_accounting(void)
+{
+    for (uint32_t residue = 0; residue < 5; ++residue) {
+        for (uint32_t remove = 0; remove < 2; ++remove) {
+            struct hpclang_rpl_mutation_io io = setup(1u);
+            struct named_pair pair = prepare_two_named_chars();
+            uint32_t dstk = get_word(DSKTOP, 5u) + residue;
+            put_word(DSKTOP, 5u, dstk);
+            put_word(EDITLINE, 5u, dstk + 10u);
+            put_word(dstk, 5u, pair.object_b);
+            const uint32_t reserved = 7u;
+            put_word(AVMEM, 5u, (dstk - get_word(RSKTOP, 5u)) / 5u - reserved);
+            struct hpclang_object *value = make_string1('X');
+            int result =
+                remove ? hpclang_rpl_mutation_store_remove(&io, pair.home, (const uint8_t *)"B", 1u)
+                       : hpclang_rpl_mutation_store_replace(&io, pair.home, (const uint8_t *)"B",
+                                                            1u, value);
+            assert(result == HPCLANG_RPL_MUTATION_OK);
+            uint32_t final_cells = (get_word(DSKTOP, 5u) - get_word(RSKTOP, 5u)) / 5u;
+            assert(get_word(AVMEM, 5u) == final_cells - reserved);
+            assert_char_at(get_word(get_word(DSKTOP, 5u), 5u), 'B');
+            hpclang_object_release(value);
+        }
+    }
+}
+
 static void test_avmem_reservation_is_preserved(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -819,6 +871,7 @@ int main(void)
     test_push_transaction();
     test_temp_allocation_retargets_existing_reference();
     test_avmem_reservation_is_preserved();
+    test_named_preservation_accounting();
     test_stack_reserve_blocks_last_cell();
     test_nospace_is_non_mutating();
     test_drop_and_replace();
@@ -834,6 +887,7 @@ int main(void)
     test_named_size_change_preserves_reference();
     test_userob_shift_roundtrip();
     test_userob_shift_rejects_removed_reference();
+    test_retained_reference_does_not_hide_invalid_root();
     test_userob_shift_nospace_is_non_mutating();
     return 0;
 }

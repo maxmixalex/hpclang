@@ -21,6 +21,7 @@ int hpclang_object_store_remove_existing(const struct hpclang_object_store *stor
                                          const uint8_t *name, uint32_t name_length);
 
 volatile uint32_t hpclang_e2e_result;
+uint32_t hpclang_e2e_nested_mutation(void);
 
 #define HPCLANG_OBJECT_PHASE UINT32_C(0x4f530000)
 
@@ -302,6 +303,10 @@ int main(void)
         failure = 0xf9u;
         goto done;
     }
+    phase(26u);
+    failure = hpclang_e2e_nested_mutation();
+    if (failure != 0u)
+        goto done;
     phase(25u);
     current = hpclang_object_store_current();
     if (current == NULL || (entries_after = hpclang_object_store_iterator_open(current)) == NULL ||

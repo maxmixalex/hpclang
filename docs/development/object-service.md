@@ -307,7 +307,7 @@ Current implementation and evidence have different scopes:
   Stock data-stack reference and an ARM-held root. Removal preserves the old
   value through TEMPOB; subsequent replacement/create/remove keeps both
   references valid and the current-directory path stable. This is host
-  evidence, not yet a nested-directory Stock witness.
+  evidence; the additional nested-directory Stock witness is described below.
 - HP39gs/40gs have a private same-size descriptor-store bridge, using an owned
   snapshot staged in the portal page. Historical Runtime #358 validated the
   bounded `NoteText` witness; general size-changing writes remain unproven.
@@ -376,9 +376,8 @@ Work proceeds in this order:
 memory, then updates stack/accounting words. Each callback can currently report
 failure after earlier writes succeeded. The range preflight tests readability;
 it is not a generic promise that arbitrary write callbacks cannot fail.
-Replacement/removal can additionally allocate a preserved TEMPOB value before
-replanning the directory shift. Existing rejection tests and passing Stock
-round trips therefore do not establish rollback for arbitrary late I/O faults.
+Existing rejection tests and passing Stock round trips do not establish
+rollback for arbitrary late I/O faults.
 
 The production write backend now captures all 128 main-RAM page bases in an
 invocation-local `rpl-stock-memory` view before publishing mutation I/O. It
@@ -393,10 +392,29 @@ use the read-only Saturn view.
 This removes late mapping lookup failure from the production backend for valid
 main-RAM accesses. It does not add rollback to arbitrary callback backends, nor
 prove that all algorithmic error paths after TEMPOB preservation are unreachable.
-The remaining gate is a complete commit-path audit (including the second plan
-after preservation), plus negative/fault-injection evidence before public API
-closure. Do not add a blanket retry after a partially applied mutation. The
-captured-view implementation and its Stock regression remain pending formal CI.
+The captured-view implementation in `257dcd4b` is accepted by Object mutation
+[36978224382](https://github.com/zyf722/hpclang/actions/runs/36978224382), with
+Core, Quality, Runtime and Storage green on the same head.
+
+The next change reuses the validated directory-movement plan after preservation,
+calculating the final free-memory accounting before the first write. Reference
+validation scans past retained references so they cannot hide a later invalid
+root. Host tests cover rejection without any memory changes and preserved
+allocation reservations across all five nibble-to-cell alignment remainders.
+The remaining gate is a complete commit-path audit and negative/fault-injection
+evidence before public API closure. Do not add a blanket retry after a partially
+applied mutation.
+
+The expanded Stock witness transfers a two-level directory fixture through the
+shared USB runners. It retains logical directory handles across replacement,
+removal and recreation, checks sibling values, and checks the original value
+through a real data-stack reference after replacement and removal. A test-only
+helper reserves a stack cell through the public API, then resolves the named
+object and installs its pointer in that cell; this is not a ROM `RCL` invocation
+or a public borrowed-pointer API. The original stack depth is restored. These
+new checks pass locally on HP48gII/49g+/50g, including strict settled return,
+and remain pending formal CI. All 33 host tests, lint, source formatting and
+host/ARM Clang analysis pass. Named write bridges remain private.
 
 The focused mutation workflow is justified by its destructive object lifecycle
 and lack of keyboard interaction. It shares the normal build entry, Stock asset

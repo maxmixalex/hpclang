@@ -31,9 +31,22 @@ cp "$ASSETS_DIR/hp4950/SETUP.BIN" "$SEND/SETUP.BIN"
 cp "$SEND/SETUP.BIN" "$ROOT/build/$TARGET-setup.bin"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
-KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py"     "$SEND/ZZE2E.HP" "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP")"
+# Focused applications may supply additional named Stock objects.
+EXTRA_FILES=()
+EXTRA_SEND=()
+for fixture in "$APP_DIR/stock-fixtures/"*.hp; do
+    [[ -f "$fixture" ]] || continue
+    filename="$(basename "$fixture")"
+    cp "$fixture" "$SEND/$filename"
+    EXTRA_FILES+=("$SEND/$filename")
+    EXTRA_SEND+=("$filename=${filename%.hp}")
+done
+
+KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
+    "$SEND/ZZE2E.HP" "$SEND/SETUP.BIN" "$SEND/HPCLANG.HP" "${EXTRA_FILES[@]}")"
 EMULATOR_TIMEOUT=$((20 + KERMIT_TIMEOUT + 120))
-printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss bytes=%s\n'     "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"     "$(( $(stat -c %s "$SEND/ZZE2E.HP") + $(stat -c %s "$SEND/SETUP.BIN") + $(stat -c %s "$SEND/HPCLANG.HP") ))"
+printf 'HP49/50 Stock USB watchdog: kermit=%ss emulator=%ss\n' \
+    "$KERMIT_TIMEOUT" "$EMULATOR_TIMEOUT"
 
 X50_TTY="$RUNNER_TEMP/$TARGET-x50ng-usb"
 KERMIT_TTY="$RUNNER_TEMP/$TARGET-kermit-usb"
@@ -96,7 +109,11 @@ done
     exit 1
 }
 
-timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh"     "$KERMIT_TTY" "$SEND" "$KERMIT_LOG"     --remote-host "-95 CF -95 FC?" ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG     > "$ROOT/build/$TARGET-kermit.out" 2>&1
+# Store extras first: Stock's newest-first menu must keep HPCLANG and SETUP on F1/F2.
+timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
+    "$KERMIT_TTY" "$SEND" "$KERMIT_LOG" --remote-host "-95 CF -95 FC?" \
+    "${EXTRA_SEND[@]}" ZZE2E.HP=ZZE2E SETUP.BIN=SETUP HPCLANG.HP=HPCLANG \
+    > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"
 printf 'HP49/50 Stock USB Kermit completed; released host gate: %s\n' "$HOST_GATE"
 
