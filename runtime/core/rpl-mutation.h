@@ -16,6 +16,13 @@ extern "C"
 
     struct hpclang_rpl_mutation_io
     {
+        /* Production uses an invocation-local writable main-RAM view while
+         * interrupts
+         * remain masked. Callback backends must keep mappings and
+         * contents stable except
+         * for these writes; preflight is not rollback
+         * for a backend that starts failing
+         * after the commit has begun. */
         hpclang_rpl_read_nibble_fn read_nibble;
         hpclang_rpl_write_nibble_fn write_nibble;
         void *context;
@@ -96,16 +103,6 @@ extern "C"
     int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io,
                                           uint32_t directory, const uint8_t *name,
                                           uint32_t name_length);
-
-    /*
-     * Strict compatibility helper for the first live M7.3f witness. It rejects a
-     * different native extent even though the general replacement path can now
-     * resize objects while preserving live references to the old value.
-     */
-    int hpclang_rpl_mutation_store_replace_same_size(const struct hpclang_rpl_mutation_io *io,
-                                                     uint32_t directory, const uint8_t *name,
-                                                     uint32_t name_length,
-                                                     const struct hpclang_object *object);
 
     /*
      * Internal USEROB geometry primitive for M7.3f.

@@ -59,6 +59,19 @@ static int io_ready(const struct hpclang_rpl_mutation_io *io)
            (io->native_root_count == 0u || io->native_roots != NULL);
 }
 
+/* Preserve native reservations when either end of the free interval moves. */
+static int plan_free_cells(uint32_t avmem, uint32_t old_cells, uint32_t new_cells,
+                           uint32_t *updated)
+{
+    if (avmem > old_cells)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t reserved = old_cells - avmem;
+    if (new_cells < reserved)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    *updated = new_cells - reserved;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int read_word(const struct hpclang_rpl_mutation_io *io, uint32_t address, uint32_t nibbles,
                      uint32_t *value)
 {
@@ -902,17 +915,9 @@ static int plan_userob_shift(const struct hpclang_rpl_mutation_io *io, uint32_t 
     uint32_t old_cells = (old_dstk - rstk) / 5u;
     uint32_t new_cells = (new_dstk - rstk) / 5u;
     uint32_t new_avmem;
-    if (new_cells < old_cells) {
-        uint32_t cost = old_cells - new_cells;
-        if (avmem < cost)
-            return HPCLANG_RPL_MUTATION_NOSPACE;
-        new_avmem = avmem - cost;
-    } else {
-        uint32_t gain = new_cells - old_cells;
-        if (avmem > UINT32_MAX - gain)
-            return HPCLANG_RPL_MUTATION_MALFORMED;
-        new_avmem = avmem + gain;
-    }
+    result = plan_free_cells(avmem, old_cells, new_cells, &new_avmem);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
 
     uint32_t move_nibbles = move_end - old_dstk;
     if (!range_mapped(io, old_dstk, move_nibbles) || !range_mapped(io, new_dstk, move_nibbles))
@@ -1348,26 +1353,6 @@ int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, 
     return commit_userob_shift(io, &geometry, &directory_plan);
 }
 
-int hpclang_rpl_mutation_store_replace_same_size(const struct hpclang_rpl_mutation_io *io,
-                                                 uint32_t directory, const uint8_t *name,
-                                                 uint32_t name_length,
-                                                 const struct hpclang_object *object)
-{
-    if (!io_ready(io) || object == NULL || object->nibble_count == 0u ||
-        (name == NULL && name_length != 0u))
-        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
-
-    struct hpclang_rpl_directory_entry_view entry;
-    uint32_t span = 0u;
-    int result = store_replace_target(io, directory, name, name_length, &entry, &span);
-    if (result != HPCLANG_RPL_MUTATION_OK)
-        return result;
-    if (span != object->nibble_count)
-        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
-
-    return hpclang_rpl_mutation_store_replace(io, directory, name, name_length, object);
-}
-
 static int stack_depth(const struct hpclang_rpl_mutation_io *io, uint32_t *depth)
 {
     const struct hpclang_rpl_reader reader = {
@@ -1452,9 +1437,10 @@ static int plan_temp(const struct hpclang_rpl_mutation_io *io, uint32_t object_n
     uint32_t new_cells = (dstk - new_rstk) / 5u;
     if (new_cells > old_cells)
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    uint32_t temp_cost = old_cells - new_cells;
-    if (avmem < temp_cost)
-        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t new_avmem = 0u;
+    result = plan_free_cells(avmem, old_cells, new_cells, &new_avmem);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
 
     uint32_t source_size = rstk - ttop;
     if (!range_mapped(io, ttop, source_size) || !range_mapped(io, new_ttop, source_size) ||
@@ -1487,7 +1473,7 @@ static int plan_temp(const struct hpclang_rpl_mutation_io *io, uint32_t object_n
     plan->dstk = dstk;
     plan->avmem = avmem;
     plan->delta = delta;
-    plan->temp_cost = temp_cost;
+    plan->temp_cost = avmem - new_avmem;
     plan->new_rstk = new_rstk;
     plan->new_ttop = new_ttop;
     plan->object_address = ttop + 1u;
@@ -1579,28 +1565,15 @@ static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_
 
         uint32_t old_cells = (plan.dstk - plan.rstk) / 5u;
         uint32_t final_cells = (final_dstk - plan.new_rstk) / 5u;
-        if (final_cells < old_cells) {
-            uint32_t total_cost = old_cells - final_cells;
-            if (plan.avmem < total_cost)
-                return HPCLANG_RPL_MUTATION_NOSPACE;
-        } else {
-            uint32_t gain = final_cells - old_cells;
-            if (plan.avmem > UINT32_MAX - gain)
-                return HPCLANG_RPL_MUTATION_MALFORMED;
-        }
+        uint32_t final_avmem = 0u;
+        result = plan_free_cells(plan.avmem, old_cells, final_cells, &final_avmem);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
         /* TEMP allocation changes the accounting, not USEROB positions or
            directory links. Finish the already-validated USEROB plan now;
            never discover a new planning error after the first write. */
-        if (future_geometry != NULL) {
-            uint32_t after_temp_cells = (plan.dstk - plan.new_rstk) / 5u;
-            uint32_t after_temp_avmem = plan.avmem - plan.temp_cost;
-            uint32_t final_avmem = final_cells < after_temp_cells
-                                       ? after_temp_avmem - (after_temp_cells - final_cells)
-                                       : after_temp_avmem + (final_cells - after_temp_cells);
-            if (final_avmem > 0xfffffu)
-                return HPCLANG_RPL_MUTATION_MALFORMED;
+        if (future_geometry != NULL)
             future_geometry->new_avmem = final_avmem;
-        }
     }
 
     int64_t offset_wide = (int64_t)plan.object_address - (int64_t)start;
@@ -1693,23 +1666,30 @@ int hpclang_rpl_mutation_drop(const struct hpclang_rpl_mutation_io *io, uint32_t
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    if (count > UINT32_MAX / 5u || avmem > UINT32_MAX - count)
+    if (count > UINT32_MAX / 5u)
         return HPCLANG_RPL_MUTATION_LEVEL;
     uint32_t delta = count * 5u;
     uint32_t new_dstk = 0u;
     if (!checked_add(dstk, delta, &new_dstk) || new_dstk > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    /*
-     * Match Stock/HPGCC stack semantics: AVMEM changes by stack cells, not by
-     * recomputing DSKTOP-RSKTOP. The latter would incorrectly count a hidden
-     * launcher-bias cell and hpclang-owned native pages as ordinary free RAM.
-     */
+    uint32_t rstk = 0u;
+    result = read_word(io, RPL_RSKTOP, 5u, &rstk);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (rstk < RPL_MAIN_FIRST || rstk >= dstk)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t new_avmem = 0u;
+    result = plan_free_cells(avmem, (dstk - rstk) / 5u, (new_dstk - rstk) / 5u, &new_avmem);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    /* Release count cells without exposing native reservations as free RAM. */
     result = write_word(io, RPL_DSKTOP, 5u, new_dstk);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    return write_word(io, RPL_AVMEM, 5u, avmem + count);
+    return write_word(io, RPL_AVMEM, 5u, new_avmem);
 }
 
 int hpclang_rpl_mutation_replace(const struct hpclang_rpl_mutation_io *io, uint32_t level,

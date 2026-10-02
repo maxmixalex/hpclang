@@ -16,16 +16,21 @@ enum
     EDITLINE = 0x806fdu,
     USEROB = 0x80711u,
     CONTEXT = 0x8071bu,
+    TEMPENV = 0x80702u,
+    TOUCHTAB = 0x8070cu,
+    FSTVGERPTR = 0x8072fu,
     AVMEM = 0x80e9bu,
     DORRP = 0x02a96u
 };
 
 static uint8_t memory[NIBBLES];
+static uint32_t rejected_read;
+static uint32_t writes;
 
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
     (void)context;
-    if (value == NULL || address >= NIBBLES)
+    if (value == NULL || address >= NIBBLES || address == rejected_read)
         return 0;
     *value = memory[address] & 0x0fu;
     return 1;
@@ -37,6 +42,7 @@ static int write_nibble(void *context, uint32_t address, uint8_t value)
     if (address >= NIBBLES || value > 0x0fu)
         return 0;
     memory[address] = value;
+    ++writes;
     return 1;
 }
 
@@ -114,6 +120,8 @@ static struct hpclang_object *make_char(uint8_t ch)
 static struct hpclang_rpl_mutation_io setup(uint32_t depth)
 {
     memset(memory, 0, sizeof(memory));
+    rejected_read = UINT32_MAX;
+    writes = 0;
 
     const uint32_t ttop = 0x84000u;
     const uint32_t rstk = 0x85000u;
@@ -453,6 +461,134 @@ static void test_nested_mutation_preserves_context_and_references(void)
     free(value);
 }
 
+/* HPGCC3 sat3_dir.c __sat3_fixptrs2: exercise each root family, including
+ * tables whose own
+ * storage moves during TEMPOB preservation. */
+static void prepare_reference_tables(const struct named_pair *pair)
+{
+    put_word(get_word(DSKTOP, 5u), 5u, pair->object_b);
+    put_word(0x84ffbu, 5u, pair->object_b);
+    put_word(0x84ff6u, 5u, 0u);
+    memset(memory + 0x84400u, 0, 0x300u);
+    put_word(TEMPENV, 5u, 0x84400u);
+    put_word(0x84400u, 5u, 25u);
+    put_word(0x8440au, 5u, pair->object_b);
+    put_word(0x8440fu, 5u, pair->object_b + 5u);
+    put_word(TOUCHTAB, 5u, 0x84500u);
+    put_word(0x84503u, 5u, pair->object_b);
+    put_word(0x84508u, 5u, pair->object_a);
+    put_word(FSTVGERPTR, 5u, 0x84600u);
+    put_word(0x84600u, 5u, 0x12345u); /* header is not a pointer cell */
+    put_word(0x8460fu, 5u, 2u);
+    put_word(0x84623u, 5u, pair->object_b);
+    put_word(0x8463cu, 5u, pair->object_b + 5u);
+    put_word(0x84641u, 5u, pair->object_a);
+    put_word(0x80734u, 5u, pair->object_b);
+}
+
+static void test_all_reference_families_survive_preservation(void)
+{
+    for (uint32_t remove = 0; remove < 2; ++remove) {
+        struct hpclang_rpl_mutation_io io = setup(1u);
+        struct named_pair pair = prepare_two_named_chars();
+        prepare_reference_tables(&pair);
+        uint32_t native = pair.object_b;
+        uint32_t *roots[] = {&native};
+        io.native_roots = roots;
+        io.native_root_count = 1u;
+        struct hpclang_object *value = make_string1('X');
+        int result =
+            remove ? hpclang_rpl_mutation_store_remove(&io, pair.home, (const uint8_t *)"B", 1u)
+                   : hpclang_rpl_mutation_store_replace(&io, pair.home, (const uint8_t *)"B", 1u,
+                                                        value);
+        assert(result == HPCLANG_RPL_MUTATION_OK);
+        const uint32_t preserved = 0x84001u;
+        const uint32_t delta = 13u; /* seven-nibble CHAR plus TEMP block overhead */
+        assert(native == preserved);
+        assert_char_at(preserved, 'B');
+        assert(get_word(get_word(DSKTOP, 5u), 5u) == preserved);
+        assert(get_word(0x84ffbu + delta, 5u) == preserved);
+        assert(get_word(TEMPENV, 5u) == 0x84400u + delta);
+        assert(get_word(0x8440au + delta, 5u) == preserved);
+        assert(get_word(0x8440fu + delta, 5u) == preserved + 5u);
+        assert(get_word(TOUCHTAB, 5u) == 0x84500u + delta);
+        assert(get_word(0x84503u + delta, 5u) == preserved);
+        assert(get_word(0x84508u + delta, 5u) == pair.object_a);
+        assert(get_word(FSTVGERPTR, 5u) == 0x84600u + delta);
+        assert(get_word(0x84600u + delta, 5u) == 0x12345u);
+        assert(get_word(0x84623u + delta, 5u) == preserved);
+        assert(get_word(0x8463cu + delta, 5u) == preserved + 5u);
+        assert(get_word(0x84641u + delta, 5u) == pair.object_a);
+        assert(get_word(0x80734u, 5u) == preserved);
+        hpclang_object_release(value);
+    }
+}
+
+static void test_reference_preflight_rejects_before_writing(void)
+{
+    for (uint32_t fault = 0; fault < 4; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup(1u);
+        struct named_pair pair = prepare_two_named_chars();
+        prepare_reference_tables(&pair);
+        int expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        switch (fault) {
+        case 0:
+            put_word(0x84400u, 5u, 0xfffffu);
+            break;
+        case 1:
+            put_word(TOUCHTAB, 5u, NIBBLES - 2u);
+            break;
+        case 2:
+            put_word(0x8460fu, 5u, 257u);
+            break;
+        default:
+            rejected_read = 0x84646u; /* late terminator after several retained roots */
+            expected = HPCLANG_RPL_MUTATION_IO;
+            break;
+        }
+        uint8_t *before = malloc(sizeof(memory));
+        assert(before != NULL);
+        memcpy(before, memory, sizeof(memory));
+        struct hpclang_object *value = make_string1('X');
+        assert(hpclang_rpl_mutation_store_replace(&io, pair.home, (const uint8_t *)"B", 1u,
+                                                  value) == expected);
+        assert(hpclang_rpl_mutation_store_remove(&io, pair.home, (const uint8_t *)"B", 1u) ==
+               expected);
+        assert(hpclang_rpl_mutation_store_create(&io, pair.home, (const uint8_t *)"C", 1u, value) ==
+               expected);
+        assert(writes == 0u);
+        assert(memcmp(before, memory, sizeof(memory)) == 0);
+        free(before);
+        hpclang_object_release(value);
+    }
+}
+
+static void test_impossible_free_memory_is_rejected(void)
+{
+    for (uint32_t large = 0; large < 2; ++large) {
+        struct hpclang_rpl_mutation_io io = setup(1u);
+        struct named_pair pair = prepare_two_named_chars();
+        uint32_t cells = (get_word(DSKTOP, 5u) - get_word(RSKTOP, 5u)) / 5u;
+        put_word(AVMEM, 5u, large ? 0xfffffu : cells + 1u);
+        uint8_t *before = malloc(sizeof(memory));
+        assert(before != NULL);
+        memcpy(before, memory, sizeof(memory));
+        struct hpclang_object *value = make_string1('X');
+        assert(hpclang_rpl_mutation_store_create(&io, pair.home, (const uint8_t *)"C", 1u, value) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_mutation_store_replace(&io, pair.home, (const uint8_t *)"B", 1u,
+                                                  value) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_mutation_store_remove(&io, pair.home, (const uint8_t *)"B", 1u) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_mutation_push_snapshot(&io, value) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_mutation_replace(&io, 1u, value) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_mutation_drop(&io, 1u) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(writes == 0u && memcmp(before, memory, sizeof(memory)) == 0);
+        free(before);
+        hpclang_object_release(value);
+    }
+}
+
 static void test_named_remove_newest(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -626,35 +762,28 @@ static void test_named_same_size_replace(void)
     struct hpclang_object *char_b = make_char('B');
     struct hpclang_object *char_c = make_char('C');
 
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"A", 1u,
-                                                        char_b) == HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_store_replace(&io, 0x92000u, (const uint8_t *)"A", 1u, char_b) ==
+           HPCLANG_RPL_MUTATION_OK);
     assert_char_at(object_address, 'B');
 
     const uint32_t dstk = get_word(DSKTOP, 5u);
     put_word(dstk, 5u, object_address);
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"A", 1u,
-                                                        char_c) == HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_store_replace(&io, 0x92000u, (const uint8_t *)"A", 1u, char_c) ==
+           HPCLANG_RPL_MUTATION_OK);
     assert_char_at(object_address, 'C');
 
     uint32_t preserved = get_word(dstk, 5u);
     assert(preserved != object_address);
     assert_char_at(preserved, 'B');
 
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"A", 1u,
-                                                        char_c) == HPCLANG_RPL_MUTATION_OK);
+    assert(hpclang_rpl_mutation_store_replace(&io, 0x92000u, (const uint8_t *)"A", 1u, char_c) ==
+           HPCLANG_RPL_MUTATION_OK);
     assert_char_at(object_address, 'C');
     assert(get_word(dstk, 5u) == preserved);
     assert_char_at(preserved, 'B');
 
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"NO", 2u,
-                                                        char_b) == HPCLANG_RPL_MUTATION_NOT_FOUND);
-
-    uint32_t original_size = char_c->nibble_count;
-    char_c->nibble_count = original_size + 1u;
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"A", 1u,
-                                                        char_c) ==
-           HPCLANG_RPL_MUTATION_UNSUPPORTED);
-    char_c->nibble_count = original_size;
+    assert(hpclang_rpl_mutation_store_replace(&io, 0x92000u, (const uint8_t *)"NO", 2u, char_b) ==
+           HPCLANG_RPL_MUTATION_NOT_FOUND);
 
     hpclang_object_release(char_b);
     hpclang_object_release(char_c);
@@ -670,8 +799,8 @@ static void test_named_reference_preservation_nospace_is_non_mutating(void)
     put_word(dstk, 5u, object_address);
     io.temp_limit = get_word(RSKTOP, 5u) + 17u;
 
-    assert(hpclang_rpl_mutation_store_replace_same_size(&io, 0x92000u, (const uint8_t *)"A", 1u,
-                                                        char_c) == HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(hpclang_rpl_mutation_store_replace(&io, 0x92000u, (const uint8_t *)"A", 1u, char_c) ==
+           HPCLANG_RPL_MUTATION_NOSPACE);
     assert_char_at(object_address, 'B');
     assert(get_word(dstk, 5u) == object_address);
 
@@ -881,6 +1010,9 @@ int main(void)
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();
     test_named_remove_newest();
+    test_all_reference_families_survive_preservation();
+    test_reference_preflight_rejects_before_writing();
+    test_impossible_free_memory_is_rejected();
     test_nested_mutation_preserves_context_and_references();
     test_named_remove_missing_is_non_mutating();
     test_named_size_changing_replace();

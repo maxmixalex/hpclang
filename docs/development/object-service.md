@@ -396,7 +396,7 @@ The captured-view implementation in `257dcd4b` is accepted by Object mutation
 [36978224382](https://github.com/zyf722/hpclang/actions/runs/36978224382), with
 Core, Quality, Runtime and Storage green on the same head.
 
-The next change reuses the validated directory-movement plan after preservation,
+The implementation reuses the validated directory-movement plan after preservation,
 calculating the final free-memory accounting before the first write. Reference
 validation scans past retained references so they cannot hide a later invalid
 root. Host tests cover rejection without any memory changes and preserved
@@ -412,9 +412,40 @@ through a real data-stack reference after replacement and removal. A test-only
 helper reserves a stack cell through the public API, then resolves the named
 object and installs its pointer in that cell; this is not a ROM `RCL` invocation
 or a public borrowed-pointer API. The original stack depth is restored. These
-new checks pass locally on HP48gII/49g+/50g, including strict settled return,
-and remain pending formal CI. All 33 host tests, lint, source formatting and
-host/ARM Clang analysis pass. Named write bridges remain private.
+new checks are accepted on `c5329a54` by Object mutation
+[36981866894](https://github.com/zyf722/hpclang/actions/runs/36981866894), with
+Core, Quality, Runtime, Storage and Font Gallery also green on that head.
+Named write bridges remain private.
+
+#### Reference and accounting audit
+
+The root families were checked against HPGCC3 `hplib/sat3/sat3_dir.c`,
+`__sat3_fixptrs2`: data stack, return stack, temporary environments, TOUCHTAB,
+VGER groups and the system-variable table. hpclang additionally tracks native
+launcher roots. Host tests now retain the same value through every family,
+including interior pointers, two VGER groups and table storage that itself moves
+during TEMPOB preservation. The VGER base is relocated once through the system
+table; its header is not overwritten as though it were a pointer cell.
+
+Malformed table lengths/bases and an injected unreadable late VGER cell are
+rejected by create/replace/remove with zero write-callback invocations and an
+unchanged memory image. This covers preflight failures, not rollback of a
+callback that fails during commit.
+
+All allocation/accounting plans preserve the difference between physical free
+cells and AVMEM as the native reservation. An AVMEM value exceeding the physical
+gap is rejected before mutation, avoiding over-allocation or truncation on a
+five-nibble write. The same rule covers named mutation, TEMPOB allocation and
+stack drop. Tests cover both a one-cell overstatement and `0xfffff`, as well as
+the existing reservation/alignment cases.
+
+The unused classic-RPL same-size-only bridges have been removed. Same-size,
+identical-value and retained-reference rejection tests now call the general
+replacement primitive. The separate HP39 descriptor-store bridge remains
+bounded; this cleanup does not establish general HP39 writes. This audit batch
+passes all 33 host tests, formatting/lint and host/ARM Clang analysis. Local
+Object mutation and canonical Runtime both pass on HP48gII/49g+/50g with settled
+return; Runtime also completes all 52 keyboard frames. Formal CI is pending.
 
 The focused mutation workflow is justified by its destructive object lifecycle
 and lack of keyboard interaction. It shares the normal build entry, Stock asset

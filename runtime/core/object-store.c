@@ -411,25 +411,6 @@ int hpclang_object_store_replace_existing(const struct hpclang_object_store *sto
         hpclang_rpl_mutation_store_replace(&io, directory, name, name_length, object));
 }
 
-int hpclang_object_store_replace_existing_same_size(const struct hpclang_object_store *store,
-                                                    const uint8_t *name, uint32_t name_length,
-                                                    const struct hpclang_object *object)
-{
-    if (object == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
-
-    uint32_t directory = 0u;
-    struct hpclang_rpl_mutation_io io;
-    struct hpclang_rpl_stock_memory memory;
-    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
-        return -1;
-
-    return set_mutation_errno(
-        hpclang_rpl_mutation_store_replace_same_size(&io, directory, name, name_length, object));
-}
-
 int hpclang_object_store_create_new(const struct hpclang_object_store *store, const uint8_t *name,
                                     uint32_t name_length, const struct hpclang_object *object)
 {
