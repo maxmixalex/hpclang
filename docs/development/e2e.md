@@ -196,7 +196,10 @@ that descriptor across the call and publishes its restoration before returning
 to stage1. KOS returns through the caller LR, so the bridge supplies an explicit
 continuation before restoring the original ARM/Thumb caller. `ResetSD`, strict
 return checks and the Stock UI witness remain required. Local Stock and Direct
-hp4950 verification passes with this repair; formal CI acceptance is pending. Storage
+hp4950 verification passes with this repair. Formal Storage
+[36972578170](https://github.com/zyf722/hpclang/actions/runs/36972578170)
+is fully green on `7cca953b` after an unchanged rerun of jobs interrupted by
+runner communication loss. Storage
 path filters include `runtime/libc/kos-call.S` so future bridge changes exercise
 this boundary.
 

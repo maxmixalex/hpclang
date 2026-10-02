@@ -288,20 +288,22 @@ the private mutation implementation still needs lifecycle and failure evidence.
 
 Current implementation and evidence have different scopes:
 
-- Classic-RPL private bridges can create and replace named entries, including
-  size changes. The lower-level remove primitive has host-unit coverage, but
-  no object-store remove bridge or Stock deletion witness exists yet.
+- Classic-RPL private bridges can create, replace and remove named entries,
+  including size-changing replacement. The remove bridge re-resolves the
+  logical store before calling the existing host-tested mutation primitive.
 - The Stock mutation payload grows and restores an existing string, then
-  creates `ZZM7F`. It does not remove that new entry. A payload PASS therefore
-  proves neither a complete create/remove round trip nor clean Stock teardown.
+  creates and deletes `ZZM7F`. It checks duplicate-create `EEXIST`, missing-get
+  and repeated-remove `ENOENT`, retained owned readback after deletion, and
+  preservation of the original witness. Local HP48gII/HP49g+/HP50g runs pass
+  the new deletion witness and strict return/UI gates; formal CI is pending.
 - HP39gs/40gs have a private same-size descriptor-store bridge, using an owned
   snapshot staged in the portal page. Historical Runtime #358 validated the
   bounded `NoteText` witness; general size-changing writes remain unproven.
   This does not establish HP39g+ descriptor compatibility.
 - Historical Object mutation #12 reached payload PASS on HP48gII but failed
   return teardown; canonical Runtime #371 regressed HP39gs/40gs before keyboard
-  progression. These are unresolved historical symptoms, not diagnoses of the
-  synchronized branch. Fresh CI must establish which remain reproducible.
+  progression. The synchronized baseline reproduced these symptoms; the
+  follow-up diagnosis and accepted repairs are recorded below.
 - The old mutation test assumed the SD-created `X50NG-VV.FAT` entry on HP49/50.
   It now uses the shared USB harness's explicit `ZZE2E` string on all three
   classic-RPL models. Main's input timing, capture and USB launch code is kept.
@@ -320,12 +322,17 @@ and Object mutation
 are fully green. Storage
 [36509415707](https://github.com/zyf722/hpclang/actions/runs/36509415707)
 still failed HP49g+/HP50g after payload PASS, during SD shutdown and return;
-that regression requires separate acceptance. Local verification passed Stock Object mutation on HP48gII,
+the KOS mapping repair in `7cca953b` is accepted by Storage
+[36972578170](https://github.com/zyf722/hpclang/actions/runs/36972578170)
+after an unchanged rerun. Core and Runtime on that same head are also green;
+Object mutation [36972578142](https://github.com/zyf722/hpclang/actions/runs/36972578142)
+passed on its first attempt. The interrupted jobs reported runner communication
+loss, not test assertion failures. Local verification passed Stock Object mutation on HP48gII,
 HP49g+ and HP50g with strict return checks, Runtime on all three HP39 Stock
 models and the HP39 Direct family, and all 32 host unit tests. The HP48 runner
 now starts from fresh emulator state and waits for the server-ready capture
-before sending bytes. This does not close the missing remove bridge or general
-failure transaction semantics listed below.
+before sending bytes. This closes the resumed launch/return baseline, but not general mutation
+failure semantics or the expanded deletion witness listed below.
 
 Work proceeds in this order:
 
@@ -343,9 +350,9 @@ Work proceeds in this order:
    Preflight/ENOSPC unit coverage does not prove rollback after a late write
    failure. Establish a non-failing commit boundary or recoverable transaction,
    and test nested directories, retained references and rejected mutations.
-4. Complete the named remove bridge and Stock create/read/replace/remove
-   round trip, checking absence after deletion, existing-object restoration,
-   unchanged cwd and owned-input lifetime. Preserve the failing teardown gate;
+4. Accept the new private remove bridge and Stock create/read/replace/remove
+   round trip, then extend retained Stock references, nested-directory,
+   unchanged-cwd and owned-input lifetime evidence. Preserve the failing teardown gate;
    do not relax it to accept payload PASS alone.
 5. Generalize HP39 variable writes only after descriptor, context and allocation
    lifetime are established. Then freeze the clean public put/remove contract

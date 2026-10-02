@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -15,6 +16,9 @@ int hpclang_object_store_replace_existing(const struct hpclang_object_store *sto
                                           const struct hpclang_object *object);
 int hpclang_object_store_create_new(const struct hpclang_object_store *store, const uint8_t *name,
                                     uint32_t name_length, const struct hpclang_object *object);
+
+int hpclang_object_store_remove_existing(const struct hpclang_object_store *store,
+                                         const uint8_t *name, uint32_t name_length);
 
 volatile uint32_t hpclang_e2e_result;
 
@@ -225,6 +229,48 @@ int main(void)
         goto done;
     }
     phase(22u);
+    errno = 0;
+    if (hpclang_object_store_create_new(home, create_name, sizeof(create_name), created_input) !=
+            -1 ||
+        errno != EEXIST) {
+        failure = 0xf4u;
+        goto done;
+    }
+    hpclang_object_release(created_input);
+    created_input = NULL;
+
+    phase(23u);
+    if (hpclang_object_store_remove_existing(home, create_name, sizeof(create_name)) != 0) {
+        failure = 0xf5u;
+        goto done;
+    }
+    errno = 0;
+    if (hpclang_object_store_get(home, create_name, sizeof(create_name), &after) != -1 ||
+        errno != ENOENT || after != NULL) {
+        failure = 0xf6u;
+        goto done;
+    }
+    errno = 0;
+    if (hpclang_object_store_remove_existing(home, create_name, sizeof(create_name)) != -1 ||
+        errno != ENOENT) {
+        failure = 0xf7u;
+        goto done;
+    }
+    /* Deleting Stock storage must not invalidate an owned readback snapshot. */
+    if (hpclang_object_string_copy(created_readback, created_actual, created_size) != 0 ||
+        memcmp(created_actual, create_value, created_size) != 0) {
+        failure = 0xf8u;
+        goto done;
+    }
+    phase(24u);
+    if (hpclang_object_store_get(home, name, name_length, &after) != 0 || after == NULL ||
+        hpclang_object_string_size(after, &after_size) != 0 || after_size != expected_size ||
+        hpclang_object_string_copy(after, expected, expected_size) != 0 ||
+        memcmp(expected, initial_value, expected_size) != 0) {
+        failure = 0xf9u;
+        goto done;
+    }
+    phase(25u);
 
 done:
     hpclang_object_release(created_readback);

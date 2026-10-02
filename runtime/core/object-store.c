@@ -479,6 +479,17 @@ int hpclang_object_store_create_new(const struct hpclang_object_store *store, co
         hpclang_rpl_mutation_store_create(&io, directory, name, name_length, object));
 }
 
+int hpclang_object_store_remove_existing(const struct hpclang_object_store *store,
+                                         const uint8_t *name, uint32_t name_length)
+{
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    if (mutation_prepare(store, name, name_length, &directory, &io) != 0)
+        return -1;
+
+    return set_mutation_errno(hpclang_rpl_mutation_store_remove(&io, directory, name, name_length));
+}
+
 struct hpclang_object_store_iterator *
 hpclang_object_store_iterator_open(const struct hpclang_object_store *store)
 {
