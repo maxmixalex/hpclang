@@ -1,0 +1,52 @@
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <hpclang/abi.h>
+#include "rpl-stock-memory.h"
+
+const struct hpclang_boot_info *hpclang_boot_info(void)
+{
+    return NULL;
+}
+
+int main(void)
+{
+    uint32_t map[256] = {0};
+    struct hpclang_rpl_stock_memory memory;
+    for (uint32_t i = 0u; i < 128u; ++i)
+        map[128u + i] = 0x08040000u + i * 0x800u;
+    assert(hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au));
+    uintptr_t last = memory.pages[127];
+    map[255] = 0u;
+    assert(memory.pages[127] == last); /* captured mapping no longer follows Read[] */
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au));
+    map[255] = (uint32_t)last;
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x0800081au)); /* read-only */
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x00000c1au)); /* ROM alias */
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c19u)); /* coarse table */
+    map[255] = map[128];
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* duplicate RAM */
+    map[255] = (uint32_t)last + 1u;
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* unaligned */
+    map[255] = 0x0007e000u;
+    assert(!hpclang_rpl_stock_memory_capture(&memory, map, 0x08000c1au)); /* ROM page */
+
+    uint8_t bytes[4096];
+    memset(bytes, 0xa5, sizeof(bytes));
+    memory.pages[0] = (uintptr_t)bytes;
+    memory.pages[1] = (uintptr_t)(bytes + 2048);
+    uint8_t value = 0u;
+    assert(hpclang_rpl_stock_memory_write(&memory, 0x80fffu, 3u));
+    assert(bytes[2047] == 0x35u);
+    assert(hpclang_rpl_stock_memory_write(&memory, 0x81000u, 7u));
+    assert(bytes[2048] == 0xa7u);
+    assert(hpclang_rpl_stock_memory_read(&memory, 0x80fffu, &value) && value == 3u);
+    assert(hpclang_rpl_stock_memory_read(&memory, 0x81000u, &value) && value == 7u);
+    assert(!hpclang_rpl_stock_memory_write(&memory, 0x7ffffu, 1u));
+    assert(!hpclang_rpl_stock_memory_write(&memory, 0x100000u, 1u));
+    assert(!hpclang_rpl_stock_memory_write(&memory, 0x81000u, 16u));
+    assert(bytes[2048] == 0xa7u);
+    assert(!hpclang_rpl_stock_mutation_io(NULL, &memory));
+    return 0;
+}

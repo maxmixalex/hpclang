@@ -5,13 +5,13 @@
 #include <string.h>
 
 #include <hpclang/abi.h>
-#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
 #include <hpclang/target.h>
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
+#include "rpl-stock-memory.h"
 #include "rpl-object-store.h"
 #include "saturn-view.h"
 
@@ -58,41 +58,6 @@ static int stock_read_nibble(void *context, uint32_t nibble_address, uint8_t *va
 {
     (void)context;
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(nibble_address), value);
-}
-
-static int stock_write_nibble(void *context, uint32_t nibble_address, uint8_t value)
-{
-    (void)context;
-    return hpclang_saturn_write_nibble(hpclang_saturn_address_make(nibble_address), value);
-}
-
-static int stock_mutation_io(struct hpclang_rpl_mutation_io *io)
-{
-    if (io == NULL || !stock_store_available())
-        return 0;
-
-    const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (boot == NULL || (boot->platform_cookie & HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
-        return 0;
-
-    uintptr_t raw = boot->platform_cookie & ~(uintptr_t)HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
-    const struct hpclang_rpl_memory_bounds *bounds = (const struct hpclang_rpl_memory_bounds *)raw;
-    if (bounds == NULL || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
-        bounds->temp_limit <= UINT32_C(0x00080000) || bounds->temp_limit > UINT32_C(0x00100000) ||
-        bounds->user_limit < UINT32_C(0x00080000) || bounds->user_limit >= UINT32_C(0x00100000) ||
-        bounds->stack_reserve_nibbles > UINT32_C(0x00100000) - bounds->user_limit ||
-        (bounds->stack_reserve_nibbles % 5u) != 0u)
-        return 0;
-
-    io->read_nibble = stock_read_nibble;
-    io->write_nibble = stock_write_nibble;
-    io->context = NULL;
-    io->temp_limit = bounds->temp_limit;
-    io->user_limit = bounds->user_limit;
-    io->stack_reserve_nibbles = bounds->stack_reserve_nibbles;
-    io->native_roots = bounds->native_roots;
-    io->native_root_count = bounds->native_root_count;
-    return 1;
 }
 
 static const struct hpclang_rpl_reader stock_reader = {
@@ -399,7 +364,8 @@ static int set_mutation_errno(int result)
 
 static int mutation_prepare(const struct hpclang_object_store *store, const uint8_t *name,
                             uint32_t name_length, uint32_t *directory,
-                            struct hpclang_rpl_mutation_io *io)
+                            struct hpclang_rpl_mutation_io *io,
+                            struct hpclang_rpl_stock_memory *memory)
 {
     if (store == NULL || directory == NULL || io == NULL) {
         errno = EFAULT;
@@ -413,7 +379,7 @@ static int mutation_prepare(const struct hpclang_object_store *store, const uint
         return -1;
     if (resolve_store(store, directory) != 0)
         return -1;
-    if (!stock_mutation_io(io)) {
+    if (!hpclang_rpl_stock_mutation_io(io, memory)) {
         errno = ENOSYS;
         return -1;
     }
@@ -437,7 +403,8 @@ int hpclang_object_store_replace_existing(const struct hpclang_object_store *sto
 
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (mutation_prepare(store, name, name_length, &directory, &io) != 0)
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
 
     return set_mutation_errno(
@@ -455,7 +422,8 @@ int hpclang_object_store_replace_existing_same_size(const struct hpclang_object_
 
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (mutation_prepare(store, name, name_length, &directory, &io) != 0)
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
 
     return set_mutation_errno(
@@ -472,7 +440,8 @@ int hpclang_object_store_create_new(const struct hpclang_object_store *store, co
 
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (mutation_prepare(store, name, name_length, &directory, &io) != 0)
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
 
     return set_mutation_errno(
@@ -484,7 +453,8 @@ int hpclang_object_store_remove_existing(const struct hpclang_object_store *stor
 {
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
-    if (mutation_prepare(store, name, name_length, &directory, &io) != 0)
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
 
     return set_mutation_errno(hpclang_rpl_mutation_store_remove(&io, directory, name, name_length));

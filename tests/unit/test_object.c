@@ -63,7 +63,7 @@ int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *v
     return 1;
 }
 
-int hpclang_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
+int test_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
 {
     if (fake_boot.saturn_state == 0u || address.nibble >= SATURN_NIBBLES || value > 0x0fu)
         return 0;

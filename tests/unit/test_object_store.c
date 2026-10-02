@@ -54,7 +54,7 @@ const struct hpclang_device_info *hpclang_device_info(void)
     return &fake_device;
 }
 
-int hpclang_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
+int test_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t value)
 {
     if (fake_boot.saturn_state == 0u || address.nibble >= NIBBLES || value > 0x0fu)
         return 0;

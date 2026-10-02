@@ -300,8 +300,9 @@ Current implementation and evidence have different scopes:
   that head also pass. The next witness releases the create input before
   readback, rejects a duplicate carrying different bytes, and compares the
   retained current-directory iterator with a fresh post-mutation snapshot.
-  These isolation checks pass locally on all three Stock models; formal
-  acceptance is pending.
+  These isolation checks are accepted by Object mutation
+  [36976632973](https://github.com/zyf722/hpclang/actions/runs/36976632973)
+  on `ad26f2b9`, with Core and Quality also green.
 - Host mutation tests now exercise a nested `D` directory with a retained
   Stock data-stack reference and an ARM-held root. Removal preserves the old
   value through TEMPOB; subsequent replacement/create/remove keeps both
@@ -379,12 +380,23 @@ Replacement/removal can additionally allocate a preserved TEMPOB value before
 replanning the directory shift. Existing rejection tests and passing Stock
 round trips therefore do not establish rollback for arbitrary late I/O faults.
 
-The production Saturn view writes directly through the same `Read[]` mapping
-used by reads; it does not perform external I/O. The next implementation step
-must make the stable mapping and writable RAM requirements explicit across the
-complete planned commit, or provide recovery where that guarantee cannot be
-made. Keep public put/remove private until that boundary has testable failure
-semantics. Do not add a blanket retry after a partially applied mutation.
+The production write backend now captures all 128 main-RAM page bases in an
+invocation-local `rpl-stock-memory` view before publishing mutation I/O. It
+requires the Stock identity section's user read/write permission, aligned
+non-aliased RAM page bases, and valid launcher fences. Reads and writes during
+the mutation use this captured view rather than repeatedly consulting `Read[]`.
+The complete operation remains inside the launcher's interrupt-masked native
+interval, without Stock service calls. The old generic mapped-write primitive
+and duplicated stack/store mutation setup are removed; ordinary reads still
+use the read-only Saturn view.
+
+This removes late mapping lookup failure from the production backend for valid
+main-RAM accesses. It does not add rollback to arbitrary callback backends, nor
+prove that all algorithmic error paths after TEMPOB preservation are unreachable.
+The remaining gate is a complete commit-path audit (including the second plan
+after preservation), plus negative/fault-injection evidence before public API
+closure. Do not add a blanket retry after a partially applied mutation. The
+captured-view implementation and its Stock regression remain pending formal CI.
 
 The focused mutation workflow is justified by its destructive object lifecycle
 and lack of keyboard interaction. It shares the normal build entry, Stock asset

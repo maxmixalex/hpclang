@@ -132,6 +132,7 @@ target_include_directories(test_object_construct PRIVATE
 
 hpclang_unit(object_store
     test_object_store.c
+    rpl-stock-memory-stub.c
     "${HPCLANG_ROOT}/runtime/core/object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
@@ -160,6 +161,7 @@ target_include_directories(test_hpgcc_saturn PRIVATE
 
 hpclang_unit(object
     test_object.c
+    rpl-stock-memory-stub.c
     "${HPCLANG_ROOT}/runtime/core/object.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c"
@@ -230,3 +232,7 @@ target_include_directories(test_e2e_events PRIVATE
 
 hpclang_unit(e2e_phase test_e2e_phase.c "${HPCLANG_ROOT}/tests/e2e/phase.c")
 target_include_directories(test_e2e_phase PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(rpl_stock_memory test_rpl_stock_memory.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
+target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

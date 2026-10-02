@@ -33,6 +33,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-satdir.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-saturn.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-key-map.c"
