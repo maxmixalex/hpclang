@@ -158,6 +158,8 @@ jobs:
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - name: Download object-mutation build
         uses: actions/download-artifact@v7
         with:

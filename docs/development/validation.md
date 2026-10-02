@@ -362,3 +362,12 @@ The implementation and local acceptance scope are complete. Final CI evidence
 must be recorded for this batch before checking off M7.3f/M7.3. Earlier payload
 passes and older same-size HP39 witnesses do not replace these GC and
 settled-return gates. No further feature work is required for this slice.
+
+On `3ddbab3a`, Core, Quality, Storage, Font Gallery and the complete
+[Runtime matrix](https://github.com/zyf722/hpclang/actions/runs/37004261685)
+passed formal CI. [Object mutation](https://github.com/zyf722/hpclang/actions/runs/37004261635)
+passed HP39gs/40gs and HP48/49/50; HP39g+ failed before emulator startup because
+the new Stock job did not fetch its Git LFS ROM fixture. The pointer text
+reproduces the reported XZ decode error; the resolved fixture passes the existing
+NOR preparation checks. Stock mutation checkout now enables LFS, matching Runtime.
+Its formal rerun is the remaining acceptance gate.
