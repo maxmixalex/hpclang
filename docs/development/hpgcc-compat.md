@@ -245,7 +245,7 @@ HP48's successful named-object get uses a bounded `ZZE2E` DOCSTR rather than
 copying the large launcher merely as a test fixture.
 
 **M7.3a-e are complete at the intended HPGCC 1.1/2.0 object/stack adapter
-baseline.** M7.3f public named-store and native-variable writes are implemented in the clean core and under final acceptance.
+baseline.** M7.3f public named-store and native-variable writes are implemented and accepted in the clean core.
 Additional raw/native helpers remain explicit Migration or demand-driven future
 compatibility work.
 
@@ -270,7 +270,7 @@ The large HPGCC 1.1/2.0 widget family is **Migration initially; adapter later if
 | time `sys_*Ticks*` | monotonic time/deadlines | Adapter | M8 |
 | standard stdio | picolibc + hp4950 storage backend | Direct | implemented on hp4950 |
 | HPGCC2/3 `FS*` | bounded source adapter above owned FatFs storage | Adapter | M7.2d implemented; Storage #53 green |
-| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented; final acceptance pending |
+| Saturn/RPL `sat_*` | typed object/stack bridge | Adapter | M7.3e bounded application subset complete; Runtime #338 green; M7.3f public mutation implemented and accepted |
 | KOS/syscall internals | platform/private service | Migration/Unsupported | later |
 | `win*` widgets | future UI toolkit | Migration, adapter later | later |
 | raw MMU/interrupt APIs | internal only | Unsupported normal API | none |

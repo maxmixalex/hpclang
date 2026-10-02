@@ -250,7 +250,7 @@ replace the stronger focused evidence above.
 
 The bounded source surface is therefore frozen for **M7.3e**. General named-object
 put/remove remains outside the HPGCC 1.1/2.0 read/search/recall adapter
-baseline, and is implemented by the clean-core **M7.3f** public API, under final acceptance.
+baseline, and is implemented by the clean-core **M7.3f** public API, with final acceptance complete.
 Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders, and
 non-transactional stack reorders stay Migration/Internal or demand-driven
 future compatibility work rather than requirements for M7.3f.

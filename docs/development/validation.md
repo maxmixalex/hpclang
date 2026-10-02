@@ -113,8 +113,8 @@ Formal cross-workflow acceptance is complete on the same functional commit
 - [Font Gallery](https://github.com/zyf722/hpclang/actions/runs/36320408833): the full Direct and Stock matrix passes.
 - [Core runtime](https://github.com/zyf722/hpclang/actions/runs/36320408835) and [Quality](https://github.com/zyf722/hpclang/actions/runs/36320408847): both pass.
 
-This closes the integration harness failures. It does not claim completion of
-the optional U5 repeated-run benchmark or the separate M7.3f object-store WIP.
+This closed the integration harness failures. The optional U5 repeated-run
+benchmark and the later M7.3f acceptance below have separate evidence.
 
 ## Runtime PASS contract
 
@@ -358,10 +358,8 @@ for its C stack, and retains PIC return code in the unused half of the L2
 workspace. Runtime, Storage and Gallery regressions cover this shared layout;
 the MMU unit also checks that table operations preserve the return-code area.
 
-The implementation and local acceptance scope are complete. Final CI evidence
-must be recorded for this batch before checking off M7.3f/M7.3. Earlier payload
-passes and older same-size HP39 witnesses do not replace these GC and
-settled-return gates. No further feature work is required for this slice.
+The implementation and local acceptance scope are complete. The final CI
+acceptance below closes M7.3f/M7.3, including the GC and settled-return gates.
 
 On `3ddbab3a`, Core, Quality, Storage, Font Gallery and the complete
 [Runtime matrix](https://github.com/zyf722/hpclang/actions/runs/37004261685)
@@ -370,4 +368,7 @@ passed HP39gs/40gs and HP48/49/50; HP39g+ failed before emulator startup because
 the new Stock job did not fetch its Git LFS ROM fixture. The pointer text
 reproduces the reported XZ decode error; the resolved fixture passes the existing
 NOR preparation checks. Stock mutation checkout now enables LFS, matching Runtime.
-Its formal rerun is the remaining acceptance gate.
+The corrected [Object mutation run](https://github.com/zyf722/hpclang/actions/runs/37007395058)
+on `8348c142` is fully green across all six Stock models. Together with the
+unchanged implementation gates on `3ddbab3a`, this completes formal acceptance
+and closes **M7.3f and M7.3**.

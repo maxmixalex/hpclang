@@ -143,7 +143,7 @@ variable deletion. The native staging limit is 7000 nibbles, corresponding to
 3495 string bytes. Oversize inputs fail with `E2BIG` before entering Stock;
 native type errors map to `EINVAL`, and native memory exhaustion to `ENOSPC`.
 
-These public mutation interfaces are under M7.3f acceptance testing. RPL stack
+These public mutation interfaces are accepted under M7.3f. RPL stack
 `push/pop/drop/replace` retain their existing HP48gII/49g+/50g Stock contract.
 
 ## Error and mutation rules
@@ -276,9 +276,9 @@ baseline.
 
 ### M7.3f public mutation and native-variable lifetime
 
-The public APIs and acceptance payloads are implemented and locally validated.
-Formal CI acceptance of this combined batch is the remaining closure gate;
-see the [validation record](validation.md#m73f-final-implementation-batch).
+The public APIs and acceptance payloads have passed local and formal CI
+validation. M7.3f is complete; see the
+[validation record](validation.md#m73f-final-implementation-batch).
 
 #### Classic RPL writes
 
