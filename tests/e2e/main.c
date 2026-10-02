@@ -15,6 +15,7 @@
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/object.h>
+#include <hpclang/variable.h>
 #include <hpclang/object-store.h>
 #include <hpclang/storage.h>
 #include <hpclang/target.h>
@@ -27,12 +28,6 @@ int hpclang_hp39_aplet_snapshot(const uint8_t *name, size_t name_length,
 int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
 int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object);
-int hpclang_hp39_variable_value_snapshot(const uint8_t *category, size_t category_length,
-                                         const uint8_t *name, size_t name_length,
-                                         struct hpclang_object **object);
-int hpclang_hp39_variable_value_store(const uint8_t *category, size_t category_length,
-                                      const uint8_t *name, size_t name_length,
-                                      const struct hpclang_object *object);
 int hpclang_hp39_program_body_snapshot(const uint8_t *name, size_t name_length,
                                        struct hpclang_object **object);
 int hpclang_hp39_note_body_snapshot(const uint8_t *name, size_t name_length,
@@ -1623,7 +1618,8 @@ int main(void)
         return finish(object_failure, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
-    if (boot->model == HPCLANG_MODEL_HP39GS || boot->model == HPCLANG_MODEL_HP40GS) {
+    if (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
+        boot->model == HPCLANG_MODEL_HP40GS) {
         errno = 0;
         struct hpclang_object *aplet_catalog = NULL;
         struct hpclang_object *program_catalog = NULL;
@@ -1670,51 +1666,16 @@ int main(void)
             static const uint8_t note_text_name[] = "NoteText";
             struct hpclang_object *note_text_value = NULL;
             errno = 0;
-            int note_text_result = hpclang_hp39_variable_value_snapshot(
-                note_category, sizeof(note_category) - 1u, note_text_name,
-                sizeof(note_text_name) - 1u, &note_text_value);
+            int note_text_result =
+                hpclang_variable_get(note_category, sizeof(note_category) - 1u, note_text_name,
+                                     sizeof(note_text_name) - 1u, &note_text_value);
             if (note_text_result != 0) {
-                uint32_t code = 0xc3u;
-                if (errno == ENOENT)
-                    code = 0xbbu;
-                else if (errno == EIO)
-                    code = 0xbfu;
-                else if (errno == EILSEQ)
-                    code = 0xc0u;
-                else if (errno == EBUSY)
-                    code = 0xc1u;
-                else if (errno == ENOTSUP)
-                    code = 0xc2u;
-                else if (errno == EBADF)
-                    code = 0xc4u; /* portal -3: pre-call DSKTOP */
-                else if (errno == EFAULT)
-                    code = 0xc5u; /* portal -4: post-call DSKTOP */
-                else if (errno == E2BIG)
-                    code = 0xc6u; /* portal -5: result shape */
-                else if (errno == ENOMEM)
-                    code = 0xc7u; /* portal -6: cleanup */
-                else if (errno == EINVAL)
-                    code = 0xc8u; /* portal -7: request/thunk */
-                else if (errno == EDOM)
-                    code = 0xd0u; /* portal -8: zero results */
-                else if (errno == ESRCH)
-                    code = 0xd1u; /* portal -9: two results */
-                else if (errno == ERANGE)
-                    code = 0xd2u; /* portal -10: other stack delta */
-                else if (errno == ENOEXEC)
-                    code = 0xd3u; /* portal -11: result cell unreadable */
-                else if (errno == EACCES)
-                    code = 0xd4u; /* portal -12: result pointer invalid */
-                else if (errno == EPERM)
-                    code = 0xd5u; /* portal -13: prologue unreadable */
-                else if (errno == ENFILE)
-                    code = 0xd6u; /* portal -14: prologue mismatch */
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
                 hpclang_object_release(variable_schema);
                 hpclang_object_release(note_text_value);
-                return finish(code, boot->model);
+                return finish(0xbfu, boot->model);
             }
             if (note_text_value == NULL) {
                 hpclang_object_release(aplet_catalog);
@@ -1748,9 +1709,8 @@ int main(void)
                 hpclang_object_release(note_text_value);
                 return finish(0xd7u, boot->model);
             }
-            if (hpclang_hp39_variable_value_store(note_category, sizeof(note_category) - 1u,
-                                                  note_text_name, sizeof(note_text_name) - 1u,
-                                                  note_text_value) != 0) {
+            if (hpclang_variable_set(note_category, sizeof(note_category) - 1u, note_text_name,
+                                     sizeof(note_text_name) - 1u, note_text_value) != 0) {
                 hpclang_object_release(aplet_catalog);
                 hpclang_object_release(program_catalog);
                 hpclang_object_release(note_catalog);
@@ -1760,9 +1720,8 @@ int main(void)
             }
 
             struct hpclang_object *note_text_roundtrip = NULL;
-            if (hpclang_hp39_variable_value_snapshot(note_category, sizeof(note_category) - 1u,
-                                                     note_text_name, sizeof(note_text_name) - 1u,
-                                                     &note_text_roundtrip) != 0 ||
+            if (hpclang_variable_get(note_category, sizeof(note_category) - 1u, note_text_name,
+                                     sizeof(note_text_name) - 1u, &note_text_roundtrip) != 0 ||
                 note_text_roundtrip == NULL ||
                 hpclang_object_kind(note_text_roundtrip) != HPCLANG_OBJECT_STRING) {
                 hpclang_object_release(aplet_catalog);
@@ -1898,17 +1857,27 @@ int main(void)
             int direct_schema_result = hpclang_hp39_variable_schema_snapshot(&direct_schema);
             int schema_errno = errno;
             errno = 0;
-            int direct_value_result = hpclang_hp39_variable_value_snapshot(
+            int direct_value_result = hpclang_variable_get(
                 (const uint8_t *)"Note", sizeof("Note") - 1u, (const uint8_t *)"NoteText",
                 sizeof("NoteText") - 1u, &direct_value);
             int value_errno = errno;
+            struct hpclang_object *direct_input = NULL;
+            if (hpclang_object_create_string(NULL, 0u, &direct_input) != 0)
+                return finish(0xb5u, boot->model);
+            errno = 0;
+            int direct_set_result = hpclang_variable_set(
+                (const uint8_t *)"Note", sizeof("Note") - 1u, (const uint8_t *)"NoteText",
+                sizeof("NoteText") - 1u, direct_input);
+            int set_errno = errno;
+            hpclang_object_release(direct_input);
             hpclang_object_release(missing_body);
             hpclang_object_release(direct_aplet);
             hpclang_object_release(direct_schema);
             hpclang_object_release(direct_value);
             if (aplet_result != -1 || missing_result != -1 || missing_errno != ENOSYS ||
                 direct_aplet_result != -1 || aplet_errno != ENOSYS || direct_schema_result != -1 ||
-                schema_errno != ENOSYS || direct_value_result != -1 || value_errno != ENOSYS)
+                schema_errno != ENOSYS || direct_value_result != -1 || value_errno != ENOSYS ||
+                direct_set_result != -1 || set_errno != ENOSYS)
                 return finish(0xb5u, boot->model);
         }
     }

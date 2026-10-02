@@ -21,6 +21,8 @@ on:
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/hp48-kermit-watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
@@ -46,6 +48,8 @@ on:
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/fetch-x50ng.sh"
+      - "tools/run-hp39-kermit-server.sh"
+      - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp48-kermit-send.sh"
       - "tools/hp48-kermit-watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
@@ -148,7 +152,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [hp48, hp4950]
+        family: [hp39, hp48, hp4950]
     env:
       FAMILY: ${{ matrix.family }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0

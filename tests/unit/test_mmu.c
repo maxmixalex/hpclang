@@ -110,5 +110,11 @@ int main(void)
     assert(code[31] == 0u);
     assert(code[32] == 0x08080ffeu);
 
+    /* Stock return code may occupy the unused half of the workspace. Neither
+     * table preparation nor install/restore may overwrite that live code. */
+    for (size_t i = HPCLANG_L2_TABLES_BYTES / sizeof(uint32_t);
+         i < sizeof(workspace) / sizeof(workspace[0]); ++i)
+        assert(workspace[i] == UINT32_C(0xa5a5a5a5));
+
     return 0;
 }

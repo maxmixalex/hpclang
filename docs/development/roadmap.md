@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. Remaining M7 work includes M7.3f named object-store mutation, common system services, and the final parity audit.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. Remaining M7 work includes final CI acceptance of M7.3f object mutation, common system services, and the final parity audit.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**M7.1 and M7.2 are complete. M7.3a-e are closed; M7.3f named object-store mutation has resumed on `m7-object-parity` with accepted main `8cdaf130` as its integration baseline; its private write implementation is not yet regression-closed or public API.**
+**M7.1 and M7.2 are complete. M7.3a-e are closed; M7.3f public put/remove and native-variable get/set are implemented on `m7-object-parity`; final CI acceptance of the combined implementation/test batch remains.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -256,7 +256,7 @@ M7.2 is complete: a typical HPGCC HP49g+/HP50g program that uses files and direc
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**In progress: M7.3a-e are complete; M7.3f named object-store mutation remains.** The ownership/API boundary is frozen in
+**M7.3a-e are complete; M7.3f is implemented and awaits final CI acceptance.** The ownership/API boundary is frozen in
 [Calculator object service design](object-service.md). The closed M7.3a-e baseline provides a
 runtime-private Saturn view, conservative proven-boundary parsing, opaque owned
 snapshots, typed construction/conversion, read-only stack observation, bounded
@@ -322,28 +322,18 @@ applications.
 - [x] close M7.3e at the bounded HPGCC 1.1/2.0 adapter baseline. Historical
   `satdir.h` remains read/search/recall oriented, so the adapter closure does
   not depend on exposing HPGCC3 raw/native mutation interfaces;
-- [ ] **M7.3f — named object-store mutation:** add failure-safe HP48gII/49g+/50g
-  named `put/remove` above explicit logical store handles, and close an HP39
-  descriptor-driven variable-store bridge without fabricating a HOME hierarchy
-  or changing Stock global cwd. Validate create/replace/remove/error round trips
-  against the original Stock environments and preserve calculator state on
-  failure. HPGCC3 `sat3_sto*` / `sat3_purge*` and the recovered HP39
-  descriptor store words are implementation evidence, not a requirement to
-  reproduce their raw address/lifetime model.
+- [ ] **M7.3f — final acceptance:** public HP48gII/49g+/50g logical-directory
+  put/remove and HP39g+/39gs/40gs descriptor-driven variable get/set are
+  implemented. The final gate covers nested references, unchanged cwd/context,
+  owned-input lifetime, error handling, size-changing HP39 writes across GC,
+  and settled Stock return. Formal CI acceptance remains pending.
 
-M7.3f restart order: establish fresh canonical Runtime and Object mutation
-results, audit relocation/teardown and failure semantics, complete the missing
-remove bridge and Stock deletion round trip, then generalize HP39 writes and
-publish the clean API. Historical payload PASS does not close teardown;
-lower-level remove unit tests do not close the application-facing delete path.
-See the [restart review](object-service.md#restart-review-2026-09-28) for the
-implementation/evidence gaps and acceptance sequence.
-
-M7.3a-e completion criterion is met: typical HPGCC 1.1/2.0 programs that
-inspect/search/recall/exchange calculator objects or use the RPL stack can
-migrate through owned objects and bounded adapters without raw Saturn pointers
-or private OS calling conventions. M7.3 as a whole closes after the planned
-named-store write/delete round trips in M7.3f.
+The implementation and limits are described in
+[Object service](object-service.md#m73f-public-mutation-and-native-variable-lifetime).
+M7.3a-e's read/stack/adapter baseline remains accepted. The new public mutation
+APIs complete the intended capability scope without exposing HPGCC3 raw native
+pointers or inventing HP39 directory semantics. M7.3 closes when this final
+implementation/test batch passes its regression gates.
 
 ### M7.4 — Common system services
 

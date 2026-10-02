@@ -172,7 +172,7 @@ Named-store and HP39 native-object validation then close the M7.3d read side:
 - HP39 Aplet-variable research after Runtime #254 recovered the current `ApletVars# = EIGHT` schema contract, preserved genuine extended-ID source references, and pinned the standard `NoteText` descriptor triple. **Runtime #304 (`35596158126`)** remains useful negative evidence: routing genuine `xNoteText #2C812` through ordinary Stock EVAL produces the same private `B9` result on HP39gs and HP40gs, proving that EVAL is not the generic descriptor-recall protocol;
 - the successful path instead quotes the genuine extended variable ID into Stock and invokes Stock `@`, so the calculator follows descriptor word 0 through its own supported recall path. The HP39 portal enters with `GETPTR`, commits the final live RPL pointers with `SAVPTR`, and restores the suspended runstream pointer before returning to ARM. The **Stock / hp39 job in Runtime #320** validates this descriptor-driven recall on both HP39gs and HP40gs using `NoteText`: both reach HPC1 PASS, `stock-hp39.json` passes, and the complete 52-frame keyboard progression returns cleanly. Runtime #304 is therefore superseded as a blocker, but retained as evidence against the discarded EVAL shortcut;
 - the HP39 side also has a strict private `HP39AscA` directory parser with unit coverage against the original HPGCC 39G-support `HP39DIR.000` / `HP39DIR.CUR` records and malformed/truncated/overflow cases. Those files remain typed transfer-protocol evidence rather than an internal HOME namespace. ROM analysis likewise keeps `DoRecv/GetOb`, `DoGetObFrSto`, `OpenIO` and `StdIOProc` classified as System-RPL/DOCOL transfer/I/O controllers rather than direct ARM object-fetch entry points;
-- no general named object-store write gate is claimed **yet**. HP48gII/49g+/50g named stores remain read-only; HP39 descriptor store-handler words are known but do not yet constitute a validated generic variable-write path. This is the planned M7.3f work item, distinct from the already-validated HP48/HP4950 stack mutation capability.
+- those historical gates established the read/stack baseline. M7.3f adds the public named-write and native-variable contract documented in [Object service](object-service.md#m73f-public-mutation-and-native-variable-lifetime); its final combined acceptance is tracked separately below.
 
 M7.3e compatibility-adapter validation is closed above that read core:
 
@@ -330,3 +330,35 @@ The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06`; only the resu
 Machine-readable assertions remain the gate. Images are review/debug evidence rather than substitutes for assertions.
 
 Canonical summaries are published to `ci-evidence` and standard Actions artifacts retain per-run evidence. Keyboard progression and Font Gallery contact sheets/summaries use separate paths. Runtime and Gallery use globally serialized publisher jobs, and cancelled runs do not enter that publisher queue; standard Actions artifacts remain the per-run fallback.
+
+
+### M7.3f final implementation batch
+
+The accepted pre-publication audit head is `71644639` (all CI green, confirmed
+by the maintainer). The final implementation adds public put/remove, HP39
+variable get/set, native type validation and error trapping, GC-safe portal
+storage, and a focused HP39 mutation matrix. Runtime keeps its complete service
+and 52-frame keyboard coverage.
+
+The combined implementation was locally validated on 2026-10-02 with the pinned
+toolchain and the repository's CI build/harness scripts:
+
+| Gate | Result |
+| --- | --- |
+| Host units | All 34 pass, including public mutation modes, native-arena pinning, moved/error stack cleanup and MMU workspace preservation |
+| Quality | Formatter check, lint and Clang analysis pass |
+| Object mutation | All six Stock models pass through USB, including HP39 growth/shrink/empty writes across observed native GC and strict settled return |
+| Runtime | All six Direct and all six Stock targets pass, including each complete 52-frame keyboard sequence |
+| Storage regression | HP49g+/50g Direct and Stock pass, including native SD teardown and settled return |
+| Gallery regression | HP39gs Stock passes the independent native-font pixel oracle and settled return |
+| Build/package | Hardware validation builds and all three HP39-family packages succeed; documentation builds without issues |
+
+The bootstrap now leaves two HP39 pool pages available to Stock, uses one page
+for its C stack, and retains PIC return code in the unused half of the L2
+workspace. Runtime, Storage and Gallery regressions cover this shared layout;
+the MMU unit also checks that table operations preserve the return-code area.
+
+The implementation and local acceptance scope are complete. Final CI evidence
+must be recorded for this batch before checking off M7.3f/M7.3. Earlier payload
+passes and older same-size HP39 witnesses do not replace these GC and
+settled-return gates. No further feature work is required for this slice.

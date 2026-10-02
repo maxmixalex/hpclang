@@ -13,7 +13,8 @@ add_executable(hpclang_object_mutation_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
-    nested.c)
+    nested.c
+    hp39.c)
 
 target_include_directories(
     hpclang_object_mutation_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

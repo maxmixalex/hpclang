@@ -995,8 +995,54 @@ static void test_drop_and_replace(void)
     hpclang_object_release(object);
 }
 
+static void test_native_arena_pins_prefix_without_overwriting_payload(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    io.temp_limit = 0x8f000u;
+    const uint32_t first = 0x84000u - 13u;
+    put_word(0x806e9u, 5u, first - 5u);
+    put_word(first, 1u, 0u);
+    put_word(first + 1u, 5u, 0x029bfu);
+    put_word(first + 6u, 2u, 'A');
+    put_word(first + 8u, 5u, 13u);
+    memory[0x87000u] = 11u;
+    uint32_t roots[] = {0x82000u, 0x82005u, 0x8200au};
+    uint32_t count = 0u;
+    uint32_t old_avmem = get_word(AVMEM, 5u);
+    assert(hpclang_rpl_mutation_pin_arena(&io, 0x86000u, 0x88000u, roots, 3u, &count) == 0);
+    assert(count == 5u);
+    assert(get_word(TEMPTOP, 5u) == 0x88000u);
+    assert(get_word(RSKTOP, 5u) == 0x89000u);
+    assert(get_word(DSKTOP, 5u) == 0x90000u - 25u);
+    assert(get_word(0x90000u, 5u) == 0x82000u); /* incoming stack untouched */
+    for (uint32_t i = 0u; i < 3u; ++i)
+        assert(get_word(0x90000u - (i + 1u) * 5u, 5u) == roots[i]);
+    assert(get_word(0x90000u - 20u, 5u) == 0x84001u);
+    assert(get_word(0x90000u - 25u, 5u) == first + 1u);
+    assert(get_word(0x84001u, 5u) == 0x02a2cu);
+    assert(get_word(0x87ffbu, 5u) == 0x4000u);
+    assert(memory[0x87000u] == 11u);
+    uint32_t cost = (0x90000u - 0x85000u) / 5u - (0x90000u - 0x89000u) / 5u;
+    assert(get_word(AVMEM, 5u) == old_avmem - cost - count);
+
+    io = setup(1u);
+    put_word(0x806e9u, 5u, first - 5u);
+    put_word(0x83ffbu, 5u, 0u); /* broken prefix chain */
+    writes = 0u;
+    assert(hpclang_rpl_mutation_pin_arena(&io, 0x86000u, 0x88000u, roots, 3u, &count) != 0);
+    assert(writes == 0u);
+
+    io = setup(1u);
+    put_word(0x806e9u, 5u, 0x83ffbu); /* empty prefix, insufficient native space */
+    writes = 0u;
+    assert(hpclang_rpl_mutation_pin_arena(&io, 0x86000u, 0x8f000u, roots, 3u, &count) ==
+           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(writes == 0u);
+}
+
 int main(void)
 {
+    test_native_arena_pins_prefix_without_overwriting_payload();
     test_push_transaction();
     test_temp_allocation_retargets_existing_reference();
     test_avmem_reservation_is_preserved();

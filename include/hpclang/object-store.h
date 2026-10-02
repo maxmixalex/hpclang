@@ -53,6 +53,28 @@ extern "C"
 
     void hpclang_object_store_close(struct hpclang_object_store *store);
 
+    enum hpclang_object_store_put_mode
+    {
+        HPCLANG_OBJECT_STORE_UPSERT = 0,
+        HPCLANG_OBJECT_STORE_CREATE_ONLY = 1,
+        HPCLANG_OBJECT_STORE_REPLACE_ONLY = 2
+    };
+
+    /*
+     * Copy an owned value into one exact name in this logical directory.
+     * UPSERT creates or replaces. CREATE_ONLY rejects existing names (EEXIST);
+     * REPLACE_ONLY rejects missing names (ENOENT). Directories are rejected
+     * (EISDIR). Input snapshots and old Stock references retain their values.
+     * Stock cwd is unchanged. Unsupported platforms return ENOSYS.
+     */
+    int hpclang_object_store_put(const struct hpclang_object_store *store, const uint8_t *name,
+                                 uint32_t name_length, const struct hpclang_object *object,
+                                 enum hpclang_object_store_put_mode mode);
+
+    /* Remove one exact non-directory name; a missing name returns ENOENT. */
+    int hpclang_object_store_remove(const struct hpclang_object_store *store, const uint8_t *name,
+                                    uint32_t name_length);
+
     /*
      * Copy one non-directory named object into an owned hpclang_object snapshot.
      * Directories are opened with hpclang_object_store_open_child().

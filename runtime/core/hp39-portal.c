@@ -5,6 +5,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
 #include <hpclang/object.h>
+#include <hpclang/variable.h>
 #include <hpclang/target.h>
 
 #include "hp39-native-directory.h"
@@ -12,6 +13,7 @@
 #include "object-snapshot.h"
 #include "../../platform/armtoolbox/hp39-portal-private.h"
 #include "saturn-view.h"
+#include "rpl-stock-memory.h"
 
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
 #define HP39_SUPPORTED_ENTRY UINT32_C(0x00011111)
@@ -54,8 +56,51 @@ static int hp39_live_stock_available(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     return boot != NULL &&
-           (boot->model == HPCLANG_MODEL_HP39GS || boot->model == HPCLANG_MODEL_HP40GS) &&
+           (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
+            boot->model == HPCLANG_MODEL_HP40GS) &&
            boot->saturn_state != 0u;
+}
+
+static int hp39_pin_native_arena(struct hpclang_hp39_portal_context *portal)
+{
+    if (portal->pinned_cells != 0u)
+        return 0;
+    uint32_t top = 0u, editline = 0u, stream = 0u;
+    if (portal->arena_end < 0x80000u || portal->arena_end > 0xffff0u ||
+        !hp39_stock_read_word5(0x806f8u, &top) || !hp39_stock_read_word5(0x806fdu, &editline) ||
+        editline < top || !hp39_stock_read_word5(0x8076bu, &stream)) {
+        errno = EILSEQ;
+        return -1;
+    }
+    struct hpclang_rpl_stock_memory memory;
+    const volatile uint32_t *l1 = (const void *)portal->l1;
+    if (!hpclang_rpl_stock_memory_capture(&memory, (const void *)portal->saturn_state, l1[0x80])) {
+        errno = ENOSYS;
+        return -1;
+    }
+    portal->incoming_stack_span = editline - top;
+    uint32_t roots[] = {portal->stock_regs[0], stream,
+                        portal->launcher_object != 0u ? portal->launcher_object : 0x04049u};
+    struct hpclang_rpl_mutation_io io = {
+        .read_nibble = hpclang_rpl_stock_memory_read,
+        .write_nibble = hpclang_rpl_stock_memory_write,
+        .context = &memory,
+        .temp_limit = top,
+        .user_limit = 0x80000u,
+    };
+    int result = hpclang_rpl_mutation_pin_arena(&io, portal->arena_first, portal->arena_end + 16u,
+                                                roots, 3u, &portal->pinned_cells);
+    if (result != 0) {
+        errno = result == HPCLANG_RPL_MUTATION_NOSPACE ? ENOSPC : EILSEQ;
+        return -1;
+    }
+    uint32_t temp_top = 0u;
+    if (!hp39_stock_read_word5(0x806eeu, &temp_top)) {
+        errno = EIO;
+        return -1;
+    }
+    portal->arena_object_end = temp_top - 5u;
+    return 0;
 }
 
 static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_length,
@@ -70,7 +115,8 @@ static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_le
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (boot == NULL ||
-        (boot->model != HPCLANG_MODEL_HP39GS && boot->model != HPCLANG_MODEL_HP40GS) ||
+        (boot->model != HPCLANG_MODEL_HP39GPLUS && boot->model != HPCLANG_MODEL_HP39GS &&
+         boot->model != HPCLANG_MODEL_HP40GS) ||
         boot->saturn_state == 0u ||
         (boot->platform_cookie & (uintptr_t)3u) != HPCLANG_PLATFORM_COOKIE_HP39_TAG) {
         errno = ENOSYS;
@@ -97,7 +143,10 @@ static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_le
     int (*entry)(uint32_t *, uint32_t *, uint32_t, const uint8_t *, uint32_t) =
         (int (*)(uint32_t *, uint32_t *, uint32_t, const uint8_t *, uint32_t))(
             uintptr_t)context->portal_entry;
+    if (hp39_pin_native_arena((struct hpclang_hp39_portal_context *)(uintptr_t)context) != 0)
+        return -1;
     int result = entry(object, prologue, kind, name, (uint32_t)name_length);
+    ((struct hpclang_hp39_portal_context *)(uintptr_t)context)->last_result = result;
     if (result == 1) {
         errno = ENOENT;
         return -1;
@@ -106,72 +155,14 @@ static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_le
         errno = EBUSY;
         return -1;
     }
-    /*
-     * Keep the private Stock-portal failure classes distinguishable. These are
-     * structural transport failures, not calculator-object lookup misses:
-     *   -3 pre-call DSKTOP unreadable
-     *   -4 post-call DSKTOP unreadable
-     *   -5 result stack/object shape invalid
-     *   -6 private result-cell cleanup failed
-     *   -7 generated request/thunk validation failed
-     *   -8 Stock returned no result stack object
-     *   -9 Stock returned two result stack objects
-     *  -10 Stock returned another unexpected stack-depth delta
-     *  -11 result stack cell unreadable
-     *  -12 result object pointer outside Saturn main
-     *  -13 result prologue unreadable
-     *  -14 result prologue violates the request contract
-     *
-     * The public object API still reports failure through errno, while Stock
-     * validation can now identify the exact broken boundary instead of
-     * collapsing every portal fault to EIO.
-     */
-    if (result == -3) {
-        errno = EBADF;
+    /* Structural portal faults are I/O failures. Internal diagnostic codes
+     * remain private instead of being disguised as unrelated errno values. */
+    if (result == -16) {
+        errno = ENOSPC;
         return -1;
     }
-    if (result == -4) {
-        errno = EFAULT;
-        return -1;
-    }
-    if (result == -5) {
-        errno = E2BIG;
-        return -1;
-    }
-    if (result == -6) {
-        errno = ENOMEM;
-        return -1;
-    }
-    if (result == -7) {
+    if (result == -15) {
         errno = EINVAL;
-        return -1;
-    }
-    if (result == -8) {
-        errno = EDOM;
-        return -1;
-    }
-    if (result == -9) {
-        errno = ESRCH;
-        return -1;
-    }
-    if (result == -10) {
-        errno = ERANGE;
-        return -1;
-    }
-    if (result == -11) {
-        errno = ENOEXEC;
-        return -1;
-    }
-    if (result == -12) {
-        errno = EACCES;
-        return -1;
-    }
-    if (result == -13) {
-        errno = EPERM;
-        return -1;
-    }
-    if (result == -14) {
-        errno = ENFILE;
         return -1;
     }
     if (result != 0) {
@@ -314,9 +305,8 @@ static int hp39_variable_reference_resolve(void *context, uint32_t reference,
                                             object);
 }
 
-int hpclang_hp39_variable_value_snapshot(const uint8_t *category, size_t category_length,
-                                         const uint8_t *name, size_t name_length,
-                                         struct hpclang_object **object)
+int hpclang_variable_get(const uint8_t *category, size_t category_length, const uint8_t *name,
+                         size_t name_length, struct hpclang_object **object)
 {
     if (object == NULL || category == NULL || category_length == 0u || name == NULL ||
         name_length == 0u || name_length > HP39_VARIABLE_ID_MAX - 3u) {
@@ -369,16 +359,10 @@ int hpclang_hp39_variable_value_snapshot(const uint8_t *category, size_t categor
                                             object);
 }
 
-/*
- * Private first M7.3f witness. Keep this deliberately narrower than the future
- * public object-store mutation API: Stock must already contain the variable and
- * the replacement must have the same native extent. That preserves the portal's
- * current DSKTOP accounting while proving the descriptor word-2 store dispatch
- * without exposing raw Saturn addresses or changing Stock cwd.
- */
-int hpclang_hp39_variable_value_store(const uint8_t *category, size_t category_length,
-                                      const uint8_t *name, size_t name_length,
-                                      const struct hpclang_object *object)
+/* Resolve a genuine schema ID before handing the owned value to Stock STO.
+ * Stock owns native type validation, context selection and variable resizing. */
+int hpclang_variable_set(const uint8_t *category, size_t category_length, const uint8_t *name,
+                         size_t name_length, const struct hpclang_object *object)
 {
     if (object == NULL || category == NULL || category_length == 0u || name == NULL ||
         name_length == 0u || name_length > HP39_VARIABLE_ID_MAX - 3u) {
@@ -391,22 +375,6 @@ int hpclang_hp39_variable_value_store(const uint8_t *category, size_t category_l
     }
     if (object->nibble_count < 5u || object->nibble_count > HP39P_VARIABLE_STORE_MAX_NIBBLES) {
         errno = E2BIG;
-        return -1;
-    }
-
-    /*
-     * Freeze the first bridge to same-size replacement. General growth/shrink
-     * needs separate USEROB/DSKTOP lifetime accounting and is not smuggled into
-     * this descriptor-dispatch witness.
-     */
-    struct hpclang_object *current = NULL;
-    if (hpclang_hp39_variable_value_snapshot(category, category_length, name, name_length,
-                                             &current) != 0)
-        return -1;
-    uint32_t current_nibbles = current->nibble_count;
-    hpclang_object_release(current);
-    if (current_nibbles != object->nibble_count) {
-        errno = ENOTSUP;
         return -1;
     }
 
@@ -428,8 +396,14 @@ int hpclang_hp39_variable_value_store(const uint8_t *category, size_t category_l
         return -1;
     }
 
+    struct hpclang_hp39_variable_descriptor descriptor;
+    if (hpclang_hp39_variable_descriptor_read(&hp39_stock_reader, match.descriptor_address,
+                                              &descriptor) != 0)
+        return -1;
+
     struct hpclang_hp39_variable_store_request request = {
         .id_reference = match.source_reference,
+        .type_predicate = descriptor.type_predicate_word,
         .object_data = (uintptr_t)object->data,
         .object_nibbles = object->nibble_count,
     };

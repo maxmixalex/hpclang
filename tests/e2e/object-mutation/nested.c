@@ -5,13 +5,6 @@
 #include "rpl-object-store.h"
 #include "rpl-stock-memory.h"
 
-int hpclang_object_store_replace_existing(const struct hpclang_object_store *, const uint8_t *,
-                                          uint32_t, const struct hpclang_object *);
-int hpclang_object_store_create_new(const struct hpclang_object_store *, const uint8_t *, uint32_t,
-                                    const struct hpclang_object *);
-int hpclang_object_store_remove_existing(const struct hpclang_object_store *, const uint8_t *,
-                                         uint32_t);
-
 static int matches(const struct hpclang_object *object, const char *expected)
 {
     uint8_t bytes[32];
@@ -90,10 +83,10 @@ uint32_t hpclang_e2e_nested_mutation(void)
         if (alias_value() != 0)
             goto done;
         ++failure;
-        int status =
-            operation == 0
-                ? hpclang_object_store_replace_existing(inner, (const uint8_t *)"VALUE", 5, longer)
-                : hpclang_object_store_remove_existing(inner, (const uint8_t *)"VALUE", 5);
+        int status = operation == 0
+                         ? hpclang_object_store_put(inner, (const uint8_t *)"VALUE", 5, longer,
+                                                    HPCLANG_OBJECT_STORE_REPLACE_ONLY)
+                         : hpclang_object_store_remove(inner, (const uint8_t *)"VALUE", 5);
         if (status != 0)
             goto done;
         ++failure;
@@ -107,11 +100,11 @@ uint32_t hpclang_e2e_nested_mutation(void)
         ++failure;
         if (operation == 0 && !named_matches(inner, "VALUE", "NESTED-LONGER"))
             goto done;
-        status =
-            operation == 0
-                ? hpclang_object_store_replace_existing(inner, (const uint8_t *)"VALUE", 5,
-                                                        original)
-                : hpclang_object_store_create_new(inner, (const uint8_t *)"VALUE", 5, original);
+        status = operation == 0
+                     ? hpclang_object_store_put(inner, (const uint8_t *)"VALUE", 5, original,
+                                                HPCLANG_OBJECT_STORE_REPLACE_ONLY)
+                     : hpclang_object_store_put(inner, (const uint8_t *)"VALUE", 5, original,
+                                                HPCLANG_OBJECT_STORE_CREATE_ONLY);
         if (status != 0 || !named_matches(inner, "VALUE", "NESTED"))
             goto done;
     }

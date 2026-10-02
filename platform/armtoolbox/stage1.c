@@ -6,10 +6,11 @@
 #include <hpclang/target.h>
 
 #include "hp39-portal-private.h"
+#include "hp39-portal-stack.h"
 
 #define STAGE_WINDOW_BASE 0x09000000u
 #define STAGE_CODE_OFFSET 0x00000400u
-#define STAGE_STACK_PAGES 2u
+#define STAGE_STACK_PAGES 1u
 
 #define ARMSYS_PAGE_COUNT 0x914u
 #define ARMSYS_L2_PHYS 0x920u
@@ -18,6 +19,7 @@
 
 #define RPL_RSKTOP 0x000806f3u
 #define RPL_DSKTOP 0x000806f8u
+#define RPL_EDITLINE 0x000806fdu
 #define RPL_INTRPPTR 0x0008076bu
 #define RPL_AVMEM 0x00080e9bu
 #define RPL_DOCSTR 0x00002a2cu
@@ -101,8 +103,8 @@ struct hpclang_hp39_portal_context hpclang_hp39_portal_context
  * absent name returns a private thunk-local sentinel whose Saturn address is
  * distinguishable from a real, possibly empty, Stock body. The result remains
  * on the private RPL data stack
- * until the ARM resume validates one pushed cell, records its pointer and rolls
- * DSKTOP back to the pre-call value.
+ * until ARM validates the result and drops its private cells relative to the
+ * current EDITLINE, allowing Stock to relocate the stack during writes.
  */
 static uint8_t hp39_saturn_portal_thunk[HPCLANG_PAGE_SIZE]
     __attribute__((section(".bss.hp39.thunk"), aligned(HPCLANG_PAGE_SIZE)));
@@ -111,37 +113,37 @@ enum
 {
     HP39P_MACHINE_NIBBLE = 0u,
     HP39P_COLON_NIBBLE = 28u,
-    HP39P_ARG_NIBBLE = 33u,
-    HP39P_OPERATION_NIBBLE = 38u,
-    HP39P_PACK_NIBBLE = 43u,
-    HP39P_NORMALIZE_NIBBLE = 48u,
-    HP39P_FINALIZE_NIBBLE = 53u,
-    HP39P_RETURN_NIBBLE = 63u,
-    HP39P_DOCODE_NIBBLE = 68u,
-    HP39P_C_TEMPLATE_NIBBLE = 121u,
-    HP39P_SAVED_INTRPPTR_NIBBLE = 137u,
-    HP39P_EXEC_NIBBLES = 142u,
-    HP39P_NAME_NIBBLE = 144u,
+    HP39P_ARG_NIBBLE = 43u,
+    HP39P_OPERATION_NIBBLE = 48u,
+    HP39P_PACK_NIBBLE = 53u,
+    HP39P_NORMALIZE_NIBBLE = 58u,
+    HP39P_FINALIZE_NIBBLE = 63u,
+    HP39P_RETURN_NIBBLE = 93u,
+    HP39P_DOCODE_NIBBLE = 98u,
+    HP39P_C_TEMPLATE_NIBBLE = 153u,
+    HP39P_SAVED_INTRPPTR_NIBBLE = 169u,
+    HP39P_EXEC_NIBBLES = 174u,
+    HP39P_NAME_NIBBLE = 174u,
     HP39P_NAME_MAX_BYTES = 255u,
     HP39P_BODY_NAME_MAX_BYTES = 19u,
     HP39P_NAME_MAX_NIBBLES = 7u + HP39P_NAME_MAX_BYTES * 2u,
-    HP39P_MISS_NIBBLE = 680u,
+    HP39P_MISS_NIBBLE = 710u,
     HP39P_MISS_NIBBLES = 10u,
-    HP39P_APLETVARS_NIBBLE = 690u,
+    HP39P_APLETVARS_NIBBLE = 720u,
     HP39P_APLETVARS_NIBBLES = 50u,
-    HP39P_REFERENCE_LIST_NIBBLE = 740u,
+    HP39P_REFERENCE_LIST_NIBBLE = 770u,
     HP39P_REFERENCE_LIST_NIBBLES = 15u,
-    HP39P_VARIABLE_RECALL_NIBBLE = 755u,
+    HP39P_VARIABLE_RECALL_NIBBLE = 785u,
     HP39P_VARIABLE_RECALL_NIBBLES = 35u,
-    HP39P_VARIABLE_STORE_NIBBLE = 790u,
-    HP39P_VARIABLE_STORE_NIBBLES = 40u,
-    HP39P_VARIABLE_OBJECT_NIBBLE = HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES,
-    HP39P_STATIC_NIBBLES = HP39P_VARIABLE_OBJECT_NIBBLE + HP39P_VARIABLE_STORE_MAX_NIBBLES,
-    HP39P_DOCODE_MACHINE_NIBBLES = 43u,
+    HP39P_VARIABLE_STORE_NIBBLE = 820u,
+    HP39P_VARIABLE_STORE_NIBBLES = 60u,
+    HP39P_VARIABLE_OBJECT_NIBBLE = HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES + 10u,
+    HP39P_STATIC_NIBBLES = HP39P_VARIABLE_OBJECT_NIBBLE + HP39P_VARIABLE_STORE_MAX_NIBBLES + 10u,
+    HP39P_DOCODE_MACHINE_NIBBLES = 45u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
 
-_Static_assert(HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES <= HP39P_MISS_NIBBLE &&
+_Static_assert(HP39P_NAME_NIBBLE + HP39P_NAME_MAX_NIBBLES + 10u <= HP39P_MISS_NIBBLE &&
                    HP39P_MISS_NIBBLE + HP39P_MISS_NIBBLES <= HP39P_APLETVARS_NIBBLE &&
                    HP39P_APLETVARS_NIBBLE + HP39P_APLETVARS_NIBBLES <=
                        HP39P_REFERENCE_LIST_NIBBLE &&
@@ -357,6 +359,7 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
         const struct hpclang_hp39_variable_store_request *request =
             (const struct hpclang_hp39_variable_store_request *)(const void *)name;
         if (request->id_reference == 0u || request->id_reference >= UINT32_C(0x00100000) ||
+            request->type_predicate == 0u || request->type_predicate >= UINT32_C(0x00100000) ||
             request->object_data == (uintptr_t)0u || request->object_nibbles < 5u ||
             request->object_nibbles > HP39P_VARIABLE_STORE_MAX_NIBBLES)
             return 0;
@@ -367,7 +370,10 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                                             HP39P_VARIABLE_STORE_NIBBLE + 10u, object_address) ||
             !hp39_saturn_buffer_store_word5(
                 hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_VARIABLE_STORE_NIBBLE + 20u, request->id_reference))
+                HP39P_VARIABLE_STORE_NIBBLE + 40u, request->id_reference) ||
+            !hp39_saturn_buffer_store_word5(
+                hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                HP39P_VARIABLE_STORE_NIBBLE + 15u, request->type_predicate))
             return 0;
 
         const uint8_t *source = (const uint8_t *)(uintptr_t)request->object_data;
@@ -473,6 +479,7 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
     static const uint8_t pc_indirect[] = {0x8u, 0x0u, 0x8u, 0xcu};
     static const uint8_t c_dat0_a[] = {0x1u, 0x4u, 0x6u};
     static const uint8_t dat0_c_a[] = {0x1u, 0x4u, 0x4u};
+    static const uint8_t p_zero[] = {0x2u, 0x0u};
     static const uint8_t c_dat0_w[] = {0x1u, 0x5u, 0x6u, 0x7u};
     static const uint8_t armsys[] = {0x8u, 0x0u, 0xbu, 0xfu, 0xeu};
 
@@ -526,16 +533,21 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
         builder.nibbles != HP39P_COLON_NIBBLE)
         return 0;
 
-    /*
-     * Synthetic colon object. The five request cells start as the safe Aplet
-     * catalog sequence and are rewritten transactionally before every trip.
-     */
+    /* One native error boundary covers every operation, including allocation
+     * during schema/catalog reads. Success returns value ZERO; failure returns
+     * ERROR@ with any private operands left by Stock. */
     if (!hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000565c)) || /* ERRSET */
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x00002d9d)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0003f5ab)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000765c)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x00004049)) || /* ZERO */
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x000056b6)) || /* ERRTRAP */
+        !hp39_saturn_put_word5(&builder, UINT32_C(0x000054f8)) || /* ERROR@ */
         !hp39_saturn_put_word5(&builder, UINT32_C(0x0000312b)) ||
         builder.nibbles != HP39P_RETURN_NIBBLE)
         return 0;
@@ -563,6 +575,7 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
         !hp39_saturn_put_sequence(&builder, dat0_c_a, (uint32_t)sizeof(dat0_c_a)) ||
         !hp39_saturn_put_sequence(&builder, d0_imm, (uint32_t)sizeof(d0_imm)) ||
         !hp39_saturn_put_word5(&builder, c_template) ||
+        !hp39_saturn_put_sequence(&builder, p_zero, (uint32_t)sizeof(p_zero)) ||
         !hp39_saturn_put_sequence(&builder, c_dat0_w, (uint32_t)sizeof(c_dat0_w)) ||
         !hp39_saturn_put_sequence(&builder, armsys, (uint32_t)sizeof(armsys)) ||
         builder.nibbles != HP39P_C_TEMPLATE_NIBBLE)
@@ -661,24 +674,21 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
             return 0;
     }
 
-    /*
-     * First M7.3f store bridge:
-     *   :: ' <staged owned object> ' <genuine extended ID> STO ONE ;
-     *
-     * HP39 Stock @ already proves that genuine extended IDs dispatch through
-     * their descriptor. STO is the symmetric Stock path expected to consume
-     * descriptor word 2. ONE is a private success marker so the ARM portal can
-     * keep its one-result transport contract. The first witness deliberately
-     * writes the exact existing object back, keeping USEROB size unchanged.
-     */
+    /* The descriptor predicate preserves the value and supplies a type flag.
+     * Reject false through Stock SETTYPEERR before STO dispatches the genuine ID.
+     * The enclosing portal traps native rejections for reads and writes alike. */
     const uint32_t variable_store_words[] = {
         UINT32_C(0x00002d9d), /* DOCOL */
-        UINT32_C(0x00007665), /* ' */
+        UINT32_C(0x00007665), /* quote */
         UINT32_C(0x00004053), /* patched: staged object */
-        UINT32_C(0x00007665), /* ' */
+        UINT32_C(0x00004053), /* patched: native descriptor type predicate */
+        UINT32_C(0x00003af2), /* NOT */
+        UINT32_C(0x0000d585), /* IT */
+        UINT32_C(0x0001320c), /* SETTYPEERR */
+        UINT32_C(0x00007665), /* quote */
         UINT32_C(0x00004053), /* patched: genuine ID */
         UINT32_C(0x00008644), /* STO */
-        UINT32_C(0x00004053), /* ONE: private success marker */
+        UINT32_C(0x00004049), /* ZERO: success */
         UINT32_C(0x0000312b), /* SEMI */
     };
     for (uint32_t i = 0u;
@@ -688,8 +698,6 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
                 HP39P_VARIABLE_STORE_NIBBLE + i * 5u, variable_store_words[i]))
             return 0;
     }
-
-    hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     /*
      * Prove the complete generated stream through the Saturn alias before the
@@ -742,7 +750,11 @@ static void hp39_portal_configure(const struct hpclang_launch_context *launch, v
     portal->active = 0u;
     portal->trips = 0u;
     portal->last_cpsr = 0u;
-    portal->pre_dsktop = 0u;
+    portal->pre_stack_span = 0u;
+    portal->pinned_cells = 0u;
+    portal->incoming_stack_span = 0u;
+    for (uint32_t i = 0u; i < 4u; ++i)
+        portal->native_call[i] = load32(saturn_state, ARMSYS_PAGE_COUNT + 4u * i);
     portal->result_object = 0u;
     portal->result_prologue = 0u;
     portal->request_kind = 0u;
@@ -758,13 +770,31 @@ static void hp39_portal_configure(const struct hpclang_launch_context *launch, v
             portal->emulator_regs[i] = saved[i + 4u];
     }
 
-    if ((model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) &&
+    if ((model == HPCLANG_MODEL_HP39GPLUS || model == HPCLANG_MODEL_HP39GS ||
+         model == HPCLANG_MODEL_HP40GS) &&
         launch->saturn_state != 0u && saturn_pc >= 5u && emulator_lr != 0u && stock_frame != 0u) {
         portal->armsys_target = load32(saturn_state, ARMSYS_C_LO);
         if (hp39_portal_prepare_thunk(saturn_state, portal)) {
             portal->public_context.portal_entry = (uintptr_t)&hpclang_hp39_portal_enter;
         }
     }
+}
+
+/* Stock GC finds a TEMP block by repeatedly skipping objects from each live
+ * pointer. Embedded RPL streams must therefore lead to the enclosing block's
+ * end, even though the native arena itself is an opaque string. A DOCODE tail
+ * provides that path without exposing ARM instructions as RPL objects. */
+static int hp39_portal_gc_tail(const struct hpclang_hp39_portal_context *portal, uint32_t offset)
+{
+    uint32_t address = portal->saturn_entry + offset;
+    if (portal->arena_object_end < address + 10u)
+        return 0;
+    return hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                          (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u, offset,
+                                          0x02dccu) &&
+           hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                          (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
+                                          offset + 5u, portal->arena_object_end - address - 5u);
 }
 
 int hpclang_hp39_portal_prepare_stock(void)
@@ -775,14 +805,17 @@ int hpclang_hp39_portal_prepare_stock(void)
 
     uint32_t dsktop = 0u;
     uint32_t intrpptr = 0u;
-    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
+    uint32_t editline = 0u;
+    if (!stage_saturn_read_word5(read_map, RPL_EDITLINE, &editline) ||
+        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) ||
         !stage_saturn_read_word5(read_map, RPL_INTRPPTR, &intrpptr) || dsktop < 5u ||
-        dsktop > RPL_MAIN_END || intrpptr >= RPL_MAIN_END) {
-        portal->pre_dsktop = 0u;
+        dsktop > RPL_MAIN_END || editline < dsktop || (editline - dsktop) % 5u != 0u ||
+        intrpptr >= RPL_MAIN_END) {
+        portal->pre_stack_span = 0u;
         return -3;
     }
 
-    portal->pre_dsktop = dsktop;
+    portal->pre_stack_span = editline - dsktop;
     portal->result_object = 0u;
     portal->result_prologue = 0u;
 
@@ -818,82 +851,22 @@ int hpclang_hp39_portal_prepare_stock(void)
         return -7;
 
     portal->expected_prologue = expected_prologue;
-    hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
-
-    uint32_t observed = 0u;
-    const uint32_t offsets[5] = {
-        HP39P_ARG_NIBBLE,       HP39P_OPERATION_NIBBLE, HP39P_PACK_NIBBLE,
-        HP39P_NORMALIZE_NIBBLE, HP39P_FINALIZE_NIBBLE,
-    };
-    const uint32_t expected[5] = {arg, operation, pack, normalize, finalize};
-    for (uint32_t i = 0u; i < 5u; ++i) {
-        if (!stage_saturn_read_word5(read_map, portal->saturn_entry + offsets[i], &observed) ||
-            observed != expected[i])
-            return -7;
-    }
-    if (!stage_saturn_read_word5(read_map, portal->saturn_entry + HP39P_SAVED_INTRPPTR_NIBBLE,
-                                 &observed) ||
-        observed != intrpptr)
-        return -7;
-
     const uint32_t kind = portal->request_kind;
     const uint32_t name_length = portal->request_name_length;
+    if (!hp39_portal_gc_tail(portal, HP39P_DOCODE_NIBBLE) ||
+        !hp39_portal_gc_tail(portal, HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES))
+        return -7;
     if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
-        uint32_t name_end = HP39P_NAME_NIBBLE + 7u + name_length * 2u;
-        for (uint32_t i = HP39P_NAME_NIBBLE; i < name_end; ++i) {
-            uint8_t nibble = 0u;
-            if (!stage_saturn_read_nibble(read_map, portal->saturn_entry + i, &nibble) ||
-                nibble != hp39_saturn_buffer_nibble(hp39_saturn_portal_thunk, i))
-                return -7;
-        }
-    } else if (kind == HP39P_VARIABLE_VALUE) {
-        const uint8_t *request = (const uint8_t *)(uintptr_t)portal->request_name;
-        uint32_t expected_id =
-            (uint32_t)request[0] | ((uint32_t)request[1] << 8u) | ((uint32_t)request[2] << 16u);
-        uint32_t observed_id = 0u;
-        if (!stage_saturn_read_word5(read_map,
-                                     portal->saturn_entry + HP39P_VARIABLE_RECALL_NIBBLE + 10u,
-                                     &observed_id) ||
-            observed_id != expected_id)
+        if (!hp39_portal_gc_tail(portal, HP39P_NAME_NIBBLE + 7u + name_length * 2u))
             return -7;
     } else if (kind == HP39P_VARIABLE_STORE) {
         const struct hpclang_hp39_variable_store_request *request =
             (const struct hpclang_hp39_variable_store_request *)(uintptr_t)portal->request_name;
-        uint32_t observed_object = 0u;
-        uint32_t observed_id = 0u;
-        if (request == NULL || request->object_nibbles < 5u ||
-            request->object_nibbles > HP39P_VARIABLE_STORE_MAX_NIBBLES ||
-            !stage_saturn_read_word5(read_map,
-                                     portal->saturn_entry + HP39P_VARIABLE_STORE_NIBBLE + 10u,
-                                     &observed_object) ||
-            observed_object != portal->saturn_entry + HP39P_VARIABLE_OBJECT_NIBBLE ||
-            !stage_saturn_read_word5(
-                read_map, portal->saturn_entry + HP39P_VARIABLE_STORE_NIBBLE + 20u, &observed_id) ||
-            observed_id != request->id_reference)
-            return -7;
-
-        const uint8_t *source = (const uint8_t *)(uintptr_t)request->object_data;
-        for (uint32_t i = 0u; i < request->object_nibbles; ++i) {
-            const uint8_t packed = source[i >> 1];
-            const uint8_t expected_nibble =
-                (i & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
-            uint8_t observed_nibble = 0u;
-            if (!stage_saturn_read_nibble(read_map,
-                                          portal->saturn_entry + HP39P_VARIABLE_OBJECT_NIBBLE + i,
-                                          &observed_nibble) ||
-                observed_nibble != expected_nibble)
-                return -7;
-        }
-    } else if (kind == HP39P_REFERENCE_EVAL) {
-        const uint8_t *request = (const uint8_t *)(uintptr_t)portal->request_name;
-        uint32_t expected_reference =
-            (uint32_t)request[0] | ((uint32_t)request[1] << 8u) | ((uint32_t)request[2] << 16u);
-        uint32_t patch = HP39P_REFERENCE_LIST_NIBBLE + 5u;
-        uint32_t observed_reference = 0u;
-        if (!stage_saturn_read_word5(read_map, portal->saturn_entry + patch, &observed_reference) ||
-            observed_reference != expected_reference)
+        if (!hp39_portal_gc_tail(portal, HP39P_VARIABLE_OBJECT_NIBBLE + request->object_nibbles))
             return -7;
     }
+
+    hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     store32((void *)portal->saturn_state, ARMSYS_C_LO,
             (uint32_t)(uintptr_t)&hpclang_hp39_portal_resume);
@@ -916,26 +889,34 @@ int hpclang_hp39_portal_restore_hpc(void)
     int result = 0;
     const uint32_t *read_map = (const uint32_t *)portal->saturn_state;
     uint32_t post_dsktop = 0u;
+    uint32_t restored_top = 0u, dropped = 0u;
     uint32_t object = 0u;
     uint32_t prologue = 0u;
 
-    if (portal->pre_dsktop < 5u || !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop)) {
+    uint32_t editline = 0u;
+    if (!stage_saturn_read_word5(read_map, RPL_EDITLINE, &editline) ||
+        !stage_saturn_read_word5(read_map, RPL_DSKTOP, &post_dsktop) || editline < post_dsktop) {
         result = -4;
     } else {
-        /*
-         * Keep result-shape failures precise while closing the HP39
-         * extended-variable recall path. The normal portal contract is one
-         * newly-pushed object (post DSKTOP = pre DSKTOP - 5).
-         */
-        if (post_dsktop == portal->pre_dsktop) {
-            result = -8; /* Stock returned no stack object. */
-        } else if (post_dsktop + 10u == portal->pre_dsktop) {
-            result = -9; /* Stock returned two stack objects. */
-        } else if (post_dsktop + 5u != portal->pre_dsktop) {
-            result = -10; /* Other stack-depth delta. */
-        } else if (!stage_saturn_read_word5(read_map, post_dsktop, &object)) {
-            result = -11; /* Result stack cell unreadable. */
+        /* Normal calls produce a value and a success marker. Errors may leave
+         * private operands below ERROR@; all are relative to the moved stack. */
+        result = hpclang_hp39_portal_stack_plan(portal->pre_stack_span, post_dsktop, editline,
+                                                &restored_top, &dropped);
+        if (result == 0 && !stage_saturn_read_word5(read_map, post_dsktop, &object))
+            result = -11;
+        if (result == 0) {
+            uint32_t type = 0u, error = 0u;
+            if (!stage_saturn_read_word5(read_map, object, &type) || type != 0x02911u ||
+                !stage_saturn_read_word5(read_map, object + 5u, &error))
+                result = -14;
+            else if (error != 0u)
+                result = error == 1u ? -16 : -15; /* SUPROM39: MEMERR = ONE */
+            else if (dropped != 2u)
+                result = -10;
         }
+
+        if (result == 0 && !stage_saturn_read_word5(read_map, post_dsktop + 5u, &object))
+            result = -11;
 
         if (result == 0 && object > RPL_MAIN_END - 5u) {
             result = -12; /* Result object pointer outside Saturn main. */
@@ -963,25 +944,29 @@ int hpclang_hp39_portal_restore_hpc(void)
             }
         }
 
-        /*
-         * Every portal request is normalized to exactly one private result
-         * object. Read requests leave their value; the first bounded mutation
-         * request leaves ONE only after Stock STO returns successfully. Mirror
-         * Stock DROP exactly when removing that private result cell: DSKTOP
-         * advances by one five-nibble pointer and AVMEM
-         * gains one stack level. Do not restore pre-call AVMEM wholesale:
-         * Program/Note catalog packing may legitimately leave a temporary
-         * result object allocated below RSKTOP until the ARM snapshot copies
-         * it.
-         */
-        uint32_t avmem = 0u;
-        if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
-            avmem >= UINT32_C(0x000fffff) ||
-            !stage_saturn_write_word5(read_map, RPL_DSKTOP, portal->pre_dsktop) ||
-            !stage_saturn_write_word5(read_map, RPL_AVMEM, avmem + 1u))
-            result = -6;
+        /* Drop private results/operands relative to the current EDITLINE:
+         * Stock may have moved the stack while resizing the variable. Preserve
+         * its AVMEM changes; release only the cells removed by this cleanup. */
+        if (result == 0 || result == 1 || result == -15 || result == -16) {
+            uint32_t avmem = 0u;
+            if (!stage_saturn_read_word5(read_map, RPL_AVMEM, &avmem) ||
+                dropped > 0xfffffu - avmem ||
+                !stage_saturn_write_word5(read_map, RPL_DSKTOP, restored_top) ||
+                !stage_saturn_write_word5(read_map, RPL_AVMEM, avmem + dropped))
+                result = -6;
+        }
     }
 
+    if (portal->pinned_cells != 0u) {
+        uint32_t caller_top = editline - portal->incoming_stack_span;
+        uint32_t pc = 0u, stream = 0u;
+        if (!stage_saturn_read_word5(read_map, caller_top - 5u, &pc) ||
+            !stage_saturn_read_word5(read_map, caller_top - 10u, &stream) ||
+            !stage_saturn_write_word5(read_map, RPL_INTRPPTR, stream))
+            result = -6;
+        else
+            portal->stock_regs[0] = pc;
+    }
     store32((void *)portal->saturn_state, ARMSYS_C_LO, portal->armsys_target);
 
     /*
@@ -1324,15 +1309,14 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     uint32_t code_count = (hpc1->image_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE;
 
     uintptr_t live_state = live_saturn_state(saturn_state, model);
-    int preserve_stage0 =
-        live_state != 0u && (model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
-                             model == HPCLANG_MODEL_HP50G);
-    /* One separately fenced native page holds the PIC return path. */
-    if (preserve_stage0 && (stage0_size == 0u || stage0_size > HPCLANG_PAGE_SIZE ||
-                            hpclang_stage0_resume_target < stage0_code ||
-                            hpclang_stage0_resume_target - stage0_code >= stage0_size))
+    int preserve_stage0 = live_state != 0u;
+    /* The unused half of the L2 workspace holds the PIC return path. */
+    if (preserve_stage0 &&
+        (stage0_size == 0u || stage0_size > HPCLANG_L2_WORKSPACE_BYTES - HPCLANG_L2_TABLES_BYTES ||
+         hpclang_stage0_resume_target < stage0_code ||
+         hpclang_stage0_resume_target - stage0_code >= stage0_size))
         return -5;
-    uint32_t workspace_page = stage_pages + (preserve_stage0 ? 1u : 0u);
+    uint32_t workspace_page = stage_pages;
     uint32_t code_first = workspace_page + 1u;
     uint32_t rw_first = code_first + code_count;
 
@@ -1349,7 +1333,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         return -4;
 
     if (preserve_stage0) {
-        uint32_t page = old_l2[stage_pages] & UINT32_C(0xfffff000);
+        uint32_t page = old_l2[workspace_page] & UINT32_C(0xfffff000);
         /* Native pool pages may be system RAM outside Saturn Read[]. Prove
            the Stock identity section from its live ARM page table instead. */
         volatile const uint32_t *stock_l1 = (volatile const uint32_t *)(uintptr_t)0x07f00000u;
@@ -1357,9 +1341,10 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         if ((descriptor & 3u) != 2u ||
             (descriptor & UINT32_C(0xfff00000)) != (page & UINT32_C(0xfff00000)))
             return -6;
-        uintptr_t stock_alias = page;
+        uintptr_t stock_alias = page + HPCLANG_L2_TABLES_BYTES;
         volatile uint8_t *copy =
-            (volatile uint8_t *)(uintptr_t)(STAGE_WINDOW_BASE + stage_pages * HPCLANG_PAGE_SIZE);
+            (volatile uint8_t *)(uintptr_t)(STAGE_WINDOW_BASE + workspace_page * HPCLANG_PAGE_SIZE +
+                                            HPCLANG_L2_TABLES_BYTES);
         const uint8_t *source = (const uint8_t *)stage0_code;
         for (uint32_t i = 0u; i < stage0_size; ++i)
             copy[i] = source[i];
@@ -1448,9 +1433,26 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         if (bias_status < 0)
             return -5;
     }
-    if (launch.mmu.code_window_page_count != 0u) {
+    if (model == HPCLANG_MODEL_HP39GPLUS || model == HPCLANG_MODEL_HP39GS ||
+        model == HPCLANG_MODEL_HP40GS) {
         hp39_portal_configure(&launch, saturn_state, model, saturn_pc, emulator_lr, stock_cpsr,
                               stock_frame);
+        struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
+        portal->arena_first = RPL_MAIN_END;
+        portal->arena_end = 0u;
+        portal->launcher_object = launcher_bias.object;
+        if (live_state != 0u) {
+            for (uint32_t i = 0u; i < total_pages; ++i) {
+                uint32_t start = 0u;
+                if (stage_phys_page_saturn_start((const uint32_t *)saturn_state,
+                                                 old_l2[i] & 0xfffff000u, &start)) {
+                    if (start < portal->arena_first)
+                        portal->arena_first = start;
+                    if (start + RPL_PHYS_PAGE_NIBBLES > portal->arena_end)
+                        portal->arena_end = start + RPL_PHYS_PAGE_NIBBLES;
+                }
+            }
+        }
         launch.platform_cookie = (uintptr_t)&hpclang_hp39_portal_context.public_context |
                                  HPCLANG_PLATFORM_COOKIE_HP39_TAG;
     } else if (launch.saturn_state != 0u &&
@@ -1479,6 +1481,22 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     }
 
     int result = hpclang_bootstrap_run(&launch);
+
+    struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
+    if (portal->pinned_cells != 0u) {
+        const uint32_t *map = saturn_state;
+        uint32_t editline = 0u, top = 0u, avmem = 0u;
+        if (!stage_saturn_read_word5(map, RPL_EDITLINE, &editline))
+            return -8;
+        top = editline - portal->incoming_stack_span;
+        if (!stage_saturn_read_word5(map, top - 15u, &launcher_bias.object) ||
+            !stage_saturn_read_word5(map, RPL_AVMEM, &avmem) ||
+            !stage_saturn_write_word5(map, RPL_DSKTOP, top) ||
+            !stage_saturn_write_word5(map, RPL_AVMEM, avmem + portal->pinned_cells))
+            return -8;
+        for (uint32_t i = 0u; i < 4u; ++i)
+            store32(saturn_state, ARMSYS_PAGE_COUNT + 4u * i, portal->native_call[i]);
+    }
 
     if (!stage_restore_launcher_bias(saturn_state, &launcher_bias))
         return -6;

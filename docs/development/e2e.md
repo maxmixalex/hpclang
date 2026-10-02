@@ -23,7 +23,7 @@ The two tiers are deliberately separate. Direct runtime owns common-bootstrap ex
 
 ## Calculator-object and stack-mutation witness
 
-The canonical runtime payload covers the closed M7.3a-e read/stack/adapter baseline. M7.3f named-store write/delete is in separate WIP development on `m7-object-parity`; it is not integrated into the canonical USB baseline and has no accepted write-round-trip E2E claim there.
+The canonical runtime payload covers the closed M7.3a-e read/stack/adapter baseline and HP39 public variable access. The focused Object mutation payload uses the shared USB harness on all six Stock models: classic RPL put/remove and nested-reference preservation on HP48/49/50; size-changing native-variable writes, GC, rejection paths and context restoration on HP39. Both require settled Stock return. The M7.3f implementation is complete; final CI acceptance is tracked in [Validation](validation.md#m73f-final-implementation-batch).
 
 - Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.
 - Stock HP48gII and HP49g+/HP50g read `DSKTOP`/D1 and `EDITLINE`, derive user-visible depth after launcher-bias normalization, and snapshot only objects whose native extent is provable.

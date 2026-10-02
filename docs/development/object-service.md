@@ -110,7 +110,7 @@ A store handle identifies an explicit namespace. The currently frozen mapping is
 
 - HP48gII/49g+/50g: HOME/current RPL directory or an explicitly opened child
   directory.
-- HP39gs/40gs: no generic HOME/current mapping is frozen. Stock exposes a
+- HP39g+/39gs/40gs: no generic HOME/current mapping is frozen. Stock exposes a
   hierarchy of native catalogs/contexts rather than one HOME-like directory:
   the Aplet directory is the top-level catalog; Program and Note catalogs are
   reached through the current `PGMCXT` / `NOTESCXT` bindings; ordinary
@@ -127,16 +127,24 @@ Lookup returns owned snapshots. Enumeration owns independent iterator state.
 Names are exposed as text only when the underlying Stock object model has a text
 name; implementation-specific record addresses remain private.
 
-The **contract** for a future named-store put operation is to copy from an owned
-snapshot rather than transfer the caller's handle. That contract must not be
-confused with current implementation status: M7.3 currently implements
-the public HP48gII/49g+/50g named-store API as read-only, and HP39 has no
-generic named-store put/remove API. The M7.3f work branch has private classic-RPL
-create/replace bridges and a bounded HP39 same-size descriptor-store witness;
-neither establishes a completed public mutation contract.
-This is separate from RPL stack mutation: `stack_push`, `stack_pop`,
-`stack_drop` and `stack_replace` are already implemented for the bounded
-HP48gII/49g+/50g Stock stack path.
+`hpclang_object_store_put()` copies an owned value into a logical directory.
+Its mode selects upsert, create-only (`EEXIST` on a duplicate), or replace-only
+(`ENOENT` on a missing name). `hpclang_object_store_remove()` deletes an exact
+non-directory entry. Directory replacement/removal is rejected with `EISDIR`.
+Caller-owned values, existing snapshots and retained Stock references keep their
+old values. Store handles continue to identify paths, not physical addresses.
+
+HP39g+/39gs/40gs instead use `<hpclang/variable.h>`:
+`hpclang_variable_get/set()` resolve exact category/name bytes in the current
+Aplet schema. Get returns an owned copy; set keeps caller ownership, invokes the
+native descriptor's type predicate, and then dispatches native `STO`. Variables
+are predefined, so these operations do not create a HOME namespace or expose
+variable deletion. The native staging limit is 7000 nibbles, corresponding to
+3495 string bytes. Oversize inputs fail with `E2BIG` before entering Stock;
+native type errors map to `EINVAL`, and native memory exhaustion to `ENOSPC`.
+
+These public mutation interfaces are under M7.3f acceptance testing. RPL stack
+`push/pop/drop/replace` retain their existing HP48gII/49g+/50g Stock contract.
 
 ## Error and mutation rules
 
@@ -195,19 +203,19 @@ above or outside this clean object API.
 - temporary-object allocation charged against existing Stock AVMEM reservations rather than raw geometry;
 - self-contained Stock HP48/HP4950 create/push/replace/peek/pop/drop round-trip evidence.
 
-Arbitrary TEMPOB reclamation/GC remains an internal lifecycle concern for future long-lived named-store mutation. The public stack path does not expose raw allocation blocks or Saturn addresses.
+Classic stack allocations are bounded by the native arena fences and are reclaimed by Stock after return. The HP39 portal separately supports Stock garbage collection during native calls, as described below. Public APIs expose neither allocation blocks nor Saturn addresses.
 
 ### M7.3d — named object stores — read-only core closed
 
 - logical root/current/child handles use length-delimited calculator-byte names rather than assuming UTF-8 paths;
-- HP48gII/49g+/50g read-only RPL directory resolution, independent enumeration and owned named-object snapshots are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn pointers across GC/moving allocation;
+- HP48gII/49g+/50g RPL directory resolution, independent enumeration, owned snapshots and named put/remove are implemented. Logical handles re-resolve names instead of retaining borrowed Saturn pointers across GC/moving allocation;
 - Stock HP49g+/50g validation uses the real USEROB witness `X50NG-VV.FAT`, an empty DOCSTR published by the x50ng VVFAT environment. `HPCLANG.HP` is the FAT transfer/launcher file and is not a HOME/USEROB variable;
 - HP39 `HP39AscA` / `HP39BinX` parsing is retained privately as external typed-transfer protocol support. ROM and HPGCC39 evidence show `HP39DIR.*` belongs to the Disk Drive/Conn3x transfer path, so it is not an internal HOME/root backend;
 - HP39 Aplet, Program and Note storage is read through the calculator's native structures rather than a synthetic filesystem. Aplet snapshots follow HOME → `'apletdir` → `'Name` and preserve the native DORRP as an owned snapshot; Program and Note catalogs/bodies use the current `PGMCXT` / `NOTESCXT` directory bindings;
 - HP39 Aplet variables are a separate descriptor-driven contract, not directory entries. Topic Type property `ApletVars# = EIGHT` supplies the current Aplet schema; each extended variable ID carries a 15-nibble recall/type/store descriptor. Runtime preserves genuine schema source references (for example MiniVar's `xNoteText` at `#2C812`) and recalls values generically by quoting that genuine extended ID into Stock and invoking Stock `@`, which follows descriptor word 0 including the supported-entry path. The portal enters through `GETPTR`, commits the final live RPL pointers through Stock `SAVPTR`, and restores the suspended `#8076B` runstream pointer before returning to ARM. Runtime #320 validates this path on both HP39gs and HP40gs: `NoteText` passes as the standard witness, each model reaches HPC1 PASS, `stock-hp39.json` passes, and the complete 52-frame keyboard progression returns cleanly;
 - no synthetic HP39 HOME/current hierarchy is exposed merely for API symmetry. Generic named-store entry points remain `ENOSYS` where the Stock model has no matching namespace;
 - historical HPGCC 1.1/2.0 `satdir.h` use is primarily directory inspection/search/recall. Real HPGCC39 applications also read native Note/object directories directly. hpclang therefore treats safe read-only access plus owned lifetime as the M7.3 parity baseline rather than requiring a new database-style abstraction;
-- public named put/remove is **not implemented yet**. It is not required to close the HPGCC 1.1/2.0 read/search/recall adapter baseline, but it remains planned M7 work in M7.3f. HP48gII/49g+/50g need failure-safe named put/remove above explicit logical store handles; HP39 needs a validated generic descriptor-store invocation path for Aplet variables. HPGCC3's later `sat3_sto*` / `sat3_purge*` family and the recovered HP39 descriptor store word are implementation evidence, not permission to expose their raw address/lifetime model.
+- public named put/remove and HP39 variable get/set implement the write-side contract described above. Raw HPGCC3 mutation descriptors remain private; generic HP39 directory creation/deletion is not invented.
 
 ### M7.3e — HPGCC adapters and closure — complete at the bounded parity baseline
 
@@ -234,7 +242,7 @@ inside it:
 - `sat_stack_swap` / `sat_stack_nip` stay outside the bounded subset until a
   real port justifies a transactional reorder primitive. Their omission is an
   explicit compatibility classification. General named put/remove is different:
-  it remains a planned clean-core capability in M7.3f rather than part of the
+  it belongs to the clean-core M7.3f contract rather than the
   bounded historical `saturn.h` / `satdir.h` adapter surface.
 
 Validation progressed from Core #396 (first adapter slice) through Core #399
@@ -266,193 +274,88 @@ cross-family Stock round-trip and clean-return evidence. This closes
 **M7.3a-e** at the intended HPGCC 1.1/2.0 read/search/recall/stack-exchange
 baseline.
 
-### M7.3f — named object-store mutation — resumed, not accepted
+### M7.3f public mutation and native-variable lifetime
 
-M7.3f finishes the write side that was intentionally left out while the read
-model and compatibility boundary were being proven:
+The public APIs and acceptance payloads are implemented and locally validated.
+Formal CI acceptance of this combined batch is the remaining closure gate;
+see the [validation record](validation.md#m73f-final-implementation-batch).
 
-- HP48gII/49g+/50g: add named put/replace/remove through explicit logical store
-  handles, with owned input snapshots and no Stock-global cwd mutation;
-- HP39gs/40gs: validate the descriptor store word as a generic variable-write
-  bridge and preserve the native Aplet/topic context instead of inventing a
-  synthetic HOME hierarchy;
-- make create/replace/remove failure-safe, with bounded allocation/lifetime
-  handling and original-Stock round-trip evidence;
-- keep raw Saturn addresses and HPGCC3 native mutation descriptors private.
+#### Classic RPL writes
 
-#### Restart review (2026-09-28)
+Put/remove re-resolve the logical directory immediately before mutation. The
+production backend captures all 128 writable, non-aliased main-RAM page bases
+under the launcher's interrupt mask. The operation then uses that captured
+view, without calling Stock or consulting a changing mapping during commit.
 
-`m7-object-parity` incorporates accepted main `8cdaf130`.
-The existing ownership and namespace direction remains the intended design;
-the private mutation implementation still needs lifecycle and failure evidence.
+Preflight validates directory structure, allocation/accounting, and every live
+reference family before writing. Referenced old values are preserved in TEMPOB;
+USEROB movement updates the data/return stacks, temporary environments,
+TOUCHTAB, VGER groups, the system-variable table and launcher-held roots.
+HPGCC3 `hplib/sat3/sat3_dir.c` provides the reference-family baseline. Native
+AVMEM reservations are preserved rather than replaced with the physical gap.
 
-Current implementation and evidence have different scopes:
+Host tests exercise nested directories, interior references, moving reference
+tables, malformed late roots and insufficient memory. Rejected preflight plans
+leave the memory image unchanged. This is a validated stable-RAM commit model,
+not rollback for an arbitrary callback backend that fails after writing.
 
-- Classic-RPL private bridges can create, replace and remove named entries,
-  including size-changing replacement. The remove bridge re-resolves the
-  logical store before calling the existing host-tested mutation primitive.
-- The Stock mutation payload grows and restores an existing string, then
-  creates and deletes `ZZM7F`. It checks duplicate-create `EEXIST`, missing-get
-  and repeated-remove `ENOENT`, retained owned readback after deletion, and
-  preservation of the original witness. Object mutation
-  [36975086116](https://github.com/zyf722/hpclang/actions/runs/36975086116)
-  accepts this deletion witness on `d040dbb2`; Core, Quality and Runtime on
-  that head also pass. The next witness releases the create input before
-  readback, rejects a duplicate carrying different bytes, and compares the
-  retained current-directory iterator with a fresh post-mutation snapshot.
-  These isolation checks are accepted by Object mutation
-  [36976632973](https://github.com/zyf722/hpclang/actions/runs/36976632973)
-  on `ad26f2b9`, with Core and Quality also green.
-- Host mutation tests now exercise a nested `D` directory with a retained
-  Stock data-stack reference and an ARM-held root. Removal preserves the old
-  value through TEMPOB; subsequent replacement/create/remove keeps both
-  references valid and the current-directory path stable. This is host
-  evidence; the additional nested-directory Stock witness is described below.
-- HP39gs/40gs have a private same-size descriptor-store bridge, using an owned
-  snapshot staged in the portal page. Historical Runtime #358 validated the
-  bounded `NoteText` witness; general size-changing writes remain unproven.
-  This does not establish HP39g+ descriptor compatibility.
-- Historical Object mutation #12 reached payload PASS on HP48gII but failed
-  return teardown; canonical Runtime #371 regressed HP39gs/40gs before keyboard
-  progression. The synchronized baseline reproduced these symptoms; the
-  follow-up diagnosis and accepted repairs are recorded below.
-- The old mutation test assumed the SD-created `X50NG-VV.FAT` entry on HP49/50.
-  It now uses the shared USB harness's explicit `ZZE2E` string on all three
-  classic-RPL models. Main's input timing, capture and USB launch code is kept.
+The original nested-reference/failure audit is accepted through `71644639`.
+Earlier cross-workflow evidence on `c5329a54` includes
+[Object mutation](https://github.com/zyf722/hpclang/actions/runs/36981866894) and
+[Runtime](https://github.com/zyf722/hpclang/actions/runs/36981866981).
+The public API replaces the old private create/replace/remove entry points.
 
-The resumed baseline at `0d16cd2a` reproduced both failures: Runtime
-[36388263936](https://github.com/zyf722/hpclang/actions/runs/36388263936)
-failed all three HP39 Stock models before keyboard progression; Object mutation
-[36388264008](https://github.com/zyf722/hpclang/actions/runs/36388264008)
-reached payload PASS on HP48/49/50 but failed return. The follow-up separates
-stage1 file bytes from its zero-initialized memory extent, moves the classic-RPL
-stage0 return path into protected native storage, and registers launcher-held
-Saturn addresses as relocation roots. At `bc80ac58`, canonical Runtime
-[36509415719](https://github.com/zyf722/hpclang/actions/runs/36509415719)
-and Object mutation
-[36509415723](https://github.com/zyf722/hpclang/actions/runs/36509415723)
-are fully green. Storage
-[36509415707](https://github.com/zyf722/hpclang/actions/runs/36509415707)
-still failed HP49g+/HP50g after payload PASS, during SD shutdown and return;
-the KOS mapping repair in `7cca953b` is accepted by Storage
-[36972578170](https://github.com/zyf722/hpclang/actions/runs/36972578170)
-after an unchanged rerun. Core and Runtime on that same head are also green;
-Object mutation [36972578142](https://github.com/zyf722/hpclang/actions/runs/36972578142)
-passed on its first attempt. The interrupted jobs reported runner communication
-loss, not test assertion failures. Local verification passed Stock Object mutation on HP48gII,
-HP49g+ and HP50g with strict return checks, Runtime on all three HP39 Stock
-models and the HP39 Direct family, and all 32 host unit tests. The HP48 runner
-now starts from fresh emulator state and waits for the server-ready capture
-before sending bytes. This closes the resumed launch/return baseline, but not general mutation
-failure semantics or the expanded deletion witness listed below.
+#### HP39 native calls
 
-Work proceeds in this order:
+Variable access resolves the current `ApletVars#` schema and preserves its
+actual extended ID. Reads invoke Stock `@`. Writes first invoke descriptor
+word 1, the native type predicate, then quote the ID and invoke Stock `STO`.
+The low-level store entry alone does not perform that type check.
 
-1. Establish the synchronized baseline with canonical Runtime and the focused
-   Object mutation workflow. Keep payload success, return control/state and
-   visible Stock recovery as separate mandatory checks.
-2. Audit USEROB movement, TEMPOB allocation, live reference relocation and
-   launcher accounting against original HPGCC source evidence. The current
-   manual relocation algorithm is a candidate implementation, not a frozen
-   architecture. A missed reference root or unsupported object layout must
-   fail before memory moves. newRPL can inform design but cannot prove Stock
-   layout or calling conventions.
-3. Close failure semantics before publishing API: current commit paths perform
-   multiple writes and can return I/O errors after earlier writes succeeded.
-   Preflight/ENOSPC unit coverage does not prove rollback after a late write
-   failure. Establish a non-failing commit boundary or recoverable transaction,
-   and test nested directories, retained references and rejected mutations.
-4. Accept the new private remove bridge and Stock create/read/replace/remove
-   round trip, then extend retained Stock references, nested-directory,
-   unchanged-cwd and owned-input lifetime evidence. Preserve the failing teardown gate;
-   do not relax it to accept payload PASS alone.
-5. Generalize HP39 variable writes only after descriptor, context and allocation
-   lifetime are established. Then freeze the clean public put/remove contract
-   and remove obsolete same-size/probe-only bridges where no longer needed.
+One ERRSET/ERRTRAP boundary covers every portal operation, including schema
+allocation. The normal result is a value plus a success marker; native errors
+carry ERROR@ and may leave private operands. Cleanup measures the stack relative
+to the current EDITLINE, so growth/shrinkage does not restore stale addresses.
+The application retains owned input/output snapshots across all native calls.
+Native setters keep their own domain rules; for example PageNum depends on the
+Aplet's existing sketch pages. There is no generic rollback promise for arbitrary
+custom-Aplet handler side effects.
 
-### Commit-failure audit (2026-10-02)
+The historical HPGCC39 launcher exposes free Saturn RAM as ARM pages without
+making those pages native TEMP objects. Before the first portal call, hpclang
+reserves that interval as an opaque rooted TEMP string and retains the existing
+TEMP prefix. This keeps the ARM code/data physically stationary while Stock
+allocates and collects temporary objects. Original caller roots stay live, and
+the private roots are released before returning to Stock.
 
-`commit_userob_shift()` patches directory links, relocates references, moves
-memory, then updates stack/accounting words. Each callback can currently report
-failure after earlier writes succeeded. The range preflight tests readability;
-it is not a generic promise that arbitrary write callbacks cannot fail.
-Existing rejection tests and passing Stock round trips do not establish
-rollback for arbitrary late I/O faults.
+A retained outer object is not sufficient for GC safety: live embedded RPL
+streams must also lead to the TEMP block's end when traversed by SKIPOB. The
+portal supplies bounded DOCODE tails for its return stream, helpers, names and
+staged values. This follows the invariant explained in
+[Safe Garbage Collection](https://www.hpcalc.org/hp48/docs/programming/garbage2.txt);
+the HP39 behavior is verified against the original Stock ROMs.
 
-The production write backend now captures all 128 main-RAM page bases in an
-invocation-local `rpl-stock-memory` view before publishing mutation I/O. It
-requires the Stock identity section's user read/write permission, aligned
-non-aliased RAM page bases, and valid launcher fences. Reads and writes during
-the mutation use this captured view rather than repeatedly consulting `Read[]`.
-The complete operation remains inside the launcher's interrupt-masked native
-interval, without Stock service calls. The old generic mapped-write primitive
-and duplicated stack/store mutation setup are removed; ordinary reads still
-use the read-only Saturn view.
+Two pool pages remain available to Stock allocation. Bootstrap C uses a separate
+one-page stack; its measured C-frame bound plus assembly call overhead fits that
+page. The PIC return code shares the unused half of the L2 workspace, whose
+preservation is covered by the MMU unit test. No public image ABI or compiler
+mode change is needed.
 
-This removes late mapping lookup failure from the production backend for valid
-main-RAM accesses. It does not add rollback to arbitrary callback backends, nor
-prove that all algorithmic error paths after TEMPOB preservation are unreachable.
-The captured-view implementation in `257dcd4b` is accepted by Object mutation
-[36978224382](https://github.com/zyf722/hpclang/actions/runs/36978224382), with
-Core, Quality, Runtime and Storage green on the same head.
+#### Acceptance scope
 
-The implementation reuses the validated directory-movement plan after preservation,
-calculating the final free-memory accounting before the first write. Reference
-validation scans past retained references so they cannot hide a later invalid
-root. Host tests cover rejection without any memory changes and preserved
-allocation reservations across all five nibble-to-cell alignment remainders.
-The remaining gate is a complete commit-path audit and negative/fault-injection
-evidence before public API closure. Do not add a blanket retry after a partially
-applied mutation.
+The focused Object mutation payload uses the public APIs:
 
-The expanded Stock witness transfers a two-level directory fixture through the
-shared USB runners. It retains logical directory handles across replacement,
-removal and recreation, checks sibling values, and checks the original value
-through a real data-stack reference after replacement and removal. A test-only
-helper reserves a stack cell through the public API, then resolves the named
-object and installs its pointer in that cell; this is not a ROM `RCL` invocation
-or a public borrowed-pointer API. The original stack depth is restored. These
-new checks are accepted on `c5329a54` by Object mutation
-[36981866894](https://github.com/zyf722/hpclang/actions/runs/36981866894), with
-Core, Quality, Runtime, Storage and Font Gallery also green on that head.
-Named write bridges remain private.
+- HP48gII/49g+/50g: upsert/create/replace/remove, nested paths, retained Stock
+  references and owned snapshots, duplicate/missing-name rejection, unchanged
+  cwd, and restoration of the transferred fixture;
+- HP39g+/39gs/40gs: repeated growing/shrinking/empty NoteText writes until native
+  GC occurs, byte-exact readback after releasing input snapshots, native type
+  errors, oversized and missing-name rejection, REAL PageNum round trips,
+  original-value/context restoration, and settled Stock return;
+- Runtime independently retains its full service and 52-frame keyboard gates,
+  with unsupported Direct variable access returning ENOSYS.
 
-#### Reference and accounting audit
-
-The root families were checked against HPGCC3 `hplib/sat3/sat3_dir.c`,
-`__sat3_fixptrs2`: data stack, return stack, temporary environments, TOUCHTAB,
-VGER groups and the system-variable table. hpclang additionally tracks native
-launcher roots. Host tests now retain the same value through every family,
-including interior pointers, two VGER groups and table storage that itself moves
-during TEMPOB preservation. The VGER base is relocated once through the system
-table; its header is not overwritten as though it were a pointer cell.
-
-Malformed table lengths/bases and an injected unreadable late VGER cell are
-rejected by create/replace/remove with zero write-callback invocations and an
-unchanged memory image. This covers preflight failures, not rollback of a
-callback that fails during commit.
-
-All allocation/accounting plans preserve the difference between physical free
-cells and AVMEM as the native reservation. An AVMEM value exceeding the physical
-gap is rejected before mutation, avoiding over-allocation or truncation on a
-five-nibble write. The same rule covers named mutation, TEMPOB allocation and
-stack drop. Tests cover both a one-cell overstatement and `0xfffff`, as well as
-the existing reservation/alignment cases.
-
-The unused classic-RPL same-size-only bridges have been removed. Same-size,
-identical-value and retained-reference rejection tests now call the general
-replacement primitive. The separate HP39 descriptor-store bridge remains
-bounded; this cleanup does not establish general HP39 writes. This audit batch
-passes all 33 host tests, formatting/lint and host/ARM Clang analysis. Local
-Object mutation and canonical Runtime both pass on HP48gII/49g+/50g with settled
-return; Runtime also completes all 52 keyboard frames. Formal CI is pending.
-
-The focused mutation workflow is justified by its destructive object lifecycle
-and lack of keyboard interaction. It shares the normal build entry, Stock asset
-preparation, target profiles, USB runners and strict return verification.
-Canonical Runtime remains the independent regression gate; the focused workflow
-must not become a fork of the transport or a substitute for full Runtime.
-
-The precise adapter/Migration split remains recorded in
-[HPGCC Saturn / satdir adapter map](hpgcc-saturn-adapter.md). M7.3 as a whole
-closes after this named write/delete slice is implemented and validated.
+The focused workflow shares build, target profiles, assets, USB transport and
+strict return verification with the existing harness. Payload PASS alone is
+insufficient. The raw-address HPGCC adapter boundary remains documented in the
+[adapter map](hpgcc-saturn-adapter.md).

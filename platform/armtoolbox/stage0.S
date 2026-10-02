@@ -82,6 +82,18 @@ hpclang_armtoolbox_stage0:
 
     /* Move to the top of the temporary page pool. */
     ldr     r2, [r10, #0x914]
+#if HPCLANG_STAGE0_MODEL <= 3
+    /* Original Stock HP39 shares this pool with the Saturn allocator. Leave
+     * two pages for native calls; stage1 roots the remaining native arena.
+     * A Direct launcher has no Saturn RAM map and needs no Stock workspace. */
+    ldr     r3, [r10, #0x200]       /* Read[0x80] */
+    cmp     r3, #0
+    beq     .Lhp39_pool_ready
+    cmp     r2, #2
+    subhi   r2, r2, #2
+    strhi   r2, [r10, #0x914]
+.Lhp39_pool_ready:
+#endif
     mov     r2, r2, lsl #12
     ldr     r3, =STAGE_WINDOW_BASE
     add     r2, r2, r3

@@ -1526,6 +1526,93 @@ static int commit_temp(const struct hpclang_rpl_mutation_io *io, const struct te
     return write_word(io, RPL_AVMEM, 5u, plan->avmem - plan->temp_cost);
 }
 
+int hpclang_rpl_mutation_pin_arena(const struct hpclang_rpl_mutation_io *io, uint32_t first,
+                                   uint32_t end, const uint32_t *extra_roots, uint32_t extra_count,
+                                   uint32_t *pinned_cells)
+{
+    if (!io_ready(io) || pinned_cells == NULL || extra_count >= RPL_REFERENCE_SLOT_LIMIT - 1u ||
+        (extra_count != 0u && extra_roots == NULL))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t bottom = 0u, top = 0u;
+    int result = read_word(io, 0x806e9u, 5u, &bottom);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = read_word(io, RPL_TEMPTOP, 5u, &top);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (bottom < RPL_MAIN_FIRST || top < bottom + 5u || end <= top || end - top < 16u ||
+        first < top + 11u || first >= end)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t sentinel = 0u;
+    if (read_word(io, bottom, 5u, &sentinel) != HPCLANG_RPL_MUTATION_OK || sentinel != 0u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    bottom += 5u;            /* The first TEMP link is the zero sentinel. */
+    end += (end - top) & 1u; /* DOCSTR body has a whole number of bytes. */
+    uint32_t count = 1u + extra_count;
+    uint32_t cursor = top;
+    while (cursor > bottom) {
+        uint32_t extent = 0u, marker = 0u;
+        if (cursor - bottom < 6u || count >= RPL_REFERENCE_SLOT_LIMIT ||
+            read_word(io, cursor - 5u, 5u, &extent) != HPCLANG_RPL_MUTATION_OK || extent < 11u ||
+            extent > cursor - bottom)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        cursor -= extent;
+        if (read_word(io, cursor, 1u, &marker) != HPCLANG_RPL_MUTATION_OK || marker != 0u)
+            return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        ++count;
+    }
+    for (uint32_t i = 0u; i < extra_count; ++i)
+        if (extra_roots[i] >= RPL_MAIN_END)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    struct temp_plan plan;
+    result = plan_temp(io, end - top - 6u, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (plan.rstk > first)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    if (count > plan.avmem - plan.temp_cost || plan.dstk < count * 5u ||
+        plan.dstk - count * 5u <= plan.new_rstk + 5u)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    if (!range_mapped(io, plan.dstk - count * 5u, count * 5u))
+        return HPCLANG_RPL_MUTATION_IO;
+    result = commit_temp(io, &plan);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    /* Opaque DOCSTR: GC must never interpret native instructions as pointers. */
+    if (write_word(io, top, 1u, 0u) != HPCLANG_RPL_MUTATION_OK ||
+        write_word(io, top + 1u, 5u, 0x02a2cu) != HPCLANG_RPL_MUTATION_OK ||
+        write_word(io, top + 6u, 5u, end - top - 11u) != HPCLANG_RPL_MUTATION_OK)
+        return HPCLANG_RPL_MUTATION_IO;
+    uint32_t slot = plan.dstk;
+    for (uint32_t i = 0u; i < extra_count; ++i) {
+        slot -= 5u;
+        uint32_t root = extra_roots[i];
+        if (root >= plan.ttop && root < plan.rstk)
+            root += plan.delta;
+        if (write_word(io, slot, 5u, root) != HPCLANG_RPL_MUTATION_OK)
+            return HPCLANG_RPL_MUTATION_IO;
+    }
+    slot -= 5u;
+    if (write_word(io, slot, 5u, top + 1u) != HPCLANG_RPL_MUTATION_OK)
+        return HPCLANG_RPL_MUTATION_IO;
+    cursor = top;
+    while (cursor > bottom) {
+        uint32_t extent = 0u;
+        if (read_word(io, cursor - 5u, 5u, &extent) != HPCLANG_RPL_MUTATION_OK)
+            return HPCLANG_RPL_MUTATION_IO;
+        cursor -= extent;
+        slot -= 5u;
+        if (write_word(io, slot, 5u, cursor + 1u) != HPCLANG_RPL_MUTATION_OK)
+            return HPCLANG_RPL_MUTATION_IO;
+    }
+    if (write_word(io, RPL_DSKTOP, 5u, slot) != HPCLANG_RPL_MUTATION_OK ||
+        write_word(io, RPL_AVMEM, 5u, plan.avmem - plan.temp_cost - count) !=
+            HPCLANG_RPL_MUTATION_OK)
+        return HPCLANG_RPL_MUTATION_IO;
+    *pinned_cells = count;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_io *io,
                                               uint32_t start, uint32_t end,
                                               int32_t future_user_delta,

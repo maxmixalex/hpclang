@@ -54,6 +54,17 @@ extern "C"
         HPCLANG_RPL_MUTATION_EXISTS = -10
     };
 
+    /* Bootstrap-only: turn the native page interval into a rooted opaque
+     * TEMPOB block. Pin
+     * the compact pre-existing TEMP prefix as well, so Stock
+     * GC cannot move the block while
+     * ARM executes from it. Extra roots are
+     * pushed first, immediately below the incoming
+     * data stack. */
+    int hpclang_rpl_mutation_pin_arena(const struct hpclang_rpl_mutation_io *io, uint32_t first,
+                                       uint32_t end, const uint32_t *extra_roots,
+                                       uint32_t extra_count, uint32_t *pinned_cells);
+
     /*
      * Copy an owned ARM-side snapshot into a new Stock TEMPOB block and push its
      * pointer onto level 1. All expected logical failures are checked before the

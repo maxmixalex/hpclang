@@ -27,7 +27,7 @@
 #define HP39P_TRIPS 164
 #define HP39P_LAST_CPSR 168
 #define HP39P_EMULATOR_REGS 172
-#define HP39P_PRE_DSKTOP 204
+#define HP39P_PRE_STACK_SPAN 204
 #define HP39P_RESULT_OBJECT 208
 #define HP39P_RESULT_PROLOGUE 212
 #define HP39P_APP_RESULT_OBJ 216
@@ -50,12 +50,9 @@
 #define HP39P_REFERENCE_EVAL 8
 #define HP39P_VARIABLE_STORE 9
 
-/*
- * First M7.3f write witness: keep the owned object entirely inside the
- * bootstrap-private Saturn staging page while Stock executes the extended-ID
- * store protocol. Larger objects fail closed until mutation lifetime/accounting
- * is generalized beyond this bounded bridge.
- */
+/* The owned value must fit beside the generated request/return streams in the
+ * bootstrap-private staging page. Stock can relocate its own variable storage;
+ * it cannot relocate this reserved page or retain it as caller-owned input. */
 #define HP39P_VARIABLE_STORE_MAX_NIBBLES 7000u
 
 #ifndef __ASSEMBLER__
@@ -67,6 +64,7 @@
 struct hpclang_hp39_variable_store_request
 {
     uint32_t id_reference;
+    uint32_t type_predicate;
     uintptr_t object_data;
     uint32_t object_nibbles;
 };
@@ -95,7 +93,7 @@ struct hpclang_hp39_portal_context
     uint32_t trips;
     uint32_t last_cpsr;
     uint32_t emulator_regs[8];
-    uint32_t pre_dsktop;
+    uint32_t pre_stack_span;
     uint32_t result_object;
     uint32_t result_prologue;
     uintptr_t app_result_object;
@@ -105,6 +103,14 @@ struct hpclang_hp39_portal_context
     uint32_t request_name_length;
     uint32_t expected_prologue;
     uint8_t portal_stack[HP39P_STACK_SIZE];
+    uint32_t pinned_cells;
+    uint32_t incoming_stack_span;
+    uint32_t native_call[4];
+    uint32_t arena_first;
+    uint32_t arena_end;
+    uint32_t launcher_object;
+    uint32_t arena_object_end;
+    int32_t last_result; /* Private transport diagnostic; public calls use errno. */
 };
 
 _Static_assert(HPCLANG_HP39_PLATFORM_MAGIC == HPCLANG_HP39_PORTAL_MAGIC_VALUE,
@@ -121,8 +127,8 @@ _Static_assert(offsetof(struct hpclang_hp39_portal_context, app_regs) == HP39P_A
                "HP39 portal application registers");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, emulator_regs) == HP39P_EMULATOR_REGS,
                "HP39 portal emulator registers");
-_Static_assert(offsetof(struct hpclang_hp39_portal_context, pre_dsktop) == HP39P_PRE_DSKTOP,
-               "HP39 portal pre-DSKTOP");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, pre_stack_span) == HP39P_PRE_STACK_SPAN,
+               "HP39 portal pre-call stack extent");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, result_object) == HP39P_RESULT_OBJECT,
                "HP39 portal result object");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, result_prologue) ==
@@ -146,8 +152,8 @@ _Static_assert(offsetof(struct hpclang_hp39_portal_context, expected_prologue) =
                "HP39 portal expected prologue");
 _Static_assert(offsetof(struct hpclang_hp39_portal_context, portal_stack) == HP39P_STACK,
                "HP39 portal stack");
-_Static_assert(sizeof(struct hpclang_hp39_portal_context) == HP39P_STACK_END,
-               "HP39 portal context size");
+_Static_assert(offsetof(struct hpclang_hp39_portal_context, pinned_cells) == HP39P_STACK_END,
+               "HP39 portal stack extent");
 
 extern struct hpclang_hp39_portal_context hpclang_hp39_portal_context;
 int hpclang_hp39_portal_enter(void);

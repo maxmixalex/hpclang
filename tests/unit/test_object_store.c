@@ -309,6 +309,57 @@ static void test_unsupported_environments(void)
     assert(errno == ENOSYS);
 }
 
+static void test_public_mutation_modes(void)
+{
+    prepare_tree();
+    struct hpclang_object_store *home = hpclang_object_store_home();
+    struct hpclang_object_store *sub =
+        hpclang_object_store_open_child(home, (const uint8_t *)"SUB", 3u);
+    struct hpclang_object *character = NULL, *string = NULL, *snapshot = NULL;
+    assert(hpclang_object_store_get(home, (const uint8_t *)"A", 1u, &character) == 0);
+    assert(hpclang_object_store_get(sub, (const uint8_t *)"TXT", 3u, &string) == 0);
+    assert(hpclang_object_store_put(home, (const uint8_t *)"SUB", 3u, character,
+                                    HPCLANG_OBJECT_STORE_UPSERT) == -1 &&
+           errno == EISDIR);
+    assert(hpclang_object_store_remove(home, (const uint8_t *)"SUB", 3u) == -1 && errno == EISDIR);
+    hpclang_object_store_close(sub);
+    memset(memory, 0, sizeof(memory));
+    put_nibbles(USEROB, 0x92000u, 5u);
+    put_nibbles(CONTEXT, 0x92000u, 5u);
+    put_nibbles(0x92000u, DORRP, 5u);
+    put_nibbles(0x806eeu, 0x84000u, 5u);
+    put_nibbles(0x806f3u, 0x85000u, 5u);
+    put_nibbles(0x806f8u, 0x90000u, 5u);
+    put_nibbles(0x806fdu, 0x90005u, 5u);
+    put_nibbles(0x80e9bu, (0x90000u - 0x85000u) / 5u, 5u);
+    const uint8_t name[] = "VALUE";
+    assert(hpclang_object_store_put(home, name, 5u, character,
+                                    (enum hpclang_object_store_put_mode)3) == -1 &&
+           errno == EINVAL);
+    assert(hpclang_object_store_put(home, name, 5u, character, HPCLANG_OBJECT_STORE_REPLACE_ONLY) ==
+               -1 &&
+           errno == ENOENT);
+    assert(hpclang_object_store_put(home, name, 5u, character, HPCLANG_OBJECT_STORE_UPSERT) == 0);
+    assert(hpclang_object_store_put(home, name, 5u, string, HPCLANG_OBJECT_STORE_CREATE_ONLY) ==
+               -1 &&
+           errno == EEXIST);
+    assert(hpclang_object_store_put(home, name, 5u, string, HPCLANG_OBJECT_STORE_UPSERT) == 0);
+    assert(hpclang_object_store_get(home, name, 5u, &snapshot) == 0);
+    assert(hpclang_object_store_put(home, name, 5u, character, HPCLANG_OBJECT_STORE_REPLACE_ONLY) ==
+           0);
+    assert(hpclang_object_store_remove(home, name, 5u) == 0);
+    assert(hpclang_object_store_remove(home, name, 5u) == -1 && errno == ENOENT);
+    uint8_t bytes[2];
+    assert(hpclang_object_string_copy(snapshot, bytes, sizeof(bytes)) == 0 &&
+           memcmp(bytes, "OK", 2u) == 0);
+    assert(hpclang_object_store_put(home, name, 5u, string, HPCLANG_OBJECT_STORE_CREATE_ONLY) == 0);
+    assert(hpclang_object_store_remove(home, name, 5u) == 0);
+    hpclang_object_release(snapshot);
+    hpclang_object_release(string);
+    hpclang_object_release(character);
+    hpclang_object_store_close(home);
+}
+
 int main(void)
 {
     test_home_lookup_and_child();
@@ -316,5 +367,6 @@ int main(void)
     test_iterator_snapshots_metadata();
     test_hidden_directory_logical_handle();
     test_unsupported_environments();
+    test_public_mutation_modes();
     return 0;
 }

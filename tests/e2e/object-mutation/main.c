@@ -11,17 +11,9 @@
 #include <hpclang/object-store.h>
 #include <hpclang/target.h>
 
-int hpclang_object_store_replace_existing(const struct hpclang_object_store *store,
-                                          const uint8_t *name, uint32_t name_length,
-                                          const struct hpclang_object *object);
-int hpclang_object_store_create_new(const struct hpclang_object_store *store, const uint8_t *name,
-                                    uint32_t name_length, const struct hpclang_object *object);
-
-int hpclang_object_store_remove_existing(const struct hpclang_object_store *store,
-                                         const uint8_t *name, uint32_t name_length);
-
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_nested_mutation(void);
+uint32_t hpclang_e2e_hp39_mutation(void);
 
 #define HPCLANG_OBJECT_PHASE UINT32_C(0x4f530000)
 
@@ -89,6 +81,10 @@ static int same_entries(struct hpclang_object_store_iterator *before,
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot != NULL &&
+        (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
+         boot->model == HPCLANG_MODEL_HP40GS))
+        return finish(hpclang_e2e_hp39_mutation());
     if (boot == NULL || !supported_model(boot->model))
         return finish(0xe0u);
     if (boot->saturn_state == 0u)
@@ -166,7 +162,8 @@ int main(void)
      * after the shift; no raw Saturn address is retained across either write.
      */
     phase(15u);
-    if (hpclang_object_store_replace_existing(home, name, name_length, replacement) != 0) {
+    if (hpclang_object_store_put(home, name, name_length, replacement,
+                                 HPCLANG_OBJECT_STORE_UPSERT) != 0) {
         failure = 0xe7u;
         goto done;
     }
@@ -195,7 +192,8 @@ int main(void)
     after = NULL;
 
     phase(17u);
-    if (hpclang_object_store_replace_existing(home, name, name_length, before) != 0) {
+    if (hpclang_object_store_put(home, name, name_length, before,
+                                 HPCLANG_OBJECT_STORE_REPLACE_ONLY) != 0) {
         failure = 0xebu;
         goto done;
     }
@@ -232,16 +230,16 @@ int main(void)
     }
 
     phase(20u);
-    if (hpclang_object_store_create_new(home, create_name, (uint32_t)sizeof(create_name),
-                                        created_input) != 0) {
+    if (hpclang_object_store_put(home, create_name, (uint32_t)sizeof(create_name), created_input,
+                                 HPCLANG_OBJECT_STORE_UPSERT) != 0) {
         failure = 0xf0u;
         goto done;
     }
 
     phase(21u);
     errno = 0;
-    if (hpclang_object_store_create_new(home, create_name, sizeof(create_name), replacement) !=
-            -1 ||
+    if (hpclang_object_store_put(home, create_name, sizeof(create_name), replacement,
+                                 HPCLANG_OBJECT_STORE_CREATE_ONLY) != -1 ||
         errno != EEXIST) {
         failure = 0xf4u;
         goto done;
@@ -273,7 +271,7 @@ int main(void)
     }
 
     phase(23u);
-    if (hpclang_object_store_remove_existing(home, create_name, sizeof(create_name)) != 0) {
+    if (hpclang_object_store_remove(home, create_name, sizeof(create_name)) != 0) {
         failure = 0xf5u;
         goto done;
     }
@@ -284,7 +282,7 @@ int main(void)
         goto done;
     }
     errno = 0;
-    if (hpclang_object_store_remove_existing(home, create_name, sizeof(create_name)) != -1 ||
+    if (hpclang_object_store_remove(home, create_name, sizeof(create_name)) != -1 ||
         errno != ENOENT) {
         failure = 0xf7u;
         goto done;

@@ -386,58 +386,47 @@ static int mutation_prepare(const struct hpclang_object_store *store, const uint
     return 0;
 }
 
-/*
- * Private M7.3f bridges used by Stock E2E while the public put/remove contract
- * is still being completed. They expose no Saturn address and accept only an
- * owned snapshot. Each call re-resolves the logical store handle, so USEROB
- * movement cannot leave a stale directory address in the caller.
- */
-int hpclang_object_store_replace_existing(const struct hpclang_object_store *store,
-                                          const uint8_t *name, uint32_t name_length,
-                                          const struct hpclang_object *object)
+int hpclang_object_store_put(const struct hpclang_object_store *store, const uint8_t *name,
+                             uint32_t name_length, const struct hpclang_object *object,
+                             enum hpclang_object_store_put_mode mode)
 {
     if (object == NULL) {
         errno = EFAULT;
         return -1;
     }
-
-    uint32_t directory = 0u;
-    struct hpclang_rpl_mutation_io io;
-    struct hpclang_rpl_stock_memory memory;
-    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
-        return -1;
-
-    return set_mutation_errno(
-        hpclang_rpl_mutation_store_replace(&io, directory, name, name_length, object));
-}
-
-int hpclang_object_store_create_new(const struct hpclang_object_store *store, const uint8_t *name,
-                                    uint32_t name_length, const struct hpclang_object *object)
-{
-    if (object == NULL) {
-        errno = EFAULT;
+    if (mode != HPCLANG_OBJECT_STORE_UPSERT && mode != HPCLANG_OBJECT_STORE_CREATE_ONLY &&
+        mode != HPCLANG_OBJECT_STORE_REPLACE_ONLY) {
+        errno = EINVAL;
         return -1;
     }
-
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
     struct hpclang_rpl_stock_memory memory;
     if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
-
-    return set_mutation_errno(
-        hpclang_rpl_mutation_store_create(&io, directory, name, name_length, object));
+    if (hpclang_object_kind(object) == HPCLANG_OBJECT_DIRECTORY) {
+        errno = EISDIR;
+        return -1;
+    }
+    int result;
+    if (mode == HPCLANG_OBJECT_STORE_REPLACE_ONLY)
+        result = hpclang_rpl_mutation_store_replace(&io, directory, name, name_length, object);
+    else {
+        result = hpclang_rpl_mutation_store_create(&io, directory, name, name_length, object);
+        if (result == HPCLANG_RPL_MUTATION_EXISTS && mode == HPCLANG_OBJECT_STORE_UPSERT)
+            result = hpclang_rpl_mutation_store_replace(&io, directory, name, name_length, object);
+    }
+    return set_mutation_errno(result);
 }
 
-int hpclang_object_store_remove_existing(const struct hpclang_object_store *store,
-                                         const uint8_t *name, uint32_t name_length)
+int hpclang_object_store_remove(const struct hpclang_object_store *store, const uint8_t *name,
+                                uint32_t name_length)
 {
     uint32_t directory = 0u;
     struct hpclang_rpl_mutation_io io;
     struct hpclang_rpl_stock_memory memory;
     if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
-
     return set_mutation_errno(hpclang_rpl_mutation_store_remove(&io, directory, name, name_length));
 }
 

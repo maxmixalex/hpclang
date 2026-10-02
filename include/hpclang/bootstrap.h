@@ -15,6 +15,8 @@ extern "C"
 #define HPCLANG_L2_ENTRIES 256u
 #define HPCLANG_L2_BYTES (HPCLANG_L2_ENTRIES * sizeof(uint32_t))
 #define HPCLANG_L2_WORKSPACE_BYTES HPCLANG_PAGE_SIZE
+/* Two tables occupy the first half; the remaining bytes belong to the launcher. */
+#define HPCLANG_L2_TABLES_BYTES (2u * HPCLANG_L2_BYTES)
 
 #define HPCLANG_DATA_L2_FIRST 0u
 #define HPCLANG_CODE_L2_FIRST ((HPCLANG_CODE_BASE & 0x000fffffu) >> 12)
