@@ -188,6 +188,18 @@ Storage #22 (`35378151818`) is the M7.2b historical closure evidence for the ear
 
 The integrated M7.2 implementation goes further: the first byte-stream operation acquires the process-wide SD/FAT lease, and all stdio, metadata, capacity, namespace mutation, and owned directory iteration use hpclang's S3C2410 SDI + FatFs backend until runtime shutdown. The focused payload verifies missing-file semantics, create/truncate/append, seek/tell, metadata and FAT timestamps, capacity/free space, rename/mkdir/rmdir, UTF-8 long filenames, case-insensitive lookup with preserved stored case, simultaneous independent iterators, ordinary stdio while an iterator is live, and final reopen/read before the runtime unmounts/releases the controller and invokes Stock ResetSD.
 
+The M7.3f follow-up Storage run
+[36509415707](https://github.com/zyf722/hpclang/actions/runs/36509415707)
+passed the payload but crashed on HP49g+/HP50g during shutdown: Stock `ResetSD`
+reused the launcher's live `L1[0x90]` mapping. The private KOS bridge now preserves
+that descriptor across the call and publishes its restoration before returning
+to stage1. KOS returns through the caller LR, so the bridge supplies an explicit
+continuation before restoring the original ARM/Thumb caller. `ResetSD`, strict
+return checks and the Stock UI witness remain required. Local Stock and Direct
+hp4950 verification passes with this repair; formal CI acceptance is pending. Storage
+path filters include `runtime/libc/kos-call.S` so future bridge changes exercise
+this boundary.
+
 Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
 
 HP 39g+ participates in Direct, focused, and original-Stock family matrices through its data-driven `nor` profile. All six profiles currently select `stock_transport: usb`. See [Stock USB transport](stock-usb-transport.md) for migration evidence and the distinction between implemented defaults and repeated-run stability.

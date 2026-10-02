@@ -313,8 +313,14 @@ failed all three HP39 Stock models before keyboard progression; Object mutation
 reached payload PASS on HP48/49/50 but failed return. The follow-up separates
 stage1 file bytes from its zero-initialized memory extent, moves the classic-RPL
 stage0 return path into protected native storage, and registers launcher-held
-Saturn addresses as relocation roots. Formal acceptance of these changes is
-still pending. Local verification passed Stock Object mutation on HP48gII,
+Saturn addresses as relocation roots. At `bc80ac58`, canonical Runtime
+[36509415719](https://github.com/zyf722/hpclang/actions/runs/36509415719)
+and Object mutation
+[36509415723](https://github.com/zyf722/hpclang/actions/runs/36509415723)
+are fully green. Storage
+[36509415707](https://github.com/zyf722/hpclang/actions/runs/36509415707)
+still failed HP49g+/HP50g after payload PASS, during SD shutdown and return;
+that regression requires separate acceptance. Local verification passed Stock Object mutation on HP48gII,
 HP49g+ and HP50g with strict return checks, Runtime on all three HP39 Stock
 models and the HP39 Direct family, and all 32 host unit tests. The HP48 runner
 now starts from fresh emulator state and waits for the server-ready capture

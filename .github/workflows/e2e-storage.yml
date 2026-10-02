@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - "runtime/libc/storage.c"
+      - "runtime/libc/kos-call.S"
       - "runtime/libc/storage-namespace*"
       - "runtime/libc/s3c2410-sdio-*"
       - "runtime/libc/hp4950-fatfs-*"
@@ -52,6 +53,7 @@ on:
   pull_request:
     paths:
       - "runtime/libc/storage.c"
+      - "runtime/libc/kos-call.S"
       - "runtime/libc/storage-namespace*"
       - "runtime/libc/s3c2410-sdio-*"
       - "runtime/libc/hp4950-fatfs-*"
