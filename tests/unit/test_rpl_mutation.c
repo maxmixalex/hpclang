@@ -365,6 +365,68 @@ static void test_named_remove_oldest_preserves_reference(void)
     assert_char_at(preserved, 'B');
 }
 
+/* One nested directory, with both ARM-held and Stock stack references. */
+static void test_nested_mutation_preserves_context_and_references(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    const uint32_t home = pair.home;
+    const uint32_t child = home + 24u;
+    memmove(memory + child, memory + home, pair.object_a + 7u - home);
+    memset(memory + home, 0, 24u);
+    put_word(home, 5u, DORRP);
+    put_word(home + 8u, 5u, 10u);
+    put_word(home + 18u, 2u, 1u);
+    put_word(home + 20u, 2u, 'D');
+    put_word(home + 22u, 2u, 1u);
+    put_word(CONTEXT, 5u, child);
+    uint32_t retained = pair.object_b + 24u;
+    uint32_t *roots[] = {&retained};
+    io.native_roots = roots;
+    io.native_root_count = 1u;
+    put_word(get_word(DSKTOP, 5u), 5u, retained);
+    const struct hpclang_rpl_reader reader = {.read_nibble = read_nibble};
+    struct hpclang_rpl_directory_entry_view entry;
+    struct hpclang_object *value = make_string1('X');
+
+    assert(hpclang_rpl_mutation_store_remove(&io, child, (const uint8_t *)"B", 1u) ==
+           HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(retained, 'B');
+    assert(get_word(get_word(DSKTOP, 5u), 5u) == retained);
+
+    for (unsigned step = 0u; step < 3u; ++step) {
+        uint32_t current = get_word(CONTEXT, 5u);
+        uint8_t path[8];
+        uint32_t size = 0u, count = 0u;
+        assert(hpclang_rpl_directory_path_to(&reader, current, path, sizeof(path), &size, &count) ==
+               HPCLANG_RPL_STORE_OK);
+        assert(count == 1u && size == 2u && path[0] == 1u && path[1] == 'D');
+        assert(hpclang_rpl_directory_find(&reader, get_word(USEROB, 5u), (const uint8_t *)"D", 1u,
+                                          &entry) == HPCLANG_RPL_STORE_OK);
+        assert(entry.object_address == current);
+        assert(hpclang_rpl_directory_find(&reader, current, (const uint8_t *)"B", 1u, &entry) ==
+               HPCLANG_RPL_STORE_NOT_FOUND);
+        if (step == 0u)
+            assert(hpclang_rpl_mutation_store_replace(&io, current, (const uint8_t *)"A", 1u,
+                                                      value) == HPCLANG_RPL_MUTATION_OK);
+        else if (step == 1u)
+            assert(hpclang_rpl_mutation_store_create(&io, current, (const uint8_t *)"C", 1u,
+                                                     value) == HPCLANG_RPL_MUTATION_OK);
+        else
+            assert(hpclang_rpl_mutation_store_remove(&io, current, (const uint8_t *)"C", 1u) ==
+                   HPCLANG_RPL_MUTATION_OK);
+        assert_char_at(retained, 'B');
+        assert(get_word(get_word(DSKTOP, 5u), 5u) == retained);
+    }
+    assert(hpclang_rpl_directory_find(&reader, get_word(CONTEXT, 5u), (const uint8_t *)"C", 1u,
+                                      &entry) == HPCLANG_RPL_STORE_NOT_FOUND);
+    assert(hpclang_rpl_directory_find(&reader, get_word(CONTEXT, 5u), (const uint8_t *)"A", 1u,
+                                      &entry) == HPCLANG_RPL_STORE_OK);
+    assert(get_word(entry.object_address, 5u) == 0x02a2cu);
+    assert(get_word(entry.object_address + 10u, 2u) == 'X');
+    free(value);
+}
+
 static void test_named_remove_newest(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
@@ -766,6 +828,7 @@ int main(void)
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();
     test_named_remove_newest();
+    test_nested_mutation_preserves_context_and_references();
     test_named_remove_missing_is_non_mutating();
     test_named_size_changing_replace();
     test_named_size_change_preserves_reference();

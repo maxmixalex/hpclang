@@ -65,6 +65,26 @@ static int supported_model(uint32_t model)
            model == HPCLANG_MODEL_HP50G;
 }
 
+static int same_entries(struct hpclang_object_store_iterator *before,
+                        struct hpclang_object_store_iterator *after)
+{
+    struct hpclang_object_store_entry a = {.size = sizeof(a),
+                                           .version = HPCLANG_OBJECT_STORE_ENTRY_VERSION};
+    struct hpclang_object_store_entry b = {.size = sizeof(b),
+                                           .version = HPCLANG_OBJECT_STORE_ENTRY_VERSION};
+    for (;;) {
+        int left = hpclang_object_store_iterator_read(before, &a);
+        int right = hpclang_object_store_iterator_read(after, &b);
+        if (left < 0 || right < 0 || left != right)
+            return 0;
+        if (left == 0)
+            return 1;
+        if (a.name_length != b.name_length || a.kind != b.kind || a.flags != b.flags ||
+            memcmp(a.name, b.name, a.name_length) != 0)
+            return 0;
+    }
+}
+
 int main(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -85,6 +105,9 @@ int main(void)
 
     uint32_t failure = 0u;
     struct hpclang_object_store *home = NULL;
+    struct hpclang_object_store *current = NULL;
+    struct hpclang_object_store_iterator *entries_before = NULL;
+    struct hpclang_object_store_iterator *entries_after = NULL;
     struct hpclang_object *before = NULL;
     struct hpclang_object *replacement = NULL;
     struct hpclang_object *after = NULL;
@@ -98,6 +121,14 @@ int main(void)
         failure = 0xe2u;
         goto done;
     }
+
+    current = hpclang_object_store_current();
+    if (current == NULL || (entries_before = hpclang_object_store_iterator_open(current)) == NULL) {
+        failure = 0xfau;
+        goto done;
+    }
+    hpclang_object_store_close(current);
+    current = NULL;
 
     phase(2u);
     if (hpclang_object_store_get(home, name, name_length, &before) != 0 || before == NULL ||
@@ -207,6 +238,17 @@ int main(void)
     }
 
     phase(21u);
+    errno = 0;
+    if (hpclang_object_store_create_new(home, create_name, sizeof(create_name), replacement) !=
+            -1 ||
+        errno != EEXIST) {
+        failure = 0xf4u;
+        goto done;
+    }
+    hpclang_object_release(created_input);
+    created_input = NULL;
+
+    phase(22u);
     if (hpclang_object_store_get(home, create_name, (uint32_t)sizeof(create_name),
                                  &created_readback) != 0 ||
         created_readback == NULL ||
@@ -228,16 +270,6 @@ int main(void)
         failure = 0xf3u;
         goto done;
     }
-    phase(22u);
-    errno = 0;
-    if (hpclang_object_store_create_new(home, create_name, sizeof(create_name), created_input) !=
-            -1 ||
-        errno != EEXIST) {
-        failure = 0xf4u;
-        goto done;
-    }
-    hpclang_object_release(created_input);
-    created_input = NULL;
 
     phase(23u);
     if (hpclang_object_store_remove_existing(home, create_name, sizeof(create_name)) != 0) {
@@ -271,8 +303,17 @@ int main(void)
         goto done;
     }
     phase(25u);
+    current = hpclang_object_store_current();
+    if (current == NULL || (entries_after = hpclang_object_store_iterator_open(current)) == NULL ||
+        !same_entries(entries_before, entries_after)) {
+        failure = 0xfbu;
+        goto done;
+    }
 
 done:
+    hpclang_object_store_iterator_close(entries_after);
+    hpclang_object_store_iterator_close(entries_before);
+    hpclang_object_store_close(current);
     hpclang_object_release(created_readback);
     hpclang_object_release(created_input);
     hpclang_object_release(restored);

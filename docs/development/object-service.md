@@ -294,8 +294,19 @@ Current implementation and evidence have different scopes:
 - The Stock mutation payload grows and restores an existing string, then
   creates and deletes `ZZM7F`. It checks duplicate-create `EEXIST`, missing-get
   and repeated-remove `ENOENT`, retained owned readback after deletion, and
-  preservation of the original witness. Local HP48gII/HP49g+/HP50g runs pass
-  the new deletion witness and strict return/UI gates; formal CI is pending.
+  preservation of the original witness. Object mutation
+  [36975086116](https://github.com/zyf722/hpclang/actions/runs/36975086116)
+  accepts this deletion witness on `d040dbb2`; Core, Quality and Runtime on
+  that head also pass. The next witness releases the create input before
+  readback, rejects a duplicate carrying different bytes, and compares the
+  retained current-directory iterator with a fresh post-mutation snapshot.
+  These isolation checks pass locally on all three Stock models; formal
+  acceptance is pending.
+- Host mutation tests now exercise a nested `D` directory with a retained
+  Stock data-stack reference and an ARM-held root. Removal preserves the old
+  value through TEMPOB; subsequent replacement/create/remove keeps both
+  references valid and the current-directory path stable. This is host
+  evidence, not yet a nested-directory Stock witness.
 - HP39gs/40gs have a private same-size descriptor-store bridge, using an owned
   snapshot staged in the portal page. Historical Runtime #358 validated the
   bounded `NoteText` witness; general size-changing writes remain unproven.
@@ -357,6 +368,23 @@ Work proceeds in this order:
 5. Generalize HP39 variable writes only after descriptor, context and allocation
    lifetime are established. Then freeze the clean public put/remove contract
    and remove obsolete same-size/probe-only bridges where no longer needed.
+
+### Commit-failure audit (2026-10-02)
+
+`commit_userob_shift()` patches directory links, relocates references, moves
+memory, then updates stack/accounting words. Each callback can currently report
+failure after earlier writes succeeded. The range preflight tests readability;
+it is not a generic promise that arbitrary write callbacks cannot fail.
+Replacement/removal can additionally allocate a preserved TEMPOB value before
+replanning the directory shift. Existing rejection tests and passing Stock
+round trips therefore do not establish rollback for arbitrary late I/O faults.
+
+The production Saturn view writes directly through the same `Read[]` mapping
+used by reads; it does not perform external I/O. The next implementation step
+must make the stable mapping and writable RAM requirements explicit across the
+complete planned commit, or provide recovery where that guarantee cannot be
+made. Keep public put/remove private until that boundary has testable failure
+semantics. Do not add a blanket retry after a partially applied mutation.
 
 The focused mutation workflow is justified by its destructive object lifecycle
 and lack of keyboard interaction. It shares the normal build entry, Stock asset
