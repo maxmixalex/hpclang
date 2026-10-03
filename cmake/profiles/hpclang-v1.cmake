@@ -16,7 +16,9 @@ set(HPCLANG_RUNTIME_START
 set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/power.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/contrast.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display-surface.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/font.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/saturn-view.c"
@@ -35,9 +37,17 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-key-map.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-events.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/datetime.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rtc-decode.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rtc.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/timer-engine.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/timer.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound-engine.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sound.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time-math.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/time.c")
 set(HPCLANG_RUNTIME_EABI_SHIMS

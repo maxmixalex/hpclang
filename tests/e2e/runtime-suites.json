@@ -1,0 +1,4 @@
+[
+  {"mode": "runtime", "keyboard": true},
+  {"mode": "system-services", "keyboard": false}
+]

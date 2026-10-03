@@ -1,8 +1,12 @@
 #include <stdint.h>
+#include <errno.h>
 
 #include <hpclang/time.h>
+#include <hpclang/device.h>
 
 #include "time-math.h"
+#include "clock-internal.h"
+#include "datetime-internal.h"
 
 #define XTAL_HZ UINT64_C(12000000)
 #define USEC_PER_SEC UINT64_C(1000000)
@@ -21,19 +25,13 @@
 #define TCNTB0 REG16(0x0760000cu)
 #define TCNTO0 REG16(0x07600014u)
 
-#define RTC_SECOND REG8(0x07b00070u)
-#define RTC_MINUTE REG8(0x07b00074u)
-#define RTC_HOUR REG8(0x07b00078u)
-#define RTC_DATE REG8(0x07b0007cu)
-#define RTC_MONTH REG8(0x07b00084u)
-#define RTC_YEAR REG8(0x07b00088u)
-
 struct time_state
 {
     uint64_t origin_rtc;
     uint64_t freq_num;
     uint64_t freq_den;
     uint64_t last_us;
+    uint64_t base_us;
     uint32_t period;
     uint16_t origin_count;
     int ready;
@@ -51,78 +49,14 @@ static uint64_t gcd_u64(uint64_t a, uint64_t b)
     return a;
 }
 
-static int bcd(unsigned value)
-{
-    unsigned lo = value & 0x0fu;
-    unsigned hi = (value >> 4) & 0x0fu;
-    if (lo > 9u || hi > 9u)
-        return -1;
-    return (int)(hi * 10u + lo);
-}
-
-static int leap_year(unsigned year)
-{
-    return (year % 4u) == 0u;
-}
-
-static unsigned days_in_month(unsigned year, unsigned month)
-{
-    static const uint8_t days[] = {31u, 28u, 31u, 30u, 31u, 30u, 31u, 31u, 30u, 31u, 30u, 31u};
-
-    if (month == 2u && leap_year(year))
-        return 29u;
-    return days[month - 1u];
-}
-
-static int rtc_seconds_once(uint64_t *value)
-{
-    uint8_t sec_before = RTC_SECOND;
-    uint8_t year_raw = RTC_YEAR;
-    uint8_t month_raw = RTC_MONTH;
-    uint8_t date_raw = RTC_DATE;
-    uint8_t hour_raw = RTC_HOUR;
-    uint8_t minute_raw = RTC_MINUTE;
-    uint8_t sec_after = RTC_SECOND;
-
-    if (sec_before != sec_after)
-        return 0;
-
-    int year2 = bcd(year_raw);
-    int month = bcd(month_raw & 0x1fu);
-    int date = bcd(date_raw & 0x3fu);
-    int hour = bcd(hour_raw & 0x3fu);
-    int minute = bcd(minute_raw & 0x7fu);
-    int second = bcd(sec_before & 0x7fu);
-
-    if (year2 < 0 || month < 1 || month > 12 || date < 1 || hour < 0 || hour > 23 || minute < 0 ||
-        minute > 59 || second < 0 || second > 59)
-        return 0;
-
-    unsigned year = 2000u + (unsigned)year2;
-    unsigned dim = days_in_month(year, (unsigned)month);
-    if ((unsigned)date > dim)
-        return 0;
-
-    uint64_t days = 0u;
-    for (unsigned y = 2000u; y < year; ++y)
-        days += leap_year(y) ? 366u : 365u;
-
-    for (unsigned m = 1u; m < (unsigned)month; ++m)
-        days += days_in_month(year, m);
-
-    days += (unsigned)date - 1u;
-
-    *value =
-        days * UINT64_C(86400) + (uint64_t)hour * 3600u + (uint64_t)minute * 60u + (uint64_t)second;
-    return 1;
-}
-
 static int rtc_seconds(uint64_t *value)
 {
-    for (unsigned attempt = 0u; attempt < 8u; ++attempt)
-        if (rtc_seconds_once(value))
-            return 1;
-    return 0;
+    struct hpclang_datetime now;
+    int64_t seconds;
+    if (!hpclang_rtc_read(&now) || hpclang_datetime_to_seconds(&now, &seconds) < 0)
+        return 0;
+    *value = (uint64_t)seconds;
+    return 1;
 }
 
 static int sample(uint64_t *rtc, uint16_t *count)
@@ -148,7 +82,7 @@ static int sample(uint64_t *rtc, uint16_t *count)
     return 0;
 }
 
-static int timer_frequency(uint64_t *num, uint64_t *den)
+void hpclang_clock_pclk(uint64_t *num, uint64_t *den)
 {
     uint64_t numerator = XTAL_HZ;
     uint64_t denominator = 1u;
@@ -176,6 +110,15 @@ static int timer_frequency(uint64_t *num, uint64_t *den)
     if (clkdivn & (1u << 0))
         denominator *= 2u;
 
+    uint64_t g = gcd_u64(numerator, denominator);
+    *num = numerator / g;
+    *den = denominator / g;
+}
+
+static int timer_frequency(uint64_t *num, uint64_t *den)
+{
+    uint64_t numerator, denominator;
+    hpclang_clock_pclk(&numerator, &denominator);
     uint32_t prescaler = (TCFG0 & 0xffu) + 1u;
     uint32_t mux = TCFG1 & 0x0fu;
     if (mux > 3u)
@@ -194,6 +137,7 @@ void hpclang_time_init(void)
 {
     state.ready = 0;
     state.last_us = 0u;
+    state.base_us = 0u;
 
     /*
      * Timer0 must already be running in auto-reload mode. hpclang never
@@ -249,6 +193,9 @@ static int monotonic_now(uint64_t *value)
     uint64_t elapsed = hpclang_time_elapsed_us(rtc - state.origin_rtc, state.origin_count, count,
                                                state.period, state.freq_num, state.freq_den);
 
+    if (elapsed > UINT64_MAX - state.base_us)
+        return 0;
+    elapsed += state.base_us;
     if (elapsed > state.last_us)
         state.last_us = elapsed;
 
@@ -260,6 +207,19 @@ uint64_t hpclang_time_monotonic_us(void)
 {
     uint64_t value;
     return monotonic_now(&value) ? value : state.last_us;
+}
+
+int hpclang_time_read_us(uint64_t *microseconds)
+{
+    if (!microseconds) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!monotonic_now(microseconds)) {
+        errno = EIO;
+        return -1;
+    }
+    return 0;
 }
 
 void hpclang_delay_us(uint64_t microseconds)
@@ -278,4 +238,54 @@ void hpclang_delay_us(uint64_t microseconds)
         if (now - start >= microseconds)
             return;
     }
+}
+
+int hpclang_datetime_set(const struct hpclang_datetime *value)
+{
+    if (!hpclang_datetime_valid(value)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (value->year < 2000 || value->year > 2099) {
+        errno = ERANGE;
+        return -1;
+    }
+    if (hpclang_device_info()->family == HPCLANG_FAMILY_UNKNOWN) {
+        errno = ENOSYS;
+        return -1;
+    }
+    uint64_t before;
+    if (hpclang_time_read_us(&before) < 0)
+        return -1;
+    uint16_t count_before = TCNTO0;
+    if (hpclang_rtc_write(value) < 0)
+        return -1;
+    uint64_t rtc_after;
+    uint16_t count_after;
+    int sampled = sample(&rtc_after, &count_after);
+    if (!sampled) {
+        int64_t requested;
+        hpclang_datetime_to_seconds(value, &requested);
+        rtc_after = (uint64_t)requested;
+        count_after = TCNTO0;
+    }
+    /* The bounded register transaction is shorter than one Timer0 period.
+     * Count its elapsed ticks independently of the deliberately changed RTC. */
+    uint64_t elapsed = hpclang_time_elapsed_us(0, count_before, count_after, state.period,
+                                               state.freq_num, state.freq_den);
+    state.base_us = elapsed > UINT64_MAX - before ? UINT64_MAX : before + elapsed;
+    state.last_us = state.base_us;
+    state.origin_rtc = rtc_after;
+    state.origin_count = count_after;
+    if (!sampled) {
+        errno = EIO;
+        return -1;
+    }
+    int64_t requested;
+    hpclang_datetime_to_seconds(value, &requested);
+    if (rtc_after < (uint64_t)requested || rtc_after - (uint64_t)requested > 1) {
+        errno = EIO;
+        return -1;
+    }
+    return 0;
 }

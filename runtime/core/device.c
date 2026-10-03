@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
 
@@ -31,4 +32,36 @@ const struct hpclang_device_info *hpclang_device_info(void)
         return &unknown;
 
     return &devices[model];
+}
+
+int hpclang_device_capability(enum hpclang_capability capability)
+{
+    uint32_t family = hpclang_device_info()->family;
+    switch (capability) {
+    case HPCLANG_CAPABILITY_DISPLAY:
+    case HPCLANG_CAPABILITY_KEYBOARD:
+    case HPCLANG_CAPABILITY_MONOTONIC_TIME:
+    case HPCLANG_CAPABILITY_CIVIL_TIME_READ:
+    case HPCLANG_CAPABILITY_POLL_TIMERS:
+    case HPCLANG_CAPABILITY_SOUND:
+    case HPCLANG_CAPABILITY_USB_POWER_DETECT:
+    case HPCLANG_CAPABILITY_CIVIL_TIME_SET:
+    case HPCLANG_CAPABILITY_CONTRAST_READ:
+        return family != HPCLANG_FAMILY_UNKNOWN ? HPCLANG_CAPABILITY_SUPPORTED
+                                                : HPCLANG_CAPABILITY_UNSUPPORTED;
+    case HPCLANG_CAPABILITY_STREAM_STORAGE:
+        return family == HPCLANG_FAMILY_HP4950 ? HPCLANG_CAPABILITY_SUPPORTED
+                                               : HPCLANG_CAPABILITY_UNSUPPORTED;
+    case HPCLANG_CAPABILITY_RPL_STACK:
+    case HPCLANG_CAPABILITY_RPL_OBJECT_STORE: {
+        if (family != HPCLANG_FAMILY_HP48 && family != HPCLANG_FAMILY_HP4950)
+            return HPCLANG_CAPABILITY_UNSUPPORTED;
+        const struct hpclang_boot_info *boot = hpclang_boot_info();
+        return boot && boot->saturn_state ? HPCLANG_CAPABILITY_SUPPORTED
+                                          : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
+    }
+    default:
+        errno = EINVAL;
+        return -1;
+    }
 }

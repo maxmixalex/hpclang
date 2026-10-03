@@ -31,6 +31,38 @@ extern "C"
         uint32_t display_height;
     };
 
+    enum hpclang_capability
+    {
+        HPCLANG_CAPABILITY_DISPLAY = 1,
+        HPCLANG_CAPABILITY_KEYBOARD,
+        HPCLANG_CAPABILITY_MONOTONIC_TIME,
+        HPCLANG_CAPABILITY_CIVIL_TIME_READ,
+        HPCLANG_CAPABILITY_POLL_TIMERS,
+        HPCLANG_CAPABILITY_SOUND,
+        HPCLANG_CAPABILITY_STREAM_STORAGE,
+        HPCLANG_CAPABILITY_RPL_STACK,
+        HPCLANG_CAPABILITY_RPL_OBJECT_STORE,
+        HPCLANG_CAPABILITY_USB_POWER_DETECT,
+        HPCLANG_CAPABILITY_CIVIL_TIME_SET,
+        HPCLANG_CAPABILITY_CONTRAST_READ
+    };
+
+    enum hpclang_capability_state
+    {
+        HPCLANG_CAPABILITY_UNSUPPORTED = 0,
+        HPCLANG_CAPABILITY_SUPPORTED = 1,
+        HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE = 2
+    };
+
+    /* Discover implemented services for this model and launch context without
+     * accessing hardware or acquiring resources. SUPPORTED does not promise
+     * media presence, free memory, valid RTC contents or an idle sound timer.
+     * Service calls still report their own runtime errors. Unknown capability
+     * IDs return -1/EINVAL; otherwise return a hpclang_capability_state.
+     * This describes services, not compatibility-header/function availability.
+     */
+    int hpclang_device_capability(enum hpclang_capability capability);
+
     /*
      * Return an immutable process-lifetime descriptor for the active calculator.
      * Unknown model IDs return a valid descriptor with family/geometry set to 0.

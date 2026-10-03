@@ -16,6 +16,11 @@ extern "C"
      */
     uint64_t hpclang_time_monotonic_us(void);
 
+    /* Checked clock read: 0 on success, -1 with EINVAL for NULL or EIO when
+     * the clock cannot
+     * be sampled. Failure leaves the output unchanged. */
+    int hpclang_time_read_us(uint64_t *microseconds);
+
     /*
      * Busy-wait for at least the requested duration while the monotonic clock is
      * available. This does not yield the CPU and is deliberately named delay

@@ -159,6 +159,18 @@ int main(void)
     /* Invalid UTF-8 -> U+FFFD -> configured '?' fallback. */
     expect_pixel(surface, 1, 1, 255u);
 
+    hpclang_surface_clear(surface, 0u);
+    const char bounded[] = {'A', (char)0xce, (char)0xa9};
+    hpclang_surface_draw_text_n(surface, &test_font, 1, 1, bounded, 1, 255u);
+    expect_pixel(surface, 2, 1, 255u);
+    expect_pixel(surface, 7, 1, 0u);
+    hpclang_surface_clear(surface, 0u);
+    hpclang_surface_draw_text_n(surface, &test_font, 1, 1, bounded + 1, 1, 255u);
+    expect_pixel(surface, 1, 1, 255u); /* Truncated Omega uses replacement. */
+    hpclang_surface_clear(surface, 0u);
+    hpclang_surface_draw_text_n(surface, &test_font, 1, 1, bounded, 0, 255u);
+    expect_pixel(surface, 2, 1, 0u);
+
     hpclang_surface_destroy(surface);
     puts("PASS: native ROM fonts, packaged bitmap metrics, UTF-8 and fallback.");
     return EXIT_SUCCESS;

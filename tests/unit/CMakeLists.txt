@@ -17,6 +17,38 @@ endfunction()
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")
 target_link_libraries(test_softfloat PRIVATE m)
 
+hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
+target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(device test_device.c "${HPCLANG_ROOT}/runtime/core/device.c"
+    "${HPCLANG_ROOT}/runtime/core/contrast.c" "${HPCLANG_ROOT}/runtime/core/power.c")
+target_include_directories(test_device PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(datetime test_datetime.c
+    "${HPCLANG_ROOT}/runtime/core/datetime.c"
+    "${HPCLANG_ROOT}/runtime/core/rtc-decode.c")
+target_include_directories(test_datetime PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rtc_clock test_rtc_clock.c
+    "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/rtc-clock.c"
+    "${HPCLANG_ROOT}/runtime/core/datetime.c"
+    "${HPCLANG_ROOT}/runtime/core/rtc-decode.c")
+target_include_directories(test_rtc_clock PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(timer test_timer.c
+    "${HPCLANG_ROOT}/runtime/core/timer-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/timer.c")
+target_include_directories(test_timer PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(sound_api test_sound_api.c "${HPCLANG_ROOT}/runtime/core/sound.c")
+target_include_directories(test_sound_api PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(sound test_sound.c "${HPCLANG_ROOT}/runtime/core/sound-engine.c")
+target_include_directories(test_sound PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(time test_time.c "${HPCLANG_ROOT}/runtime/core/time-math.c")
 target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")
 

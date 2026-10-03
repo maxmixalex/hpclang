@@ -428,6 +428,150 @@ static void s3c2410_usbdev_write(
     )
 
 
+def patch_rtc_clock(root: Path) -> None:
+    """Model writable calculator civil time independently of host wall-clock reads."""
+    project = Path(__file__).resolve().parent.parent
+    support = project / "tests/e2e/harness/x50ng"
+    for name in ("rtc-clock.c", "rtc-clock.h"):
+        shutil.copyfile(support / name, root / "src" / name)
+    (root / "src/hpclang").mkdir(exist_ok=True)
+    shutil.copyfile(project / "include/hpclang/datetime.h", root / "src/hpclang/datetime.h")
+    for name in ("datetime.c", "datetime-internal.h", "rtc-decode.c"):
+        shutil.copyfile(project / "runtime/core" / name, root / "src" / name)
+    replace_once(
+        root / "Makefile",
+        "\tsrc/s3c2410/s3c2410_rtc.c \\\n",
+        "\tsrc/s3c2410/s3c2410_rtc.c \\\n\tsrc/rtc-clock.c \\\n\tsrc/datetime.c \\\n\tsrc/rtc-decode.c \\\n",
+        "RTC clock sources",
+    )
+    path = root / "src/s3c2410/s3c2410_rtc.c"
+    replace_once(
+        path,
+        '#include "../module.h"',
+        '#include "../module.h"\n#include "../rtc-clock.h"',
+        "RTC clock include",
+    )
+    replace_once(
+        path,
+        "    uint32_t rtccon;",
+        "    struct hpclang_rtc_clock clock;\n    uint32_t rtccon;",
+        "RTC clock state",
+    )
+    replace_once(
+        path,
+        "    memset( rtc, 0, sizeof( s3c2410_rtc_t ) );",
+        """    memset( rtc, 0, sizeof( s3c2410_rtc_t ) );
+    time_t initial_time = time( NULL );
+    struct tm initial = *localtime( &initial_time );
+    struct hpclang_datetime civil = {
+        initial.tm_year + 1900, initial.tm_mon + 1, initial.tm_mday,
+        initial.tm_hour, initial.tm_min, initial.tm_sec
+    };
+    hpclang_rtc_clock_init( &rtc->clock, &civil, timer_get_clock() );""",
+        "RTC clock initialization",
+    )
+    text = path.read_text()
+    start = text.index("    if ( S3C2410_RTC_BCDSEC <= offset")
+    end = text.index("\n#ifdef DEBUG_S3C2410_RTC", start)
+    text = (
+        text[:start]
+        + """    if ( S3C2410_RTC_BCDSEC <= offset && offset <= S3C2410_RTC_BCDYEAR ) {
+        uint8_t raw[7];
+        hpclang_rtc_clock_read( &rtc->clock, timer_get_clock(), raw );
+        *( reg->datap ) = raw[(offset - S3C2410_RTC_BCDSEC) / 4];
+    }
+"""
+        + text[end:]
+    )
+    path.write_text(text)
+    replace_once(
+        path,
+        "    switch ( offset ) {\n        case S3C2410_RTC_TICNT:",
+        """    if ( S3C2410_RTC_BCDSEC <= offset && offset <= S3C2410_RTC_BCDYEAR ) {
+        if ( rtc->rtccon & 1 ) {
+            hpclang_rtc_clock_write( &rtc->clock,
+                (offset - S3C2410_RTC_BCDSEC) / 4, data, timer_get_clock() );
+            *( reg->datap ) = data;
+        }
+        return;
+    }
+    switch ( offset ) {
+        case S3C2410_RTC_RTCCON:
+            hpclang_rtc_clock_stop( &rtc->clock, !!(data & 8), timer_get_clock() );
+            *( reg->datap ) = data;
+            break;
+        case S3C2410_RTC_TICNT:""",
+        "RTC calendar writes",
+    )
+    replace_once(
+        path,
+        "    tm = localtime( &tv.tv_sec );",
+        """    uint8_t calendar[7];
+    hpclang_rtc_clock_read( &rtc->clock, timer_get_clock(), calendar );
+    struct tm calendar_tm = {0};
+    calendar_tm.tm_sec = bcd2bin(calendar[0]);
+    calendar_tm.tm_min = bcd2bin(calendar[1]);
+    calendar_tm.tm_hour = bcd2bin(calendar[2]);
+    calendar_tm.tm_mday = bcd2bin(calendar[3]);
+    calendar_tm.tm_mon = bcd2bin(calendar[5]) - 1;
+    calendar_tm.tm_year = bcd2bin(calendar[6]) + 100;
+    tm = &calendar_tm;""",
+        "RTC alarm calendar",
+    )
+
+    replace_once(
+        path,
+        "    s3c2410_rtc_set_ticnt( rtc );\n    s3c2410_rtc_set_rtcalm( rtc );\n\n    return error;",
+        """    uint32_t version, seconds_lo, seconds_hi, anchor_lo, anchor_hi, valid;
+    if ( module_get_u32(module, key, "hpclang_clock_version", 0, &version) == 0 && version == 1 &&
+         module_get_u32(module, key, "hpclang_clock_seconds_lo", 0, &seconds_lo) == 0 &&
+         module_get_u32(module, key, "hpclang_clock_seconds_hi", 0, &seconds_hi) == 0 &&
+         module_get_u32(module, key, "hpclang_clock_anchor_lo", 0, &anchor_lo) == 0 &&
+         module_get_u32(module, key, "hpclang_clock_anchor_hi", 0, &anchor_hi) == 0 &&
+         module_get_u32(module, key, "hpclang_clock_valid", 0, &valid) == 0 ) {
+        rtc->clock.seconds = (int64_t)(((uint64_t)seconds_hi << 32) | seconds_lo);
+        rtc->clock.anchor_us = (int64_t)(((uint64_t)anchor_hi << 32) | anchor_lo);
+        rtc->clock.valid = !!valid;
+        rtc->clock.stopped = !!(rtc->rtccon & 8);
+        uint8_t raw[7] = {rtc->bcdsec, rtc->bcdmin, rtc->bcdhour, rtc->bcddate,
+                          rtc->bcdday, rtc->bcdmon, rtc->bcdyear};
+        memcpy(rtc->clock.raw, raw, sizeof(raw));
+        rtc->clock.weekday = raw[4];
+    }
+    s3c2410_rtc_set_ticnt( rtc );
+    s3c2410_rtc_set_rtcalm( rtc );
+
+    return error;""",
+        "RTC saved clock load",
+    )
+    replace_once(
+        path,
+        "static int s3c2410_rtc_save( hdw_module_t* module, GKeyFile* key )\n{\n    s3c2410_rtc_t* rtc = module->user_data;",
+        """static int s3c2410_rtc_save( hdw_module_t* module, GKeyFile* key )
+{
+    s3c2410_rtc_t* rtc = module->user_data;
+    uint8_t raw[7];
+    int64_t now_us = timer_get_clock();
+    hpclang_rtc_clock_read(&rtc->clock, now_us, raw);
+    hpclang_rtc_clock_write(&rtc->clock, 0, raw[0], now_us);
+    rtc->bcdsec = raw[0]; rtc->bcdmin = raw[1]; rtc->bcdhour = raw[2];
+    rtc->bcddate = raw[3]; rtc->bcdday = raw[4]; rtc->bcdmon = raw[5]; rtc->bcdyear = raw[6];
+    module_set_u32(module, key, "hpclang_clock_version", 1);
+    module_set_u32(module, key, "hpclang_clock_seconds_lo", (uint32_t)rtc->clock.seconds);
+    module_set_u32(module, key, "hpclang_clock_seconds_hi", (uint64_t)rtc->clock.seconds >> 32);
+    module_set_u32(module, key, "hpclang_clock_anchor_lo", (uint32_t)rtc->clock.anchor_us);
+    module_set_u32(module, key, "hpclang_clock_anchor_hi", (uint64_t)rtc->clock.anchor_us >> 32);
+    module_set_u32(module, key, "hpclang_clock_valid", rtc->clock.valid);""",
+        "RTC saved clock store",
+    )
+    replace_once(
+        path,
+        "    s3c2410_rtc_set_ticnt( rtc );\n\n    return 0;",
+        "    hpclang_rtc_clock_stop(&rtc->clock, !!(rtc->rtccon & 8), timer_get_clock());\n    s3c2410_rtc_set_ticnt( rtc );\n\n    return 0;",
+        "RTC reset divider state",
+    )
+
+
 def patch_host_uart0(root: Path) -> None:
     path = root / "src" / "s3c2410" / "s3c2410_uart.c"
 
@@ -647,6 +791,7 @@ def main() -> None:
     patch_runtime_sram(root)
     patch_host_usbdev(root, args)
     patch_host_uart0(root)
+    patch_rtc_clock(root)
     patch_reserved_ram(root)
     patch_optional_state_logging(root)
 

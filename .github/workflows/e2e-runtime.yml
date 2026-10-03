@@ -80,29 +80,44 @@ concurrency:
 
 jobs:
   build:
-    name: Build canonical runtime E2E
+    name: Build Runtime suite payloads
     runs-on: home-docker
+    outputs:
+      suites: ${{ steps.build.outputs.suites }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build canonical E2E payload and launchers
+      - name: Build suite payloads and launchers
+        id: build
+        shell: bash
         run: |
-          chmod +x tools/build-e2e.sh
-          tools/build-e2e.sh runtime "$GITHUB_WORKSPACE/build/e2e-runtime"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
 
-      - name: Upload canonical runtime build
+          suites = json.loads(Path("tests/e2e/runtime-suites.json").read_text())
+          for suite in suites:
+              subprocess.run(["bash", "tools/build-e2e.sh", suite["mode"],
+                              f"build/e2e/{suite['mode']}"], check=True)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("suites=" + json.dumps(suites) + "\n")
+          PY
+
+      - name: Upload suite builds
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-runtime-build
+          name: e2e-suite-builds
           retention-days: 1
           path: |
-            build/e2e-runtime/e2e.hpc
-            build/e2e-runtime/e2e.result-address
-            build/e2e-runtime/launchers/*.bin
-            build/e2e-runtime/launchers/*.hp
+            build/e2e/*/e2e.hpc
+            build/e2e/*/e2e.result-address
+            build/e2e/*/launchers/*.bin
+            build/e2e/*/launchers/*.hp
           if-no-files-found: error
 
   x50ng:
@@ -127,16 +142,16 @@ jobs:
           if-no-files-found: error
 
   stock-assets:
-    name: Prepare shared Stock assets
+    name: Prepare Stock suite assets
     needs: build
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download canonical runtime build
+      - name: Download suite builds
         uses: actions/download-artifact@v7
         with:
-          name: e2e-runtime-build
+          name: e2e-suite-builds
           path: build/e2e
 
       - name: Restore HPGCC39 asset cache
@@ -158,10 +173,21 @@ jobs:
             bash tools/install-ci-packages.sh innoextract
           fi
 
-      - name: Prepare shared Stock assets
-        run: bash tests/e2e/harness/prepare-stock-assets.sh build/e2e build/assets
+      - name: Prepare suite Stock assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
 
-      - name: Upload shared Stock assets
+          for suite in json.loads(Path("tests/e2e/runtime-suites.json").read_text()):
+              mode = suite["mode"]
+              subprocess.run(["bash", "tests/e2e/harness/prepare-stock-assets.sh",
+                              f"build/e2e/{mode}", f"build/assets/{mode}"], check=True)
+          PY
+
+      - name: Upload suite Stock assets
         uses: actions/upload-artifact@v7
         with:
           name: e2e-stock-assets
@@ -170,7 +196,7 @@ jobs:
           if-no-files-found: error
 
   direct:
-    name: Direct / ${{ matrix.family }}
+    name: Direct / ${{ matrix.suite.mode }} / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
     timeout-minutes: 15
@@ -178,18 +204,21 @@ jobs:
       fail-fast: false
       matrix:
         family: [hp39, hp48, hp4950]
+        suite: ${{ fromJSON(needs.build.outputs.suites) }}
     env:
       FAMILY: ${{ matrix.family }}
+      SUITE: ${{ matrix.suite.mode }}
+      HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           lfs: true
 
-      - name: Download canonical runtime build
+      - name: Download suite builds
         uses: actions/download-artifact@v7
         with:
-          name: e2e-runtime-build
+          name: e2e-suite-builds
           path: build/e2e
 
       - name: Download universal x50ng
@@ -207,9 +236,9 @@ jobs:
         run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
 
       - name: Execute Direct family
-        run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
+        run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" "build/e2e/$SUITE"
 
-      - name: Generate canonical LCD evidence
+      - name: Generate suite LCD evidence
         if: always()
         continue-on-error: true
         run: |
@@ -223,7 +252,7 @@ jobs:
               --image-only
             args=(tests/e2e/specs/runtime.json)
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/direct-$SUITE/$GITHUB_RUN_ID/$TARGET.png?raw=1")
             fi
             python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
@@ -232,7 +261,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-direct-runtime-e2e
+          name: ${{ matrix.family }}-direct-${{ matrix.suite.mode }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
@@ -240,11 +269,11 @@ jobs:
             build/*-e2e.json
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt
-            build/e2e/e2e.hpc
+            build/e2e/${{ matrix.suite.mode }}/e2e.hpc
           if-no-files-found: warn
 
   stock:
-    name: Stock / ${{ matrix.family }}
+    name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.family }}
     needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
@@ -252,18 +281,21 @@ jobs:
       fail-fast: false
       matrix:
         family: [hp39, hp48, hp4950]
+        suite: ${{ fromJSON(needs.build.outputs.suites) }}
     env:
       FAMILY: ${{ matrix.family }}
+      SUITE: ${{ matrix.suite.mode }}
+      HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           lfs: true
 
-      - name: Download canonical runtime build
+      - name: Download suite builds
         uses: actions/download-artifact@v7
         with:
-          name: e2e-runtime-build
+          name: e2e-suite-builds
           path: build/e2e
 
       - name: Download universal x50ng
@@ -277,7 +309,7 @@ jobs:
           mkdir -p build/x50ng
           tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
 
-      - name: Download shared Stock assets
+      - name: Download suite Stock assets
         uses: actions/download-artifact@v7
         with:
           name: e2e-stock-assets
@@ -287,9 +319,9 @@ jobs:
         run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
 
       - name: Execute Stock family
-        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
+        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$SUITE" "build/assets/$SUITE"
 
-      - name: Generate canonical LCD evidence
+      - name: Generate suite LCD evidence
         if: always()
         continue-on-error: true
         run: |
@@ -303,7 +335,7 @@ jobs:
               --image-only
             args=(tests/e2e/specs/runtime.json)
             if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-runtime/$GITHUB_RUN_ID/$TARGET.png?raw=1")
+              args+=(--image-url "https://github.com/$GITHUB_REPOSITORY/blob/ci-evidence/stock-$SUITE/$GITHUB_RUN_ID/$TARGET.png?raw=1")
             fi
             python3 tests/e2e/report.py "${args[@]}" >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
@@ -312,7 +344,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-stock-runtime-e2e
+          name: ${{ matrix.family }}-stock-${{ matrix.suite.mode }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
@@ -324,7 +356,7 @@ jobs:
             build/*-summary.png
             build/*-send/*
             build/stock-${{ matrix.family }}-targets.txt
-            build/e2e/e2e.hpc
+            build/e2e/${{ matrix.suite.mode }}/e2e.hpc
           if-no-files-found: warn
 
   publish-evidence:
@@ -344,39 +376,38 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          pattern: "*-direct-runtime-e2e"
+          pattern: "*-direct-*-e2e"
           path: build/publish/direct
 
       - name: Download Stock evidence artifacts
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          pattern: "*-stock-runtime-e2e"
+          pattern: "*-stock-*-e2e"
           path: build/publish/stock
 
-      - name: Stage Runtime ci-evidence tree
+      - name: Stage suite evidence
+        shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p build/publish/direct build/publish/stock
-          direct_out="build/ci-evidence/direct-runtime/$GITHUB_RUN_ID"
-          stock_out="build/ci-evidence/stock-runtime/$GITHUB_RUN_ID"
-          mkdir -p "$direct_out" "$stock_out"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
 
-          find build/publish/direct -type f -name '*-summary.png' -print0 \
-            | while IFS= read -r -d '' image; do
-                base="$(basename "$image")"
-                target="${base%-summary.png}"
-                cp "$image" "$direct_out/$target.png"
-              done
+          suites = json.loads(Path("tests/e2e/runtime-suites.json").read_text())
+          for tier in ("direct", "stock"):
+              for suite in suites:
+                  mode = suite["mode"]
+                  output = Path("build/ci-evidence") / f"{tier}-{mode}" / os.environ["GITHUB_RUN_ID"]
+                  output.mkdir(parents=True, exist_ok=True)
+                  for artifact in (Path("build/publish") / tier).glob(f"*-{tier}-{mode}-e2e"):
+                      for image in artifact.rglob("*-summary.png"):
+                          target = image.name.removesuffix("-summary.png")
+                          shutil.copyfile(image, output / f"{target}.png")
+          PY
 
-          find build/publish/stock -type f -name '*-summary.png' -print0 \
-            | while IFS= read -r -d '' image; do
-                base="$(basename "$image")"
-                target="${base%-summary.png}"
-                cp "$image" "$stock_out/$target.png"
-              done
-
-      - name: Publish Runtime ci-evidence in one commit
+      - name: Publish suite evidence in one commit
         continue-on-error: true
         run: |
           chmod +x tools/publish-ci-evidence.sh

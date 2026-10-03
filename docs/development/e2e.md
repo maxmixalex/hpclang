@@ -13,6 +13,18 @@ test merely to reuse its launch harness.
 The emulator workflows are split by what they prove, not by which historical
 emulator happens to execute them.
 
+The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run two
+payloads through the same Direct/Stock family harness: `runtime` (including the
+physical keyboard progression) and `system-services` (RTC read/set, deadline
+continuity, timers, sound, contrast, USB detection and bounded input). The latter
+has no keyboard-injection sequence. Keeping its code separate avoids exhausting
+HP48gII's heap with a monolithic payload. Each suite has distinct artifacts and
+published evidence paths; no service probe is skipped to make the large binary fit.
+
+The prepared emulator models a writable civil RTC initialized from the host's
+local calendar. Later register reads, alarms and saved-state restoration use its
+own clock state. Its calendar conversion sources are explicit x50ng cache inputs.
+
 ## Test tiers
 
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.

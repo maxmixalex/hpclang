@@ -31,6 +31,8 @@ The application-facing surface currently includes:
 - `<hpclang/target.h>`
 - `<hpclang/device.h>`
 - `<hpclang/time.h>` and `<hpclang/time.hpp>`
+- `<hpclang/datetime.h>`, `<hpclang/timer.h>`, `<hpclang/sound.h>` and `<hpclang/power.h>`
+- `<hpclang/input.h>` for bounded UTF-8 line editing
 - `<hpclang/keyboard.h>`
 - `<hpclang/display.h>` and `<hpclang/display.hpp>`
 - `<hpclang/font.h>`
@@ -50,15 +52,28 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `enum hpclang_model` | ✅ | Stable model IDs for HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, HP50g. |
 | `enum hpclang_family` | ✅ | `hp39`, `hp48`, `hp4950`; implementation grouping rather than an application ABI fork. |
 | `hpclang_device_info()` | ✅ | Model, family and visible LCD geometry. |
+| `hpclang_device_capability()` | 🧪 | Service support by model/launch context; distinguishes missing RPL context from unsupported hardware. Does not reserve resources or guarantee current media/hardware readiness. |
 
-## Time
+## Time and system services
 
 | API | Status | Contract |
 | --- | --- | --- |
 | `hpclang_time_monotonic_us()` | ✅ | Monotonic microseconds since runtime entry. The stock backend observes existing timer/RTC state. |
+| `hpclang_time_read_us()` | 🧪 | Checked monotonic read; reports an unavailable clock instead of returning the last sample. |
+| `hpclang_datetime_read()` | 🧪 | Calculator civil clock, RTC years 2000–2099; read-only and bounded retry. |
+| `hpclang_datetime_set()` | 🧪 | Set civil RTC years 2000–2099; preserves monotonic deadlines and RTC alarm configuration. |
+| `hpclang_datetime_to_seconds/from_seconds()` | 🧪 | Gregorian years 1–9999, seconds relative to civil 2000-01-01; no UTC/timezone assumption. |
+| `hpclang_datetime_weekday()` | 🧪 | Computed weekday, Sunday=0; does not trust the RTC weekday register. |
+| `hpclang_timer_start/poll/cancel()` | 🧪 | Caller-owned one-shot/periodic events; cooperative polling, missed-expiration counts, cancellation and overflow checks. |
+| `hpclang_sound_play()` | 🧪 | Blocking PWM tone with frequency/duration, cooperative cancellation and restoration of borrowed Timer2/GPIO/IRQ state. |
 | `hpclang_delay_us()` | ✅ | Explicit microsecond busy-wait; returns rather than deadlocking if the clock cannot be sampled. |
 | `hpclang::monotonic_time()` | ✅ | C++23 chrono wrapper returning `std::chrono::microseconds`. |
 | `hpclang::delay()` | ✅ | C++23 chrono duration wrapper. |
+| `hpclang_power_usb_present()` | 🧪 | USB voltage-detect input; does not infer battery percentage, enumeration or actual power-source selection. |
+| `hpclang_display_contrast_read()` | 🧪 | Stock contrast ordinal 0–15, queried without changing the setting. |
+
+These M7.4 services have local six-model Direct/Stock coverage; formal CI acceptance is pending.
+Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
 
 ## Keyboard
 
@@ -74,6 +89,21 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39g+/39gs/40gs, HP48gII, HP49g+, and HP50g. Model 1 passes the same strict 51-key Direct transition gate against its verified D1.55 full-NOR fixture rather than a sibling inference. |
 | `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. |
 | text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
+
+### Bounded application input
+
+`hpclang_text_input_init/edit/key()` provide allocation-free UTF-8 line editing in
+an explicitly sized caller buffer, Unicode-scalar cursor movement/deletion,
+capacity errors, accept and cancel. The key helper covers common numeric/editing
+keys; applications or future HPG adapters supply Alpha/Shift-plane text through
+explicit Unicode insertion. It does not introduce a global terminal or change
+stdin/stdout behavior. The application chooses rendering, event polling and
+whether to retain a cancelled working line.
+
+`hpclang_surface_draw_text_n()` renders bounded message/error text without requiring
+a terminator, exiting, waiting for a key or clearing the caller's surface.
+Both services have host tests and local six-model Direct/Stock ARM E2E coverage;
+formal CI acceptance is pending.
 
 ## Display and surfaces
 
@@ -256,13 +286,13 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
 | elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Monotonic microseconds + explicit delay; source adapter absent. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | ⬜ |
+| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | 🧪 Civil read/set/conversion and computed weekday; historical source adapters remain pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API unless a real generic policy use case appears. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Surface/display API; physical grayscale ownership pending. |
 | virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
 | physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ canonical API; specialized DMA resource support may justify a later low-level service. |
-| tone/beep | `sys_playTone*`, `kos_beep` | ⬜ |
+| tone/beep | `sys_playTone*`, `kos_beep` | 🧪 Clean PWM playback and cancellation; source adapters absent. |
 
 ## Files, stdio and storage
 

@@ -116,6 +116,12 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
+Current parallel-work note: the later capability review reopened the overall
+M7.3 scope beyond the accepted M7.3a–f subset. Its follow-up implementation is
+maintained on `m7-parity-audit`; M7.4 proceeds independently on
+`m74-system-services`. The historical closure statements below describe the
+earlier acceptance scope, not closure of the expanded M7.3 goals.
+
 **M7.1, M7.2 and M7.3 are complete. M7.3f public put/remove and native-variable get/set have passed final CI acceptance. M7.4 common system services is next.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
@@ -338,7 +344,8 @@ batch has passed its regression gates, closing M7.3.
 
 ### M7.4 — Common system services
 
-**Planned.**
+**Implementation and local validation complete; formal CI acceptance pending.**
+The unchecked acceptance items below remain open until that CI gate passes.
 
 Prioritize application capabilities that appear repeatedly in HPGCC programs and have a coherent stock-hosted implementation:
 
@@ -347,6 +354,22 @@ Prioritize application capabilities that appear repeatedly in HPGCC programs and
 - [ ] useful battery/power/contrast/status queries where semantics are stable across families;
 - [ ] capability discovery for services that are genuinely model-specific;
 - [ ] classify clock-rate control, raw interrupt/timer programming, cache/MMU manipulation and physical allocation as low-level Migration/Unsupported unless an ownership-safe application use case justifies a typed service.
+
+Additional M7.4 acceptance (preserving the expanded M7 requirements):
+
+- [ ] civil-time setting with forward/backward adjustment, valid date ranges and monotonic-deadline continuity;
+- [ ] cooperative one-shot/periodic expiration counts and cancellation;
+- [ ] bounded UTF-8 input, accept/cancel and bounded error/message presentation;
+- [ ] model/context capability discovery and deterministic unsupported/error results;
+- [ ] writable emulator RTC calendar, alarm-clock consistency and saved-state continuity;
+- [ ] six-model Direct/Stock regression with unchanged borrowed hardware state and settled return.
+
+Implementation: `datetime.h`, `timer.h`, `sound.h`, `power.h`, `input.h`, device
+capability queries, contrast reads and bounded font rendering. System-service
+probes use a separate `system-services` payload in the Runtime workflow matrix;
+this preserves sufficient heap for the HP48 Runtime/object probes.
+Physical audio output still requires a hardware witness; simulator results prove
+configuration/timing/restoration, not audible speaker behavior.
 
 ### M7.5 — Remaining display/runtime parity needs
 

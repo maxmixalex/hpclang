@@ -480,7 +480,7 @@ void hpclang_surface_draw_char(struct hpclang_surface *surface, const struct hpc
     hpclang_surface_draw_codepoint(surface, font, x, y, character, intensity);
 }
 
-static uint32_t utf8_next(const char **cursor)
+static uint32_t utf8_next(const char **cursor, const char *end)
 {
     const uint8_t *s = (const uint8_t *)*cursor;
     uint32_t c = *s++;
@@ -511,7 +511,7 @@ static uint32_t utf8_next(const char **cursor)
 
     const uint8_t *p = s;
     for (unsigned i = 0u; i < continuation; ++i) {
-        if ((p[i] & 0xc0u) != 0x80u) {
+        if ((end && (size_t)(end - (const char *)p) <= i) || (p[i] & 0xc0u) != 0x80u) {
             *cursor = (const char *)s;
             return 0xfffdu;
         }
@@ -527,23 +527,43 @@ static uint32_t utf8_next(const char **cursor)
     return value;
 }
 
-void hpclang_surface_draw_utf8(struct hpclang_surface *surface, const struct hpclang_font *font,
-                               int32_t x, int32_t y, const char *text, uint8_t intensity)
+static void draw_text(struct hpclang_surface *surface, const struct hpclang_font *font, int32_t x,
+                      int32_t y, const char *text, const char *end, uint8_t intensity)
 {
     if (surface == NULL || font == NULL || text == NULL)
         return;
 
     int32_t origin_x = x;
-    while (*text != '\0') {
-        uint32_t codepoint = utf8_next(&text);
+    while ((!end || text < end) && *text != '\0') {
+        uint32_t codepoint = utf8_next(&text, end);
         if (codepoint == (uint32_t)'\n') {
             x = origin_x;
-            y += (int32_t)hpclang_font_height(font);
+            uint32_t height = hpclang_font_height(font);
+            if ((int64_t)y + height > INT32_MAX)
+                return;
+            y = (int32_t)((int64_t)y + height);
             continue;
         }
         hpclang_surface_draw_codepoint(surface, font, x, y, codepoint, intensity);
-        x += (int32_t)hpclang_font_codepoint_advance(font, codepoint);
+        uint32_t advance = hpclang_font_codepoint_advance(font, codepoint);
+        if ((int64_t)x + advance > INT32_MAX)
+            return;
+        x = (int32_t)((int64_t)x + advance);
     }
+}
+
+void hpclang_surface_draw_utf8(struct hpclang_surface *surface, const struct hpclang_font *font,
+                               int32_t x, int32_t y, const char *text, uint8_t intensity)
+{
+    draw_text(surface, font, x, y, text, NULL, intensity);
+}
+
+void hpclang_surface_draw_text_n(struct hpclang_surface *surface, const struct hpclang_font *font,
+                                 int32_t x, int32_t y, const char *text, size_t byte_count,
+                                 uint8_t intensity)
+{
+    if (text)
+        draw_text(surface, font, x, y, text, text + byte_count, intensity);
 }
 
 void hpclang_surface_draw_text(struct hpclang_surface *surface, const struct hpclang_font *font,

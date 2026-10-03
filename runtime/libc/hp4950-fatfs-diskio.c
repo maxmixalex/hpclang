@@ -1,25 +1,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../core/datetime-internal.h"
+
 #include "../../third_party/fatfs/ff.h"
 #include "../../third_party/fatfs/diskio.h"
 #include "hp4950-fatfs-diskio.h"
 #include "s3c2410-sdio-card.h"
 
-#define REG8(address) (*(volatile uint8_t *)(uintptr_t)(address))
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 #define MPLLCON REG32(UINT32_C(0x07200004))
 #define CLKCON REG32(UINT32_C(0x0720000c))
 #define CLKSLOW REG32(UINT32_C(0x07200010))
 #define CLKDIVN REG32(UINT32_C(0x07200014))
-
-#define RTC_SECOND REG8(UINT32_C(0x07b00070))
-#define RTC_MINUTE REG8(UINT32_C(0x07b00074))
-#define RTC_HOUR REG8(UINT32_C(0x07b00078))
-#define RTC_DATE REG8(UINT32_C(0x07b0007c))
-#define RTC_MONTH REG8(UINT32_C(0x07b00084))
-#define RTC_YEAR REG8(UINT32_C(0x07b00088))
 
 #define SDI_BASE UINT32_C(0x07e00000)
 #define CLKCON_SDI (UINT32_C(1) << 9)
@@ -210,43 +204,13 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
     }
 }
 
-static int bcd_value(uint8_t raw)
-{
-    unsigned lo = raw & 0x0fu;
-    unsigned hi = (raw >> 4) & 0x0fu;
-    if (lo > 9u || hi > 9u)
-        return -1;
-    return (int)(hi * 10u + lo);
-}
-
 DWORD get_fattime(void)
 {
-    for (unsigned attempt = 0u; attempt < 8u; ++attempt) {
-        uint8_t before = RTC_SECOND;
-        uint8_t year_raw = RTC_YEAR;
-        uint8_t month_raw = RTC_MONTH;
-        uint8_t day_raw = RTC_DATE;
-        uint8_t hour_raw = RTC_HOUR;
-        uint8_t minute_raw = RTC_MINUTE;
-        uint8_t after = RTC_SECOND;
-
-        if (before != after)
-            continue;
-
-        int year = bcd_value(year_raw);
-        int month = bcd_value(month_raw & 0x1fu);
-        int day = bcd_value(day_raw & 0x3fu);
-        int hour = bcd_value(hour_raw & 0x3fu);
-        int minute = bcd_value(minute_raw & 0x7fu);
-        int second = bcd_value(before & 0x7fu);
-
-        if (year < 0 || month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 ||
-            minute < 0 || minute > 59 || second < 0 || second > 59)
-            break;
-
-        unsigned full_year = 2000u + (unsigned)year;
-        return ((DWORD)(full_year - 1980u) << 25) | ((DWORD)month << 21) | ((DWORD)day << 16) |
-               ((DWORD)hour << 11) | ((DWORD)minute << 5) | ((DWORD)second >> 1);
+    struct hpclang_datetime now;
+    if (hpclang_rtc_read(&now)) {
+        return ((DWORD)(now.year - 1980u) << 25) | ((DWORD)now.month << 21) |
+               ((DWORD)now.day << 16) | ((DWORD)now.hour << 11) | ((DWORD)now.minute << 5) |
+               ((DWORD)now.second >> 1);
     }
 
     /*

@@ -110,6 +110,11 @@ extern "C"
     void hpclang_surface_fill_rect(struct hpclang_surface *surface, int32_t x, int32_t y,
                                    int32_t width, int32_t height, uint8_t intensity);
 
+    /* Read Stock's contrast setting (0..15) without changing it. Returns 0,
+     * or -1 with EINVAL (NULL), ENOSYS (unknown model), EIO (invalid result).
+     * The setting is an ordinal level, not a measured LCD luminance. */
+    int hpclang_display_contrast_read(unsigned *level);
+
 #ifdef __cplusplus
 }
 #endif

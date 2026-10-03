@@ -167,7 +167,42 @@ Compatibility decision is split by responsibility:
 - LCD mode/controller: **Migration**, except safe behavior exposed by display services;
 - interrupts/MMU/physical allocation: **Unsupported as routine application API** or internal/unsafe;
 - standard libc: **Direct through picolibc**, not duplicate hpclang wrappers;
-- tone/beep: future service if justified.
+- tone/beep: clean PWM playback passes local validation; formal CI is pending.
+
+The M7.4 development branch adds civil-time reading/conversion and cooperative
+one-shot/periodic timers. The historical RTC implementations read separate BCD
+registers without a coherent-snapshot check; 1.1/2.0/3 also mark the hardware
+weekday field as unreliable. The clean datetime API validates a stable sample,
+computes weekdays from the Gregorian date and leaves timezone policy to the
+application. Its conversion range is 1–9999; the physical RTC is 2000–2099.
+Clock setting is implemented with monotonic-clock rebasing: forward/backward
+adjustments preserve existing deadlines. RTC control/alarm configuration is
+retained; alarms observe the newly selected civil time.
+
+HPGCC3 timed events invoke callbacks from timer interrupts. The clean timer API
+reports expiration counts when the application polls, preserving the periodic
+schedule after a late poll. Applications dispatch their work in their own event
+loop. This provides deadline and periodic notification without installing IRQ
+handlers; it does not claim historical interrupt-callback compatibility.
+
+The clean `hpclang_sound_play()` service uses Timer2 PWM instead of historical
+whole-port GPIO bit-banging. It preserves the shared prescaler and restores the
+borrowed timer, pin function and interrupt mask. Busy Timer2/DMA ownership is
+reported as `EBUSY`; cancellation runs on the application stack, and nested
+playback is rejected. Tests observe PWM configuration, elapsed duration,
+cancellation and restoration. Emulator success does not establish audible
+frequency or speaker volume on physical hardware.
+
+Stock contrast queries use the historical KOS getter on all six validated models.
+USB voltage detection is read-only and deliberately does not claim battery
+percentage or power-source selection. Capability discovery distinguishes model
+support from a missing RPL launch context; resource/media errors remain the
+responsibility of the individual service call.
+
+Bounded UTF-8 editing and length-bounded message rendering provide the clean
+primitives for historical line-input/error helpers. Buffer ownership, cancellation
+and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
+`readint`/`readline` spelling and global stdio routing remain adapter/UI work.
 
 ## File I/O and standard C I/O
 

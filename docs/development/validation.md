@@ -372,3 +372,36 @@ The corrected [Object mutation run](https://github.com/zyf722/hpclang/actions/ru
 on `8348c142` is fully green across all six Stock models. Together with the
 unchanged implementation gates on `3ddbab3a`, this completes formal acceptance
 and closes **M7.3f and M7.3**.
+
+
+### M7.4 system services — local validation
+
+The `m74-system-services` batch implements civil RTC read/set/conversion,
+cooperative timers, cancellable tones, model/context capabilities, USB voltage
+presence, contrast reads, bounded UTF-8 editing and bounded text rendering.
+Formal CI acceptance is pending; this does not close the expanded M7.3 scope.
+
+Local checks on 2026-10-03 use the pinned toolchain and repository harness:
+
+| Gate | Result |
+| --- | --- |
+| Host units | All 41 pass, including the full Gregorian conversion range, invalid RTC samples, timer overflow, sound cleanup and bounded UTF-8 operations |
+| Quality | Formatter, lint and Clang analysis pass for host units and all four ARM payload projects; modified workflows pass actionlint |
+| System services | All six Direct and all six Stock models pass; forward/backward date changes preserve an existing timer deadline, tone cancellation restores borrowed registers, and Stock returns settle |
+| Emulator | A fresh pinned x50ng checkout prepares and builds with the writable RTC; host tests cover leap/year boundaries, reset freeze/resume and invalid-register repair |
+| Documentation | Zensical build passes |
+
+The System services payload is separate from Runtime in one shared workflow
+matrix. Combining them exhausted HP48's small application heap during the
+existing object-directory probe. The split keeps that probe and the complete
+52-frame Runtime keyboard sequence intact. After the split, Stock Runtime passes
+HP48 and all three HP39 models, including every keyboard frame. The earlier
+combined payload also passed all six Direct models and HP49g+/50g Stock.
+
+One HP48 System services Stock attempt remained on the Stock desktop before
+payload entry and timed out. An unchanged isolated rerun passed. The initiating
+cause is unresolved; the retry is not evidence of a transport fix.
+
+Emulator tests establish register activity, timing and restoration, not audible
+speaker output on physical hardware. USB detection means voltage presence;
+battery percentage and actual power-source selection are not inferred.

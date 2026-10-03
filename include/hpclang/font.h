@@ -2,6 +2,7 @@
 #define HPCLANG_FONT_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /*
  * Mark a compile-time UI string for STATIC_AUTO font repertoire collection.
@@ -75,6 +76,14 @@ extern "C"
      * hpclang_surface_draw_utf8(). */
     void hpclang_surface_draw_text(struct hpclang_surface *surface, const struct hpclang_font *font,
                                    int32_t x, int32_t y, const char *text, uint8_t intensity);
+
+    /* Bounded message/error text: at most byte_count bytes are read. No NUL
+     * terminator is required; an embedded NUL ends the message. Truncated or
+     * invalid UTF-8 follows draw_text's replacement policy. Does not exit,
+     * wait for keys, change errno, or clear the application's surface. */
+    void hpclang_surface_draw_text_n(struct hpclang_surface *surface,
+                                     const struct hpclang_font *font, int32_t x, int32_t y,
+                                     const char *text, size_t byte_count, uint8_t intensity);
 
 #ifdef __cplusplus
 }
