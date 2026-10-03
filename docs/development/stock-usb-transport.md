@@ -49,6 +49,17 @@ secondary transport paths, not an unfinished USB feature or a prerequisite
 for integration. The formal acceptance links are kept in
 [Validation](validation.md).
 
+## HP39 Kermit turnaround
+
+The HP39-family server uses C-Kermit's `SET SEND PAUSE 10` to leave 10 ms
+before each reply. Stock can still be completing its send/receive transition
+when the host has already parsed the request checksum. Immediate replies can
+reach the guest USB FIFO yet fail to advance the Stock Kermit exchange,
+causing repeated directory requests and an eventual lazy-fetch timeout before
+the payload is installed. The pacing applies to the shared HP39 server on
+both USB and UART; it does not alter the USB controller or the UI sequences.
+See [C-Kermit's packet-pacing command](https://www.kermitproject.org/ck10commandref.html).
+
 ## HP49g+/50g failure diagnosis
 
 A later main regression exposed a third assumption: a timed MODE/NEG/F6
