@@ -213,11 +213,15 @@ static void key_cb(void *arg)
  * retry key-downs are discarded while ordinary sequence input remains valid.
  * Always allow key-up so a retry pressed just before the transition is released.
  */
+static void fail(struct state *s, const char *why);
+
 struct sequence_key_event
 {
     struct state *state;
     const struct key_action *action;
     int launch_retry;
+    int delivered;
+    int64_t deadline;
 };
 
 static int64_t sequence_key_cb(void *arg)
@@ -226,8 +230,28 @@ static int64_t sequence_key_cb(void *arg)
     const struct key_action *action = event->action;
     struct state *s = event->state;
 
-    if (!action->down || !event->launch_retry || !s->payload_started)
+    if (event->launch_retry && s->payload_started) {
+        if (!action->down)
+            key_cb((void *)action);
+        free(event);
+        return 0;
+    }
+    if (!event->delivered) {
         key_cb((void *)action);
+        event->delivered = 1;
+        event->deadline = timer_get_clock() + 15000000LL;
+    }
+    /* Wall-clock delay alone does not prove that a loaded emulator let Stock
+     * scan this edge. Keep it in place until a real GPIO read observes it.
+     * Payload keyboard tests have their own stronger KACK protocol. */
+    if (!emulator_key_observed(action->key)) {
+        if (timer_get_clock() < event->deadline)
+            return 10000LL;
+        fprintf(stderr, "Stock key not sampled: key=%d down=%d\n", action->key, action->down);
+        free(event);
+        fail(s, "input-not-sampled");
+        return -1;
+    }
     free(event);
     return 0;
 }

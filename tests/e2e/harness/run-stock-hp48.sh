@@ -128,6 +128,7 @@ done
 # Store extras first: Stock's newest-first menu must keep HPCLANG and L275 on F1/F2.
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
+    --remote-host "-95 CF -95 FC?" \
     "${EXTRA_SEND[@]}" ZZE2E.HP=ZZE2E L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"

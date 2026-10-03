@@ -133,3 +133,21 @@ the canonical USB install/launch sequence. Its timestamps use the same clock
 reset by the host-transfer gate. Font Gallery supplies face captures and exit
 keys through this suffix; it does not duplicate connection, mode selection,
 library installation or launch steps. Runtime leaves the suffix unset.
+
+
+## Stock input delivery
+
+Scripted Stock key transitions wait for a guest GPIO read that observes the
+injected state before advancing. Matrix keys require the relevant row/column
+to be selected; ON and modifiers use their dedicated GPIO inputs. A wall-clock
+key duration alone is insufficient when emulator execution is delayed.
+The existing key hold/gap durations still apply after observation. A missing
+sample fails as `input-not-sampled` after a bounded wait rather than continuing
+an unobserved sequence. This proves input delivery, not menu acceptance;
+transfer completion, payload results and settled return remain separate gates.
+
+HP48 and HP49/50 installation selects RPN with Stock Kermit's `-95 CF -95 FC?`
+command before releasing the host gate. It does not depend on toggling MODE in
+the boot-time UI. HP48 Gallery uses the same command on its serial transport. The HP48 USB
+sequence explicitly visits Transfer configuration before Start Server, matching
+the menu state established by the serial sequence.

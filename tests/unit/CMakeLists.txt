@@ -244,3 +244,6 @@ target_include_directories(test_hp39_portal_stack PRIVATE "${HPCLANG_ROOT}/platf
 hpclang_unit(hp39_aplet_frame test_hp39_aplet_frame.c
     "${HPCLANG_ROOT}/runtime/core/hp39-aplet-frame.c")
 target_include_directories(test_hp39_aplet_frame PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(key_sample test_key_sample.c)
+target_include_directories(test_key_sample PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

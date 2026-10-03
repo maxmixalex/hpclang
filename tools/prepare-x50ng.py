@@ -603,6 +603,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "event-queue.h",
         "timed-sequence.h",
         "ready-window.h",
+        "key-sample.h",
     ):
         shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 
@@ -631,6 +632,78 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     makefile.write_text("".join(lines))
 
 
+def patch_key_observation(root: Path) -> None:
+    """Expose actual guest GPIO sampling to the Stock input sequencer."""
+    api = root / "src/emulator_api.c"
+    replace_once(
+        api,
+        '#include "emulator_api.h"',
+        '#include "emulator_api.h"\n#include "key-sample.h"',
+        "key sampling helper",
+    )
+    replace_once(
+        api,
+        "static void set_key( int hpkey, bool state )",
+        """static unsigned key_observed[sizeof(x50ng_keyboard) / sizeof(x50ng_keyboard[0])];
+
+unsigned emulator_key_observed(int key) { return key_observed[key]; }
+
+void emulator_observe_keys(int port, uint32_t config, uint32_t value)
+{
+    for (unsigned i = 0; i < sizeof(x50ng_keyboard) / sizeof(x50ng_keyboard[0]); ++i) {
+        hp50g_key_t key = x50ng_keyboard[i];
+        if (hpclang_key_sampled(port, config, value, key.column, key.row, key.eint, key.pressed))
+            ++key_observed[i];
+    }
+}
+
+static void set_key( int hpkey, bool state )""",
+        "guest key observation",
+    )
+    replace_once(
+        api,
+        "    set_key_state( x50ng_keyboard[ hpkey ], state );",
+        "    key_observed[hpkey] = 0;\n    set_key_state( x50ng_keyboard[ hpkey ], state );",
+        "key observation reset",
+    )
+    header = root / "src/emulator_api.h"
+    replace_once(
+        header,
+        "extern void press_key( int hpkey );",
+        "extern unsigned emulator_key_observed(int key);\n"
+        "extern void emulator_observe_keys(int port, uint32_t config, uint32_t value);\n"
+        "extern void press_key( int hpkey );",
+        "key observation API",
+    )
+    gpio = root / "src/s3c2410/s3c2410_io_port.c"
+    replace_once(
+        gpio,
+        '#include "../module.h"',
+        '#include "../module.h"\n#include "../emulator_api.h"',
+        "GPIO key observer include",
+    )
+    replace_once(
+        gpio,
+        """        case S3C2410_IO_PORT_GPGDAT:
+            return s3c2410_scan_keys( io->hdw_state, io->gpgcon, io->gpgdat );""",
+        """        case S3C2410_IO_PORT_GPGDAT: {
+            uint32_t value = s3c2410_scan_keys(io->hdw_state, io->gpgcon, io->gpgdat);
+            emulator_observe_keys(1, io->gpgcon, value);
+            return value;
+        }""",
+        "guest matrix read observation",
+    )
+    replace_once(
+        gpio,
+        """        case S3C2410_IO_PORT_GPFDAT:
+            if""",
+        """        case S3C2410_IO_PORT_GPFDAT:
+            emulator_observe_keys(0, io->gpfcon, io->gpfdat);
+            if""",
+        "guest dedicated key read observation",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -651,6 +724,7 @@ def main() -> None:
     patch_host_uart0(root)
     patch_reserved_ram(root)
     patch_optional_state_logging(root)
+    patch_key_observation(root)
 
 
 if __name__ == "__main__":
