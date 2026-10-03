@@ -748,6 +748,9 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "timed-sequence.h",
         "ready-window.h",
         "key-sample.h",
+        "key-sequence.h",
+        "key-delivery.h",
+        "lcd-stability.h",
     ):
         shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 
@@ -792,6 +795,12 @@ def patch_key_observation(root: Path) -> None:
 
 unsigned emulator_key_observed(int key) { return key_observed[key]; }
 
+int emulator_key_ready(int key)
+{
+    hp50g_key_t k = x50ng_keyboard[key];
+    return s3c2410_io_port_key_ready(__hdw_state, k.column, k.row, k.eint);
+}
+
 void emulator_observe_keys(int port, uint32_t config, uint32_t value)
 {
     for (unsigned i = 0; i < sizeof(x50ng_keyboard) / sizeof(x50ng_keyboard[0]); ++i) {
@@ -814,16 +823,34 @@ static void set_key( int hpkey, bool state )""",
     replace_once(
         header,
         "extern void press_key( int hpkey );",
+        "extern int emulator_key_ready(int key);\n"
         "extern unsigned emulator_key_observed(int key);\n"
         "extern void emulator_observe_keys(int port, uint32_t config, uint32_t value);\n"
         "extern void press_key( int hpkey );",
         "key observation API",
     )
+    gpio_header = root / "src/s3c2410/s3c2410_io_port.h"
+    with gpio_header.open("a") as f:
+        f.write("\nextern int s3c2410_io_port_key_ready(hdw_t *, unsigned, unsigned, int);\n")
     gpio = root / "src/s3c2410/s3c2410_io_port.c"
     replace_once(
         gpio,
+        "static void s3c2410_io_port_write(",
+        """int s3c2410_io_port_key_ready(hdw_t *hdw, unsigned column, unsigned row, int eint)
+{
+    s3c2410_io_port_t *io = hdw->s3c2410_io_port;
+    return eint >= 0
+        ? hpclang_key_ready(0, io->gpfcon, io->gpfdat, column, row, eint)
+        : hpclang_key_ready(1, io->gpgcon, io->gpgdat, column, row, eint);
+}
+
+static void s3c2410_io_port_write(""",
+        "key input readiness",
+    )
+    replace_once(
+        gpio,
         '#include "../module.h"',
-        '#include "../module.h"\n#include "../emulator_api.h"',
+        '#include "../module.h"\n#include "../emulator_api.h"\n#include "../key-sample.h"',
         "GPIO key observer include",
     )
     replace_once(

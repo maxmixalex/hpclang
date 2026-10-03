@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Wait for the HP39/40 Stock serial-disk lazy fetch to finish.
 
-Synchronization is based on Kermit's successful EOF acknowledgement for
+Synchronization uses acknowledged Kermit transactions for the directory and
 LIB275L.000. By the time Stock requests and completes that file, the larger
 HPGCC000.000 transfer has already completed. The size-derived duration is only
 a watchdog ceiling; it is never used to pace calculator UI actions.
@@ -26,62 +26,76 @@ def watchdog_seconds(directory: Path) -> int:
     ) // EFFECTIVE_BYTES_PER_SECOND + WATCHDOG_MARGIN_SECONDS
 
 
+class Completions:
+    """Match a file's successful EOF followed by its transaction acknowledgement."""
+
+    def __init__(self) -> None:
+        self.pending = ""
+        self.filename = ""
+        self.eof = False
+
+    def feed(self, chunk: str) -> list[str]:
+        text = self.pending + chunk
+        lines = text.split("\n")
+        self.pending = lines.pop()
+        completed = []
+        for line in lines:
+            line = line.rstrip("\r")
+            if line.startswith("openi name[") and line.endswith("]"):
+                self.filename = line[len("openi name[") : -1]
+                self.eof = False
+            elif line == "<sseof>Y success=1":
+                self.eof = True
+            elif line.startswith("sseot justone="):
+                if self.filename and self.eof:
+                    completed.append(self.filename)
+                self.filename = ""
+                self.eof = False
+        return completed
+
+
 def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
     timeout = watchdog_seconds(directory)
     deadline = time.monotonic() + timeout
     position = 0
-    buffer = ""
-    saw_target = False
-    open_token = f"openi name[{TARGET_FILE}]"
-    success_token = "<sseof>Y success=1"
-
+    parser = Completions()
+    gates = {
+        "HP39DIR.000": Path(f"{marker}.directory"),
+        TARGET_FILE: marker,
+    }
+    failed = Path(f"{marker}.failed")
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.unlink(missing_ok=True)
+    for path in (*gates.values(), failed):
+        path.unlink(missing_ok=True)
 
     print(
-        f"waiting for {TARGET_FILE} completion: watchdog={timeout}s log={log_path}",
+        f"waiting for directory and payload transactions: watchdog={timeout}s log={log_path}",
         flush=True,
     )
-
     while time.monotonic() < deadline:
         try:
             size = log_path.stat().st_size
             if size < position:
                 position = 0
-                buffer = ""
-                saw_target = False
+                parser = Completions()
             with log_path.open("r", encoding="latin-1") as stream:
                 stream.seek(position)
                 chunk = stream.read()
                 position = stream.tell()
         except FileNotFoundError:
             chunk = ""
-
-        if chunk:
-            # Search the entire newly read chunk before retaining just the tail:
-            # USB Kermit can append more than 16 KiB between polling intervals.
-            buffer += chunk
-            if not saw_target:
-                index = buffer.find(open_token)
-                if index >= 0:
-                    saw_target = True
-                    buffer = buffer[index + len(open_token) :]
-                    print(f"Kermit opened {TARGET_FILE}", flush=True)
-            if saw_target and success_token in buffer:
-                marker.write_text("complete\n", encoding="ascii")
-                print(
-                    f"Kermit completed {TARGET_FILE}; released host gate: {marker}",
-                    flush=True,
-                )
-                return 0
-            buffer = buffer[-16384:]
-
+        for name in parser.feed(chunk):
+            if name in gates:
+                gates[name].write_text("complete\n", encoding="ascii")
+                print(f"Kermit completed {name} transaction; released {gates[name]}", flush=True)
+                if name == TARGET_FILE:
+                    return 0
         time.sleep(POLL_SECONDS)
 
-    print(
-        f"timed out waiting for successful {TARGET_FILE} EOF after {timeout}s",
-        flush=True,
-    )
+    phase = "payload" if gates["HP39DIR.000"].exists() else "directory"
+    message = f"timed out waiting for {phase} transaction after {timeout}s"
+    failed.write_text(message + "\n", encoding="ascii")
+    print(message, flush=True)
     return 1
 
 

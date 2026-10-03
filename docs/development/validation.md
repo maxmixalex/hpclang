@@ -520,6 +520,35 @@ GPIO sampling unit, lint, formatting and documentation checks pass; M7.4 has
 42 passing host units. These local results do not replace formal CI acceptance.
 
 
+## Main boot/input and blank-return regressions
+
+At `479dfbb6`, [Runtime](https://github.com/zyf722/hpclang/actions/runs/37120100691)
+fails Stock HP50g before payload entry (`input-not-sampled`, first F6).
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37120100744) fails Direct
+HP49g+ shard 01 at `before-capture`, and HP48 shards 05/09 at `stock-resume` after
+application PASS. These failures invalidate a general reliability claim based
+on the preceding green branch run.
+
+A controlled four-second host pause during HP50g cold boot reproduces the first
+failure. The key is delivered while `GPGCON=0x55555555` (all outputs); when Stock
+later configures the keyboard, that already-held key has no fresh input edge.
+The shared key sequencer now waits for input readiness before delivery, then
+waits for guest sampling. Direct boot keys use the same implementation.
+
+The HP48 return error has a separate defect: quiescence accepted a stable blank
+screen, and the following nonblank capture check immediately failed. Blank
+samples now reset the stability count and remain pending within the existing
+watchdog. Host regression tests cover initialization delay, stale samples,
+separate readiness/sampling timeouts and blank-to-visible repaint transitions.
+
+Local validation uses the pinned emulator, main's CI Gallery payloads and the
+repository runners. HP48 shards 05 and 09 pass three consecutive runs each;
+HP39gs Direct Gallery shard 00 passes. A fresh source preparation/build succeeds,
+as do 38 host tests, lint, formatting and workflow validation. Controlled boot
+pause checks on HP50g Stock Runtime and HP49g+ Direct Gallery pass after the fix.
+This is evidence for the identified races, not proof that every Stock UI path
+is deterministic. Formal acceptance of the follow-up remains pending.
+
 ### M7.4 integration and HP48 Gallery USB follow-up
 
 The accepted M7.3 branch head `479dfbb6` is integrated into M7.4 in `a47b6b40`.
@@ -549,3 +578,61 @@ A fresh unchanged rerun passes System services and settled return. That rerun
 does not resolve the boot/input failure. GPIO sampling does not guarantee
 boot/menu readiness.
 Formal acceptance of the merged M7.4 follow-up remains pending.
+
+
+### HP39 directory selection and HP48 Gallery transport follow-up
+
+On `c11d02e6`, the preceding HP50g input and Direct Gallery failure points pass.
+[Runtime](https://github.com/zyf722/hpclang/actions/runs/37123155107) fails HP39gs
+before application entry: Kermit completes `HP39DIR.CUR` and `HP39DIR.000`, but
+never receives a request for `HPGCC000.000`. Its selection capture still shows
+`Preparing to get aplet`. The sequence had a fixed selection time while only
+the later payload transfer was gated.
+
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37123155104) fails HP48
+Stock at Send-Init on main's separate UART path. The shared USB Gallery fix
+from M7.4 `4a1d7115` is now carried onto main's follow-up branch; it passes locally
+with three distinct nonblank captures and settled return.
+
+HP39/40 sequences now have separate acknowledged directory and payload gates.
+A transaction requires both successful EOF and its final acknowledgement; an
+EOF from a previous file cannot release a new gate. The completion parser
+handles split log lines and large reads, and produces an explicit failed marker
+on its existing watchdog. Stock then saves failure evidence promptly.
+
+Local validation uses the unchanged Runtime build and Stock assets downloaded
+from the failing CI run. HP39gs passes the full keyboard and settled-return
+checks. In the HP40 slow-directory experiment, each host response is delayed by
+two seconds until the payload starts; the test peer's packet timeout is four
+seconds to accommodate that injected latency. The directory gate releases at
+44.5 seconds, beyond the old 41.5-second selection time, and only then does Stock
+request the payload. This experiment stops after proving directory selection;
+it is not counted as a full Runtime pass. Production protocol timeouts and
+watchdogs are unchanged.
+A separate 35-second full interruption exceeds Stock's own communication timeout;
+that experiment is a protocol failure, not successful delay-tolerance evidence.
+Host verification passes 38 C tests and all 9 discovered Python tests, including
+the six completion-parser cases; lint, formatting, workflow validation and
+documentation build pass. Formal acceptance of this follow-up remains pending.
+
+
+### M7.4 synchronization with accepted main
+
+All seven main workflows pass at `fe061d52`. M7.4 integrates that head,
+including keyboard readiness, nonblank LCD stability and HP39 directory gates.
+The remaining [M7.4 Gallery failure at `4a1d7115`](https://github.com/zyf722/hpclang/actions/runs/37121385063)
+is HP40gs `input-not-sampled` on the first F6, before application entry;
+main's keyboard-readiness fix covers that failure path.
+The [Runtime workflow at the same head](https://github.com/zyf722/hpclang/actions/runs/37121385143)
+passes both Runtime and System services across all six Direct/Stock models.
+Full-branch acceptance remains pending after synchronization.
+
+The merged tree passes all 45 host CTest entries (including the Python tool
+suite), lint, formatting, workflow validation and documentation build.
+Fresh preparation and compilation of the pinned emulator source succeed with
+both the writable RTC and input-readiness changes. HP39gs System services
+passes USB directory/payload transfer, application checks and settled return.
+HP40gs Stock Gallery also passes with the freshly prepared emulator and the
+merged branch's rebuilt Gallery payload: four distinct nonblank pages, native
+font checks and settled Stock return. The earlier reference-payload run passes
+separately; the rebuilt-payload run supplies the branch-specific evidence.

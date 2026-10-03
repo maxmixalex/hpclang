@@ -29,10 +29,13 @@ class KermitFetchGateTests(unittest.TestCase):
             ):
                 self.assertEqual(fetch.wait_for_fetch(log, root, marker), expected)
             self.assertEqual(marker.exists(), expected == 0)
+            self.assertEqual(Path(f"{marker}.failed").exists(), expected != 0)
 
     def test_open_marker_survives_large_log_read(self) -> None:
         self.check_log(
-            "openi name[LIB275L.000]\n" + ("packet diagnostics\n" * 2500) + "<sseof>Y success=1\n",
+            "openi name[LIB275L.000]\n"
+            + ("packet diagnostics\n" * 2500)
+            + "<sseof>Y success=1\nsseot justone=0\n",
             0,
         )
 
@@ -42,6 +45,37 @@ class KermitFetchGateTests(unittest.TestCase):
             "openi name[LIB275L.000]\n" + ("packet diagnostics\n" * 2500),
             1,
         )
+
+    def test_eof_without_transaction_ack_does_not_release(self) -> None:
+        self.check_log("openi name[LIB275L.000]\n<sseof>Y success=1\n", 1)
+
+    def test_directory_and_payload_are_distinct_transactions(self) -> None:
+        parser = fetch.Completions()
+        self.assertEqual(parser.feed("openi name[HP39DIR.000]\n<sseof>Y success=1\n"), [])
+        self.assertEqual(parser.feed("sseot justone=0\n"), ["HP39DIR.000"])
+        self.assertEqual(parser.feed("openi name[LIB275L.000]\nsseot justone=0\n"), [])
+
+    def test_partial_lines_and_large_reads(self) -> None:
+        parser = fetch.Completions()
+        self.assertEqual(parser.feed("openi name[HP39"), [])
+        self.assertEqual(parser.feed("DIR.000]\n" + "packet diagnostics\n" * 2500), [])
+        self.assertEqual(parser.feed("<sseof>Y success=1\nsseot just"), [])
+        self.assertEqual(parser.feed("one=0\n"), ["HP39DIR.000"])
+
+    def test_directory_gate_is_published_before_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "kermit.log"
+            marker = root / "complete"
+            log.write_text("openi name[HP39DIR.000]\n<sseof>Y success=1\nsseot justone=0\n")
+            with (
+                patch.object(fetch, "watchdog_seconds", return_value=0.01),
+                patch.object(fetch, "POLL_SECONDS", 0.001),
+            ):
+                self.assertEqual(fetch.wait_for_fetch(log, root, marker), 1)
+            self.assertTrue(Path(f"{marker}.directory").exists())
+            self.assertFalse(marker.exists())
+            self.assertIn("payload", Path(f"{marker}.failed").read_text())
 
 
 if __name__ == "__main__":

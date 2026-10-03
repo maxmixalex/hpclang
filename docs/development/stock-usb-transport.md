@@ -151,3 +151,14 @@ command before releasing the host gate. It does not depend on toggling MODE in
 the boot-time UI. HP48 Gallery shares this USB installation flow. The HP48 USB
 sequence explicitly visits Transfer configuration before Start Server, matching
 the menu state established by the serial sequence.
+
+
+### HP39 directory and payload milestones
+
+HP39/40 Stock loads `HP39DIR.CUR` and `HP39DIR.000` before showing the remote
+Aplet list. Runtime and Gallery sequences wait for the directory transaction
+acknowledgement before sending the selection key. A second gate waits for the
+lazy Aplet/library transactions. Both use the same completion parser for USB
+and UART. The existing size-derived watchdog remains a failure ceiling; it does
+not decide when to send selection keys. Transfer failures retain phase-specific
+logs and a Stock failure capture.

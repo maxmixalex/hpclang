@@ -72,7 +72,8 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `hpclang_power_usb_present()` | 🧪 | USB voltage-detect input; does not infer battery percentage, enumeration or actual power-source selection. |
 | `hpclang_display_contrast_read()` | 🧪 | Stock contrast ordinal 0–15, queried without changing the setting. |
 
-These M7.4 services have local six-model Direct/Stock coverage; formal CI acceptance is pending.
+These M7.4 services pass the six-model Direct/Stock Runtime workflow at `4a1d7115`.
+Acceptance of the complete branch after integrating main's E2E synchronization fixes is pending.
 Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
 
 ## Keyboard
