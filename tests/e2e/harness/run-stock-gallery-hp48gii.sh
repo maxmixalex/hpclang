@@ -96,6 +96,7 @@ X50_PID=$!
 sleep 35
 timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-stock-gallery-kermit-debug.log" \
+    --remote-host "-95 CF -95 FC?" \
     L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-stock-gallery-kermit.out" 2>&1
 : > "$HOST_GATE"

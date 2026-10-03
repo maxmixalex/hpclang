@@ -271,3 +271,6 @@ target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/includ
 
 hpclang_unit(hp39_portal_stack test_hp39_portal_stack.c)
 target_include_directories(test_hp39_portal_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
+
+hpclang_unit(key_sample test_key_sample.c)
+target_include_directories(test_key_sample PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

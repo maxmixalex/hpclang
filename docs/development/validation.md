@@ -426,3 +426,28 @@ The regular payload PASS, settled return and Gallery captures remain required.
 Local HP50g USB Gallery validation passes with all three intended font pages,
 payload PASS, `returned=true` and `return_settled=true`. Lint, actionlint and
 the documentation build pass. Formal acceptance of this change is pending.
+
+
+### Stock input delivery regression follow-up
+
+On the second `7535af0f` Object mutation attempt, HP39g+ again selected
+calculator-to-calculator reception instead of the disk service and never
+entered the payload. The first M7.4 rerun also left HP39gs/HP48/HP50g at boot
+or incorrectly configured installation screens. These are pre-payload failures;
+none is an object-service or system-service assertion failure.
+
+The Stock input sequencer now waits for actual guest GPIO sampling of each
+injected edge, with a bounded `input-not-sampled` failure. Unit coverage checks
+both matrix scan directions, unselected rows/columns, release polarity and
+separate ON/modifier inputs. HP48's canonical and Gallery Kermit paths now
+select RPN explicitly before installation, matching HP49/50.
+Local HP39 object runs pass all three models, and HP48/HP50g Stock Gallery pass
+with the new input gate and settled return. Formal regression acceptance remains pending.
+
+The paired M7.4 branch also passes all three HP39 and both HP49/50 System
+services Stock targets with this gate. HP48 Runtime passes USB installation,
+the full 52-frame keyboard sequence and settled return after its USB sequence
+explicitly configures Transfer before Start Server. The HP48 serial Gallery
+path independently passes explicit RPN selection and settled return. The new
+GPIO sampling unit, lint, formatting and documentation checks pass; M7.4 has
+42 passing host units. These local results do not replace formal CI acceptance.
