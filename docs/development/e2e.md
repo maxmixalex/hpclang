@@ -278,6 +278,11 @@ HP39gs/40gs are different: their fixed native raster tables are physical stock-R
 
 Gallery #99 was the first fully-green production closure across Build, universal x50ng, all three Direct families, and the four Stock Gallery targets; #102 later exercised the strict HP48 settled-return gate. The final M7.1 head is now covered by **35298949457 / #112**, which repeats the full matrix after the HP39 EditLine/native-font census correction and documentation sync.
 
+HP48gII and HP50g Stock Gallery use the canonical USB install/launch runners.
+Their sequence suffixes contain only face selection, captures and exit. This
+keeps transfer readiness, explicit RPN setup and settled-return handling shared
+with Runtime while preserving Gallery's three distinct, nonblank frame checks.
+
 Keeping Gallery separate prevents font exploration from inflating the runtime ABI/keyboard/storage test and lets its visual evidence evolve independently of canonical runtime PASS evidence.
 
 ### Current bitmap-only font closure status (2026-09-14)

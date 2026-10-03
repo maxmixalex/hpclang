@@ -102,6 +102,12 @@ if [[ "$TRANSPORT" == usb ]]; then
 else
     export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp48gii-stock-run.seq"
 fi
+# Interactive payloads append actions after the canonical install and launch.
+if [[ -n "${HPCLANG_E2E_PAYLOAD_SEQUENCE:-}" ]]; then
+    cat "$HPCLANG_E2E_SEQUENCE" "$HPCLANG_E2E_PAYLOAD_SEQUENCE" \
+        > "$ROOT/build/$TARGET-stock-sequence.seq"
+    export HPCLANG_E2E_SEQUENCE="$ROOT/build/$TARGET-stock-sequence.seq"
+fi
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"

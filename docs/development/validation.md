@@ -14,7 +14,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
 | `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is automated. All six profiles select USB for canonical Stock Runtime. Stock Gallery retains UART on HP39/48 and now uses the shared USB path on HP50g; Storage retains SD; see [Stock USB transport](stock-usb-transport.md) for the precise scope.
+Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is automated. All six profiles select USB for canonical Stock Runtime. Stock Gallery retains UART on HP39 and uses the shared USB paths on HP48gII/HP50g; Storage retains SD; see [Stock USB transport](stock-usb-transport.md) for the precise scope.
 
 Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
@@ -518,3 +518,34 @@ explicitly configures Transfer before Start Server. The HP48 serial Gallery
 path independently passes explicit RPN selection and settled return. The new
 GPIO sampling unit, lint, formatting and documentation checks pass; M7.4 has
 42 passing host units. These local results do not replace formal CI acceptance.
+
+
+### M7.4 integration and HP48 Gallery USB follow-up
+
+The accepted M7.3 branch head `479dfbb6` is integrated into M7.4 in `a47b6b40`.
+The merged tree passes 43 host units, System services and HP48 Runtime/Gallery
+ARM builds, lint, formatting, workflow validation and documentation build.
+
+On the preceding M7.4 head `993ae9bb`,
+[Runtime](https://github.com/zyf722/hpclang/actions/runs/37117820561) passes the
+Runtime/System services matrix. The remaining
+[Gallery failure](https://github.com/zyf722/hpclang/actions/runs/37117820541)
+is HP48 Stock: Kermit Send-Init retries expire before any payload execution.
+The captures show a boot dialog followed by a server screen, but do not prove
+which transport the calculator selected. They do not establish a UART root cause.
+
+HP48 Gallery now shares the canonical USB transfer, installation and launch
+runner. Its suffix contains only the three face captures, selection keys and
+exit. This removes the separate UART setup and fixed 35-second transfer delay.
+The workflow includes the shared HP48 dependencies and reads the canonical
+Stock result. Local Gallery passes with three distinct nonblank frames,
+HPC1 PASS and settled return. System services pass on HP39gs, HP48gII and
+HP50g with launchers/packages rebuilt from the merged tree. Ordinary HP48
+Runtime also passes with the complete 51-key acknowledged sequence.
+
+A separate HP50g local attempt fails at the initial memory-recovery dialog with
+`input-not-sampled` for the first F6 press, before server setup or payload entry.
+A fresh unchanged rerun passes System services and settled return. That rerun
+does not resolve the boot/input failure. GPIO sampling does not guarantee
+boot/menu readiness.
+Formal acceptance of the merged M7.4 follow-up remains pending.

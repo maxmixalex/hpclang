@@ -7,8 +7,9 @@
     }
   ],
   "captures": [
-    "build/${TARGET}-stock-home-rpn.pgm",
+    "build/${TARGET}-stock-home.pgm",
     "build/${TARGET}-stock-server-serial.pgm",
+    "build/${TARGET}-stock-server-usb.pgm",
     "build/${TARGET}-stock-after-transfer.pgm",
     "build/${TARGET}-stock-vars-before-install.pgm",
     "build/${TARGET}-stock-l275-stack.pgm",
