@@ -11,71 +11,20 @@ TARGET=hp50g
 APP_DIR="$(realpath "$1")"
 export TARGET
 
-while IFS= read -r line; do
-    env_name="${line%%=*}"
-    env_value="${line#*=}"
-    printf -v "$env_name" '%s' "$env_value"
-    export "${env_name?}"
-done < <(python3 "$ROOT/tools/e2e-target-env.py" "$ROOT/tests/e2e/targets/$TARGET.json")
-
-export HPCLANG_X50NG_HARNESS=stock
-export HPCLANG_X50NG_SRAM_SIZE=0x00080000
-unset HPCLANG_X50NG_UART0 || true
-
-STATE="$ROOT/build/$TARGET-stock-gallery-state"
-SD="$ROOT/build/$TARGET-stock-gallery-sd"
+ASSETS="$ROOT/build/$TARGET-gallery-assets"
 CACHE="$ROOT/.cache/hpcalc"
-rm -rf "$STATE" "$SD"
-mkdir -p "$STATE" "$SD" "$CACHE"
-
+mkdir -p "$ASSETS/hp4950" "$CACHE"
 if [[ ! -f "$CACHE/mlreg.zip" ]]; then
     curl -fL --retry 3 --retry-delay 2 \
         https://www.hpcalc.org/hp49/math/statistic/mlreg.zip \
         -o "$CACHE/mlreg.zip"
 fi
-unzip -p "$CACHE/mlreg.zip" SETUP.BIN > "$SD/SETUP.BIN"
+unzip -p "$CACHE/mlreg.zip" SETUP.BIN > "$ASSETS/hp4950/SETUP.BIN"
 
-COMMON_ARGS=(
-    --datadir="$STATE"
-    --overwrite-config
-    --style="$ROOT/build/x50ng/dist/style-50g.css"
-    --sd-dir="$SD"
-    --bootloader="$ROOT/build/x50ng/dist/firmware/$HPCLANG_E2E_BOOTLOADER"
-    --firmware="$ROOT/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
-)
-
-# Install ARMToolbox through the same stock path used by canonical runtime E2E.
-export HPCLANG_STOCK_MODE=install
-export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-install.seq"
-export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery-install"
-export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery-install.json"
-
-timeout 45s "$ROOT/build/x50ng/dist/x50ng" \
-    "${COMMON_ARGS[@]}" \
-    --flash
-
-rm -f "$SD/SETUP.BIN"
-cp "$APP_DIR/launchers/$TARGET.hp" "$SD/HPCLANG.HP"
-
-export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
-export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
-export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
-export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
-export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
-export HPCLANG_STOCK_MODE=run
-export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-gallery-run.seq"
-HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
-export HPCLANG_STOCK_RESULT_ADDR
-export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery"
-export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery.json"
-
-timeout 150s "$ROOT/build/x50ng/dist/x50ng" \
-    "${COMMON_ARGS[@]}"
-
-for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
-    [[ -f "$pgm" ]] || continue
-    python3 "$ROOT/tools/pgm-to-png.py" "$pgm" "$pgm.png"
-done
+export HPCLANG_E2E_REQUIRE_KEYBOARD=0
+export HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE=usb
+export HPCLANG_E2E_PAYLOAD_SEQUENCE="$ROOT/tests/e2e/sequences/hp50g-stock-gallery-run.seq"
+bash "$ROOT/tests/e2e/harness/run-stock.sh" "$TARGET" "$APP_DIR" "$ASSETS"
 
 FRAMES=(
     "$ROOT/build/$TARGET-stock-gallery-native-mini.pgm"

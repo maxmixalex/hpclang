@@ -1,38 +1,10 @@
-# HP50g Stock Font Gallery launch through the original UI and ARMToolbox.
-# Exhaustive traversal of all 308 generated faces belongs to Direct Gallery.
-# This compact Stock payload proves the native UI -> ARMToolbox -> standard
-# HPC1 path with both native faces and one representative generated face.
-2000 chord lshift files
-4200 capture files
-4500 tap up
-4800 tap f6
-6500 capture sd
-6900 tap enter
-7200 tap down
-7600 capture sd-payload
-8000 tap f2
-9200 capture copy-destination
-9500 tap down
-9800 tap f6
-20000 capture copy-result
-20500 tap f4
-21800 capture recalled-in-filer
-22200 tap nxt
-22600 tap nxt
-23400 capture filer-halt-menu
-23800 tap f1
-25100 capture payload-recalled
-25600 chord rshift two
-26850 capture lib
-27200 tap f1
-28500 capture armtoolbox
-28700 monitor 90000
-28900 tap f1
-# Compact Gallery starts on Native / calculator minifont. DOWN changes face
-# within the Native family; RIGHT then advances to the generated-control family.
-40000 capture native-mini
-41500 tap down
-43000 capture native-main
-44500 tap right
-46000 capture generated-control
-47500 tap on
+# Interactive suffix for the shared HP49/50 Stock USB launch sequence.
+# Offsets are relative to its host gate; PrRUN is pressed at 32500 ms.
+# The compact payload starts on Native/minifont. DOWN selects Native/main;
+# RIGHT selects the representative generated face, then ON exits normally.
+44000 capture gallery-native-mini
+45500 tap down
+47000 capture gallery-native-main
+48500 tap right
+50000 capture gallery-generated-control
+51500 tap on

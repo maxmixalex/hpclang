@@ -40,7 +40,7 @@ if env LD_LIBRARY_PATH="$RUNTIME_LD_LIBRARY_PATH" ldd "$DIST/x50ng" | tee "$ROOT
     exit 1
 fi
 
-if [[ "$MODE" == stock && ( "$FAMILY" == hp39 || "$FAMILY" == hp48 ) ]]; then
+if [[ "$MODE" == stock ]]; then
     [[ -x "$TOOLDIR/kermit" ]] || {
         echo "portable E2E bundle is missing C-Kermit" >&2
         exit 1

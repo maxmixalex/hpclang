@@ -26,6 +26,14 @@ on:
       - "tests/e2e/targets/**"
       - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
+      - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp4950*.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
+      - "tests/e2e/specs/runtime.json"
+      - "tests/e2e/specs/stock-hp4950-usb.json"
+      - "tests/e2e/verify.py"
+      - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
@@ -68,6 +76,14 @@ on:
       - "tests/e2e/targets/**"
       - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
+      - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp4950*.sh"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
+      - "tests/e2e/specs/runtime.json"
+      - "tests/e2e/specs/stock-hp4950-usb.json"
+      - "tests/e2e/verify.py"
+      - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/sequences/*stock-gallery-run.seq"
       - "tests/e2e/specs/font-gallery.json"
@@ -355,7 +371,7 @@ jobs:
         if: matrix.family == 'hp39'
         run: bash tests/e2e/harness/run-stock-gallery-hp39.sh "$TARGET" build/e2e
 
-      - name: Launch Gallery through stock HP50g ARMToolbox
+      - name: Launch Gallery through shared HP50g Stock USB/ARMToolbox
         if: matrix.family == 'hp4950'
         run: bash tests/e2e/harness/run-stock-gallery-hp50g.sh build/e2e
 
@@ -443,6 +459,10 @@ jobs:
             build/${{ matrix.target }}-stock-gallery*.json
             build/${{ matrix.target }}-stock-gallery-kermit*
             build/${{ matrix.target }}-stock-gallery-socat.log
+            build/${{ matrix.target }}-stock.json
+            build/${{ matrix.target }}-stock-*.pgm
+            build/${{ matrix.target }}-kermit*
+            build/${{ matrix.target }}-socat.log
             build/e2e/e2e.hpc
             build/e2e/e2e.size.txt
           if-no-files-found: warn

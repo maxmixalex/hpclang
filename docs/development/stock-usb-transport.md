@@ -18,9 +18,10 @@ The intended layers are:
 
 All six target profiles already select `stock_transport: usb`. UART and
 SD/VVFAT remain explicit secondary paths; Storage overrides the default to SD.
-The separate Stock Gallery runners still use UART for HP39gs/40gs/48gII and
-SD for HP50g. Their results validate regression behavior, not USB transport;
-the profile default does not change those dedicated runners.
+Stock Gallery retains UART for HP39gs/40gs/48gII. HP50g Gallery now reuses
+the canonical USB runner and appends only its interactive face-selection steps.
+Its USB path explicitly selects RPN through Stock Kermit before installation.
+The other dedicated Gallery runners remain secondary-transport evidence.
 Repeated-run flake-rate and wall-clock comparison remains open: selecting USB
 in the profiles is an implementation fact, not evidence that U5 is complete.
 
@@ -38,8 +39,8 @@ launch on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+ and HP 50g.
 Direct runtime, Storage, Core, Quality, and Font Gallery all pass on integration
 historical head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
 and the harness timing fixes. See
-[Validation](validation.md) for the historical records and current main `d1dd4688` acceptance. Stock Gallery continues to exercise its dedicated UART/SD launchers, not
-the USB transport. The HP39 Direct Gallery job has a 25-minute budget for its
+[Validation](validation.md) for the historical records and current main `d1dd4688` acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
+current HP50g Gallery USB change is recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
 three sequential model sweeps; all other Direct Gallery families retain 15
 minutes.
 
@@ -123,3 +124,12 @@ over USB install and launch the same packaged HPC1 payload through the original
 Stock UI, with payload, teardown, and Stock-repaint witnesses. U5 measures
 repeatability and elapsed time separately; its open status does not imply
 unfinished USB transport implementation.
+
+
+## Interactive payloads on the common HP49/50 runner
+
+`HPCLANG_E2E_PAYLOAD_SEQUENCE` optionally names a sequence suffix appended after
+the canonical USB install/launch sequence. Its timestamps use the same clock
+reset by the host-transfer gate. Font Gallery supplies face captures and exit
+keys through this suffix; it does not duplicate connection, mode selection,
+library installation or launch steps. Runtime leaves the suffix unset.
