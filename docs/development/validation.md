@@ -391,3 +391,19 @@ not evidence that a timeout defect was fixed.
 These gates accept M7.3a–f for their implemented scope. Directory operations,
 Aplet-owned persistence, composite objects and native namespace coverage remain
 open under M7.3g–j in [Roadmap](roadmap.md).
+
+## M7.3g local directory-service acceptance
+
+The directory implementation in `b2a69739` passed local validation on 2026-10-03:
+
+- all 34 host unit tests, including directory lifecycle, retained interior
+  references, active cwd/ancestor rejection and failure-before-write cases;
+- Clang analysis across host, Runtime, Font Gallery and Object mutation
+  compilation configurations; formatting and documentation builds;
+- the focused Object mutation Stock matrix on all six models, using the shared
+  build/asset-preparation/USB harness and settled-return gates. HP48gII/49g+/50g
+  execute the new directory lifecycle; HP39g+/39gs/40gs revalidate native-variable
+  mutation with the same rebuilt payload and freshly prepared Aplet packages.
+
+This is local regression evidence. Formal CI acceptance is pending; M7.3g and
+its downstream M7.3h–j work remain open on the roadmap.
