@@ -18,10 +18,10 @@ The intended layers are:
 
 All six target profiles already select `stock_transport: usb`. UART and
 SD/VVFAT remain explicit secondary paths; Storage overrides the default to SD.
-Stock Gallery retains UART for HP39gs/40gs/48gII. HP50g Gallery now reuses
-the canonical USB runner and appends only its interactive face-selection steps.
-Its USB path explicitly selects RPN through Stock Kermit before installation.
-The other dedicated Gallery runners remain secondary-transport evidence.
+Stock Gallery retains UART for HP39gs/40gs. HP48gII and HP50g Gallery reuse
+the canonical USB runners and append only their interactive face-selection steps.
+Both paths explicitly select RPN through Stock Kermit before installation.
+The dedicated HP39 Gallery runner remains secondary-transport evidence.
 Repeated-run flake-rate and wall-clock comparison remains open: selecting USB
 in the profiles is an implementation fact, not evidence that U5 is complete.
 
@@ -39,8 +39,8 @@ launch on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+ and HP 50g.
 Direct runtime, Storage, Core, Quality, and Font Gallery all pass on integration
 historical head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
 and the harness timing fixes. See
-[Validation](validation.md) for the historical records and current main `d1dd4688` acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
-current HP50g Gallery USB change is recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
+[Validation](validation.md) for the historical records and integration acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
+Gallery USB follow-ups are recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
 three sequential model sweeps; all other Direct Gallery families retain 15
 minutes.
 
@@ -148,6 +148,6 @@ transfer completion, payload results and settled return remain separate gates.
 
 HP48 and HP49/50 installation selects RPN with Stock Kermit's `-95 CF -95 FC?`
 command before releasing the host gate. It does not depend on toggling MODE in
-the boot-time UI. HP48 Gallery uses the same command on its serial transport. The HP48 USB
+the boot-time UI. HP48 Gallery shares this USB installation flow. The HP48 USB
 sequence explicitly visits Transfer configuration before Start Server, matching
 the menu state established by the serial sequence.

@@ -1,68 +1,7 @@
-# HP48gII compact Stock Font Gallery through stock Kermit + ARMToolbox48.
-# The install/launch path deliberately mirrors hp48gii-stock-run.seq; only the
-# post-launch Gallery captures differ from the canonical runtime sequence.
-2000 tap f6
-4000 tap f6
-# RPN is selected explicitly by the host Kermit command before installation.
-7000 capture home
-# Configure wire I/O to Serial.
-8000 tap files
-9500 tap down
-10000 tap enter
-11500 tap down
-12000 tap down
-12500 tap down
-13000 tap down
-14000 tap enter
-16000 tap up
-17000 tap f2
-18000 tap down
-18500 tap enter
-20000 tap enter
-# Start stock Kermit server.
-22000 tap files
-23500 tap down
-24500 tap enter
-26000 tap down
-27000 tap down
-28000 tap down
-29000 tap down
-30000 tap down
-31500 tap enter
-33500 capture server-serial
-# The host starts Kermit at t=35s. The Gallery resumes only after the host has
-# completed both transfers and released HPCLANG_E2E_HOST_GATE_FILE. Times below
-# are relative to that release.
-35000 host-gate
-1000 capture after-transfer
-# Install ARMToolbox48 Library 275 into Port 0. HPCLANG is F1 and L275 is F2.
-2000 tap var
-3000 capture vars-before-install
-4000 tap f2
-5000 capture l275-stack
-6000 tap zero
-7000 tap enter
-8000 capture port-zero-stack
-9000 tap sto
-11000 capture stored
-13000 chord on f3
-19000 capture after-warmstart
-20000 tap var
-21000 capture vars-after-install
-22000 tap f1
-24000 capture hpclang-stack
-# Library 275 is the first LIB entry; ARMTo exposes PrRUN on F1.
-26000 chord rshift two
-27500 capture lib-menu
-28500 tap f1
-30500 capture armtoolbox
-31000 monitor 60000
-31500 tap f1
-# Compact Gallery starts on Native / calculator minifont. DOWN changes face
-# within the Native family; RIGHT then advances to the generated-control family.
-39000 capture native-mini
+# App actions relative to the canonical Stock host-transfer gate.
+39000 capture gallery-native-mini
 41000 tap down
-43000 capture native-main
+43000 capture gallery-native-main
 45000 tap right
-47000 capture generated-control
+47000 capture gallery-generated-control
 49000 tap on
