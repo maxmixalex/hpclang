@@ -78,6 +78,13 @@ export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_E2E_HOST_GATE_FILE="$HOST_GATE"
 export HPCLANG_STOCK_MODE=run
 export HPCLANG_E2E_SEQUENCE="$ROOT/tests/e2e/sequences/hp4950-stock-usb-run.seq"
+# Reuse the canonical install/launch sequence for interactive payloads.
+# Suffix offsets share the post-host-gate clock with the launch steps.
+if [[ -n "${HPCLANG_E2E_PAYLOAD_SEQUENCE:-}" ]]; then
+    cat "$HPCLANG_E2E_SEQUENCE" "$HPCLANG_E2E_PAYLOAD_SEQUENCE" \
+        > "$ROOT/build/$TARGET-stock-sequence.seq"
+    export HPCLANG_E2E_SEQUENCE="$ROOT/build/$TARGET-stock-sequence.seq"
+fi
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 HPCLANG_STOCK_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"

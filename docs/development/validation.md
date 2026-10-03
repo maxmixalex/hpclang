@@ -14,7 +14,7 @@ hpclang separates common-runtime correctness from calculator UI/package automati
 | `E2E / Font Gallery` | exhaustively traverse generated/native Gallery entries in Direct plus compact live-native Stock controls on HP50g and HP48gII |
 | `Maintenance / CI` | trim Actions history and retained CI evidence |
 
-Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is automated. All six profiles select USB for canonical Stock Runtime. Stock Gallery retains UART/SD and Storage retains SD; see [Stock USB transport](stock-usb-transport.md) for the precise scope.
+Direct runtime has established green evidence on HP39g+, HP39gs, HP40gs, HP48gII, HP49g+, and HP50g. HP39g+ model 1 boots the verified real-machine D1.55 full-NOR fixture, passes the strict 51-key Direct transition gate, and returns cleanly; no sibling firmware result is substituted. Its original-Stock USB Connectivity Kit install/launch is automated. All six profiles select USB for canonical Stock Runtime. Stock Gallery retains UART on HP39/48 and now uses the shared USB path on HP50g; Storage retains SD; see [Stock USB transport](stock-usb-transport.md) for the precise scope.
 
 Historical fully-green canonical runtime regression evidence is **35832611353 / #357** on the final cleanup functional head `d33b3127`: Build, all three Direct families, Stock hp39, Stock hp48, Stock hp4950, and evidence publication all pass. This predates the USB migration. The M7.3a-e semantic closure gate remains **35812005032 / #338** on `ba2c0398`; #357 revalidates that same cross-family runtime/return contract after the subsequent cleanup, report-renderer consolidation, and workflow-dependency fixes. Runtime #122 remains the first run that closed the strict HP48 Stock return contract, while later superseded intermediate runs are retained only as historical diagnostics.
 
@@ -405,3 +405,24 @@ cause is unresolved; the retry is not evidence of a transport fix.
 Emulator tests establish register activity, timing and restoration, not audible
 speaker output on physical hardware. USB detection means voltage presence;
 battery percentage and actual power-source selection are not inferred.
+
+
+### HP50g Stock Gallery installation regression
+
+On `770e2d5c`, [Runtime](https://github.com/zyf722/hpclang/actions/runs/37107606230),
+[Object mutation](https://github.com/zyf722/hpclang/actions/runs/37107606212) and
+[Quality](https://github.com/zyf722/hpclang/actions/runs/37107606256) pass.
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37107606274) fails only
+HP50g Stock. Its installer screenshot shows `Too Few Arguments`; the calculator
+remains in ALG mode with no destination port on the stack, and ARMToolbox is
+absent from the subsequent library menu. No Gallery payload entry is observed.
+An unchanged local rerun passes, so that rerun does not close the failure.
+
+HP50g Gallery now reuses canonical USB transfer/installation, including the
+explicit Stock `-95 CF` RPN command. Only Gallery's interactive capture/exit
+sequence is appended. This removes its duplicated, timing-sensitive MODE
+switch and the unchecked SD install completion from the Gallery path.
+The regular payload PASS, settled return and Gallery captures remain required.
+Local HP50g USB Gallery validation passes with all three intended font pages,
+payload PASS, `returned=true` and `return_settled=true`. Lint, actionlint and
+the documentation build pass. Formal acceptance of this change is pending.
