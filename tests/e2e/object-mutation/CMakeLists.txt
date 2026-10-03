@@ -12,9 +12,23 @@ add_executable(hpclang_object_mutation_e2e
     ${HPCLANG_RUNTIME_EABI_SHIMS}
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
-    main.c
-    nested.c
-    hp39.c)
+    main.c)
+
+# The default compiles both paths for source analysis. CI builds one family
+# per artifact so HP39 Aplets do not consume RAM for classic-only probes.
+set(HPCLANG_E2E_FAMILY "all" CACHE STRING "Object mutation target family")
+set_property(CACHE HPCLANG_E2E_FAMILY PROPERTY STRINGS all hp39 hp48 hp4950)
+if(NOT HPCLANG_E2E_FAMILY MATCHES "^(all|hp39|hp48|hp4950)$")
+    message(FATAL_ERROR "Unsupported object mutation family: ${HPCLANG_E2E_FAMILY}")
+endif()
+if(HPCLANG_E2E_FAMILY MATCHES "^(all|hp39)$")
+    target_sources(hpclang_object_mutation_e2e PRIVATE hp39.c)
+    target_compile_definitions(hpclang_object_mutation_e2e PRIVATE HPCLANG_E2E_HP39=1)
+endif()
+if(NOT HPCLANG_E2E_FAMILY STREQUAL "hp39")
+    target_sources(hpclang_object_mutation_e2e PRIVATE classic.c nested.c)
+    target_compile_definitions(hpclang_object_mutation_e2e PRIVATE HPCLANG_E2E_CLASSIC=1)
+endif()
 
 target_include_directories(
     hpclang_object_mutation_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

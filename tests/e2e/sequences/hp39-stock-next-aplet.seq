@@ -1,0 +1,8 @@
+# Stock's default chronological library puts the last-used Aplet first.
+# Our two instances occupy the first two entries; select the other instance.
+0 monitor 90000
+2000 tap down
+3500 tap f6
+5000 retry enter
+15000 retry enter
+30000 retry enter

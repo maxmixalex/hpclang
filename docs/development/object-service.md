@@ -359,3 +359,85 @@ The focused workflow shares build, target profiles, assets, USB transport and
 strict return verification with the existing harness. Payload PASS alone is
 insufficient. The raw-address HPGCC adapter boundary remains documented in the
 [adapter map](hpgcc-saturn-adapter.md).
+
+## M7.3g — directory lifecycle
+
+HP48gII/49g+/50g Stock applications can create a child directory with
+`hpclang_object_store_mkdir()` and remove one with `hpclang_object_store_rmdir()`.
+Names use the existing raw-byte, explicit-length contract, including the empty
+name used by Hidden directories. Creation rejects every existing name with
+`EEXIST`; it never overwrites a value or directory.
+
+Removal requires an explicit mode:
+
+- `HPCLANG_OBJECT_STORE_REMOVE_EMPTY` rejects nonempty directories with `ENOTEMPTY`;
+- `HPCLANG_OBJECT_STORE_REMOVE_TREE` removes the entire child subtree;
+- a non-directory returns `ENOTDIR`, a missing name `ENOENT`, and Stock cwd or
+  any ancestor containing it `EBUSY`.
+
+The existing ordinary-object `remove()` still rejects directories with `EISDIR`.
+HP39 and Direct execution remain unsupported for this classic-RPL namespace.
+
+Before writing, the mutation planner validates the removed subtree's links,
+remaining directory geometry, live references and combined USEROB/TEMPOB space.
+References to removed values retain a TEMP copy of the subtree with its relative
+links intact. Expected allocation, malformed-tree and active-cwd failures leave
+Stock memory unchanged. As with the existing mutation backend, unexpected I/O
+failure after commit starts is not a rollback guarantee.
+
+Logical handles name paths: they return `ENOENT` while the path is absent and
+resolve a later directory created at the same path. Owned value and iterator
+snapshots keep their prior contents independently of those handles.
+
+Host tests cover nested/Hidden directory lifecycle, duplicate/type/nonempty
+errors, cwd/ancestor protection, live interior-value retention, stale/recreated
+handles, malformed links and memory exhaustion before writes. The focused
+Object mutation payload creates its own nested tree through the public APIs,
+retains a native value reference across recursive removal, checks active-cwd
+rejection, removes empty directories and restores the original namespace before
+requiring settled Stock return. Formal CI acceptance remains pending.
+
+## M7.3h — HP39 Aplet-owned data (in progress)
+
+`<hpclang/aplet.h>` provides `hpclang_aplet_data_get()`,
+`hpclang_aplet_data_set()` and `hpclang_aplet_data_clear()` for HP39 Stock
+applications packaged with the supported HPGCC39 Aplet template. This is the
+current Aplet's custom data channel, separate from predefined Aplet Variables.
+
+Get returns an owned snapshot. Set makes an independent Stock-owned copy, so
+the caller can release its input immediately. Clear restores the template's
+initial empty list. The template commits the returned data when the Aplet is
+exited; a successful set is not a promise that an interrupted native execution
+has already saved its value. Set is bounded to 7000 native nibbles (3495 string
+bytes), with `E2BIG` for larger values. Unsupported models, Direct execution and
+unrecognized template callers return `ENOSYS`.
+
+The runtime verifies the template's `_Action` instruction protocol before
+accessing its data argument. Stock `TOTEMPOB` makes the copy, and the caller
+frame is resolved again after allocation because garbage collection can move
+both the frame and native objects. No fixed RAM address or Aplet title
+identifies the data cell.
+
+Local HP39g+/39gs/40gs evidence covers growing, shrinking and empty strings across native
+garbage collection, input release, clear, and settled return. Four successive
+invocations, separated by Aplet exit and emulator restart, verified write,
+read-and-clear, empty-and-write, and read-and-clear. The payload's lifecycle
+contract checks the expected phase as well as PASS and settled return, so
+reinitializing the data on every launch cannot pass the persistence gate.
+The eight-invocation contract then saves a second instance through Stock SAVE.
+Alternating between the two instances verifies independent writes and clears,
+without lowering native stack requirements or dropping the GC stress checks.
+All three HP39 models pass this contract locally. Reset behavior and formal CI
+acceptance remain required before M7.3h closes.
+
+The historical template's reset entry needs separate verification: its
+`_Reset` routine contains a data-clear operation, but `=Common.h` defines the
+`StndReset` dispatch as `MINUSTHREE NOP`. A routine's presence in the source
+does not establish that Stock invokes it. The public `clear()` operation does
+not currently claim to change the calculator's Reset UI or dispatch.
+
+Reset has two separate prerequisites: the topic type's `ApletReset#` property
+controls Stock's reset capability, while the template's negative-event dispatch
+selects the action. A local experiment connecting `StndReset` to `INT_04`
+alone left the library Reset softkey disabled and the saved value intact.
+That experimental template change is not shipped.

@@ -49,17 +49,24 @@
 #define HP39P_VARIABLE_VALUE 7
 #define HP39P_REFERENCE_EVAL 8
 #define HP39P_VARIABLE_STORE 9
+#define HP39P_COPY_OBJECT 10
 
 /* The owned value must fit beside the generated request/return streams in the
  * bootstrap-private staging page. Stock can relocate its own variable storage;
  * it cannot relocate this reserved page or retain it as caller-owned input. */
-#define HP39P_VARIABLE_STORE_MAX_NIBBLES 7000u
+#define HP39P_STAGED_OBJECT_MAX_NIBBLES 7000u
 
 #ifndef __ASSEMBLER__
 
 #include <stddef.h>
 #include <stdint.h>
 #include <hpclang/bootstrap.h>
+
+struct hpclang_hp39_object_request
+{
+    uintptr_t object_data;
+    uint32_t object_nibbles;
+};
 
 struct hpclang_hp39_variable_store_request
 {

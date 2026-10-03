@@ -64,7 +64,7 @@ transferred calculator object as several kilobytes of zeros.
 
 Classic-RPL named writes may move the USEROB object containing stage0. Before
 exposing mutation, stage1 copies the position-independent stage0 code into a
-reserved native pool page and validates its Stock identity mapping. Return uses
+protected unused upper half of the L2 workspace and validates its Stock identity mapping. Return uses
 that protected copy, including the final removal of the temporary stage alias.
 The hidden launcher object and saved post-ARMSYS Saturn PC are explicit private
 relocation roots. They move with USEROB/TEMPOB references rather than retaining

@@ -1,0 +1,10 @@
+# Save a second instance named "2" from the selected original Aplet.
+# Stock's chronological library selects the newly created instance first.
+0 monitor 90000
+2000 tap f1
+4500 tap two
+5500 tap enter
+8000 tap f6
+10000 retry enter
+20000 retry enter
+30000 retry enter

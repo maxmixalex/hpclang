@@ -12,11 +12,24 @@ APP_DIR="$(realpath "$2")"
 ASSETS_DIR="$(realpath "$3")"
 export TARGET
 
+LIFECYCLE="$APP_DIR/e2e.stock-lifecycle.json"
+if [[ -f "$LIFECYCLE" ]]; then
+    python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE" --validate-only
+    export HPCLANG_STOCK_REQUIRE_OBJECT_PHASE=1
+else
+    unset HPCLANG_STOCK_REQUIRE_OBJECT_PHASE || true
+fi
+
 TRANSFER="$ASSETS_DIR/$TARGET-stock-transfer"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
 rm -f "$KERMIT_LOG" "$HOST_GATE"
+# A fresh launch must not collect screenshots or lifecycle results from an
+# earlier attempt in the same build directory.
+rm -f "$ROOT/build/$TARGET-"*.pgm "$ROOT/build/$TARGET-"*.pgm.png \
+    "$ROOT/build/$TARGET-stock.json" "$ROOT/build/$TARGET-e2e.json" \
+    "$ROOT/build/$TARGET-lifecycle-"*.json "$ROOT/build/$TARGET-lifecycle-"*.log
 
 case "$TRANSPORT" in
     uart|usb) ;;
@@ -149,6 +162,10 @@ GATE_PID=
 kill "$KERMIT_PID" 2>/dev/null || true
 wait "$KERMIT_PID" 2>/dev/null || true
 KERMIT_PID=
+
+if [[ -f "$LIFECYCLE" ]]; then
+    python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE"
+fi
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue

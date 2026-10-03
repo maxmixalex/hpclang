@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|object-mutation|font-gallery|font-gallery-stock> [out-dir]" >&2
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+    echo "usage: $0 <runtime|storage|hardware|system-services|object-mutation|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
     exit 2
 fi
 
 MODE="$1"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${2:-$ROOT/build/e2e-$MODE}"
+FAMILY="${3:-all}"
+case "$FAMILY" in
+    all|hp39|hp48|hp4950) ;;
+    *) echo "unsupported E2E family: $FAMILY" >&2; exit 2 ;;
+esac
 ATFE="${ATFE:?set ATFE to the extracted Arm Toolchain for Embedded root}"
 CC="$ATFE/bin/clang"
 LD="$ATFE/bin/ld.lld"
@@ -36,7 +41,7 @@ if [[ "$MODE" == font-gallery && -z "${HPCLANG_GALLERY_SHARD_INDEX+x}" ]]; then
         echo "=== Direct Gallery shard $shard_index/$GALLERY_BUNDLE_COUNT ==="
         HPCLANG_GALLERY_SHARD_INDEX="$shard_index" \
         HPCLANG_GALLERY_SHARD_COUNT="$GALLERY_BUNDLE_COUNT" \
-            "$0" font-gallery "$shard_out"
+            "$0" font-gallery "$shard_out" "$FAMILY"
 
         shard_result="$(cat "$shard_out/e2e.result-address")"
         if [[ -z "$expected_result" ]]; then
@@ -97,7 +102,7 @@ case "$MODE" in
         E2E_SOURCE="$ROOT/tests/e2e/object-mutation"
         E2E_TARGET="hpclang_object_mutation_e2e"
         E2E_ELF="hpclang-object-mutation-e2e.elf"
-        E2E_CMAKE_ARGS=()
+        E2E_CMAKE_ARGS=(-DHPCLANG_E2E_FAMILY="$FAMILY")
         ;;
     font-gallery)
         E2E_SOURCE="$ROOT/tests/e2e/font-gallery"
@@ -192,7 +197,8 @@ fi
 "$CC" "${COMMON[@]}" -Os -c "$ROOT/platform/armtoolbox/stage1.c" -o "$OUT/stage1.o"
 "$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/stage1-entry.S" -o "$OUT/stage1-entry.o"
 "$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/hp39-portal.S" -o "$OUT/stage1-hp39-portal.o"
-"$LD" -m armelf -T "$ROOT/platform/armtoolbox/stage1.ld" \
+"$CC" -E -P -x c "$ROOT/platform/armtoolbox/stage1.ld" -o "$OUT/stage1.ld"
+"$LD" -m armelf -T "$OUT/stage1.ld" \
     "$OUT/stage1-entry.o" "$OUT/stage1.o" "$OUT/stage1-hp39-portal.o" \
     "$OUT/bootstrap-mmu.o" "$OUT/bootstrap-run.o" \
     "$OUT/bootstrap-sync.o" "$OUT/bootstrap-enter.o" \
@@ -263,14 +269,15 @@ while read -r target model; do
             "$OUT/launchers/$target.hp"
     fi
 done < <(
-    python3 - "$ROOT/tests/e2e/targets" <<'PY'
+    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 for path in sorted(Path(sys.argv[1]).glob("*.json")):
     data = json.loads(path.read_text(encoding="utf-8"))
-    print(data["target"], data["model"])
+    if sys.argv[2] == "all" or data["family"] == sys.argv[2]:
+        print(data["target"], data["model"])
 PY
 )
 
@@ -292,6 +299,11 @@ fi
 
 if [[ "$MODE" == object-mutation ]]; then
     python3 "$ROOT/tests/e2e/object-mutation/fixtures.py" "$OUT/stock-fixtures"
+fi
+
+if [[ ( "$FAMILY" == all || "$FAMILY" == hp39 ) &&
+      -f "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" ]]; then
+    cp "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" "$OUT/e2e.stock-lifecycle.json"
 fi
 
 if (( WRAP_LAUNCHERS )); then

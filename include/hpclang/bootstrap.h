@@ -99,9 +99,10 @@ extern "C"
 /*
  * ARMToolbox-private HP39 platform context prefix.
  *
- * The full context lives in the temporary 0x09000000 stage window for the
- * complete HPC1 call. Runtime code may decode this prefix only after checking
- * the opaque cookie tag and magic; applications still must not infer any
+ * The context stays in the temporary stage window throughout the HPC1 call.
+ * Runtime code must
+ * check the cookie tag and magic before decoding this prefix.
+ * Applications must not infer the
  * platform_cookie representation.
  */
 #define HPCLANG_HP39_PLATFORM_MAGIC UINT32_C(0x39335048) /* "HP39" */

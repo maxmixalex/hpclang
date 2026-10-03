@@ -1,10 +1,12 @@
+#include "stage-layout.h"
+
 OUTPUT_FORMAT("elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(hpclang_armtoolbox_stage1_entry)
 
 SECTIONS
 {
-    . = 0x09000400;
+    . = HPCLANG_STAGE1_BASE;
 
     /* The raw image is copied at this VMA; preserve section alignment gaps. */
     .text :
@@ -29,7 +31,7 @@ SECTIONS
     }
 
     __stage1_end = .;
-    __stage1_size = __stage1_end - 0x09000400;
+    __stage1_size = __stage1_end - HPCLANG_STAGE1_BASE;
 
     /DISCARD/ :
     {

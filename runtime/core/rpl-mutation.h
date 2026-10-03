@@ -51,7 +51,9 @@ extern "C"
         HPCLANG_RPL_MUTATION_NOT_FOUND = -7,
         HPCLANG_RPL_MUTATION_DIRECTORY = -8,
         HPCLANG_RPL_MUTATION_UNSUPPORTED = -9,
-        HPCLANG_RPL_MUTATION_EXISTS = -10
+        HPCLANG_RPL_MUTATION_EXISTS = -10,
+        HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
+        HPCLANG_RPL_MUTATION_NOT_EMPTY = -12
     };
 
     /* Bootstrap-only: turn the native page interval into a rooted opaque
@@ -114,6 +116,11 @@ extern "C"
     int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io,
                                           uint32_t directory, const uint8_t *name,
                                           uint32_t name_length);
+
+    /* Explicit directory removal, with cwd/ancestor rejection before writes. */
+    int hpclang_rpl_mutation_store_rmdir(const struct hpclang_rpl_mutation_io *io,
+                                         uint32_t directory, const uint8_t *name,
+                                         uint32_t name_length, int recursive);
 
     /*
      * Internal USEROB geometry primitive for M7.3f.

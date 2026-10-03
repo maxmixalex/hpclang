@@ -144,7 +144,7 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 
 No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/bigfont objects are resolved through the live Saturn logical mapping supplied by the launcher. HPGCC3 documents bigfont as an 8-row raster with normal advance 6; its raw record is eight bytes per character, so “8×8” describes storage/raster capacity rather than a fixed 8-pixel text advance.
 
-HP39gs/40gs fixed native rasters are physical stock-ROM assets. The launcher maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime accepts that mapping only when the opaque `platform_cookie` matches the expected private-window base. The established 5×8 main and proportional mini tables already live in this window.
+HP39gs/40gs fixed native rasters are physical stock-ROM assets. The launcher maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB pages in the bootstrap-private prefix of hpclang's own code coarse table. Runtime validates the private window through the tagged HP39 context carried by the opaque `platform_cookie`; it also accepts the legacy direct-base token. Applications must not decode either form. The established 5×8 main and proportional mini tables already live in this window.
 
 Independent HP39 UI reverse engineering also establishes a third, dedicated EditLine table: fixed 6×10 cells, 20 Saturn nibbles per character, with the legacy lookup `0x07D3EA + 20 * characterCode`. The official 2.22 images place the same table at physical nibble `0x0FD882` on HP39gs and `0x0FDA35` on HP40gs. Both locations independently match the legacy table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`, and Direct/Stock Gallery both pass a ROM-derived 6×10 pixel oracle. No glyph payload from that table is redistributed by hpclang.
 
@@ -204,6 +204,17 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
 
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
+
+## Aplet-owned data (M7.3h, in progress)
+
+`<hpclang/aplet.h>` adds `hpclang_aplet_data_get/set/clear` for the current
+HP39 Stock Aplet under the supported HPGCC39 template. Reads return owned
+snapshots, writes copy their input, and clear restores the empty-list value.
+The template saves on Aplet exit. Writes are limited to 7000 native nibbles;
+other models, Direct execution and unsupported callers return `ENOSYS`.
+HP39g+/39gs/40gs have local GC, instance-isolation and exit/relaunch evidence;
+Reset behavior and formal M7.3h acceptance remain pending.
+See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-in-progress).
 
 ## Validation by service
 
@@ -341,11 +352,12 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | `hpclang_object_store_home/current/open_child/get` | ✅ HP48/HP4950 Stock | Logical store handles re-resolve paths; named lookup returns owned snapshots and never changes Stock cwd |
 | `hpclang_object_store_iterator_*` | ✅ HP48/HP4950 Stock | Independent ARM-side metadata snapshots; raw calculator-byte names are preserved |
 | `hpclang_object_store_put/remove` | M7.3f accepted | Copy owned values into logical directories. Put supports upsert, create-only and replace-only; remove deletes a non-directory entry. Stock cwd and old references are preserved. |
+| `hpclang_object_store_mkdir/rmdir` | 🧪 M7.3g implemented; formal CI pending | Classic Stock child creation, empty/explicit recursive removal, cwd/ancestor protection and retained value references. See [directory lifecycle](object-service.md#m73g-directory-lifecycle). |
 | `hpclang_variable_get/set` | M7.3f accepted | Exact HP39 category/name lookup in the active Aplet schema; native `@`, descriptor type check and `STO`; owned snapshots and size-changing writes up to 7000 nibbles. |
 | HP39 Aplet/Program/Note native reads | ✅ private runtime | Native DORRP / `PGMCXT` / `NOTESCXT` structures; no fabricated classic-RPL hierarchy |
-| HP39 Aplet Variable value recall | ✅ private runtime | `ApletVars#` schema + genuine extended ID are resolved through the Stock descriptor contract by quoting the ID and invoking Stock `@`; Runtime #320 Stock/hp39 validates `NoteText` on both HP39gs and HP40gs with HPC1 PASS and the full 52-frame progression |
+| HP39 Aplet Variable value recall | ✅ public `hpclang_variable_get/set` on HP39 Stock | `ApletVars#` schema + genuine extended ID are resolved through the Stock descriptor contract by quoting the ID and invoking Stock `@`; Runtime #320 Stock/hp39 validates `NoteText` on both HP39gs and HP40gs with HPC1 PASS and the full 52-frame progression |
 | HPGCC `<satdir.h>` high-level subset | ✅ bounded compatibility adapter | `sat_dir_open/close/curdir/chdir`, exact get, ancestor recall, recursive HOME search, owned search-result cleanup, REAL kind/query and get/recall REAL are implemented above owned store handles. `SAT_OBJ_DSCR.addr` is an opaque adapter token, not a Saturn address. |
-| HPGCC `<saturn.h>` safe subset | ✅ bounded compatibility adapter | Lifecycle, depth/drop/dropn, String push/pick/pop, historical textual int/double pushes, exact ZINT push/pop, classic REAL push/pop, CHAR push, and failure-safe `stdargs` are implemented above the clean object/stack service. Raw-address/native-BCD helpers and non-transactional reorder operations remain Migration/Internal or demand-driven. |
+| HPGCC `<saturn.h>` safe subset | ✅ bounded compatibility adapter | Lifecycle, depth/drop/dropn, String push/pick/pop, historical textual int/double pushes, exact ZINT push/pop, classic REAL push/pop, CHAR push, and failure-safe `stdargs` are implemented above the clean object/stack service. Historical raw-address/native-BCD signatures remain Migration/Internal; clean composite and transactional reorder equivalents are pending M7.3i. |
 
 **Core #296 (`35439583956`)** remains the focused mutation-core gate, and
 Runtime #320 Stock/hp39 remains the descriptor-driven `NoteText` recall gate.
@@ -371,10 +383,9 @@ mutation is different: although HPGCC 1.1/2.0 read/search/recall adapter parity
 does not require it, hpclang implements it as the clean-core **M7.3f**
 write/delete slice.
 
-**M7.3a-e are complete.** Additional source adapters should be added only when a
-representative port needs safe behavior that the bounded layer does not yet
-cover. M7.3 is complete, including the accepted M7.3f named-store and
-native-variable APIs.
+**M7.3a–f are accepted for their implemented scope.** Overall M7.3 remains open
+for directory operations, composite objects, Aplet-owned persistence and native
+namespaces. See the additional acceptance requirements in [Roadmap](roadmap.md).
 
 ## KOS, raw syscalls and widgets
 
@@ -393,6 +404,8 @@ HPGCC 1.1/2.0 win widgets and HPGCC3 GUI are also not implemented. Graphics/inpu
 | Migration | No historical wrapper in the canonical SDK; document the hpclang replacement. |
 | Unsupported | Historical behavior conflicts with hpclang architecture or cannot be made reliable. |
 
+Classifying a historical signature as Migration/Unsupported does not waive its useful application behavior. Any omitted capability requires an individually documented, maintainer-approved limitation.
+
 Binary compatibility with old HPGCC executables is not a goal. HPGCC3 custom-ROM/ROMLIB ABI is not an hpclang target.
 
 ## Near-term API order
@@ -400,12 +413,12 @@ Binary compatibility with old HPGCC executables is not a goal. HPGCC3 custom-ROM
 Based on historical stability, current implementation, and remaining dependencies:
 
 1. ✅ owned 2/4/16-level surfaces, geometry and blit;
-2. ✅ five-model physical keyboard identity/event core;
+2. ✅ six-model physical keyboard identity/event core;
 3. ✅ calculator-native font borrowing plus generated custom-font package with `STATIC_AUTO`, `STATIC_EXPLICIT`, and `FULL`;
 4. ✅ hp4950 standard-C stream storage through picolibc;
 5. ✅ exhaustive Direct Font Gallery plus HP50g and HP48gII compact Stock live-native controls; font implementation/evidence closure is complete;
 6. ✅ M7.2d filesystem source adapters over the now-owned HP49g+/HP50g FatFs core;
-7. ✅ M7.3 calculator-object/RPL/stack integration and the bounded `satdir.h` / `saturn.h` application subset are closed by Runtime #338; further raw/native compatibility remains demand-driven Migration/Internal work;
+7. M7.3a–e read/stack/adapters are accepted by historical Runtime #338; M7.3f mutation is also accepted. Complete M7.3g–j directory, persistence, composite and namespace capabilities next;
 8. only after the corresponding clean services are stable, begin broad HPG/keyboard/system compatibility headers and the renderer-agnostic declarative UI layer.
 
 This preserves the dependency direction: historical HPGCC APIs are implemented on top of a coherent hpclang core, not used to define that core.

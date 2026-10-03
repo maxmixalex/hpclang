@@ -8,7 +8,9 @@
 #include "hp39-portal-private.h"
 #include "hp39-portal-stack.h"
 
-#define STAGE_WINDOW_BASE 0x09000000u
+#include "stage-layout.h"
+
+#define STAGE_WINDOW_BASE HPCLANG_STAGE_WINDOW_BASE
 #define STAGE_CODE_OFFSET 0x00000400u
 #define STAGE_STACK_PAGES 1u
 
@@ -138,7 +140,7 @@ enum
     HP39P_VARIABLE_STORE_NIBBLE = 820u,
     HP39P_VARIABLE_STORE_NIBBLES = 60u,
     HP39P_VARIABLE_OBJECT_NIBBLE = HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES + 10u,
-    HP39P_STATIC_NIBBLES = HP39P_VARIABLE_OBJECT_NIBBLE + HP39P_VARIABLE_STORE_MAX_NIBBLES + 10u,
+    HP39P_STATIC_NIBBLES = HP39P_VARIABLE_OBJECT_NIBBLE + HP39P_STAGED_OBJECT_MAX_NIBBLES + 10u,
     HP39P_DOCODE_MACHINE_NIBBLES = 45u,
     HP39P_DOCODE_SIZE_NIBBLES = 5u + HP39P_DOCODE_MACHINE_NIBBLES
 };
@@ -319,6 +321,15 @@ static int hp39_request_words(uint32_t kind, uint32_t name_length, uint32_t satu
         return 1;
     }
 
+    if (kind == HP39P_COPY_OBJECT && name_length == sizeof(struct hpclang_hp39_object_request)) {
+        *arg = saturn_base + HP39P_REFERENCE_LIST_NIBBLE;
+        *operation = UINT32_C(0x00004053); /* ONE */
+        *pack = UINT32_C(0x0000f476);      /* NTHCOMPDROP */
+        *normalize = UINT32_C(0x00006e2f); /* TOTEMPOB: independent Stock-owned copy */
+        *expected_prologue = 0u;
+        return 1;
+    }
+
     if (kind == HP39P_VARIABLE_STORE &&
         name_length == sizeof(struct hpclang_hp39_variable_store_request)) {
         *arg = nop;
@@ -349,35 +360,51 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
     const int variable_request = kind == HP39P_VARIABLE_VALUE;
     const int reference_request = kind == HP39P_REFERENCE_EVAL;
     const int store_request = kind == HP39P_VARIABLE_STORE;
-    if (!body_request && !variable_request && !reference_request && !store_request)
+    const int copy_request = kind == HP39P_COPY_OBJECT;
+    if (!body_request && !variable_request && !reference_request && !store_request && !copy_request)
         return name_length == 0u;
 
-    if (store_request) {
-        if (name == NULL || name_length != sizeof(struct hpclang_hp39_variable_store_request))
+    if (store_request || copy_request) {
+        const size_t request_size = store_request
+                                        ? sizeof(struct hpclang_hp39_variable_store_request)
+                                        : sizeof(struct hpclang_hp39_object_request);
+        if (name == NULL || name_length != request_size)
             return 0;
-
-        const struct hpclang_hp39_variable_store_request *request =
-            (const struct hpclang_hp39_variable_store_request *)(const void *)name;
-        if (request->id_reference == 0u || request->id_reference >= UINT32_C(0x00100000) ||
-            request->type_predicate == 0u || request->type_predicate >= UINT32_C(0x00100000) ||
-            request->object_data == (uintptr_t)0u || request->object_nibbles < 5u ||
-            request->object_nibbles > HP39P_VARIABLE_STORE_MAX_NIBBLES)
-            return 0;
-
         const uint32_t object_address = saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE;
-        if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
-                                            (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                            HP39P_VARIABLE_STORE_NIBBLE + 10u, object_address) ||
-            !hp39_saturn_buffer_store_word5(
-                hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_VARIABLE_STORE_NIBBLE + 40u, request->id_reference) ||
-            !hp39_saturn_buffer_store_word5(
-                hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_VARIABLE_STORE_NIBBLE + 15u, request->type_predicate))
+        uintptr_t object_data;
+        uint32_t object_nibbles;
+        if (store_request) {
+            const struct hpclang_hp39_variable_store_request *request = (const void *)name;
+            if (request->id_reference == 0u || request->id_reference >= UINT32_C(0x00100000) ||
+                request->type_predicate == 0u || request->type_predicate >= UINT32_C(0x00100000))
+                return 0;
+            object_data = request->object_data;
+            object_nibbles = request->object_nibbles;
+            if (!hp39_saturn_buffer_store_word5(
+                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
+                    HP39P_VARIABLE_STORE_NIBBLE + 10u, object_address) ||
+                !hp39_saturn_buffer_store_word5(
+                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
+                    HP39P_VARIABLE_STORE_NIBBLE + 40u, request->id_reference) ||
+                !hp39_saturn_buffer_store_word5(
+                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
+                    HP39P_VARIABLE_STORE_NIBBLE + 15u, request->type_predicate))
+                return 0;
+        } else {
+            const struct hpclang_hp39_object_request *request = (const void *)name;
+            object_data = request->object_data;
+            object_nibbles = request->object_nibbles;
+            if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                                sizeof(hp39_saturn_portal_thunk) * 2u,
+                                                HP39P_REFERENCE_LIST_NIBBLE + 5u, object_address))
+                return 0;
+        }
+        if (object_data == 0u || object_nibbles < 5u ||
+            object_nibbles > HP39P_STAGED_OBJECT_MAX_NIBBLES)
             return 0;
 
-        const uint8_t *source = (const uint8_t *)(uintptr_t)request->object_data;
-        for (uint32_t i = 0u; i < request->object_nibbles; ++i) {
+        const uint8_t *source = (const uint8_t *)(uintptr_t)object_data;
+        for (uint32_t i = 0u; i < object_nibbles; ++i) {
             const uint8_t packed = source[i >> 1];
             const uint8_t nibble =
                 (i & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
@@ -859,6 +886,10 @@ int hpclang_hp39_portal_prepare_stock(void)
     if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
         if (!hp39_portal_gc_tail(portal, HP39P_NAME_NIBBLE + 7u + name_length * 2u))
             return -7;
+    } else if (kind == HP39P_COPY_OBJECT) {
+        const struct hpclang_hp39_object_request *request = (const void *)portal->request_name;
+        if (!hp39_portal_gc_tail(portal, HP39P_VARIABLE_OBJECT_NIBBLE + request->object_nibbles))
+            return -7;
     } else if (kind == HP39P_VARIABLE_STORE) {
         const struct hpclang_hp39_variable_store_request *request =
             (const struct hpclang_hp39_variable_store_request *)(uintptr_t)portal->request_name;
@@ -1289,7 +1320,7 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
  * trampoline.
  *
  * The stock launcher has already created a page pool and a coarse L2 table for
- * the temporary 0x09000000 window. We use that pool only as startup storage;
+ * the temporary stage window. We use that pool only as startup storage;
  * HPC1 itself sees the normal hpclang v1 fixed layout.
  */
 int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_header *hpc1,
@@ -1350,7 +1381,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
             copy[i] = source[i];
         hpclang_cache_clean((const void *)copy, stage0_size);
         /* bootstrap MMU publication invalidates I-cache before this is used.
-           The Stock alias remains valid after stage0 removes L1[0x90]. */
+           The Stock alias remains valid after stage0 removes the stage mapping. */
         hpclang_stage0_resume_target = stock_alias + (hpclang_stage0_resume_target - stage0_code);
     }
 

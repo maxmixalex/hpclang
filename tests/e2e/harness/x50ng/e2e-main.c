@@ -41,7 +41,8 @@
 
 #define L1_DATA_VA 0x07f00044u
 #define L1_CODE_VA 0x07f00048u
-#define L1_STAGE_VA 0x07f00240u
+#include "stage-layout.h"
+#define L1_STAGE_VA HPCLANG_STAGE_L1_SLOT
 #define L1_INJECT_VA 0x07f00c00u
 #define SWI_VECTOR_VA 0x08000008u
 

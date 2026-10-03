@@ -66,8 +66,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build object-mutation E2E
+    name: Build object-mutation / ${{ matrix.family }}
     runs-on: home-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [hp39, hp48, hp4950]
+    env:
+      FAMILY: ${{ matrix.family }}
     steps:
       - uses: actions/checkout@v7
       - name: Setup Arm Toolchain for Embedded
@@ -75,15 +81,16 @@ jobs:
       - name: Build object-mutation payload and launchers
         run: |
           chmod +x tools/build-e2e.sh
-          tools/build-e2e.sh object-mutation "$GITHUB_WORKSPACE/build/e2e-object"
+          tools/build-e2e.sh object-mutation "$GITHUB_WORKSPACE/build/e2e-object" "$FAMILY"
       - name: Upload object-mutation build
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-object-mutation-build
+          name: e2e-object-mutation-${{ matrix.family }}-build
           retention-days: 1
           path: |
             build/e2e-object/e2e.hpc
             build/e2e-object/e2e.result-address
+            build/e2e-object/e2e.stock-lifecycle.json
             build/e2e-object/launchers/*.bin
             build/e2e-object/launchers/*.hp
             build/e2e-object/stock-fixtures/*.hp
@@ -116,7 +123,7 @@ jobs:
       - name: Download object-mutation build
         uses: actions/download-artifact@v7
         with:
-          name: e2e-object-mutation-build
+          name: e2e-object-mutation-hp39-build
           path: build/e2e
       - name: Restore HPGCC39 asset cache
         uses: actions/cache@v6
@@ -163,7 +170,7 @@ jobs:
       - name: Download object-mutation build
         uses: actions/download-artifact@v7
         with:
-          name: e2e-object-mutation-build
+          name: e2e-object-mutation-${{ matrix.family }}-build
           path: build/e2e
       - name: Download universal x50ng
         uses: actions/download-artifact@v7
@@ -210,6 +217,7 @@ jobs:
             build/*-*.json
             build/*-kermit*
             build/*-socat.log
+            build/*-lifecycle-*.log
             build/*-summary.png
             build/stock-${{ matrix.family }}-targets.txt
             build/e2e/e2e.hpc

@@ -37,7 +37,7 @@ This is a headless emulator transport, not host OS USB passthrough.
 The common USB transport is implemented and passes canonical original-Stock
 launch on HP 39g+, HP 39gs, HP 40gs, HP 48gII, HP 49g+ and HP 50g.
 Direct runtime, Storage, Core, Quality, and Font Gallery all pass on integration
-head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
+historical head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
 and the harness timing fixes. See
 [Validation](validation.md) for the historical records and current main `d1dd4688` acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
 current HP50g Gallery USB change is recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
@@ -49,6 +49,17 @@ non-blocking repeated-run reliability and wall-clock benchmark against the
 secondary transport paths, not an unfinished USB feature or a prerequisite
 for integration. The formal acceptance links are kept in
 [Validation](validation.md).
+
+## HP39 Kermit turnaround
+
+The HP39-family server uses C-Kermit's `SET SEND PAUSE 10` to leave 10 ms
+before each reply. Stock can still be completing its send/receive transition
+when the host has already parsed the request checksum. Immediate replies can
+reach the guest USB FIFO yet fail to advance the Stock Kermit exchange,
+causing repeated directory requests and an eventual lazy-fetch timeout before
+the payload is installed. The pacing applies to the shared HP39 server on
+both USB and UART; it does not alter the USB controller or the UI sequences.
+See [C-Kermit's packet-pacing command](https://www.kermitproject.org/ck10commandref.html).
 
 ## HP49g+/50g failure diagnosis
 

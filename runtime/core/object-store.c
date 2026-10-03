@@ -351,6 +351,12 @@ static int set_mutation_errno(int result)
     case HPCLANG_RPL_MUTATION_IO:
         errno = EIO;
         break;
+    case HPCLANG_RPL_MUTATION_NOT_DIRECTORY:
+        errno = ENOTDIR;
+        break;
+    case HPCLANG_RPL_MUTATION_NOT_EMPTY:
+        errno = ENOTEMPTY;
+        break;
     case HPCLANG_RPL_MUTATION_LEVEL:
         errno = EINVAL;
         break;
@@ -428,6 +434,49 @@ int hpclang_object_store_remove(const struct hpclang_object_store *store, const 
     if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
         return -1;
     return set_mutation_errno(hpclang_rpl_mutation_store_remove(&io, directory, name, name_length));
+}
+
+int hpclang_object_store_mkdir(const struct hpclang_object_store *store, const uint8_t *name,
+                               uint32_t name_length)
+{
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
+        return -1;
+
+    /* Classic child DORRP: prologue, #7ff header, empty relative chain.
+     * The 13-nibble layout is shared by HPGCC3 sat3_crdir and Stock. */
+    static const uint8_t empty_directory[] = {0x96u, 0x2au, 0xf0u, 0x7fu, 0u, 0u, 0u};
+    struct hpclang_object *object = malloc(sizeof(*object) + sizeof(empty_directory));
+    if (object == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+    object->kind = HPCLANG_OBJECT_DIRECTORY;
+    object->native_prologue = 0x02a96u;
+    object->nibble_count = 13u;
+    memcpy(object->data, empty_directory, sizeof(empty_directory));
+    int result = hpclang_rpl_mutation_store_create(&io, directory, name, name_length, object);
+    hpclang_object_release(object);
+    return set_mutation_errno(result);
+}
+
+int hpclang_object_store_rmdir(const struct hpclang_object_store *store, const uint8_t *name,
+                               uint32_t name_length,
+                               enum hpclang_object_store_directory_remove_mode mode)
+{
+    if (mode != HPCLANG_OBJECT_STORE_REMOVE_EMPTY && mode != HPCLANG_OBJECT_STORE_REMOVE_TREE) {
+        errno = EINVAL;
+        return -1;
+    }
+    uint32_t directory = 0u;
+    struct hpclang_rpl_mutation_io io;
+    struct hpclang_rpl_stock_memory memory;
+    if (mutation_prepare(store, name, name_length, &directory, &io, &memory) != 0)
+        return -1;
+    return set_mutation_errno(hpclang_rpl_mutation_store_rmdir(
+        &io, directory, name, name_length, mode == HPCLANG_OBJECT_STORE_REMOVE_TREE));
 }
 
 struct hpclang_object_store_iterator *

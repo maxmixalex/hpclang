@@ -359,7 +359,7 @@ workspace. Runtime, Storage and Gallery regressions cover this shared layout;
 the MMU unit also checks that table operations preserve the return-code area.
 
 The implementation and local acceptance scope are complete. The final CI
-acceptance below closes M7.3f/M7.3, including the GC and settled-return gates.
+acceptance below closes M7.3f, including the GC and settled-return gates.
 
 On `3ddbab3a`, Core, Quality, Storage, Font Gallery and the complete
 [Runtime matrix](https://github.com/zyf722/hpclang/actions/runs/37004261685)
@@ -371,7 +371,74 @@ NOR preparation checks. Stock mutation checkout now enables LFS, matching Runtim
 The corrected [Object mutation run](https://github.com/zyf722/hpclang/actions/runs/37007395058)
 on `8348c142` is fully green across all six Stock models. Together with the
 unchanged implementation gates on `3ddbab3a`, this completes formal acceptance
-and closes **M7.3f and M7.3**.
+and closes **M7.3f**. Overall M7.3 remains open for the additional capabilities in
+[Roadmap](roadmap.md).
+
+## Main integration acceptance — M7.3f
+
+Main `d1dd4688` passed [Runtime](https://github.com/zyf722/hpclang/actions/runs/37008732124),
+[Object mutation](https://github.com/zyf722/hpclang/actions/runs/37008732154),
+[Core](https://github.com/zyf722/hpclang/actions/runs/37008732178),
+[Quality](https://github.com/zyf722/hpclang/actions/runs/37008732116),
+[Font Gallery](https://github.com/zyf722/hpclang/actions/runs/37008732111),
+[Docs](https://github.com/zyf722/hpclang/actions/runs/37008732108), and
+[Storage](https://github.com/zyf722/hpclang/actions/runs/37008732176).
+Storage required an unchanged failed-job rerun after a Stock HP49/50 launch
+timeout. The same CI payload passed local reproduction; the root cause remains
+unconfirmed. This is retained as a reliability investigation alongside U5,
+not evidence that a timeout defect was fixed.
+
+These gates accept M7.3a–f for their implemented scope. Directory operations,
+Aplet-owned persistence, composite objects and native namespace coverage remain
+open under M7.3g–j in [Roadmap](roadmap.md).
+
+## M7.3g local directory-service acceptance
+
+The directory implementation in `b2a69739` passed local validation on 2026-10-03:
+
+- all 34 host unit tests, including directory lifecycle, retained interior
+  references, active cwd/ancestor rejection and failure-before-write cases;
+- Clang analysis across host, Runtime, Font Gallery and Object mutation
+  compilation configurations; formatting and documentation builds;
+- the focused Object mutation Stock matrix on all six models, using the shared
+  build/asset-preparation/USB harness and settled-return gates. HP48gII/49g+/50g
+  execute the new directory lifecycle; HP39g+/39gs/40gs revalidate native-variable
+  mutation with the same rebuilt payload and freshly prepared Aplet packages.
+
+This is local regression evidence. Formal CI acceptance is pending; M7.3g and
+its downstream M7.3h–j work remain open on the roadmap.
+
+## M7.3h local Aplet-data regression
+
+Local validation on 2026-10-03 covers the in-progress Aplet data service and
+the shared stage mapping correction:
+
+- 35 host tests, Clang analysis across the four compilation configurations,
+  formatting, lint and documentation builds;
+- Stock Object mutation on all six models; each HP39 model also completes
+  eight successive invocations with checked write/read/clear phases, native GC,
+  a Stock SAVE copy, per-instance isolation and settled return between invocations;
+- Direct Runtime on all six models, including keyboard transitions;
+- HP50g Stock Storage with the workflow's SD transport and storage witness.
+
+The HP39g+ fourth-invocation abort was traced to a Stock IRQ byte store that
+overwrote the former stage descriptor at `0x07f00240`. The stage now uses the
+shared private mapping defined in `stage-layout.h` and restores its previous
+descriptor on exit. The rebuilt payload passes the previously failing sequence.
+
+The per-family Object mutation builds retain all applicable probes while
+reducing HP39 code from about 45 KB to 31 KB, allowing two test Aplets to coexist.
+This exposed a separate HP39g+ corruption path in the historical splash: the
+46-character author description produces a negative drawing coordinate. A short
+author credit fixes the package; all three HP39 models pass the eight-run gate.
+
+HP40gs also exposed a stale-PASS observation before the next runtime cleared
+BSS. Lifecycle monitoring now requires an object phase before accepting PASS.
+HP40gs passes a fresh eight-run installation with this guard; HP39g+/39gs pass
+four additional alternating-instance invocations with the same guard.
+
+These are local emulator results, not formal CI acceptance. Stock Reset behavior
+and the CI gate still need acceptance before M7.3h closes.
 
 
 ### M7.4 system services — local validation

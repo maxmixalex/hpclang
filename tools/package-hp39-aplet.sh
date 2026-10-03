@@ -38,10 +38,13 @@ mkdir -p "$BUILD" "$OUT"
 
 cc -O2 "$SDK/src/hp2aplet.c" -o "$BUILD/hp2aplet"
 
+# The historical splash centers the author using 66 - 2 * length and does
+# not clip a negative coordinate on HP39g+. Keep this field a short credit;
+# a long test description can overwrite unrelated Stock objects while drawing.
 cat > "$BUILD/hp39prj.dat" <<'EOF'
 HP39 Aplet Project
 HPCLANG HPC1 TEST
-hpclang v1 visible runtime and bootstrap smoke
+hpclang
 N
 EOF
 

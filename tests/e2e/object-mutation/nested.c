@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 #include <hpclang/object.h>
@@ -29,7 +30,7 @@ static int named_matches(const struct hpclang_object_store *store, const char *n
 /* Test-only alias construction: reserve a cell through the public stack API,
  * then point it at the named Stock object. This exercises real Stock roots,
  * without adding a borrowed-pointer API to the SDK. Resolve after allocation. */
-static int alias_value(void)
+static int alias_value(const char *root_name)
 {
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;
@@ -39,7 +40,7 @@ static int alias_value(void)
     uint32_t address = 0;
     if (hpclang_rpl_store_home_object(&reader, &address) != 0)
         return -1;
-    const char *path[] = {"ZZM7DIR", "INNER", "VALUE"};
+    const char *path[] = {root_name, "INNER", "VALUE"};
     for (uint32_t i = 0; i < 3; ++i) {
         struct hpclang_rpl_directory_entry_view entry;
         if (hpclang_rpl_directory_find(&reader, address, (const uint8_t *)path[i],
@@ -80,7 +81,7 @@ uint32_t hpclang_e2e_nested_mutation(void)
         if (hpclang_stack_push(original) != 0)
             goto done;
         pushed = 1;
-        if (alias_value() != 0)
+        if (alias_value("ZZM7DIR") != 0)
             goto done;
         ++failure;
         int status = operation == 0
@@ -119,6 +120,125 @@ done:
     hpclang_object_release(retained);
     hpclang_object_release(longer);
     hpclang_object_release(original);
+    hpclang_object_store_close(inner);
+    hpclang_object_store_close(root);
+    hpclang_object_store_close(home);
+    return failure;
+}
+
+/* Test-only context setup: prove public deletion refuses the active directory
+ * and its ancestor, then restore the incoming context before further writes. */
+static int rejects_active_directory(const struct hpclang_object_store *home,
+                                    const struct hpclang_object_store *root)
+{
+    struct hpclang_rpl_stock_memory memory;
+    struct hpclang_rpl_mutation_io io;
+    if (!hpclang_rpl_stock_mutation_io(&io, &memory))
+        return 0;
+    const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+    uint32_t original = 0u, address = 0u;
+    if (hpclang_rpl_store_current_object(&reader, &original) != 0 ||
+        hpclang_rpl_store_home_object(&reader, &address) != 0)
+        return 0;
+    const char *path[] = {"ZZM7NEW", "INNER"};
+    for (uint32_t i = 0u; i < 2u; ++i) {
+        struct hpclang_rpl_directory_entry_view entry;
+        if (hpclang_rpl_directory_find(&reader, address, (const uint8_t *)path[i],
+                                       (uint32_t)strlen(path[i]), &entry) != 0)
+            return 0;
+        address = entry.object_address;
+    }
+    for (uint32_t i = 0u; i < 5u; ++i)
+        if (!io.write_nibble(io.context, 0x8071bu + i, (address >> (4u * i)) & 15u))
+            return 0;
+    int ok = hpclang_object_store_rmdir(home, (const uint8_t *)"ZZM7NEW", 7u,
+                                        HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+             errno == EBUSY;
+    ok = ok &&
+         hpclang_object_store_rmdir(root, (const uint8_t *)"INNER", 5u,
+                                    HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+         errno == EBUSY;
+    uint32_t current = 0u;
+    ok = ok && hpclang_rpl_store_current_object(&reader, &current) == 0 && current == address;
+    for (uint32_t i = 0u; i < 5u; ++i)
+        if (!io.write_nibble(io.context, 0x8071bu + i, (original >> (4u * i)) & 15u))
+            ok = 0;
+    return ok;
+}
+
+uint32_t hpclang_e2e_directory_mutation(void)
+{
+    const uint8_t *name = (const uint8_t *)"ZZM7NEW";
+    struct hpclang_object_store *home = hpclang_object_store_home();
+    struct hpclang_object_store *root = NULL, *inner = NULL;
+    struct hpclang_object *value = NULL, *retained = NULL;
+    uint32_t failure = 0x120u;
+    int pushed = 0, created = 0;
+    if (home == NULL || hpclang_object_store_mkdir(home, name, 7u) != 0)
+        goto done;
+    created = 1;
+    ++failure;
+    if (hpclang_object_store_mkdir(home, name, 7u) != -1 || errno != EEXIST)
+        goto done;
+    root = hpclang_object_store_open_child(home, name, 7u);
+    if (root == NULL || hpclang_object_store_mkdir(root, (const uint8_t *)"INNER", 5u) != 0)
+        goto done;
+    ++failure;
+    inner = hpclang_object_store_open_child(root, (const uint8_t *)"INNER", 5u);
+    if (inner == NULL ||
+        hpclang_object_create_string((const uint8_t *)"DIRECTORY", 9u, &value) != 0 ||
+        hpclang_object_store_put(inner, (const uint8_t *)"VALUE", 5u, value,
+                                 HPCLANG_OBJECT_STORE_CREATE_ONLY) != 0)
+        goto done;
+    ++failure;
+    if (hpclang_object_store_rmdir(home, name, 7u, HPCLANG_OBJECT_STORE_REMOVE_EMPTY) != -1 ||
+        errno != ENOTEMPTY)
+        goto done;
+    if (hpclang_object_store_rmdir(inner, (const uint8_t *)"VALUE", 5u,
+                                   HPCLANG_OBJECT_STORE_REMOVE_TREE) != -1 ||
+        errno != ENOTDIR)
+        goto done;
+    ++failure;
+    if (hpclang_stack_push(value) != 0)
+        goto done;
+    pushed = 1;
+    if (alias_value("ZZM7NEW") != 0 || !rejects_active_directory(home, root))
+        goto done;
+    ++failure;
+    if (hpclang_object_store_rmdir(home, name, 7u, HPCLANG_OBJECT_STORE_REMOVE_TREE) != 0)
+        goto done;
+    created = 0;
+    ++failure;
+    if (hpclang_stack_peek(1u, &retained) != 0 || !matches(retained, "DIRECTORY"))
+        goto done;
+    hpclang_object_release(retained);
+    retained = NULL;
+    if (hpclang_stack_drop(1u) != 0)
+        goto done;
+    pushed = 0;
+    ++failure;
+    if (hpclang_object_store_get(inner, (const uint8_t *)"VALUE", 5u, &retained) != -1 ||
+        errno != ENOENT)
+        goto done;
+    if (hpclang_object_store_mkdir(home, name, 7u) != 0)
+        goto done;
+    created = 1;
+    ++failure;
+    /* Existing logical handles resolve recreated names. */
+    if (hpclang_object_store_mkdir(root, (const uint8_t *)"EMPTY", 5u) != 0 ||
+        hpclang_object_store_rmdir(root, (const uint8_t *)"EMPTY", 5u,
+                                   HPCLANG_OBJECT_STORE_REMOVE_EMPTY) != 0 ||
+        hpclang_object_store_rmdir(home, name, 7u, HPCLANG_OBJECT_STORE_REMOVE_EMPTY) != 0)
+        goto done;
+    created = 0;
+    failure = 0u;
+done:
+    if (pushed)
+        (void)hpclang_stack_drop(1u);
+    if (created)
+        (void)hpclang_object_store_rmdir(home, name, 7u, HPCLANG_OBJECT_STORE_REMOVE_TREE);
+    hpclang_object_release(retained);
+    hpclang_object_release(value);
     hpclang_object_store_close(inner);
     hpclang_object_store_close(root);
     hpclang_object_store_close(home);
