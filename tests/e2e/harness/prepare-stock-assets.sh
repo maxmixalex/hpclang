@@ -36,5 +36,3 @@ if [[ ! -f "$ROOT/.cache/hpcalc/mlreg.zip" ]]; then
 fi
 unzip -p "$ROOT/.cache/hpcalc/mlreg.zip" SETUP.BIN \
     > "$OUT/hp4950/SETUP.BIN"
-
-sha256sum "$OUT/L275_48" "$OUT/hp4950/SETUP.BIN"

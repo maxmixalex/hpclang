@@ -5,6 +5,10 @@
   "relaunches": [
     {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530301"},
     {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530301"}
+    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530301"},
+    {"sequence": "hp39-stock-copy-aplet.seq", "phase": "0x4f530300"},
+    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530300"},
+    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530301"},
+    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530301"}
   ]
 }

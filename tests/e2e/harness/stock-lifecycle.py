@@ -80,6 +80,7 @@ def main() -> None:
         env.update(
             {
                 "HPCLANG_E2E_SEQUENCE": str(sequences / step["sequence"]),
+                "HPCLANG_STOCK_REQUIRE_OBJECT_PHASE": "1",
                 "HPCLANG_STOCK_PREFIX": str(prefix),
                 "HPCLANG_STOCK_JSON": f"{prefix}-stock.json",
                 "HPCLANG_X50NG_E2E_JSON": str(result),

@@ -23,6 +23,33 @@ The two tiers are deliberately separate. Direct runtime owns common-bootstrap ex
 
 ## Calculator-object and stack-mutation witness
 
+Object mutation artifacts are built per `hp39`, `hp48`, and `hp4950` family.
+`tools/build-e2e.sh object-mutation <out-dir> <family>` selects the matching
+payload sources and launchers from the target profiles. The default `all`
+build remains available for source analysis and cross-family debugging.
+This keeps classic directory probes out of HP39 Aplet RAM while preserving
+their coverage in the classic-family jobs. Each artifact carries its own HPC1
+image and result address; the workflow never substitutes another family's image.
+
+The HP39 lifecycle contract includes Stock SAVE of a second Aplet and alternating
+write/read/clear invocations of the two instances. The default chronological
+library ordering moves the last-used Aplet to the first row, so each switch
+selects the second row. Every invocation must match its data phase and reach a
+settled Stock return.
+
+Lifecycle runs require a newly observed object phase before accepting PASS.
+Saved emulator RAM can retain the previous invocation's PASS while the new
+bootstrap has installed the data mapping but has not yet cleared BSS. Accepting
+that value would also inject the return key while the new payload is still
+running. `HPCLANG_STOCK_REQUIRE_OBJECT_PHASE` enables this launch guard for the
+lifecycle runner; it does not change the payload's result or skip a phase check.
+
+The historical HPGCC39 splash computes the author's horizontal position as
+`66 - 2 * length`. The package uses a short author credit: a long description
+produces a negative coordinate, and HP39g+ can write outside the destination
+GROB into another stored Aplet. Instance relaunches cover this corruption path;
+a PASS from only the first invocation would miss it.
+
 The canonical runtime payload covers the closed M7.3a-e read/stack/adapter baseline and HP39 public variable access. The focused Object mutation payload uses the shared USB harness on all six Stock models: classic RPL put/remove and nested-reference preservation on HP48/49/50; size-changing native-variable writes, GC, rejection paths and context restoration on HP39. Both require settled Stock return. M7.3f is complete; final CI acceptance is recorded in [Validation](validation.md#m73f-final-implementation-batch).
 
 - Direct/non-Stock environments and HP39-family targets reject the Stock-only RPL stack mutation surface cleanly with `ENOSYS`.

@@ -59,6 +59,7 @@ struct state
     struct hpclang_lcd_quiescence return_quiescence;
     int saw_pass;
     uint32_t object_store_phase;
+    int require_object_phase;
     int payload_started;
     int payload_keyboard_scheduled;
     size_t payload_keyboard_sent;
@@ -695,7 +696,13 @@ static void monitor(void *arg)
                     (unsigned)(value & 0xffffu), value);
         }
 
-        if (!s->saw_pass && value == PASS_WORD) {
+        /*
+         * Saved RAM may retain PASS before this launch clears BSS.
+         * Lifecycle
+         * payloads must publish an object phase first.
+         */
+        if (!s->saw_pass && value == PASS_WORD &&
+            (!s->require_object_phase || s->object_store_phase != 0u)) {
             size_t keyboard_count =
                 sizeof(payload_keyboard_codes) / sizeof(payload_keyboard_codes[0]);
             s->saw_pass = 1;
@@ -1001,6 +1008,7 @@ int main(int argc, char **argv)
     const char *lcd_height_text = getenv("HPCLANG_X50NG_LCD_HEIGHT");
 
     memset(&s, 0, sizeof(s));
+    s.require_object_phase = getenv("HPCLANG_STOCK_REQUIRE_OBJECT_PHASE") != NULL;
     s.mode = mode && strcmp(mode, "run") == 0 ? MODE_RUN : MODE_INSTALL;
     s.prefix = getenv("HPCLANG_STOCK_PREFIX");
     s.json = getenv("HPCLANG_STOCK_JSON");

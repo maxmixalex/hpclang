@@ -182,8 +182,8 @@ HP39 Stock Aplet under the supported HPGCC39 template. Reads return owned
 snapshots, writes copy their input, and clear restores the empty-list value.
 The template saves on Aplet exit. Writes are limited to 7000 native nibbles;
 other models, Direct execution and unsupported callers return `ENOSYS`.
-HP39g+/39gs/40gs have local GC and exit/relaunch evidence; full M7.3h acceptance
-is pending.
+HP39g+/39gs/40gs have local GC, instance-isolation and exit/relaunch evidence;
+Reset behavior and formal M7.3h acceptance remain pending.
 See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-in-progress).
 
 ## Validation by service

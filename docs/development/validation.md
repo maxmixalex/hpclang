@@ -416,8 +416,8 @@ the shared stage mapping correction:
 - 35 host tests, Clang analysis across the four compilation configurations,
   formatting, lint and documentation builds;
 - Stock Object mutation on all six models; each HP39 model also completes
-  four successive invocations with checked write/read/clear phases, native GC
-  and settled return between invocations;
+  eight successive invocations with checked write/read/clear phases, native GC,
+  a Stock SAVE copy, per-instance isolation and settled return between invocations;
 - Direct Runtime on all six models, including keyboard transitions;
 - HP50g Stock Storage with the workflow's SD transport and storage witness.
 
@@ -426,5 +426,16 @@ overwrote the former stage descriptor at `0x07f00240`. The stage now uses the
 shared private mapping defined in `stage-layout.h` and restores its previous
 descriptor on exit. The rebuilt payload passes the previously failing sequence.
 
-These are local emulator results, not formal CI acceptance. Independent Aplet
-instances and Stock Reset behavior still need acceptance before M7.3h closes.
+The per-family Object mutation builds retain all applicable probes while
+reducing HP39 code from about 45 KB to 31 KB, allowing two test Aplets to coexist.
+This exposed a separate HP39g+ corruption path in the historical splash: the
+46-character author description produces a negative drawing coordinate. A short
+author credit fixes the package; all three HP39 models pass the eight-run gate.
+
+HP40gs also exposed a stale-PASS observation before the next runtime cleared
+BSS. Lifecycle monitoring now requires an object phase before accepting PASS.
+HP40gs passes a fresh eight-run installation with this guard; HP39g+/39gs pass
+four additional alternating-instance invocations with the same guard.
+
+These are local emulator results, not formal CI acceptance. Stock Reset behavior
+and the CI gate still need acceptance before M7.3h closes.

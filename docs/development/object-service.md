@@ -424,11 +424,20 @@ invocations, separated by Aplet exit and emulator restart, verified write,
 read-and-clear, empty-and-write, and read-and-clear. The payload's lifecycle
 contract checks the expected phase as well as PASS and settled return, so
 reinitializing the data on every launch cannot pass the persistence gate.
-Independent Aplet instances and Reset behavior remain required before M7.3h
-closes; formal CI acceptance is pending.
+The eight-invocation contract then saves a second instance through Stock SAVE.
+Alternating between the two instances verifies independent writes and clears,
+without lowering native stack requirements or dropping the GC stress checks.
+All three HP39 models pass this contract locally. Reset behavior and formal CI
+acceptance remain required before M7.3h closes.
 
 The historical template's reset entry needs separate verification: its
 `_Reset` routine contains a data-clear operation, but `=Common.h` defines the
 `StndReset` dispatch as `MINUSTHREE NOP`. A routine's presence in the source
 does not establish that Stock invokes it. The public `clear()` operation does
 not currently claim to change the calculator's Reset UI or dispatch.
+
+Reset has two separate prerequisites: the topic type's `ApletReset#` property
+controls Stock's reset capability, while the template's negative-event dispatch
+selects the action. A local experiment connecting `StndReset` to `INT_04`
+alone left the library Reset softkey disabled and the saved value intact.
+That experimental template change is not shipped.
