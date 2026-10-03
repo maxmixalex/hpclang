@@ -289,6 +289,8 @@ jobs:
             build/*-font-gallery.pgm.png
             build/*-font-gallery-summary.png
             build/*-font-gallery-frames/**
+            build/*-font-gallery-shards/*/*.json
+            build/*-font-gallery-shards/*/*.pgm*
             build/gallery-${{ matrix.family }}-targets.txt
             build/e2e/e2e.hpc
             build/e2e/e2e.size.txt

@@ -485,3 +485,33 @@ explicitly configures Transfer before Start Server. The HP48 serial Gallery
 path independently passes explicit RPN selection and settled return. The new
 GPIO sampling unit, lint, formatting and documentation checks pass; M7.4 has
 42 passing host units. These local results do not replace formal CI acceptance.
+
+
+## Main boot/input and blank-return regressions
+
+At `479dfbb6`, [Runtime](https://github.com/zyf722/hpclang/actions/runs/37120100691)
+fails Stock HP50g before payload entry (`input-not-sampled`, first F6).
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37120100744) fails Direct
+HP49g+ shard 01 at `before-capture`, and HP48 shards 05/09 at `stock-resume` after
+application PASS. These failures invalidate a general reliability claim based
+on the preceding green branch run.
+
+A controlled four-second host pause during HP50g cold boot reproduces the first
+failure. The key is delivered while `GPGCON=0x55555555` (all outputs); when Stock
+later configures the keyboard, that already-held key has no fresh input edge.
+The shared key sequencer now waits for input readiness before delivery, then
+waits for guest sampling. Direct boot keys use the same implementation.
+
+The HP48 return error has a separate defect: quiescence accepted a stable blank
+screen, and the following nonblank capture check immediately failed. Blank
+samples now reset the stability count and remain pending within the existing
+watchdog. Host regression tests cover initialization delay, stale samples,
+separate readiness/sampling timeouts and blank-to-visible repaint transitions.
+
+Local validation uses the pinned emulator, main's CI Gallery payloads and the
+repository runners. HP48 shards 05 and 09 pass three consecutive runs each;
+HP39gs Direct Gallery shard 00 passes. A fresh source preparation/build succeeds,
+as do 38 host tests, lint, formatting and workflow validation. Controlled boot
+pause checks on HP50g Stock Runtime and HP49g+ Direct Gallery pass after the fix.
+This is evidence for the identified races, not proof that every Stock UI path
+is deterministic. Formal acceptance of the follow-up remains pending.

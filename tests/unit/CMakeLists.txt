@@ -247,3 +247,9 @@ target_include_directories(test_hp39_aplet_frame PRIVATE "${HPCLANG_ROOT}/runtim
 
 hpclang_unit(key_sample test_key_sample.c)
 target_include_directories(test_key_sample PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(lcd_stability test_lcd_stability.c)
+target_include_directories(test_lcd_stability PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(key_delivery test_key_delivery.c)
+target_include_directories(test_key_delivery PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

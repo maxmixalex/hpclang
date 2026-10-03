@@ -277,3 +277,21 @@ The general TTF importer has been removed. Final bitmap curation adds Cubic 11, 
 `E2E / Font Gallery` **#130 (`35832611436`)** is a historical fully-green regression gate. Current integration acceptance is tracked in [Validation](validation.md). HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
 The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). HP39g+ native-font pixel verification remains an open requirement.
+
+
+### Stock boot and repaint synchronization
+
+Direct Runtime, Direct Gallery and Stock launch sequences share the key-delivery
+state machine. A matrix key-down waits for a driven scan line and a readable
+input line; it is not sent while Stock has configured the whole matrix as
+outputs during cold boot. After each edge, the sequence waits for an actual
+guest GPIO sample. Readiness and sampling each have a bounded watchdog and a
+distinct failure reason. Neither proves that a Stock menu accepted the action;
+transfer completion, application results and settled return remain independent
+gates.
+
+LCD return stability requires a changed, nonblank frame across consecutive
+observations. A blank repaint interval resets stability instead of becoming an
+immediate `stock-resume` failure. The existing return deadline still bounds a
+screen that never recovers. Gallery artifacts retain each shard's result and
+before/PASS/return images so later shards cannot hide the failing screen.

@@ -23,5 +23,13 @@ int main(void)
     assert(!hpclang_key_sampled(0, 1u << 10, 1u << 5, 0, 0, 5, 1));
     assert(!hpclang_key_sampled(1, 0, 1u << 5, 0, 0, 5, 1));
     assert(!hpclang_key_sampled(0, 0, value, 2, 3, -1, 1));
+    /* A cold boot with all outputs must not consume a pending key-down. */
+    assert(!hpclang_key_ready(1, 0x55555555u, 0, 5, 6, -1));
+    assert(!hpclang_key_ready(1, 0, 0, 5, 6, -1));
+    assert(hpclang_key_ready(1, 1u << 26, 0, 5, 6, -1));
+    assert(hpclang_key_ready(1, 1u << 12, 0, 5, 6, -1));
+    assert(!hpclang_key_ready(1, 1u << 26, 1u << 13, 5, 6, -1));
+    assert(hpclang_key_ready(0, 2u << 10, 0, 0, 0, 5));
+    assert(!hpclang_key_ready(0, 1u << 10, 0, 0, 0, 5));
     return 0;
 }

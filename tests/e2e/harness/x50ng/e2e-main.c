@@ -11,6 +11,7 @@
 #include "options.h"
 #include "timer.h"
 #include "timed-sequence.h"
+#include "key-sequence.h"
 #include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
@@ -823,6 +824,11 @@ static int64_t inject(void *arg)
     return 0;
 }
 
+static void boot_input_failure(void *context, const char *reason)
+{
+    fail(context, reason);
+}
+
 int main(int argc, char **argv)
 {
     const char *stage0_path = getenv("HPCLANG_X50NG_STAGE0");
@@ -873,10 +879,14 @@ int main(int argc, char **argv)
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!hpclang_event_add(&s.boot.events, BOOT_NO_US, timed_key_cb, (void *)&f_down) ||
-        !hpclang_event_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US, timed_key_cb, (void *)&f_up) ||
-        !hpclang_event_add(&s.boot.events, BOOT_OK_US, timed_key_cb, (void *)&f_down) ||
-        !hpclang_event_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US, timed_key_cb, (void *)&f_up) ||
+    if (!hpclang_key_add(&s.boot.events, BOOT_NO_US, f_down.key, f_down.down, boot_input_failure,
+                         &s) ||
+        !hpclang_key_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US, f_up.key, f_up.down,
+                         boot_input_failure, &s) ||
+        !hpclang_key_add(&s.boot.events, BOOT_OK_US, f_down.key, f_down.down, boot_input_failure,
+                         &s) ||
+        !hpclang_key_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US, f_up.key, f_up.down,
+                         boot_input_failure, &s) ||
         !hpclang_event_add(&s.boot.events, INJECT_US, inject, &s) ||
         !hpclang_sequence_start(&s.boot)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");

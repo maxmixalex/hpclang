@@ -10,6 +10,7 @@
 #include "options.h"
 #include "timer.h"
 #include "timed-sequence.h"
+#include "key-sequence.h"
 #include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
@@ -220,8 +221,7 @@ struct sequence_key_event
     struct state *state;
     const struct key_action *action;
     int launch_retry;
-    int delivered;
-    int64_t deadline;
+    struct hpclang_key_delivery delivery;
 };
 
 static int64_t sequence_key_cb(void *arg)
@@ -236,20 +236,15 @@ static int64_t sequence_key_cb(void *arg)
         free(event);
         return 0;
     }
-    if (!event->delivered) {
-        key_cb((void *)action);
-        event->delivered = 1;
-        event->deadline = timer_get_clock() + 15000000LL;
-    }
-    /* Wall-clock delay alone does not prove that a loaded emulator let Stock
-     * scan this edge. Keep it in place until a real GPIO read observes it.
-     * Payload keyboard tests have their own stronger KACK protocol. */
-    if (!emulator_key_observed(action->key)) {
-        if (timer_get_clock() < event->deadline)
-            return 10000LL;
-        fprintf(stderr, "Stock key not sampled: key=%d down=%d\n", action->key, action->down);
+    int64_t delay = hpclang_key_poll(&event->delivery, action->key, action->down);
+    if (delay > 0)
+        return delay;
+    if (delay < 0) {
+        const char *reason = event->delivery.failure;
+        fprintf(stderr, "Stock key delivery failed: key=%d down=%d phase=%s\n", action->key,
+                action->down, reason);
         free(event);
-        fail(s, "input-not-sampled");
+        fail(s, reason);
         return -1;
     }
     free(event);
