@@ -13,12 +13,13 @@
 12600 tap down
 12900 capture receive-serial-disk
 13300 tap enter
-31000 capture remote-aplet
-32500 tap enter
-34000 capture lazy-fetch
-35000 host-gate
+13800 host-gate directory
+0 capture remote-aplet
+1500 tap enter
+3000 capture lazy-fetch
+4000 host-gate
 
-# Times below are relative to host-gate release. Kermit EOF proves delivery but
+# Times below are relative to host-gate release. Kermit transaction completion proves delivery but
 # Stock may still be committing the aplet/library or unwinding the serial-disk
 # UI. Use the same sparse launch-only ENTER retries as canonical Runtime. The
 # harness cancels pending retries as soon as Gallery publishes its 0x47... state,

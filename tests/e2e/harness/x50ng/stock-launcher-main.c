@@ -884,19 +884,37 @@ static int64_t seq_finish_install(void *arg)
     return 0;
 }
 
+struct host_gate_event
+{
+    struct state *state;
+    char marker[640];
+};
+
 static int64_t seq_host_gate(void *arg)
 {
-    struct state *s = arg;
-    const char *marker = getenv("HPCLANG_E2E_HOST_GATE_FILE");
-    FILE *ready = fopen(marker, "rb");
+    struct host_gate_event *event = arg;
+    struct state *s = event->state;
+    char failed[640];
+    snprintf(failed, sizeof(failed), "%s.failed", getenv("HPCLANG_E2E_HOST_GATE_FILE"));
+    FILE *error = fopen(failed, "rb");
+    if (error) {
+        fclose(error);
+        fprintf(stderr, "Stock transfer failed while waiting for %s\n", event->marker);
+        free(event);
+        fail(s, "host-gate-failed");
+        return -1;
+    }
+    FILE *ready = fopen(event->marker, "rb");
     if (!ready) {
         if (errno == ENOENT)
             return 100000LL;
+        free(event);
         fail(s, "host-gate-read");
         return -1;
     }
     fclose(ready);
-    fprintf(stderr, "stock launcher: host gate released: %s\n", marker);
+    fprintf(stderr, "stock launcher: host gate released: %s\n", event->marker);
+    free(event);
     return 0;
 }
 
@@ -906,7 +924,6 @@ static int schedule_sequence(struct state *s, const char *path)
     char line[256];
     unsigned line_no = 0;
     int64_t offset_base = 0;
-    int found_gate = 0;
 
     if (!f) {
         fprintf(stderr, "cannot open E2E sequence %s\n", path);
@@ -982,12 +999,23 @@ static int schedule_sequence(struct state *s, const char *path)
                 free(event);
                 goto invalid_action;
             }
-        } else if (strcmp(op, "host-gate") == 0 && fields == 2) {
+        } else if (strcmp(op, "host-gate") == 0 && (fields == 2 || fields == 3)) {
             const char *marker = getenv("HPCLANG_E2E_HOST_GATE_FILE");
-            if (found_gate || !marker || !*marker ||
-                !hpclang_event_add(&s->sequence.events, us, seq_host_gate, s))
+            if (!marker || !*marker ||
+                (fields == 3 &&
+                 strspn(first, "abcdefghijklmnopqrstuvwxyz0123456789-") != strlen(first)))
                 goto invalid_action;
-            found_gate = 1;
+            struct host_gate_event *event = calloc(1, sizeof(*event));
+            if (!event)
+                goto invalid_action;
+            event->state = s;
+            int length = snprintf(event->marker, sizeof(event->marker), "%s%s%s", marker,
+                                  fields == 3 ? "." : "", fields == 3 ? first : "");
+            if (length < 0 || (size_t)length >= sizeof(event->marker) ||
+                !hpclang_event_add(&s->sequence.events, us, seq_host_gate, event)) {
+                free(event);
+                goto invalid_action;
+            }
             offset_base = us;
         } else if (strcmp(op, "finish-install") == 0 && fields == 2) {
             if (!hpclang_event_add(&s->sequence.events, us, seq_finish_install, s))

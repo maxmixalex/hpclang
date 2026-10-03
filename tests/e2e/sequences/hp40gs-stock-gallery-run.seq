@@ -13,10 +13,11 @@
 19900 tap down
 20200 capture receive-serial-disk
 20600 tap enter
-40000 capture remote-aplet
-41500 tap enter
-43000 capture lazy-fetch
-44000 host-gate
+21100 host-gate directory
+0 capture remote-aplet
+1500 tap enter
+3000 capture lazy-fetch
+4000 host-gate
 
 # Times below are relative to host-gate release. Delivery completion and Stock
 # UI/install settling are separate events, so use sparse launch-only ENTER

@@ -24,7 +24,7 @@ TRANSFER="$ASSETS_DIR/$TARGET-stock-transfer"
 KERMIT_LOG="$ROOT/build/$TARGET-kermit-debug.log"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
 TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
-rm -f "$KERMIT_LOG" "$HOST_GATE"
+rm -f "$KERMIT_LOG" "$HOST_GATE" "$HOST_GATE.directory" "$HOST_GATE.failed"
 # A fresh launch must not collect screenshots or lifecycle results from an
 # earlier attempt in the same build directory.
 rm -f "$ROOT/build/$TARGET-"*.pgm "$ROOT/build/$TARGET-"*.pgm.png \
@@ -53,7 +53,7 @@ cleanup() {
     wait "${GATE_PID:-}" 2>/dev/null || true
     wait "${KERMIT_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
-    rm -f "$HOST_GATE"
+    rm -f "$HOST_GATE" "$HOST_GATE.directory" "$HOST_GATE.failed"
 }
 trap cleanup EXIT
 

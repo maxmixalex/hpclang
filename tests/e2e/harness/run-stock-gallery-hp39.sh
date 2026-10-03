@@ -35,7 +35,7 @@ HOST_GATE="$ROOT/build/$TARGET-stock-gallery-kermit-complete"
 STATE="$ROOT/build/$TARGET-stock-gallery-state"
 FIRMWARE="$ROOT/build/$TARGET-stock-gallery-2.22.bin"
 rm -rf "$TRANSFER" "$STATE"
-rm -f "$KERMIT_LOG" "$HOST_GATE"
+rm -f "$KERMIT_LOG" "$HOST_GATE" "$HOST_GATE.directory" "$HOST_GATE.failed"
 
 # Reuse the reviewed HPGCC39 packaging path used by canonical Stock runtime
 # E2E. The compact Gallery HPC1 differs; the stock APLET/Library transport does
@@ -69,7 +69,7 @@ cleanup() {
     wait "${GATE_PID:-}" 2>/dev/null || true
     wait "${KERMIT_PID:-}" 2>/dev/null || true
     wait "$SOCAT_PID" 2>/dev/null || true
-    rm -f "$HOST_GATE"
+    rm -f "$HOST_GATE" "$HOST_GATE.directory" "$HOST_GATE.failed"
 }
 trap cleanup EXIT
 

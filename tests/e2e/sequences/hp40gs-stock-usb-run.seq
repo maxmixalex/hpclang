@@ -13,10 +13,12 @@
 19500 capture receive-usb-disk
 19900 tap enter
 
-40000 capture remote-aplet
-41500 tap enter
-43000 capture lazy-fetch
-44000 host-gate
+# Wait for the directory transaction before selecting the remote Aplet.
+20400 host-gate directory
+0 capture remote-aplet
+1500 tap enter
+3000 capture lazy-fetch
+4000 host-gate
 
 0 monitor 90000
 500 capture fetch-complete

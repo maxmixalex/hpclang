@@ -22,15 +22,14 @@
 12900 capture receive-serial-disk
 13300 tap enter
 
-# Directory metadata loads first. This ENTER starts the selected aplet's lazy
-# HPGCC000/LIB275L fetch; host-gate then waits for Kermit to report successful
-# EOF for LIB275L, which implies both lazy files are complete.
-31000 capture remote-aplet
-32500 tap enter
-34000 capture lazy-fetch
-35000 host-gate
+# Wait for the directory transaction before selecting the remote Aplet.
+13800 host-gate directory
+0 capture remote-aplet
+1500 tap enter
+3000 capture lazy-fetch
+4000 host-gate
 
-# Times below are relative to host-gate release, not emulator start. Kermit EOF
+# Times below are relative to host-gate release, not emulator start. Kermit transaction completion
 # proves the bytes have arrived, but Stock can still be committing the fetched
 # aplet/library or unwinding the serial-disk UI. Retry ENTER sparsely instead
 # of guessing a fixed post-transfer delay. Once HPC1 reaches KBRD the harness

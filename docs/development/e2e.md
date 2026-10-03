@@ -136,7 +136,12 @@ Events execute in offset order. The gap between adjacent offsets is a minimum
 delay from actual delivery, so a host scheduling pause cannot collapse a key
 press and release into one guest-invisible callback batch. `host-gate` pauses
 the sequence until the transfer-completion marker exists; subsequent offsets
-start at zero relative to gate release. `monitor` first waits up to two seconds
+start at zero relative to gate release. A named gate such as `host-gate directory`
+waits for the corresponding marker suffix. HP39/40 first await the acknowledged
+`HP39DIR.000` transaction before selecting an Aplet, then await `LIB275L.000`
+before launching it. EOF alone is insufficient: the sender must also observe
+the transaction acknowledgement. A failed-transfer marker stops the sequence
+with evidence instead of waiting for the outer emulator timeout. `monitor` first waits up to two seconds
 for a nonblank pre-launch LCD frame, then arms the payload deadline before
 allowing launch keys to proceed. Blank screens still fail when that bound expires.
 

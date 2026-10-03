@@ -15,15 +15,14 @@
 12100 tap enter
 12800 capture usb-preparing
 
-# Directory metadata must be allowed to finish before selecting the remote APLET.
-# Host-gate belongs after this ENTER: waiting for LIB275L before selecting an
-# APLET deadlocks because Stock has no reason to request the lazy payload yet.
-28000 capture remote-aplet
-29500 tap enter
-31000 capture lazy-fetch
-32000 host-gate
+# Wait for the directory transaction before selecting the remote Aplet.
+13300 host-gate directory
+0 capture remote-aplet
+1500 tap enter
+3000 capture lazy-fetch
+4000 host-gate
 
-# Relative to Kermit EOF. Delivery completion and Stock install settling are
+# Relative to Kermit transaction completion. Delivery completion and Stock install settling are
 # distinct, so use sparse launch-only ENTER retries. The launcher cancels
 # retries after the runtime publishes its phase word.
 0 monitor 90000

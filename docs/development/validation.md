@@ -545,3 +545,39 @@ A fresh unchanged rerun passes System services and settled return. That rerun
 does not resolve the boot/input failure. GPIO sampling does not guarantee
 boot/menu readiness.
 Formal acceptance of the merged M7.4 follow-up remains pending.
+
+
+### HP39 directory selection and HP48 Gallery transport follow-up
+
+On `c11d02e6`, the preceding HP50g input and Direct Gallery failure points pass.
+[Runtime](https://github.com/zyf722/hpclang/actions/runs/37123155107) fails HP39gs
+before application entry: Kermit completes `HP39DIR.CUR` and `HP39DIR.000`, but
+never receives a request for `HPGCC000.000`. Its selection capture still shows
+`Preparing to get aplet`. The sequence had a fixed selection time while only
+the later payload transfer was gated.
+
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37123155104) fails HP48
+Stock at Send-Init on main's separate UART path. The shared USB Gallery fix
+from M7.4 `4a1d7115` is now carried onto main's follow-up branch; it passes locally
+with three distinct nonblank captures and settled return.
+
+HP39/40 sequences now have separate acknowledged directory and payload gates.
+A transaction requires both successful EOF and its final acknowledgement; an
+EOF from a previous file cannot release a new gate. The completion parser
+handles split log lines and large reads, and produces an explicit failed marker
+on its existing watchdog. Stock then saves failure evidence promptly.
+
+Local validation uses the unchanged Runtime build and Stock assets downloaded
+from the failing CI run. HP39gs passes the full keyboard and settled-return
+checks. In the HP40 slow-directory experiment, each host response is delayed by
+two seconds until the payload starts; the test peer's packet timeout is four
+seconds to accommodate that injected latency. The directory gate releases at
+44.5 seconds, beyond the old 41.5-second selection time, and only then does Stock
+request the payload. This experiment stops after proving directory selection;
+it is not counted as a full Runtime pass. Production protocol timeouts and
+watchdogs are unchanged.
+A separate 35-second full interruption exceeds Stock's own communication timeout;
+that experiment is a protocol failure, not successful delay-tolerance evidence.
+Host verification passes 38 C tests and all 9 discovered Python tests, including
+the six completion-parser cases; lint, formatting, workflow validation and
+documentation build pass. Formal acceptance of this follow-up remains pending.
