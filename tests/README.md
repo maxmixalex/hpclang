@@ -7,8 +7,9 @@ hpclang has two source-test layers.
 `unit/` contains host-side tests named `test_*.c`. Each test covers one
 pure or hardware-independent implementation unit and is run through CTest.
 
-Unit tests must not depend on calculator firmware, x50ng, stock UI navigation,
-or test-only replacements for SDK runtime services.
+Unit tests must not depend on calculator firmware, x50ng or Stock UI navigation.
+Bounded memory/I/O seams may isolate the implementation under test; Stock E2E
+must execute real runtime/platform behavior.
 
 ## End-to-end tests
 
@@ -29,7 +30,9 @@ integration are shared harness data rather than separate platform test suites:
 - `e2e/sequences/`: original-system UI sequences;
 - `e2e/specs/`: machine-readable behavioral/evidence expectations;
 - `e2e/harness/`: x50ng host frontends and family runners;
-- `e2e/font-gallery/`: focused all-face font visual/sample application.
+- `e2e/font-gallery/`: focused all-face font visual/sample application;
+- the `storage` build mode of `e2e/`: focused file/SD lifecycle and restoration checks;
+- `e2e/object-mutation/`: focused object/variable mutation and restoration checks.
 
 When a new public SDK capability belongs naturally in the canonical runtime
 contract, add it there. Visual/demo-heavy or independently scoped behavior may

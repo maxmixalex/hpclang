@@ -167,7 +167,7 @@ Compatibility decision is split by responsibility:
 - LCD mode/controller: **Migration**, except safe behavior exposed by display services;
 - interrupts/MMU/physical allocation: **Unsupported as routine application API** or internal/unsafe;
 - standard libc: **Direct through picolibc**, not duplicate hpclang wrappers;
-- tone/beep: future service if justified.
+- tone/beep: required M7.4 service with safe restoration.
 
 ## File I/O and standard C I/O
 
@@ -236,7 +236,7 @@ the standard `NoteText` witness on HP39gs and HP40gs. The older Runtime #304
 against that discarded shortcut.
 
 Adapter validation progresses through Core #396/#399/#400/#402/#404 and the
-focused calculator witness. The final M7.3 gate is **E2E / Runtime #338
+focused calculator witness. The historical M7.3a–e gate is **E2E / Runtime #338
 (`35812005032`) on `ba2c0398`**, fully green across Build, all Direct
 families, all Stock families, and evidence publication. The Stock witness
 round-trips ZINT/REAL/String values without changing the incoming depth, uses
@@ -246,8 +246,8 @@ copying the large launcher merely as a test fixture.
 
 **M7.3a-e are complete at the intended HPGCC 1.1/2.0 object/stack adapter
 baseline.** M7.3f public named-store and native-variable writes are implemented and accepted in the clean core.
-Additional raw/native helpers remain explicit Migration or demand-driven future
-compatibility work.
+Historical raw signatures remain Migration interfaces. Clean directory, composite,
+precision and stack-reorder equivalents remain required M7.3 work.
 
 HPGCC3's `SAT_OBJECT` direction remains useful design evidence but is not an ABI target; hpclang deliberately replaces borrowed raw addresses with owned snapshots.
 
@@ -298,6 +298,65 @@ Canonical bundled assets are bitmap-source only. The generated catalog is **245 
 
 Final curation includes Cubic 11, ChillBitmap 7px, and QuanPixel/May7 with provenance retained. Gallery labels/specimens have been strengthened for Ark Pixel regional variants, width-sensitive Latin, punctuation/digits, accents/symbols, and supported CJK/Japanese/Korean repertoires.
 
-`E2E / Font Gallery` **35298949457 / #112** is the current fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. HP39 summaries now show minifont, main, EditLine, and generated control; HP48/HP50 remain minifont, bigfont/default, and generated control.
+`E2E / Font Gallery` **35298949457 / #112** is the historical M7.1 fully-green closure gate. It is green across Build, universal x50ng, all three Direct families, and all four Stock Gallery targets. HP39 summaries now show minifont, main, EditLine, and generated control; HP48/HP50 remain minifont, bigfont/default, and generated control.
 
-The font implementation/evidence slice is closed. Remaining repository integration and bounded Stock-harness closeout are not HPGCC/font compatibility blockers.
+The tested font/model slice is accepted. Repository integration subsequently passed on main; HP39g+ native-font pixel verification remains a separate open requirement.
+
+## Full declaration counts and remaining capabilities
+
+The source set is the complete HPGCC 1.0.3 beta, HPGCC 1.1 with 39g support,
+HPGCC 2.0 SP2 and HPGCC3 R004.revA distributions. The C-header pass removes
+comments/preprocessor directives, joins multiline declarations, de-duplicates
+function names, and compares whitespace-normalized declarations. Macros,
+conditional availability, ABI compatibility and C++ classes require separate
+review; a declaration count proves none of those.
+
+| Header / comparison | Unique functions in each version | Identical common declarations | Finding |
+| --- | --- | --- | --- |
+| `hpgraphics.h`, 1.0.3 → 1.1 | 55 → 59 | 55 | Existing count confirmed; four metric/geometry helpers added |
+| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | Existing count confirmed; wrappers still not implemented by hpclang |
+| `hpkeyb49.h`, 1.0.3 → 1.1 | 12 → 17 | 11 | `keyb_getkey` changes return type; five names added |
+| `hpkeyb49.h`, 1.1 → 2.0 | 17 → 17 | 17 | Existing count confirmed |
+| `hpscreen.h`, 1.0.3 → 1.1 | 12 → 9 | 9 | Three old minifont helpers removed; 9 is the retained subset |
+| `hpscreen.h`, 1.1 → 2.0 | 9 → 9 | 9 | Existing count confirmed |
+| `kos.h`, 1.0.3 → 1.1 | 15 → 32 | 15 | Existing retained-subset count confirmed |
+| `kos.h`, 1.1 → 2.0 | 32 → 33 | 31 | `fdelete` replaced by `kos_fdelete`; `kos_ResetSD` added |
+| `kos.h`, 2.0 → 3 | 33 → 33 | 33 | Existing count confirmed |
+| `syscall.h`, 1.0.3 → 1.1 | 9 → 9 | 9 | Raw syscall equality is not six-model service availability |
+| `ggl.h`, 1.1 → 2.0 | 28 → 28 | 28 | Existing count confirmed |
+| `hpsys.h`, 1.1 → 2.0 | 40 → 41 | 40 | `sys_is_slowOn` added; repeated `sys_waitTicks` is counted once |
+| `saturn.h`, 1.1 → 2.0 | 50 → 58 | 49 | Nine names added, `sat_moveup` removed; repeated `sat_push_string` counted once |
+| `satdir.h`, 1.1 → 2.0 | 29 → 29 | 29 | High-level get/recall/search remains read-oriented |
+| `hpstdio.h`, 1.1 → 2.0 | 37 → 40 | 37 | `_scanf`, `_sscanf`, `_vsscanf` added |
+| `hpstdio.h` → `stdio.h`, 2.0 → 3 | 40 → 40 | 40 | Existing count confirmed; console input semantics still need their own comparison |
+| `fsystem.h`, 2.0 → 3 | 41 → 43 | 41 | Two handle helpers added; existing count confirmed |
+| HPGCC3 `sat3.h` | 156 | Not a same-header comparison | Must be inventoried by application capability as well as raw representation |
+
+Common-signature counts must not be interpreted as complete capability
+coverage. For example, `saturn.h`'s 49 common declarations do not describe all
+58 functions in 2.0, and neither count covers HP39's Aplet template protocol.
+
+### Confirmed gaps and source anchors
+
+Archive-relative paths identify evidence without making the old libraries
+build dependencies or copying their implementations into hpclang.
+
+| Application capability | Historical evidence | Current hpclang / required follow-up |
+| --- | --- | --- |
+| Create a directory; remove an entire directory tree | HPGCC3 `libs_workspace/headers/sat3.h`: `sat3_crdir`, `sat3_pgdir`; implemented in `hplib/sat3/sat3_dir.c` | Clean `mkdir/rmdir` implemented with reference/cwd safety; formal M7.3g acceptance pending |
+| Aplet-owned persistent data | 1.1 `sources/HP39-Aplet/Skeleton/hpgccaplet.s`: `CustomData@`, `_Entry`, `_Action`, `_Exit`, `_Reset` | Stock template passes data around ARM execution and saves it on exit; no public hpclang self-data contract or relaunch persistence gate |
+| Lists, real/complex arrays and matrices | 1.1/2.0 `saturn.h` construction/push helpers; HPGCC3 `sat3_createlist`, list operations, `sat3_createrarray/carray/matrix`; corresponding list/matrix sources exist | Kind recognition and opaque snapshots do not supply construction, indexing, extraction or edits; add owned typed services |
+| Complex, identifiers/tags, binary and wider numeric values | HPGCC3 `sat3_createcplx_*`, `sat3_createid_str`, `sat3_createtag_str`, `sat3_createhxs_*`, decNumber/XREAL conversion families | Current constructors cover CHAR, String, int64 ZINT and finite-double REAL only; inventory exact preservation and conversion requirements separately from arithmetic |
+| Stack rearrangement and Boolean exchange | 1.1/2.0 `sat_stack_swap/nip`, `sat_pushtruefalse`; HPGCC3 `sat3_swap`, `sat3_pushtruefalse` | Public push/pop/drop/replace is not a transactional swap; add a safe single-operation contract |
+| HP39 named Program/Note/Aplet lifecycle | Native catalogs and ROM descriptor/context evidence; public generic HPGCC variable-definition CRUD has not been established | Private reads and public schema-variable get/set are not general named-object CRUD; research creation, deletion, naming and context rules explicitly |
+| Port namespaces | Existing roadmap assigns HOME/Port 0/1/2 to object services | Current handles expose HOME/current/child only; distinguish RAM directories, libraries/backups and flash port persistence before declaring support |
+| File attribute mutation and timestamp coverage | 2.0 `fsystem.h`: `FSChAttr`, `FSGetCreatTime`, `FSGetAccessDate` | Public adapter lacks these; `FSCreate` rejects read-only/hidden/system attributes. Extend independently of accepted basic stream tests |
+| Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | Monotonic time exists; public civil clock, sound, contrast and event scheduling are missing. Design Stock-preserving services rather than raw IRQ exposure |
+| Text input and console behavior | Historical `readint/readdouble/_gets`, key-plane helpers; HPGCC3 `keyb_setalphalock/shiftplane` and message API | Physical DOWN/UP/REPEAT is not text entry, Alpha-lock policy, numeric input or an on-screen console |
+| Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | Software gray surfaces do not prove physical gray output; demonstrate PAINT/XOR/pattern/clip and status behavior through clean primitives/adapters |
+
+HPGCC3 declarations, especially ROMLIB-dependent functions, are evidence of
+application requirements, not proof they work on all six Stock ROMs. Likewise,
+the HP39 template proves a saved-data channel, not arbitrary creation of system
+variable definitions. Every proposed cross-model API needs its own execution
+and restoration evidence.

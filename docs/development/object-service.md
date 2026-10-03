@@ -359,3 +359,40 @@ The focused workflow shares build, target profiles, assets, USB transport and
 strict return verification with the existing harness. Payload PASS alone is
 insufficient. The raw-address HPGCC adapter boundary remains documented in the
 [adapter map](hpgcc-saturn-adapter.md).
+
+## M7.3g — directory lifecycle
+
+HP48gII/49g+/50g Stock applications can create a child directory with
+`hpclang_object_store_mkdir()` and remove one with `hpclang_object_store_rmdir()`.
+Names use the existing raw-byte, explicit-length contract, including the empty
+name used by Hidden directories. Creation rejects every existing name with
+`EEXIST`; it never overwrites a value or directory.
+
+Removal requires an explicit mode:
+
+- `HPCLANG_OBJECT_STORE_REMOVE_EMPTY` rejects nonempty directories with `ENOTEMPTY`;
+- `HPCLANG_OBJECT_STORE_REMOVE_TREE` removes the entire child subtree;
+- a non-directory returns `ENOTDIR`, a missing name `ENOENT`, and Stock cwd or
+  any ancestor containing it `EBUSY`.
+
+The existing ordinary-object `remove()` still rejects directories with `EISDIR`.
+HP39 and Direct execution remain unsupported for this classic-RPL namespace.
+
+Before writing, the mutation planner validates the removed subtree's links,
+remaining directory geometry, live references and combined USEROB/TEMPOB space.
+References to removed values retain a TEMP copy of the subtree with its relative
+links intact. Expected allocation, malformed-tree and active-cwd failures leave
+Stock memory unchanged. As with the existing mutation backend, unexpected I/O
+failure after commit starts is not a rollback guarantee.
+
+Logical handles name paths: they return `ENOENT` while the path is absent and
+resolve a later directory created at the same path. Owned value and iterator
+snapshots keep their prior contents independently of those handles.
+
+Host tests cover nested/Hidden directory lifecycle, duplicate/type/nonempty
+errors, cwd/ancestor protection, live interior-value retention, stale/recreated
+handles, malformed links and memory exhaustion before writes. The focused
+Object mutation payload creates its own nested tree through the public APIs,
+retains a native value reference across recursive removal, checks active-cwd
+rejection, removes empty directories and restores the original namespace before
+requiring settled Stock return. Formal CI acceptance remains pending.

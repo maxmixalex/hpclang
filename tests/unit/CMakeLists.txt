@@ -131,6 +131,7 @@ target_include_directories(test_object_construct PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(object_store
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     test_object_store.c
     rpl-stock-memory-stub.c
     "${HPCLANG_ROOT}/runtime/core/object-store.c"

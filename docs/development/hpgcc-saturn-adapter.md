@@ -18,7 +18,7 @@ surface progression:
 | HPGCC 1.0.3 beta | not in the inventoried public surface | not in the inventoried public surface | no compatibility baseline is inferred from 1.0.3 |
 | HPGCC 1.1 / 39G-support tree | about 50 functions | 29 functions | primary source/behavior baseline |
 | HPGCC 2.0 SP2 | 58 functions | 29 functions | 49/49 common `saturn.h` signatures and 29/29 `satdir.h` signatures remain exact from 1.1 |
-| HPGCC3 R004.revA | replaced by the later `sat3_*` environment | replaced | design/mutation evidence only; not an hpclang ROMLIB ABI target |
+| HPGCC3 R004.revA | replaced by the later `sat3_*` environment | replaced | directory/composite capability evidence; not an hpclang ROMLIB ABI target |
 
 The 1.1 and 2.0 `satdir.h` behavior is therefore stable enough to adapt as one
 bounded source surface. HPGCC3 is intentionally not used to force its raw
@@ -146,35 +146,23 @@ compatibility scope. The 2.0 distribution also contains real `stdargs` clients
 such as the sieve/lotto examples. These are stronger priorities than merely
 matching every declaration in `saturn.h`.
 
-## Deliberately not expanded further
+## Historical M7.3e boundary and remaining capability work
 
-The complete 2.0 SP2 source was checked before freezing the breadth of this
-adapter. The remaining historical families are not treated as an automatic
-backlog:
+M7.3e accepted a bounded 1.1/2.0 scalar/read adapter. The following capabilities
+remain required in the clean object service before overall parity closure:
 
-- `sat_stack_swap` directly rewrites the DSKTOP pointer table, and
-  `sat_stack_nip` is implemented as swap+drop. A clean equivalent needs one
-  transactional stack-reorder primitive; two sequential replaces would permit
-  a half-swapped failure state. No bundled representative client currently
-  justifies adding that primitive solely for compatibility.
-- HPGCC list construction builds native nibble-form objects in a C heap buffer
-  and later copies the representation into Saturn memory. A future typed list
-  constructor can be added if an actual port needs list assembly; the old raw
-  representation builder is not the model for the canonical API.
-- `sat_push_bint` is safe in isolation but exposes a narrower 20-bit native
-  integer object and has no meaningful bundled-client pressure. The exact ZINT
-  constructor already supplies the useful general integer exchange capability.
-- `sat_push_comp`, `sat_push_realvector`, and `sat_push_realarray` accept native
-  calculator BCD words as their public data representation. They remain
-  Migration/Internal rather than being mistaken for ordinary C complex/vector
-  APIs.
-- `sat_push_zint_array` and raw conversion helpers can be revisited if a real
-  arbitrary-precision port requires them; their digit-array/native-form
-  contracts do not justify widening the core pre-emptively.
+- transactional stack swap/nip, with preflight preventing partial updates;
+- owned list construction and element access;
+- binary integer exchange with explicit native width and range;
+- complex values, real/complex arrays and matrices without public native BCD;
+- wider-number exchange with explicit precision and conversion rules;
+- HPGCC3 directory creation and explicit recursive removal.
 
-This is an intentional compatibility boundary: representative application-level
-behavior is adapted; raw representation and pointer-table behavior is not
-reintroduced merely to increase function counts.
+Historical pointer-table edits, borrowed addresses and raw nibble builders
+remain migration interfaces. Their representation is not required in public
+APIs, but their useful application behavior must have a clean equivalent.
+An omitted capability requires an individually documented, maintainer-approved
+limitation. M7.3g–j in [Roadmap](roadmap.md) track the remaining work.
 
 ### Migration/Internal `saturn.h` area
 
@@ -251,6 +239,6 @@ replace the stronger focused evidence above.
 The bounded source surface is therefore frozen for **M7.3e**. General named-object
 put/remove remains outside the HPGCC 1.1/2.0 read/search/recall adapter
 baseline, and is implemented by the clean-core **M7.3f** public API, with final acceptance complete.
-Raw-address `satdir`, raw Saturn memory/BCD helpers, list builders, and
-non-transactional stack reorders stay Migration/Internal or demand-driven
-future compatibility work rather than requirements for M7.3f.
+Raw-address and native-representation signatures remain Migration/Internal.
+Clean list/composite and transactional stack-reorder behavior belongs to M7.3i;
+it does not invalidate the narrower accepted M7.3f gate.

@@ -24,7 +24,8 @@ repeated-run performance benchmarking is tracked independently in
 [Stock USB transport](docs/development/stock-usb-transport.md).
 
 The ALG/RPN setup and keyboard readiness corrections, together with the full
-Quality gates, pass formal acceptance on `fdcd38b7`; see
+Quality gates, passed the historical acceptance on `fdcd38b7`. Current main
+acceptance is `d1dd4688`, including M7.3f; see
 [Validation](docs/development/validation.md).
 
 ## Development documentation
@@ -46,5 +47,6 @@ Run `tools/lint.sh` for the repository lint gate: Ruff checks the Python 3.12 ho
 Run `tools/format.sh` to format tracked C/C++ and Python sources with clang-format and Ruff. `tools/format.sh --check <files...>` checks selected files without rewriting them. Quality checks all owned C/C++ and Python sources against the committed format baseline. Third-party and generated font sources are excluded. Use clang-format from the pinned ATfE toolchain and Ruff from `tools/requirements-quality.txt`.
 
 Run `ATFE=/path/to/atfe tools/analyze.sh` for Clang static analysis using the
-CMake compilation databases for host unit tests and ARM runtime/Gallery builds.
+four CMake compilation databases: host unit tests and ARM Runtime, Font Gallery,
+and Object mutation builds.
 See [Validation](docs/development/validation.md) for scope and CI responsibilities.

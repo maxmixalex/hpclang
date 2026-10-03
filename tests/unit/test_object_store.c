@@ -22,6 +22,7 @@ enum
 };
 
 static uint8_t memory[NIBBLES];
+static uint32_t writes;
 
 static struct hpclang_rpl_memory_bounds fake_bounds = {
     .magic = HPCLANG_RPL_BOUNDS_MAGIC,
@@ -59,6 +60,7 @@ int test_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t valu
     if (fake_boot.saturn_state == 0u || address.nibble >= NIBBLES || value > 0x0fu)
         return 0;
     memory[address.nibble] = value;
+    ++writes;
     return 1;
 }
 
@@ -360,6 +362,117 @@ static void test_public_mutation_modes(void)
     hpclang_object_store_close(home);
 }
 
+static uint32_t word5(uint32_t address)
+{
+    uint32_t value = 0u;
+    for (uint32_t i = 0; i < 5u; ++i)
+        value |= (uint32_t)memory[address + i] << (i * 4u);
+    return value;
+}
+
+static void test_public_directory_lifecycle(void)
+{
+    fake_boot.saturn_state = 1u;
+    fake_boot.platform_cookie = (uintptr_t)&fake_bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    fake_device.model = HPCLANG_MODEL_HP50G;
+    fake_device.family = HPCLANG_FAMILY_HP4950;
+    memset(memory, 0, sizeof(memory));
+    put_nibbles(USEROB, 0x92000u, 5u);
+    put_nibbles(CONTEXT, 0x92000u, 5u);
+    put_nibbles(0x92000u, DORRP, 5u);
+    put_nibbles(0x806eeu, 0x84000u, 5u);
+    put_nibbles(0x806f3u, 0x85000u, 5u);
+    put_nibbles(0x806f8u, 0x90000u, 5u);
+    put_nibbles(0x806fdu, 0x9000au, 5u); /* one existing stack reference */
+    put_nibbles(0x90000u, 0x82000u, 5u);
+    put_nibbles(0x80e9bu, (0x90000u - 0x85000u) / 5u, 5u);
+    struct hpclang_object_store *home = hpclang_object_store_home();
+    assert(home != NULL);
+    uint32_t fence = fake_bounds.user_limit;
+    fake_bounds.user_limit = word5(0x806f8u);
+    writes = 0u;
+    assert(hpclang_object_store_mkdir(home, (const uint8_t *)"D", 1u) == -1 && errno == ENOSPC);
+    assert(writes == 0u);
+    fake_bounds.user_limit = fence;
+    assert(hpclang_object_store_mkdir(home, (const uint8_t *)"D", 1u) == 0);
+    assert(hpclang_object_store_mkdir(home, (const uint8_t *)"D", 1u) == -1 && errno == EEXIST);
+    struct hpclang_object_store *child =
+        hpclang_object_store_open_child(home, (const uint8_t *)"D", 1u);
+    assert(child != NULL);
+    assert(hpclang_object_store_mkdir(child, (const uint8_t *)"E", 1u) == 0);
+    struct hpclang_object_store *nested =
+        hpclang_object_store_open_child(child, (const uint8_t *)"E", 1u);
+    assert(nested != NULL);
+    struct hpclang_object *value = NULL;
+    assert(hpclang_object_create_string((const uint8_t *)"saved", 5u, &value) == 0);
+    assert(value != NULL);
+    assert(hpclang_object_store_put(nested, (const uint8_t *)"V", 1u, value,
+                                    HPCLANG_OBJECT_STORE_CREATE_ONLY) == 0);
+    assert(hpclang_object_store_rmdir(nested, (const uint8_t *)"V", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+           errno == ENOTDIR);
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_EMPTY) == -1 &&
+           errno == ENOTEMPTY);
+    assert(hpclang_object_store_remove(home, (const uint8_t *)"D", 1u) == -1 && errno == EISDIR);
+
+    /* Find nested objects through the live native links, then keep an interior
+     * value reference on the Stock stack across recursive removal. */
+    uint32_t h = word5(USEROB);
+    uint32_t d = h + 8u + word5(h + 8u) + 6u;
+    uint32_t e = d + 8u + word5(d + 8u) + 6u;
+    uint32_t v = e + 8u + word5(e + 8u) + 6u;
+    put_nibbles(word5(0x806f8u), v, 5u);
+    put_nibbles(CONTEXT, e, 5u);
+    writes = 0u;
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+           errno == EBUSY);
+    assert(word5(CONTEXT) == e && word5(USEROB) == h && writes == 0u);
+    assert(hpclang_object_store_rmdir(child, (const uint8_t *)"E", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+           errno == EBUSY);
+    put_nibbles(CONTEXT, h, 5u);
+    uint32_t temp_limit = fake_bounds.temp_limit;
+    fake_bounds.temp_limit = word5(0x806f3u);
+    writes = 0u;
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+           errno == ENOSPC);
+    assert(writes == 0u && word5(word5(0x806f8u)) == v);
+    fake_bounds.temp_limit = temp_limit;
+    /* Corrupt a nested chain link: reject the whole tree before any write. */
+    uint32_t saved_link = word5(v - 11u);
+    put_nibbles(v - 11u, 0xfffffu, 5u);
+    writes = 0u;
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1);
+    assert(writes == 0u);
+    put_nibbles(v - 11u, saved_link, 5u);
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == 0);
+    assert(word5(CONTEXT) == word5(USEROB));
+    uint32_t preserved = word5(word5(0x806f8u));
+    assert(preserved != v && word5(preserved) == DOCSTR);
+    assert(memory[preserved + 10u] == ('s' & 15) && memory[preserved + 11u] == ('s' >> 4));
+    struct hpclang_object *out = NULL;
+    assert(hpclang_object_store_get(nested, (const uint8_t *)"V", 1u, &out) == -1 &&
+           errno == ENOENT);
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_TREE) == -1 &&
+           errno == ENOENT);
+    /* Logical handles resolve the same name again after recreation. */
+    assert(hpclang_object_store_mkdir(home, (const uint8_t *)"D", 1u) == 0);
+    assert(hpclang_object_store_mkdir(child, NULL, 0u) == 0);
+    assert(hpclang_object_store_rmdir(child, NULL, 0u, HPCLANG_OBJECT_STORE_REMOVE_EMPTY) == 0);
+    assert(hpclang_object_store_rmdir(home, (const uint8_t *)"D", 1u,
+                                      HPCLANG_OBJECT_STORE_REMOVE_EMPTY) == 0);
+    hpclang_object_release(value);
+    hpclang_object_store_close(nested);
+    hpclang_object_store_close(child);
+    hpclang_object_store_close(home);
+}
+
 int main(void)
 {
     test_home_lookup_and_child();
@@ -368,5 +481,6 @@ int main(void)
     test_hidden_directory_logical_handle();
     test_unsupported_environments();
     test_public_mutation_modes();
+    test_public_directory_lifecycle();
     return 0;
 }

@@ -359,7 +359,7 @@ workspace. Runtime, Storage and Gallery regressions cover this shared layout;
 the MMU unit also checks that table operations preserve the return-code area.
 
 The implementation and local acceptance scope are complete. The final CI
-acceptance below closes M7.3f/M7.3, including the GC and settled-return gates.
+acceptance below closes M7.3f, including the GC and settled-return gates.
 
 On `3ddbab3a`, Core, Quality, Storage, Font Gallery and the complete
 [Runtime matrix](https://github.com/zyf722/hpclang/actions/runs/37004261685)
@@ -371,4 +371,23 @@ NOR preparation checks. Stock mutation checkout now enables LFS, matching Runtim
 The corrected [Object mutation run](https://github.com/zyf722/hpclang/actions/runs/37007395058)
 on `8348c142` is fully green across all six Stock models. Together with the
 unchanged implementation gates on `3ddbab3a`, this completes formal acceptance
-and closes **M7.3f and M7.3**.
+and closes **M7.3f**. Overall M7.3 remains open for the additional capabilities in
+[Roadmap](roadmap.md).
+
+## Main integration acceptance — M7.3f
+
+Main `d1dd4688` passed [Runtime](https://github.com/zyf722/hpclang/actions/runs/37008732124),
+[Object mutation](https://github.com/zyf722/hpclang/actions/runs/37008732154),
+[Core](https://github.com/zyf722/hpclang/actions/runs/37008732178),
+[Quality](https://github.com/zyf722/hpclang/actions/runs/37008732116),
+[Font Gallery](https://github.com/zyf722/hpclang/actions/runs/37008732111),
+[Docs](https://github.com/zyf722/hpclang/actions/runs/37008732108), and
+[Storage](https://github.com/zyf722/hpclang/actions/runs/37008732176).
+Storage required an unchanged failed-job rerun after a Stock HP49/50 launch
+timeout. The same CI payload passed local reproduction; the root cause remains
+unconfirmed. This is retained as a reliability investigation alongside U5,
+not evidence that a timeout defect was fixed.
+
+These gates accept M7.3a–f for their implemented scope. Directory operations,
+Aplet-owned persistence, composite objects and native namespace coverage remain
+open under M7.3g–j in [Roadmap](roadmap.md).

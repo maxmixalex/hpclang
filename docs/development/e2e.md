@@ -241,4 +241,4 @@ The general TTF importer has been removed. Final bitmap curation adds Cubic 11, 
 
 `E2E / Font Gallery` **#130 (`35832611436`)** is a historical fully-green regression gate. Current integration acceptance is tracked in [Validation](validation.md). HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
-The font implementation/evidence slice is therefore closed. Remaining work is repository integration and bounded Stock-harness closeout, not additional font-core or Gallery implementation.
+The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). HP39g+ native-font pixel verification remains an open requirement.

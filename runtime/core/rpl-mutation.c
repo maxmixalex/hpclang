@@ -794,7 +794,7 @@ static int collect_directory_patches(const struct hpclang_rpl_mutation_io *io,
                        item == delete_context->item;
 
         if (deleting) {
-            if (delete_context->found != 0u || entry.prologue == RPL_DORRP)
+            if (delete_context->found != 0u)
                 return HPCLANG_RPL_MUTATION_MALFORMED;
 
             uint32_t next = cursor.finished ? 0u : cursor.item;
@@ -1184,7 +1184,8 @@ int hpclang_rpl_mutation_store_create(const struct hpclang_rpl_mutation_io *io, 
 
 static int store_replace_target(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
                                 const uint8_t *name, uint32_t name_length,
-                                struct hpclang_rpl_directory_entry_view *entry, uint32_t *span)
+                                struct hpclang_rpl_directory_entry_view *entry, uint32_t *span,
+                                int allow_directory)
 {
     if (!io_ready(io) || entry == NULL || span == NULL || (name == NULL && name_length != 0u))
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -1197,7 +1198,7 @@ static int store_replace_target(const struct hpclang_rpl_mutation_io *io, uint32
     int result = hpclang_rpl_directory_find(&reader, directory, name, name_length, entry);
     if (result != HPCLANG_RPL_STORE_OK)
         return store_result_to_mutation(result);
-    if (entry->prologue == RPL_DORRP)
+    if (entry->prologue == RPL_DORRP && !allow_directory)
         return HPCLANG_RPL_MUTATION_DIRECTORY;
 
     result = hpclang_rpl_object_span(&reader, entry->object_address,
@@ -1220,7 +1221,7 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
 
     struct hpclang_rpl_directory_entry_view entry;
     uint32_t span = 0u;
-    result = store_replace_target(io, directory, name, name_length, &entry, &span);
+    result = store_replace_target(io, directory, name, name_length, &entry, &span, 0);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -1287,8 +1288,8 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
     return snapshot_copy_to_saturn(io, new_address, object);
 }
 
-int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
-                                      const uint8_t *name, uint32_t name_length)
+static int store_remove(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
+                        const uint8_t *name, uint32_t name_length, int directory_mode)
 {
     if (!io_ready(io) || (name == NULL && name_length != 0u) ||
         name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
@@ -1296,7 +1297,8 @@ int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, 
 
     struct hpclang_rpl_directory_entry_view entry;
     uint32_t span = 0u;
-    int result = store_replace_target(io, directory, name, name_length, &entry, &span);
+    int result =
+        store_replace_target(io, directory, name, name_length, &entry, &span, directory_mode != 0);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
@@ -1309,6 +1311,39 @@ int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, 
     uint32_t object_end = 0u;
     if (!checked_add(entry.object_address, span, &object_end) || object_end <= link)
         return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    if (directory_mode != 0) {
+        if (entry.prologue != RPL_DORRP)
+            return HPCLANG_RPL_MUTATION_NOT_DIRECTORY;
+        const struct hpclang_rpl_reader reader = {
+            .read_nibble = io->read_nibble,
+            .context = io->context,
+        };
+        uint32_t cwd = 0u;
+        result = hpclang_rpl_store_current_object(&reader, &cwd);
+        if (result != HPCLANG_RPL_STORE_OK)
+            return store_result_to_mutation(result);
+        if (cwd >= entry.object_address && cwd < object_end)
+            return HPCLANG_RPL_MUTATION_BUSY;
+        struct hpclang_rpl_directory_cursor cursor;
+        result = hpclang_rpl_directory_cursor_open(&reader, entry.object_address, &cursor);
+        if (result != HPCLANG_RPL_STORE_OK)
+            return store_result_to_mutation(result);
+        if (directory_mode == 1 && !cursor.finished)
+            return HPCLANG_RPL_MUTATION_NOT_EMPTY;
+
+        /* The deletion plan skips the removed subtree. Validate its internal
+         * links separately before copying it for any surviving references. */
+        const struct userob_shift_geometry identity = {0};
+        struct directory_patch_plan validation = {
+            .count = 0u,
+            .remaining_entries = RPL_DIRECTORY_ENTRY_LIMIT,
+        };
+        result = collect_directory_patches(io, &reader, &identity, &validation,
+                                           entry.object_address, object_end, 0u, NULL);
+        if (result != HPCLANG_RPL_MUTATION_OK)
+            return result;
+    }
 
     uint32_t remove_nibbles = object_end - link;
     if (remove_nibbles > INT32_MAX)
@@ -1351,6 +1386,20 @@ int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, 
     }
 
     return commit_userob_shift(io, &geometry, &directory_plan);
+}
+
+int hpclang_rpl_mutation_store_remove(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
+                                      const uint8_t *name, uint32_t name_length)
+{
+    return store_remove(io, directory, name, name_length, 0);
+}
+
+int hpclang_rpl_mutation_store_rmdir(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
+                                     const uint8_t *name, uint32_t name_length, int recursive)
+{
+    if (recursive != 0 && recursive != 1)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    return store_remove(io, directory, name, name_length, recursive ? 2 : 1);
 }
 
 static int stack_depth(const struct hpclang_rpl_mutation_io *io, uint32_t *depth)

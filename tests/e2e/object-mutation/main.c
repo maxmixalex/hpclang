@@ -13,6 +13,7 @@
 
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_nested_mutation(void);
+uint32_t hpclang_e2e_directory_mutation(void);
 uint32_t hpclang_e2e_hp39_mutation(void);
 
 #define HPCLANG_OBJECT_PHASE UINT32_C(0x4f530000)
@@ -302,6 +303,9 @@ int main(void)
         goto done;
     }
     phase(26u);
+    failure = hpclang_e2e_directory_mutation();
+    if (failure != 0u)
+        goto done;
     failure = hpclang_e2e_nested_mutation();
     if (failure != 0u)
         goto done;

@@ -75,6 +75,28 @@ extern "C"
     int hpclang_object_store_remove(const struct hpclang_object_store *store, const uint8_t *name,
                                     uint32_t name_length);
 
+    /* Create an empty child directory; any existing name returns EEXIST. */
+    int hpclang_object_store_mkdir(const struct hpclang_object_store *store, const uint8_t *name,
+                                   uint32_t name_length);
+
+    enum hpclang_object_store_directory_remove_mode
+    {
+        HPCLANG_OBJECT_STORE_REMOVE_EMPTY = 0,
+        HPCLANG_OBJECT_STORE_REMOVE_TREE = 1
+    };
+
+    /*
+     * Remove a child directory. EMPTY rejects nonempty directories (ENOTEMPTY);
+     * TREE explicitly removes the whole subtree. Non-directories return ENOTDIR.
+     * Deleting Stock cwd or an ancestor returns EBUSY, without changing cwd.
+     * Existing Stock value references retain a TEMP copy; logical path handles
+     * re-resolve names and report ENOENT while their directory is absent.
+     * Unsupported platforms return ENOSYS. Expected failures precede mutation.
+     */
+    int hpclang_object_store_rmdir(const struct hpclang_object_store *store, const uint8_t *name,
+                                   uint32_t name_length,
+                                   enum hpclang_object_store_directory_remove_mode mode);
+
     /*
      * Copy one non-directory named object into an owned hpclang_object snapshot.
      * Directories are opened with hpclang_object_store_open_child().
