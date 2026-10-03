@@ -596,6 +596,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
     )
     shutil.copy2(args.selector, root / "src" / "main.c")
     shutil.copy2(args.headless_header, root / "src" / "headless-ui-init.h")
+    shutil.copy2(args.stage_layout, root / "src" / "stage-layout.h")
     for header in (
         "stock-return-phase.h",
         "lcd-quiescence.h",
@@ -638,6 +639,7 @@ def main() -> None:
     parser.add_argument("--gallery-frontend", type=Path, required=True)
     parser.add_argument("--selector", type=Path, required=True)
     parser.add_argument("--headless-header", type=Path, required=True)
+    parser.add_argument("--stage-layout", type=Path, required=True)
     args = parser.parse_args()
 
     root = args.x50ng

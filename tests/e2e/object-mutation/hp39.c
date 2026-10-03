@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <hpclang/object.h>
+#include <hpclang/aplet.h>
 #include <hpclang/variable.h>
 #include "saturn-view.h"
 
@@ -72,8 +73,116 @@ done:
     return failure;
 }
 
+static uint32_t aplet_data_roundtrip(void)
+{
+    struct hpclang_object *original = NULL, *value = NULL, *readback = NULL;
+    uint32_t failure = 0x280u;
+    uint8_t text[1536], actual[1536];
+    hpclang_e2e_result = 0x4f530280u;
+    if (hpclang_aplet_data_get(NULL) != -1 || errno != EINVAL ||
+        hpclang_aplet_data_set(NULL) != -1 || errno != EINVAL)
+        goto done;
+    if (hpclang_aplet_data_get(&original) != 0)
+        goto done;
+    uint32_t previous = stock_word(0x806eeu);
+    int collected = 0;
+    for (uint32_t step = 0; step < 128u; step++) {
+        size_t size = step % 3u == 0u ? 1536u : (step % 3u == 1u ? 7u : 0u);
+        memset(text, (int)('A' + step % 26u), size);
+        failure = 0x281u;
+        hpclang_e2e_result = 0x4f532000u | step;
+        if (hpclang_object_create_string(text, size, &value) != 0 ||
+            hpclang_aplet_data_set(value) != 0)
+            goto done;
+        hpclang_object_release(value);
+        value = NULL;
+        failure = 0x282u;
+        hpclang_e2e_result = 0x4f533000u | step;
+        if (hpclang_aplet_data_get(&readback) != 0)
+            goto done;
+        size_t count = 0;
+        if (hpclang_object_string_size(readback, &count) != 0 || count != size ||
+            hpclang_object_string_copy(readback, actual, size) != 0 ||
+            memcmp(text, actual, size) != 0)
+            goto done;
+        hpclang_object_release(readback);
+        readback = NULL;
+        uint32_t current = stock_word(0x806eeu);
+        if (current < previous)
+            collected = 1;
+        previous = current;
+        if (collected && step > 5u)
+            break;
+    }
+    failure = 0x283u;
+    if (!collected || hpclang_aplet_data_clear() != 0 || hpclang_aplet_data_get(&readback) != 0 ||
+        hpclang_object_kind(readback) != HPCLANG_OBJECT_LIST)
+        goto done;
+    /* The rejected write must leave the current value and older snapshot intact. */
+    failure = 0x285u;
+    uint8_t *oversize = calloc(3496u, 1u);
+    if (oversize == NULL)
+        goto done;
+    int created = hpclang_object_create_string(oversize, 3496u, &value);
+    free(oversize);
+    if (created != 0 || hpclang_aplet_data_set(value) != -1 || errno != E2BIG ||
+        hpclang_object_kind(readback) != HPCLANG_OBJECT_LIST)
+        goto done;
+    hpclang_object_release(readback);
+    readback = NULL;
+    if (hpclang_aplet_data_get(&readback) != 0 ||
+        hpclang_object_kind(readback) != HPCLANG_OBJECT_LIST)
+        goto done;
+    failure = 0x284u;
+    if (hpclang_aplet_data_set(original) != 0)
+        goto done;
+    failure = 0u;
+done:
+    hpclang_object_release(original);
+    hpclang_object_release(value);
+    hpclang_object_release(readback);
+    return failure;
+}
+
+/* The lifecycle gate expects EMPTY -> SAVED -> EMPTY across distinct ARM
+ * invocations, each separated by a settled APLET-library return. */
+static uint32_t aplet_data_lifecycle(void)
+{
+    static const uint8_t saved[] = "HPCLANG-APLET-PERSIST";
+    struct hpclang_object *value = NULL, *next = NULL;
+    uint32_t failure = 0x290u, phase = 0u;
+    if (hpclang_aplet_data_get(&value) != 0)
+        goto done;
+    if (hpclang_object_kind(value) == HPCLANG_OBJECT_LIST) {
+        if (hpclang_object_create_string(saved, sizeof(saved) - 1u, &next) != 0 ||
+            hpclang_aplet_data_set(next) != 0)
+            goto done;
+        phase = 0x300u;
+    } else {
+        uint8_t bytes[sizeof(saved)];
+        size_t size = 0u;
+        if (hpclang_object_string_size(value, &size) != 0 || size != sizeof(saved) - 1u ||
+            hpclang_object_string_copy(value, bytes, size) != 0 || memcmp(bytes, saved, size) != 0)
+            goto done;
+        if (hpclang_aplet_data_clear() != 0)
+            goto done;
+        phase = 0x301u;
+    }
+    hpclang_e2e_result = 0x4f530000u | phase;
+    for (volatile uint32_t n = 12000000u; n != 0u; --n)
+        __asm__ volatile("nop");
+    failure = 0u;
+done:
+    hpclang_object_release(value);
+    hpclang_object_release(next);
+    return failure;
+}
+
 uint32_t hpclang_e2e_hp39_mutation(void)
 {
+    uint32_t aplet_failure = aplet_data_roundtrip();
+    if (aplet_failure != 0u)
+        return aplet_failure;
     struct hpclang_object *original = NULL, *value = NULL, *readback = NULL;
     uint8_t *text = malloc(3500u), *actual = malloc(3500u);
     uint32_t failure = 0x120u;
@@ -165,7 +274,7 @@ uint32_t hpclang_e2e_hp39_mutation(void)
     for (size_t i = 0u; i < 4u; ++i)
         if (context_before[i] == UINT32_MAX || stock_word(bindings[i]) != context_before[i])
             goto done;
-    failure = 0;
+    failure = aplet_data_lifecycle();
 done:
     free(actual);
     free(text);

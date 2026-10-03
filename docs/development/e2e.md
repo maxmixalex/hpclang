@@ -203,6 +203,14 @@ runner communication loss. Storage
 path filters include `runtime/libc/kos-call.S` so future bridge changes exercise
 this boundary.
 
+The current private stage window is `0x01300000`, defined once in
+`platform/armtoolbox/stage-layout.h` for C, assembly, linking and emulator
+observers. Stage0 restores the previous descriptor on exit. Stock HP39g+
+interrupts use the byte at `0x07f00240`, so the historical `L1[0x90]` location
+cannot remain a private mapping while native Stock calls run. The KOS bridge
+protects the current shared-layout slot; the public HPC1 data/code ABI is
+unchanged.
+
 Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
 
 HP 39g+ participates in Direct, focused, and original-Stock family matrices through its data-driven `nor` profile. All six profiles currently select `stock_transport: usb`. See [Stock USB transport](stock-usb-transport.md) for migration evidence and the distinction between implemented defaults and repeated-run stability.

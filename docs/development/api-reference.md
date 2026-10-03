@@ -175,6 +175,17 @@ Creation/access timestamps, raw KOS handles/module IDs, and implementation-speci
 
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
+## Aplet-owned data (M7.3h, in progress)
+
+`<hpclang/aplet.h>` adds `hpclang_aplet_data_get/set/clear` for the current
+HP39 Stock Aplet under the supported HPGCC39 template. Reads return owned
+snapshots, writes copy their input, and clear restores the empty-list value.
+The template saves on Aplet exit. Writes are limited to 7000 native nibbles;
+other models, Direct execution and unsupported callers return `ENOSYS`.
+HP39g+/39gs/40gs have local GC and exit/relaunch evidence; full M7.3h acceptance
+is pending.
+See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-in-progress).
+
 ## Validation by service
 
 | Service | Host | ARMv4T link | Direct runtime | Stock evidence |

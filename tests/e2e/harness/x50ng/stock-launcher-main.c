@@ -470,6 +470,7 @@ static void write_json(struct state *s, const char *status)
             "  \"returned\":%s,\n"
             "  \"return_settled\":%s,\n"
             "  \"return_observations\":%u,\n"
+            "  \"object_store_phase\":%u,\n"
             "  \"pc\":\"0x%08x\",\n"
             "  \"display_on\":%s,\n"
             "  \"sd_mounted\":%s\n"
@@ -477,7 +478,7 @@ static void write_json(struct state *s, const char *status)
             s->mode == MODE_INSTALL ? "install" : "run", status, s->saw_pass ? "true" : "false",
             s->payload_keyboard_scheduled ? "true" : "false", s->returned ? "true" : "false",
             return_is_settled(s) ? "true" : "false", s->return_quiescence.observations,
-            s->hdw->cpu->regs[15], is_display_on() ? "true" : "false",
+            s->object_store_phase, s->hdw->cpu->regs[15], is_display_on() ? "true" : "false",
             emulator_is_sd_mounted() ? "true" : "false");
     fclose(f);
 }
@@ -505,12 +506,13 @@ static void write_runtime_json(struct state *s, const char *status)
             "  \"returned\":%s,\n"
             "  \"return_settled\":%s,\n"
             "  \"return_observations\":%u,\n"
+            "  \"object_store_phase\":%u,\n"
             "  \"pc\":\"0x%08x\"\n"
             "}\n",
             status, s->saw_pass ? "true" : "false",
             s->payload_keyboard_scheduled ? "true" : "false", s->returned ? "true" : "false",
             return_is_settled(s) ? "true" : "false", s->return_quiescence.observations,
-            s->hdw->cpu->regs[15]);
+            s->object_store_phase, s->hdw->cpu->regs[15]);
     fclose(f);
 }
 
@@ -687,6 +689,7 @@ static void monitor(void *arg)
         }
 
         if ((value & 0xffff0000u) == PHASE_OBJECT_STORE && value != s->object_store_phase) {
+            s->payload_started = 1;
             s->object_store_phase = value;
             fprintf(stderr, "stock object-store phase OS%02u (0x%08x)\n",
                     (unsigned)(value & 0xffffu), value);
@@ -731,7 +734,7 @@ static void monitor(void *arg)
      * bootstrap restored the stock MMU. HP48gII, HP49g+ and HP50g still have
      * to return through stage1 and stage0; injecting a key during that teardown
      * can trip the stock launcher. The monitor snapshots the pre-PrRUN Stock
-     * L1[0x90] descriptor and observes the stage0 coarse alias while the
+     * private stage descriptor and observes the stage0 coarse alias while the
      * payload runs. After PASS, returning to that baseline or otherwise leaving
      * the observed alias proves that stage0 no longer owns the slot. Stock may
      * immediately reuse/remap the address space, so a transient literal zero is

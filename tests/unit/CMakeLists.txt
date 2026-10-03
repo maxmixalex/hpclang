@@ -240,3 +240,7 @@ target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/includ
 
 hpclang_unit(hp39_portal_stack test_hp39_portal_stack.c)
 target_include_directories(test_hp39_portal_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
+
+hpclang_unit(hp39_aplet_frame test_hp39_aplet_frame.c
+    "${HPCLANG_ROOT}/runtime/core/hp39-aplet-frame.c")
+target_include_directories(test_hp39_aplet_frame PRIVATE "${HPCLANG_ROOT}/runtime/core")

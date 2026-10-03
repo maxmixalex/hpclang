@@ -1,13 +1,15 @@
 .syntax unified
 .arm
 
+#include "stage-layout.h"
+
 #ifndef HPCLANG_STAGE0_MODEL
 #error HPCLANG_STAGE0_MODEL must identify the packaged calculator model
 #endif
 
-.equ STAGE_WINDOW_BASE, 0x09000000
-.equ STAGE1_BASE,       0x09000400
-.equ STAGE_L1_SLOT,     0x07f00240
+.equ STAGE_WINDOW_BASE, HPCLANG_STAGE_WINDOW_BASE
+.equ STAGE1_BASE,       HPCLANG_STAGE1_BASE
+.equ STAGE_L1_SLOT,     HPCLANG_STAGE_L1_SLOT
 .equ SWI_VECTOR,        0x08000008
 
 .section .text.stage0.entry,"ax",%progbits
@@ -56,27 +58,18 @@ hpclang_armtoolbox_stage0:
     mov     r10, r1                  /* ARMSYS/Saturn state */
     adr     r8, hpclang_armtoolbox_stage0
 
-    /*
-     * The temporary 0x09000000 mapping and stage stack belong to this stage0
-     * invocation. Keep stock IRQ/FIQ masked for their entire lifetime. The
-     * common bootstrap has its own nested save/disable/restore pair; because
-     * it now observes this already-masked CPSR, its restore leaves interrupts
-     * masked until stage0 has removed the temporary alias below.
-     *
-     * HP48gII in particular can otherwise take a stock interrupt immediately
-     * after the common bootstrap restores L1[0x11]/L1[0x12]. That stock path
-     * reuses L1[0x90], replacing this launcher's coarse table while stage1 is
-     * still executing from 0x09000000. Preserve the original caller CPSR in
-     * callee-saved r9; stage1 already follows AAPCS and stage0 relies on the
-     * same rule for r8/r10.
-     */
+    /* Keep Stock IRQ/FIQ masked until the temporary stage mapping and stack
+     * have been released. The common bootstrap observes this masked CPSR and
+     * preserves it; native portal calls explicitly manage their Stock edge.
+     * Keep the caller CPSR in callee-saved r9 for the final restoration. */
     bl      .Lirq_save_disable
     mov     r9, r0
 
-    /* Install the stock launcher-provided coarse table at 0x09000000. */
+    /* Install the stock launcher-provided coarse table in the private stage slot. */
     ldr     r0, [r10, #0x920]
     orr     r0, r0, #0x11
     ldr     r2, =STAGE_L1_SLOT
+    ldr     r12, [r2]                /* restore the prior descriptor on exit */
     str     r0, [r2]
     bl      .Lpublish_stage_map
 
@@ -97,8 +90,9 @@ hpclang_armtoolbox_stage0:
     mov     r2, r2, lsl #12
     ldr     r3, =STAGE_WINDOW_BASE
     add     r2, r2, r3
-    sub     r2, r2, #4
+    sub     r2, r2, #8
     str     sp, [r2]
+    str     r12, [r2, #4]
     mov     sp, r2
 
     /* Resolve the two embedded blobs relative to the actual packed image. */
@@ -168,12 +162,12 @@ hpclang_armtoolbox_stage0:
     add     sp, sp, #24
 
     /* Restore the original stock-launcher stack. */
+    ldr     r5, [sp, #4]
     ldr     sp, [sp]
 
-    /* Remove only our temporary 0x09000000 alias while IRQ/FIQ stay masked. */
-    mov     r0, #0
+    /* Restore the borrowed slot while IRQ/FIQ stay masked. */
     ldr     r2, =STAGE_L1_SLOT
-    str     r0, [r2]
+    str     r5, [r2]
     bl      .Lpublish_stage_map
 
     /*
@@ -242,7 +236,7 @@ hpclang_armtoolbox_stage0:
 
 
 /*
- * Publish the L1[0x90] install/remove. This is deliberately local to the
+ * Publish the stage slot install/remove. This is deliberately local to the
  * position-independent stage0; the normal common bootstrap uses sync.S.
  * Restore the stock SWI vector inside the supervisor handler, before
  * exception-return can expose a temporary vector to a pending interrupt.

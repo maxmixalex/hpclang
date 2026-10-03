@@ -407,3 +407,24 @@ The directory implementation in `b2a69739` passed local validation on 2026-10-03
 
 This is local regression evidence. Formal CI acceptance is pending; M7.3g and
 its downstream M7.3h–j work remain open on the roadmap.
+
+## M7.3h local Aplet-data regression
+
+Local validation on 2026-10-03 covers the in-progress Aplet data service and
+the shared stage mapping correction:
+
+- 35 host tests, Clang analysis across the four compilation configurations,
+  formatting, lint and documentation builds;
+- Stock Object mutation on all six models; each HP39 model also completes
+  four successive invocations with checked write/read/clear phases, native GC
+  and settled return between invocations;
+- Direct Runtime on all six models, including keyboard transitions;
+- HP50g Stock Storage with the workflow's SD transport and storage witness.
+
+The HP39g+ fourth-invocation abort was traced to a Stock IRQ byte store that
+overwrote the former stage descriptor at `0x07f00240`. The stage now uses the
+shared private mapping defined in `stage-layout.h` and restores its previous
+descriptor on exit. The rebuilt payload passes the previously failing sequence.
+
+These are local emulator results, not formal CI acceptance. Independent Aplet
+instances and Stock Reset behavior still need acceptance before M7.3h closes.

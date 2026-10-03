@@ -1,15 +1,17 @@
 .syntax unified
 .arm
 
+#include "../../platform/armtoolbox/stage-layout.h"
+
 .section .text.hpclang_kos_swi3,"ax",%progbits
 .global hpclang_kos_swi3
 .type hpclang_kos_swi3,%function
 hpclang_kos_swi3:
-    /* Stock SD services may reuse L1[0x90]. The ARMToolbox caller still
+    /* Protect the private stage slot across Stock SD services. The caller still
        owns that window for its return code and stack. Keep bookkeeping
        in preserved registers and the HPC1 stack, outside that window. */
     stmfd sp!, {r4-r8, lr}
-    ldr r4, =0x07f00240
+    ldr r4, =HPCLANG_STAGE_L1_SLOT
     ldr r5, [r4]
     /* KOS returns through the caller LR, not the instruction after SWI. */
     adr lr, .Lkos_service_return

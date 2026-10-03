@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <hpclang/bootstrap.h>
+#include <hpclang/aplet.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
@@ -59,6 +60,19 @@ static int supported_model(uint32_t model)
            model == HPCLANG_MODEL_HP50G;
 }
 
+static int rejects_aplet_data(void)
+{
+    struct hpclang_object *value = NULL, *snapshot = NULL;
+    if (hpclang_object_create_string(NULL, 0u, &value) != 0)
+        return 0;
+    int rejected = hpclang_aplet_data_get(&snapshot) == -1 && errno == ENOSYS && snapshot == NULL &&
+                   hpclang_aplet_data_set(value) == -1 && errno == ENOSYS &&
+                   hpclang_aplet_data_clear() == -1 && errno == ENOSYS;
+    hpclang_object_release(snapshot);
+    hpclang_object_release(value);
+    return rejected;
+}
+
 static int same_entries(struct hpclang_object_store_iterator *before,
                         struct hpclang_object_store_iterator *after)
 {
@@ -90,6 +104,8 @@ int main(void)
         return finish(0xe0u);
     if (boot->saturn_state == 0u)
         return finish(0xe1u);
+    if (!rejects_aplet_data())
+        return finish(0xe2u);
 
     /* The shared USB harness transfers the same owned witness on all models. */
     static const uint8_t name[] = {'Z', 'Z', 'E', '2', 'E'};

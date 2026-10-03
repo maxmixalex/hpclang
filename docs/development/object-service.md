@@ -396,3 +396,39 @@ Object mutation payload creates its own nested tree through the public APIs,
 retains a native value reference across recursive removal, checks active-cwd
 rejection, removes empty directories and restores the original namespace before
 requiring settled Stock return. Formal CI acceptance remains pending.
+
+## M7.3h — HP39 Aplet-owned data (in progress)
+
+`<hpclang/aplet.h>` provides `hpclang_aplet_data_get()`,
+`hpclang_aplet_data_set()` and `hpclang_aplet_data_clear()` for HP39 Stock
+applications packaged with the supported HPGCC39 Aplet template. This is the
+current Aplet's custom data channel, separate from predefined Aplet Variables.
+
+Get returns an owned snapshot. Set makes an independent Stock-owned copy, so
+the caller can release its input immediately. Clear restores the template's
+initial empty list. The template commits the returned data when the Aplet is
+exited; a successful set is not a promise that an interrupted native execution
+has already saved its value. Set is bounded to 7000 native nibbles (3495 string
+bytes), with `E2BIG` for larger values. Unsupported models, Direct execution and
+unrecognized template callers return `ENOSYS`.
+
+The runtime verifies the template's `_Action` instruction protocol before
+accessing its data argument. Stock `TOTEMPOB` makes the copy, and the caller
+frame is resolved again after allocation because garbage collection can move
+both the frame and native objects. No fixed RAM address or Aplet title
+identifies the data cell.
+
+Local HP39g+/39gs/40gs evidence covers growing, shrinking and empty strings across native
+garbage collection, input release, clear, and settled return. Four successive
+invocations, separated by Aplet exit and emulator restart, verified write,
+read-and-clear, empty-and-write, and read-and-clear. The payload's lifecycle
+contract checks the expected phase as well as PASS and settled return, so
+reinitializing the data on every launch cannot pass the persistence gate.
+Independent Aplet instances and Reset behavior remain required before M7.3h
+closes; formal CI acceptance is pending.
+
+The historical template's reset entry needs separate verification: its
+`_Reset` routine contains a data-clear operation, but `=Common.h` defines the
+`StndReset` dispatch as `MINUSTHREE NOP`. A routine's presence in the source
+does not establish that Stock invokes it. The public `clear()` operation does
+not currently claim to change the calculator's Reset UI or dispatch.

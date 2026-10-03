@@ -84,6 +84,7 @@ jobs:
           path: |
             build/e2e-object/e2e.hpc
             build/e2e-object/e2e.result-address
+            build/e2e-object/e2e.stock-lifecycle.json
             build/e2e-object/launchers/*.bin
             build/e2e-object/launchers/*.hp
             build/e2e-object/stock-fixtures/*.hp
@@ -210,6 +211,7 @@ jobs:
             build/*-*.json
             build/*-kermit*
             build/*-socat.log
+            build/*-lifecycle-*.log
             build/*-summary.png
             build/stock-${{ matrix.family }}-targets.txt
             build/e2e/e2e.hpc
