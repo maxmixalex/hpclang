@@ -636,3 +636,23 @@ HP40gs Stock Gallery also passes with the freshly prepared emulator and the
 merged branch's rebuilt Gallery payload: four distinct nonblank pages, native
 font checks and settled Stock return. The earlier reference-payload run passes
 separately; the rebuilt-payload run supplies the branch-specific evidence.
+
+### M7.4 HP39 command-wait recovery
+
+[Runtime at `144bd930`](https://github.com/zyf722/hpclang/actions/runs/37130948663)
+fails on HP39gs before application entry: directory transfer completes, but
+the Init-Info exchange for `HPGCC000.000` expires. The portable Kermit bundle
+now preserves command receive mode and its active packet timer after an
+Init-Info reply. Idle startup remains silent. Stock ROMs, payload assertions
+and the existing transfer watchdogs are unchanged.
+
+The PTY regression fails with the unmodified server at the missing recovery
+NAK, and passes with the patched executable built by `tools/build-ckermit.sh`.
+It also checks CRCs, all binary byte values, a lost data ACK and a second file
+transaction. The CI bundle runs this check after both cache restore and build.
+Local System services passes complete USB installation, application checks and
+settled Stock return on HP39g+, HP39gs, HP40gs and HP48gII with the newly built
+server. The three HP39 runs execute concurrently with normal CPU scheduling.
+An additional experiment restricting all three to one CPU exceeds existing
+launch/transfer bounds; it is not successful load-tolerance evidence.
+Complete-branch CI acceptance remains pending.

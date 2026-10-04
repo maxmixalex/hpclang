@@ -24,6 +24,14 @@ Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calcu
 
 They are not vendored into the normal source tree unless their redistribution terms are explicitly suitable. Where CI needs an external firmware fixture, the documentation must record what the fixture is, where it came from, and how its identity is checked.
 
+## E2E host tools
+
+The portable tool bundle builds the pinned upstream C-Kermit source with
+`tests/e2e/harness/ckermit-server-command-wait.patch`. C-Kermit uses the
+three-clause BSD license; `tools/build-ckermit.sh` installs its upstream
+`COPYING.TXT` alongside the executable as `kermit-COPYING.txt`. This host-side
+test tool is not linked into calculator applications.
+
 ## Font assets
 
 The old provisional Basic-Latin tables are no longer the long-term custom-font source. `runtime/fonts/fonts.zip` is the reviewed source bundle used to regenerate the checked-in font catalog. It contains upstream font families together with source/provenance and license material; redistribution decisions are made per included family rather than inferred from historical HPGCC code.

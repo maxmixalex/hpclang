@@ -1,0 +1,24 @@
+diff --git a/ckcpro.w b/ckcpro.w
+index 6d0563f..f72a201 100644
+--- a/ckcpro.w
++++ b/ckcpro.w
+@@ -84,7 +84,7 @@ _PROTOTYP(int sndspace,(int));
+   extern char * snd_move, * snd_rename, * srimsg;
+   extern char filnam[], ofilnam[], fspec[], ttname[], ofn1[];
+   extern CHAR sstate, *srvptr, *data;
+-  extern int timint, rtimo, nfils, hcflg, xflg, flow, mdmtyp, network;
++  extern int rcvtimo, timint, rtimo, nfils, hcflg, xflg, flow, mdmtyp, network;
+   extern int oopts, omode, oname, opath, nopush, isguest, xcmdsrc, rcdactive;
+   extern int rejection, moving, fncact, bye_active, urserver, fatalio;
+   extern int protocol, prefixing, carrier, fnspath, interrupted;
+@@ -636,6 +636,10 @@ a {
+     justone = x;			/* But this... */
+ #else
+     tinit(0);				/* Initialize most things */
++    nakstate = 1;                    /* Still waiting for a client command. */
++    if (timint < 1)
++        timint = chktimo(rtimo,timef); /* Active exchange, not idle server. */
++    rcvtimo = timint;
+ #endif /* COMMENT */
+ #endif /* COMMENT */
+ #endif /* NOSERVER */

@@ -61,6 +61,22 @@ the payload is installed. The pacing applies to the shared HP39 server on
 both USB and UART; it does not alter the USB controller or the UI sequences.
 See [C-Kermit's packet-pacing command](https://www.kermitproject.org/ck10commandref.html).
 
+The portable E2E bundle builds C-Kermit from the revision pinned in
+`tools/build-ckermit.sh`. Its small command-wait patch preserves receive mode
+and an active packet timer after an Init-Info (`I`) exchange. Upstream's
+`tinit(0)` clears both, leaving the server unable to send a recovery NAK if
+Stock misses the init-reply notification while receive interrupts are disabled;
+the small packet pause alone cannot prevent that race. A server waiting for its first
+request remains silent; the patch enables recovery only after negotiation.
+Stock ROMs, application results and transfer watchdogs are unchanged.
+
+`tests/e2e/harness/test-kermit-server.py` checks the bundled executable over
+a PTY on both cache hits and fresh builds. It verifies idle silence, recovery
+after an ignored init reply, CRC-checked binary transfer, a lost data ACK and
+a subsequent file transaction. This exercises the actual server rather than
+matching its configuration text. See the upstream
+[Init-Info protocol contract](https://www.kermitproject.org/protocol/kproto.pdf).
+
 ## HP49g+/50g failure diagnosis
 
 A later main regression exposed a third assumption: a timed MODE/NEG/F6

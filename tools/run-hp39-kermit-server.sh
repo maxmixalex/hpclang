@@ -24,8 +24,10 @@ cd "$SERVE"
 
 # Stock can still be retiring its USB send when Kermit has already parsed the
 # request checksum. Give it time to enter receive mode before replying; an
-# immediate reply can be consumed and discarded during that transition.
+# immediate reply can arrive before Stock enables receive notifications.
 # Use Kermit's packet pacing for both transports, not a model-specific UI wait.
+# The bundled server also recovers an unanswered Init-Info exchange; pacing
+# alone cannot guarantee that Stock observes every receive notification.
 exec "$KERMIT" \
     -Y -H \
     -l "$TTY" \

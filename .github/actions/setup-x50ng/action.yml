@@ -9,7 +9,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: build/x50ng/dist
-        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tools/install-ci-packages.sh', 'tests/e2e/harness/x50ng/**', 'platform/armtoolbox/stage-layout.h', 'runtime/core/datetime.c', 'runtime/core/datetime-internal.h', 'runtime/core/rtc-decode.c', 'include/hpclang/datetime.h') }}
+        key: hpclang-x50ng-portable-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/setup-x50ng/action.yml', 'tools/prepare-x50ng.py', 'tools/fetch-x50ng.sh', 'tools/build-ckermit.sh', 'tools/install-ci-packages.sh', 'tests/e2e/harness/ckermit-server-command-wait.patch', 'tests/e2e/harness/x50ng/**', 'platform/armtoolbox/stage-layout.h', 'runtime/core/datetime.c', 'runtime/core/datetime-internal.h', 'runtime/core/rtc-decode.c', 'include/hpclang/datetime.h') }}
 
     - name: Inspect restored x50ng state
       id: x50ng-state
@@ -59,11 +59,16 @@ runs:
       shell: bash
       run: make -C build/x50ng/dist/firmware bootloaders official
 
-    - name: Install portable runtime tools and libraries
+    - name: Install portable tool build dependencies and runtime libraries
       if: steps.x50ng-state.outputs.portable != 'true'
       shell: bash
       run: |
-        bash tools/install-ci-packages.sh libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 ckermit socat
+        bash tools/install-ci-packages.sh gcc make libncurses-dev libcrypt-dev libglib2.0-0t64 libgtk-4-1 libncurses6 liblua5.4-0 socat
+
+    - name: Build pinned Kermit with command-wait recovery
+      if: steps.x50ng-state.outputs.portable != 'true'
+      shell: bash
+      run: bash tools/build-ckermit.sh build/x50ng/dist/tools
 
     - name: Make x50ng bundle self-contained for E2E runners
       if: steps.x50ng-state.outputs.portable != 'true'
@@ -75,13 +80,6 @@ runs:
         libs="$dist/runtime-lib"
         mkdir -p "$tools" "$libs"
 
-        if command -v ckermit >/dev/null 2>&1; then
-          kermit="$(command -v ckermit)"
-        else
-          kermit="$(command -v kermit)"
-        fi
-        cp -L "$kermit" "$tools/kermit"
-        ln -sfn kermit "$tools/ckermit"
         cp -L "$(command -v socat)" "$tools/socat"
         chmod +x "$tools/kermit" "$tools/socat"
 
@@ -115,6 +113,12 @@ runs:
           exit 1
         fi
         touch "$dist/.hpclang-portable"
+
+    - name: Verify Kermit command recovery and binary transfers
+      shell: bash
+      run: |
+        LD_LIBRARY_PATH="$GITHUB_WORKSPACE/build/x50ng/dist/runtime-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+          python3 tests/e2e/harness/test-kermit-server.py build/x50ng/dist/tools
 
     - name: Save portable universal x50ng cache
       if: steps.x50ng-cache.outputs.cache-hit != 'true'
