@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. M7.3f object mutation is also accepted. Remaining M7 work includes directory operations, composite objects, HP39 Aplet-owned persistence, native namespaces, common system services and the final parity audit.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. M7.3f object mutation is also accepted. Remaining M7 work includes directory operations, composite objects, HP39 Aplet-owned persistence, native namespaces, display/runtime parity and the final parity audit. M7.4 common system services are accepted.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -337,25 +337,25 @@ directory semantics. Overall M7.3 remains open for M7.3g–j below.
 
 ### M7.4 — Common system services
 
-**Implementation and local validation complete; formal CI acceptance pending.**
-The unchecked acceptance items below remain open until that CI gate passes.
+**Complete and accepted at functional head `06ab4deb`.**
+The six-model Direct/Stock gate and cross-workflow regressions pass; see [validation evidence](validation.md#m74-formal-acceptance).
 
 Prioritize application capabilities that appear repeatedly in HPGCC programs and have a coherent stock-hosted implementation:
 
-- [ ] wall-clock/RTC date-time query and conversion;
-- [ ] tone/beep with explicit frequency/duration and safe host restoration;
-- [ ] useful battery/power/contrast/status queries where semantics are stable across families;
-- [ ] capability discovery for services that are genuinely model-specific;
-- [ ] classify clock-rate control, raw interrupt/timer programming, cache/MMU manipulation and physical allocation as low-level Migration/Unsupported unless an ownership-safe application use case justifies a typed service.
+- [x] wall-clock/RTC date-time query and conversion;
+- [x] tone/beep with explicit frequency/duration and safe host restoration;
+- [x] useful battery/power/contrast/status queries where semantics are stable across families;
+- [x] capability discovery for services that are genuinely model-specific;
+- [x] classify clock-rate control, raw interrupt/timer programming, cache/MMU manipulation and physical allocation as low-level Migration/Unsupported unless an ownership-safe application use case justifies a typed service.
 
 Additional M7.4 acceptance (preserving the expanded M7 requirements):
 
-- [ ] civil-time setting with forward/backward adjustment, valid date ranges and monotonic-deadline continuity;
-- [ ] cooperative one-shot/periodic expiration counts and cancellation;
-- [ ] bounded UTF-8 input, accept/cancel and bounded error/message presentation;
-- [ ] model/context capability discovery and deterministic unsupported/error results;
-- [ ] writable emulator RTC calendar, alarm-clock consistency and saved-state continuity;
-- [ ] six-model Direct/Stock regression with unchanged borrowed hardware state and settled return.
+- [x] civil-time setting with forward/backward adjustment, valid date ranges and monotonic-deadline continuity;
+- [x] cooperative one-shot/periodic expiration counts and cancellation;
+- [x] bounded UTF-8 input, accept/cancel and bounded error/message presentation;
+- [x] model/context capability discovery and deterministic unsupported/error results;
+- [x] writable emulator RTC calendar, alarm-clock consistency and saved-state continuity;
+- [x] six-model Direct/Stock regression with unchanged borrowed hardware state and settled return.
 
 Implementation: `datetime.h`, `timer.h`, `sound.h`, `power.h`, `input.h`, device
 capability queries, contrast reads and bounded font rendering. System-service
@@ -447,11 +447,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 
 ### M7.4 / M7.5 — expanded acceptance requirements
 
-- [ ] For RTC, define civil-time validity/conversion and separately decide
+- [x] For RTC, define civil-time validity/conversion and separately decide
   whether/how callers may set time; do not invent timezone semantics.
-- [ ] For sound, define frequency/duration/cancellation and restore shared
+- [x] For sound, define frequency/duration/cancellation and restore shared
   hardware state; distinguish emulator activity from audible hardware evidence.
-- [ ] Add contrast/status/power observations, safe deadline/periodic events,
+- [x] Add contrast/status/power observations, safe deadline/periodic events,
   bounded input/error presentation and model/context capability discovery.
 - [ ] Prove physical gray4/gray16 and flipping/vsync requirements against
   temporary DMA/contiguous-memory ownership, low-memory behavior and return.

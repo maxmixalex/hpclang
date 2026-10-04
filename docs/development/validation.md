@@ -446,7 +446,7 @@ and the CI gate still need acceptance before M7.3h closes.
 The `m74-system-services` batch implements civil RTC read/set/conversion,
 cooperative timers, cancellable tones, model/context capabilities, USB voltage
 presence, contrast reads, bounded UTF-8 editing and bounded text rendering.
-Formal CI acceptance is pending; this does not close the expanded M7.3 scope.
+Formal CI acceptance is recorded below; this does not close the expanded M7.3 scope.
 
 Local checks on 2026-10-03 use the pinned toolchain and repository harness:
 
@@ -655,4 +655,24 @@ settled Stock return on HP39g+, HP39gs, HP40gs and HP48gII with the newly built
 server. The three HP39 runs execute concurrently with normal CPU scheduling.
 An additional experiment restricting all three to one CPU exceeds existing
 launch/transfer bounds; it is not successful load-tolerance evidence.
-Complete-branch CI acceptance remains pending.
+Complete-branch CI acceptance is recorded below.
+
+### M7.4 formal acceptance
+
+Functional head `06ab4deb` passes [Runtime](https://github.com/zyf722/hpclang/actions/runs/37170021039),
+[Object mutation](https://github.com/zyf722/hpclang/actions/runs/37170021046),
+[Storage](https://github.com/zyf722/hpclang/actions/runs/37170021065),
+[Font Gallery](https://github.com/zyf722/hpclang/actions/runs/37170021083),
+[Quality](https://github.com/zyf722/hpclang/actions/runs/37170021057) and
+[FatFs vendor verification](https://github.com/zyf722/hpclang/actions/runs/37170021118).
+Runtime covers both Runtime and System services on all six Direct/Stock models,
+including settled Stock return. Interrupted runner jobs were rerun after the
+host shutdown; the accepted runs use unchanged code.
+
+[Core runtime](https://github.com/zyf722/hpclang/actions/runs/37130948680)
+passes at `144bd930`; the subsequent change affects the Kermit harness and its
+packaging, not the core implementation, and does not select the Core workflow.
+
+This closes M7.4's documented application-service and emulator acceptance.
+Physical audible output remains unverified. Expanded M7.3 object services and
+M7.5 display/runtime work remain open.
