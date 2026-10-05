@@ -17,6 +17,14 @@ SPEC.loader.exec_module(fetch)
 
 
 class KermitFetchGateTests(unittest.TestCase):
+    def test_watchdog_includes_named_program_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("HPGCC000.000", "LIB275L.000", "HPCRESET.000", "HP39DIR.000"):
+                (root / name).write_bytes(bytes(fetch.EFFECTIVE_BYTES_PER_SECOND))
+            (root / "TESTING.txt").write_bytes(bytes(10000))
+            self.assertEqual(fetch.watchdog_seconds(root), fetch.WATCHDOG_MARGIN_SECONDS + 4)
+
     def check_log(self, contents: str, expected: int) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

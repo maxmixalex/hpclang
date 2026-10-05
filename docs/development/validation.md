@@ -405,8 +405,10 @@ The directory implementation in `b2a69739` passed local validation on 2026-10-03
   execute the new directory lifecycle; HP39g+/39gs/40gs revalidate native-variable
   mutation with the same rebuilt payload and freshly prepared Aplet packages.
 
-This is local regression evidence. Formal CI acceptance is pending; M7.3g and
-its downstream M7.3h–j work remain open on the roadmap.
+Subsequent formal Object mutation regressions, including functional head
+`06ab4deb` and main `3ad37ac6`, execute this directory lifecycle on all three
+classic Stock models and pass with settled return. This closes M7.3g.
+M7.3h–j remain separate acceptance items.
 
 ## M7.3h local Aplet-data regression
 
@@ -437,8 +439,41 @@ BSS. Lifecycle monitoring now requires an object phase before accepting PASS.
 HP40gs passes a fresh eight-run installation with this guard; HP39g+/39gs pass
 four additional alternating-instance invocations with the same guard.
 
-These are local emulator results, not formal CI acceptance. Stock Reset behavior
-and the CI gate still need acceptance before M7.3h closes.
+These are historical local emulator results. The expanded Reset and object
+completion evidence below supersedes their incomplete Reset coverage.
+
+### M7.3h-j local completion
+
+Local validation on 2026-10-05 completes the implementation gate:
+
+- Object mutation passes on all six Stock models. HP39g+/39gs/40gs each pass
+  15 invocations covering native GC, exit/relaunch, two saved instances,
+  cancelled Reset, confirmed Reset and isolation from the other instance.
+- Composite objects pass on all six Stock models. Each HP39 model passes eight
+  invocations with nested owned values surviving native GC and independent
+  persistence. Classic models cover numeric/symbolic matrices, exact wider
+  numbers, stack reorder/Booleans and representative flows from all four HPGCC
+  generations.
+- The dedicated HP39 catalog fixture passes Program/Note CRUD and Aplet
+  list/clone/remove on all three models, with native record maintenance,
+  caller-context restoration, active/default protection and owned snapshots.
+- All 47 host tests, formatting, lint, host plus six ARM Clang analysis
+  configurations, workflow matrix validation and documentation builds pass.
+
+The native portal request writer is nonrecursive and has a guarded private ARM
+stack. Aplet clone restores GC-traced caller contexts on success and error;
+delete maintains Stock's cached display list as well as storage. These address
+faults reproduced by the public catalog fixture.
+
+Catalog and composite checks use separate payloads: combining them exceeded
+the Stock startup memory available when two full test Aplets were saved.
+The split retains every test and the original mutation/composite lifecycle
+contracts. Suite applicability is declared in `tests/e2e/object-suites.json`.
+
+Port 0/1/2 lack public read/write services. Each was accepted as an M7.3j
+limitation on 2026-10-04, with separate future implementation goals retained.
+M7.3h–j now await formal CI acceptance; these local results do not claim a
+completed remote CI run or native-port support.
 
 
 ### M7.4 system services — local validation

@@ -3,7 +3,8 @@
 
 Synchronization uses acknowledged Kermit transactions for the directory and
 LIB275L.000. By the time Stock requests and completes that file, the larger
-HPGCC000.000 transfer has already completed. The size-derived duration is only
+HPGCC000.000 and its named-program dependencies have already completed.
+The size-derived duration is only
 a watchdog ceiling; it is never used to pace calculator UI actions.
 """
 
@@ -20,7 +21,7 @@ POLL_SECONDS = 0.1
 
 
 def watchdog_seconds(directory: Path) -> int:
-    total = sum((directory / name).stat().st_size for name in ("HPGCC000.000", TARGET_FILE))
+    total = sum(path.stat().st_size for path in directory.glob("*.000"))
     return (
         total + EFFECTIVE_BYTES_PER_SECOND - 1
     ) // EFFECTIVE_BYTES_PER_SECOND + WATCHDOG_MARGIN_SECONDS

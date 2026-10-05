@@ -43,6 +43,17 @@ This keeps classic directory probes out of HP39 Aplet RAM while preserving
 their coverage in the classic-family jobs. Each artifact carries its own HPC1
 image and result address; the workflow never substitutes another family's image.
 
+The Objects workflow reads suite names and applicable families from
+`tests/e2e/object-suites.json`. `object-composite` uses the same build command
+shape and Stock harness. It covers lists, numeric/symbolic matrices, scalar
+precision, stack reorder/Booleans and historical application flows. Splitting
+these payloads keeps sufficient HP39 RAM for two saved Aplet instances; mutation
+and composite retain their own lifecycle checks. `object-catalog` separately
+checks HP39 Program/Note CRUD and native Aplet clone/remove, name-list snapshots,
+protected Aplets and settled return. It does not load the numerical/GC fixture
+into the same Aplet. The workflow publishes separate results for each applicable
+suite/family and derives the available families from the target profiles.
+
 The HP39 lifecycle contract includes Stock SAVE of a second Aplet and alternating
 write/read/clear invocations of the two instances. The default chronological
 library ordering moves the last-used Aplet to the first row, so each switch

@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/power.h>
@@ -44,11 +45,27 @@ int main(void)
                                                        : HPCLANG_CAPABILITY_UNSUPPORTED;
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_STACK) == available);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE) == available);
+        for (int capability = HPCLANG_CAPABILITY_APLET_DATA;
+             capability <= HPCLANG_CAPABILITY_APLET_CATALOG; ++capability) {
+            int hp39 = model <= HPCLANG_MODEL_HP40GS;
+            boot.platform_cookie = 0u;
+            assert(
+                hpclang_device_capability((enum hpclang_capability)capability) ==
+                (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            boot.platform_cookie = HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+            assert(hpclang_device_capability((enum hpclang_capability)capability) ==
+                   (hp39 ? HPCLANG_CAPABILITY_SUPPORTED : HPCLANG_CAPABILITY_UNSUPPORTED));
+            boot.saturn_state = 0u;
+            assert(
+                hpclang_device_capability((enum hpclang_capability)capability) ==
+                (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            boot.saturn_state = 1u;
+        }
     }
     boot.model = UINT32_MAX;
     assert(hpclang_device_info()->family == HPCLANG_FAMILY_UNKNOWN);
     for (int capability = HPCLANG_CAPABILITY_DISPLAY;
-         capability <= HPCLANG_CAPABILITY_CONTRAST_READ; ++capability)
+         capability <= HPCLANG_CAPABILITY_APLET_CATALOG; ++capability)
         assert(hpclang_device_capability((enum hpclang_capability)capability) ==
                HPCLANG_CAPABILITY_UNSUPPORTED);
     assert(hpclang_device_capability((enum hpclang_capability)0) == -1 && errno == EINVAL);

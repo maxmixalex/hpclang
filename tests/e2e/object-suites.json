@@ -1,0 +1,5 @@
+[
+  {"name": "object-mutation", "families": ["hp39", "hp48", "hp4950"]},
+  {"name": "object-composite", "families": ["hp39", "hp48", "hp4950"]},
+  {"name": "object-catalog", "families": ["hp39"]}
+]

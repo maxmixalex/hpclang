@@ -79,6 +79,12 @@ extern "C"
     /* Drop count objects after validating the complete request. */
     int hpclang_rpl_mutation_drop(const struct hpclang_rpl_mutation_io *io, uint32_t count);
 
+    /* Validate both levels and accounting before changing any pointer cell. */
+    int hpclang_rpl_mutation_reorder(const struct hpclang_rpl_mutation_io *io, int nip);
+
+    /* Push the immutable supported-entry Boolean reference without allocating. */
+    int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value);
+
     /*
      * Allocate/copy first, then replace one existing pointer cell. A failure before
      * pointer commit leaves the visible stack unchanged; an unreferenced TEMPOB

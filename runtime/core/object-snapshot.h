@@ -25,6 +25,12 @@ struct hpclang_object
 int hpclang_object_snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address,
                                  uint32_t limit, struct hpclang_object **object);
 
+/* Internal executable schemas retain native references for immediate resolution.
+ * This copies
+ * their encoding only; it must not escape as an owned data value. */
+int hpclang_object_snapshot_copy_encoded(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                         uint32_t limit, struct hpclang_object **object);
+
 /* Runtime-private lossless access used by future push/store operations. */
 int hpclang_object_snapshot_read_nibble(const struct hpclang_object *object, uint32_t offset,
                                         uint8_t *value);

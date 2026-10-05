@@ -14,9 +14,9 @@ SPEC.loader.exec_module(lifecycle)
 
 class StockLifecycleTests(unittest.TestCase):
     def test_repository_contract(self):
-        lifecycle.load_contract(
-            ROOT / "tests/e2e/object-mutation/stock-lifecycle.json", ROOT / "tests/e2e/sequences"
-        )
+        for contract in (ROOT / "tests/e2e").glob("*/stock-lifecycle.json"):
+            with self.subTest(contract=contract):
+                lifecycle.load_contract(contract, ROOT / "tests/e2e/sequences")
 
     def test_stale_phase_and_unsettled_pass_are_rejected(self):
         good = {

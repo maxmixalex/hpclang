@@ -43,6 +43,12 @@ extern "C"
     int sat_stack_depth(void);
     int sat_stack_drop(void);
     int sat_stack_dropn(int n);
+    int sat_stack_swap(void);
+    int sat_stack_nip(void);
+
+    /* HPGCC 2.0 treats any nonzero argument as TRUE. Errors set errno. */
+    void sat_pushtruefalse(BOOL arg);
+#define sat_stack_push_bool sat_pushtruefalse
 
     int sat_stack_push_string(const char *str);
     char *sat_pick_str(int level, char *buf);

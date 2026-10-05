@@ -37,8 +37,12 @@
 #define HP39P_REQUEST_NAME_LEN 232
 #define HP39P_EXPECTED_PROLOGUE 236
 #define HP39P_STACK 240
-#define HP39P_STACK_SIZE 256
-#define HP39P_STACK_END 496
+/* Request serialization is nonrecursive. Reserve headroom above the measured
+ * prepare -> request
+ * -> operation writer call chain of the pinned ARM compiler. */
+#define HP39P_STACK_SIZE 384
+#define HP39P_STACK_GUARD_SIZE 32
+#define HP39P_STACK_END (HP39P_STACK + HP39P_STACK_SIZE)
 
 #define HP39P_CATALOG_APLET 1
 #define HP39P_CATALOG_PROGRAM 2
@@ -50,6 +54,13 @@
 #define HP39P_REFERENCE_EVAL 8
 #define HP39P_VARIABLE_STORE 9
 #define HP39P_COPY_OBJECT 10
+#define HP39P_PROGRAM_PUT 11
+#define HP39P_PROGRAM_REMOVE 12
+#define HP39P_NOTE_PUT 13
+#define HP39P_NOTE_REMOVE 14
+#define HP39P_APLET_CLONE 15
+#define HP39P_APLET_REMOVE 16
+#define HP39P_APLET_IS_DEFAULT 17
 
 /* The owned value must fit beside the generated request/return streams in the
  * bootstrap-private staging page. Stock can relocate its own variable storage;
@@ -66,6 +77,22 @@ struct hpclang_hp39_object_request
 {
     uintptr_t object_data;
     uint32_t object_nibbles;
+};
+
+struct hpclang_hp39_catalog_request
+{
+    uintptr_t object_data;
+    uint32_t object_nibbles;
+    uint32_t name_length;
+    uint8_t name[19];
+};
+
+struct hpclang_hp39_aplet_request
+{
+    uint32_t name_length;
+    uint32_t destination_length;
+    uint8_t name[254];
+    uint8_t destination[254];
 };
 
 struct hpclang_hp39_variable_store_request

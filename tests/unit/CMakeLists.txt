@@ -153,11 +153,30 @@ target_include_directories(test_object_snapshot PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(object_composite
+    test_object_composite.c
+    "${HPCLANG_ROOT}/runtime/core/object-decimal.c"
+    "${HPCLANG_ROOT}/runtime/core/object-composite.c"
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_composite PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_construct
     test_object_construct.c
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+
+hpclang_unit(object_catalog
+    test_object_catalog.c
+    "${HPCLANG_ROOT}/runtime/core/object-catalog.c"
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_catalog PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_include_directories(test_object_construct PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")

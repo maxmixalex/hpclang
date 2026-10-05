@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. M7.3f object mutation is also accepted. Remaining M7 work includes directory operations, composite objects, HP39 Aplet-owned persistence, native namespaces, display/runtime parity and the final parity audit. M7.4 common system services are accepted.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–g object/stack/directory services. M7.3h–j composite objects, HP39 Aplet persistence/Reset and native catalogs are implemented and locally validated, awaiting formal CI acceptance. M7.4 common system services are accepted. M7.5 display/runtime parity and the final parity audit remain open; the individually reviewed native-port limitations retain implementation goals below.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**The existing M7.1/M7.2 acceptance and M7.3a–f gates remain valid for their tested scope. Overall M7.3 remains open: complete directory, composite-object, Aplet-owned data and namespace work while M7.4 proceeds in parallel as requested. Additional M7.1/M7.2 coverage is listed below.**
+**The existing M7.1/M7.2 acceptance and M7.3a–g gates remain valid for their tested scope. Overall M7.3 remains open: complete composite-object, Aplet-owned data and namespace acceptance. M7.4 common system services are accepted. Additional M7.1/M7.2 coverage is listed below.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -256,7 +256,7 @@ The accepted M7.2 stream/directory subset supports typical HP49g+/HP50g file flo
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**M7.3a-f are complete and accepted.** The ownership/API boundary is frozen in
+**M7.3a-g are complete and accepted.** The ownership/API boundary is frozen in
 [Calculator object service design](object-service.md). The closed M7.3a-e baseline provides a
 runtime-private Saturn view, conservative proven-boundary parsing, opaque owned
 snapshots, typed construction/conversion, read-only stack observation, bounded
@@ -333,7 +333,7 @@ The implementation and limits are described in
 [Object service](object-service.md#m73f-public-mutation-and-native-variable-lifetime).
 M7.3a-e's read/stack/adapter baseline remains accepted. The new public mutation
 APIs close M7.3f without exposing HPGCC3 raw native pointers or inventing HP39
-directory semantics. Overall M7.3 remains open for M7.3g–j below.
+directory semantics. Overall M7.3 awaits formal acceptance of M7.3h–j below.
 
 ### M7.4 — Common system services
 
@@ -432,7 +432,13 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 
 ### M7.3g–j — object-service capability completion
 
-- [ ] **M7.3g:** directory creation, empty removal and explicit recursive tree
+M7.3h–j implementation and local validation are complete as of 2026-10-05;
+their checkboxes remain open until formal CI acceptance. Local evidence covers
+all six Stock models, all three HP39 15-invocation Reset and eight-invocation
+composite lifecycles, the dedicated HP39 catalog fixture, 47 host tests and
+host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion).
+
+- [x] **M7.3g:** directory creation, empty removal and explicit recursive tree
   removal; nested references, active cwd/ancestor safety and failure preflight.
 - [ ] **M7.3h:** HP39 Aplet-owned data read/replace/clear, GC-safe lifetime,
   per-instance isolation, reset behavior and persistence across exit/relaunch.
@@ -442,8 +448,21 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 - [ ] **M7.3j:** investigate HP39 Program/Note/Aplet creation/removal and
   Port 0/1/2 namespaces; produce tested operations or individually reviewed
   limitations for each actual native object model.
+  - Port 0 (main RAM), Port 1 (extended RAM) and Port 2 (Flash): the maintainer
+    accepted each port's current lack of read/write services as an M7.3j
+    limitation on 2026-10-04. This does not mark port services implemented.
 - [ ] Validate genuine historical application flows using the four HPGCC
   generations and HP39 Aplet template, not only scalar API probes.
+
+### Native port services — retained follow-up
+
+- [ ] Port 0: enumerate/read/store/remove native backup and library objects;
+  define RAM ownership, active library safety and failure behavior.
+- [ ] Port 1: provide the same native object operations with explicit handling
+  of banked/extended RAM and its interaction with the ARM allocator.
+- [ ] Port 2: provide native Flash object operations, including erase/write
+  transactions, full-media behavior and persistence. Preserve library and
+  backup semantics; these ports are not HOME directories or stream files.
 
 ### M7.4 / M7.5 — expanded acceptance requirements
 

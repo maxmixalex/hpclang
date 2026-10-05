@@ -1040,8 +1040,48 @@ static void test_native_arena_pins_prefix_without_overwriting_payload(void)
     assert(writes == 0u);
 }
 
+static void test_stack_reorder(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(3u);
+    uint32_t top = get_word(DSKTOP, 5u), avmem = get_word(AVMEM, 5u) - 7u;
+    put_word(AVMEM, 5u, avmem); /* Preserve an existing native reservation. */
+    assert(hpclang_rpl_mutation_reorder(&io, 0) == HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(top, 5u) == 0x82020u);
+    assert(get_word(top + 5u, 5u) == 0x82000u);
+    assert(get_word(top + 10u, 5u) == 0x82040u);
+    assert(get_word(AVMEM, 5u) == avmem);
+    assert(get_word(DSKTOP, 5u) == top);
+    assert(get_word(TEMPTOP, 5u) == 0x84000u);
+
+    assert(hpclang_rpl_mutation_reorder(&io, 1) == HPCLANG_RPL_MUTATION_OK);
+    assert(get_word(DSKTOP, 5u) == top + 5u);
+    assert(get_word(top + 5u, 5u) == 0x82020u);
+    assert(get_word(top + 10u, 5u) == 0x82040u);
+    assert(get_word(AVMEM, 5u) == avmem + 1u);
+    assert(get_word(TEMPTOP, 5u) == 0x84000u);
+
+    for (int nip = 0; nip <= 1; ++nip) {
+        io = setup(1u);
+        assert(hpclang_rpl_mutation_reorder(&io, nip) == HPCLANG_RPL_MUTATION_LEVEL);
+        assert(writes == 0u);
+        io = setup(2u);
+        rejected_read = get_word(DSKTOP, 5u) + 9u;
+        assert(hpclang_rpl_mutation_reorder(&io, nip) == HPCLANG_RPL_MUTATION_IO);
+        assert(writes == 0u);
+        rejected_read = UINT32_MAX;
+        put_word(AVMEM, 5u, 0xfffffu);
+        assert(hpclang_rpl_mutation_reorder(&io, nip) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(writes == 0u);
+        io = setup(2u);
+        put_word(get_word(DSKTOP, 5u) + 5u, 5u, 0u);
+        assert(hpclang_rpl_mutation_reorder(&io, nip) == HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(writes == 0u);
+    }
+}
+
 int main(void)
 {
+    test_stack_reorder();
     test_native_arena_pins_prefix_without_overwriting_payload();
     test_push_transaction();
     test_temp_allocation_retargets_existing_reference();

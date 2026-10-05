@@ -13,6 +13,7 @@ mkdir -p "$CACHE"
 
 if [[ -f "$SDK/.hpclang-prepared" &&
       -f "$SDK/src/hp2aplet.c" &&
+      -f "$SDK/data/HPCRESET.000" &&
       -f "$SDK/data/LIB275L.L39" ]]; then
     echo "$SDK"
     exit 0

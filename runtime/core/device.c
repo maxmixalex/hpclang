@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 
 #define DEVICE(model_, family_, width_, height_)                                                   \
@@ -59,6 +60,18 @@ int hpclang_device_capability(enum hpclang_capability capability)
         const struct hpclang_boot_info *boot = hpclang_boot_info();
         return boot && boot->saturn_state ? HPCLANG_CAPABILITY_SUPPORTED
                                           : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
+    }
+    case HPCLANG_CAPABILITY_APLET_DATA:
+    case HPCLANG_CAPABILITY_APLET_VARIABLES:
+    case HPCLANG_CAPABILITY_TEXT_CATALOG:
+    case HPCLANG_CAPABILITY_APLET_CATALOG: {
+        if (family != HPCLANG_FAMILY_HP39)
+            return HPCLANG_CAPABILITY_UNSUPPORTED;
+        const struct hpclang_boot_info *boot = hpclang_boot_info();
+        return boot && boot->saturn_state &&
+                       (boot->platform_cookie & (uintptr_t)3u) == HPCLANG_PLATFORM_COOKIE_HP39_TAG
+                   ? HPCLANG_CAPABILITY_SUPPORTED
+                   : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     }
     default:
         errno = EINVAL;

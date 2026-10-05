@@ -395,7 +395,8 @@ handles, malformed links and memory exhaustion before writes. The focused
 Object mutation payload creates its own nested tree through the public APIs,
 retains a native value reference across recursive removal, checks active-cwd
 rejection, removes empty directories and restores the original namespace before
-requiring settled Stock return. Formal CI acceptance remains pending.
+requiring settled Stock return. M7.3g is accepted by the subsequent Object
+mutation regressions, including main `3ad37ac6`; see the validation record.
 
 ## M7.3h — HP39 Aplet-owned data (in progress)
 
@@ -418,6 +419,12 @@ frame is resolved again after allocation because garbage collection can move
 both the frame and native objects. No fixed RAM address or Aplet title
 identifies the data cell.
 
+The frame resolver also follows the launcher's explicit bias metadata. When
+the launcher string has already been hidden, the data argument is the top
+cell; otherwise it follows the launcher string. The runtime verifies the
+same `_Action` continuation in both cases, rather than guessing from the data
+value's type.
+
 Local HP39g+/39gs/40gs evidence covers growing, shrinking and empty strings across native
 garbage collection, input release, clear, and settled return. Four successive
 invocations, separated by Aplet exit and emulator restart, verified write,
@@ -427,17 +434,142 @@ reinitializing the data on every launch cannot pass the persistence gate.
 The eight-invocation contract then saves a second instance through Stock SAVE.
 Alternating between the two instances verifies independent writes and clears,
 without lowering native stack requirements or dropping the GC stress checks.
-All three HP39 models pass this contract locally. Reset behavior and formal CI
-acceptance remain required before M7.3h closes.
+All three HP39 models pass this contract locally. The expanded Reset contract
+below also passes; formal CI acceptance remains required before M7.3h closes.
 
-The historical template's reset entry needs separate verification: its
+The historical template does not connect its reset entry by default: its
 `_Reset` routine contains a data-clear operation, but `=Common.h` defines the
 `StndReset` dispatch as `MINUSTHREE NOP`. A routine's presence in the source
-does not establish that Stock invokes it. The public `clear()` operation does
-not currently claim to change the calculator's Reset UI or dispatch.
+does not establish that Stock invokes it. The public `clear()` operation
+clears data directly; the packaged menu entry below supplies the UI path.
 
-Reset has two separate prerequisites: the topic type's `ApletReset#` property
-controls Stock's reset capability, while the template's negative-event dispatch
-selects the action. A local experiment connecting `StndReset` to `INT_04`
-alone left the library Reset softkey disabled and the saved value intact.
-That experimental template change is not shipped.
+The package now supplies a native named Reset program and explicit Start/Reset
+view entries. Stock's library asks for confirmation before running the named
+program. That program selects the active Aplet context, calls the template's
+`_Reset` entry (`INT_04`), and restores the program context. Start retains the
+native ARM view. The SDK preparation validates the historical epilog structure
+and adjusts its backward field link when adding these entries.
+
+The mutation lifecycle adds cancellation, confirmed clear, relaunch and
+two-instance isolation checks. HP39g+, HP39gs and HP40gs pass all 15 invocations
+locally; CI acceptance remains pending.
+
+## M7.3i — composite objects and stack reorder (in progress)
+
+The implementation provides owned classic complex values and homogeneous
+REAL/COMPLEX numeric vectors and matrices. Arrays have rank one or two,
+nonzero dimensions, and zero-based row-major indexing. Construction copies
+each element; extraction and replacement return independent snapshots.
+Replacement never edits its source. Native decimal components retain their
+digits and exponent even when the value cannot be represented by a C `double`.
+The explicit complex-to-double conversion reports range errors and changes
+neither output on failure.
+
+Heterogeneous lists support construction, indexing and splice into a new list.
+Symbolic matrices use the native rectangular DOMATRIX representation and have
+separate row/column accessors. Inputs remain valid after edits; extracted
+children survive release of the parent. Native data-list and matrix references
+are materialized while the native reader is valid, including lists inside tags.
+Cycles and excessive nesting fail without returning a partial object. Internal
+HP39 executable variable schemas keep their references for immediate descriptor
+resolution and do not use this data-copy operation.
+
+Identifiers distinguish global and local scope. Identifier names and tag labels
+are explicit-length calculator bytes; constructing an identifier does not
+define a variable. Binary values preserve their exact nibble width. Decimal
+ZINT exchange preserves arbitrarily large integers within the object/memory
+limits. Exact classic REAL exchange uses a sign, up-to-12-digit coefficient and
+decimal exponent, so values outside C `double` range can be retained. These are
+representation and exchange APIs, not arbitrary-precision arithmetic; separate
+EREAL/LONGREAL conversions remain unsupported. Short copy buffers return
+`ENOBUFS` without truncation.
+
+`hpclang_stack_swap()` and `hpclang_stack_nip()` operate on the top two visible
+classic Stock entries without allocating native objects. They validate stack
+geometry, pointer reads and available-memory accounting before writing, and
+preserve native stack reservations. This shares the mutation backend's mapped,
+interrupt-masked commit contract, rather than promising rollback for arbitrary
+failing write callbacks.
+
+Boolean stack exchange uses genuine immutable SysRPL TRUE/FALSE objects. It
+checks the ROM identity through the full read interface before modifying the
+RAM-only stack mapping. Numeric 0 and 1 are not silently treated as Boolean
+objects. The HPGCC adapters preserve `swap/nip`'s success/failure convention and
+`sat_pushtruefalse`'s interpretation of any nonzero C value as TRUE.
+
+The Objects workflow builds separate mutation, composite and native-catalog
+payloads using the shared Stock harness. Suite family applicability is declared
+in `tests/e2e/object-suites.json`; native catalogs run only on HP39 models.
+Keeping the payloads separate leaves
+enough calculator memory to save a second native Aplet while retaining the
+mutation fixture's GC and oversized-write checks. The mutation payload has a
+15-invocation contract including Reset; the composite payload retains the
+eight-invocation persistence/isolation contract. The composite payload also
+retains an owned nested value across native GC and verifies it after relaunch.
+
+The composite contract passes locally on HP39g+, HP39gs and HP40gs.
+HP48gII, HP49g+ and HP50g pass composite stack exchange, symbolic matrices,
+60-digit ZINT round trips and the historical application flows.
+The 47 host tests, formatting, lint and Clang analysis pass with the compatibility
+adapters and historical-flow fixtures. M7.3h/i/j implementation and local
+validation are complete; formal CI acceptance remains pending.
+
+Historical-flow source anchors are HPGCC 1.0.3
+`examples/libtests/stack.c`, HPGCC 1.1 `examples/stack/rplstk.c`, HPGCC 2.0
+`examples/stack.c`, and HPGCC3 `sat3.h`'s existing-object list-construction
+example. The composite fixture re-expresses these workflows through clean
+snapshots or the bounded adapter, checks their results and restores the caller's
+stack depth. This is workflow evidence, not a claim that old raw-pointer source
+or binaries run unchanged. HP39's original `_Entry`/`_Action`/`_Exit` protocol
+is exercised by the native Aplet lifecycle tests.
+
+## M7.3j — native catalogs (in progress)
+
+`hpclang/catalog.h` exposes Program and Note catalogs on HP39g+/39gs/40gs Stock.
+`list()` returns an owned list of global identifiers; `get()` returns an owned
+string. Names are 1–19 raw calculator bytes. `put()` accepts string objects and
+the existing UPSERT/CREATE_ONLY/REPLACE_ONLY modes. `remove()` reports missing
+names with `ENOENT`. Program `Editline` is a reserved native record and cannot
+be mutated (`EPERM`). These services do not define Aplet Variables or open a
+classic HOME directory.
+
+Writes use Stock's catalog save/delete routines. Program save updates the
+apostrophe-prefixed source and the colon-prefixed compilation trampoline;
+delete also removes the semicolon-prefixed editor record. Note operations
+maintain the corresponding source/editor records. Source-only STO/PURGE would
+leave stale native state. Syntax is checked when Stock runs a program, not by
+the ARM API. The portal stages at most 7000 nibbles per object and reports
+native allocation failure as `ENOSPC`; ARM snapshots remain independent.
+
+The dedicated catalog fixture passes Program/Note create/read/list/replace/remove,
+mode rejections, missing-name behavior, snapshot ownership and settled return
+on HP39g+, HP39gs and HP40gs. Formal CI remains pending.
+
+`hpclang_aplet_list/clone/remove` expose the native Aplet catalog separately.
+Names are 1–254 raw calculator bytes; list returns owned display-name strings.
+Clone uses Stock's save operation, rejects existing destinations and preserves
+the caller's selected Aplet, Program/Note contexts and current context. The
+native operation selects its new copy, so the portal retains the original
+contexts in GC-traced native bindings and restores them on success and error.
+Remove rejects the active Aplet (`EBUSY`) and native defaults (`EPERM`). Large
+clones can fail with `ENOSPC` while the ARM application's memory is reserved.
+Deletion updates both native storage and Stock's cached Aplet display list;
+the purge primitive alone leaves a stale menu entry. Existing owned name-list
+snapshots remain independent of subsequent deletion.
+The dedicated catalog fixture passes this complete public lifecycle on all
+three HP39 models, including active/default protection and independent lists.
+
+### Reviewed port limitations
+
+On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
+
+| Namespace | Native model | Current limitation and retained work |
+| --- | --- | --- |
+| Port 0 | Main RAM, containing library/backup objects | No public port read/write service; implement native enumeration, ownership and mutation separately. |
+| Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
+| Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
+
+HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
+areas explicitly. None has HOME-style subdirectories. Acceptance of these
+limits does not claim implemented port APIs or remove the follow-up goals in
+the roadmap.
