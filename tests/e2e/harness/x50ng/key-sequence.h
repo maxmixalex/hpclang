@@ -9,8 +9,10 @@
 
 static inline int64_t hpclang_key_poll(struct hpclang_key_delivery *s, int key, int down)
 {
+    /* Stock may stop scanning after handling a press. Release is a switch
+     * state change; requiring another guest read can deadlock an idle ROM. */
     int step = hpclang_key_delivery_step(s, timer_get_clock(), down, emulator_key_ready(key),
-                                         emulator_key_observed(key) != 0);
+                                         emulator_key_observed(key) != 0, !is_key_pressed(key));
     if (step == HPCLANG_KEY_EMIT) {
         if (down)
             press_key(key);
