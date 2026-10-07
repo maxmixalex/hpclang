@@ -325,11 +325,35 @@ HP39/40 is a separate stock-ROM path. Historical HPGCC HP39 support binds stock 
 
 The first physical-NOR implementation borrowed an apparently empty high L1 section descriptor. Diagnostics proved that descriptor storage could overlap the active LCD framebuffer and be overwritten by ordinary drawing. Production code therefore maps only physical NOR pages `0x0007e000` and `0x0007f000` as uncached 4 KiB small pages in the private prefix of hpclang's own code coarse table. The private virtual window is `0x01200000..0x01201FFF`; public HPC1 code still starts at `0x01220000`. The launch ABI keeps `platform_cookie` opaque to applications; current HP39 runtime code decodes a tagged private platform context whose validated `font_window_base` points at that window.
 
-HP39g+ is deliberately excluded from that physical layout even though a real-hardware full-NOR fixture now establishes its firmware identity; its own native font object/page mapping has not yet been established.
+HP39g+ uses a separate physical layout, established below; it never borrows the gs offsets.
+
+### HP39g+ native-font follow-up
+
+The D1.55 physical full-NOR fixture places main, mini and EditLine at nibble
+addresses `0x0DC096`, `0x0DE0DA` and `0x0DCE2F`. ASCII-run matching locates
+main/EditLine; comparison of the complete tables confirms exact equality
+with the reviewed HP39gs 2.22 full-NOR atlas, including the 155-record mini
+atlas and its extended-character map. The launcher maps only pages
+`0x0006e000` and `0x0006f000` into the existing private window.
+
+The runtime now exposes all three concrete fonts on HP39g+. The oracle checks known
+ASCII A/P/5/1 shapes and the previously established EditLine fingerprint
+before comparing rendered pixels. This distinguishes genuine font identity
+from agreement with an arbitrary ROM region. Local Direct shard 0 and compact
+Stock USB Gallery pass all three native-font pixel oracles on HP39g+, HP39gs
+and HP40gs. All three Stock runs reach application PASS and settled return;
+the runtime, Stock and Gallery post-run assertions pass. The 54 host test
+targets include ROM-identity/shifted-table rejection and three-model invalid
+font-window checks. Clang analysis, formatting, workflow syntax and docs build
+also pass.
+The Stock Gallery now reuses the canonical USB install/launch harness and a
+shared Gallery interaction suffix, adding HP39g+ to the CI matrix. Formal CI
+acceptance is pending. Exhaustive generated-font
+coverage remains the existing 20-shard gate.
 
 ## Native ROM-font API contract
 
-Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. A new `hpclang_font_editline()` accessor is reserved for the independently established HP39gs/40gs 6×10 EditLine table and is unavailable on the HP48/49/50 family. HP39g+ now has a full-NOR fixture, but the model-1 EditLine object/page mapping remains unverified, so the accessor stays unavailable there.
+Native access is intentionally a small census of concrete stock fonts, not a semantic role layer. `hpclang_font_default()` remains a convenience selection. `hpclang_font_mini()` exposes the stock minifont. `hpclang_font_big()` is reserved for the historical HP48gII/49g+/50g bigfont and must be unavailable on the HP39 family rather than aliasing the 5×8 main raster. `hpclang_font_editline()` exposes the independently established HP39g+/39gs/40gs 6×10 EditLine tables and is unavailable on the HP48/49/50 family. HP39g+ uses its own D1.55 raster; its extension has a separate acceptance gate above.
 
 The 2.22 HP39gs/40gs EditLine relocation is independently gated against stock NOR data rather than accepted from address arithmetic alone. HP39gs physical nibble `0x0FD882` and HP40gs `0x0FDA35` both match the legacy EditLine-table SHA-256 `f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53`; the Direct and Stock Gallery paths also pass the independent ROM-derived 6×10 pixel oracle.
 

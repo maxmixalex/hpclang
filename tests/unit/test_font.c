@@ -105,23 +105,26 @@ int main(void)
         fail("HP39 native font metrics");
 
     fake_boot.model = HPCLANG_MODEL_HP39GPLUS;
-    if (hpclang_font_big() != NULL || hpclang_font_editline() != NULL ||
-        hpclang_font_default() == NULL)
+    if (hpclang_font_big() != NULL || hpclang_font_editline() == NULL ||
+        hpclang_font_default() == NULL || hpclang_font_height(hpclang_font_editline()) != 10u)
         fail("HP39g+ native font availability");
-    fake_boot.model = HPCLANG_MODEL_HP39GS;
-
     /* A missing or stale private-window cookie must never be dereferenced.
      * The native mini-font reader fails closed to its nominal advance. The
      * exact valid VA is deliberately not dereferenced in this host unit test. */
-    fake_boot.platform_cookie = 0u;
-    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 missing font-window cookie");
-    fake_boot.platform_cookie = HPCLANG_CODE_WINDOW_BASE + HPCLANG_PAGE_SIZE;
-    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 shifted font-window cookie");
-    fake_boot.platform_cookie = 0x0a000000u;
-    if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
-        fail("HP39 retired section-alias cookie");
+    const uint32_t hp39_models[] = {HPCLANG_MODEL_HP39GPLUS, HPCLANG_MODEL_HP39GS,
+                                    HPCLANG_MODEL_HP40GS};
+    for (unsigned i = 0; i < sizeof(hp39_models) / sizeof(hp39_models[0]); ++i) {
+        fake_boot.model = hp39_models[i];
+        fake_boot.platform_cookie = 0u;
+        if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+            fail("HP39 missing font-window cookie");
+        fake_boot.platform_cookie = HPCLANG_CODE_WINDOW_BASE + HPCLANG_PAGE_SIZE;
+        if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+            fail("HP39 shifted font-window cookie");
+        fake_boot.platform_cookie = 0x0a000000u;
+        if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+            fail("HP39 retired section-alias cookie");
+    }
     fake_boot.platform_cookie = 0u;
 
     if (hpclang_font_height(&test_font) != 6u || hpclang_font_advance(&test_font) != 4u ||

@@ -178,10 +178,10 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_font_default()` | ✅ | Borrow the calculator's normal default native selection. On HP39gs/40gs this is the stock 5×8 main raster; on HP48gII/49g+/50g it is the stock bigfont. This convenience alias is not a semantic role. |
+| `hpclang_font_default()` | ✅ | Borrow the calculator's normal default native selection. On HP39g+/39gs/40gs this is the stock 5×8 main raster; on HP48gII/49g+/50g it is the stock bigfont. This convenience alias is not a semantic role. |
 | `hpclang_font_mini()` | ✅ | Borrow the stock minifont. HP39/40 uses its proportional five-row small font; HP48/49/50 uses the historical six-row minifont. |
 | `hpclang_font_big()` | ✅ | Expose the historical HP48/49/50 bigfont only: eight raster rows with nominal advance 6. HP39-family calculators return `NULL` rather than aliasing the 5×8 main font. |
-| `hpclang_font_editline()` | ✅ | Expose the dedicated HP39gs/40gs fixed 6×10 EditLine ROM font. It is unavailable on HP48gII/49g+/50g. HP39g+ now has a trustworthy full-NOR fixture, but its EditLine object/page mapping is still unproven, so the accessor remains unavailable there. |
+| `hpclang_font_editline()` | ✅ | Expose the dedicated HP39g+/39gs/40gs fixed 6×10 EditLine ROM font using each model’s own ROM. It is unavailable on HP48gII/49g+/50g. The HP39g+ extension awaits formal CI acceptance. |
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
@@ -196,7 +196,7 @@ The HP39 two-page window replaced an experimental long-lived high-L1 NOR section
 
 HP39 mini is five bitmap rows with a per-glyph advance (nominal 4); ASCII lowercase follows the stock small-font case-folding behavior. HP39 main is the stock 5×8 raster with nominal advance 6. HP39 EditLine is a separate fixed 6×10 raster with advance 6. HP48/49/50 mini/big retain the historical 6/4 and 8/6 line-height/advance conventions.
 
-HP39g+ is intentionally not inferred from its siblings. The real-hardware full-NOR fixture establishes firmware identity and runtime bootability, but not the native font object/page offsets. The model therefore retains the non-physical fallback path for already established fonts, and the EditLine accessor remains unavailable until its own native layout is mapped.
+HP39g+ D1.55 uses its own physical NOR pages `0x0006e000` and `0x0006f000` in the same private window. Its main, mini and EditLine tables begin at physical nibble addresses `0x0DC096`, `0x0DE0DA` and `0x0DCE2F`. The complete tables match the reviewed gs atlas; known ASCII shapes and the independent EditLine fingerprint guard their identity before pixel comparison. The old logical-address fallback is removed. See [validation](validation.md#hp39g-native-font-follow-up) for the current acceptance state.
 
 ### Generated custom fonts
 
@@ -305,7 +305,7 @@ per-call validation of the active Aplet template.
 | hp4950 stream storage | — | ✅ | non-stream families reject unsupported stream/metadata/media access cleanly | ✅ Storage #53 (`35428824540`): unified FatFs stdio/metadata/capacity/namespace/directory semantics plus bounded HPGCC filesystem adapters; Direct hp39/hp48/hp4950 and Stock hp4950 all green |
 | calculator objects / M7.3a-e | ✅ owned-object + adapter units | ✅ focused Core gates through #404 | ✅ Runtime #338 all Direct families | ✅ Runtime #338 all Stock families + clean return; bounded `satdir`/`saturn` parity baseline closed; M7.3f acceptance recorded below |
 
-Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. HP39g+ now participates in Direct emulator E2E through its verified full-NOR fixture, but stays on the non-physical two-face Gallery baseline until native model-1 ROM-font offsets are independently established.
+Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Build, universal x50ng, all three Direct Gallery families, and Stock hp39gs/hp40gs/hp48gii/hp50g. HP39gs/40gs traverse **248 entries (245 generated + 3 concrete ROM fonts) × 2 pages = 496 captures**; HP48gII/49g+/50g remain **247 × 2 = 494** because they expose minifont + bigfont/default only. The HP39g+ follow-up adds the third native face, making its full Gallery contract 248 entries / 496 captures, and adds Stock USB Gallery to the matrix. This extension has its own pending acceptance gate; #112 does not cover it.
 
 ## Historical public-surface size
 

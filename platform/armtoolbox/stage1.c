@@ -57,9 +57,15 @@ static const uint32_t hp39_font_nor_pages[] = {
     0x0007f000u,
 };
 
+/* HP39g+ D1.55 full-NOR: main/EditLine/mini occupy these two pages. */
+static const uint32_t hp39gplus_font_nor_pages[] = {0x0006e000u, 0x0006f000u};
+
 _Static_assert(sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]) <=
                    HPCLANG_CODE_WINDOW_PAGE_CAPACITY,
                "HP39 native font window must fit before HPCLANG_CODE_BASE");
+_Static_assert(sizeof(hp39gplus_font_nor_pages) / sizeof(hp39gplus_font_nor_pages[0]) <=
+                   HPCLANG_CODE_WINDOW_PAGE_CAPACITY,
+               "HP39g+ native font window must fit before HPCLANG_CODE_BASE");
 
 void hpclang_cache_clean(const void *start, uint32_t size);
 void hpclang_mmu_sync(volatile uint32_t *l2_workspace, volatile uint32_t *l1);
@@ -1605,21 +1611,24 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
      * Stock HP39gs/40gs 2.22 carries the reviewed native main/mini raster
      * tables in NOR pages 0x7e and 0x7f. Expose only those pages in the unused
      * prefix of hpclang's own L1[0x12] coarse table; runtime handles each
-     * model's exact nibble offset. A verified real HP39g+ full-NOR fixture now
-     * exists, but its native-font object/page layout remains intentionally
-     * excluded until that mapping is independently established.
+     * model's exact nibble offset. HP39g+ D1.55 uses pages 0x6e and 0x6f
+     * established from its physical full-NOR fixture.
      */
     if (model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS) {
         launch.mmu.code_window_pages = hp39_font_nor_pages;
         launch.mmu.code_window_page_count =
             (uint32_t)(sizeof(hp39_font_nor_pages) / sizeof(hp39_font_nor_pages[0]));
+    } else if (model == HPCLANG_MODEL_HP39GPLUS) {
+        launch.mmu.code_window_pages = hp39gplus_font_nor_pages;
+        launch.mmu.code_window_page_count =
+            (uint32_t)(sizeof(hp39gplus_font_nor_pages) / sizeof(hp39gplus_font_nor_pages[0]));
     }
 
     launch.model = model;
     launch.entry_offset = hpc1->entry_offset;
-    /* Only advertise a Saturn state when its Read[] map contains every ROM
-       page the current native-font runtime may dereference. This keeps Direct
-       E2E's synthetic allocator block from masquerading as a live stock map. */
+    /* Require the established ROM ranges in Read[] before advertising a live
+       Stock context. This keeps Direct E2E's synthetic allocator block from
+       masquerading as a live map; HP39 fixed fonts use the private window. */
     launch.saturn_state = live_state;
 
     /*

@@ -156,6 +156,15 @@ For HP39 hardware validation the established post-return action is **APLET**;
 a valid return opens/redraws the normal APLET library. Other families should
 use an equally harmless model-appropriate Stock-UI action.
 
+## Stock Gallery on HP39
+
+HP39g+/39gs/40gs use the canonical USB Aplet install/launch harness.
+`run-stock-gallery-hp39.sh` prepares the compact Gallery package and appends
+`hp39-stock-gallery-run.seq` for native mini/main/EditLine and generated-control
+navigation. It retains the standard runtime and settled Stock return gates,
+then compares native pixels with the target's own NOR. The former duplicated
+gs/40gs serial-disk install sequences are retired.
+
 ## Stock transfer mechanisms
 
 HP 39g+, HP 39gs, and HP 40gs use the original USB Connectivity Kit path by default. A headless Kermit server supplies the typed files:
@@ -397,7 +406,7 @@ The general TTF importer has been removed. Final bitmap curation adds Cubic 11, 
 
 `E2E / Font Gallery` **#130 (`35832611436`)** is a historical fully-green regression gate. Current integration acceptance is tracked in [Validation](validation.md). HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
-The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). HP39g+ native-font pixel verification remains an open requirement.
+The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). The HP39g+ native-font extension has its own Direct/Stock ROM-pixel validation and CI acceptance gate.
 
 
 ### Stock boot and repaint synchronization

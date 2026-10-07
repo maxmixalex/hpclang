@@ -354,13 +354,13 @@ static int native_raster_available(const struct hpclang_device_info *device)
         return 0;
 
     /*
-     * HP39gs/40gs native fonts are exposed through the public font service.
+     * HP39-family native fonts are exposed through the public font service.
      * The Gallery application must not decode the runtime-private
      * platform_cookie merely to predict whether the backend can draw them.
      * The independent stock-ROM pixel oracle below validates the actual
      * rendered raster, so a broken/private mapping still fails the E2E.
      */
-    if (device->model == HPCLANG_MODEL_HP39GS || device->model == HPCLANG_MODEL_HP40GS)
+    if (device->family == HPCLANG_FAMILY_HP39)
         return 1;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
