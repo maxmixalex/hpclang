@@ -413,3 +413,22 @@ application requirements, not proof they work on all six Stock ROMs. Likewise,
 the HP39 template proves a saved-data channel, not arbitrary creation of system
 variable definitions. Every proposed cross-model API needs its own execution
 and restoration evidence.
+
+### SD media discovery and replacement
+
+Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3
+`libs_workspace/headers/fsystem.h` distinguish `FS_NOCARD` from `FS_CHANGED`
+and describe reinitialization after a card change. Those declarations do not
+establish a safe Stock syscall sequence for every model. HPGCC3's
+`libs_workspace/fsystem/common/sddriver/sddriver.c` reads GPF3 for card presence;
+newRPL's `firmware/sys/target_50g/sddriver.c` independently identifies GPF3
+presence and active-low GPD3 write protection. x50ng models the same pins.
+
+| Capability | Clean equivalent / model | Adapter | Validation / remaining work |
+| --- | --- | --- | --- |
+| Query an absent card, insert it, retry before controller acquisition | HP49g+/HP50g: fresh GPIO sampling; no pin reconfiguration or repeated Stock `CHECKINSERT`. HP39/40 and HP48: `ENOSYS` | `FSVolumeInserted` uses the clean media query | Host register-transition and ownership tests; formal regression accepted on `256e8496` |
+| Observe write protection before acquisition | HP49g+/HP50g: GPD3 sampled per attempt; absent media does not require a protection read | Existing open/attribute/volume adapters inherit the mounted policy | Host polarity/change/error tests; formal regression accepted on `256e8496` |
+| Remove/replace a mounted card and recover stale handles | Required M7 follow-up; the current process-lifetime namespace does not implement media-generation tracking or recovery | `FS_CHANGED` is a declared error value, not proof of detection; broad historical reinitialization adapters remain unimplemented | Keep removal, replacement, stale-descriptor rejection and safe Stock return as explicit acceptance requirements |
+
+The new pre-acquisition sampling is separate from the accepted metadata and
+normal file-I/O contract. It does not claim safe hot swapping of a mounted card.

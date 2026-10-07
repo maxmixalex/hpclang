@@ -455,6 +455,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   automatic access-date maintenance or timestamp setters.
 - [ ] Audit media-change and ownership behavior; retain the unresolved Stock
   HP49/50 Storage launch intermittency as a reliability investigation.
+  - Pre-takeover insertion/protection refresh now uses read-only GPIO sampling
+    instead of repeating Stock `CHECKINSERT`; regression acceptance is complete
+    on `256e8496` (Storage, Runtime, Objects, Core and Quality).
+    Replacement of an already mounted card, stale handles and recovery remain
+    required follow-ups. This does not close the media-change goal.
 
 ### M7.3g–j — object-service capability completion
 

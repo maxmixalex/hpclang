@@ -171,6 +171,13 @@ HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generat
 
 HP 49g+ and HP 50g transfer SETUP, generated `HPCLANG.HP`, and `ZZE2E` over USB Kermit, then install ARMToolbox into Port 2. They share the same Stock UI sequence while retaining their native per-model ARM bootloaders. An explicit SD override retains the emulated-card path used by Storage. Current migration evidence is tracked in [Stock USB transport](stock-usb-transport.md).
 
+When reproducing Stock Storage, use the workflow's
+`HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE=sd`, `HPCLANG_E2E_STORAGE_WITNESS=1`
+and `HPCLANG_E2E_REQUIRE_KEYBOARD=0` settings. The SD path prepares the FAT
+fixture used by the file assertions; the default USB launch does not mount
+that fixture. A missing-card error from such a USB run is not evidence of a
+Storage regression.
+
 The SD installer explicitly selects RPN in the Stock modes form once HOME is
 ready. Its CHOOS selection works from either initial mode; a toggle during cold
 boot could be lost to the Memory Clear dialog or switch in the wrong direction.

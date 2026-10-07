@@ -154,7 +154,6 @@ static int lease_stock_reinit(void *context)
 {
     (void)context;
     (void)hpclang_kos_swi3(KOS_SYSCALL_RESET_SD, 0u, 0u, 0u);
-    hpclang_storage_after_stock_reinit();
     return 0;
 }
 
@@ -193,9 +192,9 @@ static int namespace_acquire(void)
     }
 
     /*
-     * KOS participates only at the ownership boundary: sample insertion and
-     * write-protect state before touching the SD controller. All namespace
-     * and byte-stream operations after this point are FatFs-backed.
+     * Sample insertion and write-protect GPIOs before touching the SD
+     * controller, without re-entering Stock KOS. All namespace and byte-stream
+     * operations after this point are FatFs-backed.
      */
     int present = 0;
     int read_only = 0;
@@ -230,6 +229,11 @@ static int namespace_acquire(void)
 int hpclang_namespace_direct_active(void)
 {
     return namespace_ready && namespace_lease.state == HPCLANG_NAMESPACE_DIRECT;
+}
+
+int hpclang_namespace_stock_active(void)
+{
+    return !namespace_ready || namespace_lease.state == HPCLANG_NAMESPACE_STOCK;
 }
 
 static struct direct_fd_state *direct_fd_from_number(int fd)

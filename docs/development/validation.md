@@ -386,7 +386,15 @@ HP48 Stock now reaches HPC1 PASS, control-flow restoration, temporary-stage tear
 
 M7.2 keeps standard byte-stream I/O in picolibc, but the production filesystem backend is now hpclang-owned FatFs rather than Stock KOS file calls. The first storage operation acquires a whole-process SD namespace lease; from then until shutdown, stdio, metadata, capacity, rename/mkdir/rmdir and directory traversal all use the same direct S3C2410 SDI + FatFs stack.
 
-KOS remains only at the Stock ownership boundary. Insertion and write-protect state are sampled once before takeover because repeated `CHECKINSERT` is not return-safe on the HP49g+ path. On shutdown hpclang closes direct descriptors, unmounts FatFs, releases the controller, invokes KOS syscall 19 (`ResetSD`), invalidates the cached media sample, and returns to Stock. Ordinary file data and namespace operations never alternate between KOS and FatFs within the process.
+KOS remains only at the Stock ownership boundary. The original implementation cached insertion and write-protect state before takeover because repeated `CHECKINSERT` is not return-safe on the HP49g+ path. The media-discovery follow-up replaces that cache with read-only GPIO sampling before controller acquisition: GPF3 reports insertion and GPD3 reports active-low protection. Unsupported pin configurations fail with `ENOTSUP` without changing Stock's configuration. On shutdown hpclang closes direct descriptors, unmounts FatFs, releases the controller, invokes KOS syscall 19 (`ResetSD`), and returns to Stock. Ordinary file data and namespace operations never alternate between KOS and FatFs within the process.
+
+The follow-up has 55 passing host tests, including register-state transitions,
+ownership guards and a real FatFs namespace retry after an absent-card failure.
+Local six-model Direct Storage and HP49g+/HP50g SD Stock Storage pass,
+including file operations and settled return. These runs validate integration;
+insertion/protection transitions are simulated by host tests, not physical
+hot-plug evidence. Formal CI acceptance is complete on `256e8496`: [Storage](https://github.com/zyf722/hpclang/actions/runs/37626827017), [Runtime](https://github.com/zyf722/hpclang/actions/runs/37626826775), [Objects](https://github.com/zyf722/hpclang/actions/runs/37626826929), [Core](https://github.com/zyf722/hpclang/actions/runs/37626827015) and [Quality](https://github.com/zyf722/hpclang/actions/runs/37626827014) all pass. Replacing an already mounted
+card, rejecting stale handles and recovering ownership remain open M7 goals.
 
 The focused Storage payload covers:
 
@@ -404,7 +412,10 @@ The focused Storage payload covers:
 
 Storage #22 (`35378151818`) remains the historical M7.2b evidence for the earlier KOS-backed metadata/stream bridge. Storage #23 independently established the Stock `ResetSD` reinitialization half. The later M7.2c runs, culminating in Storage #30, established the direct SDIO/FatFs backend, owned iterators, namespace mutation, capacity and process-wide lease. Final M7.2 closure is **Storage #53 (`35428824540`)** on `c4b827fe`: Build, Direct hp39/hp48/hp4950 and Stock hp4950 all pass after ordinary KOS file I/O is removed, mounted-volume capacity replaces whole-card capacity, the HPGCC filesystem adapter flow is exercised, and POSIX `ftruncate()` extension is zero-filled. **Core #254 (`35428824495`)** also passes on the same head.
 
-The timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06`; only the resulting FAT last-modified civil fields are public. Creation/access timestamp semantics remain outside the public contract.
+The original timestamp fixture pins `HPCLANG.TST` to `2024-01-02 03:04:06`.
+The accepted metadata extension also exposes validity-gated stored FAT creation
+time and access date, with persistence and unsupported-case coverage. It does
+not add timestamp setters or automatic access-date maintenance.
 
 ## Evidence retention
 

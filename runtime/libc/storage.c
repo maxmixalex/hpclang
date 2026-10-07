@@ -11,38 +11,15 @@
 #include <hpclang/storage.h>
 
 #include "storage-namespace.h"
+#include "storage-media.h"
 
 /*
  * HP49g+/HP50g byte-stream storage policy.
  *
  * Application file I/O is served by hpclang's owned FatFs namespace for the
- * whole native-process lifetime. Stock KOS is intentionally retained only as
- * a host-coordination boundary: sample SD insertion/write-protect state before
- * taking direct controller ownership, then ResetSD after releasing it.
+ * whole native-process lifetime. Media pins are sampled before taking direct
+ * controller ownership; Stock ResetSD runs only after releasing it.
  */
-
-enum
-{
-    KOS_SYSCALL_GET_FUNC_ENTRY = 218u,
-    KOS_MODULE_FILESYSTEM = 1u,
-    KOS_FUNC_CHECKINSERT = 17u,
-    KOS_FUNC_CHECKPROTECT = 18u
-};
-
-uint32_t hpclang_kos_swi3(uint32_t index, uint32_t arg1, uint32_t arg2, uint32_t arg3);
-
-typedef uint32_t (*kos_fn0)(void);
-
-enum stream_media_presence_state
-{
-    STREAM_MEDIA_PRESENCE_UNKNOWN = 0,
-    STREAM_MEDIA_PRESENCE_ABSENT = 1,
-    STREAM_MEDIA_PRESENCE_PRESENT = 2
-};
-
-static uint8_t stream_media_presence;
-static uint8_t stream_media_protect_known;
-static uint8_t stream_media_protected;
 
 static int stream_storage_available(void)
 {
@@ -56,89 +33,9 @@ static int unsupported(void)
     return -1;
 }
 
-static uintptr_t kos_entry(uint32_t index)
+uint32_t hpclang_storage_media_read32(unsigned offset)
 {
-    if (!stream_storage_available())
-        return 0u;
-
-    return (uintptr_t)hpclang_kos_swi3(KOS_SYSCALL_GET_FUNC_ENTRY, KOS_MODULE_FILESYSTEM, index,
-                                       0u);
-}
-
-static int stock_media_presence_query(void)
-{
-    if (stream_media_presence == STREAM_MEDIA_PRESENCE_PRESENT)
-        return 1;
-    if (stream_media_presence == STREAM_MEDIA_PRESENCE_ABSENT)
-        return 0;
-
-    uintptr_t addr = kos_entry(KOS_FUNC_CHECKINSERT);
-    if (addr == 0u)
-        return unsupported();
-
-    int32_t result = (int32_t)((kos_fn0)addr)();
-    if (result < 0) {
-        errno = ENODEV;
-        return -1;
-    }
-
-    stream_media_presence =
-        result != 0 ? STREAM_MEDIA_PRESENCE_PRESENT : STREAM_MEDIA_PRESENCE_ABSENT;
-    return result != 0;
-}
-
-static int stock_media_read_only_query(void)
-{
-    if (stream_media_protect_known)
-        return stream_media_protected != 0u;
-
-    uintptr_t addr = kos_entry(KOS_FUNC_CHECKPROTECT);
-    if (addr == 0u)
-        return unsupported();
-
-    int32_t result = (int32_t)((kos_fn0)addr)();
-    if (result < 0) {
-        errno = EIO;
-        return -1;
-    }
-
-    stream_media_protect_known = 1u;
-    stream_media_protected = result != 0;
-    return stream_media_protected != 0u;
-}
-
-int hpclang_storage_stock_media_query(int *present, int *read_only)
-{
-    if (!stream_storage_available())
-        return unsupported();
-    if (present == NULL || read_only == NULL) {
-        errno = EFAULT;
-        return -1;
-    }
-
-    int is_present = stock_media_presence_query();
-    if (is_present < 0)
-        return -1;
-
-    *present = is_present;
-    if (!is_present) {
-        *read_only = 0;
-        return 0;
-    }
-
-    int is_read_only = stock_media_read_only_query();
-    if (is_read_only < 0)
-        return -1;
-
-    *read_only = is_read_only;
-    return 0;
-}
-
-void hpclang_storage_after_stock_reinit(void)
-{
-    stream_media_presence = STREAM_MEDIA_PRESENCE_UNKNOWN;
-    stream_media_protect_known = 0u;
-    stream_media_protected = 0u;
+    return *(volatile uint32_t *)(uintptr_t)(UINT32_C(0x07a00000) + offset);
 }
 
 int open(const char *path, int flags, ...)

@@ -153,7 +153,7 @@ Storage is split by **semantics**, not by media.
 
 HP49g+/HP50g expose the SD card as the hpclang byte-stream filesystem. The clean runtime uses one process-lifetime owned namespace:
 
-1. before takeover, Stock KOS is consulted once for SD insertion/write-protect state;
+1. before takeover, existing SD insertion/write-protect GPIO inputs are sampled without re-entering Stock KOS or changing pin configuration;
 2. hpclang acquires the S3C2410 SDI controller;
 3. the independently implemented block driver mounts the card through FatFs;
 4. all standard stream I/O, metadata, capacity, rename/mkdir/rmdir and directory traversal use that same namespace until process shutdown;
@@ -161,7 +161,7 @@ HP49g+/HP50g expose the SD card as the hpclang byte-stream filesystem. The clean
 
 Ordinary application I/O therefore does **not** alternate between KOS and FatFs. The earlier KOS-backed stream bridge established the required POSIX-facing behavior during bring-up, but it is no longer the production file backend.
 
-The public surface remains normal libc plus typed hpclang queries. `hpclang_stream_path_query()` reports versioned FAT metadata and a validity-gated last-modified civil datetime without inventing timezone/epoch meaning. `hpclang_stream_storage_query()` reports media state, free bytes and total capacity from the owned backend. Repeated Stock `CHECKINSERT` is avoided because HP49g+ evidence showed it is not return-safe within one native launch.
+The public surface remains normal libc plus typed hpclang queries. `hpclang_stream_path_query()` reports versioned FAT metadata and validity-gated civil timestamps without inventing timezone/epoch meaning. `hpclang_stream_storage_query()` reports media state, free bytes and total capacity from the owned backend. Repeated Stock `CHECKINSERT` is avoided because HP49g+ evidence showed it is not return-safe within one native launch. Before acquisition, GPIO sampling permits an absent-card query to be retried after insertion. Once acquired, the volume and protection policy remain fixed until shutdown; detection and recovery for replacement of a mounted card remain an open M7 follow-up. Unsupported pin modes fail without changing Stock's configuration.
 
 HP39/40 and HP48 do not pretend to expose this SD byte-stream service; unsupported operations fail with `ENOSYS`.
 

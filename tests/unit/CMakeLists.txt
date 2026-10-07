@@ -289,6 +289,10 @@ target_include_directories(test_storage_metadata PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
 target_link_libraries(test_storage_metadata PRIVATE hpclang_fatfs_vendor)
 
+hpclang_unit(storage_media test_storage_media.c "${HPCLANG_ROOT}/runtime/libc/storage-media.c")
+target_include_directories(test_storage_media PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
+
 hpclang_unit(namespace_lease
     test_namespace_lease.c
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
