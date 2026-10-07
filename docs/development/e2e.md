@@ -121,6 +121,12 @@ HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generat
 
 HP 49g+ and HP 50g transfer SETUP, generated `HPCLANG.HP`, and `ZZE2E` over USB Kermit, then install ARMToolbox into Port 2. They share the same Stock UI sequence while retaining their native per-model ARM bootloaders. An explicit SD override retains the emulated-card path used by Storage. Current migration evidence is tracked in [Stock USB transport](stock-usb-transport.md).
 
+The SD installer explicitly selects RPN in the Stock modes form once HOME is
+ready. Its CHOOS selection works from either initial mode; a toggle during cold
+boot could be lost to the Memory Clear dialog or switch in the wrong direction.
+ALG command entry alone does not execute the stack-based `PrRUN` launch.
+Installation and application PASS remain separate checks.
+
 The historical pre-USB cleanup baseline is retained for regression provenance. Canonical **Runtime #357 (`35832611353`)** is fully green on the final cleanup functional head, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. **Font Gallery #130 (`35832611436`) is also fully green** across Direct hp39/hp48/hp4950 and Stock hp39gs/hp40gs/hp48gii/hp50g. **Storage #141 (`35832611387`)** and **Quality #13 (`35832611366`)** are green on the same head. The earlier HP39 Gallery red path had two independent harness regressions: launch/UI settling required payload-aware launch-only retries, and the Gallery application retained an obsolete direct `platform_cookie == code-window` availability check after runtime moved HP39 private state behind an opaque tagged platform context. The runtime font service now owns that private mapping decision and the independent ROM pixel oracle validates the rendered result.
 
 ## Target profiles
@@ -326,9 +332,11 @@ The tested font/model slice is accepted. Later main integration evidence is reco
 Direct Runtime, Direct Gallery and Stock launch sequences share the key-delivery
 state machine. A matrix key-down waits for a driven scan line and a readable
 input line; it is not sent while Stock has configured the whole matrix as
-outputs during cold boot. After each edge, the sequence waits for an actual
-guest GPIO sample. Readiness and sampling each have a bounded watchdog and a
-distinct failure reason. Neither proves that a Stock menu accepted the action;
+outputs during cold boot. After a press, the sequence waits for a fresh guest
+GPIO sample. After release, it confirms that the emulated switch is open;
+Stock may stop scanning after handling the press, so a second guest read is
+not required. Readiness, press sampling and switch release each have a bounded
+watchdog and a distinct failure reason. None proves that a Stock menu accepted the action;
 transfer completion, application results and settled return remain independent
 gates.
 

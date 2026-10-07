@@ -40,9 +40,9 @@ Direct runtime, Storage, Core, Quality, and Font Gallery all pass on integration
 historical head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
 and the harness timing fixes. See
 [Validation](validation.md) for the historical records and integration acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
-Gallery USB follow-ups are recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
-three sequential model sweeps; all other Direct Gallery families retain 15
-minutes.
+Gallery USB follow-ups are recorded separately in validation. Gallery jobs use
+a shared 25-minute budget, leaving room for the bounded Stock transfer and
+subsequent verification; HP39 Direct also performs three sequential model sweeps.
 
 The implementation is functionally complete. U5 is a separately tracked,
 non-blocking repeated-run reliability and wall-clock benchmark against the

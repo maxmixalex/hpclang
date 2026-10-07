@@ -32,6 +32,10 @@ esac
 
 STATE="$ROOT/build/$TARGET-state"
 SD="$ROOT/build/$TARGET-sd"
+# Retained local runs must not mix prior USB/SD success evidence into this run.
+rm -f "$ROOT/build/$TARGET-"*.pgm "$ROOT/build/$TARGET-"*.pgm.png \
+    "$ROOT/build/$TARGET-install.json" "$ROOT/build/$TARGET-run.json" \
+    "$ROOT/build/$TARGET-stock.json" "$ROOT/build/$TARGET-e2e.json"
 rm -rf "$STATE" "$SD"
 mkdir -p "$STATE" "$SD"
 

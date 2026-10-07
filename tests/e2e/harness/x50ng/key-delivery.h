@@ -16,10 +16,11 @@ struct hpclang_key_delivery
     const char *failure;
 };
 
-/* Readiness precedes the edge; a fresh guest sample acknowledges the edge.
- * The caller resets its sample counter when it emits a key press/release. */
+/* A press requires readiness and a fresh guest sample after emission.
+ * Release requires confirmation that the emulated switch is open: an idle ROM
+ * need not scan again until the next press. Neither proves UI acceptance. */
 static inline int hpclang_key_delivery_step(struct hpclang_key_delivery *s, int64_t now, int down,
-                                            int ready, int sampled)
+                                            int ready, int sampled, int released)
 {
     if (!s->started) {
         s->started = 1;
@@ -36,11 +37,11 @@ static inline int hpclang_key_delivery_step(struct hpclang_key_delivery *s, int6
         s->deadline = now + 15000000LL;
         return HPCLANG_KEY_EMIT;
     }
-    if (sampled)
+    if (down ? sampled : released)
         return HPCLANG_KEY_DONE;
     if (now < s->deadline)
         return HPCLANG_KEY_WAIT;
-    s->failure = "input-not-sampled";
+    s->failure = down ? "input-not-sampled" : "input-not-released";
     return -1;
 }
 #endif
