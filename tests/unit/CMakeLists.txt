@@ -14,6 +14,13 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+if(UNIX)
+    hpclang_unit(execution_clock test_execution_clock.c
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/execution-clock.c")
+    target_include_directories(test_execution_clock PRIVATE
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+endif()
+
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")
 target_link_libraries(test_softfloat PRIVATE m)
 

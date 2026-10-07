@@ -310,6 +310,20 @@ GitHub Actions YAML is orchestration, not the test specification. Expected files
 
 ## Full-keyboard validation and progression evidence
 
+Headless x50ng uses process CPU time plus bounded intentional idle waits for
+both guest hardware timers and harness events. Time spent descheduled by the
+host does not become a long calculator key press. Interactive frontends retain
+the upstream wall clock. RTC calendar initialization still uses the host date;
+subsequent RTC progression shares the guest clock with the other peripherals.
+Shell and workflow watchdogs remain wall-clock limits, including the external
+Kermit transfer watchdog. This avoids input drift under scheduling pauses; it
+does not guarantee instruction-level deterministic emulation or USB success.
+
+A local regression experiment paused the emulator during each of three DOWN
+presses in the HP39gs receive menu. The wall-clock implementation selected the
+wrong transport; the execution clock preserved the USB selection under the
+same pauses. Formal CI acceptance is still required.
+
 The canonical runtime E2E injects every physical key position on each automated calculator model. The guest verifies DOWN/UP events, raw scan code, physical key identity, and dedicated-key modifier state for all 51 keys.
 
 The final LCD screen renders the physical keyboard rather than the electrical scan matrix: six menu keys, two three-key control rows beside the cursor cluster, and seven five-key main rows. Passed positions are filled, and a failing position is left open and marked. The screen labels use the public font/text API, so calculator E2E exercises the same rasterization path instead of carrying a test-only glyph table. The machine-readable result remains the actual gate; the LCD diagram is a visual summary of the same checks.

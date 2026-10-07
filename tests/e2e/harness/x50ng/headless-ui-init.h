@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "emulator_api.h"
+#include "execution-clock.h"
 #include "options.h"
 #include "ui4x/src/api.h"
 
@@ -19,6 +20,7 @@
  */
 static inline config_t hpclang_x50ng_headless_config(int argc, char **argv)
 {
+    hpclang_execution_clock_enable();
     char *progname = g_path_get_basename(argv[0]);
     char *progpath = g_path_get_dirname(argv[0]);
     char *default_datadir = g_build_filename(g_get_user_config_dir(), progname, NULL);
