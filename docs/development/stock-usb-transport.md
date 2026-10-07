@@ -52,7 +52,7 @@ for integration. The formal acceptance links are kept in
 
 ## HP39 Kermit turnaround
 
-The HP39-family server uses C-Kermit's `SET SEND PAUSE 10` to leave 10 ms
+The HP39-family server uses C-Kermit's `SET SEND PAUSE 50` to leave 50 ms
 before each reply. Stock can still be completing its send/receive transition
 when the host has already parsed the request checksum. Immediate replies can
 reach the guest USB FIFO yet fail to advance the Stock Kermit exchange,
@@ -70,10 +70,19 @@ the small packet pause alone cannot prevent that race. A server waiting for its 
 request remains silent; the patch enables recovery only after negotiation.
 Stock ROMs, application results and transfer watchdogs are unchanged.
 
+The server starts with a one-second retransmission timeout
+(`SET SEND TIMEOUT 1 DYNAMIC 1 30`). The bundled sender patch doubles the
+interval after consecutive timeouts, capped at 30 seconds, and returns to
+normal packet-rate timing on an accepted ACK. This preserves fast recovery
+from an isolated lost notification without exhausting all ten retries while
+a busy Stock receiver is still processing a packet. The existing 90-second
+no-progress and 20-minute total watchdogs still apply.
+
 `tests/e2e/harness/test-kermit-server.py` checks the bundled executable over
 a PTY on both cache hits and fresh builds. It verifies idle silence, recovery
-after an ignored init reply, CRC-checked binary transfer, a lost data ACK and
-a subsequent file transaction. This exercises the actual server rather than
+after an ignored init reply, CRC-checked binary transfer, a lost data ACK,
+an ACK delayed past the former retry budget, and a subsequent file transaction.
+This exercises the actual server rather than
 matching its configuration text. See the upstream
 [Init-Info protocol contract](https://www.kermitproject.org/protocol/kproto.pdf).
 

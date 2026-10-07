@@ -369,6 +369,15 @@ watchdog and a distinct failure reason. None proves that a Stock menu accepted t
 transfer completion, application results and settled return remain independent
 gates.
 
+Within the Direct Gallery application, automated builds enable
+`HPCLANG_GALLERY_KEY_HANDSHAKE`: the harness holds each key until the real
+event engine reports DOWN and the payload publishes `GKAC`. The harness then
+releases it; the payload waits for the matching UP before rendering and
+publishing the next ready frame. This avoids missed timed taps and repeated
+navigation while a slow frame is drawn. Standalone interactive builds keep
+normal key repeat. Failure JSON retains the last payload state, including
+an unfinished key acknowledgement.
+
 LCD return stability requires a changed, nonblank frame across consecutive
 observations. A blank repaint interval resets stability instead of becoming an
 immediate `stock-resume` failure. The existing return deadline still bounds a

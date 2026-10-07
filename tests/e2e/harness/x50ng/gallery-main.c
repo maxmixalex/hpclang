@@ -24,6 +24,7 @@
 #define PASS_WORD 0x50415353u
 #define FAIL_PREFIX 0x46410000u
 #define GALLERY_PREFIX 0x47000000u
+#define GALLERY_KEY_ACK 0x474b4143u
 #define GALLERY_NEXT_FACE 0x00400000u
 
 #define TEST_RAM_SIZE 0x00200000u
@@ -56,7 +57,6 @@
 #define POLL_US 20000LL
 #define DEADLINE_US 300000000LL
 #define KEY_HOLD_US 50000LL
-#define KEY_SETTLE_US 120000LL
 #define RETURN_ON_US 200000LL
 #define RETURN_SETTLE_FIRST_US 300000LL
 #define RETURN_SETTLE_INTERVAL_US 50000LL
@@ -82,13 +82,6 @@ enum gallery_phase
     GALLERY_WAIT_SAMPLE_RETURN,
     GALLERY_WAIT_NEXT,
     GALLERY_WAIT_PASS,
-};
-
-struct state;
-struct key_release
-{
-    struct state *state;
-    int key;
 };
 
 struct state
@@ -120,8 +113,7 @@ struct state
     uint32_t gallery_frames;
     int gallery_started;
     int key_busy;
-    int64_t next_action;
-    struct key_release key_release;
+    int gallery_key;
 
     struct hpclang_lcd_quiescence return_quiescence;
     int64_t return_settle_deadline;
@@ -175,23 +167,14 @@ static int tap(struct state *s, const struct key_action *down, const struct key_
            hpclang_sequence_start(&s->return_keys);
 }
 
-static void gallery_release(void *arg)
-{
-    struct key_release *release = arg;
-    release_key(release->key);
-    release->state->key_busy = 0;
-}
-
 static int gallery_tap(struct state *s, int key)
 {
     if (s->key_busy)
         return 0;
     press_key(key);
-    s->key_release.state = s;
-    s->key_release.key = key;
+    s->gallery_key = key;
     s->key_busy = 1;
-    s->next_action = timer_get_clock() + KEY_SETTLE_US;
-    return later(gallery_release, &s->key_release, KEY_HOLD_US);
+    return 1;
 }
 
 static int guest_read32(hdw_t *h, uint32_t va, uint32_t *v)
@@ -450,7 +433,7 @@ static int drive_gallery(struct state *s, uint32_t value)
 
     if (count == 0u || index >= count)
         return 0;
-    if (s->key_busy || timer_get_clock() < s->next_action)
+    if (s->key_busy)
         return 1;
 
     if (!s->gallery_started) {
@@ -524,7 +507,14 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
-        if ((v & 0xff000000u) == GALLERY_PREFIX && !s->saw_pass) {
+        if (!s->saw_pass)
+            s->result = v;
+        if (v == GALLERY_KEY_ACK && !s->saw_pass) {
+            if (s->key_busy) {
+                release_key(s->gallery_key);
+                s->key_busy = 0;
+            }
+        } else if ((v & 0xff000000u) == GALLERY_PREFIX && !s->saw_pass) {
             if (!drive_gallery(s, v)) {
                 fail(s, "gallery-drive");
                 return;
