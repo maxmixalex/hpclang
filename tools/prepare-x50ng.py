@@ -901,6 +901,41 @@ def patch_lcd_scanout(root: Path) -> None:
     )
 
 
+def patch_execution_clock(root: Path, args: argparse.Namespace) -> None:
+    """Keep headless guest timers and input on CPU time plus intentional idle."""
+    for name in ("execution-clock.c", "execution-clock.h"):
+        shutil.copy2(args.headless_header.parent / name, root / "src" / name)
+    replace_once(
+        root / "Makefile",
+        "\tsrc/timer.c",
+        "\tsrc/execution-clock.c \\\n\tsrc/timer.c",
+        "execution clock source",
+    )
+    timer = root / "src/timer.c"
+    replace_once(
+        timer,
+        '#include "timer.h"',
+        '#include "timer.h"\n#include "execution-clock.h"',
+        "execution clock API",
+    )
+    replace_once(
+        timer,
+        "poll( NULL, 0, timeout );",
+        "hpclang_execution_clock_poll( timeout );",
+        "intentional idle accounting",
+    )
+    replace_once(
+        timer,
+        """    struct timeval tv;
+
+    gettimeofday( &tv, NULL );
+
+    return ( tv.tv_sec * 1000000LL + tv.tv_usec );""",
+        "    return hpclang_execution_clock_read();",
+        "headless execution time",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -914,6 +949,7 @@ def main() -> None:
 
     root = args.x50ng
     patch_frontends(root, args)
+    patch_execution_clock(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
