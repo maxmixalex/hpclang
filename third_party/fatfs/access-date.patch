@@ -1,0 +1,28 @@
+--- a/ff.h
++++ b/ff.h
+@@ -262,6 +262,7 @@
+ 	WORD	fdate;			/* Date of file modification or directory creation */
+ 	WORD	ftime;			/* Time of file modification or directory creation */
+ #if FF_FS_CRTIME
++	WORD	adate;			/* Stored FAT access date (zero if absent) */
+ 	WORD	crdate;			/* Date of object createion */
+ 	WORD	crtime;			/* Time of object createion */
+ #endif
+--- a/ff.c
++++ b/ff.c
+@@ -2704,6 +2704,7 @@
+ 		fno->ftime = ld_16(fs->dirbuf + XDIR_ModTime + 0);	/* Last modified time */
+ 		fno->fdate = ld_16(fs->dirbuf + XDIR_ModTime + 2);	/* Last modified date */
+ #if FF_FS_CRTIME
++		fno->adate = ld_16(fs->dirbuf + XDIR_AccTime + 2);
+ 		fno->crtime = ld_16(fs->dirbuf + XDIR_CrtTime + 0);	/* Created time */
+ 		fno->crdate = ld_16(fs->dirbuf + XDIR_CrtTime + 2);	/* Created date */
+ #endif
+@@ -2790,6 +2791,7 @@
+ 	fno->ftime = ld_16(dp->dir + DIR_ModTime + 0);	/* Last modified time */
+ 	fno->fdate = ld_16(dp->dir + DIR_ModTime + 2);	/* Last Modified date */
+ #if FF_FS_CRTIME
++	fno->adate = ld_16(dp->dir + DIR_LstAccDate);
+ 	fno->crtime = ld_16(dp->dir + DIR_CrtTime + 0);	/* Created time */
+ 	fno->crdate = ld_16(dp->dir + DIR_CrtTime + 2);	/* Created date */
+ #endif

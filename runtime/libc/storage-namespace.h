@@ -26,6 +26,7 @@ extern "C"
     int hpclang_namespace_mkdir(const char *path);
     int hpclang_namespace_rmdir(const char *path);
     int hpclang_namespace_path_query(const char *path, struct hpclang_stream_path_info *info);
+    int hpclang_namespace_path_set_attributes(const char *path, uint32_t attributes, uint32_t mask);
     int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info);
 
     void hpclang_storage_shutdown(void);

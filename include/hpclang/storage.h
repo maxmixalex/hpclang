@@ -8,9 +8,9 @@ extern "C"
 {
 #endif
 
-#define HPCLANG_STREAM_PATH_INFO_VERSION 2u
+#define HPCLANG_STREAM_PATH_INFO_VERSION 3u
 #define HPCLANG_STREAM_STORAGE_INFO_VERSION 1u
-#define HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION 1u
+#define HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION 2u
 #define HPCLANG_STREAM_NAME_CAPACITY 256u
 
     enum hpclang_stream_path_type
@@ -31,13 +31,19 @@ extern "C"
 
     enum hpclang_stream_path_time_validity
     {
-        HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID = 1u << 0
+        HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID = 1u << 0,
+        HPCLANG_STREAM_PATH_CREATED_VALID = 1u << 1,
+        HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID = 1u << 2
     };
 
     /*
      * Filesystem civil date/time values. They deliberately carry no timezone or
      * epoch interpretation: FAT stores local civil fields. Last-modified has
-     * FAT's two-second resolution.
+     * FAT's two-second resolution, as does created. Last-accessed is a stored
+     * date only
+     * (hour/minute/second zero); this backend does not maintain atime.
+     * Absent or malformed
+     * dates are zero-filled with their validity bit clear.
      */
 
     struct hpclang_stream_civil_datetime
@@ -56,7 +62,9 @@ extern "C"
      *
      * The public attributes deliberately expose only stable FAT semantics.
      * Timestamp validity is explicit. The owned FatFs backend publishes the FAT
-     * last-modified civil datetime without inventing a timezone/epoch conversion.
+     * creation, modification and stored access dates without inventing a
+     * timezone/epoch
+     * conversion.
      */
     struct hpclang_stream_path_info
     {
@@ -69,6 +77,8 @@ extern "C"
         uint32_t reserved;
         struct hpclang_stream_civil_datetime last_modified;
         uint32_t reserved2[2];
+        struct hpclang_stream_civil_datetime created;
+        struct hpclang_stream_civil_datetime last_accessed;
     };
 
     enum hpclang_stream_storage_flag
@@ -110,6 +120,13 @@ extern "C"
      * calculator-object stores as POSIX/byte-stream filesystems.
      */
     int hpclang_stream_path_query(const char *path, struct hpclang_stream_path_info *info);
+    /* Change only masked READ_ONLY/HIDDEN/SYSTEM/ARCHIVE bits. Unknown bits or
+     * attributes
+     * outside mask fail with EINVAL. Existing open descriptors retain
+     * their access rights.
+
+     * * Changes are synchronized before successful return. */
+    int hpclang_stream_path_set_attributes(const char *path, uint32_t attributes, uint32_t mask);
 
     /*
      * Owned directory iterator.
@@ -132,6 +149,8 @@ extern "C"
         uint32_t reserved;
         struct hpclang_stream_civil_datetime last_modified;
         char name[HPCLANG_STREAM_NAME_CAPACITY];
+        struct hpclang_stream_civil_datetime created;
+        struct hpclang_stream_civil_datetime last_accessed;
     };
 
     struct hpclang_stream_directory *hpclang_stream_directory_open(const char *path);

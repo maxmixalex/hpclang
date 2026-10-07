@@ -239,13 +239,27 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable-attribute metadata plus validity-gated last-modified civil datetime. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
-| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID` | ✅ | The civil timestamp is usable only when this bit is set. FAT local civil fields are preserved directly; no timezone or epoch is invented. |
+| `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable attributes and validity-gated modification, creation and stored access dates. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
+| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID`, `HPCLANG_STREAM_PATH_CREATED_VALID`, `HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID` | ✅ | Each date is usable only with its corresponding validity bit. No timezone or epoch is invented. |
+| `hpclang_stream_path_set_attributes(path, attributes, mask)` | Implemented; CI pending | Updates only masked read-only/hidden/system/archive bits and synchronizes before success. Unknown bits or attributes outside the mask fail with `EINVAL`; other families return `ENOSYS`. Existing descriptors retain their access rights; new write opens respect read-only. |
 | `hpclang_stream_storage_query()` | ✅ | Media-present/read-only flags plus free bytes and total capacity. Stock is consulted only once before direct takeover for insertion/protect state; space/capacity come from the owned FatFs/block backend. |
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
-Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
+Path-info version 3 and directory-entry version 2 append `created` and
+`last_accessed`; rebuild applications against the matching SDK headers/runtime.
+Creation and modification are exported at two-second resolution. Access is the
+stored FAT date with zero time fields: reads do not update it, and FatFs clears
+it on writes. Missing or malformed dates are zero-filled with their validity
+bit clear. These are queries, not timestamp setters or POSIX atime tracking.
+Raw KOS handles/module IDs and implementation-specific FAT internals remain private.
+
+The `fsystem.h` adapter implements `FSChAttr`, `FSGetCreatTime` and
+`FSGetAccessDate`; `FSCreate` accepts read-only/hidden/system/archive flags.
+Date getters fill local civil `struct tm` fields, or zero the output when
+unavailable. `FSChAttr` replaces mutable flags while requiring directory/volume
+type bits to remain unchanged. Entries retain their path independently of the
+parent iterator. This metadata extension has local acceptance; formal CI is pending.
 
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
@@ -380,6 +394,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | size/type/portable path attributes | ✅ versioned typed FAT query |
 | media present/read-only + free bytes | ✅; KOS only samples presence/protect before takeover |
 | last-modified timestamp | ✅ validity-gated FAT civil datetime; no timezone/epoch claim |
+| attribute mutation and creation/access dates | Locally validated; CI pending. Masked FAT attributes, creation datetime and stored access date; no automatic atime tracking |
 | total capacity | ✅ direct block-device sector count |
 | rename/mkdir/rmdir | ✅ direct FatFs namespace |
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |

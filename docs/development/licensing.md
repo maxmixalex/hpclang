@@ -18,6 +18,11 @@ hpclang adopts ChaN FatFs as the independent FAT namespace layer beginning in M7
 
 Only the generic FatFs layer is vendored. `ffconf.h` is hpclang-owned configuration and the S3C2410 SDIO/media-ownership layer is a fresh hpclang implementation. HPGCC3 FSystem and its SD driver remain behavior evidence only and are not implementation source.
 
+`third_party/fatfs/access-date.patch` is a small hpclang extension exposing the
+existing FAT access-date field through `FILINFO`. The vendor verifier applies
+this declared patch to the official baseline before comparing checked-in bytes;
+ChaN's notices remain intact.
+
 ## HP tools and binary assets
 
 Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calculator binary assets have separate provenance and redistribution terms.

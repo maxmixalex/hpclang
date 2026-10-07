@@ -275,6 +275,13 @@ target_include_directories(test_fatfs_config PRIVATE
     "${HPCLANG_ROOT}/third_party/fatfs")
 target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
 
+hpclang_unit(storage_metadata test_storage_metadata.c
+    "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
+    "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
+target_include_directories(test_storage_metadata PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
+target_link_libraries(test_storage_metadata PRIVATE hpclang_fatfs_vendor)
+
 hpclang_unit(namespace_lease
     test_namespace_lease.c
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")

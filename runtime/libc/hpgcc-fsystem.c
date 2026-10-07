@@ -282,18 +282,44 @@ static void compat_time(FS_FILE *file, const struct hpclang_stream_civil_datetim
     }
 }
 
+static void compat_extra_times(FS_FILE *file, const struct hpclang_stream_civil_datetime *created,
+                               const struct hpclang_stream_civil_datetime *accessed,
+                               uint32_t validity)
+{
+    FS_FILE converted = {0};
+    file->_hpclang_time_validity = validity;
+    compat_time(&converted, created,
+                (validity & HPCLANG_STREAM_PATH_CREATED_VALID)
+                    ? HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID
+                    : 0u);
+    file->_hpclang_created_tm = converted._hpclang_write_tm;
+    file->CreatTimeDate = converted.WriteTimeDate;
+    compat_time(&converted, accessed,
+                (validity & HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID)
+                    ? HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID
+                    : 0u);
+    file->_hpclang_accessed_tm = converted._hpclang_write_tm;
+    file->LastAccDate = converted.WriteTimeDate >> 16;
+}
+
+static const char *metadata_path(const FS_FILE *file)
+{
+    return file->_hpclang_kind == HPCLANG_HPGCC_FS_ENTRY ? file->_hpclang_entry_path : file->Name;
+}
+
 static int refresh_file_metadata(FS_FILE *file)
 {
     if (file == NULL || file->Name == NULL)
         return FS_INVHANDLE;
 
     struct hpclang_stream_path_info info;
-    if (hpclang_stream_path_query(file->Name, &info) != 0)
+    if (hpclang_stream_path_query(metadata_path(file), &info) != 0)
         return compat_error();
 
     file->Attr = compat_attrs(info.type, info.attributes);
     file->FileSize = info.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)info.byte_size;
     compat_time(file, &info.last_modified, info.time_validity);
+    compat_extra_times(file, &info.created, &info.last_accessed, info.time_validity);
     return FS_OK;
 }
 
@@ -380,11 +406,11 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
 
 int FSCreate(char *name, int attr, FS_FILE **fileptr)
 {
-    if ((attr & (FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM | FSATTR_DIR | FSATTR_VOLUME)) != 0)
-        return FS_CANTWRITE;
     if (fileptr == NULL)
         return FS_BADNAME;
     *fileptr = NULL;
+    if ((attr & ~(FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM | FSATTR_ARCHIVE)) != 0)
+        return FS_CANTWRITE;
 
     char path[HPCLANG_STREAM_NAME_CAPACITY];
     if (normalize_path(name, path, sizeof(path)) != 0)
@@ -404,8 +430,13 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
 
     file->_hpclang_kind = HPCLANG_HPGCC_FS_FILE;
     file->_hpclang_fd = fd;
-    file->Attr = (unsigned)attr;
-    (void)refresh_file_metadata(file);
+    int result = FSChAttr(file, attr);
+    if (result != FS_OK) {
+        (void)close(fd);
+        free(file->Name);
+        free(file);
+        return result;
+    }
     *fileptr = file;
     return FS_OK;
 }
@@ -687,12 +718,21 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
     if (entry->Name == NULL)
         return FS_MAXFILES;
 
+    size_t path_size = strlen(dir->Name) + strlen(raw.name) + 2u;
+    entry->_hpclang_entry_path = malloc(path_size);
+    if (entry->_hpclang_entry_path == NULL) {
+        free(entry->Name);
+        entry->Name = NULL;
+        return FS_MAXFILES;
+    }
+    (void)snprintf(entry->_hpclang_entry_path, path_size, "%s/%s", dir->Name, raw.name);
     entry->Volume = 0u;
     entry->Mode = FSMODE_READ;
     entry->Attr = compat_attrs(raw.type, raw.attributes);
     entry->FileSize = raw.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)raw.byte_size;
     entry->_hpclang_kind = HPCLANG_HPGCC_FS_ENTRY;
     compat_time(entry, &raw.last_modified, raw.time_validity);
+    compat_extra_times(entry, &raw.created, &raw.last_accessed, raw.time_validity);
     return FS_OK;
 }
 
@@ -700,8 +740,10 @@ void FSReleaseEntry(FS_FILE *file)
 {
     if (file == NULL)
         return;
-    if (file->_hpclang_kind == HPCLANG_HPGCC_FS_ENTRY && file->Name != NULL)
+    if (file->_hpclang_kind == HPCLANG_HPGCC_FS_ENTRY) {
         free(file->Name);
+        free(file->_hpclang_entry_path);
+    }
     memset(file, 0, sizeof(*file));
     file->_hpclang_fd = -1;
 }
@@ -729,6 +771,57 @@ void FSGetWriteTime(FS_FILE *file, struct tm *timedate)
     memset(timedate, 0, sizeof(*timedate));
     if (file != NULL && file->_hpclang_write_time_valid)
         *timedate = file->_hpclang_write_tm;
+}
+
+void FSGetCreatTime(FS_FILE *file, struct tm *timedate)
+{
+    if (timedate == NULL)
+        return;
+    memset(timedate, 0, sizeof(*timedate));
+    if (file != NULL && (file->_hpclang_time_validity & HPCLANG_STREAM_PATH_CREATED_VALID))
+        *timedate = file->_hpclang_created_tm;
+}
+
+void FSGetAccessDate(FS_FILE *file, struct tm *timedate)
+{
+    if (timedate == NULL)
+        return;
+    memset(timedate, 0, sizeof(*timedate));
+    if (file != NULL && (file->_hpclang_time_validity & HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID))
+        *timedate = file->_hpclang_accessed_tm;
+}
+
+int FSChAttr(FS_FILE *file, int newattr)
+{
+    if (file == NULL ||
+        (file->_hpclang_kind != HPCLANG_HPGCC_FS_FILE &&
+         file->_hpclang_kind != HPCLANG_HPGCC_FS_DIRECTORY &&
+         file->_hpclang_kind != HPCLANG_HPGCC_FS_ENTRY) ||
+        metadata_path(file) == NULL)
+        return FS_INVHANDLE;
+    const unsigned mutable = FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM | FSATTR_ARCHIVE;
+    if (((unsigned)newattr & ~(mutable | FSATTR_DIR | FSATTR_VOLUME)) != 0u)
+        return FS_BADNAME;
+    int result = refresh_file_metadata(file);
+    if (result != FS_OK)
+        return result;
+    if (((unsigned)newattr & (FSATTR_DIR | FSATTR_VOLUME)) !=
+        (file->Attr & (FSATTR_DIR | FSATTR_VOLUME)))
+        return FS_CANTWRITE;
+    uint32_t attributes = 0u;
+    if (newattr & FSATTR_RDONLY)
+        attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY;
+    if (newattr & FSATTR_HIDDEN)
+        attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN;
+    if (newattr & FSATTR_SYSTEM)
+        attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM;
+    if (newattr & FSATTR_ARCHIVE)
+        attributes |= HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
+    uint32_t mask = HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY | HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
+                    HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
+    if (hpclang_stream_path_set_attributes(metadata_path(file), attributes, mask) != 0)
+        return compat_error();
+    return refresh_file_metadata(file);
 }
 
 static int volume_info(int volume, struct hpclang_stream_storage_info *info)

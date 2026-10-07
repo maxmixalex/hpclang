@@ -211,6 +211,68 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+static uint32_t storage_metadata_test(void)
+{
+    const char *path = "META/flags.txt";
+    FS_FILE *file = NULL;
+    if (FSMkdir("META") != FS_OK ||
+        FSCreate("META/flags.txt", FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM, &file) != FS_OK)
+        return 0xb0u;
+    if (FSWrite("metadata", 8, file) != 8 || FSClose(file) != FS_OK)
+        return 0xb1u;
+    struct hpclang_stream_path_info before, after;
+    if (hpclang_stream_path_query(path, &before) != 0 || before.byte_size != 8u ||
+        before.attributes !=
+            (HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY | HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
+             HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) ||
+        !(before.time_validity & HPCLANG_STREAM_PATH_CREATED_VALID) ||
+        (before.time_validity & HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID))
+        return 0xb2u;
+    errno = 0;
+    int fd = open(path, O_WRONLY);
+    if (fd >= 0 || errno != EACCES)
+        return 0xb3u;
+    if (FSOpen("META/flags.txt", FSMODE_READ, &file) != FS_OK)
+        return 0xb4u;
+    struct tm created, accessed;
+    FSGetCreatTime(file, &created);
+    FSGetAccessDate(file, &accessed);
+    if (created.tm_year != (int)before.created.year - 1900 ||
+        created.tm_mon != (int)before.created.month - 1 || created.tm_mday != before.created.day ||
+        created.tm_hour != before.created.hour || created.tm_min != before.created.minute ||
+        created.tm_sec != before.created.second || accessed.tm_year != 0 || accessed.tm_mon != 0 ||
+        accessed.tm_mday != 0 || FSClose(file) != FS_OK)
+        return 0xb5u;
+    FS_FILE *dir = NULL;
+    FS_FILE entry;
+    if (FSOpenDir("META", &dir) != FS_OK || FSGetNextEntry(&entry, dir) != FS_OK ||
+        FSClose(dir) != FS_OK)
+        return 0xb6u;
+    // Entry owns its mutation path even after its iterator has been closed.
+    if (FSChAttr(&entry, FSATTR_HIDDEN) != FS_OK || FSAttr(&entry) != FSATTR_HIDDEN)
+        return 0xb7u;
+    FSGetCreatTime(&entry, &created);
+    if (created.tm_year != (int)before.created.year - 1900)
+        return 0xb8u;
+    FSReleaseEntry(&entry);
+    if (hpclang_stream_path_query(path, &after) != 0 ||
+        after.attributes != HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN ||
+        memcmp(&before.created, &after.created, sizeof(before.created)) != 0)
+        return 0xb9u;
+    errno = 0;
+    if (hpclang_stream_path_set_attributes(path, 0u, 0x100u) != -1 || errno != EINVAL)
+        return 0xbau;
+    if (FSOpen("META/flags.txt", FSMODE_MODIFY | FSMODE_NOCREATE, &file) != FS_OK ||
+        FSWrite("M", 1, file) != 1 || FSClose(file) != FS_OK)
+        return 0xbbu;
+    if (hpclang_stream_path_set_attributes(path, 0u, HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN) != 0 ||
+        hpclang_stream_path_query(path, &after) != 0 ||
+        after.attributes != HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE ||
+        FSDelete("META/flags.txt") != FS_OK || FSRmdir("META") != FS_OK)
+        return 0xbcu;
+    return 0u;
+}
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS && model != HPCLANG_MODEL_HP50G) {
@@ -232,6 +294,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         errno = 0;
         if (hpclang_stream_path_query("HPCLANG.TST", &unavailable_path) == 0 || errno != ENOSYS)
             return 0x54u;
+
+        errno = 0;
+        if (hpclang_stream_path_set_attributes("HPCLANG.TST", 0u, 1u) != -1 || errno != ENOSYS)
+            return 0xbdu;
 
         struct hpclang_stream_storage_info unavailable_storage;
         errno = 0;
@@ -744,7 +810,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x6eu;
 
-    return 0u;
+    return storage_metadata_test();
 }
 #endif
 

@@ -1,5 +1,21 @@
 # Validation
 
+## M7.2 file metadata extension
+
+Local acceptance on 2026-10-07 covers masked read-only/hidden/system/archive
+mutation, creation and stored access-date queries, and the HPGCC metadata adapters.
+Formal CI acceptance is pending. All 53 host tests pass. A real FatFs namespace
+on an independently constructed FAT12 image checks distinct timestamps, leap-day
+validation, absent/malformed dates, remount persistence, write protection, invalid
+masks, missing paths and unsupported models. Access dates are stored metadata;
+the runtime does not maintain atime on reads.
+
+Storage passes Direct on all six models and Stock on HP49g+/HP50g. The payload
+checks attributed creation, read-only write rejection, close/reopen persistence,
+timestamp getters, mutation through an entry after its parent iterator closes,
+masked preservation and cleanup. The vendor check reproduces the official FatFs
+baseline plus the declared access-date extension without fuzzy patch application.
+
 ## M7.5 display runtime local acceptance
 
 The `m75-display-runtime` implementation is locally validated on 2026-10-07;

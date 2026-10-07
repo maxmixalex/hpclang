@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Verify official FatFs bytes
+      - name: Verify FatFs baseline and declared patch
         id: verify
         continue-on-error: true
         shell: bash
@@ -47,6 +47,6 @@ jobs:
             build/fatfs-official-verify/unpacked/source/diskio.h
             build/fatfs-official-verify/unicode/**
 
-      - name: Enforce official byte match
+      - name: Enforce baseline and patch match
         if: always()
         run: test "${{ steps.verify.outcome }}" = success

@@ -448,6 +448,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   above the accepted physical keyboard core.
 - [ ] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
+  Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT
+  creation/access-date queries and `FSChAttr`/`FSGetCreatTime`/`FSGetAccessDate`
+  adapters. Local persistence/error tests, six-model Direct and both SD-model
+  Stock Storage pass; formal CI acceptance remains pending. This does not add
+  automatic access-date maintenance or timestamp setters.
 - [ ] Audit media-change and ownership behavior; retain the unresolved Stock
   HP49/50 Storage launch intermittency as a reliability investigation.
 

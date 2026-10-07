@@ -310,7 +310,15 @@ cannot remain a private mapping while native Stock calls run. The KOS bridge
 protects the current shared-layout slot; the public HPC1 data/code ABI is
 unchanged.
 
-Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
+Final acceptance evidence for the original M7.2 subset is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
+
+The metadata follow-up extends that same Storage payload with attributed file
+creation, masked mutation, read-only rejection, creation/access-date getters,
+close/reopen persistence and directory-entry ownership after iterator closure.
+All six Direct models and both HP49g+/HP50g Stock models pass locally; formal CI
+acceptance of this extension remains pending. Host tests additionally construct
+distinct on-disk FAT timestamps and verify malformed-date handling and remount
+persistence. Stored access-date queries do not imply automatic atime updates.
 
 HP 39g+ participates in Direct, focused, and original-Stock family matrices through its data-driven `nor` profile. All six profiles currently select `stock_transport: usb`. See [Stock USB transport](stock-usb-transport.md) for migration evidence and the distinction between implemented defaults and repeated-run stability.
 
