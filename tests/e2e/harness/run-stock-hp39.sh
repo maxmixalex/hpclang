@@ -70,7 +70,7 @@ bash "$ROOT/tools/run-hp39-kermit-server.sh" \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1 &
 KERMIT_PID=$!
 
-FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout "$TRANSFER")"
+FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout)"
 X50_TIMEOUT=$((FETCH_TIMEOUT + 90))
 printf 'HP39 Stock %s lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
     "$TRANSPORT" "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
@@ -117,11 +117,6 @@ export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 
-python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
-    "$KERMIT_LOG" "$TRANSFER" "$HOST_GATE" \
-    > "$ROOT/build/$TARGET-kermit-gate.log" 2>&1 &
-GATE_PID=$!
-
 STATE="$ROOT/build/$TARGET-state"
 rm -rf "$STATE"
 mkdir -p "$STATE"
@@ -154,6 +149,11 @@ else
         --firmware="$FIRMWARE"
     )
 fi
+
+python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
+    "$KERMIT_LOG" "$HOST_GATE" \
+    > "$ROOT/build/$TARGET-kermit-gate.log" 2>&1 &
+GATE_PID=$!
 
 timeout "${X50_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" "${X50_ARGS[@]}"
 

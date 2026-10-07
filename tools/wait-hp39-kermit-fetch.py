@@ -4,8 +4,8 @@
 Synchronization uses acknowledged Kermit transactions for the directory and
 LIB275L.000. By the time Stock requests and completes that file, the larger
 HPGCC000.000 and its named-program dependencies have already completed.
-The size-derived duration is only
-a watchdog ceiling; it is never used to pace calculator UI actions.
+Acknowledged packet progress refreshes the idle watchdog; an independent
+absolute ceiling bounds the whole transfer. Neither limit paces UI actions.
 """
 
 from __future__ import annotations
@@ -14,17 +14,10 @@ import argparse
 import time
 from pathlib import Path
 
+from kermit_watchdog import TOTAL_SECONDS, Watchdog
+
 TARGET_FILE = "LIB275L.000"
-EFFECTIVE_BYTES_PER_SECOND = 128
-WATCHDOG_MARGIN_SECONDS = 90
 POLL_SECONDS = 0.1
-
-
-def watchdog_seconds(directory: Path) -> int:
-    total = sum(path.stat().st_size for path in directory.glob("*.000"))
-    return (
-        total + EFFECTIVE_BYTES_PER_SECOND - 1
-    ) // EFFECTIVE_BYTES_PER_SECOND + WATCHDOG_MARGIN_SECONDS
 
 
 class Completions:
@@ -55,9 +48,8 @@ class Completions:
         return completed
 
 
-def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
-    timeout = watchdog_seconds(directory)
-    deadline = time.monotonic() + timeout
+def wait_for_fetch(log_path: Path, marker: Path) -> int:
+    watchdog = Watchdog()
     position = 0
     parser = Completions()
     gates = {
@@ -70,10 +62,10 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
         path.unlink(missing_ok=True)
 
     print(
-        f"waiting for directory and payload transactions: watchdog={timeout}s log={log_path}",
+        f"waiting for directory and payload transactions: ceiling={TOTAL_SECONDS}s log={log_path}",
         flush=True,
     )
-    while time.monotonic() < deadline:
+    while True:
         try:
             size = log_path.stat().st_size
             if size < position:
@@ -85,16 +77,19 @@ def wait_for_fetch(log_path: Path, directory: Path, marker: Path) -> int:
                 position = stream.tell()
         except FileNotFoundError:
             chunk = ""
+        watchdog.observe(chunk)
         for name in parser.feed(chunk):
             if name in gates:
                 gates[name].write_text("complete\n", encoding="ascii")
                 print(f"Kermit completed {name} transaction; released {gates[name]}", flush=True)
                 if name == TARGET_FILE:
                     return 0
+        if reason := watchdog.failure():
+            break
         time.sleep(POLL_SECONDS)
 
     phase = "payload" if gates["HP39DIR.000"].exists() else "directory"
-    message = f"timed out waiting for {phase} transaction after {timeout}s"
+    message = f"{phase} transaction failed: {reason}"
     failed.write_text(message + "\n", encoding="ascii")
     print(message, flush=True)
     return 1
@@ -104,21 +99,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
 
-    timeout_parser = sub.add_parser("timeout")
-    timeout_parser.add_argument("transfer_directory", type=Path)
+    sub.add_parser("timeout")
 
     wait_parser = sub.add_parser("wait")
     wait_parser.add_argument("debug_log", type=Path)
-    wait_parser.add_argument("transfer_directory", type=Path)
     wait_parser.add_argument("marker", type=Path)
 
     args = parser.parse_args()
     if args.command == "timeout":
-        print(watchdog_seconds(args.transfer_directory))
+        print(TOTAL_SECONDS)
         return 0
     return wait_for_fetch(
         args.debug_log,
-        args.transfer_directory,
         args.marker,
     )
 

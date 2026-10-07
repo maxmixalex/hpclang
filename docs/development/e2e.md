@@ -117,7 +117,7 @@ HP 39g+, HP 39gs, and HP 40gs use the original USB Connectivity Kit path by defa
 
 The stock ROM performs the transfer/install itself.
 
-HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. UART remains available as an override. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The computed transfer timeout is only a watchdog ceiling, not a guessed delay.
+HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. UART remains available as an override. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The shared Kermit watchdog fails after 90 seconds without an acknowledged send-window advance, with a separate 20-minute absolute transfer ceiling. Repeated packets do not refresh the idle budget; neither limit paces UI actions.
 
 HP 49g+ and HP 50g transfer SETUP, generated `HPCLANG.HP`, and `ZZE2E` over USB Kermit, then install ARMToolbox into Port 2. They share the same Stock UI sequence while retaining their native per-model ARM bootloaders. An explicit SD override retains the emulated-card path used by Storage. Current migration evidence is tracked in [Stock USB transport](stock-usb-transport.md).
 
