@@ -42,29 +42,11 @@ case "$FAMILY" in
         ;;
 esac
 
-mapfile -t TARGETS < <(
-    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" "$MODE" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-profiles = Path(sys.argv[1])
-family = sys.argv[2]
-mode = sys.argv[3]
-targets = []
-
-for path in profiles.glob("*.json"):
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("family") != family or not data.get("automated_e2e", True):
-        continue
-    if mode == "stock" and not data.get("automated_stock_e2e", True):
-        continue
-    targets.append(str(data["target"]))
-
-for target in sorted(targets):
-    print(target)
-PY
-)
+target_args=("$MODE" --family "$FAMILY" --names)
+if [[ -n "${HPCLANG_E2E_TARGET:-}" ]]; then
+    target_args+=(--target "$HPCLANG_E2E_TARGET")
+fi
+mapfile -t TARGETS < <(python3 "$ROOT/tools/e2e-target-matrix.py" "${target_args[@]}")
 
 if (( ${#TARGETS[@]} == 0 )); then
     echo "no automated E2E targets for family: $FAMILY" >&2
@@ -76,8 +58,10 @@ mkdir -p "$ROOT/build"
 printf '%s\n' "${TARGETS[@]}" > "$TARGETS_FILE"
 printf 'E2E %s/%s targets: %s\n' "$MODE" "$FAMILY" "${TARGETS[*]}"
 
-declare -a PIDS=()
-declare -a KEYBOARD_FRAME_DIRS=()
+# The workflow matrix owns parallelism. Running another emulator per target
+# here multiplies that load and lets wall-clock guest timers outrun guest CPU
+# execution on a busy runner. Preserve every target and aggregate failures.
+status=0
 for target in "${TARGETS[@]}"; do
     frames=""
     if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
@@ -87,45 +71,29 @@ for target in "${TARGETS[@]}"; do
     fi
 
     if [[ "$MODE" == direct ]]; then
-        if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
-            HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
-                bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
-        else
-            bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR" &
-        fi
+        command=(bash "$ROOT/tests/e2e/harness/run-direct.sh" "$target" "$APP_DIR")
     else
-        if [[ "$REQUIRE_KEYBOARD" == 1 ]]; then
-            HPCLANG_X50NG_KEYBOARD_DIR="$frames" \
-                bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
-        else
-            bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR" &
-        fi
+        command=(bash "$ROOT/tests/e2e/harness/run-stock.sh" "$target" "$APP_DIR" "$ASSETS_DIR")
     fi
-    KEYBOARD_FRAME_DIRS+=("$frames")
-    PIDS+=("$!")
-done
-
-status=0
-for i in "${!PIDS[@]}"; do
-    if wait "${PIDS[$i]}"; then
-        printf 'PASS %s\n' "${TARGETS[$i]}"
+    if HPCLANG_X50NG_KEYBOARD_DIR="$frames" "${command[@]}"; then
+        printf 'PASS %s\n' "$target"
     else
         rc=$?
-        printf 'FAIL %s (exit %d)\n' "${TARGETS[$i]}" "$rc" >&2
+        printf 'FAIL %s (exit %d)\n' "$target" "$rc" >&2
         status=1
     fi
 
-    frame_dir="${KEYBOARD_FRAME_DIRS[$i]}"
+    frame_dir="$frames"
     if [[ -n "$frame_dir" ]]; then
         shopt -s nullglob
         keyboard_frames=("$frame_dir"/*.pgm)
         shopt -u nullglob
         if (( ${#keyboard_frames[@]} != 52 )); then
             printf 'FAIL %s keyboard progression: expected 52 frames, got %d\n' \
-                "${TARGETS[$i]}" "${#keyboard_frames[@]}" >&2
+                "$target" "${#keyboard_frames[@]}" >&2
             status=1
         else
-            merged="$ROOT/build/${TARGETS[$i]}-keyboard-progress.pgm"
+            merged="$ROOT/build/$target-keyboard-progress.pgm"
             python3 "$ROOT/tools/merge-pgm-grid.py" \
                 "$merged" "${keyboard_frames[@]}"
             python3 "$ROOT/tools/pgm-to-png.py" "$merged" "$merged.png"

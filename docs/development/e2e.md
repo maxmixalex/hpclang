@@ -27,6 +27,27 @@ own clock state. Its calendar conversion sources are explicit x50ng cache inputs
 
 ## Test tiers
 
+### Execution scheduling
+
+An Actions execution job runs one emulator at a time. Runtime Stock and Object
+jobs select an individual model from the canonical target profiles; the matrix
+supplies `HPCLANG_E2E_TARGET` to the shared family harness. Payloads remain shared
+or built per family as appropriate. `tools/e2e-target-matrix.py` applies the same
+automation flags and family/model filters for planning and execution, rejects
+empty selections, and keeps all six enabled models covered.
+
+Direct Runtime and Storage family jobs execute their models sequentially, as
+Gallery already does. Local family invocations without a model filter still run
+every eligible model and collect failures. This avoids multiplying runner slots
+by a hidden second level of emulator processes. Slow Stock models have separate
+jobs so their transfer ceilings are not accumulated inside one job timeout.
+Result, keyboard-frame, lifecycle and settled-return gates are unchanged. Stock
+and Object evidence artifact names use model prefixes; each artifact retains
+the selected-target list consumed by reports and suite-specific verifiers.
+Stock Gallery uses the same 25-minute outer job limit as Runtime/Object Stock:
+its job must not be cancelled before the shared 20-minute transfer watchdog can
+report a result. The 90-second acknowledged-progress idle limit is unchanged.
+
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 
 **Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same runtime application.
@@ -52,7 +73,7 @@ and composite retain their own lifecycle checks. `object-catalog` separately
 checks HP39 Program/Note CRUD and native Aplet clone/remove, name-list snapshots,
 protected Aplets and settled return. It does not load the numerical/GC fixture
 into the same Aplet. The workflow publishes separate results for each applicable
-suite/family and derives the available families from the target profiles.
+suite/model and derives the available families and models from the target profiles.
 
 The suite manifest also declares its launch modes. `object-catalog` preserves
 both the HP39 catalog/schema/NoteText round-trip witnesses formerly embedded in

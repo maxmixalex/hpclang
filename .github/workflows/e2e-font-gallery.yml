@@ -228,7 +228,6 @@ jobs:
     name: Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
-    # Leave room for the shared Stock transfer ceiling and gallery verification.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -319,7 +318,8 @@ jobs:
     name: Stock / ${{ matrix.target }}
     needs: [build, x50ng]
     runs-on: home-docker
-    timeout-minutes: 12
+    # Match other Stock jobs: allow the shared transfer ceiling plus verification.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
