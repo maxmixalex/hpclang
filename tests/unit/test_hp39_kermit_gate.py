@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +14,8 @@ SOURCE = Path(__file__).resolve().parents[2] / "tools" / "wait-hp39-kermit-fetch
 SPEC = importlib.util.spec_from_file_location("hp39_kermit_fetch", SOURCE)
 assert SPEC is not None and SPEC.loader is not None
 fetch = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(fetch)
+with patch.object(sys, "path", [str(SOURCE.parent), *sys.path]):
+    SPEC.loader.exec_module(fetch)
 
 
 class KermitFetchGateTests(unittest.TestCase):
@@ -24,10 +26,10 @@ class KermitFetchGateTests(unittest.TestCase):
             marker = root / "complete"
             log.write_text(contents, encoding="latin-1")
             with (
-                patch.object(fetch, "watchdog_seconds", return_value=0.03),
+                patch("kermit_watchdog.IDLE_SECONDS", 0.03),
                 patch.object(fetch, "POLL_SECONDS", 0.001),
             ):
-                self.assertEqual(fetch.wait_for_fetch(log, root, marker), expected)
+                self.assertEqual(fetch.wait_for_fetch(log, marker), expected)
             self.assertEqual(marker.exists(), expected == 0)
             self.assertEqual(Path(f"{marker}.failed").exists(), expected != 0)
 
@@ -69,10 +71,10 @@ class KermitFetchGateTests(unittest.TestCase):
             marker = root / "complete"
             log.write_text("openi name[HP39DIR.000]\n<sseof>Y success=1\nsseot justone=0\n")
             with (
-                patch.object(fetch, "watchdog_seconds", return_value=0.01),
+                patch("kermit_watchdog.IDLE_SECONDS", 0.01),
                 patch.object(fetch, "POLL_SECONDS", 0.001),
             ):
-                self.assertEqual(fetch.wait_for_fetch(log, root, marker), 1)
+                self.assertEqual(fetch.wait_for_fetch(log, marker), 1)
             self.assertTrue(Path(f"{marker}.directory").exists())
             self.assertFalse(marker.exists())
             self.assertIn("payload", Path(f"{marker}.failed").read_text())

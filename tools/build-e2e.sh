@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 3 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|object-mutation|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|display|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
     exit 2
 fi
 
@@ -92,16 +92,16 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services)
-        E2E_SOURCE="$ROOT/tests/e2e/system-services"
-        E2E_TARGET="hpclang_system_services_e2e"
-        E2E_ELF="hpclang-system-services-e2e.elf"
+    system-services|display)
+        E2E_SOURCE="$ROOT/tests/e2e/$MODE"
+        E2E_TARGET="hpclang_${MODE//-/_}_e2e"
+        E2E_ELF="hpclang-$MODE-e2e.elf"
         E2E_CMAKE_ARGS=()
         ;;
-    object-mutation)
-        E2E_SOURCE="$ROOT/tests/e2e/object-mutation"
-        E2E_TARGET="hpclang_object_mutation_e2e"
-        E2E_ELF="hpclang-object-mutation-e2e.elf"
+    object-mutation|object-composite|object-catalog)
+        E2E_SOURCE="$ROOT/tests/e2e/$MODE"
+        E2E_TARGET="hpclang_${MODE//-/_}_e2e"
+        E2E_ELF="hpclang-$MODE-e2e.elf"
         E2E_CMAKE_ARGS=(-DHPCLANG_E2E_FAMILY="$FAMILY")
         ;;
     font-gallery)
@@ -112,6 +112,7 @@ case "$MODE" in
         GALLERY_SHARD_COUNT="${HPCLANG_GALLERY_SHARD_COUNT:-1}"
         E2E_CMAKE_ARGS=(
             -DHPCLANG_GALLERY_PROFILE=full
+            -DHPCLANG_GALLERY_KEY_HANDSHAKE=ON
             -DHPCLANG_GALLERY_SHARD_INDEX="$GALLERY_SHARD_INDEX"
             -DHPCLANG_GALLERY_SHARD_COUNT="$GALLERY_SHARD_COUNT"
         )

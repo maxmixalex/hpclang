@@ -2704,6 +2704,7 @@ static void get_fileinfo (
 		fno->ftime = ld_16(fs->dirbuf + XDIR_ModTime + 0);	/* Last modified time */
 		fno->fdate = ld_16(fs->dirbuf + XDIR_ModTime + 2);	/* Last modified date */
 #if FF_FS_CRTIME
+		fno->adate = ld_16(fs->dirbuf + XDIR_AccTime + 2);
 		fno->crtime = ld_16(fs->dirbuf + XDIR_CrtTime + 0);	/* Created time */
 		fno->crdate = ld_16(fs->dirbuf + XDIR_CrtTime + 2);	/* Created date */
 #endif
@@ -2790,6 +2791,7 @@ static void get_fileinfo (
 	fno->ftime = ld_16(dp->dir + DIR_ModTime + 0);	/* Last modified time */
 	fno->fdate = ld_16(dp->dir + DIR_ModTime + 2);	/* Last Modified date */
 #if FF_FS_CRTIME
+	fno->adate = ld_16(dp->dir + DIR_LstAccDate);
 	fno->crtime = ld_16(dp->dir + DIR_CrtTime + 0);	/* Created time */
 	fno->crdate = ld_16(dp->dir + DIR_CrtTime + 2);	/* Created date */
 #endif

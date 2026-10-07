@@ -30,6 +30,13 @@ extern "C"
                                            const uint8_t *name, size_t name_length,
                                            struct hpclang_object **object);
 
+    /* Private, borrowed address for immediate preflight only; never retain it
+     * across a
+     * native call or expose it as a public handle. */
+    int hpclang_hp39_native_aplet_resolve(const struct hpclang_rpl_reader *reader,
+                                          const uint8_t *name, size_t name_length,
+                                          uint32_t *address);
+
     /*
      * Read the HP39 Program/Note private directory format without entering the
      * Stock evaluator. context_pointer_address is the five-nibble RAM cell used by

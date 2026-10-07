@@ -1,4 +1,4 @@
-name: E2E / Object mutation
+name: E2E / Objects
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
@@ -25,7 +26,7 @@ on:
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp48-kermit-watchdog.py"
+      - "tools/kermit_watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
@@ -45,6 +46,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
@@ -53,7 +55,7 @@ on:
       - "tools/run-hp39-kermit-server.sh"
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp48-kermit-watchdog.py"
+      - "tools/kermit_watchdog.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
@@ -68,34 +70,69 @@ concurrency:
 
 jobs:
   build:
-    name: Build object-mutation / ${{ matrix.family }}
+    name: Build object suite payloads
     runs-on: home-docker
-    strategy:
-      fail-fast: false
-      matrix:
-        family: [hp39, hp48, hp4950]
-    env:
-      FAMILY: ${{ matrix.family }}
+    outputs:
+      suites: ${{ steps.build.outputs.suites }}
+      matrix: ${{ steps.build.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
-      - name: Build object-mutation payload and launchers
+      - name: Build object payload and launchers
+        id: build
         run: |
-          chmod +x tools/build-e2e.sh
-          tools/build-e2e.sh object-mutation "$GITHUB_WORKSPACE/build/e2e-object" "$FAMILY"
-      - name: Upload object-mutation build
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          suites = json.loads(Path("tests/e2e/object-suites.json").read_text())
+          profiles = [json.loads(path.read_text())
+                      for path in Path("tests/e2e/targets").glob("*.json")]
+          families = sorted({p["family"] for p in profiles
+                             if p.get("automated_e2e", True)
+                             and p.get("automated_stock_e2e", True)})
+          names = [s["name"] for s in suites]
+          if not names or len(names) != len(set(names)):
+              raise ValueError("Object suite names must be nonempty and unique")
+          for suite in suites:
+              if (set(suite) != {"name", "families", "modes"} or not suite["families"]
+                      or set(suite["families"]) - set(families)
+                      or not suite["modes"] or set(suite["modes"]) - {"direct", "stock"}
+                      or len(suite["modes"]) != len(set(suite["modes"]))):
+                  raise ValueError(f"Invalid object suite: {suite}")
+          matrix = {"include": [{"suite": suite["name"], "family": family}
+                                for suite in suites for family in families
+                                if family in suite["families"]]}
+          for item in matrix["include"]:
+              subprocess.run(["bash", "tools/build-e2e.sh", item["suite"],
+                              f"build/e2e/{item['suite']}/{item['family']}",
+                              item["family"]], check=True)
+          targets = {mode: json.loads(subprocess.check_output(
+              ["python3", "tools/e2e-target-matrix.py", mode], text=True))
+              for mode in {mode for suite in suites for mode in suite["modes"]}}
+          matrix = {"include": [{"suite": suite["name"], "mode": mode, **target}
+                                for suite in suites for mode in suite["modes"]
+                                for target in targets[mode]
+                                if target["family"] in suite["families"]]}
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("suites=" + json.dumps(names) + "\n")
+              output.write("matrix=" + json.dumps(matrix) + "\n")
+          PY
+      - name: Upload object build
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-object-mutation-${{ matrix.family }}-build
+          name: e2e-object-builds
           retention-days: 1
           path: |
-            build/e2e-object/e2e.hpc
-            build/e2e-object/e2e.result-address
-            build/e2e-object/e2e.stock-lifecycle.json
-            build/e2e-object/launchers/*.bin
-            build/e2e-object/launchers/*.hp
-            build/e2e-object/stock-fixtures/*.hp
+            build/e2e/*/*/e2e.hpc
+            build/e2e/*/*/e2e.result-address
+            build/e2e/*/*/e2e.stock-lifecycle.json
+            build/e2e/*/*/launchers/*.bin
+            build/e2e/*/*/launchers/*.hp
+            build/e2e/*/*/stock-fixtures/*.hp
           if-no-files-found: error
 
   x50ng:
@@ -117,15 +154,21 @@ jobs:
           if-no-files-found: error
 
   stock-assets:
-    name: Prepare object Stock assets
+    name: Prepare ${{ matrix.suite }} Stock assets
     needs: build
     runs-on: home-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.build.outputs.suites) }}
+    env:
+      OBJECT_SUITE: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@v7
-      - name: Download object-mutation build
+      - name: Download object build
         uses: actions/download-artifact@v7
         with:
-          name: e2e-object-mutation-hp39-build
+          name: e2e-object-builds
           path: build/e2e
       - name: Restore HPGCC39 asset cache
         uses: actions/cache@v6
@@ -144,35 +187,37 @@ jobs:
             bash tools/install-ci-packages.sh innoextract
           fi
       - name: Prepare Stock assets
-        run: bash tests/e2e/harness/prepare-stock-assets.sh build/e2e build/assets
+        run: bash tests/e2e/harness/prepare-stock-assets.sh "build/e2e/$OBJECT_SUITE/hp39" build/assets
       - name: Upload object Stock assets
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-object-stock-assets
+          name: e2e-${{ matrix.suite }}-stock-assets
           retention-days: 1
           path: build/assets/
           if-no-files-found: error
 
-  stock:
-    name: Stock / ${{ matrix.family }}
+  e2e:
+    name: ${{ matrix.mode == 'stock' && 'Stock' || 'Direct' }} ${{ matrix.suite }} / ${{ matrix.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        family: [hp39, hp48, hp4950]
+      matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
     env:
       FAMILY: ${{ matrix.family }}
+      HPCLANG_E2E_TARGET: ${{ matrix.target }}
+      OBJECT_SUITE: ${{ matrix.suite }}
+      MODE: ${{ matrix.mode }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
     steps:
       - uses: actions/checkout@v7
         with:
           lfs: true
-      - name: Download object-mutation build
+      - name: Download object build
         uses: actions/download-artifact@v7
         with:
-          name: e2e-object-mutation-${{ matrix.family }}-build
+          name: e2e-object-builds
           path: build/e2e
       - name: Download universal x50ng
         uses: actions/download-artifact@v7
@@ -184,34 +229,44 @@ jobs:
           mkdir -p build/x50ng
           tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
       - name: Download object Stock assets
+        if: matrix.mode == 'stock'
         uses: actions/download-artifact@v7
         with:
-          name: e2e-object-stock-assets
+          name: e2e-${{ matrix.suite }}-stock-assets
           path: build/assets
       - name: Prepare platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
-      - name: Execute Stock family
-        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
-      - name: Generate object-mutation evidence
+        run: bash tests/e2e/harness/setup-runtime.sh "$MODE" "$FAMILY"
+      - name: Execute object target
+        run: |
+          args=("$MODE" "$FAMILY" "build/e2e/$OBJECT_SUITE/$FAMILY")
+          if [[ "$MODE" == stock ]]; then
+            args+=(build/assets)
+          fi
+          bash tests/e2e/harness/run-family.sh "${args[@]}"
+      - name: Generate object evidence
         if: always()
         continue-on-error: true
         run: |
-          targets_file="build/stock-$FAMILY-targets.txt"
+          targets_file="build/$MODE-$FAMILY-targets.txt"
+          spec="tests/e2e/specs/runtime.json"
+          if [[ "$MODE" == stock ]]; then
+            spec="tests/e2e/specs/$OBJECT_SUITE.json"
+          fi
           [[ -f "$targets_file" ]] || exit 0
           while IFS= read -r TARGET; do
             [[ -n "$TARGET" ]] || continue
             export TARGET
-            python3 tests/e2e/report.py tests/e2e/specs/object-mutation.json \
+            python3 tests/e2e/report.py "$spec" \
               --image-out "build/$TARGET-summary.png" \
               --image-only
-            python3 tests/e2e/report.py tests/e2e/specs/object-mutation.json \
+            python3 tests/e2e/report.py "$spec" \
               >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
-      - name: Upload object-mutation evidence
+      - name: Upload object evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-stock-object-mutation-e2e
+          name: ${{ matrix.target }}-${{ matrix.mode }}-${{ matrix.suite }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
@@ -221,6 +276,6 @@ jobs:
             build/*-socat.log
             build/*-lifecycle-*.log
             build/*-summary.png
-            build/stock-${{ matrix.family }}-targets.txt
-            build/e2e/e2e.hpc
+            build/${{ matrix.mode }}-${{ matrix.family }}-targets.txt
+            build/e2e/${{ matrix.suite }}/${{ matrix.family }}/e2e.hpc
           if-no-files-found: warn

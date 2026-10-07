@@ -48,6 +48,10 @@ void hpclang_mmu_prepare(const struct hpclang_mmu_layout *layout)
 
     for (uint32_t i = 0; i < layout->code_page_count; ++i)
         code[HPCLANG_CODE_L2_FIRST + i] = layout->code_pages[i] | SMALL_L2_FLAGS;
+
+    /* AP=2 permits user reads and privileged writes in every subpage.
+     * DMA validation does not require a physical identity mapping. */
+    code[HPCLANG_CODE_L2_FIRST - 1u] = layout->l2_workspace_phys | 0x0aa2u;
 }
 
 void hpclang_mmu_install(const struct hpclang_mmu_layout *layout, struct hpclang_mmu_saved *saved)

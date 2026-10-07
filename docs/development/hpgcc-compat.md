@@ -94,7 +94,23 @@ Compatibility decision:
 
 The hpclang core already provides opaque physical/software surfaces, clipped pixel/line/rectangle/circle/polygon operations, cross-level blit, native/generated fonts, and UTF-8/codepoint text drawing. That is enough clean machinery for many HPG wrappers without reproducing `hpg_t` as the core state model.
 
-Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter. Physical gray4/gray16 and `hpg_flip` remain separately gated because they require contiguous LCD DMA memory and reliable stock-state restoration.
+Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter.
+M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
+synchronization and six status segments through the clean display service.
+The runtime owns contiguous DMA allocations, cache publication and LCD restoration.
+`tests/e2e/display/hpg-prototype.c` exercises intersecting clips, PAINT/XOR,
+repeating surface patterns, clipped line masks and transparent RGB XPM import
+using only public surface operations. Its one-character XPM subset is a feasibility
+witness; the broad historical parser and installed HPG spelling remain M8 work.
+No missing low-level drawing primitive was found by these witnesses.
+
+The source review includes HPGCC 1.0.3, HP39-enabled 1.1, 2.0 SP2 and HPGCC3 R004,
+plus newRPL's HP50g LCD implementation. The S3C2410A register contract takes
+precedence where old code writes status bits, forces LCD enable or spins without
+a timeout. hpclang's flip stops DMA at an observed frame boundary rather than
+changing live frame addresses with prefetched FIFO data. Emulator acceptance
+does not establish real-panel flicker or luminance. See the
+[display contract](api-reference.md#physical-display-ownership).
 
 ## Native calculator fonts: important platform split
 
@@ -167,9 +183,10 @@ Compatibility decision is split by responsibility:
 - LCD mode/controller: **Migration**, except safe behavior exposed by display services;
 - interrupts/MMU/physical allocation: **Unsupported as routine application API** or internal/unsafe;
 - standard libc: **Direct through picolibc**, not duplicate hpclang wrappers;
-- tone/beep: clean PWM playback passes local validation; formal CI is pending.
+- tone/beep: clean PWM configuration/timing/restoration passes formal M7.4 CI;
+  audible output still requires a physical-hardware witness.
 
-The M7.4 development branch adds civil-time reading/conversion and cooperative
+M7.4 provides civil-time reading/conversion and cooperative
 one-shot/periodic timers. The historical RTC implementations read separate BCD
 registers without a coherent-snapshot check; 1.1/2.0/3 also mark the hardware
 weekday field as unreliable. The clean datetime API validates a stable sample,
@@ -208,7 +225,7 @@ and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
 
 The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g now route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Stock KOS is retained only for insertion/write-protect sampling before takeover and `ResetSD` after release.
 
-M7.2's clean core covers path metadata, FAT attributes and last-modified civil time, media state, free/total capacity, rename/mkdir/rmdir, UTF-8 LFN, and independent owned directory iterators. HP39/40 and HP48 continue to return clean `ENOSYS` rather than treating calculator-object stores as files.
+M7.2's clean core covers path metadata, masked FAT attribute mutation, modification/creation civil time and stored access-date queries, media state, free/total capacity, rename/mkdir/rmdir, UTF-8 LFN, and independent owned directory iterators. HP39/40 and HP48 continue to return clean `ENOSYS` rather than treating calculator-object stores as files. Access-date queries do not imply automatic atime maintenance: reads leave the stored date unchanged and FatFs clears it on writes. Creation/modification queries expose two-second precision; missing dates are explicitly invalid.
 
 The M7.2d source adapter now provides a deliberately bounded historical surface:
 
@@ -217,7 +234,7 @@ The M7.2d source adapter now provides a deliberately bounded historical surface:
 - common visible `FS_FILE` metadata fields are retained for source ports, but the historical binary layout and direct FAT/controller state are not reproduced;
 - the single real hpclang SD volume accepts legacy SD path aliases while multi-volume mutable state is not reintroduced.
 
-Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and unverified timestamp/attribute mutation remain Migration/Internal rather than canonical compatibility APIs.
+Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and timestamp setters remain Migration/Internal rather than canonical compatibility APIs.
 
 ## HP39 calculator objects
 
@@ -225,7 +242,7 @@ HP39gs/40gs have typed internal calculator objects, but the native storage model
 
 `HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA`, and `HP39BinX` are a different layer: the typed external Disk Drive/Conn3x transfer protocol used to import/export Aplets, Programs, Notes and related records. Historical `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to this transfer/I/O path and must not be treated as proof that `HP39DIR.*` is the internal calculator namespace.
 
-Compatibility code may preserve that transfer protocol privately, while canonical internal object access goes through the proven Saturn/System-RPL portal and native catalog/context primitives. The current private bridge normalizes Aplet, Program and Note catalogs into owned list snapshots without exposing ROM addresses or leaving its temporary RPL stack cell behind. The public HP39 catalog/lookup shape remains deliberately unfrozen, and HP39 is not flattened into `FILE *` or a fabricated HOME tree.
+Compatibility code may preserve that transfer protocol privately, while canonical internal object access goes through the Saturn/System-RPL portal and native catalog/context primitives. The bridge normalizes Aplet, Program and Note catalogs into owned list snapshots without exposing ROM addresses or leaving its temporary RPL stack cell behind. Public Program/Note services live in `hpclang/catalog.h`; Aplet lifecycle services live in `hpclang/aplet.h`. Their M7.3 acceptance is still being validated. HP39 is not flattened into `FILE *` or a fabricated HOME tree.
 
 ## Saturn / RPL object bridge
 
@@ -253,8 +270,9 @@ Compatibility decision and current implementation:
 - **Migration/Internal** remains the classification for low-level
   address-returning `satdir`, raw memory mapping/peek/poke/memmove, borrowed
   stack descriptors, native-BCD complex/vector/array helpers and raw list
-  builders. `swap/nip` also stays outside the bounded subset until a real port
-  justifies a transactional reorder primitive;
+  builders. M7.3i adds bounded `sat_stack_swap/nip` adapters over the clean
+  transactional reorder service and HPGCC 2.0 `sat_pushtruefalse` over native
+  Boolean exchange; their formal CI acceptance is still pending;
 - HPGCC 1.1/2.0 adapter parity does not itself require general named-object
   mutation because historical `satdir.h` is read/search/recall oriented.
   However, hpclang's M7 capability plan still includes that write side as
@@ -378,17 +396,17 @@ build dependencies or copying their implementations into hpclang.
 
 | Application capability | Historical evidence | Current hpclang / required follow-up |
 | --- | --- | --- |
-| Create a directory; remove an entire directory tree | HPGCC3 `libs_workspace/headers/sat3.h`: `sat3_crdir`, `sat3_pgdir`; implemented in `hplib/sat3/sat3_dir.c` | Clean `mkdir/rmdir` implemented with reference/cwd safety; formal M7.3g acceptance pending |
-| Aplet-owned persistent data | 1.1 `sources/HP39-Aplet/Skeleton/hpgccaplet.s`: `CustomData@`, `_Entry`, `_Action`, `_Exit`, `_Reset` | Clean `hpclang_aplet_data_get/set/clear` in progress; all three HP39 models have local GC, instance-isolation and exit/relaunch evidence. Reset and formal CI acceptance remain open |
-| Lists, real/complex arrays and matrices | 1.1/2.0 `saturn.h` construction/push helpers; HPGCC3 `sat3_createlist`, list operations, `sat3_createrarray/carray/matrix`; corresponding list/matrix sources exist | Kind recognition and opaque snapshots do not supply construction, indexing, extraction or edits; add owned typed services |
-| Complex, identifiers/tags, binary and wider numeric values | HPGCC3 `sat3_createcplx_*`, `sat3_createid_str`, `sat3_createtag_str`, `sat3_createhxs_*`, decNumber/XREAL conversion families | Current constructors cover CHAR, String, int64 ZINT and finite-double REAL only; inventory exact preservation and conversion requirements separately from arithmetic |
-| Stack rearrangement and Boolean exchange | 1.1/2.0 `sat_stack_swap/nip`, `sat_pushtruefalse`; HPGCC3 `sat3_swap`, `sat3_pushtruefalse` | Public push/pop/drop/replace is not a transactional swap; add a safe single-operation contract |
-| HP39 named Program/Note/Aplet lifecycle | Native catalogs and ROM descriptor/context evidence; public generic HPGCC variable-definition CRUD has not been established | Private reads and public schema-variable get/set are not general named-object CRUD; research creation, deletion, naming and context rules explicitly |
-| Port namespaces | Existing roadmap assigns HOME/Port 0/1/2 to object services | Current handles expose HOME/current/child only; distinguish RAM directories, libraries/backups and flash port persistence before declaring support |
-| File attribute mutation and timestamp coverage | 2.0 `fsystem.h`: `FSChAttr`, `FSGetCreatTime`, `FSGetAccessDate` | Public adapter lacks these; `FSCreate` rejects read-only/hidden/system attributes. Extend independently of accepted basic stream tests |
-| Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | Monotonic time exists; public civil clock, sound, contrast and event scheduling are missing. Design Stock-preserving services rather than raw IRQ exposure |
+| Create a directory; remove an entire directory tree | HPGCC3 `libs_workspace/headers/sat3.h`: `sat3_crdir`, `sat3_pgdir`; implemented in `hplib/sat3/sat3_dir.c` | Clean `mkdir/rmdir` accepted with reference/cwd safety; see M7.3g validation |
+| Aplet-owned persistent data | 1.1 `sources/HP39-Aplet/Skeleton/hpgccaplet.s`: `CustomData@`, `_Entry`, `_Action`, `_Exit`, `_Reset` | Clean `hpclang_aplet_data_get/set/clear`; all three HP39 models pass the 15-invocation local contract, including native GC, instance isolation, exit/relaunch and menu Reset cancellation/confirmation. Formal CI acceptance is complete on `6a7f9a28`. |
+| Lists, real/complex arrays and matrices | 1.1/2.0 `saturn.h` construction/push helpers; HPGCC3 `sat3_createlist`, list operations, `sat3_createrarray/carray/matrix`; corresponding list/matrix sources exist | M7.3i locally implements owned lists, homogeneous numeric arrays and heterogeneous symbolic matrices, with construction, access and independent edits. Raw historical signatures are not thereby declared compatible. See [composite object progress](object-service.md#m73i-composite-objects-and-stack-reorder-in-progress). |
+| Complex, identifiers/tags, binary and wider numeric values | HPGCC3 `sat3_createcplx_*`, `sat3_createid_str`, `sat3_createtag_str`, `sat3_createhxs_*`, decNumber/XREAL conversion families | M7.3i adds clean complex, identifier, tagged and width-preserving binary objects, arbitrary-length ZINT decimal exchange and exact 12-digit REAL coefficient/exponent exchange. HPGCC3's reviewed REAL decNumber/XREAL adapters still target classic REAL; distinct EREAL/LONGREAL formats and arithmetic are not implied. |
+| Stack rearrangement and Boolean exchange | 1.1/2.0 `sat_stack_swap/nip`; 2.0 `sat_pushtruefalse`; HPGCC3 `sat3_swap`, `sat3_pushtruefalse` | M7.3i implements allocation-free transactional swap/nip and genuine SysRPL TRUE/FALSE exchange. The 1.1/2.0 reorder and 2.0 Boolean push signatures have bounded adapters; formal CI is complete on `6a7f9a28`. |
+| HP39 named Program/Note/Aplet lifecycle | Native catalogs and ROM descriptor/context evidence; public generic HPGCC variable-definition CRUD has not been established | `hpclang_catalog_*` implements Program/Note CRUD, including compiler/editor records. `hpclang_aplet_list/clone/remove` provides owned name lists and named native copies, preserves caller contexts, protects active/default Aplets and maintains the cached display list on removal. The dedicated catalog fixture passes on all three HP39 models; CI acceptance is complete on `6a7f9a28`. |
+| Port namespaces | HPGCC3 `libs_workspace/headers/sat3.h` describes Port 0 main RAM, Port 1 extended RAM and Port 2 Flash; only libraries/backups, without subdirectories | On 2026-10-04 the maintainer accepted each port's lack of read/write services as an M7.3j limitation. All three retain explicit implementation goals; HOME CRUD does not imply port support. |
+| File attribute mutation and timestamp coverage | 2.0 `fsystem.h`: `FSChAttr`, `FSGetCreatTime`, `FSGetAccessDate` | Implemented over the clean metadata API; `FSCreate` accepts read-only/hidden/system/archive. Stored FAT access-date queries do not maintain atime. Persistence/error unit tests and six-model Direct plus HP49g+/HP50g Stock Storage pass locally; formal CI accepted on `6a7f9a28`. |
+| Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | M7.4 accepts civil clock read/set/conversion, cancellable tones, contrast observation and cooperative timers. Contrast mutation and low-level interrupt callbacks are not supplied by these APIs |
 | Text input and console behavior | Historical `readint/readdouble/_gets`, key-plane helpers; HPGCC3 `keyb_setalphalock/shiftplane` and message API | Physical DOWN/UP/REPEAT is not text entry, Alpha-lock policy, numeric input or an on-screen console |
-| Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | Software gray surfaces do not prove physical gray output; demonstrate PAINT/XOR/pattern/clip and status behavior through clean primitives/adapters |
+| Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | M7.5 implements owned gray2/4/16 sessions, page exchange, bounded frame waiting and six status segments; six-model Direct/Stock pixel/register gates pass locally. Public-API-only prototypes exercise clipping, PAINT/XOR, transparent anchored/relative patterns and RGB XPM. Formal CI accepted on `6a7f9a28`; broad HPG spelling/parser compatibility remains M8 |
 
 HPGCC3 declarations, especially ROMLIB-dependent functions, are evidence of
 application requirements, not proof they work on all six Stock ROMs. Likewise,

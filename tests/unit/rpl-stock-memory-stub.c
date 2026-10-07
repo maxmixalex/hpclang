@@ -10,11 +10,15 @@ int test_saturn_write_nibble(struct hpclang_saturn_address address, uint8_t valu
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
     (void)context;
+    if (address < 0x80000u || address >= 0x100000u)
+        return 0;
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
 }
 static int write_nibble(void *context, uint32_t address, uint8_t value)
 {
     (void)context;
+    if (address < 0x80000u || address >= 0x100000u)
+        return 0;
     return test_saturn_write_nibble(hpclang_saturn_address_make(address), value);
 }
 int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,

@@ -94,6 +94,10 @@ extern "C"
         unsigned _hpclang_owned;
         struct tm _hpclang_write_tm;
         unsigned _hpclang_write_time_valid;
+        char *_hpclang_entry_path;
+        struct tm _hpclang_created_tm;
+        struct tm _hpclang_accessed_tm;
+        unsigned _hpclang_time_validity;
     } FS_FILE;
 
     int FSVolumeMounted(int volume);
@@ -128,8 +132,11 @@ extern "C"
     void FSStripSemi(char *name);
     char *FSGetErrorMsg(int errornum);
     int FSAttr(FS_FILE *file);
+    int FSChAttr(FS_FILE *file, int newattr);
     int FSFileLength(FS_FILE *file);
     void FSGetWriteTime(FS_FILE *file, struct tm *timedate);
+    void FSGetCreatTime(FS_FILE *file, struct tm *timedate);
+    void FSGetAccessDate(FS_FILE *file, struct tm *timedate);
     char *FSGetFileName(FS_FILE *file, int pathflags);
 
 #ifdef __cplusplus

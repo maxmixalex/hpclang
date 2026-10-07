@@ -19,6 +19,34 @@ enum
 static struct hpclang_object *stack_items[STACK_CAPACITY];
 static uint32_t stack_depth_value;
 static uint32_t last_drop_count;
+static int last_boolean;
+
+int hpclang_stack_push_boolean(int value)
+{
+    assert(value == 0 || value == 1);
+    last_boolean = value;
+    return 0;
+}
+
+int hpclang_stack_swap(void)
+{
+    if (stack_depth_value < 2u)
+        return -1;
+    struct hpclang_object *top = stack_items[0];
+    stack_items[0] = stack_items[1];
+    stack_items[1] = top;
+    return 0;
+}
+
+int hpclang_stack_nip(void)
+{
+    if (stack_depth_value < 2u)
+        return -1;
+    hpclang_object_release(stack_items[1]);
+    memmove(stack_items + 1u, stack_items + 2u, (stack_depth_value - 2u) * sizeof(stack_items[0]));
+    --stack_depth_value;
+    return 0;
+}
 
 static struct hpclang_object *clone_object(const struct hpclang_object *object)
 {
@@ -99,6 +127,20 @@ static void test_scope_depth_and_drop(void)
     assert(sat_stack_drop() == 0);
 
     sat_stack_exit(scope);
+
+    assert(sat_stack_swap() == 0 && sat_stack_nip() == 0);
+    assert(sat_stack_push_string("bottom") == 1);
+    assert(sat_stack_swap() == 0 && sat_stack_nip() == 0);
+    assert(sat_stack_push_string("top") == 1);
+    assert(sat_stack_swap() == 1);
+    expect_top_string("bottom");
+    assert(sat_stack_nip() == 1 && sat_stack_depth() == 1);
+    expect_top_string("bottom");
+    clear_stack();
+    sat_pushtruefalse(-3);
+    assert(last_boolean == 1);
+    sat_stack_push_bool(0);
+    assert(last_boolean == 0);
 }
 
 static void test_strings(void)

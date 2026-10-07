@@ -9,7 +9,7 @@
 #define FF_USE_MKFS      0
 #define FF_USE_FASTSEEK  0
 #define FF_USE_EXPAND    0
-#define FF_USE_CHMOD     0
+#define FF_USE_CHMOD     1
 #define FF_USE_LABEL     0
 #define FF_USE_FORWARD   0
 #define FF_USE_STRFUNC   0
@@ -48,7 +48,7 @@
 #define FF_NORTC_MON     1
 #define FF_NORTC_MDAY    1
 #define FF_NORTC_YEAR    2026
-#define FF_FS_CRTIME     0
+#define FF_FS_CRTIME     1
 
 #define FF_FS_NOFSINFO   0
 #define FF_FS_LOCK       0

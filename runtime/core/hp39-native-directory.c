@@ -389,19 +389,19 @@ int hpclang_hp39_native_aplet_catalog_snapshot(const struct hpclang_rpl_reader *
     return 0;
 }
 
-int hpclang_hp39_native_aplet_snapshot(const struct hpclang_rpl_reader *reader, const uint8_t *name,
-                                       size_t name_length, struct hpclang_object **object)
+int hpclang_hp39_native_aplet_resolve(const struct hpclang_rpl_reader *reader, const uint8_t *name,
+                                      size_t name_length, uint32_t *address)
 {
     static const uint8_t aplet_directory_name[] = {'\'', 'a', 'p', 'l', 'e', 't', 'd', 'i', 'r'};
 
-    if (object == NULL || name == NULL || name_length == 0u ||
+    if (address == NULL || name == NULL || name_length == 0u ||
         name_length > HPCLANG_RPL_STORE_NAME_CAPACITY - 2u) {
-        if (object != NULL)
-            *object = NULL;
+        if (address != NULL)
+            *address = 0u;
         errno = EINVAL;
         return -1;
     }
-    *object = NULL;
+    *address = 0u;
 
     uint32_t home = 0u;
     int result = hpclang_rpl_store_home_object(reader, &home);
@@ -433,8 +433,22 @@ int hpclang_hp39_native_aplet_snapshot(const struct hpclang_rpl_reader *reader, 
         return -1;
     }
 
-    if (hpclang_object_snapshot_copy(reader, entry.object_address,
-                                     HP39_SATURN_LIMIT - entry.object_address, object) != 0)
+    *address = entry.object_address;
+    return 0;
+}
+
+int hpclang_hp39_native_aplet_snapshot(const struct hpclang_rpl_reader *reader, const uint8_t *name,
+                                       size_t name_length, struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    *object = NULL;
+    uint32_t address;
+    if (hpclang_hp39_native_aplet_resolve(reader, name, name_length, &address) != 0)
+        return -1;
+    if (hpclang_object_snapshot_copy(reader, address, HP39_SATURN_LIMIT - address, object) != 0)
         return -1;
     if (*object == NULL || hpclang_object_kind(*object) != HPCLANG_OBJECT_DIRECTORY) {
         hpclang_object_release(*object);

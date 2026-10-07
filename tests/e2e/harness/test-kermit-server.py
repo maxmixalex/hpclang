@@ -90,7 +90,9 @@ class Peer:
         self.send(packet(b"I", PARAMETERS))
         self.expect(b"Y")
 
-    def fetch(self, name: bytes, expected: bytes, *, lose_data_ack: bool) -> None:
+    def fetch(
+        self, name: bytes, expected: bytes, *, lose_data_ack: bool, delay_data_ack: float = 0
+    ) -> None:
         self.send(packet(b"R", name))
         self.expect(b"S")
         self.send(packet(b"Y", b"~* @-# 3"))
@@ -106,6 +108,20 @@ class Peer:
                 if self.expect(b"D", 3, sequence) != data:
                     raise AssertionError("retransmission changed the data")
                 lose_data_ack = False
+            if delay_data_ack:
+                # Stock can remain busy longer than the old fixed timeout's
+                # entire retry budget. Drain retries, but acknowledge only
+                # after that interval, then verify the rest of the transfer.
+                deadline = time.monotonic() + delay_data_ack
+                retries = 0
+                while (remaining := deadline - time.monotonic()) > 0:
+                    wire = self.receive(remaining)
+                    if wire and wire != packet(b"D", data, sequence, 3):
+                        raise AssertionError(f"server abandoned delayed ACK: {wire!r}")
+                    retries += bool(wire)
+                if not 1 <= retries <= 4:
+                    raise AssertionError(f"expected bounded retry backoff, got {retries} retries")
+                delay_data_ack = 0
             received.extend(unquote(data))
             self.send(packet(b"Y", sequence=sequence, check=3))
             sequence = (sequence + 1) % 64
@@ -169,7 +185,16 @@ def verify(tools: Path) -> None:
                     if peer.receive(1.2):
                         raise AssertionError("server did not return to silent command wait")
                     peer.negotiate()
-                    peer.fetch(b"NEXT.BIN", b"next transaction\x00\xff", lose_data_ack=False)
+                    peer.fetch(
+                        b"NEXT.BIN",
+                        b"next transaction\x00\xff",
+                        lose_data_ack=False,
+                        delay_data_ack=15,
+                    )
+                    if peer.receive(1.2):
+                        raise AssertionError("server did not return to silent command wait")
+                    peer.negotiate()
+                    peer.fetch(b"FIRST.BIN", payload, lose_data_ack=True)
                 except Exception:
                     output.flush()
                     print((root / "process.log").read_text(errors="replace")[-2000:])
@@ -186,7 +211,7 @@ def verify(tools: Path) -> None:
         finally:
             os.close(master)
             os.close(slave)
-    print("PASS: Kermit idle, init recovery, CRC, binary retransmission, and next file")
+    print("PASS: Kermit idle, init recovery, CRC, retransmission, delayed ACK, and next file")
 
 
 if __name__ == "__main__":

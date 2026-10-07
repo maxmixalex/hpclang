@@ -522,15 +522,27 @@ int hpclang_namespace_ftruncate(int fd, off_t length)
     return 0;
 }
 
-static void export_fat_time(struct hpclang_stream_civil_datetime *dst, WORD date, WORD time)
+static int export_fat_time(struct hpclang_stream_civil_datetime *dst, WORD date, WORD time)
 {
+    static const uint8_t days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     memset(dst, 0, sizeof(*dst));
+    unsigned year = 1980u + (date >> 9);
+    unsigned month = (date >> 5) & 15u;
+    unsigned day = date & 31u;
+    if (month == 0u || month > 12u || day == 0u)
+        return 0;
+    unsigned limit = days[month - 1u];
+    if (month == 2u && year % 4u == 0u && (year % 100u != 0u || year % 400u == 0u))
+        ++limit;
+    if (day > limit || (time >> 11) > 23u || ((time >> 5) & 63u) > 59u || (time & 31u) > 29u)
+        return 0;
     dst->year = (uint16_t)(1980u + ((date >> 9) & 0x7fu));
     dst->month = (uint8_t)((date >> 5) & 0x0fu);
     dst->day = (uint8_t)(date & 0x1fu);
     dst->hour = (uint8_t)((time >> 11) & 0x1fu);
     dst->minute = (uint8_t)((time >> 5) & 0x3fu);
     dst->second = (uint8_t)((time & 0x1fu) * 2u);
+    return 1;
 }
 
 static uint32_t export_attributes(BYTE attributes)
@@ -564,8 +576,12 @@ static void export_info(struct hpclang_stream_path_info *dst, const FILINFO *src
     dst->byte_size = (uint64_t)src->fsize;
     dst->type = export_type(src->fattrib);
     dst->attributes = export_attributes(src->fattrib);
-    export_fat_time(&dst->last_modified, src->fdate, src->ftime);
-    dst->time_validity = HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID;
+    if (export_fat_time(&dst->last_modified, src->fdate, src->ftime))
+        dst->time_validity |= HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID;
+    if (export_fat_time(&dst->created, src->crdate, src->crtime))
+        dst->time_validity |= HPCLANG_STREAM_PATH_CREATED_VALID;
+    if (export_fat_time(&dst->last_accessed, src->adate, 0u))
+        dst->time_validity |= HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID;
 }
 
 static int one_shot_begin(const char *path)
@@ -601,6 +617,43 @@ int hpclang_namespace_path_query(const char *path, struct hpclang_stream_path_in
     }
 
     return result;
+}
+
+static BYTE import_attributes(uint32_t attributes)
+{
+    BYTE out = 0u;
+    if (attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY)
+        out |= AM_RDO;
+    if (attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN)
+        out |= AM_HID;
+    if (attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM)
+        out |= AM_SYS;
+    if (attributes & HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE)
+        out |= AM_ARC;
+    return out;
+}
+
+int hpclang_namespace_path_set_attributes(const char *path, uint32_t attributes, uint32_t mask)
+{
+    const uint32_t allowed =
+        HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY | HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
+        HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE;
+    if ((mask & ~allowed) != 0u || (attributes & ~mask) != 0u) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (one_shot_begin(path) != 0)
+        return -1;
+    // Publish pending file metadata before changing its directory attributes.
+    // This also handles a different spelling of an open long/short FAT name.
+    for (unsigned i = 0; i < DIRECT_FD_SLOTS; ++i) {
+        if (direct_fds[i].used) {
+            FRESULT fr = f_sync(&direct_fds[i].file);
+            if (fr != FR_OK)
+                return set_fatfs_errno(fr);
+        }
+    }
+    return set_fatfs_errno(f_chmod(path, import_attributes(attributes), import_attributes(mask)));
 }
 
 int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
@@ -764,8 +817,12 @@ int hpclang_stream_directory_read(struct hpclang_stream_directory *directory,
     entry->byte_size = (uint64_t)info.fsize;
     entry->type = export_type(info.fattrib);
     entry->attributes = export_attributes(info.fattrib);
-    export_fat_time(&entry->last_modified, info.fdate, info.ftime);
-    entry->time_validity = HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID;
+    struct hpclang_stream_path_info metadata;
+    export_info(&metadata, &info);
+    entry->last_modified = metadata.last_modified;
+    entry->created = metadata.created;
+    entry->last_accessed = metadata.last_accessed;
+    entry->time_validity = metadata.time_validity;
     memcpy(entry->name, info.fname, name_length + 1u);
     return 1;
 }

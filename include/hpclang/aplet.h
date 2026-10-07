@@ -20,6 +20,27 @@ extern "C"
     /* Restore the template's initial empty-list value, with the same save timing. */
     int hpclang_aplet_data_clear(void);
 
+    /* Native HP39 Stock Aplet catalog. The list is an owned snapshot of the
+     * native display
+     * names. Names below contain 1..254 raw calculator bytes. */
+    int hpclang_aplet_list(struct hpclang_object **names);
+
+    /* Create an independent named copy through Stock's Aplet save operation.
+     * Existing
+     * destinations return EEXIST; a missing source returns ENOENT.
+     * Stock keeps the selected
+     * Aplet unchanged. A large copy may return ENOSPC
+     * while the ARM program's memory is
+     * reserved. This is not a compiler or an
+     * arbitrary Aplet-type constructor. */
+    int hpclang_aplet_clone(const uint8_t *source, size_t source_length, const uint8_t *destination,
+                            size_t destination_length);
+
+    /* Remove a saved Aplet through Stock. The active Aplet is protected (EBUSY),
+     * as are
+     * native default Aplets (EPERM). A missing name returns ENOENT. */
+    int hpclang_aplet_remove(const uint8_t *name, size_t name_length);
+
 #ifdef __cplusplus
 }
 #endif

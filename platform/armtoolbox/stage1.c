@@ -138,7 +138,7 @@ enum
     HP39P_VARIABLE_RECALL_NIBBLE = 785u,
     HP39P_VARIABLE_RECALL_NIBBLES = 35u,
     HP39P_VARIABLE_STORE_NIBBLE = 820u,
-    HP39P_VARIABLE_STORE_NIBBLES = 60u,
+    HP39P_VARIABLE_STORE_NIBBLES = 240u,
     HP39P_VARIABLE_OBJECT_NIBBLE = HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES + 10u,
     HP39P_STATIC_NIBBLES = HP39P_VARIABLE_OBJECT_NIBBLE + HP39P_STAGED_OBJECT_MAX_NIBBLES + 10u,
     HP39P_DOCODE_MACHINE_NIBBLES = 45u,
@@ -330,8 +330,12 @@ static int hp39_request_words(uint32_t kind, uint32_t name_length, uint32_t satu
         return 1;
     }
 
-    if (kind == HP39P_VARIABLE_STORE &&
-        name_length == sizeof(struct hpclang_hp39_variable_store_request)) {
+    if ((kind == HP39P_VARIABLE_STORE &&
+         name_length == sizeof(struct hpclang_hp39_variable_store_request)) ||
+        (kind >= HP39P_PROGRAM_PUT && kind <= HP39P_NOTE_REMOVE &&
+         name_length == sizeof(struct hpclang_hp39_catalog_request)) ||
+        (kind >= HP39P_APLET_CLONE && kind <= HP39P_APLET_IS_DEFAULT &&
+         name_length == sizeof(struct hpclang_hp39_aplet_request))) {
         *arg = nop;
         *operation = saturn_base + HP39P_VARIABLE_STORE_NIBBLE;
         *pack = nop;
@@ -353,9 +357,206 @@ static int hp39_request_words(uint32_t kind, uint32_t name_length, uint32_t satu
     return 0;
 }
 
+static int hp39_write_operation_helper(const uint32_t *words, size_t count)
+{
+    if (count < 2u || count * 5u > HP39P_VARIABLE_STORE_NIBBLES || words[count - 1u] != 0x312bu)
+        return 0;
+    for (uint32_t i = 0u; i < HP39P_VARIABLE_STORE_NIBBLES / 5u; ++i) {
+        uint32_t word = i < count - 1u ? words[i] : 0x765cu;
+        if (i == HP39P_VARIABLE_STORE_NIBBLES / 5u - 1u)
+            word = 0x312bu;
+        if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
+                                            sizeof(hp39_saturn_portal_thunk) * 2u,
+                                            HP39P_VARIABLE_STORE_NIBBLE + i * 5u, word))
+            return 0;
+    }
+    return 1;
+}
+
+static int hp39_write_variable_store(uint32_t object, uint32_t predicate, uint32_t id)
+{
+    const uint32_t words[] = {
+        0x2d9du,  0x7665u, object, predicate, 0x3af2u, 0xd585u,
+        0x1320cu, 0x7665u, id,     0x8644u,   0x4049u, 0x312bu,
+    };
+    return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
+}
+
+static int hp39_write_name_object(uint32_t offset, const uint8_t *name, uint32_t length,
+                                  uint32_t prologue)
+{
+    uint32_t maximum = prologue == 0x2e48u ? HP39P_BODY_NAME_MAX_BYTES : 254u;
+    if (name == NULL || length == 0u || length > maximum)
+        return 0;
+    struct hp39_saturn_builder builder = {
+        .bytes = hp39_saturn_portal_thunk,
+        .capacity_nibbles = sizeof(hp39_saturn_portal_thunk) * 2u,
+        .nibbles = offset,
+    };
+    if (!hp39_saturn_put_word5(&builder, prologue))
+        return 0;
+    if (prologue == 0x2e48u) {
+        if (!hp39_saturn_put_nibble(&builder, length & 15u) ||
+            !hp39_saturn_put_nibble(&builder, length >> 4u))
+            return 0;
+    } else if (!hp39_saturn_put_word5(&builder, 5u + length * 2u)) {
+        return 0;
+    }
+    for (uint32_t i = 0u; i < length; ++i) {
+        if (!hp39_saturn_put_nibble(&builder, name[i] & 15u) ||
+            !hp39_saturn_put_nibble(&builder, name[i] >> 4u))
+            return 0;
+    }
+    return 1;
+}
+
+static int hp39_stage_object(uintptr_t object_data, uint32_t object_nibbles)
+{
+    if (object_data == 0u || object_nibbles < 5u ||
+        object_nibbles > HP39P_STAGED_OBJECT_MAX_NIBBLES)
+        return 0;
+    const uint8_t *source = (const uint8_t *)object_data;
+    for (uint32_t i = 0u; i < object_nibbles; ++i) {
+        uint8_t packed = source[i >> 1];
+        uint8_t nibble = (i & 1u) != 0u ? packed >> 4u : packed & 15u;
+        if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
+                                             sizeof(hp39_saturn_portal_thunk) * 2u,
+                                             HP39P_VARIABLE_OBJECT_NIBBLE + i, nibble))
+            return 0;
+    }
+    return 1;
+}
+
 static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const uint8_t *name,
                                    uint32_t saturn_base)
 {
+    if (kind >= HP39P_APLET_CLONE && kind <= HP39P_APLET_IS_DEFAULT) {
+        if (name == NULL || name_length != sizeof(struct hpclang_hp39_aplet_request))
+            return 0;
+        const struct hpclang_hp39_aplet_request *request = (const void *)name;
+        if (!hp39_write_name_object(HP39P_NAME_NIBBLE, request->name, request->name_length,
+                                    0x2a2cu))
+            return 0;
+        uint32_t source = saturn_base + HP39P_NAME_NIBBLE;
+        if (kind == HP39P_APLET_CLONE) {
+            if (!hp39_write_name_object(HP39P_VARIABLE_OBJECT_NIBBLE, request->destination,
+                                        request->destination_length, 0x2a2cu))
+                return 0;
+            const uint32_t words[] = {
+                0x2d9du,
+                /* Stock save selects its copy. Keep the caller's contexts in
+                 *
+                   GC-traced native bindings and restore on success or error. */
+                0x9660u,
+                0x3f063u, /* CONTEXT@ dvbind */
+                0x126c6u,
+                0x3f063u, /* PGMCXT@ dvbind */
+                0x126e6u,
+                0x3f063u, /* NOTESCXT@ dvbind */
+                0x12706u,
+                0x3f063u, /* apletPTR@ dvbind */
+                0x565cu,
+                0x2d9du, /* ERRSET :: */
+                source,
+                0x7665u,
+                0x3f66eu,
+                0x775cu, /* RclAplet?Err */
+                saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE,
+                0x7665u,
+                0x3f3cbu,
+                0x775cu,
+                0x312bu,
+                0x56b6u,
+                0x2d9du, /* ; ERRTRAP :: */
+                0xfdaeu,
+                0x126f6u, /* 1GETABND apletPTR! */
+                0xfdaeu,
+                0x126d6u, /* 1GETABND NOTESCXT! */
+                0xfdaeu,
+                0x126b6u, /* 1GETABND PGMCXT! */
+                0xfdaeu,
+                0x960eu, /* 1GETABND CONTEXT! */
+                0x56cfu,
+                0x312bu, /* ERRJMP ; */
+                0xfdaeu,
+                0x126f6u,
+                0xfdaeu,
+                0x126d6u,
+                0xfdaeu,
+                0x126b6u,
+                0xfdaeu,
+                0x960eu,
+                0x4049u,
+                0x312bu, /* StoAplet */
+            };
+            return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
+        }
+        if (kind == HP39P_APLET_REMOVE) {
+            static const uint8_t cache_name[] = "'ApDirList";
+            if (!hp39_write_name_object(HP39P_VARIABLE_OBJECT_NIBBLE, cache_name,
+                                        sizeof(cache_name) - 1u, 0x2e48u))
+                return 0;
+            /* PurgeAplet removes storage only. Mirror the library's deletion
+             * path:
+             * remove the display name and replace Hidden's ApDirList. */
+            const uint32_t words[] = {
+                0x2d9du, source,
+                0x7665u, 0x3f66du,
+                0x775cu, source,
+                0x7665u, 0x3f5abu,
+                0x775cu,           /* name GetApDirList */
+                0xf892u, 0x108dfu, /* DUPROT EQUALPOSCOMP */
+                0x32c2u, 0x4053u,
+                0xcfdeu, 0x3e0eu,
+                0x5fdau, 0xcd84u,
+                0x3defu, 0x11ea1u,
+                0x5fdau, 0x59d3u,
+                0xe7d2u, 0x2d9du, /* Stock Hidden-context guard :: */
+                0x7665u, saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE,
+                0x3188u, 0x81d3u,
+                0xd585u, 0x2d9du,
+                0x3244u, 0x3188u,
+                0x952du, 0x312bu, /* DROP DUP PURGE ; */
+                0x8f9cu, 0x312bu, /* CREATE ; */
+                0x4049u, 0x312bu,
+            }; /* PurgeAplet */
+            return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
+        }
+        /* Match Stock's default-Aplet test: compare topic type property FIVE
+         * with the
+         * stored Aplet name. DoInCxt restores the caller's context. */
+        const uint32_t words[] = {
+            0x2d9du, source,  0x7665u,  0x3f66eu, 0x775cu, 0x3188u, 0x12a5cu, 0x26f7fu,
+            0x5842u, 0x407bu, 0x347ccu, 0x3244u,  0x3223u, 0x8bf2u, 0x3b97u,  0x312bu,
+        };
+        return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
+    }
+    if (kind >= HP39P_PROGRAM_PUT && kind <= HP39P_NOTE_REMOVE) {
+        if (name == NULL || name_length != sizeof(struct hpclang_hp39_catalog_request))
+            return 0;
+        const struct hpclang_hp39_catalog_request *request = (const void *)name;
+        const int put = kind == HP39P_PROGRAM_PUT || kind == HP39P_NOTE_PUT;
+        if (!hp39_write_name_object(HP39P_NAME_NIBBLE, request->name, request->name_length,
+                                    0x2e48u))
+            return 0;
+        if (put && !hp39_stage_object(request->object_data, request->object_nibbles))
+            return 0;
+        /* Native catalog operations maintain the source, compiled trampoline
+         * and editor
+         * records together. A plain STO/PURGE of the source does not. */
+        const uint32_t operations[] = {0x27c09u, 0x27c68u, 0x28096u, 0x280b9u};
+        const uint32_t words[] = {
+            0x2d9du, /* DOCOL */
+            put ? 0x7665u : 0x765cu,
+            put ? saturn_base + HP39P_VARIABLE_OBJECT_NIBBLE : 0x765cu,
+            0x7665u,
+            saturn_base + HP39P_NAME_NIBBLE,
+            operations[kind - HP39P_PROGRAM_PUT],
+            0x4049u, /* ZERO: success */
+            0x312bu,
+        };
+        return hp39_write_operation_helper(words, sizeof(words) / sizeof(words[0]));
+    }
     const int body_request = kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE;
     const int variable_request = kind == HP39P_VARIABLE_VALUE;
     const int reference_request = kind == HP39P_REFERENCE_EVAL;
@@ -380,15 +581,8 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                 return 0;
             object_data = request->object_data;
             object_nibbles = request->object_nibbles;
-            if (!hp39_saturn_buffer_store_word5(
-                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
-                    HP39P_VARIABLE_STORE_NIBBLE + 10u, object_address) ||
-                !hp39_saturn_buffer_store_word5(
-                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
-                    HP39P_VARIABLE_STORE_NIBBLE + 40u, request->id_reference) ||
-                !hp39_saturn_buffer_store_word5(
-                    hp39_saturn_portal_thunk, sizeof(hp39_saturn_portal_thunk) * 2u,
-                    HP39P_VARIABLE_STORE_NIBBLE + 15u, request->type_predicate))
+            if (!hp39_write_variable_store(object_address, request->type_predicate,
+                                           request->id_reference))
                 return 0;
         } else {
             const struct hpclang_hp39_object_request *request = (const void *)name;
@@ -399,21 +593,7 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                                                 HP39P_REFERENCE_LIST_NIBBLE + 5u, object_address))
                 return 0;
         }
-        if (object_data == 0u || object_nibbles < 5u ||
-            object_nibbles > HP39P_STAGED_OBJECT_MAX_NIBBLES)
-            return 0;
-
-        const uint8_t *source = (const uint8_t *)(uintptr_t)object_data;
-        for (uint32_t i = 0u; i < object_nibbles; ++i) {
-            const uint8_t packed = source[i >> 1];
-            const uint8_t nibble =
-                (i & 1u) != 0u ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0fu);
-            if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
-                                                 (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                                 HP39P_VARIABLE_OBJECT_NIBBLE + i, nibble))
-                return 0;
-        }
-        return 1;
+        return hp39_stage_object(object_data, object_nibbles);
     }
 
     if (reference_request) {
@@ -447,35 +627,7 @@ static int hp39_store_request_name(uint32_t kind, uint32_t name_length, const ui
                                               HP39P_VARIABLE_RECALL_NIBBLE + 10u, id_reference);
     }
 
-    uint32_t maximum = HP39P_BODY_NAME_MAX_BYTES;
-    if (name == NULL || name_length == 0u || name_length > maximum)
-        return 0;
-
-    if (!hp39_saturn_buffer_store_word5(hp39_saturn_portal_thunk,
-                                        (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                        HP39P_NAME_NIBBLE, UINT32_C(0x00002e48))) /* DOIDNT */
-        return 0;
-
-    uint32_t length_offset = HP39P_NAME_NIBBLE + 5u;
-    if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
-                                         (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                         length_offset, (uint8_t)(name_length & 0x0fu)) ||
-        !hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
-                                         (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                         length_offset + 1u, (uint8_t)((name_length >> 4) & 0x0fu)))
-        return 0;
-
-    uint32_t payload = HP39P_NAME_NIBBLE + 7u;
-    for (uint32_t i = 0u; i < name_length; ++i) {
-        if (!hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
-                                             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                             payload + i * 2u, (uint8_t)(name[i] & 0x0fu)) ||
-            !hp39_saturn_buffer_store_nibble(hp39_saturn_portal_thunk,
-                                             (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                                             payload + i * 2u + 1u, (uint8_t)(name[i] >> 4)))
-            return 0;
-    }
-    return 1;
+    return hp39_write_name_object(HP39P_NAME_NIBBLE, name, name_length, 0x2e48u);
 }
 
 static int stage_saturn_read_nibble(const uint32_t *read_map, uint32_t address, uint8_t *value);
@@ -704,27 +856,8 @@ static int hp39_portal_prepare_thunk(void *saturn_state, struct hpclang_hp39_por
     /* The descriptor predicate preserves the value and supplies a type flag.
      * Reject false through Stock SETTYPEERR before STO dispatches the genuine ID.
      * The enclosing portal traps native rejections for reads and writes alike. */
-    const uint32_t variable_store_words[] = {
-        UINT32_C(0x00002d9d), /* DOCOL */
-        UINT32_C(0x00007665), /* quote */
-        UINT32_C(0x00004053), /* patched: staged object */
-        UINT32_C(0x00004053), /* patched: native descriptor type predicate */
-        UINT32_C(0x00003af2), /* NOT */
-        UINT32_C(0x0000d585), /* IT */
-        UINT32_C(0x0001320c), /* SETTYPEERR */
-        UINT32_C(0x00007665), /* quote */
-        UINT32_C(0x00004053), /* patched: genuine ID */
-        UINT32_C(0x00008644), /* STO */
-        UINT32_C(0x00004049), /* ZERO: success */
-        UINT32_C(0x0000312b), /* SEMI */
-    };
-    for (uint32_t i = 0u;
-         i < (uint32_t)(sizeof(variable_store_words) / sizeof(variable_store_words[0])); ++i) {
-        if (!hp39_saturn_buffer_store_word5(
-                hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk) * 2u,
-                HP39P_VARIABLE_STORE_NIBBLE + i * 5u, variable_store_words[i]))
-            return 0;
-    }
+    if (!hp39_write_variable_store(0x4053u, 0x4053u, 0x4053u))
+        return 0;
 
     /*
      * Prove the complete generated stream through the Saturn alias before the
@@ -780,6 +913,9 @@ static void hp39_portal_configure(const struct hpclang_launch_context *launch, v
     portal->pre_stack_span = 0u;
     portal->pinned_cells = 0u;
     portal->incoming_stack_span = 0u;
+    /* Stage1 has no libc; volatile stores prevent a compiler memset call. */
+    for (uint32_t i = 0u; i < HP39P_STACK_GUARD_SIZE; ++i)
+        ((volatile uint8_t *)portal->portal_stack)[i] = 0xa5u;
     for (uint32_t i = 0u; i < 4u; ++i)
         portal->native_call[i] = load32(saturn_state, ARMSYS_PAGE_COUNT + 4u * i);
     portal->result_object = 0u;
@@ -807,10 +943,22 @@ static void hp39_portal_configure(const struct hpclang_launch_context *launch, v
     }
 }
 
+static int hp39_portal_stack_intact(const struct hpclang_hp39_portal_context *portal)
+{
+    for (uint32_t i = 0u; i < HP39P_STACK_GUARD_SIZE; ++i) {
+        if (portal->portal_stack[i] != 0xa5u)
+            return 0;
+    }
+    return 1;
+}
+
 /* Stock GC finds a TEMP block by repeatedly skipping objects from each live
- * pointer. Embedded RPL streams must therefore lead to the enclosing block's
- * end, even though the native arena itself is an opaque string. A DOCODE tail
- * provides that path without exposing ARM instructions as RPL objects. */
+ * pointer. Embedded
+ * RPL streams must therefore lead to the enclosing block's
+ * end, even though the native arena
+ * itself is an opaque string. A DOCODE tail
+ * provides that path without exposing ARM instructions
+ * as RPL objects. */
 static int hp39_portal_gc_tail(const struct hpclang_hp39_portal_context *portal, uint32_t offset)
 {
     uint32_t address = portal->saturn_entry + offset;
@@ -883,7 +1031,26 @@ int hpclang_hp39_portal_prepare_stock(void)
     if (!hp39_portal_gc_tail(portal, HP39P_DOCODE_NIBBLE) ||
         !hp39_portal_gc_tail(portal, HP39P_VARIABLE_STORE_NIBBLE + HP39P_VARIABLE_STORE_NIBBLES))
         return -7;
-    if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
+    if (kind >= HP39P_APLET_CLONE && kind <= HP39P_APLET_IS_DEFAULT) {
+        const struct hpclang_hp39_aplet_request *request = (const void *)portal->request_name;
+        if (!hp39_portal_gc_tail(portal, HP39P_NAME_NIBBLE + 10u + request->name_length * 2u))
+            return -7;
+        if (kind == HP39P_APLET_CLONE &&
+            !hp39_portal_gc_tail(portal, HP39P_VARIABLE_OBJECT_NIBBLE + 10u +
+                                             request->destination_length * 2u))
+            return -7;
+        if (kind == HP39P_APLET_REMOVE &&
+            !hp39_portal_gc_tail(portal, HP39P_VARIABLE_OBJECT_NIBBLE + 7u +
+                                             2u * (sizeof("'ApDirList") - 1u)))
+            return -7;
+    } else if (kind >= HP39P_PROGRAM_PUT && kind <= HP39P_NOTE_REMOVE) {
+        const struct hpclang_hp39_catalog_request *request = (const void *)portal->request_name;
+        if (!hp39_portal_gc_tail(portal, HP39P_NAME_NIBBLE + 7u + request->name_length * 2u))
+            return -7;
+        if ((kind == HP39P_PROGRAM_PUT || kind == HP39P_NOTE_PUT) &&
+            !hp39_portal_gc_tail(portal, HP39P_VARIABLE_OBJECT_NIBBLE + request->object_nibbles))
+            return -7;
+    } else if (kind == HP39P_BODY_PROGRAM || kind == HP39P_BODY_NOTE) {
         if (!hp39_portal_gc_tail(portal, HP39P_NAME_NIBBLE + 7u + name_length * 2u))
             return -7;
     } else if (kind == HP39P_COPY_OBJECT) {
@@ -897,6 +1064,8 @@ int hpclang_hp39_portal_prepare_stock(void)
             return -7;
     }
 
+    if (!hp39_portal_stack_intact(portal))
+        return -17;
     hpclang_cache_clean(hp39_saturn_portal_thunk, (uint32_t)sizeof(hp39_saturn_portal_thunk));
 
     store32((void *)portal->saturn_state, ARMSYS_C_LO,
@@ -1015,7 +1184,7 @@ int hpclang_hp39_portal_restore_hpc(void)
 
     ++portal->trips;
     portal->active = 0u;
-    return result;
+    return hp39_portal_stack_intact(portal) ? result : -17;
 }
 
 static int hpc1_header_ok(const struct hpclang_image_header *header)

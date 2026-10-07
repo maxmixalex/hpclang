@@ -15,26 +15,12 @@
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
 #include <hpclang/object.h>
-#include <hpclang/variable.h>
 #include <hpclang/object-store.h>
 #include <hpclang/storage.h>
 #include <hpclang/target.h>
 #include <hpclang/time.h>
 
 int hpclang_e2e_cpp_test(void);
-int hpclang_hp39_aplet_catalog_snapshot(struct hpclang_object **object);
-int hpclang_hp39_aplet_snapshot(const uint8_t *name, size_t name_length,
-                                struct hpclang_object **object);
-int hpclang_hp39_program_catalog_snapshot(struct hpclang_object **object);
-int hpclang_hp39_note_catalog_snapshot(struct hpclang_object **object);
-int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object);
-int hpclang_hp39_program_body_snapshot(const uint8_t *name, size_t name_length,
-                                       struct hpclang_object **object);
-int hpclang_hp39_note_body_snapshot(const uint8_t *name, size_t name_length,
-                                    struct hpclang_object **object);
-int hpclang_hp39_catalog_name_count(const struct hpclang_object *catalog, uint32_t *count);
-int hpclang_hp39_catalog_contains_name(const struct hpclang_object *catalog, const uint8_t *name,
-                                       size_t name_length, int *found);
 extern const struct hpclang_font hpclang_e2e_ui_font;
 
 static const char hpclang_e2e_font_label[] = HPCLANG_UI_TEXT("FONT OK");
@@ -225,6 +211,68 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+static uint32_t storage_metadata_test(void)
+{
+    const char *path = "META/flags.txt";
+    FS_FILE *file = NULL;
+    if (FSMkdir("META") != FS_OK ||
+        FSCreate("META/flags.txt", FSATTR_RDONLY | FSATTR_HIDDEN | FSATTR_SYSTEM, &file) != FS_OK)
+        return 0xb0u;
+    if (FSWrite("metadata", 8, file) != 8 || FSClose(file) != FS_OK)
+        return 0xb1u;
+    struct hpclang_stream_path_info before, after;
+    if (hpclang_stream_path_query(path, &before) != 0 || before.byte_size != 8u ||
+        before.attributes !=
+            (HPCLANG_STREAM_PATH_ATTRIBUTE_READ_ONLY | HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN |
+             HPCLANG_STREAM_PATH_ATTRIBUTE_SYSTEM | HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE) ||
+        !(before.time_validity & HPCLANG_STREAM_PATH_CREATED_VALID) ||
+        (before.time_validity & HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID))
+        return 0xb2u;
+    errno = 0;
+    int fd = open(path, O_WRONLY);
+    if (fd >= 0 || errno != EACCES)
+        return 0xb3u;
+    if (FSOpen("META/flags.txt", FSMODE_READ, &file) != FS_OK)
+        return 0xb4u;
+    struct tm created, accessed;
+    FSGetCreatTime(file, &created);
+    FSGetAccessDate(file, &accessed);
+    if (created.tm_year != (int)before.created.year - 1900 ||
+        created.tm_mon != (int)before.created.month - 1 || created.tm_mday != before.created.day ||
+        created.tm_hour != before.created.hour || created.tm_min != before.created.minute ||
+        created.tm_sec != before.created.second || accessed.tm_year != 0 || accessed.tm_mon != 0 ||
+        accessed.tm_mday != 0 || FSClose(file) != FS_OK)
+        return 0xb5u;
+    FS_FILE *dir = NULL;
+    FS_FILE entry;
+    if (FSOpenDir("META", &dir) != FS_OK || FSGetNextEntry(&entry, dir) != FS_OK ||
+        FSClose(dir) != FS_OK)
+        return 0xb6u;
+    // Entry owns its mutation path even after its iterator has been closed.
+    if (FSChAttr(&entry, FSATTR_HIDDEN) != FS_OK || FSAttr(&entry) != FSATTR_HIDDEN)
+        return 0xb7u;
+    FSGetCreatTime(&entry, &created);
+    if (created.tm_year != (int)before.created.year - 1900)
+        return 0xb8u;
+    FSReleaseEntry(&entry);
+    if (hpclang_stream_path_query(path, &after) != 0 ||
+        after.attributes != HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN ||
+        memcmp(&before.created, &after.created, sizeof(before.created)) != 0)
+        return 0xb9u;
+    errno = 0;
+    if (hpclang_stream_path_set_attributes(path, 0u, 0x100u) != -1 || errno != EINVAL)
+        return 0xbau;
+    if (FSOpen("META/flags.txt", FSMODE_MODIFY | FSMODE_NOCREATE, &file) != FS_OK ||
+        FSWrite("M", 1, file) != 1 || FSClose(file) != FS_OK)
+        return 0xbbu;
+    if (hpclang_stream_path_set_attributes(path, 0u, HPCLANG_STREAM_PATH_ATTRIBUTE_HIDDEN) != 0 ||
+        hpclang_stream_path_query(path, &after) != 0 ||
+        after.attributes != HPCLANG_STREAM_PATH_ATTRIBUTE_ARCHIVE ||
+        FSDelete("META/flags.txt") != FS_OK || FSRmdir("META") != FS_OK)
+        return 0xbcu;
+    return 0u;
+}
+
 static uint32_t stock_stream_storage_test(uint32_t model)
 {
     if (model != HPCLANG_MODEL_HP49GPLUS && model != HPCLANG_MODEL_HP50G) {
@@ -246,6 +294,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         errno = 0;
         if (hpclang_stream_path_query("HPCLANG.TST", &unavailable_path) == 0 || errno != ENOSYS)
             return 0x54u;
+
+        errno = 0;
+        if (hpclang_stream_path_set_attributes("HPCLANG.TST", 0u, 1u) != -1 || errno != ENOSYS)
+            return 0xbdu;
 
         struct hpclang_stream_storage_info unavailable_storage;
         errno = 0;
@@ -758,7 +810,7 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x6eu;
 
-    return 0u;
+    return storage_metadata_test();
 }
 #endif
 
@@ -1618,269 +1670,6 @@ int main(void)
         return finish(object_failure, boot->model);
 
 #ifdef HPCLANG_E2E_KEYBOARD
-    if (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
-        boot->model == HPCLANG_MODEL_HP40GS) {
-        errno = 0;
-        struct hpclang_object *aplet_catalog = NULL;
-        struct hpclang_object *program_catalog = NULL;
-        struct hpclang_object *note_catalog = NULL;
-        struct hpclang_object *variable_schema = NULL;
-        int aplet_result = hpclang_hp39_aplet_catalog_snapshot(&aplet_catalog);
-        int program_result =
-            aplet_result == 0 ? hpclang_hp39_program_catalog_snapshot(&program_catalog) : -1;
-        int note_result =
-            program_result == 0 ? hpclang_hp39_note_catalog_snapshot(&note_catalog) : -1;
-        int schema_result =
-            note_result == 0 ? hpclang_hp39_variable_schema_snapshot(&variable_schema) : -1;
-        if (boot->saturn_state != 0u) {
-            if (aplet_result != 0 || program_result != 0 || note_result != 0 ||
-                schema_result != 0 || aplet_catalog == NULL || program_catalog == NULL ||
-                note_catalog == NULL || variable_schema == NULL ||
-                hpclang_object_kind(aplet_catalog) != HPCLANG_OBJECT_LIST ||
-                hpclang_object_kind(program_catalog) != HPCLANG_OBJECT_LIST ||
-                hpclang_object_kind(note_catalog) != HPCLANG_OBJECT_LIST ||
-                hpclang_object_kind(variable_schema) != HPCLANG_OBJECT_LIST) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                return finish(0xb4u, boot->model);
-            }
-
-            static const uint8_t function_aplet_name[] = "Function";
-            struct hpclang_object *function_aplet = NULL;
-            if (hpclang_hp39_aplet_snapshot(function_aplet_name, sizeof(function_aplet_name) - 1u,
-                                            &function_aplet) != 0 ||
-                function_aplet == NULL ||
-                hpclang_object_kind(function_aplet) != HPCLANG_OBJECT_DIRECTORY) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(function_aplet);
-                return finish(0xbau, boot->model);
-            }
-            hpclang_object_release(function_aplet);
-
-            static const uint8_t note_category[] = "Note";
-            static const uint8_t note_text_name[] = "NoteText";
-            struct hpclang_object *note_text_value = NULL;
-            errno = 0;
-            int note_text_result =
-                hpclang_variable_get(note_category, sizeof(note_category) - 1u, note_text_name,
-                                     sizeof(note_text_name) - 1u, &note_text_value);
-            if (note_text_result != 0) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                return finish(0xbfu, boot->model);
-            }
-            if (note_text_value == NULL) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                return finish(0xbdu, boot->model);
-            }
-            if (hpclang_object_kind(note_text_value) != HPCLANG_OBJECT_STRING) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                return finish(0xbeu, boot->model);
-            }
-
-            /*
-             * M7.3f first write witness: write the exact owned NoteText value
-             * back through its genuine extended-ID descriptor, then read it
-             * again. This proves the Stock store dispatcher without changing
-             * calculator-visible content or relying on a raw Saturn address.
-             */
-            size_t note_text_size = 0u;
-            if (hpclang_object_string_size(note_text_value, &note_text_size) != 0 ||
-                note_text_size > 3000u) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                return finish(0xd7u, boot->model);
-            }
-            if (hpclang_variable_set(note_category, sizeof(note_category) - 1u, note_text_name,
-                                     sizeof(note_text_name) - 1u, note_text_value) != 0) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                return finish(0xd8u, boot->model);
-            }
-
-            struct hpclang_object *note_text_roundtrip = NULL;
-            if (hpclang_variable_get(note_category, sizeof(note_category) - 1u, note_text_name,
-                                     sizeof(note_text_name) - 1u, &note_text_roundtrip) != 0 ||
-                note_text_roundtrip == NULL ||
-                hpclang_object_kind(note_text_roundtrip) != HPCLANG_OBJECT_STRING) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                hpclang_object_release(note_text_roundtrip);
-                return finish(0xd9u, boot->model);
-            }
-
-            size_t roundtrip_size = 0u;
-            if (hpclang_object_string_size(note_text_roundtrip, &roundtrip_size) != 0 ||
-                roundtrip_size != note_text_size) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(note_text_value);
-                hpclang_object_release(note_text_roundtrip);
-                return finish(0xdau, boot->model);
-            }
-
-            if (note_text_size != 0u) {
-                uint8_t *before = malloc(note_text_size);
-                uint8_t *after = malloc(note_text_size);
-                if (before == NULL || after == NULL ||
-                    hpclang_object_string_copy(note_text_value, before, note_text_size) != 0 ||
-                    hpclang_object_string_copy(note_text_roundtrip, after, note_text_size) != 0 ||
-                    memcmp(before, after, note_text_size) != 0) {
-                    free(after);
-                    free(before);
-                    hpclang_object_release(aplet_catalog);
-                    hpclang_object_release(program_catalog);
-                    hpclang_object_release(note_catalog);
-                    hpclang_object_release(variable_schema);
-                    hpclang_object_release(note_text_value);
-                    hpclang_object_release(note_text_roundtrip);
-                    return finish(0xdbu, boot->model);
-                }
-                free(after);
-                free(before);
-            }
-            hpclang_object_release(note_text_roundtrip);
-            hpclang_object_release(note_text_value);
-
-            uint32_t aplet_count = 0u;
-            uint32_t program_count = 0u;
-            uint32_t note_count = 0u;
-            int fixture_found = 0;
-            int editline_found = 0;
-            static const uint8_t fixture_name[] = "HPCLANG HPC1 TEST";
-            static const uint8_t editline_name[] = "Editline";
-            if (hpclang_hp39_catalog_name_count(aplet_catalog, &aplet_count) != 0 ||
-                hpclang_hp39_catalog_name_count(program_catalog, &program_count) != 0 ||
-                hpclang_hp39_catalog_name_count(note_catalog, &note_count) != 0 ||
-                hpclang_hp39_catalog_contains_name(
-                    aplet_catalog, fixture_name, sizeof(fixture_name) - 1u, &fixture_found) != 0 ||
-                hpclang_hp39_catalog_contains_name(program_catalog, editline_name,
-                                                   sizeof(editline_name) - 1u,
-                                                   &editline_found) != 0 ||
-                fixture_found == 0 || editline_found == 0 || aplet_count == 0u ||
-                program_count == 0u) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                return finish(0xb6u, boot->model);
-            }
-
-            struct hpclang_object *editline_body = NULL;
-            size_t editline_size = 0u;
-            if (hpclang_hp39_program_body_snapshot(editline_name, sizeof(editline_name) - 1u,
-                                                   &editline_body) != 0 ||
-                editline_body == NULL ||
-                hpclang_object_kind(editline_body) != HPCLANG_OBJECT_STRING ||
-                hpclang_object_string_size(editline_body, &editline_size) != 0) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(editline_body);
-                return finish(0xb7u, boot->model);
-            }
-            hpclang_object_release(editline_body);
-
-            static const uint8_t missing_body_name[] = "HPCLANG-NO-SUCH";
-            struct hpclang_object *missing_program = NULL;
-            struct hpclang_object *missing_note = NULL;
-            errno = 0;
-            int missing_program_result = hpclang_hp39_program_body_snapshot(
-                missing_body_name, sizeof(missing_body_name) - 1u, &missing_program);
-            int missing_program_errno = errno;
-            errno = 0;
-            int missing_note_result = hpclang_hp39_note_body_snapshot(
-                missing_body_name, sizeof(missing_body_name) - 1u, &missing_note);
-            int missing_note_errno = errno;
-            if (missing_program_result != -1 || missing_note_result != -1 ||
-                missing_program != NULL || missing_note != NULL ||
-                missing_program_errno != ENOENT || missing_note_errno != ENOENT) {
-                hpclang_object_release(aplet_catalog);
-                hpclang_object_release(program_catalog);
-                hpclang_object_release(note_catalog);
-                hpclang_object_release(variable_schema);
-                hpclang_object_release(missing_program);
-                hpclang_object_release(missing_note);
-                return finish(0xb8u, boot->model);
-            }
-            hpclang_object_release(aplet_catalog);
-            hpclang_object_release(program_catalog);
-            hpclang_object_release(note_catalog);
-            hpclang_object_release(variable_schema);
-        } else {
-            hpclang_object_release(aplet_catalog);
-            hpclang_object_release(program_catalog);
-            hpclang_object_release(note_catalog);
-            hpclang_object_release(variable_schema);
-
-            static const uint8_t missing_body_name[] = "HPCLANG-NO-SUCH";
-            struct hpclang_object *missing_body = NULL;
-            struct hpclang_object *direct_aplet = NULL;
-            struct hpclang_object *direct_schema = NULL;
-            struct hpclang_object *direct_value = NULL;
-            errno = 0;
-            int missing_result = hpclang_hp39_program_body_snapshot(
-                missing_body_name, sizeof(missing_body_name) - 1u, &missing_body);
-            int missing_errno = errno;
-            errno = 0;
-            int direct_aplet_result = hpclang_hp39_aplet_snapshot(
-                (const uint8_t *)"Function", sizeof("Function") - 1u, &direct_aplet);
-            int aplet_errno = errno;
-            errno = 0;
-            int direct_schema_result = hpclang_hp39_variable_schema_snapshot(&direct_schema);
-            int schema_errno = errno;
-            errno = 0;
-            int direct_value_result = hpclang_variable_get(
-                (const uint8_t *)"Note", sizeof("Note") - 1u, (const uint8_t *)"NoteText",
-                sizeof("NoteText") - 1u, &direct_value);
-            int value_errno = errno;
-            struct hpclang_object *direct_input = NULL;
-            if (hpclang_object_create_string(NULL, 0u, &direct_input) != 0)
-                return finish(0xb5u, boot->model);
-            errno = 0;
-            int direct_set_result = hpclang_variable_set(
-                (const uint8_t *)"Note", sizeof("Note") - 1u, (const uint8_t *)"NoteText",
-                sizeof("NoteText") - 1u, direct_input);
-            int set_errno = errno;
-            hpclang_object_release(direct_input);
-            hpclang_object_release(missing_body);
-            hpclang_object_release(direct_aplet);
-            hpclang_object_release(direct_schema);
-            hpclang_object_release(direct_value);
-            if (aplet_result != -1 || missing_result != -1 || missing_errno != ENOSYS ||
-                direct_aplet_result != -1 || aplet_errno != ENOSYS || direct_schema_result != -1 ||
-                schema_errno != ENOSYS || direct_value_result != -1 || value_errno != ENOSYS ||
-                direct_set_result != -1 || set_errno != ENOSYS)
-                return finish(0xb5u, boot->model);
-        }
-    }
 
     uint32_t object_store_failure = object_store_service_test(boot->model);
     if (object_store_failure != 0u)

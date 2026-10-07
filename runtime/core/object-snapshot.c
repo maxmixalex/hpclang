@@ -22,10 +22,12 @@ enum
     RPL_DOARRY = 0x029e8u,
     RPL_DOLNKARRY = 0x02a0au,
     RPL_DOCSTR = 0x02a2cu,
+    RPL_DOHSTR = 0x02a4eu,
     RPL_DOLIST = 0x02a74u,
     RPL_DORRP = 0x02a96u,
     RPL_DOSYMB = 0x02ab8u,
     RPL_DOEXT = 0x02adau,
+    RPL_DOTAG = 0x02afcu,
     RPL_DOGROB = 0x02b1eu,
     RPL_DOLIB = 0x02b40u,
     RPL_DOCOL = 0x02d9du,
@@ -50,6 +52,10 @@ enum hpclang_object_kind hpclang_object_kind_from_native_prologue(uint32_t prolo
         return HPCLANG_OBJECT_COMPLEX;
     case RPL_DOCSTR:
         return HPCLANG_OBJECT_STRING;
+    case RPL_DOHSTR:
+        return HPCLANG_OBJECT_BINARY;
+    case RPL_DOTAG:
+        return HPCLANG_OBJECT_TAGGED;
     case RPL_DOCHAR:
         return HPCLANG_OBJECT_CHARACTER;
     case RPL_DOIDNT:
@@ -115,14 +121,118 @@ static int span_errno(int result)
     }
 }
 
-int hpclang_object_snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address,
-                                 uint32_t limit, struct hpclang_object **object)
+static int snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                         uint32_t depth, struct hpclang_object **object);
+
+static int append_snapshot(struct hpclang_object **output, uint32_t *capacity,
+                           const struct hpclang_object *source, uint32_t start, uint32_t size)
+{
+    struct hpclang_object *target = *output;
+    if (size > 0x100000u - target->nibble_count) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+    uint32_t needed = target->nibble_count + size;
+    if (needed > *capacity) {
+        uint32_t grown = *capacity > 0x80000u ? 0x100000u : *capacity * 2u;
+        if (grown < needed)
+            grown = needed;
+        struct hpclang_object *next = realloc(target, sizeof(*target) + (grown + 1u) / 2u);
+        if (next == NULL) {
+            errno = ENOMEM;
+            return -1;
+        }
+        *output = target = next;
+        *capacity = grown;
+    }
+    for (uint32_t i = 0u; i < size; ++i) {
+        uint8_t nibble = 0u;
+        if (!hpclang_object_snapshot_read_nibble(source, start + i, &nibble)) {
+            errno = EILSEQ;
+            return -1;
+        }
+        uint32_t at = target->nibble_count + i;
+        if ((at & 1u) == 0u)
+            target->data[at / 2u] = nibble;
+        else
+            target->data[at / 2u] |= (uint8_t)(nibble << 4);
+    }
+    target->nibble_count = needed;
+    return 0;
+}
+
+/* Materialize data references before GC, removal or Aplet exit can invalidate
+ * them. The
+ * resulting children belong to the ARM-side snapshot. */
+static int capture_sequence(const struct hpclang_rpl_reader *reader, uint32_t address,
+                            uint32_t depth, struct hpclang_object *raw,
+                            struct hpclang_object **output)
+{
+    uint32_t capacity = raw->nibble_count;
+    struct hpclang_object *result = calloc(1u, sizeof(*result) + (capacity + 1u) / 2u);
+    if (result == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+    result->kind = raw->kind;
+    result->native_prologue = raw->native_prologue;
+    if (append_snapshot(&result, &capacity, raw, 0u, 5u) != 0)
+        goto failure;
+    uint32_t offset = 5u;
+    while (offset < raw->nibble_count - 5u) {
+        uint32_t word = 0u;
+        if (!read_prologue(reader, address + offset, &word)) {
+            errno = EIO;
+            goto failure;
+        }
+        uint32_t source = address + offset, span = 5u;
+        uint32_t available = raw->nibble_count - offset;
+        if (hpclang_rpl_object_prologue_known(word)) {
+            int parsed = hpclang_rpl_object_span(reader, source, available, &span);
+            if (parsed != HPCLANG_RPL_SPAN_OK) {
+                errno = span_errno(parsed);
+                goto failure;
+            }
+        } else {
+            source = word;
+            if (source == 0u || source >= 0x100000u) {
+                errno = EILSEQ;
+                goto failure;
+            }
+            available = 0x100000u - source;
+        }
+        struct hpclang_object *child = NULL;
+        if (snapshot_copy(reader, source, available, depth + 1u, &child) != 0)
+            goto failure;
+        int copied = append_snapshot(&result, &capacity, child, 0u, child->nibble_count);
+        free(child);
+        if (copied != 0)
+            goto failure;
+        offset += span;
+    }
+    if (offset != raw->nibble_count - 5u ||
+        append_snapshot(&result, &capacity, raw, offset, 5u) != 0)
+        goto failure;
+    *output = result;
+    return 0;
+failure:
+    free(result);
+    return -1;
+}
+
+int hpclang_object_snapshot_copy_encoded(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                         uint32_t limit, struct hpclang_object **object)
 {
     if (object == NULL) {
         errno = EFAULT;
         return -1;
     }
     *object = NULL;
+
+    if (address >= 0x100000u || limit > 0x100000u - address) {
+        errno = EILSEQ;
+        return -1;
+    }
 
     uint32_t span = 0u;
     int result = hpclang_rpl_object_span(reader, address, limit, &span);
@@ -183,6 +293,56 @@ int hpclang_object_snapshot_copy(const struct hpclang_rpl_reader *reader, uint32
 
     *object = snapshot;
     return 0;
+}
+
+static int snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
+                         uint32_t depth, struct hpclang_object **object)
+{
+    if (object == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+    *object = NULL;
+    if (depth >= 32u) {
+        errno = EILSEQ;
+        return -1;
+    }
+    struct hpclang_object *raw = NULL;
+    if (hpclang_object_snapshot_copy_encoded(reader, address, limit, &raw) != 0)
+        return -1;
+    if (raw->native_prologue == RPL_DOLIST || raw->native_prologue == RPL_DOMATRIX) {
+        int captured = capture_sequence(reader, address, depth, raw, object);
+        free(raw);
+        return captured;
+    }
+    if (raw->native_prologue == RPL_DOTAG) {
+        uint8_t low = 0u, high = 0u;
+        hpclang_object_snapshot_read_nibble(raw, 5u, &low);
+        hpclang_object_snapshot_read_nibble(raw, 6u, &high);
+        uint32_t prefix = 7u + 2u * ((uint32_t)low | (uint32_t)high << 4);
+        struct hpclang_object *child = NULL;
+        if (snapshot_copy(reader, address + prefix, raw->nibble_count - prefix, depth + 1u,
+                          &child) != 0) {
+            free(raw);
+            return -1;
+        }
+        uint32_t capacity = raw->nibble_count;
+        raw->nibble_count = prefix;
+        int copied = append_snapshot(&raw, &capacity, child, 0u, child->nibble_count);
+        free(child);
+        if (copied != 0) {
+            free(raw);
+            return -1;
+        }
+    }
+    *object = raw;
+    return 0;
+}
+
+int hpclang_object_snapshot_copy(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t limit, struct hpclang_object **object)
+{
+    return snapshot_copy(reader, address, limit, 0u, object);
 }
 
 enum hpclang_object_kind hpclang_object_kind(const struct hpclang_object *object)

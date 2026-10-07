@@ -37,6 +37,21 @@ int sat_stack_depth(void)
     return (int)depth;
 }
 
+int sat_stack_swap(void)
+{
+    return hpclang_stack_swap() == 0;
+}
+
+int sat_stack_nip(void)
+{
+    return hpclang_stack_nip() == 0;
+}
+
+void sat_pushtruefalse(BOOL arg)
+{
+    (void)hpclang_stack_push_boolean(arg != 0);
+}
+
 int sat_stack_drop(void)
 {
     uint32_t depth = 0u;

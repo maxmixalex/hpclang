@@ -16,6 +16,7 @@
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
+#include "frame-checkpoint.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
 
@@ -476,11 +477,14 @@ static uint32_t lcd_diff_mask(const struct lcd_snapshot *expected,
             mask |= UINT32_C(1) << (bit);                                                          \
     } while (0)
 
-    LCD_DIFF(0, lcdcon1);
+    /* LINECNT is read-only live scan state, not a configuration to restore. */
+    if ((expected->lcdcon1 & 0x3ffffu) != (actual->lcdcon1 & 0x3ffffu))
+        mask |= 1u;
     LCD_DIFF(1, lcdcon2);
     LCD_DIFF(2, lcdcon3);
     LCD_DIFF(3, lcdcon4);
-    LCD_DIFF(4, lcdcon5);
+    if ((expected->lcdcon5 & 0x1fffu) != (actual->lcdcon5 & 0x1fffu))
+        mask |= 1u << 4;
     LCD_DIFF(5, lcdsaddr1);
     LCD_DIFF(6, lcdsaddr2);
     LCD_DIFF(7, lcdsaddr3);
@@ -708,6 +712,10 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (frame_checkpoint(s->hdw, s->result_addr, v, s->lcd_height) < 0) {
+            fail(s, "frame-checkpoint");
+            return;
+        }
         if (!s->payload_keyboard_scheduled && v == PHASE_KEYBOARD_READY) {
             if (!schedule_payload_keyboard(s)) {
                 fail(s, "keyboard-schedule");
@@ -721,6 +729,10 @@ static void monitor(void *arg)
                 return;
             }
             fprintf(stderr, "HPC1 machine-readable PASS observed\n");
+            /* Runtime cleanup may restore Stock's framebuffer before reaching
+             * the
+             * return sentinel. Compare against the actual PASS image. */
+            hpclang_lcd_quiescence_seed(&s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
         } else if ((v & 0xffff0000u) == FAIL_PREFIX) {
             s->result = v;
             (void)capture_lcd(s->hdw, s->pass_pgm, s->lcd_height);
@@ -736,7 +748,6 @@ static void monitor(void *arg)
             return;
         }
 
-        hpclang_lcd_quiescence_seed(&s->return_quiescence, s->hdw, LCD_W, s->lcd_height);
         if (!restore_stock(s)) {
             fail(s, "restore");
             return;

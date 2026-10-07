@@ -86,7 +86,7 @@ bash "$ROOT/tools/run-hp39-kermit-server.sh" \
     > "$ROOT/build/$TARGET-stock-gallery-kermit.out" 2>&1 &
 KERMIT_PID=$!
 
-FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout "$TRANSFER")"
+FETCH_TIMEOUT="$(python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" timeout)"
 X50_TIMEOUT=$((FETCH_TIMEOUT + 120))
 printf 'HP39 Stock Gallery lazy-fetch watchdog: fetch=%ss emulator=%ss bytes=%s\n' \
     "$FETCH_TIMEOUT" "$X50_TIMEOUT" \
@@ -107,7 +107,7 @@ export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock-gallery"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock-gallery.json"
 
 python3 "$ROOT/tools/wait-hp39-kermit-fetch.py" wait \
-    "$KERMIT_LOG" "$TRANSFER" "$HOST_GATE" \
+    "$KERMIT_LOG" "$HOST_GATE" \
     > "$ROOT/build/$TARGET-stock-gallery-kermit-gate.log" 2>&1 &
 GATE_PID=$!
 

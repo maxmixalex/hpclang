@@ -30,10 +30,10 @@ int main(void)
     assert(HPCLANG_L1_CODE_INDEX == 0x12u);
     assert(HPCLANG_CODE_WINDOW_BASE == 0x01200000u);
     assert(HPCLANG_CODE_L2_FIRST == 0x20u);
-    assert(HPCLANG_CODE_WINDOW_PAGE_CAPACITY == 32u);
+    assert(HPCLANG_CODE_WINDOW_PAGE_CAPACITY == 31u);
     assert(HPCLANG_CODE_PAGE_CAPACITY == 224u);
     assert(HPCLANG_CODE_WINDOW_BASE + HPCLANG_CODE_WINDOW_PAGE_CAPACITY * HPCLANG_PAGE_SIZE ==
-           HPCLANG_CODE_BASE);
+           HPCLANG_PAGE_TABLE_BASE);
 
     l1[HPCLANG_L1_DATA_INDEX] = 0x12345012u;
     l1[HPCLANG_L1_CODE_INDEX] = 0x6789a012u;
@@ -64,7 +64,7 @@ int main(void)
     assert(code[0] == 0x00042ff2u);
     assert(code[1] == 0x00043ff2u);
     assert(code[2] == 0u);
-    assert(code[31] == 0u);
+    assert(code[31] == (layout.l2_workspace_phys | 0x0aa2u));
     assert(code[32] == 0x08080ffeu);
     assert(code[33] == 0x08081ffeu);
     assert(code[34] == 0u);
@@ -96,7 +96,7 @@ int main(void)
     hpclang_mmu_prepare(&no_window);
     code = workspace + HPCLANG_L2_ENTRIES;
     assert(code[0] == 0u);
-    assert(code[31] == 0u);
+    assert(code[31] == (layout.l2_workspace_phys | 0x0aa2u));
     assert(code[32] == 0x08080ffeu);
 
     /* An invalid oversized private window fails closed instead of overlapping
@@ -107,7 +107,7 @@ int main(void)
     hpclang_mmu_prepare(&oversized);
     code = workspace + HPCLANG_L2_ENTRIES;
     assert(code[0] == 0u);
-    assert(code[31] == 0u);
+    assert(code[31] == (layout.l2_workspace_phys | 0x0aa2u));
     assert(code[32] == 0x08080ffeu);
 
     /* Stock return code may occupy the unused half of the workspace. Neither

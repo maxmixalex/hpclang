@@ -20,7 +20,7 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t address, uint3
 }
 
 int hpclang_hp39_aplet_data_slot(const struct hpclang_rpl_reader *reader, uint32_t incoming_span,
-                                 uint32_t *slot)
+                                 int launcher_hidden, uint32_t *slot)
 {
     if (slot == NULL) {
         errno = EINVAL;
@@ -40,8 +40,9 @@ int hpclang_hp39_aplet_data_slot(const struct hpclang_rpl_reader *reader, uint32
     }
     if (incoming_span != 0u)
         top = end - incoming_span;
-    if (end - top < 20u || !word(reader, returns - 5u, 5u, &continuation) || continuation < 36u ||
-        continuation > 0x100000u - 15u) {
+    uint32_t data_offset = launcher_hidden ? 0u : 5u;
+    if (end - top < data_offset + 15u || !word(reader, returns - 5u, 5u, &continuation) ||
+        continuation < 36u || continuation > 0x100000u - 15u) {
         errno = ENOSYS;
         return -1;
     }
@@ -65,12 +66,13 @@ int hpclang_hp39_aplet_data_slot(const struct hpclang_rpl_reader *reader, uint32
         address += width;
     }
     uint32_t object, type, view;
-    if (!word(reader, top, 5u, &object) || !word(reader, object, 5u, &type) || type != 0x02a2cu ||
-        !word(reader, top + 10u, 5u, &object) || !word(reader, object, 5u, &type) ||
+    if ((!launcher_hidden && (!word(reader, top, 5u, &object) || !word(reader, object, 5u, &type) ||
+                              type != 0x02a2cu)) ||
+        !word(reader, top + data_offset + 5u, 5u, &object) || !word(reader, object, 5u, &type) ||
         type != 0x02911u || !word(reader, object + 5u, 5u, &view) || view > 7u) {
         errno = ENOSYS;
         return -1;
     }
-    *slot = top + 5u;
+    *slot = top + data_offset;
     return 0;
 }

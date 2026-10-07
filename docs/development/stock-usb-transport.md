@@ -40,9 +40,9 @@ Direct runtime, Storage, Core, Quality, and Font Gallery all pass on integration
 historical head `fdcd38b7`, including explicit RPN setup, keyboard frame synchronization,
 and the harness timing fixes. See
 [Validation](validation.md) for the historical records and integration acceptance. That historical Gallery acceptance used dedicated UART/SD launchers. The
-Gallery USB follow-ups are recorded separately in validation. The HP39 Direct Gallery job has a 25-minute budget for its
-three sequential model sweeps; all other Direct Gallery families retain 15
-minutes.
+Gallery USB follow-ups are recorded separately in validation. Gallery jobs use
+a shared 25-minute budget, leaving room for the bounded Stock transfer and
+subsequent verification; HP39 Direct also performs three sequential model sweeps.
 
 The implementation is functionally complete. U5 is a separately tracked,
 non-blocking repeated-run reliability and wall-clock benchmark against the
@@ -52,7 +52,7 @@ for integration. The formal acceptance links are kept in
 
 ## HP39 Kermit turnaround
 
-The HP39-family server uses C-Kermit's `SET SEND PAUSE 10` to leave 10 ms
+The HP39-family server uses C-Kermit's `SET SEND PAUSE 50` to leave 50 ms
 before each reply. Stock can still be completing its send/receive transition
 when the host has already parsed the request checksum. Immediate replies can
 reach the guest USB FIFO yet fail to advance the Stock Kermit exchange,
@@ -70,10 +70,19 @@ the small packet pause alone cannot prevent that race. A server waiting for its 
 request remains silent; the patch enables recovery only after negotiation.
 Stock ROMs, application results and transfer watchdogs are unchanged.
 
+The server starts with a one-second retransmission timeout
+(`SET SEND TIMEOUT 1 DYNAMIC 1 30`). The bundled sender patch doubles the
+interval after consecutive timeouts, capped at 30 seconds, and returns to
+normal packet-rate timing on an accepted ACK. This preserves fast recovery
+from an isolated lost notification without exhausting all ten retries while
+a busy Stock receiver is still processing a packet. The existing 90-second
+no-progress and 20-minute total watchdogs still apply.
+
 `tests/e2e/harness/test-kermit-server.py` checks the bundled executable over
 a PTY on both cache hits and fresh builds. It verifies idle silence, recovery
-after an ignored init reply, CRC-checked binary transfer, a lost data ACK and
-a subsequent file transaction. This exercises the actual server rather than
+after an ignored init reply, CRC-checked binary transfer, a lost data ACK,
+an ACK delayed past the former retry budget, and a subsequent file transaction.
+This exercises the actual server rather than
 matching its configuration text. See the upstream
 [Init-Info protocol contract](https://www.kermitproject.org/protocol/kproto.pdf).
 
@@ -175,6 +184,10 @@ HP39/40 Stock loads `HP39DIR.CUR` and `HP39DIR.000` before showing the remote
 Aplet list. Runtime and Gallery sequences wait for the directory transaction
 acknowledgement before sending the selection key. A second gate waits for the
 lazy Aplet/library transactions. Both use the same completion parser for USB
-and UART. The existing size-derived watchdog remains a failure ceiling; it does
-not decide when to send selection keys. Transfer failures retain phase-specific
+and UART. All Stock Kermit transfers share a progress watchdog: 90 seconds
+without an acknowledged advance of the send window fails the transfer; a
+20-minute absolute ceiling also applies. Retransmissions and debug-log growth
+do not refresh the idle budget. File size and nominal baud rate do not predict
+elapsed transfer time on a contended emulator host. Neither watchdog decides
+when to send selection keys. HP39 transfer failures retain phase-specific
 logs and a Stock failure capture.

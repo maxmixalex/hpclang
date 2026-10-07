@@ -262,6 +262,7 @@ typedef struct {
 	WORD	fdate;			/* Date of file modification or directory creation */
 	WORD	ftime;			/* Time of file modification or directory creation */
 #if FF_FS_CRTIME
+	WORD	adate;			/* Stored FAT access date (zero if absent) */
 	WORD	crdate;			/* Date of object createion */
 	WORD	crtime;			/* Time of object createion */
 #endif

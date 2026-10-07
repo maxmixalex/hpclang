@@ -189,6 +189,13 @@ int hpclang_stream_path_query(const char *path, struct hpclang_stream_path_info 
     return hpclang_namespace_path_query(path, info);
 }
 
+int hpclang_stream_path_set_attributes(const char *path, uint32_t attributes, uint32_t mask)
+{
+    if (!stream_storage_available())
+        return unsupported();
+    return hpclang_namespace_path_set_attributes(path, attributes, mask);
+}
+
 int stat(const char *path, struct stat *info)
 {
     if (info == NULL) {

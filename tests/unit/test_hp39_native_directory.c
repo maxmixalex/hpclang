@@ -258,6 +258,19 @@ int main(void)
     put_word(&fixture, function_root, RPL_DORRP, 5u);
     put_word(&fixture, function_root + 8u, 0u, 5u);
 
+    uint32_t resolved_aplet = 0u;
+    if (!expect(hpclang_hp39_native_aplet_resolve(&reader, function_name, sizeof(function_name),
+                                                  &resolved_aplet) == 0 &&
+                    resolved_aplet == function_root,
+                "Aplet preflight resolves its native directory without copying") ||
+        !expect(hpclang_hp39_native_aplet_resolve(&reader, NULL, 0u, &resolved_aplet) == -1 &&
+                    errno == EINVAL && resolved_aplet == 0u,
+                "invalid preflight clears its borrowed address") ||
+        !expect(hpclang_hp39_native_aplet_resolve(&reader, (const uint8_t *)"Missing", 7u,
+                                                  &resolved_aplet) == -1 &&
+                    errno == ENOENT && resolved_aplet == 0u,
+                "missing preflight cannot retain a stale native address"))
+        return 1;
     struct hpclang_object *aplet = NULL;
     if (!expect(hpclang_hp39_native_aplet_snapshot(&reader, function_name, sizeof(function_name),
                                                    &aplet) == 0,

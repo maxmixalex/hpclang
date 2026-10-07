@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <hpclang/display.h>
 
 static int discard_putc(char c, FILE *stream)
 {
@@ -21,6 +22,7 @@ FILE *const stderr = &null_stdio;
 __attribute__((noreturn)) void _exit(int status)
 {
     (void)status;
+    hpclang_display_end();
     for (;;)
         ;
 }

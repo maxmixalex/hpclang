@@ -1,0 +1,20 @@
+--- a/ckcfn2.c
++++ b/ckcfn2.c
+@@ -902,6 +902,17 @@
+ 			errpkt((CHAR *)"Too many retries");
+ 			return(type = 'E');
+ 		    }
++#ifdef CK_TIMERS
++                    /* A late ACK must not exhaust every retry at the same
++                     * short interval. Back off only after sender timeouts;
++                     * the next valid ACK recalculates the normal interval. */
++                    if (rttflg && rcvtimo > 0) {
++                        extern int maxtime;
++                        int limit = maxtime > 0 ? maxtime : timint * 6;
++                        if (rcvtimo < limit)
++                            rcvtimo = rcvtimo > limit / 2 ? limit : rcvtimo * 2;
++                    }
++#endif /* CK_TIMERS */
+ #ifdef NEWDPL
+ 		    /* Reduce prevailing packet length */
+ 		    x = sseqtbl[winlo];	/* Get length of packet we want ACKd */

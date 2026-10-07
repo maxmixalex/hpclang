@@ -58,6 +58,7 @@ EOF
 # value at the calculator boundary.
 mv "$BUILD/HPGCC000.000" "$OUT/HPGCC000.000"
 cp "$SDK/data/LIB275L.L39" "$OUT/LIB275L.000"
+cp "$SDK/data/HPCRESET.000" "$OUT/HPCRESET.000"
 
 python3 - "$OUT" "$TARGET_LABEL" "$MODEL_ID" <<'PY'
 from pathlib import Path
@@ -76,6 +77,8 @@ directory = (
     + " "
     + entry("H", "LIB275L.000", "LIB275L")
     + " "
+    + entry("D", "HPCRESET.000", ".HPCRESET")
+    + " "
 )
 
 (root / "HP39DIR.000").write_bytes(directory.encode("ascii"))
@@ -85,8 +88,9 @@ directory = (
     f"hpclang {target} canonical runtime validation\n"
     "\n"
     f"Expected hpclang model id: {model}.\n"
-    f"Transfer HPGCC000.000 to the real {target} over Conn3x USB.\n"
+    f"Transfer HPGCC000.000 and HPCRESET.000 to the real {target} over Conn3x USB.\n"
     "LIB275L.000 only needs to be installed once.\n"
+    "The Aplet library Reset command clears only the selected Aplet's custom data.\n"
     "\n"
     "Launch HPCLANG HPC1 TEST. The program immediately returns to the stock OS\n"
     "after leaving one of these result lines in the framebuffer:\n"

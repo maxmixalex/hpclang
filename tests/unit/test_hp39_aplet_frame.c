@@ -44,44 +44,53 @@ int main(void)
     const struct hpclang_rpl_reader reader = {read_nibble, 0};
     uint32_t slot = 0;
     setup();
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == 0 && slot == 0x90005u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == 0 && slot == 0x90005u);
+    /* The bootstrap may explicitly hide the launcher pointer. The data slot
+     * stays put, and
+     * must not depend on whether the saved value is a string. */
+    put(0x806f8u, 5, 0x90005u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 1, &slot) == 0 && slot == 0x90005u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS);
+    put(0x806f8u, 5, 0x8ffb0u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 15, 1, &slot) == 0 && slot == 0x90005u);
+    setup();
     /* Private roots lie below the original caller, and USEROB may move it. */
     put(0x806f8u, 5, 0x8ffb0u);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 20, &slot) == 0 && slot == 0x90005u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 20, 0, &slot) == 0 && slot == 0x90005u);
     memmove(memory + 0x90030u, memory + 0x90000u, 20);
     put(0x806fdu, 5, 0x90044u);
     put(0x806f8u, 5, 0x8ffe0u);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 20, &slot) == 0 && slot == 0x90035u);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 20, 0, &slot) == 0 && slot == 0x90035u);
     /* A matching stack shape alone never authorizes the data channel. */
     for (uint32_t i = 0; i < 51u; i++) {
         setup();
         memory[0x88000u + i] ^= 1u;
         slot = 123u;
-        assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == ENOSYS &&
+        assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS &&
                slot == 123u);
     }
     setup();
     put(0x0404eu, 5, 8u);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == ENOSYS);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS);
     setup();
     put(0x89000u, 5, 0x02a74u);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == ENOSYS);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS);
     setup();
-    assert(hpclang_hp39_aplet_data_slot(&reader, 21, &slot) == -1 && errno == EILSEQ);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 21, 0, &slot) == -1 && errno == EILSEQ);
     setup();
     put(0x806fdu, 5, 0x8ffffu);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == EILSEQ);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == EILSEQ);
     setup();
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, NULL) == -1 && errno == EINVAL);
-    assert(hpclang_hp39_aplet_data_slot(NULL, 0, &slot) == -1 && errno == EIO);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, NULL) == -1 && errno == EINVAL);
+    assert(hpclang_hp39_aplet_data_slot(NULL, 0, 0, &slot) == -1 && errno == EIO);
     unreadable = 0x806f8u;
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == EIO);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == EIO);
     unreadable = 0x88000u;
     slot = 123u;
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == ENOSYS &&
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS &&
            slot == 123u);
     unreadable = UINT32_MAX;
     put(0x84ffbu, 5, 0xfffffu);
-    assert(hpclang_hp39_aplet_data_slot(&reader, 0, &slot) == -1 && errno == ENOSYS);
+    assert(hpclang_hp39_aplet_data_slot(&reader, 0, 0, &slot) == -1 && errno == ENOSYS);
     return 0;
 }

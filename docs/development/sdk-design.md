@@ -66,9 +66,19 @@ Physical LCD mode switching is separate from software surfaces. Historical HPG c
 
 The S3C2410 controller scans a 160-pixel-wide line even though the visible calculator surface is 131 pixels. Historical mono/gray4/gray16 physical storage therefore uses 20/40/80 bytes per scan line, and buffers must be physically contiguous and aligned. HPC1's ordinary heap is assembled from independently mapped pages, so it is not a safe DMA allocation contract.
 
-A future physical gray/page-flip API therefore needs an on-demand platform resource broker or contiguous DMA pool. It must not permanently reserve scarce pages from every application merely to support an optional display mode. Until that boundary exists, software 4/16-level surfaces are the supported grayscale model.
+M7.5 implements this boundary with an on-demand display session. It allocates
+two framebuffers, validates physical continuity across every mapping and the LCD's
+4 MiB bank limit, and rolls back if either allocation is unsuitable. It does
+not reserve framebuffer memory for applications that never acquire a mode.
+Cache publication, stopped-DMA page exchange, bounded frame waiting and six
+off-screen status segments stay behind the opaque surface/display API.
 
-Direct E2E snapshots stable LCD configuration before HPC1 and compares it before harness restoration, so future physical display ownership must explicitly restore stock state.
+Direct E2E snapshots writable LCD configuration before HPC1 and compares it
+before harness restoration. The display session restores Stock registers before
+freeing its memory, both explicitly and during normal runtime shutdown. Frame
+and status pixel oracles plus Stock return gates validate all six models;
+physical-panel flicker/luminance remains a hardware measurement, not an emulator
+claim. See [display ownership](api-reference.md#physical-display-ownership).
 
 ## Fonts and text
 

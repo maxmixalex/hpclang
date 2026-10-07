@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and the closed M7.3a-e calculator-object read/stack/adapter baseline. M7.3f object mutation is also accepted. Remaining M7 work includes directory operations, composite objects, HP39 Aplet-owned persistence, native namespaces, display/runtime parity and the final parity audit. M7.4 common system services are accepted.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–g object/stack/directory services. M7.3h–j composite objects, HP39 Aplet persistence/Reset and native catalogs are implemented and locally validated, awaiting formal CI acceptance. M7.4 common system services are accepted. M7.5 display/runtime services are implemented and locally validated, awaiting formal CI; the final parity audit remains open; the individually reviewed native-port limitations retain implementation goals below.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**The existing M7.1/M7.2 acceptance and M7.3a–f gates remain valid for their tested scope. Overall M7.3 remains open: complete directory, composite-object, Aplet-owned data and namespace work while M7.4 proceeds in parallel as requested. Additional M7.1/M7.2 coverage is listed below.**
+**The existing M7.1/M7.2 acceptance and M7.3a–g gates remain valid for their tested scope. Overall M7.3 remains open: complete composite-object, Aplet-owned data and namespace acceptance. M7.4 common system services are accepted. Additional M7.1/M7.2 coverage is listed below.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -146,7 +146,12 @@ See [SDK API design](sdk-design.md).
 
 Device information, stock-preserving monotonic time, keyboard scanning/events, physical key identity, the C++23 wrappers, display geometry, opaque software surfaces, blitting, text rendering, and LCD ownership preservation are implemented and validated on the current six-model Direct matrix. HP39g+ model-1 key identity is established by the real D1.55 fixture and the same strict 51-key transition gate.
 
-The display clean-core boundary remains explicit: representation-independent circles/polygons and owned 2/4/16-level surfaces are supported; historical mutable clip/style state, PAINT/XOR, patterns, annunciator slots, XPM convenience loaders, raw framebuffer-pointer behavior, physical gray4/gray16, and page flipping remain compatibility/future work.
+At M7.1 closure, the clean core provided representation-independent circles/polygons
+and owned 2/4/16-level surfaces. Mutable clip/style state, PAINT/XOR, patterns,
+annunciator slots, XPM convenience loaders, raw framebuffer-pointer behavior,
+physical gray4/gray16 and page flipping remained compatibility/future work.
+M7.5 now supplies owned physical modes, page exchange and status segments, plus
+tested clip/style/pattern/XPM prototypes; installed historical adapters remain M8.
 
 #### Font package/gallery closure
 
@@ -256,7 +261,7 @@ The accepted M7.2 stream/directory subset supports typical HP49g+/HP50g file flo
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**M7.3a-f are complete and accepted.** The ownership/API boundary is frozen in
+**M7.3a-g are complete and accepted.** The ownership/API boundary is frozen in
 [Calculator object service design](object-service.md). The closed M7.3a-e baseline provides a
 runtime-private Saturn view, conservative proven-boundary parsing, opaque owned
 snapshots, typed construction/conversion, read-only stack observation, bounded
@@ -333,7 +338,7 @@ The implementation and limits are described in
 [Object service](object-service.md#m73f-public-mutation-and-native-variable-lifetime).
 M7.3a-e's read/stack/adapter baseline remains accepted. The new public mutation
 APIs close M7.3f without exposing HPGCC3 raw native pointers or inventing HP39
-directory semantics. Overall M7.3 remains open for M7.3g–j below.
+directory semantics. M7.3h–j are now formally accepted at `6a7f9a28`; remaining parity follow-ups below are retained.
 
 ### M7.4 — Common system services
 
@@ -366,12 +371,28 @@ configuration/timing/restoration, not audible speaker behavior.
 
 ### M7.5 — Remaining display/runtime parity needs
 
-**Planned; driven by real application requirements, not by copying every HPGCC primitive.**
+**Implemented and formally accepted at integrated head `6a7f9a28`.**
 
-- [ ] determine whether physical gray4/gray16 and page flipping need an on-demand contiguous/DMA resource broker;
-- [ ] cover historical annunciator/status-plane behavior through a Stock-safe abstraction and representative application tests;
-- [ ] retain clip/style/pattern/XPM compatibility state in the future HPG adapter unless independent hpclang applications demonstrate a cleaner core need;
-- [ ] validate any temporary LCD ownership against the existing before/PASS/return state-restoration gates.
+The clean display service owns on-demand double buffers, validates every DMA
+page and LCD bank boundary, publishes caches, and supports physical 2/4/16-level
+modes, bounded frame synchronization, page exchange and six status segments.
+Explicit end and normal runtime shutdown restore writable LCD configuration
+before releasing memory. Host tests cover fragmentation, low-memory rollback,
+timeouts and restoration order. Display E2E covers every selected Direct/Stock
+model with pixel/register oracles and before/PASS/return gates.
+
+A public-API-only HPG prototype demonstrates intersecting clips, PAINT/XOR,
+surface patterns, clipped line masks and transparent RGB XPM import. Historical
+state/spelling and broad parser compatibility remain in the planned M8 adapter;
+these witnesses found no missing clean drawing primitive. No goal below is
+removed. The integrated CI gate accepts the implemented scope below.
+Real-panel flicker/luminance and electrical timing are not emulator claims.
+See [M7.5 validation](validation.md#m75-display-runtime-local-acceptance).
+
+- [x] determine whether physical gray4/gray16 and page flipping need an on-demand contiguous/DMA resource broker;
+- [x] cover historical annunciator/status-plane behavior through a Stock-safe abstraction and representative application tests;
+- [x] retain clip/style/pattern/XPM compatibility state in the future HPG adapter unless independent hpclang applications demonstrate a cleaner core need;
+- [x] validate any temporary LCD ownership against the existing before/PASS/return state-restoration gates.
 
 ### M7 parity closure
 
@@ -425,25 +446,49 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 - [ ] Establish HP39g+ native-font correctness using its own ROM/pixel evidence.
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
-- [ ] Cover historical file attribute mutation and creation/access timestamp
+- [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
+  Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT
+  creation/access-date queries and `FSChAttr`/`FSGetCreatTime`/`FSGetAccessDate`
+  adapters. Local persistence/error tests, six-model Direct and both SD-model
+  Stock Storage pass; integrated CI acceptance is complete on `6a7f9a28`. This does not add
+  automatic access-date maintenance or timestamp setters.
 - [ ] Audit media-change and ownership behavior; retain the unresolved Stock
   HP49/50 Storage launch intermittency as a reliability investigation.
 
 ### M7.3g–j — object-service capability completion
 
-- [ ] **M7.3g:** directory creation, empty removal and explicit recursive tree
+M7.3h–j implementation and local validation are complete as of 2026-10-05;
+formal CI acceptance is complete on `6a7f9a28`. Local evidence covers
+all six Stock models, all three HP39 15-invocation Reset and eight-invocation
+composite lifecycles, the dedicated HP39 catalog fixture, 47 host tests and
+host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion).
+
+- [x] **M7.3g:** directory creation, empty removal and explicit recursive tree
   removal; nested references, active cwd/ancestor safety and failure preflight.
-- [ ] **M7.3h:** HP39 Aplet-owned data read/replace/clear, GC-safe lifetime,
+- [x] **M7.3h:** HP39 Aplet-owned data read/replace/clear, GC-safe lifetime,
   per-instance isolation, reset behavior and persistence across exit/relaunch.
-- [ ] **M7.3i:** owned list/array/matrix construction and access; complex,
+- [x] **M7.3i:** owned list/array/matrix construction and access; complex,
   identifier/tag/binary exchange; explicit wider-number precision; transactional
   stack reorder and Boolean exchange.
-- [ ] **M7.3j:** investigate HP39 Program/Note/Aplet creation/removal and
+- [x] **M7.3j:** investigate HP39 Program/Note/Aplet creation/removal and
   Port 0/1/2 namespaces; produce tested operations or individually reviewed
   limitations for each actual native object model.
+  - Port 0 (main RAM), Port 1 (extended RAM) and Port 2 (Flash): the maintainer
+    accepted each port's current lack of read/write services as an M7.3j
+    limitation on 2026-10-04. This does not mark port services implemented.
 - [ ] Validate genuine historical application flows using the four HPGCC
   generations and HP39 Aplet template, not only scalar API probes.
+
+### Native port services — retained follow-up
+
+- [ ] Port 0: enumerate/read/store/remove native backup and library objects;
+  define RAM ownership, active library safety and failure behavior.
+- [ ] Port 1: provide the same native object operations with explicit handling
+  of banked/extended RAM and its interaction with the ARM allocator.
+- [ ] Port 2: provide native Flash object operations, including erase/write
+  transactions, full-media behavior and persistence. Preserve library and
+  backup semantics; these ports are not HOME directories or stream files.
 
 ### M7.4 / M7.5 — expanded acceptance requirements
 
@@ -453,9 +498,9 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   hardware state; distinguish emulator activity from audible hardware evidence.
 - [x] Add contrast/status/power observations, safe deadline/periodic events,
   bounded input/error presentation and model/context capability discovery.
-- [ ] Prove physical gray4/gray16 and flipping/vsync requirements against
+- [x] Prove physical gray4/gray16 and flipping/vsync requirements against
   temporary DMA/contiguous-memory ownership, low-memory behavior and return.
-- [ ] Prototype HPG clip/style/PAINT-XOR/pattern/XPM and annunciator behavior
+- [x] Prototype HPG clip/style/PAINT-XOR/pattern/XPM and annunciator behavior
   over the clean services; identify missing primitives rather than assuming
   that existing geometry is sufficient for a future adapter.
 

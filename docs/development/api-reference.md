@@ -103,8 +103,8 @@ whether to retain a cancelled working line.
 
 `hpclang_surface_draw_text_n()` renders bounded message/error text without requiring
 a terminator, exiting, waiting for a key or clearing the caller's surface.
-Both services have host tests and local six-model Direct/Stock ARM E2E coverage;
-formal CI acceptance is pending.
+Both services have host tests and accepted six-model Direct/Stock ARM E2E
+coverage in [M7.4](validation.md#m74-formal-acceptance).
 
 ## Display and surfaces
 
@@ -112,9 +112,14 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_display_surface()` | ✅ | Borrow the physical display as an opaque surface. |
+| `hpclang_display_surface()` | ✅ | Borrow Stock's mono display, or the back page during an acquired display session. Reacquire after presenting. |
 | `hpclang_surface_width()` / `hpclang_surface_height()` | ✅ | Visible geometry. |
-| `hpclang_surface_levels()` | ✅ | Current physical surfaces report two levels. |
+| `hpclang_surface_levels()` | ✅ | Reports 2, 4 or 16; Stock's default borrowed surface reports 2. |
+| `hpclang_display_begin(levels)` | 🧪 | Acquire two owned DMA pages and a temporary 2/4/16-level LCD mode. Failure preserves Stock state. |
+| `hpclang_display_present(timeout_us)` | 🧪 | Publish the cache, wait for a frame-counter rollover, then exchange front/back pages with LCD DMA stopped. |
+| `hpclang_display_wait_frame(timeout_us)` | 🧪 | Bounded frame synchronization without changing the display. Timeout range: 1–1,000,000 µs. |
+| `hpclang_display_indicator_set(segment, intensity)` | 🧪 | Set one of six off-screen scan segments in the back page. Present publishes it; printed icon meanings vary by model. |
+| `hpclang_display_end()` | 🧪 | Restore original LCD configuration before releasing pages; idempotent and automatic on normal runtime shutdown. |
 | `hpclang_surface_clear()` | ✅ | Clear with explicit 0–255 intensity. |
 | `hpclang_surface_get_pixel()` / `hpclang_surface_set_pixel()` | ✅ | Clipped pixel read/write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line. |
@@ -124,6 +129,44 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. |
 | `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Opaque heap-owned 2/4/16-level software surfaces. Packing remains private. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper. |
+
+### Physical display ownership
+
+`HPCLANG_CAPABILITY_DISPLAY_MODES` and `HPCLANG_CAPABILITY_DISPLAY_INDICATORS`
+report service availability; they do not promise enough contiguous free memory.
+No framebuffer is reserved at startup. Each allocation is checked page by page
+for physical continuity, alignment, address overflow and LCD bank constraints.
+An allocation or mapping failure frees temporary allocations and leaves Stock's
+LCD unchanged. Calls are single-threaded and must not run from interrupt handlers.
+
+```c
+if (hpclang_display_begin(4) == 0) {
+    struct hpclang_surface *back = hpclang_display_surface();
+    hpclang_surface_clear(back, 85);
+    hpclang_display_indicator_set(5, 255);
+    if (hpclang_display_present(200000) == 0) {
+        back = hpclang_display_surface(); /* previous front page */
+        /* Draw the next frame here. */
+    }
+    hpclang_display_end();
+}
+```
+
+The borrowed page must not be destroyed or retained across `end`. After each
+successful `present`, request the new back page; it contains the previous front
+image. Neither page aliases Stock's saved framebuffer. Indicator writes change
+display segments only, not native Alpha/Shift/battery state. Classic HPG numbers
+0–5 mean remote, left shift, right shift, alpha, battery, wait; HP39 applications
+must interpret their own panel's printed symbols.
+
+The runtime cleans framebuffer cache lines before DMA reads, restores only
+writable LCD configuration, and never forces an originally disabled LCD on.
+`end` runs after normal `main`/destructor completion, and before `_exit` halts.
+It does not recover from arbitrary CPU faults or power loss. Frame waiting reports
+disabled output, timeout or a failed/stalled clock instead of spinning forever.
+Flipping stops and restarts DMA to discard FIFO prefetch. Emulator scanout tests
+prove pixel packing and state restoration; real-panel flicker, brightness and
+electrical timing still require hardware measurement.
 
 ## Fonts and text
 
@@ -196,13 +239,27 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable-attribute metadata plus validity-gated last-modified civil datetime. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
-| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID` | ✅ | The civil timestamp is usable only when this bit is set. FAT local civil fields are preserved directly; no timezone or epoch is invented. |
+| `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable attributes and validity-gated modification, creation and stored access dates. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
+| `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID`, `HPCLANG_STREAM_PATH_CREATED_VALID`, `HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID` | ✅ | Each date is usable only with its corresponding validity bit. No timezone or epoch is invented. |
+| `hpclang_stream_path_set_attributes(path, attributes, mask)` | ✅ Accepted on `6a7f9a28` | Updates only masked read-only/hidden/system/archive bits and synchronizes before success. Unknown bits or attributes outside the mask fail with `EINVAL`; other families return `ENOSYS`. Existing descriptors retain their access rights; new write opens respect read-only. |
 | `hpclang_stream_storage_query()` | ✅ | Media-present/read-only flags plus free bytes and total capacity. Stock is consulted only once before direct takeover for insertion/protect state; space/capacity come from the owned FatFs/block backend. |
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
-Creation/access timestamps, raw KOS handles/module IDs, and implementation-specific FAT internals remain private rather than leaking into the application API.
+Path-info version 3 and directory-entry version 2 append `created` and
+`last_accessed`; rebuild applications against the matching SDK headers/runtime.
+Creation and modification are exported at two-second resolution. Access is the
+stored FAT date with zero time fields: reads do not update it, and FatFs clears
+it on writes. Missing or malformed dates are zero-filled with their validity
+bit clear. These are queries, not timestamp setters or POSIX atime tracking.
+Raw KOS handles/module IDs and implementation-specific FAT internals remain private.
+
+The `fsystem.h` adapter implements `FSChAttr`, `FSGetCreatTime` and
+`FSGetAccessDate`; `FSCreate` accepts read-only/hidden/system/archive flags.
+Date getters fill local civil `struct tm` fields, or zero the output when
+unavailable. `FSChAttr` replaces mutable flags while requiring directory/volume
+type bits to remain unchanged. Entries retain their path independently of the
+parent iterator. This metadata extension is formally accepted on `6a7f9a28`.
 
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
@@ -214,8 +271,24 @@ snapshots, writes copy their input, and clear restores the empty-list value.
 The template saves on Aplet exit. Writes are limited to 7000 native nibbles;
 other models, Direct execution and unsupported callers return `ENOSYS`.
 HP39g+/39gs/40gs have local GC, instance-isolation and exit/relaunch evidence;
-Reset behavior and formal M7.3h acceptance remain pending.
+The packaged Aplet exposes Stock's selected-Aplet Reset confirmation. Local
+HP39g+/HP39gs/HP40gs evidence covers cancellation, data reset, relaunch and isolation
+from another saved instance. Formal M7.3h acceptance is complete on `6a7f9a28`.
 See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-in-progress).
+
+`hpclang_aplet_list/clone/remove` manage the native HP39 Stock Aplet catalog.
+List returns an owned list of display-name strings; names contain 1–254 raw
+calculator bytes. Clone saves a named copy of an existing Aplet and rejects
+existing destinations (`EEXIST`). Remove protects the active Aplet (`EBUSY`)
+and native default Aplets (`EPERM`). Missing names return `ENOENT`; native
+allocation failure returns `ENOSPC`. Large copies may exhaust native memory
+while the ARM application is resident. All three HP39 models pass local catalog
+checks; CI acceptance is complete on `6a7f9a28`. This does not construct arbitrary Aplet types.
+
+`hpclang_device_capability()` separately reports `APLET_DATA`, `APLET_VARIABLES`,
+`TEXT_CATALOG` and `APLET_CATALOG`. HP39 requires a live Stock portal; other
+models report unsupported. Discovery does not reserve native memory or replace
+per-call validation of the active Aplet template.
 
 ## Validation by service
 
@@ -264,16 +337,16 @@ HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | HPG group | Historical calls | hpclang status |
 | --- | --- | --- |
 | lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; adapter can supply legacy setup semantics. |
-| display mode | mono/gray4/gray16, `hpg_flip` | ⬜ Physical grayscale/page flip deferred pending contiguous LCD-DMA resource ownership. |
+| display mode | mono/gray4/gray16, `hpg_flip` | 🧪 Clean owned display sessions and bounded page presentation; historical spelling remains an adapter. |
 | geometry | width/height, pixel, line, rect, circle, polygon | ✅ Canonical primitives implemented; legacy context/coordinate wrappers absent. |
-| indicators | `hpg_set_indicator` | ↪ Model-specific compatibility/capability concern, not part of the visible surface ABI. |
-| clipping state | `hpg_clip_*` | ◐ Surface-bound clipping exists; mutable user clip state remains adapter work. |
+| indicators | `hpg_set_indicator` | 🧪 Six scan-order status segments through the owned display service; printed icons are model-specific. |
+| clipping state | `hpg_clip_*` | ◐ Intersecting mutable clips demonstrated over public primitives; installed HPG adapter remains M8. |
 | fonts | `hpg_get_minifont`, `hpg_get_bigfont`, metrics, allocation/free | ◐ Native and generated hpclang font systems are implemented; HPG's exact bundled-font/custom-descriptor source semantics still need an adapter. |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface UTF-8/codepoint drawing exists; mutable HPG context wrapper absent. |
-| mutable style / PAINT/XOR / patterns | HPG context state | ↪ Adapter state, not canonical surface state. |
+| mutable style / PAINT/XOR / patterns | HPG context state | ◐ Executable prototype covers PAINT/XOR and transparent anchored/relative ink patterns; mutable state stays in the adapter. |
 | owned images | mono/gray images | ◐ Generic 2/4/16-level software surfaces cover the clean ownership model. |
 | blit | `hpg_blit` | ◐ Canonical blit implemented; HPG argument/context adapter pending. |
-| XPM | mono/gray loaders | ↪ Convenience importer/adapter work. |
+| XPM | mono/gray loaders | ◐ Transparent one-character RGB XPM prototype over public pixels; broad historical importer remains M8. |
 
 Zero HPG source-compatibility wrappers are claimed merely because the clean primitives exist.
 
@@ -301,9 +374,9 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 | RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | 🧪 Civil read/set/conversion and computed weekday; historical source adapters remain pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API unless a real generic policy use case appears. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
-| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Surface/display API; physical grayscale ownership pending. |
+| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
 | virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
-| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ canonical API; specialized DMA resource support may justify a later low-level service. |
+| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ raw application API; display sessions own and publish validated DMA buffers internally. |
 | tone/beep | `sys_playTone*`, `kos_beep` | 🧪 Clean PWM playback and cancellation; source adapters absent. |
 
 ## Files, stdio and storage
@@ -321,6 +394,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | size/type/portable path attributes | ✅ versioned typed FAT query |
 | media present/read-only + free bytes | ✅; KOS only samples presence/protect before takeover |
 | last-modified timestamp | ✅ validity-gated FAT civil datetime; no timezone/epoch claim |
+| attribute mutation and creation/access dates | Accepted on `6a7f9a28`. Masked FAT attributes, creation datetime and stored access date; no automatic atime tracking |
 | total capacity | ✅ direct block-device sector count |
 | rename/mkdir/rmdir | ✅ direct FatFs namespace |
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
@@ -339,26 +413,40 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | API / service | Status | Contract |
 | --- | --- | --- |
 | `struct hpclang_object` | ✅ opaque owned snapshot | ARM-side immutable copy of a proven-bounded native object; no Saturn pointer escapes the runtime |
+| `hpclang_catalog_list/get/put/remove()` | M7.3j local implementation | HP39 Stock Program/Note text catalogs; owned names and body snapshots, create/replace/upsert modes, native compilation/editor record maintenance. Names are 1–19 calculator bytes; Program `Editline` is protected. These are distinct from Aplet Variables and HOME directories. |
+| Port 0 / Port 1 / Port 2 | Reviewed limitation, 2026-10-04 | No public port read/write services. Main RAM, extended RAM and Flash library/backup namespaces retain separate follow-up goals; HOME CRUD does not imply port support. |
 | `hpclang_object_kind()` / `release()` | ✅ | Stable coarse semantic class and explicit ARM-side lifetime |
 | `hpclang_object_create_character()` | ✅ | Construct an owned calculator CHARACTER object without exposing its native prologue |
 | `hpclang_object_create_string()` | ✅ | Construct an owned classic calculator DOCSTR from explicit-length raw calculator bytes; embedded zero bytes are preserved and no UTF-8 transcoding occurs |
 | `hpclang_object_create_integer_i64()` | ✅ | Construct an exact classic ZINT snapshot for any `int64_t` value, including `INT64_MIN` |
 | `hpclang_object_create_real_f64()` | ✅ classic DOREAL | Construct the nearest bounded 12-digit classic REAL from a finite `double`; NaN/Inf are rejected |
+| `hpclang_object_create_complex_f64()` / `hpclang_object_complex_f64()` | M7.3i local implementation | Classic complex values contain two 12-digit REAL components. Construction rejects nonfinite inputs; conversion updates both outputs only on success. |
+| `hpclang_object_create_array()` / `hpclang_object_array_info()` | M7.3i local implementation | Nonempty rank-1 vectors and rank-2 numeric matrices with homogeneous classic REAL or COMPLEX elements; shape must match the element count. Linked arrays and symbolic matrices are unsupported by these APIs. |
+| `hpclang_object_array_get()` / `hpclang_object_array_replace()` | M7.3i local implementation | Zero-based row-major indexing; extraction and replacement return independent owned snapshots. Native decimal digits are copied without conversion through `double`; replacement leaves the input unchanged. |
+| `hpclang_object_create_list()` / `list_size()` / `list_get()` / `list_splice()` | M7.3i local implementation | Owned heterogeneous lists, including empty lists. Splice removes a range and inserts copied elements into a new list. Extraction survives releasing the list. Native data references are materialized before Stock can move or remove their targets. |
+| `hpclang_object_create_matrix()` / `matrix_size()` / `matrix_get()` / `matrix_replace()` | M7.3i local implementation | Nonempty rectangular native symbolic matrices, with heterogeneous cells. Row/column indices are zero-based; replacement returns a new object. Native exchange requires a model implementing DOMATRIX. |
+| `hpclang_object_create_identifier()` / `identifier_info()` / `identifier_copy()` | M7.3i local implementation | Global or local identifiers with explicit-length calculator-byte names, 1–255 bytes. Construction does not define or resolve a variable. |
+| `hpclang_object_create_tagged()` / `tag_size()` / `tag_copy()` / `tag_value()` | M7.3i local implementation | A copied label of 0–255 calculator bytes and an owned value. A tagged list retains independent children after native GC. |
+| `hpclang_object_create_binary()` / `binary_size()` / `binary_copy()` | M7.3i local implementation | Native binary integers retain their exact width. Width is a positive multiple of four bits; bytes are least-significant first and an unused high half-byte must be zero. |
+| `hpclang_object_create_integer_decimal()` / `integer_decimal_size()` / `integer_decimal_copy()` | M7.3i local implementation | Exact arbitrary-length classic ZINT text exchange, bounded by the native object-size limit and available memory. Optional input sign; canonical output without leading zeros or a plus sign. Length excludes a terminator. |
+| `hpclang_object_create_real_decimal()` / `real_decimal()` | M7.3i local implementation | Exact classic REAL coefficient/exponent exchange: `(-1)^negative × significand × 10^exponent`. At most 12 significant digits; no rounding. This preserves values outside `double` range, without claiming EREAL/LONGREAL conversion or decimal arithmetic. |
 | `hpclang_object_integer_i64()` | ✅ | Exact classic BINT/ZINT conversion; `ERANGE` if arbitrary-precision ZINT does not fit `int64_t` |
 | `hpclang_object_real_f64()` | ✅ classic DOREAL | Explicit approximate conversion; overflow or nonzero underflow is `ERANGE`, not silent HPGCC-style clamping; EREAL/LONGREAL remain `ENOTSUP` |
 | CHAR / DOCSTR conversion | ✅ | Raw calculator 8-bit code/bytes; no implicit UTF-8 reinterpretation |
 | `hpclang_stack_depth/peek` | ✅ HP48/HP4950 Stock | 1-based user-visible stack after launcher-bias normalization; peek returns an owned snapshot |
 | `hpclang_stack_push/pop/drop/replace` | ✅ HP48/HP4950 Stock | Bounded by launcher-derived native-page fences; pop snapshots before drop; replace copies before pointer commit |
+| `hpclang_stack_swap()` / `hpclang_stack_nip()` | M7.3i local implementation | Require two visible stack entries. Swap exchanges them; nip removes level 2 while preserving level 1. Native references are reordered without allocation; expected validation failures occur before writes. HP39 and Direct return `ENOSYS`. |
+| `hpclang_stack_push_boolean()` / `peek_boolean()` / `pop_boolean()` | M7.3i local implementation | Exchange actual SysRPL TRUE/FALSE identities on the classic Stock stack. Push accepts only 0 or 1. Numeric values are not coerced; failed peek/pop leave the output unchanged. No native object allocation. HP39 and Direct return `ENOSYS`. |
 | private Saturn view | ✅ runtime-only | Explicit 20-bit nibble address + launch-preserved `SAT_CPU->Read[]`; arbitrary public poke is not exposed |
 | `hpclang_object_store_home/current/open_child/get` | ✅ HP48/HP4950 Stock | Logical store handles re-resolve paths; named lookup returns owned snapshots and never changes Stock cwd |
 | `hpclang_object_store_iterator_*` | ✅ HP48/HP4950 Stock | Independent ARM-side metadata snapshots; raw calculator-byte names are preserved |
 | `hpclang_object_store_put/remove` | M7.3f accepted | Copy owned values into logical directories. Put supports upsert, create-only and replace-only; remove deletes a non-directory entry. Stock cwd and old references are preserved. |
-| `hpclang_object_store_mkdir/rmdir` | 🧪 M7.3g implemented; formal CI pending | Classic Stock child creation, empty/explicit recursive removal, cwd/ancestor protection and retained value references. See [directory lifecycle](object-service.md#m73g-directory-lifecycle). |
+| `hpclang_object_store_mkdir/rmdir` | ✅ M7.3g accepted | Classic Stock child creation, empty/explicit recursive removal, cwd/ancestor protection and retained value references. See [directory lifecycle](object-service.md#m73g-directory-lifecycle). |
 | `hpclang_variable_get/set` | M7.3f accepted | Exact HP39 category/name lookup in the active Aplet schema; native `@`, descriptor type check and `STO`; owned snapshots and size-changing writes up to 7000 nibbles. |
 | HP39 Aplet/Program/Note native reads | ✅ private runtime | Native DORRP / `PGMCXT` / `NOTESCXT` structures; no fabricated classic-RPL hierarchy |
 | HP39 Aplet Variable value recall | ✅ public `hpclang_variable_get/set` on HP39 Stock | `ApletVars#` schema + genuine extended ID are resolved through the Stock descriptor contract by quoting the ID and invoking Stock `@`; Runtime #320 Stock/hp39 validates `NoteText` on both HP39gs and HP40gs with HPC1 PASS and the full 52-frame progression |
 | HPGCC `<satdir.h>` high-level subset | ✅ bounded compatibility adapter | `sat_dir_open/close/curdir/chdir`, exact get, ancestor recall, recursive HOME search, owned search-result cleanup, REAL kind/query and get/recall REAL are implemented above owned store handles. `SAT_OBJ_DSCR.addr` is an opaque adapter token, not a Saturn address. |
-| HPGCC `<saturn.h>` safe subset | ✅ bounded compatibility adapter | Lifecycle, depth/drop/dropn, String push/pick/pop, historical textual int/double pushes, exact ZINT push/pop, classic REAL push/pop, CHAR push, and failure-safe `stdargs` are implemented above the clean object/stack service. Historical raw-address/native-BCD signatures remain Migration/Internal; clean composite and transactional reorder equivalents are pending M7.3i. |
+| HPGCC `<saturn.h>` safe subset | ✅ bounded compatibility adapter; M7.3i additions accepted on `6a7f9a28` | Lifecycle, depth/drop/dropn, String push/pick/pop, historical textual int/double pushes, exact ZINT push/pop, classic REAL push/pop, CHAR push, and failure-safe `stdargs` are implemented above the clean object/stack service. M7.3i adds `sat_stack_swap/nip` and `sat_pushtruefalse` (`sat_stack_push_bool` alias). Historical raw-address/native-BCD signatures remain Migration/Internal. |
 
 **Core #296 (`35439583956`)** remains the focused mutation-core gate, and
 Runtime #320 Stock/hp39 remains the descriptor-driven `NoteText` recall gate.
@@ -384,9 +472,8 @@ mutation is different: although HPGCC 1.1/2.0 read/search/recall adapter parity
 does not require it, hpclang implements it as the clean-core **M7.3f**
 write/delete slice.
 
-**M7.3a–f are accepted for their implemented scope.** Overall M7.3 remains open
-for directory operations, composite objects, Aplet-owned persistence and native
-namespaces. See the additional acceptance requirements in [Roadmap](roadmap.md).
+**M7.3a–j are accepted for their implemented scope and approved limitations.**
+Native port services and broader parity follow-ups remain in [Roadmap](roadmap.md).
 
 ## KOS, raw syscalls and widgets
 

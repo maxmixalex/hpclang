@@ -18,6 +18,11 @@ hpclang adopts ChaN FatFs as the independent FAT namespace layer beginning in M7
 
 Only the generic FatFs layer is vendored. `ffconf.h` is hpclang-owned configuration and the S3C2410 SDIO/media-ownership layer is a fresh hpclang implementation. HPGCC3 FSystem and its SD driver remain behavior evidence only and are not implementation source.
 
+`third_party/fatfs/access-date.patch` is a small hpclang extension exposing the
+existing FAT access-date field through `FILINFO`. The vendor verifier applies
+this declared patch to the official baseline before comparing checked-in bytes;
+ChaN's notices remain intact.
+
 ## HP tools and binary assets
 
 Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calculator binary assets have separate provenance and redistribution terms.
@@ -27,7 +32,8 @@ They are not vendored into the normal source tree unless their redistribution te
 ## E2E host tools
 
 The portable tool bundle builds the pinned upstream C-Kermit source with
-`tests/e2e/harness/ckermit-server-command-wait.patch`. C-Kermit uses the
+`tests/e2e/harness/ckermit-server-command-wait.patch` and
+`tests/e2e/harness/ckermit-send-backoff.patch`. C-Kermit uses the
 three-clause BSD license; `tools/build-ckermit.sh` installs its upstream
 `COPYING.TXT` alongside the executable as `kermit-COPYING.txt`. This host-side
 test tool is not linked into calculator applications.

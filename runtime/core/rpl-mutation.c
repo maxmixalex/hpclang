@@ -1828,6 +1828,85 @@ int hpclang_rpl_mutation_drop(const struct hpclang_rpl_mutation_io *io, uint32_t
     return write_word(io, RPL_AVMEM, 5u, new_avmem);
 }
 
+int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (value != 0 && value != 1)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t depth = 0u;
+    int result = stack_depth(io, &depth);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    /* HPGCC's SAT_TRUE/SAT_FALSE retain ROM identity. The public service checks
+     * the ROM ABI
+     * through the full reader; this commit interface maps RAM only. */
+    uint32_t reference = value ? 0x03a81u : 0x03ac0u;
+    uint32_t top = 0u, rstk = 0u, avmem = 0u;
+    if ((result = read_word(io, RPL_DSKTOP, 5u, &top)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, RPL_RSKTOP, 5u, &rstk)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, RPL_AVMEM, 5u, &avmem)) != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (rstk < RPL_MAIN_FIRST || rstk >= top)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t floor = 0u;
+    if (top < 5u || !checked_add(io->user_limit, io->stack_reserve_nibbles, &floor) ||
+        top - 5u < floor || top - 5u <= rstk)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t updated = 0u;
+    result = plan_free_cells(avmem, (top - rstk) / 5u, (top - 5u - rstk) / 5u, &updated);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = write_word(io, top - 5u, 5u, reference);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = write_word(io, RPL_DSKTOP, 5u, top - 5u);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return write_word(io, RPL_AVMEM, 5u, updated);
+}
+
+int hpclang_rpl_mutation_reorder(const struct hpclang_rpl_mutation_io *io, int nip)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+
+    uint32_t depth = 0u;
+    int result = stack_depth(io, &depth);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (depth < 2u)
+        return HPCLANG_RPL_MUTATION_LEVEL;
+
+    uint32_t top = 0u, first = 0u, second = 0u, rstk = 0u, avmem = 0u;
+    if ((result = read_word(io, RPL_DSKTOP, 5u, &top)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, top, 5u, &first)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, top + 5u, 5u, &second)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, RPL_RSKTOP, 5u, &rstk)) != HPCLANG_RPL_MUTATION_OK ||
+        (result = read_word(io, RPL_AVMEM, 5u, &avmem)) != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (first == 0u || second == 0u || rstk < RPL_MAIN_FIRST || rstk >= top)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    uint32_t new_top = top + (nip ? 5u : 0u), new_avmem = 0u;
+    result = plan_free_cells(avmem, (top - rstk) / 5u, (new_top - rstk) / 5u, &new_avmem);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+
+    /* No calls into Stock or allocation between validation and commit. The
+     * captured
+     * production mapping is writable and IRQ/FIQ remain masked. */
+    if (!nip && (result = write_word(io, top, 5u, second)) != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    result = write_word(io, top + 5u, 5u, first);
+    if (result != HPCLANG_RPL_MUTATION_OK || !nip)
+        return result;
+    result = write_word(io, RPL_DSKTOP, 5u, new_top);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return write_word(io, RPL_AVMEM, 5u, new_avmem);
+}
+
 int hpclang_rpl_mutation_replace(const struct hpclang_rpl_mutation_io *io, uint32_t level,
                                  const struct hpclang_object *object)
 {

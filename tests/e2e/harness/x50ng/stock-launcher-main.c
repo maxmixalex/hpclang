@@ -16,6 +16,7 @@
 #include "lcd-quiescence.h"
 #include "stock-return-phase.h"
 #include "s3c2410/s3c2410_lcd.h"
+#include "frame-checkpoint.h"
 
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
@@ -700,6 +701,13 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        int checkpoint = frame_checkpoint(s->hdw, s->result_addr, value, s->lcd_height);
+        if (checkpoint < 0) {
+            fail(s, "frame-checkpoint");
+            return;
+        }
+        if (checkpoint > 0)
+            s->payload_started = 1;
         if (!s->payload_started && (value & GALLERY_STATE_MASK) == GALLERY_STATE_VALUE) {
             s->payload_started = 1;
             fprintf(stderr,

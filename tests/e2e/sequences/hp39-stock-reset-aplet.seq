@@ -1,0 +1,8 @@
+# Confirm Reset for the selected Aplet, then inspect its data on relaunch.
+0 monitor 90000
+2000 tap f2
+4500 tap f6
+9000 tap aplet
+12000 tap f6
+16000 retry enter
+30000 retry enter

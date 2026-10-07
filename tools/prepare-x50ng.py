@@ -751,6 +751,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "key-sequence.h",
         "key-delivery.h",
         "lcd-stability.h",
+        "frame-checkpoint.h",
     ):
         shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 
@@ -875,6 +876,66 @@ static void s3c2410_io_port_write(""",
     )
 
 
+def patch_lcd_scanout(root: Path) -> None:
+    """Decode STN pixels from mode/pitch, independent of power/polarity bits."""
+    path = root / "src/s3c2410/s3c2410_lcd.c"
+    replace_once(
+        path,
+        "int bits_per_pixel = lcd->lcdcon5 > 2 ? 1 : 4 >> lcd->lcdcon5;",
+        """unsigned mode = (lcd->lcdcon1 >> 1) & 15u;
+    if (mode > 2u || x < 0 || y < 0)
+        return 0;
+    unsigned bits_per_pixel = 1u << mode;
+    unsigned pagewidth = lcd->lcdsaddr3 & 2047u;
+    unsigned offsize = (lcd->lcdsaddr3 >> 11) & 2047u;
+    if ((unsigned)x >= pagewidth * 16u / bits_per_pixel ||
+        (unsigned)y > ((lcd->lcdcon2 >> 14) & 1023u))
+        return 0;""",
+        "LCD STN mode decoding",
+    )
+    replace_once(
+        path,
+        "pixel_offset = ( 160 * y + x ) * bits_per_pixel;",
+        "pixel_offset = (pagewidth + offsize) * 16u * (unsigned)y + (unsigned)x * bits_per_pixel;",
+        "LCD DMA row pitch",
+    )
+
+
+def patch_execution_clock(root: Path, args: argparse.Namespace) -> None:
+    """Keep headless guest timers and input on CPU time plus intentional idle."""
+    for name in ("execution-clock.c", "execution-clock.h"):
+        shutil.copy2(args.headless_header.parent / name, root / "src" / name)
+    replace_once(
+        root / "Makefile",
+        "\tsrc/timer.c",
+        "\tsrc/execution-clock.c \\\n\tsrc/timer.c",
+        "execution clock source",
+    )
+    timer = root / "src/timer.c"
+    replace_once(
+        timer,
+        '#include "timer.h"',
+        '#include "timer.h"\n#include "execution-clock.h"',
+        "execution clock API",
+    )
+    replace_once(
+        timer,
+        "poll( NULL, 0, timeout );",
+        "hpclang_execution_clock_poll( timeout );",
+        "intentional idle accounting",
+    )
+    replace_once(
+        timer,
+        """    struct timeval tv;
+
+    gettimeofday( &tv, NULL );
+
+    return ( tv.tv_sec * 1000000LL + tv.tv_usec );""",
+        "    return hpclang_execution_clock_read();",
+        "headless execution time",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -888,6 +949,7 @@ def main() -> None:
 
     root = args.x50ng
     patch_frontends(root, args)
+    patch_execution_clock(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
     patch_runtime_sram(root)
@@ -897,6 +959,7 @@ def main() -> None:
     patch_reserved_ram(root)
     patch_optional_state_logging(root)
     patch_key_observation(root)
+    patch_lcd_scanout(root)
 
 
 if __name__ == "__main__":

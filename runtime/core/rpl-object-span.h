@@ -8,6 +8,11 @@ extern "C"
 {
 #endif
 
+    /* Distinguish a native runstream reference from an object prologue, including
+     * recognized
+     * formats whose shape is not yet supported by the span parser. */
+    int hpclang_rpl_object_prologue_known(uint32_t prologue);
+
     typedef int (*hpclang_rpl_read_nibble_fn)(void *context, uint32_t nibble_address,
                                               uint8_t *value);
 

@@ -38,7 +38,7 @@ on:
       - "tests/e2e/verify.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
-      - "tests/e2e/harness/ckermit-server-command-wait.patch"
+      - "tests/e2e/harness/ckermit-*.patch"
       - "tests/e2e/harness/test-kermit-server.py"
       - "runtime/core/datetime.c"
       - "runtime/core/datetime-internal.h"
@@ -55,7 +55,7 @@ on:
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp48-kermit-watchdog.py"
+      - "tools/kermit_watchdog.py"
       - "tools/package-hp39-aplet.sh"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
@@ -98,7 +98,7 @@ on:
       - "tests/e2e/verify.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
-      - "tests/e2e/harness/ckermit-server-command-wait.patch"
+      - "tests/e2e/harness/ckermit-*.patch"
       - "tests/e2e/harness/test-kermit-server.py"
       - "runtime/core/datetime.c"
       - "runtime/core/datetime-internal.h"
@@ -115,7 +115,7 @@ on:
       - "tools/wait-hp39-kermit-fetch.py"
       - "tools/run-hp39-kermit-server.sh"
       - "tools/run-hp48-kermit-send.sh"
-      - "tools/hp48-kermit-watchdog.py"
+      - "tools/kermit_watchdog.py"
       - "tools/package-hp39-aplet.sh"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/prepare-hp39-aplet.py"
@@ -228,9 +228,7 @@ jobs:
     name: Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
     runs-on: home-docker
-    # HP39 now runs three models sequentially (60 shards). Run #150 completed
-    # every model but hit the old 15-minute ceiling during final aggregation.
-    timeout-minutes: ${{ matrix.family == 'hp39' && 25 || 15 }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -320,7 +318,8 @@ jobs:
     name: Stock / ${{ matrix.target }}
     needs: [build, x50ng]
     runs-on: home-docker
-    timeout-minutes: 12
+    # Match other Stock jobs: allow the shared transfer ceiling plus verification.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:

@@ -1,5 +1,34 @@
 # E2E internals
 
+## Display suite
+
+The Runtime suite manifest includes `display`, reusing its payload build,
+Direct/Stock family runners, asset preparation and evidence upload. Its manifest
+entry names an additional verifier; the workflow runs that verifier after the
+ordinary launch/PASS/return checks.
+
+The payload tests actual allocator exhaustion/recovery, 2/4/16-level sessions,
+two page exchanges per mode, status segments, explicit restoration and automatic
+cleanup on return from `main`. A public-API-only HPG feasibility witness covers
+clip intersections, PAINT/XOR, repeating patterns, line masks and transparent
+RGB XPM import. Broad historical source adapters remain M8.
+
+For deterministic image evidence, the test mailbox requests `FR(id)`. Both
+frontends save the scanout plus LCD registers and only then acknowledge `FK(id)`.
+The payload does not advance while a frame is pending; missing acknowledgements
+fail within a bounded deadline. This acknowledgement is test instrumentation,
+not a production API or a replacement for payload PASS. Each invocation clears
+old frame evidence. Captures include column 131 for the six status segments.
+`tests/e2e/display/verify.py` checks every pixel, the palette, BPP/stride/end/bank
+registers, and distinct addresses after each page exchange.
+
+The pinned emulator patch derives STN depth from LCDCON1 and row pitch from
+LCDSADDR3, rather than treating power/polarity bits as a pixel-depth selector.
+Direct restoration compares writable LCD configuration and seeds its return
+image comparison at PASS, before runtime cleanup can restore Stock's buffer.
+CPU/MMU return and nonblank stable Stock output remain separate required gates.
+Emulator evidence does not measure physical-panel flicker, contrast or luminance.
+
 The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
 tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different
@@ -27,6 +56,27 @@ own clock state. Its calendar conversion sources are explicit x50ng cache inputs
 
 ## Test tiers
 
+### Execution scheduling
+
+An Actions execution job runs one emulator at a time. Runtime Stock and Object
+jobs select an individual model from the canonical target profiles; the matrix
+supplies `HPCLANG_E2E_TARGET` to the shared family harness. Payloads remain shared
+or built per family as appropriate. `tools/e2e-target-matrix.py` applies the same
+automation flags and family/model filters for planning and execution, rejects
+empty selections, and keeps all six enabled models covered.
+
+Direct Runtime and Storage family jobs execute their models sequentially, as
+Gallery already does. Local family invocations without a model filter still run
+every eligible model and collect failures. This avoids multiplying runner slots
+by a hidden second level of emulator processes. Slow Stock models have separate
+jobs so their transfer ceilings are not accumulated inside one job timeout.
+Result, keyboard-frame, lifecycle and settled-return gates are unchanged. Stock
+and Object evidence artifact names use model prefixes; each artifact retains
+the selected-target list consumed by reports and suite-specific verifiers.
+Stock Gallery uses the same 25-minute outer job limit as Runtime/Object Stock:
+its job must not be cancelled before the shared 20-minute transfer watchdog can
+report a result. The 90-second acknowledged-progress idle limit is unchanged.
+
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 
 **Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same runtime application.
@@ -42,6 +92,26 @@ build remains available for source analysis and cross-family debugging.
 This keeps classic directory probes out of HP39 Aplet RAM while preserving
 their coverage in the classic-family jobs. Each artifact carries its own HPC1
 image and result address; the workflow never substitutes another family's image.
+
+The Objects workflow reads suite names and applicable families from
+`tests/e2e/object-suites.json`. `object-composite` uses the same build command
+shape and Stock harness. It covers lists, numeric/symbolic matrices, scalar
+precision, stack reorder/Booleans and historical application flows. Splitting
+these payloads keeps sufficient HP39 RAM for two saved Aplet instances; mutation
+and composite retain their own lifecycle checks. `object-catalog` separately
+checks HP39 Program/Note CRUD and native Aplet clone/remove, name-list snapshots,
+protected Aplets and settled return. It does not load the numerical/GC fixture
+into the same Aplet. The workflow publishes separate results for each applicable
+suite/model and derives the available families and models from the target profiles.
+
+The suite manifest also declares its launch modes. `object-catalog` preserves
+both the HP39 catalog/schema/NoteText round-trip witnesses formerly embedded in
+Runtime and their Direct no-Stock `ENOSYS` checks. Stock runs additionally exercise
+catalog CRUD; Direct runs validate unavailable native services without inventing
+a Stock context. These checks share one catalog payload. Moving them out of the
+keyboard/runtime payload preserves HP39 launcher memory for its minimum stack
+and writable pages; the launcher rejects insufficient memory rather than
+shrinking those reservations.
 
 The HP39 lifecycle contract includes Stock SAVE of a second Aplet and alternating
 write/read/clear invocations of the two instances. The default chronological
@@ -97,9 +167,15 @@ HP 39g+, HP 39gs, and HP 40gs use the original USB Connectivity Kit path by defa
 
 The stock ROM performs the transfer/install itself.
 
-HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. UART remains available as an override. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The computed transfer timeout is only a watchdog ceiling, not a guessed delay.
+HP 48gII uses the Stock Kermit server over USB to receive `L275_48.LIB`, generated `HPCLANG.HP`, and any focused witness object such as `ZZE2E`, then installs library 275 into Port 0 and launches the payload through ARMToolbox48 / `PrRUN`. UART remains available as an override. The long-standing transfer race is synchronized by an explicit host-completion gate: calculator UI automation does not resume until the Kermit sender has exited successfully. The shared Kermit watchdog fails after 90 seconds without an acknowledged send-window advance, with a separate 20-minute absolute transfer ceiling. Repeated packets do not refresh the idle budget; neither limit paces UI actions.
 
 HP 49g+ and HP 50g transfer SETUP, generated `HPCLANG.HP`, and `ZZE2E` over USB Kermit, then install ARMToolbox into Port 2. They share the same Stock UI sequence while retaining their native per-model ARM bootloaders. An explicit SD override retains the emulated-card path used by Storage. Current migration evidence is tracked in [Stock USB transport](stock-usb-transport.md).
+
+The SD installer explicitly selects RPN in the Stock modes form once HOME is
+ready. Its CHOOS selection works from either initial mode; a toggle during cold
+boot could be lost to the Memory Clear dialog or switch in the wrong direction.
+ALG command entry alone does not execute the stack-based `PrRUN` launch.
+Installation and application PASS remain separate checks.
 
 The historical pre-USB cleanup baseline is retained for regression provenance. Canonical **Runtime #357 (`35832611353`)** is fully green on the final cleanup functional head, including HP48gII after the Kermit host-gate and bounded `ZZE2E` object witness. **Font Gallery #130 (`35832611436`) is also fully green** across Direct hp39/hp48/hp4950 and Stock hp39gs/hp40gs/hp48gii/hp50g. **Storage #141 (`35832611387`)** and **Quality #13 (`35832611366`)** are green on the same head. The earlier HP39 Gallery red path had two independent harness regressions: launch/UI settling required payload-aware launch-only retries, and the Gallery application retained an obsolete direct `platform_cookie == code-window` availability check after runtime moved HP39 private state behind an opaque tagged platform context. The runtime font service now owns that private mapping decision and the independent ROM pixel oracle validates the rendered result.
 
@@ -255,13 +331,36 @@ cannot remain a private mapping while native Stock calls run. The KOS bridge
 protects the current shared-layout slot; the public HPC1 data/code ABI is
 unchanged.
 
-Final M7.2 closure evidence is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The final payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
+Final acceptance evidence for the original M7.2 subset is **E2E / Storage #53 (`35428824540`)** on `c4b827fe`. All jobs pass: Build, Direct hp39, Direct hp48, Direct hp4950, and Stock hp4950. The payload additionally runs the bounded HPGCC `hpstdio.h`/`fsystem.h` adapter flow and validates HP-style paths, adapter-local cwd, LFN directory enumeration, volume size/free queries, and POSIX `ftruncate()` extension/shrink semantics including zero-filled extension.
+
+The metadata follow-up extends that same Storage payload with attributed file
+creation, masked mutation, read-only rejection, creation/access-date getters,
+close/reopen persistence and directory-entry ownership after iterator closure.
+All six Direct models and both HP49g+/HP50g Stock models pass locally; formal CI
+acceptance of this extension is complete on `6a7f9a28`. Host tests additionally construct
+distinct on-disk FAT timestamps and verify malformed-date handling and remount
+persistence. Stored access-date queries do not imply automatic atime updates.
 
 HP 39g+ participates in Direct, focused, and original-Stock family matrices through its data-driven `nor` profile. All six profiles currently select `stock_transport: usb`. See [Stock USB transport](stock-usb-transport.md) for migration evidence and the distinction between implemented defaults and repeated-run stability.
 
 GitHub Actions YAML is orchestration, not the test specification. Expected files, required captures, protocol events, and similar assertions belong under `tests/e2e/specs/` and are evaluated by the E2E harness. Fixture integrity checks such as a pinned firmware SHA-256 belong to fixture preparation, not to the behavioral test specification.
 
 ## Full-keyboard validation and progression evidence
+
+Headless x50ng uses process CPU time plus bounded intentional idle waits for
+both guest hardware timers and harness events. Time spent descheduled by the
+host does not become a long calculator key press. Interactive frontends retain
+the upstream wall clock. RTC calendar initialization still uses the host date;
+subsequent RTC progression shares the guest clock with the other peripherals.
+Shell and workflow watchdogs remain wall-clock limits, including the external
+Kermit transfer watchdog. This avoids input drift under scheduling pauses; it
+does not guarantee instruction-level deterministic emulation or USB success.
+
+A local regression experiment paused the emulator during each of three DOWN
+presses in the HP39gs receive menu. The wall-clock implementation selected the
+wrong transport; the execution clock preserved the USB selection under the
+same pauses. Formal integrated CI acceptance is recorded on `6a7f9a28`;
+USB throughput remains a reliability follow-up.
 
 The canonical runtime E2E injects every physical key position on each automated calculator model. The guest verifies DOWN/UP events, raw scan code, physical key identity, and dedicated-key modifier state for all 51 keys.
 
@@ -306,11 +405,22 @@ The tested font/model slice is accepted. Later main integration evidence is reco
 Direct Runtime, Direct Gallery and Stock launch sequences share the key-delivery
 state machine. A matrix key-down waits for a driven scan line and a readable
 input line; it is not sent while Stock has configured the whole matrix as
-outputs during cold boot. After each edge, the sequence waits for an actual
-guest GPIO sample. Readiness and sampling each have a bounded watchdog and a
-distinct failure reason. Neither proves that a Stock menu accepted the action;
+outputs during cold boot. After a press, the sequence waits for a fresh guest
+GPIO sample. After release, it confirms that the emulated switch is open;
+Stock may stop scanning after handling the press, so a second guest read is
+not required. Readiness, press sampling and switch release each have a bounded
+watchdog and a distinct failure reason. None proves that a Stock menu accepted the action;
 transfer completion, application results and settled return remain independent
 gates.
+
+Within the Direct Gallery application, automated builds enable
+`HPCLANG_GALLERY_KEY_HANDSHAKE`: the harness holds each key until the real
+event engine reports DOWN and the payload publishes `GKAC`. The harness then
+releases it; the payload waits for the matching UP before rendering and
+publishing the next ready frame. This avoids missed timed taps and repeated
+navigation while a slow frame is drawn. Standalone interactive builds keep
+normal key repeat. Failure JSON retains the last payload state, including
+an unfinished key acknowledgement.
 
 LCD return stability requires a changed, nonblank frame across consecutive
 observations. A blank repaint interval resets stability instead of becoming an

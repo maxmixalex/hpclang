@@ -279,8 +279,58 @@ static void test_malformed_stack_state(void)
     assert(errno == EILSEQ);
 }
 
+static void test_public_stack_reorder(void)
+{
+    prepare_one_real();
+    uint32_t top = get_word5(DSKTOP);
+    errno = 0;
+    assert(hpclang_stack_swap() == -1 && errno == EINVAL);
+    assert(get_word5(DSKTOP) == top);
+    assert(hpclang_stack_nip() == -1 && errno == EINVAL);
+    assert(get_word5(DSKTOP) == top);
+
+    put_word5(EDITLINE, top + 15u);
+    put_word5(top + 5u, 0x92000u);
+    assert(hpclang_stack_swap() == 0);
+    assert(get_word5(top) == 0x92000u && get_word5(top + 5u) == 0x91000u);
+    assert(hpclang_stack_nip() == 0);
+    assert(get_word5(DSKTOP) == top + 5u && get_word5(top + 5u) == 0x92000u);
+
+    fake_boot.platform_cookie = 0u;
+    assert(hpclang_stack_swap() == -1 && errno == ENOSYS);
+    assert(hpclang_stack_nip() == -1 && errno == ENOSYS);
+}
+
+static void test_boolean_exchange(void)
+{
+    prepare_one_real();
+    put_word5(0x03a81u, 0x03a86u);
+    put_word5(0x03ac0u, 0x03ac5u);
+    uint32_t top = get_word5(DSKTOP), temp = get_word5(TEMPTOP), free_cells = get_word5(AVMEM);
+    int value = 99;
+    assert(hpclang_stack_pop_boolean(&value) == -1 && errno == EINVAL && value == 99);
+    assert(get_word5(DSKTOP) == top);
+    assert(hpclang_stack_push_boolean(2) == -1 && errno == EINVAL);
+    assert(hpclang_stack_push_boolean(1) == 0);
+    assert(hpclang_stack_push_boolean(0) == 0);
+    assert(get_word5(TEMPTOP) == temp && get_word5(AVMEM) == free_cells - 2u);
+    assert(get_word5(get_word5(DSKTOP)) == 0x03ac0u);
+    assert(hpclang_stack_peek_boolean(2u, &value) == 0 && value == 1);
+    assert(hpclang_stack_pop_boolean(&value) == 0 && value == 0);
+    assert(hpclang_stack_pop_boolean(&value) == 0 && value == 1);
+    assert(get_word5(DSKTOP) == top && get_word5(AVMEM) == free_cells);
+    put_word5(0x03a81u, 0u);
+    assert(hpclang_stack_push_boolean(1) == -1 && errno == EILSEQ);
+    assert(get_word5(DSKTOP) == top && get_word5(AVMEM) == free_cells);
+    fake_boot.platform_cookie = 0u;
+    assert(hpclang_stack_push_boolean(0) == -1 && errno == ENOSYS);
+    assert(hpclang_stack_pop_boolean(&value) == -1 && errno == ENOSYS);
+}
+
 int main(void)
 {
+    test_public_stack_reorder();
+    test_boolean_exchange();
     test_public_read_only_stack();
     test_unfrozen_object_is_rejected();
     test_unavailable_family_and_mapping();

@@ -375,7 +375,7 @@ static int directory_span(const struct hpclang_rpl_reader *reader, uint32_t addr
     return HPCLANG_RPL_SPAN_OK;
 }
 
-static int recognized_prologue(uint32_t prologue)
+int hpclang_rpl_object_prologue_known(uint32_t prologue)
 {
     switch (prologue) {
     case RPL_DOINT:
@@ -451,7 +451,7 @@ static int composite_span(const struct hpclang_rpl_reader *reader, uint32_t addr
          * treated as a reference cell. A known-but-unfrozen prologue must
          * stop parsing rather than silently desynchronize the stream.
          */
-        if (!recognized_prologue(word)) {
+        if (!hpclang_rpl_object_prologue_known(word)) {
             if (!checked_add(offset, 5u, &offset) || offset > limit)
                 return HPCLANG_RPL_SPAN_BOUNDS;
             continue;

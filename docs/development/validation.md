@@ -1,5 +1,86 @@
 # Validation
 
+## M7.2 metadata / M7.3h–j / M7.5 integrated acceptance
+
+Accepted on 2026-10-07 at functional head `6a7f9a28`. This integrated tree
+contains the complete current M7.3 and M7.5 branches plus the M7.2 metadata
+extension. All six workflows passed on that exact head:
+
+- [Core](https://github.com/zyf722/hpclang/actions/runs/37607519230)
+- [Quality](https://github.com/zyf722/hpclang/actions/runs/37607519197)
+- [Runtime, System services and Display](https://github.com/zyf722/hpclang/actions/runs/37607519337)
+- [Objects](https://github.com/zyf722/hpclang/actions/runs/37607519269)
+- [Storage](https://github.com/zyf722/hpclang/actions/runs/37607519294)
+- [Font Gallery](https://github.com/zyf722/hpclang/actions/runs/37607519262)
+
+This closes formal acceptance of M7.2's metadata extension, M7.3h–j's
+documented operations and approved port limitations, and M7.5's clean display
+services and HPG feasibility witnesses. The integrated host suite has 54 tests.
+Earlier pending-status statements below describe historical validation stages.
+Native Port 0/1/2 services, broad M8 adapters and the remaining M7 parity ledger
+and application-flow goals remain open. Physical-panel/audio claims remain
+limited to their documented evidence. HP39 USB transfer throughput remains a
+reliability follow-up: another branch's run exhausted the unchanged transfer
+ceiling. A green integrated run does not establish complete determinism.
+
+## M7.2 file metadata extension
+
+Local acceptance on 2026-10-07 covers masked read-only/hidden/system/archive
+mutation, creation and stored access-date queries, and the HPGCC metadata adapters.
+Formal CI acceptance is complete on `6a7f9a28` (see above). The original 53 host tests pass. A real FatFs namespace
+on an independently constructed FAT12 image checks distinct timestamps, leap-day
+validation, absent/malformed dates, remount persistence, write protection, invalid
+masks, missing paths and unsupported models. Access dates are stored metadata;
+the runtime does not maintain atime on reads.
+
+Storage passes Direct on all six models and Stock on HP49g+/HP50g. The payload
+checks attributed creation, read-only write rejection, close/reopen persistence,
+timestamp getters, mutation through an entry after its parent iterator closes,
+masked preservation and cleanup. The vendor check reproduces the official FatFs
+baseline plus the declared access-date extension without fuzzy patch application.
+
+## M7.5 display runtime local acceptance
+
+The `m75-display-runtime` implementation is locally validated on 2026-10-07;
+formal CI acceptance is complete on `6a7f9a28`. The dedicated Display suite reuses Runtime's
+Direct/Stock matrix and original launch/return gates.
+
+| Model | Direct | Stock | Pixel/register checkpoints |
+| --- | --- | --- | --- |
+| HP39g+ D1.55 | Pass | Pass | 2/4/16 levels, both pages, six status segments |
+| HP39gs | Pass | Pass | same independent checks |
+| HP40gs | Pass | Pass | same independent checks |
+| HP48gII | Pass | Pass | same independent checks |
+| HP49g+ | Pass | Pass | same independent checks |
+| HP50g | Pass | Pass | same independent checks |
+
+Each payload exhausts and recovers its real heap before mode acquisition,
+rejects invalid/busy calls, draws forward/reversed bars, exchanges distinct
+physical pages, restores explicitly, then leaves a final gray16 session active
+for automatic runtime cleanup. The host independently checks every captured
+pixel, status segment and DMA layout. Direct also checks restored writable
+LCD configuration; Stock requires the actual launch boundary and settled return.
+The last PASS image is rendered in the owned mode, so cleanup is exercised after
+PASS rather than hidden by a manual close in the test.
+
+The 52 host tests include DMA mapping/allocator failures, LCD ordering, session
+rollback, stalled clocks and the HPG clip/style/pattern/XPM feasibility witness.
+The final transparent-pattern/origin-offset witness also passes host sanitizers
+and the HP50g Stock payload. Existing Runtime's six-model Direct regression
+passes with all 52 keyboard progression captures per target.
+The large original Runtime payload also passes HP39g+ Stock with all 52 keyboard
+captures and settled return, rechecking the earlier launcher memory-budget risk.
+The common bootstrap provides a read-only L2-table alias without allocating an
+extra physical page. Existing Runtime payload size remains within the same
+15-page code allocation as the HP39 memory-budget fix (60,632-byte container).
+
+Source review covers all four historical HPGCC distributions and newRPL's
+HP50g LCD code, with S3C2410A register semantics governing DMA bank bounds,
+read-only status, address prefetch and restore ordering. Accepted evidence here
+is emulator/application correctness: it does not measure real LCD flicker,
+luminance or electrical timing. There is no claim of recovery from arbitrary
+CPU faults or power loss, nor of an installed broad HPG source adapter.
+
 hpclang separates common-runtime correctness from calculator UI/package automation so a menu, transfer, launcher, or final repaint failure cannot be mistaken for an ABI/runtime regression.
 
 ## Continuous gates
@@ -405,8 +486,10 @@ The directory implementation in `b2a69739` passed local validation on 2026-10-03
   execute the new directory lifecycle; HP39g+/39gs/40gs revalidate native-variable
   mutation with the same rebuilt payload and freshly prepared Aplet packages.
 
-This is local regression evidence. Formal CI acceptance is pending; M7.3g and
-its downstream M7.3h–j work remain open on the roadmap.
+Subsequent formal Object mutation regressions, including functional head
+`06ab4deb` and main `3ad37ac6`, execute this directory lifecycle on all three
+classic Stock models and pass with settled return. This closes M7.3g.
+M7.3h–j remain separate acceptance items.
 
 ## M7.3h local Aplet-data regression
 
@@ -437,8 +520,41 @@ BSS. Lifecycle monitoring now requires an object phase before accepting PASS.
 HP40gs passes a fresh eight-run installation with this guard; HP39g+/39gs pass
 four additional alternating-instance invocations with the same guard.
 
-These are local emulator results, not formal CI acceptance. Stock Reset behavior
-and the CI gate still need acceptance before M7.3h closes.
+These are historical local emulator results. The expanded Reset and object
+completion evidence below supersedes their incomplete Reset coverage.
+
+### M7.3h-j local completion
+
+Local validation on 2026-10-05 completes the implementation gate:
+
+- Object mutation passes on all six Stock models. HP39g+/39gs/40gs each pass
+  15 invocations covering native GC, exit/relaunch, two saved instances,
+  cancelled Reset, confirmed Reset and isolation from the other instance.
+- Composite objects pass on all six Stock models. Each HP39 model passes eight
+  invocations with nested owned values surviving native GC and independent
+  persistence. Classic models cover numeric/symbolic matrices, exact wider
+  numbers, stack reorder/Booleans and representative flows from all four HPGCC
+  generations.
+- The dedicated HP39 catalog fixture passes Program/Note CRUD and Aplet
+  list/clone/remove on all three models, with native record maintenance,
+  caller-context restoration, active/default protection and owned snapshots.
+- All 47 host tests, formatting, lint, host plus six ARM Clang analysis
+  configurations, workflow matrix validation and documentation builds pass.
+
+The native portal request writer is nonrecursive and has a guarded private ARM
+stack. Aplet clone restores GC-traced caller contexts on success and error;
+delete maintains Stock's cached display list as well as storage. These address
+faults reproduced by the public catalog fixture.
+
+Catalog and composite checks use separate payloads: combining them exceeded
+the Stock startup memory available when two full test Aplets were saved.
+The split retains every test and the original mutation/composite lifecycle
+contracts. Suite applicability is declared in `tests/e2e/object-suites.json`.
+
+Port 0/1/2 lack public read/write services. Each was accepted as an M7.3j
+limitation on 2026-10-04, with separate future implementation goals retained.
+M7.3h–j now await formal CI acceptance; these local results do not claim a
+completed remote CI run or native-port support.
 
 
 ### M7.4 system services — local validation

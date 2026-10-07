@@ -13,6 +13,7 @@
 #include <hpclang/target.h>
 
 #include "hp39-native-directory.h"
+#include "hp39-catalog-service.h"
 #include "hp39-variable-schema.h"
 #include "object-snapshot.h"
 #include "../../platform/armtoolbox/hp39-portal-private.h"
@@ -141,6 +142,10 @@ static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_le
                                                                             : HP39_BODY_NAME_MAX);
     if (kind == HP39P_COPY_OBJECT)
         maximum_name_length = sizeof(struct hpclang_hp39_object_request);
+    if (kind >= HP39P_PROGRAM_PUT && kind <= HP39P_NOTE_REMOVE)
+        maximum_name_length = sizeof(struct hpclang_hp39_catalog_request);
+    if (kind >= HP39P_APLET_CLONE && kind <= HP39P_APLET_IS_DEFAULT)
+        maximum_name_length = sizeof(struct hpclang_hp39_aplet_request);
     if (name_length > maximum_name_length || (name == NULL && name_length != 0u)) {
         errno = EINVAL;
         return -1;
@@ -209,8 +214,8 @@ int hpclang_hp39_variable_schema_snapshot(struct hpclang_object **object)
         0)
         return -1;
 
-    if (hpclang_object_snapshot_copy(&hp39_stock_reader, address, HP39_SATURN_LIMIT - address,
-                                     object) != 0)
+    if (hpclang_object_snapshot_copy_encoded(&hp39_stock_reader, address,
+                                             HP39_SATURN_LIMIT - address, object) != 0)
         return -1;
     if (*object == NULL || hpclang_object_kind(*object) != HPCLANG_OBJECT_LIST) {
         hpclang_object_release(*object);
@@ -448,6 +453,88 @@ int hpclang_hp39_aplet_snapshot(const uint8_t *name, size_t name_length,
     return hpclang_hp39_native_aplet_snapshot(&hp39_stock_reader, name, name_length, object);
 }
 
+int hpclang_aplet_list(struct hpclang_object **names)
+{
+    if (names == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    return hpclang_hp39_aplet_catalog_snapshot(names);
+}
+
+static int hp39_aplet_name_valid(const uint8_t *name, size_t length)
+{
+    if (name == NULL || length == 0u || length > HP39_APLET_NAME_MAX) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
+        return 0;
+    }
+    return 1;
+}
+
+int hpclang_aplet_clone(const uint8_t *source, size_t source_length, const uint8_t *destination,
+                        size_t destination_length)
+{
+    if (!hp39_aplet_name_valid(source, source_length) ||
+        !hp39_aplet_name_valid(destination, destination_length))
+        return -1;
+    uint32_t address;
+    if (hpclang_hp39_native_aplet_resolve(&hp39_stock_reader, source, source_length, &address) != 0)
+        return -1;
+    if (hpclang_hp39_native_aplet_resolve(&hp39_stock_reader, destination, destination_length,
+                                          &address) == 0) {
+        errno = EEXIST;
+        return -1;
+    }
+    if (errno != ENOENT)
+        return -1;
+    struct hpclang_hp39_aplet_request request = {
+        .name_length = (uint32_t)source_length,
+        .destination_length = (uint32_t)destination_length,
+    };
+    memcpy(request.name, source, source_length);
+    memcpy(request.destination, destination, destination_length);
+    uint32_t marker, prologue;
+    return hp39_portal_result(HP39P_APLET_CLONE, (const uint8_t *)&request, sizeof(request), 0u,
+                              &marker, &prologue);
+}
+
+int hpclang_aplet_remove(const uint8_t *name, size_t length)
+{
+    if (!hp39_aplet_name_valid(name, length))
+        return -1;
+    uint32_t address, active;
+    if (hpclang_hp39_native_aplet_resolve(&hp39_stock_reader, name, length, &address) != 0)
+        return -1;
+    if (!hp39_stock_read_word5(0x80743u, &active)) { /* apletPTR */
+        errno = EIO;
+        return -1;
+    }
+    if (address == active) {
+        errno = EBUSY;
+        return -1;
+    }
+    struct hpclang_hp39_aplet_request request = {.name_length = (uint32_t)length};
+    memcpy(request.name, name, length);
+    uint32_t marker, prologue;
+    if (hp39_portal_result(HP39P_APLET_IS_DEFAULT, (const uint8_t *)&request, sizeof(request), 0u,
+                           &marker, &prologue) != 0)
+        return -1;
+    if (marker == 0x3a81u) {
+        errno = EPERM;
+        return -1;
+    }
+    if (marker != 0x3ac0u) {
+        errno = EILSEQ;
+        return -1;
+    }
+    return hp39_portal_result(HP39P_APLET_REMOVE, (const uint8_t *)&request, sizeof(request), 0u,
+                              &marker, &prologue);
+}
+
 static int hp39_native_catalog_snapshot(uint32_t context_pointer, struct hpclang_object **object)
 {
     if (!hp39_live_stock_available()) {
@@ -501,6 +588,37 @@ int hpclang_hp39_note_body_snapshot(const uint8_t *name, size_t name_length,
     return hp39_body_snapshot(HP39_NOTESCXT_POINTER, name, name_length, object);
 }
 
+int hpclang_hp39_catalog_edit(enum hpclang_catalog catalog, const uint8_t *name, uint32_t length,
+                              const struct hpclang_object *body)
+{
+    if ((catalog != HPCLANG_CATALOG_PROGRAM && catalog != HPCLANG_CATALOG_NOTE) || name == NULL ||
+        length == 0u || length > HP39_BODY_NAME_MAX) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!hp39_live_stock_available()) {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (body != NULL &&
+        (body->nibble_count < 10u || body->nibble_count > HP39P_STAGED_OBJECT_MAX_NIBBLES)) {
+        errno = E2BIG;
+        return -1;
+    }
+    struct hpclang_hp39_catalog_request request = {
+        .object_data = body != NULL ? (uintptr_t)body->data : 0u,
+        .object_nibbles = body != NULL ? body->nibble_count : 0u,
+        .name_length = length,
+    };
+    memcpy(request.name, name, length);
+    uint32_t kind = catalog == HPCLANG_CATALOG_PROGRAM ? HP39P_PROGRAM_PUT : HP39P_NOTE_PUT;
+    if (body == NULL)
+        ++kind;
+    uint32_t marker, prologue;
+    return hp39_portal_result(kind, (const uint8_t *)&request, sizeof(request), 0u, &marker,
+                              &prologue);
+}
+
 static struct hpclang_hp39_portal_context *hp39_aplet_context(uint32_t *slot)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
@@ -521,7 +639,7 @@ static struct hpclang_hp39_portal_context *hp39_aplet_context(uint32_t *slot)
     }
     if (hpclang_hp39_aplet_data_slot(&hp39_stock_reader,
                                      portal->pinned_cells != 0u ? portal->incoming_stack_span : 0u,
-                                     slot) != 0)
+                                     portal->launcher_object != 0u, slot) != 0)
         return NULL;
     return portal;
 }

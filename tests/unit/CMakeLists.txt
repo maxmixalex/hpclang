@@ -14,8 +14,20 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+if(UNIX)
+    hpclang_unit(execution_clock test_execution_clock.c
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/execution-clock.c")
+    target_include_directories(test_execution_clock PRIVATE
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+endif()
+
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")
 target_link_libraries(test_softfloat PRIVATE m)
+
+hpclang_unit(hpg_graphics test_hpg_graphics.c
+    "${HPCLANG_ROOT}/tests/e2e/display/hpg-prototype.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
@@ -23,6 +35,13 @@ target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(device test_device.c "${HPCLANG_ROOT}/runtime/core/device.c"
     "${HPCLANG_ROOT}/runtime/core/contrast.c" "${HPCLANG_ROOT}/runtime/core/power.c")
 target_include_directories(test_device PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(display_session test_display_session.c
+    "${HPCLANG_ROOT}/runtime/core/display-session.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/lcd-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/dma-buffer.c")
+target_include_directories(test_display_session PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(datetime test_datetime.c
     "${HPCLANG_ROOT}/runtime/core/datetime.c"
@@ -60,6 +79,16 @@ target_include_directories(test_keyboard_keys PRIVATE "${HPCLANG_ROOT}/include" 
 
 hpclang_unit(display test_display.c "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_display PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(dma_span test_dma_span.c "${HPCLANG_ROOT}/runtime/core/dma-span.c")
+target_include_directories(test_dma_span PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(lcd_engine test_lcd_engine.c "${HPCLANG_ROOT}/runtime/core/lcd-engine.c")
+target_include_directories(test_lcd_engine PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(dma_buffer test_dma_buffer.c "${HPCLANG_ROOT}/runtime/core/dma-buffer.c"
+    "${HPCLANG_ROOT}/runtime/core/dma-span.c")
+target_include_directories(test_dma_buffer PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(font
     test_font.c
@@ -153,11 +182,30 @@ target_include_directories(test_object_snapshot PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(object_composite
+    test_object_composite.c
+    "${HPCLANG_ROOT}/runtime/core/object-decimal.c"
+    "${HPCLANG_ROOT}/runtime/core/object-composite.c"
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_composite PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(object_construct
     test_object_construct.c
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+
+hpclang_unit(object_catalog
+    test_object_catalog.c
+    "${HPCLANG_ROOT}/runtime/core/object-catalog.c"
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_object_catalog PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_include_directories(test_object_construct PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
@@ -233,6 +281,13 @@ hpclang_unit(fatfs_config test_fatfs_config.c)
 target_include_directories(test_fatfs_config PRIVATE
     "${HPCLANG_ROOT}/third_party/fatfs")
 target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
+
+hpclang_unit(storage_metadata test_storage_metadata.c
+    "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
+    "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
+target_include_directories(test_storage_metadata PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
+target_link_libraries(test_storage_metadata PRIVATE hpclang_fatfs_vendor)
 
 hpclang_unit(namespace_lease
     test_namespace_lease.c

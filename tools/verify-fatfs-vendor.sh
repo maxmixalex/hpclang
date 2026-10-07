@@ -72,6 +72,9 @@ Path(sys.argv[2]).write_bytes(src.replace(b"\r\n", b"\n"))
 PY
 done
 
+# hpclang's small metadata extension is reproducible on the official baseline.
+patch --batch --forward --fuzz=0 -d "$WORK/canonical" -p1 < "$VENDOR/access-date.patch"
+
 status=0
 for file in ff.c ff.h diskio.h ffunicode.c; do
   if ! cmp -s "$WORK/canonical/$file" "$WORK/vendor-normalized/$file"; then
@@ -87,6 +90,7 @@ done
   echo "patch-1:    $BASE_URL/patch/ff16p1.diff"
   echo "patch-2:    $BASE_URL/patch/ff16p2.diff"
   echo "unicode:    $BASE_URL/patch/ffunicode.zip"
+  echo "extension:  third_party/fatfs/access-date.patch"
   echo "comparison: CRLF/LF normalized, patch --fuzz=0"
   echo
   echo "download hashes:"
@@ -100,8 +104,8 @@ done
 } | tee "$WORK/verification.txt"
 
 if (( status != 0 )); then
-  echo "FAIL: vendored FatFs source differs from the official R0.16 + p1 + p2 + Unicode replacement baseline." >&2
+  echo "FAIL: vendored FatFs source differs from the official baseline plus declared metadata extension." >&2
   exit 1
 fi
 
-echo "PASS: vendored FatFs source matches the official R0.16 + p1 + p2 + Unicode replacement baseline."
+echo "PASS: vendored FatFs source matches the official baseline plus declared metadata extension."

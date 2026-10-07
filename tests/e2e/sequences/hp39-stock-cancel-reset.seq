@@ -1,0 +1,7 @@
+# Cancel Reset; the saved Aplet data must still be present on relaunch.
+0 monitor 90000
+2000 tap f2
+4500 tap f5
+6500 tap f6
+9000 retry enter
+20000 retry enter
