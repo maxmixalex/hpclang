@@ -19,6 +19,10 @@ target_include_directories(hpclang_font_gallery PRIVATE
     "${HPCLANG_ROOT}/include"
     "${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_features(hpclang_font_gallery PRIVATE c_std_11)
+option(HPCLANG_GALLERY_KEY_HANDSHAKE "Acknowledge automated Gallery key transitions" OFF)
+if(HPCLANG_GALLERY_KEY_HANDSHAKE)
+    target_compile_definitions(hpclang_font_gallery PRIVATE HPCLANG_GALLERY_KEY_HANDSHAKE=1)
+endif()
 target_compile_options(hpclang_font_gallery PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)

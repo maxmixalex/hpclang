@@ -527,12 +527,11 @@ int main(void)
 
     uint32_t index = 0u;
     uint32_t page = 0u;
+    hpclang_keyboard_events_reset();
+    hpclang_keyboard_events_set_timing(10000u, 400000u, 120000u);
     remember_face(index);
     if (!redraw(surface, device, index, count, page, device->display_height))
         return fail(4);
-
-    hpclang_keyboard_events_reset();
-    hpclang_keyboard_events_set_timing(10000u, 400000u, 120000u);
 
     for (;;) {
         struct hpclang_keyboard_event event;
@@ -541,6 +540,22 @@ int main(void)
         if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN &&
             event.type != HPCLANG_KEYBOARD_EVENT_REPEAT)
             continue;
+
+#ifdef HPCLANG_GALLERY_KEY_HANDSHAKE
+        // Keep GKAC visible until the real event engine reports this key UP.
+        // Render only after release, so slow frames cannot cause repeat keys.
+        // Interactive builds retain their normal repeat behavior.
+        if (event.type != HPCLANG_KEYBOARD_EVENT_DOWN)
+            continue;
+        hpclang_e2e_result = UINT32_C(0x474b4143); /* GKAC */
+        struct hpclang_keyboard_event released;
+        do {
+            if (!hpclang_keyboard_event_poll(&released))
+                continue;
+            if (released.type == HPCLANG_KEYBOARD_EVENT_UP && released.key == event.key)
+                break;
+        } while (1);
+#endif
 
         int changed = 0;
         if (event.key == HPCLANG_KEY_LEFT) {

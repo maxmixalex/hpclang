@@ -19,6 +19,8 @@ tar -xzf "$WORK/source.tar.gz" -C "$WORK/source" --strip-components=1
 # I-packet negotiation must leave the server receiving commands with an active
 # packet timer. Upstream tinit(0) clears that state and disables recovery.
 git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-server-command-wait.patch"
+# Retain rapid first recovery without exhausting retries on a late ACK.
+git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-send-backoff.patch"
 make -C "$WORK/source" -j2 linux CC=gcc
 mkdir -p "$DEST"
 install -m 755 "$WORK/source/wermit" "$DEST/kermit"

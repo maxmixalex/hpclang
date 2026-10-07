@@ -27,7 +27,8 @@ They are not vendored into the normal source tree unless their redistribution te
 ## E2E host tools
 
 The portable tool bundle builds the pinned upstream C-Kermit source with
-`tests/e2e/harness/ckermit-server-command-wait.patch`. C-Kermit uses the
+`tests/e2e/harness/ckermit-server-command-wait.patch` and
+`tests/e2e/harness/ckermit-send-backoff.patch`. C-Kermit uses the
 three-clause BSD license; `tools/build-ckermit.sh` installs its upstream
 `COPYING.TXT` alongside the executable as `kermit-COPYING.txt`. This host-side
 test tool is not linked into calculator applications.
