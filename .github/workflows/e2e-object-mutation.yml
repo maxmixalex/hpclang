@@ -17,6 +17,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
@@ -45,6 +46,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-nor-fixture.py"
       - "tools/prepare-hp48gii-nor.py"
@@ -108,9 +110,13 @@ jobs:
               subprocess.run(["bash", "tools/build-e2e.sh", item["suite"],
                               f"build/e2e/{item['suite']}/{item['family']}",
                               item["family"]], check=True)
-          matrix = {"include": [{"suite": suite["name"], "family": family, "mode": mode}
-                                for suite in suites for family in suite["families"]
-                                for mode in suite["modes"]]}
+          targets = {mode: json.loads(subprocess.check_output(
+              ["python3", "tools/e2e-target-matrix.py", mode], text=True))
+              for mode in {mode for suite in suites for mode in suite["modes"]}}
+          matrix = {"include": [{"suite": suite["name"], "mode": mode, **target}
+                                for suite in suites for mode in suite["modes"]
+                                for target in targets[mode]
+                                if target["family"] in suite["families"]]}
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("suites=" + json.dumps(names) + "\n")
               output.write("matrix=" + json.dumps(matrix) + "\n")
@@ -191,7 +197,7 @@ jobs:
           if-no-files-found: error
 
   e2e:
-    name: ${{ matrix.mode == 'stock' && 'Stock' || 'Direct' }} ${{ matrix.suite }} / ${{ matrix.family }}
+    name: ${{ matrix.mode == 'stock' && 'Stock' || 'Direct' }} ${{ matrix.suite }} / ${{ matrix.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
@@ -200,6 +206,7 @@ jobs:
       matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
     env:
       FAMILY: ${{ matrix.family }}
+      HPCLANG_E2E_TARGET: ${{ matrix.target }}
       OBJECT_SUITE: ${{ matrix.suite }}
       MODE: ${{ matrix.mode }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
@@ -229,7 +236,7 @@ jobs:
           path: build/assets
       - name: Prepare platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh "$MODE" "$FAMILY"
-      - name: Execute object family
+      - name: Execute object target
         run: |
           args=("$MODE" "$FAMILY" "build/e2e/$OBJECT_SUITE/$FAMILY")
           if [[ "$MODE" == stock ]]; then
@@ -259,7 +266,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-${{ matrix.mode }}-${{ matrix.suite }}-e2e
+          name: ${{ matrix.target }}-${{ matrix.mode }}-${{ matrix.suite }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
