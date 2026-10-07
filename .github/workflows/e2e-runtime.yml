@@ -27,6 +27,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/prepare-nor-fixture.py"
@@ -67,6 +68,7 @@ on:
       - "tools/hpclang-pack.py"
       - "tools/armtoolbox-wrap.py"
       - "tools/e2e-target-env.py"
+      - "tools/e2e-target-matrix.py"
       - "tools/prepare-x50ng.py"
       - "tools/prepare-hp48gii-nor.py"
       - "tools/prepare-nor-fixture.py"
@@ -96,6 +98,7 @@ jobs:
     runs-on: home-docker
     outputs:
       suites: ${{ steps.build.outputs.suites }}
+      stock_targets: ${{ steps.build.outputs.stock_targets }}
     steps:
       - uses: actions/checkout@v7
 
@@ -118,6 +121,8 @@ jobs:
                               f"build/e2e/{suite['mode']}"], check=True)
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("suites=" + json.dumps(suites) + "\n")
+              output.write("stock_targets=" + subprocess.check_output(
+                  ["python3", "tools/e2e-target-matrix.py", "stock"], text=True))
           PY
 
       - name: Upload suite builds
@@ -292,17 +297,18 @@ jobs:
           if-no-files-found: warn
 
   stock:
-    name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.family }}
+    name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.model.target }}
     needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        family: [hp39, hp48, hp4950]
+        model: ${{ fromJSON(needs.build.outputs.stock_targets) }}
         suite: ${{ fromJSON(needs.build.outputs.suites) }}
     env:
-      FAMILY: ${{ matrix.family }}
+      FAMILY: ${{ matrix.model.family }}
+      HPCLANG_E2E_TARGET: ${{ matrix.model.target }}
       SUITE: ${{ matrix.suite.mode }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: ${{ matrix.suite.keyboard && '1' || '0' }}
 
@@ -337,7 +343,7 @@ jobs:
       - name: Prepare platform runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
 
-      - name: Execute Stock family
+      - name: Execute Stock target
         run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$SUITE" "build/assets/$SUITE"
 
       - name: Verify suite-specific evidence
@@ -369,7 +375,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-stock-${{ matrix.suite.mode }}-e2e
+          name: ${{ matrix.model.target }}-stock-${{ matrix.suite.mode }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
@@ -381,7 +387,7 @@ jobs:
             build/*-setup.bin
             build/*-summary.png
             build/*-send/*
-            build/stock-${{ matrix.family }}-targets.txt
+            build/stock-${{ matrix.model.family }}-targets.txt
             build/e2e/${{ matrix.suite.mode }}/e2e.hpc
           if-no-files-found: warn
 
