@@ -96,8 +96,10 @@ jobs:
           if not names or len(names) != len(set(names)):
               raise ValueError("Object suite names must be nonempty and unique")
           for suite in suites:
-              if (set(suite) != {"name", "families"} or not suite["families"]
-                      or set(suite["families"]) - set(families)):
+              if (set(suite) != {"name", "families", "modes"} or not suite["families"]
+                      or set(suite["families"]) - set(families)
+                      or not suite["modes"] or set(suite["modes"]) - {"direct", "stock"}
+                      or len(suite["modes"]) != len(set(suite["modes"]))):
                   raise ValueError(f"Invalid object suite: {suite}")
           matrix = {"include": [{"suite": suite["name"], "family": family}
                                 for suite in suites for family in families
@@ -106,6 +108,9 @@ jobs:
               subprocess.run(["bash", "tools/build-e2e.sh", item["suite"],
                               f"build/e2e/{item['suite']}/{item['family']}",
                               item["family"]], check=True)
+          matrix = {"include": [{"suite": suite["name"], "family": family, "mode": mode}
+                                for suite in suites for family in suite["families"]
+                                for mode in suite["modes"]]}
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("suites=" + json.dumps(names) + "\n")
               output.write("matrix=" + json.dumps(matrix) + "\n")
@@ -185,8 +190,8 @@ jobs:
           path: build/assets/
           if-no-files-found: error
 
-  stock:
-    name: Stock ${{ matrix.suite }} / ${{ matrix.family }}
+  e2e:
+    name: ${{ matrix.mode == 'stock' && 'Stock' || 'Direct' }} ${{ matrix.suite }} / ${{ matrix.family }}
     needs: [build, x50ng, stock-assets]
     runs-on: home-docker
     timeout-minutes: 25
@@ -196,6 +201,7 @@ jobs:
     env:
       FAMILY: ${{ matrix.family }}
       OBJECT_SUITE: ${{ matrix.suite }}
+      MODE: ${{ matrix.mode }}
       HPCLANG_E2E_REQUIRE_KEYBOARD: 0
     steps:
       - uses: actions/checkout@v7
@@ -216,34 +222,44 @@ jobs:
           mkdir -p build/x50ng
           tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
       - name: Download object Stock assets
+        if: matrix.mode == 'stock'
         uses: actions/download-artifact@v7
         with:
           name: e2e-${{ matrix.suite }}-stock-assets
           path: build/assets
       - name: Prepare platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
-      - name: Execute Stock family
-        run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$OBJECT_SUITE/$FAMILY" build/assets
+        run: bash tests/e2e/harness/setup-runtime.sh "$MODE" "$FAMILY"
+      - name: Execute object family
+        run: |
+          args=("$MODE" "$FAMILY" "build/e2e/$OBJECT_SUITE/$FAMILY")
+          if [[ "$MODE" == stock ]]; then
+            args+=(build/assets)
+          fi
+          bash tests/e2e/harness/run-family.sh "${args[@]}"
       - name: Generate object evidence
         if: always()
         continue-on-error: true
         run: |
-          targets_file="build/stock-$FAMILY-targets.txt"
+          targets_file="build/$MODE-$FAMILY-targets.txt"
+          spec="tests/e2e/specs/runtime.json"
+          if [[ "$MODE" == stock ]]; then
+            spec="tests/e2e/specs/$OBJECT_SUITE.json"
+          fi
           [[ -f "$targets_file" ]] || exit 0
           while IFS= read -r TARGET; do
             [[ -n "$TARGET" ]] || continue
             export TARGET
-            python3 tests/e2e/report.py "tests/e2e/specs/$OBJECT_SUITE.json" \
+            python3 tests/e2e/report.py "$spec" \
               --image-out "build/$TARGET-summary.png" \
               --image-only
-            python3 tests/e2e/report.py "tests/e2e/specs/$OBJECT_SUITE.json" \
+            python3 tests/e2e/report.py "$spec" \
               >> "$GITHUB_STEP_SUMMARY"
           done < "$targets_file"
       - name: Upload object evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.family }}-stock-${{ matrix.suite }}-e2e
+          name: ${{ matrix.family }}-${{ matrix.mode }}-${{ matrix.suite }}-e2e
           retention-days: 14
           path: |
             build/*-*.pgm
@@ -253,6 +269,6 @@ jobs:
             build/*-socat.log
             build/*-lifecycle-*.log
             build/*-summary.png
-            build/stock-${{ matrix.family }}-targets.txt
+            build/${{ matrix.mode }}-${{ matrix.family }}-targets.txt
             build/e2e/${{ matrix.suite }}/${{ matrix.family }}/e2e.hpc
           if-no-files-found: warn

@@ -1,5 +1,34 @@
 [
-  {"name": "object-mutation", "families": ["hp39", "hp48", "hp4950"]},
-  {"name": "object-composite", "families": ["hp39", "hp48", "hp4950"]},
-  {"name": "object-catalog", "families": ["hp39"]}
+  {
+    "name": "object-mutation",
+    "families": [
+      "hp39",
+      "hp48",
+      "hp4950"
+    ],
+    "modes": [
+      "stock"
+    ]
+  },
+  {
+    "name": "object-composite",
+    "families": [
+      "hp39",
+      "hp48",
+      "hp4950"
+    ],
+    "modes": [
+      "stock"
+    ]
+  },
+  {
+    "name": "object-catalog",
+    "families": [
+      "hp39"
+    ],
+    "modes": [
+      "direct",
+      "stock"
+    ]
+  }
 ]

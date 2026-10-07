@@ -54,6 +54,15 @@ protected Aplets and settled return. It does not load the numerical/GC fixture
 into the same Aplet. The workflow publishes separate results for each applicable
 suite/family and derives the available families from the target profiles.
 
+The suite manifest also declares its launch modes. `object-catalog` preserves
+both the HP39 catalog/schema/NoteText round-trip witnesses formerly embedded in
+Runtime and their Direct no-Stock `ENOSYS` checks. Stock runs additionally exercise
+catalog CRUD; Direct runs validate unavailable native services without inventing
+a Stock context. These checks share one catalog payload. Moving them out of the
+keyboard/runtime payload preserves HP39 launcher memory for its minimum stack
+and writable pages; the launcher rejects insufficient memory rather than
+shrinking those reservations.
+
 The HP39 lifecycle contract includes Stock SAVE of a second Aplet and alternating
 write/read/clear invocations of the two instances. The default chronological
 library ordering moves the last-used Aplet to the first row, so each switch
