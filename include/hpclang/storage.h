@@ -95,12 +95,13 @@ extern "C"
      * The HP49g+/HP50g SD volume is owned by one process-lifetime FatFs namespace
      * once byte-stream storage is first used. Free space and total capacity come
      * from that backend. Stock KOS is not used for ordinary file reads/writes; it
-     * is retained only for the narrow host-coordination boundary around SD
-     * ownership (pre-takeover media/protect sampling and post-release ResetSD).
-     *
-     * Media insertion/write-protect state is sampled once per native launch before
-     * takeover. Re-enter the native application to resample hot-plug/protect
-     * changes.
+     * is retained for post-release ResetSD. Pre-takeover insertion/protect
+     * sampling reads existing GPIO inputs without changing their configuration.
+     * Before takeover, an absent card can be inserted and a later call retried.
+     * After takeover, the mounted volume and its protection state remain fixed
+     * until shutdown: removing/replacing that card is not supported. Pin
+     * configurations that cannot be read without reconfiguration fail with
+     * ENOTSUP; the runtime does not silently repurpose Stock-owned pins.
      */
     struct hpclang_stream_storage_info
     {

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -21,6 +22,8 @@
     } while (0)
 static BYTE disk[SECTORS * 512u];
 static int protected_media;
+static int inserted_media;
+static unsigned controller_acquires;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 
 const struct hpclang_device_info *hpclang_device_info(void)
@@ -29,19 +32,18 @@ const struct hpclang_device_info *hpclang_device_info(void)
 }
 int hpclang_storage_stock_media_query(int *present, int *read_only)
 {
-    *present = 1;
+    assert(hpclang_namespace_stock_active());
+    *present = inserted_media;
     *read_only = protected_media;
     return 0;
 }
 int hpclang_hp4950_fatfs_controller_acquire(int read_only)
 {
     (void)read_only;
+    ++controller_acquires;
     return 0;
 }
 void hpclang_hp4950_fatfs_controller_release(void)
-{
-}
-void hpclang_storage_after_stock_reinit(void)
 {
 }
 uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
@@ -120,7 +122,12 @@ int main(void)
     put16(entry + 22, (3u << 11) | (4u << 5) | 3u);
     put16(entry + 24, date(2024, 1, 2));
     struct hpclang_stream_path_info info;
+    CHECK(hpclang_namespace_stock_active());
+    CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == -1 && errno == ENODEV);
+    CHECK(controller_acquires == 0 && hpclang_namespace_stock_active());
+    inserted_media = 1;
     CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == 0);
+    CHECK(controller_acquires == 1 && !hpclang_namespace_stock_active());
     CHECK(info.time_validity == 7u && info.created.year == 2020 && info.created.day == 29);
     CHECK(info.created.hour == 12 && info.created.minute == 34 && info.created.second == 56);
     CHECK(info.last_accessed.year == 2021 && info.last_accessed.month == 4 &&
