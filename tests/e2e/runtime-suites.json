@@ -1,4 +1,5 @@
 [
   {"mode": "runtime", "keyboard": true},
-  {"mode": "system-services", "keyboard": false}
+  {"mode": "system-services", "keyboard": false},
+  {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"}
 ]

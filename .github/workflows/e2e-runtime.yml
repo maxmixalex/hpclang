@@ -250,6 +250,12 @@ jobs:
       - name: Execute Direct family
         run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" "build/e2e/$SUITE"
 
+      - name: Verify suite-specific evidence
+        if: matrix.suite.verifier != ''
+        env:
+          VERIFIER: ${{ matrix.suite.verifier }}
+        run: python3 "$VERIFIER" direct "$FAMILY"
+
       - name: Generate suite LCD evidence
         if: always()
         continue-on-error: true
@@ -279,6 +285,7 @@ jobs:
             build/*-*.pgm
             build/*-*.pgm.png
             build/*-e2e.json
+            build/*-frame-*.lcd
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt
             build/e2e/${{ matrix.suite.mode }}/e2e.hpc
@@ -333,6 +340,12 @@ jobs:
       - name: Execute Stock family
         run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" "build/e2e/$SUITE" "build/assets/$SUITE"
 
+      - name: Verify suite-specific evidence
+        if: matrix.suite.verifier != ''
+        env:
+          VERIFIER: ${{ matrix.suite.verifier }}
+        run: python3 "$VERIFIER" stock "$FAMILY"
+
       - name: Generate suite LCD evidence
         if: always()
         continue-on-error: true
@@ -362,6 +375,7 @@ jobs:
             build/*-*.pgm
             build/*-*.pgm.png
             build/*-*.json
+            build/*-frame-*.lcd
             build/*-kermit*
             build/*-socat.log
             build/*-setup.bin

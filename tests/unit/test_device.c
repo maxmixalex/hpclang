@@ -30,6 +30,10 @@ int main(void)
         boot.model = model;
         assert(hpclang_device_info()->model == model);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_SOUND) == HPCLANG_CAPABILITY_SUPPORTED);
+        assert(hpclang_device_capability(HPCLANG_CAPABILITY_DISPLAY_MODES) ==
+               HPCLANG_CAPABILITY_SUPPORTED);
+        assert(hpclang_device_capability(HPCLANG_CAPABILITY_DISPLAY_INDICATORS) ==
+               HPCLANG_CAPABILITY_SUPPORTED);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_CIVIL_TIME_READ) ==
                HPCLANG_CAPABILITY_SUPPORTED);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE) ==
@@ -65,7 +69,7 @@ int main(void)
     boot.model = UINT32_MAX;
     assert(hpclang_device_info()->family == HPCLANG_FAMILY_UNKNOWN);
     for (int capability = HPCLANG_CAPABILITY_DISPLAY;
-         capability <= HPCLANG_CAPABILITY_APLET_CATALOG; ++capability)
+         capability <= HPCLANG_CAPABILITY_DISPLAY_INDICATORS; ++capability)
         assert(hpclang_device_capability((enum hpclang_capability)capability) ==
                HPCLANG_CAPABILITY_UNSUPPORTED);
     assert(hpclang_device_capability((enum hpclang_capability)0) == -1 && errno == EINVAL);

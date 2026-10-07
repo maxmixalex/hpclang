@@ -36,6 +36,12 @@ Applications use fixed virtual addresses and ordinary non-PIC code. There is no 
 
 The virtual addresses are common across calculator families. The platform launcher chooses the physical pages that back them.
 
+The last private prefix page (`0x0121F000`) is a read-only, uncached alias of the
+active L2 workspace. Runtime DMA validation reads it without assuming that a
+physical RAM identity mapping exists. Private asset mappings occupy at most the
+preceding 31 pages. The alias disappears with the normal code-table restoration;
+this adds no public boot-info field and no extra physical-page reservation.
+
 `0x01200000..0x0121FFFF` is the otherwise-unused prefix of the same coarse code-table section whose public application image begins at `0x01220000`. Bootstrap/platform code may use this prefix for short private mappings needed by runtime services; it is **not application storage and not an application-visible mapping contract**. HP39gs/40gs currently use the first two 4 KiB pages of this prefix for read-only native-font NOR access. Applications must not address or depend on that implementation detail.
 
 ## Boot record

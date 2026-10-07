@@ -1,5 +1,34 @@
 # E2E internals
 
+## Display suite
+
+The Runtime suite manifest includes `display`, reusing its payload build,
+Direct/Stock family runners, asset preparation and evidence upload. Its manifest
+entry names an additional verifier; the workflow runs that verifier after the
+ordinary launch/PASS/return checks.
+
+The payload tests actual allocator exhaustion/recovery, 2/4/16-level sessions,
+two page exchanges per mode, status segments, explicit restoration and automatic
+cleanup on return from `main`. A public-API-only HPG feasibility witness covers
+clip intersections, PAINT/XOR, repeating patterns, line masks and transparent
+RGB XPM import. Broad historical source adapters remain M8.
+
+For deterministic image evidence, the test mailbox requests `FR(id)`. Both
+frontends save the scanout plus LCD registers and only then acknowledge `FK(id)`.
+The payload does not advance while a frame is pending; missing acknowledgements
+fail within a bounded deadline. This acknowledgement is test instrumentation,
+not a production API or a replacement for payload PASS. Each invocation clears
+old frame evidence. Captures include column 131 for the six status segments.
+`tests/e2e/display/verify.py` checks every pixel, the palette, BPP/stride/end/bank
+registers, and distinct addresses after each page exchange.
+
+The pinned emulator patch derives STN depth from LCDCON1 and row pitch from
+LCDSADDR3, rather than treating power/polarity bits as a pixel-depth selector.
+Direct restoration compares writable LCD configuration and seeds its return
+image comparison at PASS, before runtime cleanup can restore Stock's buffer.
+CPU/MMU return and nonblank stable Stock output remain separate required gates.
+Emulator evidence does not measure physical-panel flicker, contrast or luminance.
+
 The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
 tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different

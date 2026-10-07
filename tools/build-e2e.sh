@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 3 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|display|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
     exit 2
 fi
 
@@ -92,10 +92,10 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services)
-        E2E_SOURCE="$ROOT/tests/e2e/system-services"
-        E2E_TARGET="hpclang_system_services_e2e"
-        E2E_ELF="hpclang-system-services-e2e.elf"
+    system-services|display)
+        E2E_SOURCE="$ROOT/tests/e2e/$MODE"
+        E2E_TARGET="hpclang_${MODE//-/_}_e2e"
+        E2E_ELF="hpclang-$MODE-e2e.elf"
         E2E_CMAKE_ARGS=()
         ;;
     object-mutation|object-composite|object-catalog)

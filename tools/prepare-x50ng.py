@@ -751,6 +751,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "key-sequence.h",
         "key-delivery.h",
         "lcd-stability.h",
+        "frame-checkpoint.h",
     ):
         shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 
@@ -875,6 +876,31 @@ static void s3c2410_io_port_write(""",
     )
 
 
+def patch_lcd_scanout(root: Path) -> None:
+    """Decode STN pixels from mode/pitch, independent of power/polarity bits."""
+    path = root / "src/s3c2410/s3c2410_lcd.c"
+    replace_once(
+        path,
+        "int bits_per_pixel = lcd->lcdcon5 > 2 ? 1 : 4 >> lcd->lcdcon5;",
+        """unsigned mode = (lcd->lcdcon1 >> 1) & 15u;
+    if (mode > 2u || x < 0 || y < 0)
+        return 0;
+    unsigned bits_per_pixel = 1u << mode;
+    unsigned pagewidth = lcd->lcdsaddr3 & 2047u;
+    unsigned offsize = (lcd->lcdsaddr3 >> 11) & 2047u;
+    if ((unsigned)x >= pagewidth * 16u / bits_per_pixel ||
+        (unsigned)y > ((lcd->lcdcon2 >> 14) & 1023u))
+        return 0;""",
+        "LCD STN mode decoding",
+    )
+    replace_once(
+        path,
+        "pixel_offset = ( 160 * y + x ) * bits_per_pixel;",
+        "pixel_offset = (pagewidth + offsize) * 16u * (unsigned)y + (unsigned)x * bits_per_pixel;",
+        "LCD DMA row pitch",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("x50ng", type=Path)
@@ -897,6 +923,7 @@ def main() -> None:
     patch_reserved_ram(root)
     patch_optional_state_logging(root)
     patch_key_observation(root)
+    patch_lcd_scanout(root)
 
 
 if __name__ == "__main__":

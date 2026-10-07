@@ -1,5 +1,47 @@
 # Validation
 
+## M7.5 display runtime local acceptance
+
+The `m75-display-runtime` implementation is locally validated on 2026-10-07;
+formal CI acceptance is pending. The dedicated Display suite reuses Runtime's
+Direct/Stock matrix and original launch/return gates.
+
+| Model | Direct | Stock | Pixel/register checkpoints |
+| --- | --- | --- | --- |
+| HP39g+ D1.55 | Pass | Pass | 2/4/16 levels, both pages, six status segments |
+| HP39gs | Pass | Pass | same independent checks |
+| HP40gs | Pass | Pass | same independent checks |
+| HP48gII | Pass | Pass | same independent checks |
+| HP49g+ | Pass | Pass | same independent checks |
+| HP50g | Pass | Pass | same independent checks |
+
+Each payload exhausts and recovers its real heap before mode acquisition,
+rejects invalid/busy calls, draws forward/reversed bars, exchanges distinct
+physical pages, restores explicitly, then leaves a final gray16 session active
+for automatic runtime cleanup. The host independently checks every captured
+pixel, status segment and DMA layout. Direct also checks restored writable
+LCD configuration; Stock requires the actual launch boundary and settled return.
+The last PASS image is rendered in the owned mode, so cleanup is exercised after
+PASS rather than hidden by a manual close in the test.
+
+The 52 host tests include DMA mapping/allocator failures, LCD ordering, session
+rollback, stalled clocks and the HPG clip/style/pattern/XPM feasibility witness.
+The final transparent-pattern/origin-offset witness also passes host sanitizers
+and the HP50g Stock payload. Existing Runtime's six-model Direct regression
+passes with all 52 keyboard progression captures per target.
+The large original Runtime payload also passes HP39g+ Stock with all 52 keyboard
+captures and settled return, rechecking the earlier launcher memory-budget risk.
+The common bootstrap provides a read-only L2-table alias without allocating an
+extra physical page. Existing Runtime payload size remains within the same
+15-page code allocation as the HP39 memory-budget fix (60,632-byte container).
+
+Source review covers all four historical HPGCC distributions and newRPL's
+HP50g LCD code, with S3C2410A register semantics governing DMA bank bounds,
+read-only status, address prefetch and restore ordering. Accepted evidence here
+is emulator/application correctness: it does not measure real LCD flicker,
+luminance or electrical timing. There is no claim of recovery from arbitrary
+CPU faults or power loss, nor of an installed broad HPG source adapter.
+
 hpclang separates common-runtime correctness from calculator UI/package automation so a menu, transfer, launcher, or final repaint failure cannot be mistaken for an ABI/runtime regression.
 
 ## Continuous gates

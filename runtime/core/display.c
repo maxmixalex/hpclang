@@ -4,6 +4,7 @@
 #include <hpclang/display.h>
 
 #include "display-surface.h"
+#include "display-internal.h"
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define LCDSADDR1 REG32(0x07300014u)
@@ -16,6 +17,9 @@ static struct hpclang_surface display;
 
 struct hpclang_surface *hpclang_display_surface(void)
 {
+    struct hpclang_surface *back = hpclang_display_back();
+    if (back)
+        return back;
     const struct hpclang_device_info *device = hpclang_device_info();
     uintptr_t pixels = ((LCDSADDR1 & UINT32_C(0xffff)) * 2u) + LCD_RAM_BASE;
 

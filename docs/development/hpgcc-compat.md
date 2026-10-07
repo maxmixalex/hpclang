@@ -94,7 +94,23 @@ Compatibility decision:
 
 The hpclang core already provides opaque physical/software surfaces, clipped pixel/line/rectangle/circle/polygon operations, cross-level blit, native/generated fonts, and UTF-8/codepoint text drawing. That is enough clean machinery for many HPG wrappers without reproducing `hpg_t` as the core state model.
 
-Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter. Physical gray4/gray16 and `hpg_flip` remain separately gated because they require contiguous LCD DMA memory and reliable stock-state restoration.
+Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter.
+M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
+synchronization and six status segments through the clean display service.
+The runtime owns contiguous DMA allocations, cache publication and LCD restoration.
+`tests/e2e/display/hpg-prototype.c` exercises intersecting clips, PAINT/XOR,
+repeating surface patterns, clipped line masks and transparent RGB XPM import
+using only public surface operations. Its one-character XPM subset is a feasibility
+witness; the broad historical parser and installed HPG spelling remain M8 work.
+No missing low-level drawing primitive was found by these witnesses.
+
+The source review includes HPGCC 1.0.3, HP39-enabled 1.1, 2.0 SP2 and HPGCC3 R004,
+plus newRPL's HP50g LCD implementation. The S3C2410A register contract takes
+precedence where old code writes status bits, forces LCD enable or spins without
+a timeout. hpclang's flip stops DMA at an observed frame boundary rather than
+changing live frame addresses with prefetched FIFO data. Emulator acceptance
+does not establish real-panel flicker or luminance. See the
+[display contract](api-reference.md#physical-display-ownership).
 
 ## Native calculator fonts: important platform split
 
@@ -390,7 +406,7 @@ build dependencies or copying their implementations into hpclang.
 | File attribute mutation and timestamp coverage | 2.0 `fsystem.h`: `FSChAttr`, `FSGetCreatTime`, `FSGetAccessDate` | Public adapter lacks these; `FSCreate` rejects read-only/hidden/system attributes. Extend independently of accepted basic stream tests |
 | Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | M7.4 accepts civil clock read/set/conversion, cancellable tones, contrast observation and cooperative timers. Contrast mutation and low-level interrupt callbacks are not supplied by these APIs |
 | Text input and console behavior | Historical `readint/readdouble/_gets`, key-plane helpers; HPGCC3 `keyb_setalphalock/shiftplane` and message API | Physical DOWN/UP/REPEAT is not text entry, Alpha-lock policy, numeric input or an on-screen console |
-| Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | Software gray surfaces do not prove physical gray output; demonstrate PAINT/XOR/pattern/clip and status behavior through clean primitives/adapters |
+| Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | M7.5 implements owned gray2/4/16 sessions, page exchange, bounded frame waiting and six status segments; six-model Direct/Stock pixel/register gates pass locally. Public-API-only prototypes exercise clipping, PAINT/XOR, transparent anchored/relative patterns and RGB XPM. Formal CI remains pending; broad HPG spelling/parser compatibility remains M8 |
 
 HPGCC3 declarations, especially ROMLIB-dependent functions, are evidence of
 application requirements, not proof they work on all six Stock ROMs. Likewise,

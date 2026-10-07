@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–g object/stack/directory services. M7.3h–j composite objects, HP39 Aplet persistence/Reset and native catalogs are implemented and locally validated, awaiting formal CI acceptance. M7.4 common system services are accepted. M7.5 display/runtime parity and the final parity audit remain open; the individually reviewed native-port limitations retain implementation goals below.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–g object/stack/directory services. M7.3h–j composite objects, HP39 Aplet persistence/Reset and native catalogs are implemented and locally validated, awaiting formal CI acceptance. M7.4 common system services are accepted. M7.5 display/runtime services are implemented and locally validated, awaiting formal CI; the final parity audit remains open; the individually reviewed native-port limitations retain implementation goals below.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -146,7 +146,12 @@ See [SDK API design](sdk-design.md).
 
 Device information, stock-preserving monotonic time, keyboard scanning/events, physical key identity, the C++23 wrappers, display geometry, opaque software surfaces, blitting, text rendering, and LCD ownership preservation are implemented and validated on the current six-model Direct matrix. HP39g+ model-1 key identity is established by the real D1.55 fixture and the same strict 51-key transition gate.
 
-The display clean-core boundary remains explicit: representation-independent circles/polygons and owned 2/4/16-level surfaces are supported; historical mutable clip/style state, PAINT/XOR, patterns, annunciator slots, XPM convenience loaders, raw framebuffer-pointer behavior, physical gray4/gray16, and page flipping remain compatibility/future work.
+At M7.1 closure, the clean core provided representation-independent circles/polygons
+and owned 2/4/16-level surfaces. Mutable clip/style state, PAINT/XOR, patterns,
+annunciator slots, XPM convenience loaders, raw framebuffer-pointer behavior,
+physical gray4/gray16 and page flipping remained compatibility/future work.
+M7.5 now supplies owned physical modes, page exchange and status segments, plus
+tested clip/style/pattern/XPM prototypes; installed historical adapters remain M8.
 
 #### Font package/gallery closure
 
@@ -366,7 +371,23 @@ configuration/timing/restoration, not audible speaker behavior.
 
 ### M7.5 — Remaining display/runtime parity needs
 
-**Planned; driven by real application requirements, not by copying every HPGCC primitive.**
+**Implemented with local acceptance; formal CI acceptance pending.**
+
+The clean display service owns on-demand double buffers, validates every DMA
+page and LCD bank boundary, publishes caches, and supports physical 2/4/16-level
+modes, bounded frame synchronization, page exchange and six status segments.
+Explicit end and normal runtime shutdown restore writable LCD configuration
+before releasing memory. Host tests cover fragmentation, low-memory rollback,
+timeouts and restoration order. Display E2E covers every selected Direct/Stock
+model with pixel/register oracles and before/PASS/return gates.
+
+A public-API-only HPG prototype demonstrates intersecting clips, PAINT/XOR,
+surface patterns, clipped line masks and transparent RGB XPM import. Historical
+state/spelling and broad parser compatibility remain in the planned M8 adapter;
+these witnesses found no missing clean drawing primitive. No goal below is
+removed. Checkboxes remain open until formal CI accepts this implementation.
+Real-panel flicker/luminance and electrical timing are not emulator claims.
+See [M7.5 validation](validation.md#m75-display-runtime-local-acceptance).
 
 - [ ] determine whether physical gray4/gray16 and page flipping need an on-demand contiguous/DMA resource broker;
 - [ ] cover historical annunciator/status-plane behavior through a Stock-safe abstraction and representative application tests;

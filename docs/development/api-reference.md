@@ -112,9 +112,14 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 
 | API | Status | Contract |
 | --- | --- | --- |
-| `hpclang_display_surface()` | ✅ | Borrow the physical display as an opaque surface. |
+| `hpclang_display_surface()` | ✅ | Borrow Stock's mono display, or the back page during an acquired display session. Reacquire after presenting. |
 | `hpclang_surface_width()` / `hpclang_surface_height()` | ✅ | Visible geometry. |
-| `hpclang_surface_levels()` | ✅ | Current physical surfaces report two levels. |
+| `hpclang_surface_levels()` | ✅ | Reports 2, 4 or 16; Stock's default borrowed surface reports 2. |
+| `hpclang_display_begin(levels)` | 🧪 | Acquire two owned DMA pages and a temporary 2/4/16-level LCD mode. Failure preserves Stock state. |
+| `hpclang_display_present(timeout_us)` | 🧪 | Publish the cache, wait for a frame-counter rollover, then exchange front/back pages with LCD DMA stopped. |
+| `hpclang_display_wait_frame(timeout_us)` | 🧪 | Bounded frame synchronization without changing the display. Timeout range: 1–1,000,000 µs. |
+| `hpclang_display_indicator_set(segment, intensity)` | 🧪 | Set one of six off-screen scan segments in the back page. Present publishes it; printed icon meanings vary by model. |
+| `hpclang_display_end()` | 🧪 | Restore original LCD configuration before releasing pages; idempotent and automatic on normal runtime shutdown. |
 | `hpclang_surface_clear()` | ✅ | Clear with explicit 0–255 intensity. |
 | `hpclang_surface_get_pixel()` / `hpclang_surface_set_pixel()` | ✅ | Clipped pixel read/write. |
 | `hpclang_surface_draw_line()` | ✅ | Geometrically clipped line. |
@@ -124,6 +129,44 @@ The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y,
 | `hpclang_surface_blit()` | ✅ | Representation-independent clipped copy with same-surface overlap support. |
 | `hpclang_surface_create()` / `hpclang_surface_create_mono()` / `hpclang_surface_destroy()` | ✅ | Opaque heap-owned 2/4/16-level software surfaces. Packing remains private. |
 | `hpclang::surface_ref` | ✅ | Zero-owning C++ wrapper. |
+
+### Physical display ownership
+
+`HPCLANG_CAPABILITY_DISPLAY_MODES` and `HPCLANG_CAPABILITY_DISPLAY_INDICATORS`
+report service availability; they do not promise enough contiguous free memory.
+No framebuffer is reserved at startup. Each allocation is checked page by page
+for physical continuity, alignment, address overflow and LCD bank constraints.
+An allocation or mapping failure frees temporary allocations and leaves Stock's
+LCD unchanged. Calls are single-threaded and must not run from interrupt handlers.
+
+```c
+if (hpclang_display_begin(4) == 0) {
+    struct hpclang_surface *back = hpclang_display_surface();
+    hpclang_surface_clear(back, 85);
+    hpclang_display_indicator_set(5, 255);
+    if (hpclang_display_present(200000) == 0) {
+        back = hpclang_display_surface(); /* previous front page */
+        /* Draw the next frame here. */
+    }
+    hpclang_display_end();
+}
+```
+
+The borrowed page must not be destroyed or retained across `end`. After each
+successful `present`, request the new back page; it contains the previous front
+image. Neither page aliases Stock's saved framebuffer. Indicator writes change
+display segments only, not native Alpha/Shift/battery state. Classic HPG numbers
+0–5 mean remote, left shift, right shift, alpha, battery, wait; HP39 applications
+must interpret their own panel's printed symbols.
+
+The runtime cleans framebuffer cache lines before DMA reads, restores only
+writable LCD configuration, and never forces an originally disabled LCD on.
+`end` runs after normal `main`/destructor completion, and before `_exit` halts.
+It does not recover from arbitrary CPU faults or power loss. Frame waiting reports
+disabled output, timeout or a failed/stalled clock instead of spinning forever.
+Flipping stops and restarts DMA to discard FIFO prefetch. Emulator scanout tests
+prove pixel packing and state restoration; real-panel flicker, brightness and
+electrical timing still require hardware measurement.
 
 ## Fonts and text
 
@@ -280,16 +323,16 @@ HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1,
 | HPG group | Historical calls | hpclang status |
 | --- | --- | --- |
 | lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; adapter can supply legacy setup semantics. |
-| display mode | mono/gray4/gray16, `hpg_flip` | ⬜ Physical grayscale/page flip deferred pending contiguous LCD-DMA resource ownership. |
+| display mode | mono/gray4/gray16, `hpg_flip` | 🧪 Clean owned display sessions and bounded page presentation; historical spelling remains an adapter. |
 | geometry | width/height, pixel, line, rect, circle, polygon | ✅ Canonical primitives implemented; legacy context/coordinate wrappers absent. |
-| indicators | `hpg_set_indicator` | ↪ Model-specific compatibility/capability concern, not part of the visible surface ABI. |
-| clipping state | `hpg_clip_*` | ◐ Surface-bound clipping exists; mutable user clip state remains adapter work. |
+| indicators | `hpg_set_indicator` | 🧪 Six scan-order status segments through the owned display service; printed icons are model-specific. |
+| clipping state | `hpg_clip_*` | ◐ Intersecting mutable clips demonstrated over public primitives; installed HPG adapter remains M8. |
 | fonts | `hpg_get_minifont`, `hpg_get_bigfont`, metrics, allocation/free | ◐ Native and generated hpclang font systems are implemented; HPG's exact bundled-font/custom-descriptor source semantics still need an adapter. |
 | text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface UTF-8/codepoint drawing exists; mutable HPG context wrapper absent. |
-| mutable style / PAINT/XOR / patterns | HPG context state | ↪ Adapter state, not canonical surface state. |
+| mutable style / PAINT/XOR / patterns | HPG context state | ◐ Executable prototype covers PAINT/XOR and transparent anchored/relative ink patterns; mutable state stays in the adapter. |
 | owned images | mono/gray images | ◐ Generic 2/4/16-level software surfaces cover the clean ownership model. |
 | blit | `hpg_blit` | ◐ Canonical blit implemented; HPG argument/context adapter pending. |
-| XPM | mono/gray loaders | ↪ Convenience importer/adapter work. |
+| XPM | mono/gray loaders | ◐ Transparent one-character RGB XPM prototype over public pixels; broad historical importer remains M8. |
 
 Zero HPG source-compatibility wrappers are claimed merely because the clean primitives exist.
 
@@ -317,9 +360,9 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 | RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | 🧪 Civil read/set/conversion and computed weekday; historical source adapters remain pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API unless a real generic policy use case appears. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
-| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Surface/display API; physical grayscale ownership pending. |
+| LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
 | virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
-| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ canonical API; specialized DMA resource support may justify a later low-level service. |
+| physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ raw application API; display sessions own and publish validated DMA buffers internally. |
 | tone/beep | `sys_playTone*`, `kos_beep` | 🧪 Clean PWM playback and cancellation; source adapters absent. |
 
 ## Files, stdio and storage

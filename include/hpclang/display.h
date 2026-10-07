@@ -16,8 +16,55 @@ extern "C"
      */
     struct hpclang_surface;
 
-    /* Borrow the current physical display surface. */
+    /* Borrow Stock's display or the active session's back page. */
     struct hpclang_surface *hpclang_display_surface(void);
+
+    /*
+     * Acquire a temporary 2/4/16-level mode and two white DMA pages.
+     * No framebuffer memory is reserved at startup. During a session,
+     * display_surface() borrows the back page. Reacquire it after present;
+     * never destroy a borrowed surface.
+     *
+     * Return 0 or -1/errno: EINVAL, EBUSY, ENOMEM, ENOTSUP, ENOSYS,
+     * or a mapping/device error. Failure preserves Stock LCD state.
+     * Calls are single-threaded and must not run from interrupt handlers.
+     */
+    int hpclang_display_begin(uint32_t levels);
+
+    /*
+     * Publish the back page and exchange pages at an observed frame boundary.
+     * timeout_us must be 1..1000000. Cache publication is automatic.
+     * LCD DMA stops/restarts to discard prefetched data; this does not promise
+     * flicker-free physical scanout. Finish drawing before calling.
+     *
+     * Failure before switching leaves both pages in place. The new back page
+     * contains the previous front image. Requires begin, otherwise EPERM.
+     */
+    int hpclang_display_present(uint32_t timeout_us);
+
+    /*
+     * Wait for the next frame-counter rollover without changing the LCD.
+     * Same timeout range; ENODEV if disabled, ETIMEDOUT on expiry,
+     * EIO for an unavailable or stalled clock.
+     */
+    int hpclang_display_wait_frame(uint32_t timeout_us);
+
+    /*
+     * Restore original LCD configuration before freeing pages. Idempotent.
+     * Also runs after main/destructors and before _exit halts.
+     * Borrowed session surfaces become invalid. Arbitrary CPU faults and
+     * power loss are outside this cleanup contract.
+     */
+    void hpclang_display_end(void);
+
+    /*
+     * Set a back-page status segment (0..5); present publishes the change.
+     * Printed icons vary by model. Classic HPG order is remote, left shift,
+     * right shift, alpha, battery, wait. This changes neither calculator flags
+     * nor the saved Stock framebuffer. EINVAL for a bad segment, EPERM if
+     * no display session is active, ENOTSUP for an incompatible scan layout.
+     */
+    int hpclang_display_indicator_set(unsigned segment, uint8_t intensity);
 
     /*
      * Allocate an owned surface initialized to white. levels must be 2, 4, or 16;
@@ -41,8 +88,9 @@ extern "C"
      * Drawing coordinates use a top-left origin. Operations clip to the surface.
      *
      * intensity uses 0 for white and 255 for black. Each surface quantizes that
-     * range to its advertised level count; the current physical display has two
-     * levels while owned software surfaces may have 2, 4, or 16.
+     * range to its advertised level count. Stock's borrowed display has two
+     * levels; an
+     * acquired display and owned surfaces may have 2, 4, or 16.
      */
     void hpclang_surface_clear(struct hpclang_surface *surface, uint8_t intensity);
 

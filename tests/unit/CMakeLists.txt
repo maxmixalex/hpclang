@@ -17,12 +17,24 @@ endfunction()
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")
 target_link_libraries(test_softfloat PRIVATE m)
 
+hpclang_unit(hpg_graphics test_hpg_graphics.c
+    "${HPCLANG_ROOT}/tests/e2e/display/hpg-prototype.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(device test_device.c "${HPCLANG_ROOT}/runtime/core/device.c"
     "${HPCLANG_ROOT}/runtime/core/contrast.c" "${HPCLANG_ROOT}/runtime/core/power.c")
 target_include_directories(test_device PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(display_session test_display_session.c
+    "${HPCLANG_ROOT}/runtime/core/display-session.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/lcd-engine.c"
+    "${HPCLANG_ROOT}/runtime/core/dma-buffer.c")
+target_include_directories(test_display_session PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(datetime test_datetime.c
     "${HPCLANG_ROOT}/runtime/core/datetime.c"
@@ -60,6 +72,16 @@ target_include_directories(test_keyboard_keys PRIVATE "${HPCLANG_ROOT}/include" 
 
 hpclang_unit(display test_display.c "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_display PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(dma_span test_dma_span.c "${HPCLANG_ROOT}/runtime/core/dma-span.c")
+target_include_directories(test_dma_span PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(lcd_engine test_lcd_engine.c "${HPCLANG_ROOT}/runtime/core/lcd-engine.c")
+target_include_directories(test_lcd_engine PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(dma_buffer test_dma_buffer.c "${HPCLANG_ROOT}/runtime/core/dma-buffer.c"
+    "${HPCLANG_ROOT}/runtime/core/dma-span.c")
+target_include_directories(test_dma_buffer PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(font
     test_font.c

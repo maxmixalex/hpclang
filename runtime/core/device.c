@@ -40,6 +40,8 @@ int hpclang_device_capability(enum hpclang_capability capability)
     uint32_t family = hpclang_device_info()->family;
     switch (capability) {
     case HPCLANG_CAPABILITY_DISPLAY:
+    case HPCLANG_CAPABILITY_DISPLAY_MODES:
+    case HPCLANG_CAPABILITY_DISPLAY_INDICATORS:
     case HPCLANG_CAPABILITY_KEYBOARD:
     case HPCLANG_CAPABILITY_MONOTONIC_TIME:
     case HPCLANG_CAPABILITY_CIVIL_TIME_READ:
