@@ -38,18 +38,15 @@ cp "$ASSETS_DIR/L275_48" "$SEND/L275_48"
 cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
 # Focused applications may supply additional named Stock objects.
-EXTRA_FILES=()
 EXTRA_SEND=()
 for fixture in "$APP_DIR/stock-fixtures/"*.hp; do
     [[ -f "$fixture" ]] || continue
     filename="$(basename "$fixture")"
     cp "$fixture" "$SEND/$filename"
-    EXTRA_FILES+=("$SEND/$filename")
     EXTRA_SEND+=("$filename=${filename%.hp}")
 done
 
-KERMIT_TIMEOUT="$(python3 "$ROOT/tools/hp48-kermit-watchdog.py" \
-    "$SEND/ZZE2E.HP" "$SEND/L275_48" "$SEND/HPCLANG.HP" "${EXTRA_FILES[@]}")"
+KERMIT_TIMEOUT="$(python3 "$ROOT/tools/kermit_watchdog.py" timeout)"
 EMULATOR_TIMEOUT=$((35 + KERMIT_TIMEOUT + 120))
 TRANSPORT="${HPCLANG_E2E_STOCK_TRANSPORT:-uart}"
 case "$TRANSPORT" in
@@ -115,7 +112,7 @@ export HPCLANG_STOCK_RESULT_ADDR
 
 # The UI sequence is no longer paced by an assumed transfer duration. x50ng
 # stops at host-gate until the Kermit process below completes successfully.
-# The dynamic timeouts are only watchdog ceilings for a genuinely stalled run.
+# This outer ceiling includes bounded UI setup and payload/return observation.
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng" \
     --datadir="$STATE" \
     --overwrite-config \
@@ -132,7 +129,8 @@ done
     exit 1
 }
 # Store extras first: Stock's newest-first menu must keep HPCLANG and L275 on F1/F2.
-timeout "${KERMIT_TIMEOUT}s" "$ROOT/tools/run-hp48-kermit-send.sh" \
+python3 "$ROOT/tools/kermit_watchdog.py" run "$ROOT/build/$TARGET-kermit-debug.log" \
+    "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
     --remote-host "-95 CF -95 FC?" \
     "${EXTRA_SEND[@]}" ZZE2E.HP=ZZE2E L275_48=L275 HPCLANG.HP=HPCLANG \
