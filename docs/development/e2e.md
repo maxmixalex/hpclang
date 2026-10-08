@@ -246,6 +246,15 @@ the path. Offsets are nominal milliseconds from sequence start:
 
 The stock runner accepts logical key actions rather than GUI coordinates.
 
+`dismiss <key> <pattern.pgm>` waits for a specific confirmation dialog before
+tapping its key. HP39 cold boots use it for the Memory Clear dialog. The P5
+pattern is relative to the sequence file, matches the model's LCD dimensions,
+and uses pixel value 128 as a wildcard for changing status indicators. A tap is
+retried only while the original dialog remains; completion requires a stable,
+nonblank changed view after key release. The operation fails after 15 seconds
+and preserves the failure screen. This prevents startup repainting or a missed
+confirmation from silently shifting the rest of the key sequence.
+
 Events execute in offset order. The gap between adjacent offsets is a minimum
 delay from actual delivery, so a host scheduling pause cannot collapse a key
 press and release into one guest-invisible callback batch. `host-gate` pauses

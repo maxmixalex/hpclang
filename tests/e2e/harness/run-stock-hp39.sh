@@ -116,8 +116,23 @@ fi
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
 # Interactive applications append actions after the shared install/launch path.
 if [[ -n "${HPCLANG_E2E_PAYLOAD_SEQUENCE:-}" ]]; then
-    cat "$HPCLANG_E2E_SEQUENCE" "$HPCLANG_E2E_PAYLOAD_SEQUENCE" \
-        > "$ROOT/build/$TARGET-stock-sequence.seq"
+    python3 - "$HPCLANG_E2E_SEQUENCE" "$HPCLANG_E2E_PAYLOAD_SEQUENCE" \
+        "$ROOT/build/$TARGET-stock-sequence.seq" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+output = Path(sys.argv[-1])
+with output.open("w") as stream:
+    for name in sys.argv[1:-1]:
+        source = Path(name)
+        for line in source.read_text().splitlines(keepends=True):
+            fields = line.split()
+            if len(fields) == 4 and fields[1] == "dismiss":
+                fields[3] = os.path.relpath(source.parent / fields[3], output.parent)
+                line = " ".join(fields) + "\n"
+            stream.write(line)
+PY
     export HPCLANG_E2E_SEQUENCE="$ROOT/build/$TARGET-stock-sequence.seq"
 fi
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"

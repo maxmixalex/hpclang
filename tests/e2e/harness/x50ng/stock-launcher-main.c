@@ -14,6 +14,7 @@
 #include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
+#include "view-tap.h"
 #include "stock-return-phase.h"
 #include "s3c2410/s3c2410_lcd.h"
 #include "frame-checkpoint.h"
@@ -278,6 +279,80 @@ static int sequence_retry_tap(struct state *s, const struct key_action *down,
                               const struct key_action *up_action, int64_t us)
 {
     return sequence_key(s, down, 1, us) && sequence_key(s, up_action, 1, us + KEY_HOLD_US);
+}
+
+struct dialog_event
+{
+    struct state *state;
+    int key;
+    struct hpclang_view_tap tap;
+    unsigned char pattern[LCD_W * 80];
+};
+
+static int64_t dismiss_dialog(void *arg)
+{
+    struct dialog_event *event = arg;
+    struct state *s = event->state;
+    int nonblank = 0;
+    int matches = 1;
+    uint64_t frame = UINT64_C(1469598103934665603);
+    for (int y = 0; y < s->lcd_height; ++y)
+        for (int x = 0; x < LCD_W; ++x) {
+            unsigned char expected = event->pattern[y * LCD_W + x];
+            if (expected == 128)
+                continue;
+            int level = s3c2410_get_pixel_color(s->hdw->s3c2410_lcd, x, y);
+            if (level < 0 || level > 15 || expected != 255 - 17 * level)
+                matches = 0;
+            nonblank |= level > 0;
+            frame ^= (uint8_t)level;
+            frame *= UINT64_C(1099511628211);
+        }
+    /* Wildcard pixels cannot prove a dialog change (e.g. blinking status). */
+    int step = hpclang_view_tap_step(
+        &event->tap, timer_get_clock(), frame, nonblank, matches, emulator_key_ready(event->key),
+        emulator_key_observed(event->key) != 0, !is_key_pressed(event->key));
+    if (step == HPCLANG_VIEW_DOWN)
+        press_key(event->key);
+    else if (step == HPCLANG_VIEW_UP)
+        release_key(event->key);
+    if (step < 0) {
+        release_key(event->key);
+        fail(s, event->tap.failure);
+    }
+    if (step < 0 || step == HPCLANG_VIEW_DONE) {
+        free(event);
+        return step < 0 ? -1 : 0;
+    }
+    return 50000LL;
+}
+
+static int sequence_dismiss(struct state *s, int key, int64_t us, const char *pattern)
+{
+    struct dialog_event *event = calloc(1, sizeof(*event));
+    if (!event)
+        return 0;
+    event->state = s;
+    event->key = key;
+    FILE *file = fopen(pattern, "rb");
+    int width, height, maximum;
+    size_t size = (size_t)LCD_W * s->lcd_height;
+    int valid = file && fscanf(file, "P5 %d %d %d", &width, &height, &maximum) == 3 &&
+                width == LCD_W && height == s->lcd_height && maximum == 255 &&
+                fgetc(file) == '\n' && fread(event->pattern, 1, size, file) == size &&
+                fgetc(file) == EOF;
+    if (file)
+        fclose(file);
+    if (!valid) {
+        fprintf(stderr, "invalid dialog pattern: %s\n", pattern);
+        free(event);
+        return 0;
+    }
+    if (!hpclang_event_add(&s->sequence.events, us, dismiss_dialog, event)) {
+        free(event);
+        return 0;
+    }
+    return 1;
 }
 
 static int sequence_chord(struct state *s, const struct key_action *mod_down,
@@ -964,6 +1039,15 @@ static int schedule_sequence(struct state *s, const char *path)
         if (strcmp(op, "tap") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);
             if (!key || !sequence_tap(s, key->down, key->up, us))
+                goto invalid_action;
+        } else if (strcmp(op, "dismiss") == 0 && fields == 4) {
+            const struct key_pair_ref *key = find_key_pair(first);
+            char pattern[1024];
+            const char *slash = strrchr(path, '/');
+            int length = snprintf(pattern, sizeof pattern, "%.*s/%s",
+                                  slash ? (int)(slash - path) : 1, slash ? path : ".", second);
+            if (!key || length < 0 || length >= (int)sizeof pattern ||
+                !sequence_dismiss(s, key->down->key, us, pattern))
                 goto invalid_action;
         } else if (strcmp(op, "retry") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);

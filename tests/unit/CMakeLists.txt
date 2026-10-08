@@ -344,3 +344,6 @@ target_include_directories(test_lcd_stability PRIVATE "${HPCLANG_ROOT}/tests/e2e
 
 hpclang_unit(key_delivery test_key_delivery.c)
 target_include_directories(test_key_delivery PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(view_tap test_view_tap.c)
+target_include_directories(test_view_tap PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

@@ -3,8 +3,7 @@
 # Selecting Disk drive... starts the USB/Kermit directory exchange. Stock then
 # presents the remote APLET list; ENTER on the selected APLET starts the lazy
 # HPGCC000/LIB275L fetch.
-2000 tap f6
-4000 tap f6
+2000 dismiss f6 ../fixtures/ui/hp39-memory-clear.pgm
 7000 tap aplet
 8000 capture aplet-library
 9000 tap f5

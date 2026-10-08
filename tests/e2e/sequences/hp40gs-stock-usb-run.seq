@@ -1,8 +1,7 @@
 # HP40gs stock launch through the original APLET UI and USB disk.
 # HP40gs 2.22 RECEIVE FROM order:
 #   HP39/40 (USB), HP39/40 (Ser), USB Disk drive, Ser. Disk drive.
-2000 tap f6
-4000 tap f6
+2000 dismiss f6 ../fixtures/ui/hp39-memory-clear.pgm
 13000 tap home
 15000 tap aplet
 16000 capture aplet-library
