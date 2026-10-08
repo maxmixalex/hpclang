@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -17,6 +19,24 @@ SPEC.loader.exec_module(matrix)
 
 
 class MatrixTests(unittest.TestCase):
+    def test_boot_dialog_is_relative_to_profile_and_clears_when_absent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            profile = directory / "probe.json"
+            data = {"target": "probe", "family": "hp39", "model": 2, "lcd_height": 64}
+            pattern = directory / "dialog.pgm"
+            pattern.write_bytes(b"P5\n1 1\n255\n\xff")
+            command = [sys.executable, str(ROOT / "tools/e2e-target-env.py"), str(profile)]
+            for value, expected_status in (("dialog.pgm", 0), ("missing.pgm", 2), ("bad\npath", 2)):
+                profile.write_text(json.dumps({**data, "boot_dialog": value}))
+                result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, expected_status, result.stderr)
+                if expected_status == 0:
+                    self.assertIn(f"HPCLANG_E2E_BOOT_DIALOG={pattern.resolve()}", result.stdout)
+            profile.write_text(json.dumps(data))
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=True)
+            self.assertIn("HPCLANG_E2E_BOOT_DIALOG=\n", result.stdout)
+
     def test_all_six_models_remain_covered(self):
         for mode in ("direct", "stock"):
             selected = matrix.targets(ROOT / "tests/e2e/targets", mode)

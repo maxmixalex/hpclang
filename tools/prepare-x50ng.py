@@ -758,6 +758,8 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "key-sequence.h",
         "key-delivery.h",
         "view-tap.h",
+        "dialog-sequence.h",
+        "direct-boot.h",
         "lcd-stability.h",
         "frame-checkpoint.h",
     ):

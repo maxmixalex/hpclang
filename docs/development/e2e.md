@@ -220,6 +220,7 @@ The historical pre-USB cleanup baseline is retained for regression provenance. C
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
 - `lcd_height` — 64- or 80-line capture height;
+- `boot_dialog` — optional P5 confirmation pattern, relative to the target profile;
 - `automated_e2e` — optional Direct/focused automation eligibility; it defaults to true;
 - `automated_stock_e2e` — optional original-Stock automation eligibility; it defaults to true and may be false when the stock host transport is not modeled;
 - `stock_transport` — `usb`, `uart`, or `sd`; all six current profiles select USB, with `HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE` available for supported secondary paths;
@@ -261,6 +262,12 @@ retried only while the original dialog remains; completion requires a stable,
 nonblank changed view after key release. The operation fails after 15 seconds
 and preserves the failure screen. This prevents startup repainting or a missed
 confirmation from silently shifting the rest of the key sequence.
+
+Direct runtime and Gallery use the same dialog event implementation as Stock.
+Their HP39 target profiles select the Memory Clear pattern through `boot_dialog`;
+the environment exporter resolves it relative to the profile and rejects missing
+files. The launch event waits until dismissal completes, rather than sending F6
+at fixed times while Stock may still be initializing its keyboard.
 
 Events execute in offset order. The gap between adjacent offsets is a minimum
 delay from actual delivery, so a host scheduling pause cannot collapse a key
