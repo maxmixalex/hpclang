@@ -114,6 +114,27 @@ fi
 # Sequence timing is gated by actual Kermit completion. The transport may be
 # UART or USB; the watchdog is only a ceiling for a genuinely stalled fetch.
 export HPCLANG_E2E_SEQUENCE="$SEQUENCE"
+# Interactive applications append actions after the shared install/launch path.
+if [[ -n "${HPCLANG_E2E_PAYLOAD_SEQUENCE:-}" ]]; then
+    python3 - "$HPCLANG_E2E_SEQUENCE" "$HPCLANG_E2E_PAYLOAD_SEQUENCE" \
+        "$ROOT/build/$TARGET-stock-sequence.seq" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+output = Path(sys.argv[-1])
+with output.open("w") as stream:
+    for name in sys.argv[1:-1]:
+        source = Path(name)
+        for line in source.read_text().splitlines(keepends=True):
+            fields = line.split()
+            if len(fields) == 4 and fields[1] == "dismiss":
+                fields[3] = os.path.relpath(source.parent / fields[3], output.parent)
+                line = " ".join(fields) + "\n"
+            stream.write(line)
+PY
+    export HPCLANG_E2E_SEQUENCE="$ROOT/build/$TARGET-stock-sequence.seq"
+fi
 export HPCLANG_STOCK_PREFIX="$ROOT/build/$TARGET-stock"
 export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-stock.json"
 
@@ -136,11 +157,15 @@ if [[ -n "${HPCLANG_E2E_NOR_PATH:-}" ]]; then
         --sha256 "$HPCLANG_E2E_NOR_SHA256"
 else
     FIRMWARE="$ROOT/build/$TARGET-2.22.bin"
-    curl -fL --retry 3 \
-        "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
-        -o "$ROOT/build/$HPCLANG_E2E_ARCHIVE"
+    archive="$ROOT/build/$TARGET-$HPCLANG_E2E_ARCHIVE"
+    if [[ ! -s "$archive" ]]; then
+        curl -fL --retry 3 \
+            "https://www.hpcalc.org/hp39/pc/$HPCLANG_E2E_ARCHIVE" \
+            -o "$archive.tmp"
+        mv "$archive.tmp" "$archive"
+    fi
     unzip -p \
-        "$ROOT/build/$HPCLANG_E2E_ARCHIVE" \
+        "$archive" \
         "$HPCLANG_E2E_MEMBER" \
         > "$FIRMWARE"
     X50_ARGS+=(

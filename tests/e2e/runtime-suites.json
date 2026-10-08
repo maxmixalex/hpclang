@@ -1,5 +1,6 @@
 [
   {"mode": "runtime", "keyboard": true},
+  {"mode": "object-basics", "keyboard": false},
   {"mode": "system-services", "keyboard": false},
   {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"}
 ]

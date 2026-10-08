@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify HP39gs/40gs native Gallery glyphs against the stock 2.22 NOR.
+"""Verify HP39-family native Gallery glyphs against each model's Stock NOR.
 
 The oracle intentionally reconstructs the reviewed physical-ROM main/mini
 rasters directly from the packed NOR image. It does not call hpclang font code,
@@ -24,6 +24,20 @@ MINI_MAP_FIRST_CODE = 0xA0
 EDITLINE_RECORD_NIBBLES = 20
 EDITLINE_TABLE_NIBBLES = 256 * EDITLINE_RECORD_NIBBLES
 EDITLINE_REFERENCE_SHA256 = "f106efa599a5bb8a783f29cbc2dfa3afbace750975e783c223f53864a2945f53"
+# Recognizable 5x7 ASCII shapes plus the blank eighth row. These validate the
+# table identity independently of runtime offsets and screenshot agreement.
+MAIN_ANCHORS = {
+    "A": (14, 17, 17, 31, 17, 17, 17, 0),
+    "P": (15, 17, 17, 15, 1, 1, 1, 0),
+    "5": (31, 1, 15, 16, 16, 17, 14, 0),
+    "1": (4, 6, 4, 4, 4, 4, 14, 0),
+}
+MINI_ANCHORS = {
+    "A": (2, 5, 7, 5, 5),
+    "P": (7, 5, 7, 1, 1),
+    "5": (7, 1, 7, 4, 7),
+    "1": (3, 2, 2, 2, 7),
+}
 SPECIMEN = (0xA3, 0xA5, 0xA9, 0xB0, 0xB1, 0xB5, 0xD7, 0xF7)
 
 
@@ -35,6 +49,8 @@ class FontBases:
 
 
 BASES = {
+    # D1.55 physical full-NOR; complete tables match the reviewed gs atlas.
+    "hp39gplus": FontBases(main=0x000DC096, mini=0x000DE0DA, editline=0x000DCE2F),
     # Physical nibble addresses inside the official packed 2.22 NOR.
     "hp39gs": FontBases(main=0x000FCAE9, mini=0x000FEB2D, editline=0x000FD882),
     "hp40gs": FontBases(main=0x000FCC9C, mini=0x000FECE0, editline=0x000FDA35),
@@ -117,6 +133,20 @@ def verify_editline_fingerprint(nor: bytes, bases: FontBases, target: str) -> No
             f"0x{bases.editline:x}: {digest} != {EDITLINE_REFERENCE_SHA256}"
         )
     print(f"PASS HP39 EditLine ROM fingerprint: {target} base=0x{bases.editline:x} sha256={digest}")
+
+
+def verify_ascii_anchors(nor: bytes, bases: FontBases) -> None:
+    for char, expected in MAIN_ANCHORS.items():
+        record = bases.main + ord(char) * 16
+        actual = tuple(saturn_byte(nor, record + row * 2) for row in range(8))
+        if actual != expected:
+            raise ValueError(f"HP39 main font is not the reviewed ASCII atlas: {char!r}")
+    for char, expected in MINI_ANCHORS.items():
+        record = bases.mini + ord(char) * MINI_RECORD_NIBBLES
+        actual = tuple(saturn_byte(nor, record + 1 + row * 2) for row in range(5))
+        if actual != expected or nibble(nor, record) != 4:
+            raise ValueError(f"HP39 mini font is not the reviewed ASCII atlas: {char!r}")
+    print("PASS HP39 main/mini ROM ASCII anchors: A/P/5/1")
 
 
 def mini_index(nor: bytes, base: int, codepoint: int) -> int:
@@ -245,6 +275,7 @@ def main() -> None:
     args = parse_args()
     nor = args.nor.read_bytes()
     bases = BASES[args.target]
+    verify_ascii_anchors(nor, bases)
     verify_editline_fingerprint(nor, bases, args.target)
     verify_kind(nor, bases, "mini", args.mini)
     verify_kind(nor, bases, "main", args.main)

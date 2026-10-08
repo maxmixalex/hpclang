@@ -41,9 +41,8 @@ extern "C"
      * big exposes only the historical HP48gII/49g+/50g bigfont (8 raster rows,
      * nominal advance 6). It returns NULL on the HP39 family.
      *
-     * editline exposes the dedicated HP39gs/40gs fixed 6x10 EditLine ROM font.
-     * It returns NULL on HP48gII/49g+/50g and on HP39g+ until that model has a
-     * trustworthy full-flash fixture.
+     * editline exposes the dedicated HP39g+/39gs/40gs fixed 6x10 EditLine ROM
+     * font, using each model's own ROM. It returns NULL on HP48gII/49g+/50g.
      */
     const struct hpclang_font *hpclang_font_default(void);
     const struct hpclang_font *hpclang_font_mini(void);

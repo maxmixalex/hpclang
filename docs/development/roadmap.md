@@ -443,7 +443,12 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 
 ### M7.1 / M7.2 follow-up — uncovered application behavior
 
-- [ ] Establish HP39g+ native-font correctness using its own ROM/pixel evidence.
+- [x] Establish HP39g+ native-font correctness using its own ROM/pixel evidence.
+  - D1.55 main/mini/EditLine tables are located and implemented through the
+    private ROM window. Local Direct and Stock USB pixel/return checks pass on
+    all three HP39 models; formal CI acceptance is complete on `8f79c156`.
+    HP39 USB transfer reliability remains a separate follow-up. The physical keyboard
+    contract is unchanged.
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
 - [x] Cover historical file attribute mutation and creation/access timestamp

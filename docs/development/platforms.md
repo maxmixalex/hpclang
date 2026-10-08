@@ -21,7 +21,7 @@ The `hp39` platform uses the HP39 aplet/container path and ARMToolbox39/library 
 
 The common runtime is validated on HP 39gs hardware and on official HP 39gs/40gs ROMs in the ARM emulator. The same historical HPGCC39 aplet/library boundary also produces a model-1 HP 39g+ hardware-validation package.
 
-HP 39g+ now uses a verified 1 MiB D1.55 full-NOR dump from real hardware. Direct runtime and the original-Stock USB install/launch path pass against that fixture. Its native ROM-font offsets remain a separate evidence task; sibling font layouts are not inferred.
+HP 39g+ now uses a verified 1 MiB D1.55 full-NOR dump from real hardware. Direct runtime and the original-Stock USB install/launch path pass against that fixture. Its native-font follow-up uses independently located D1.55 tables in NOR pages `0x6e`/`0x6f`, with a model-specific pixel oracle and a pending formal Gallery gate; sibling font layouts are not inferred.
 
 The preferred HP39/40 stock fixture path uses the original ROM's own transfer/install logic. Direct SRAM or flash patching is only a fallback. The obsolete Conn3x GUI is not part of the emulator regression contract.
 

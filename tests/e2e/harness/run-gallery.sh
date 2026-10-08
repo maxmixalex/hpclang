@@ -12,7 +12,7 @@ APP_DIR="$(realpath "$2")"
 export TARGET
 
 case "$TARGET" in
-    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    hp39gplus|hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
     *) NATIVE_FACE_COUNT=2 ;;
 esac
 
@@ -118,6 +118,8 @@ export HPCLANG_X50NG_STAGE0="${HPCLANG_GALLERY_STAGE0:-$APP_DIR/launchers/$TARGE
 HPCLANG_X50NG_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_X50NG_RESULT_ADDR
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
+export HPCLANG_X50NG_FAILURE_PGM="$ROOT/build/$TARGET-failure.pgm"
+rm -f "$HPCLANG_X50NG_FAILURE_PGM"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_GALLERY_DIR="$FRAMES"
@@ -126,7 +128,7 @@ export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
 timeout 330s "$X50" "${X50_ARGS[@]}"
 
-if [[ "$TARGET" == hp39gs || "$TARGET" == hp40gs ]]; then
+if [[ "$HPCLANG_E2E_FAMILY" == hp39 ]]; then
     FLASH="$STATE/flash"
     [[ -s "$FLASH" ]] || {
         echo "missing x50ng Gallery flash backing: $FLASH" >&2

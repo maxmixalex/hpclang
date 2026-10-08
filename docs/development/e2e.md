@@ -34,6 +34,11 @@ tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different
 targets.
 
+Host tests also discover Python `test_*.py` files. The native-font identity test
+uses the Git LFS ROM fixture; fetch it before running the host suite with
+`git lfs pull --include=tests/e2e/fixtures/hp39gplus/flash.bin.xz`. Core CI checks
+out LFS contents for this test.
+
 The canonical runtime application and focused visual/sample applications are
 separate executables. In particular, Font Gallery is a **separate E2E
 application**; it must not grow as extra screens inside the canonical runtime
@@ -42,13 +47,20 @@ test merely to reuse its launch harness.
 The emulator workflows are split by what they prove, not by which historical
 emulator happens to execute them.
 
-The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run two
-payloads through the same Direct/Stock family harness: `runtime` (including the
-physical keyboard progression) and `system-services` (RTC read/set, deadline
-continuity, timers, sound, contrast, USB detection and bounded input). The latter
-has no keyboard-injection sequence. Keeping its code separate avoids exhausting
-HP48gII's heap with a monolithic payload. Each suite has distinct artifacts and
-published evidence paths; no service probe is skipped to make the large binary fit.
+The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run
+four focused payloads through the same six-model Direct/Stock family harness:
+
+- `runtime`: core C/C++ runtime, drawing and physical keyboard progression.
+- `object-basics`: stack operations, named-object views and HPGCC Saturn compatibility.
+- `system-services`: RTC read/set, deadline continuity, timers, sound, contrast,
+  USB detection and bounded input.
+- `display`: display sessions, restoration and pixel verification described above.
+
+Only `runtime` requires the injected keyboard sequence. Separate payloads reduce
+each Stock upload and avoid exhausting HP48gII's heap with a monolithic binary.
+Each suite has distinct artifacts and evidence paths; moving object checks out
+of `runtime` preserves their assertions and Direct/Stock coverage. Transfer and
+acknowledged-progress deadlines remain unchanged.
 
 The prepared emulator models a writable civil RTC initialized from the host's
 local calendar. Later register reads, alarms and saved-state restoration use its
@@ -76,6 +88,11 @@ the selected-target list consumed by reports and suite-specific verifiers.
 Stock Gallery uses the same 25-minute outer job limit as Runtime/Object Stock:
 its job must not be cancelled before the shared 20-minute transfer watchdog can
 report a result. The 90-second acknowledged-progress idle limit is unchanged.
+
+Direct and Gallery failures retain a `*-failure.pgm` screen alongside the JSON
+result, including failures before payload injection. Key-delivery failures also
+report the key, requested edge, readiness, GPIO sample count and switch state.
+Gallery archives the failure screen with the affected shard.
 
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 
@@ -156,6 +173,15 @@ For HP39 hardware validation the established post-return action is **APLET**;
 a valid return opens/redraws the normal APLET library. Other families should
 use an equally harmless model-appropriate Stock-UI action.
 
+## Stock Gallery on HP39
+
+HP39g+/39gs/40gs use the canonical USB Aplet install/launch harness.
+`run-stock-gallery-hp39.sh` prepares the compact Gallery package and appends
+`hp39-stock-gallery-run.seq` for native mini/main/EditLine and generated-control
+navigation. It retains the standard runtime and settled Stock return gates,
+then compares native pixels with the target's own NOR. The former duplicated
+gs/40gs serial-disk install sequences are retired.
+
 ## Stock transfer mechanisms
 
 HP 39g+, HP 39gs, and HP 40gs use the original USB Connectivity Kit path by default. A headless Kermit server supplies the typed files:
@@ -194,6 +220,7 @@ The historical pre-USB cleanup baseline is retained for regression provenance. C
 - `family` — `hp39`, `hp48`, or `hp4950`;
 - `model` — stable hpclang model ID;
 - `lcd_height` — 64- or 80-line capture height;
+- `boot_dialog` — optional P5 confirmation pattern, relative to the target profile;
 - `automated_e2e` — optional Direct/focused automation eligibility; it defaults to true;
 - `automated_stock_e2e` — optional original-Stock automation eligibility; it defaults to true and may be false when the stock host transport is not modeled;
 - `stock_transport` — `usb`, `uart`, or `sd`; all six current profiles select USB, with `HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE` available for supported secondary paths;
@@ -226,6 +253,21 @@ the path. Offsets are nominal milliseconds from sequence start:
 ```
 
 The stock runner accepts logical key actions rather than GUI coordinates.
+
+`dismiss <key> <pattern.pgm>` waits for a specific confirmation dialog before
+tapping its key. HP39 cold boots use it for the Memory Clear dialog. The P5
+pattern is relative to the sequence file, matches the model's LCD dimensions,
+and uses pixel value 128 as a wildcard for changing status indicators. A tap is
+retried only while the original dialog remains; completion requires a stable,
+nonblank changed view after key release. The operation fails after 15 seconds
+and preserves the failure screen. This prevents startup repainting or a missed
+confirmation from silently shifting the rest of the key sequence.
+
+Direct runtime and Gallery use the same dialog event implementation as Stock.
+Their HP39 target profiles select the Memory Clear pattern through `boot_dialog`;
+the environment exporter resolves it relative to the profile and rejects missing
+files. The launch event waits until dismissal completes, rather than sending F6
+at fixed times while Stock may still be initializing its keyboard.
 
 Events execute in offset order. The gap between adjacent offsets is a minimum
 delay from actual delivery, so a host scheduling pause cannot collapse a key
@@ -404,7 +446,7 @@ The general TTF importer has been removed. Final bitmap curation adds Cubic 11, 
 
 `E2E / Font Gallery` **#130 (`35832611436`)** is a historical fully-green regression gate. Current integration acceptance is tracked in [Validation](validation.md). HP39gs/40gs Direct traverse **248 entries / 496 captures** including EditLine; HP48gII/49g+/HP50g remain **247 / 494**. Stock hp39gs/hp40gs pass mini/main/EditLine/generated-control plus ROM fingerprint/pixel oracles, and HP48gII/HP50g retain settled live-native evidence. Historical #112 remains the original final M7.1 native-census closure baseline.
 
-The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). HP39g+ native-font pixel verification remains an open requirement.
+The tested font/model slice is accepted. Later main integration evidence is recorded in [Validation](validation.md). The HP39g+ native-font extension has its own Direct/Stock ROM-pixel validation and CI acceptance gate.
 
 
 ### Stock boot and repaint synchronization

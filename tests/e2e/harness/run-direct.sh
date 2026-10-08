@@ -105,6 +105,8 @@ export HPCLANG_X50NG_STAGE0="$APP_DIR/launchers/$TARGET.bin"
 HPCLANG_X50NG_RESULT_ADDR="$(cat "$APP_DIR/e2e.result-address")"
 export HPCLANG_X50NG_RESULT_ADDR
 export HPCLANG_X50NG_BEFORE_PGM="$ROOT/build/$TARGET-before.pgm"
+export HPCLANG_X50NG_FAILURE_PGM="$ROOT/build/$TARGET-failure.pgm"
+rm -f "$HPCLANG_X50NG_FAILURE_PGM"
 export HPCLANG_X50NG_PASS_PGM="$ROOT/build/$TARGET-pass.pgm"
 export HPCLANG_X50NG_RETURN_PGM="$ROOT/build/$TARGET-return.pgm"
 export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"

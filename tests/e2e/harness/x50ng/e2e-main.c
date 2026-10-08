@@ -12,6 +12,7 @@
 #include "timer.h"
 #include "timed-sequence.h"
 #include "key-sequence.h"
+#include "direct-boot.h"
 #include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
@@ -59,8 +60,6 @@
 #define COARSE_FLAGS 0x11u
 #define SMALL_FLAGS 0x0ffeu
 
-#define BOOT_NO_US 2000000LL
-#define BOOT_OK_US 4000000LL
 #define INJECT_US 7000000LL
 #define BEFORE_CAPTURE_SETTLE_US 2000000LL
 #define KEY_HOLD_US 50000LL
@@ -167,7 +166,7 @@ struct keyboard_capture_event
 };
 
 static const struct key_action f_down = {HP4950_KEY_F, 1};
-static const struct key_action f_up = {HP4950_KEY_F, 0};
+
 static const struct key_action home_down = {HP4950_KEY_J, 1};
 static const struct key_action home_up = {HP4950_KEY_J, 0};
 static const struct key_action on_down = {HP4950_KEY_ON, 1};
@@ -643,6 +642,9 @@ static void json(struct e2e *s, const char *status)
 static void fail(struct e2e *s, const char *why)
 {
     s->failed = 1;
+    const char *failure_pgm = getenv("HPCLANG_X50NG_FAILURE_PGM");
+    if (failure_pgm)
+        capture_lcd(s->hdw, failure_pgm, s->lcd_height);
     fprintf(stderr, "HPC1 E2E FAIL: %s\n", why);
     json(s, why);
     hdw_stop(s->hdw);
@@ -890,14 +892,8 @@ int main(int argc, char **argv)
     config_t config = hpclang_x50ng_headless_config(argc, argv);
     s.hdw = emulator_init(&config);
 
-    if (!hpclang_key_add(&s.boot.events, BOOT_NO_US, f_down.key, f_down.down, boot_input_failure,
-                         &s) ||
-        !hpclang_key_add(&s.boot.events, BOOT_NO_US + KEY_HOLD_US, f_up.key, f_up.down,
-                         boot_input_failure, &s) ||
-        !hpclang_key_add(&s.boot.events, BOOT_OK_US, f_down.key, f_down.down, boot_input_failure,
-                         &s) ||
-        !hpclang_key_add(&s.boot.events, BOOT_OK_US + KEY_HOLD_US, f_up.key, f_up.down,
-                         boot_input_failure, &s) ||
+    if (!hpclang_direct_boot(&s.boot.events, s.hdw, s.lcd_height, f_down.key, boot_input_failure,
+                             &s) ||
         !hpclang_event_add(&s.boot.events, INJECT_US, inject, &s) ||
         !hpclang_sequence_start(&s.boot)) {
         fprintf(stderr, "cannot schedule boot/E2E actions\n");

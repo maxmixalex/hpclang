@@ -2,8 +2,7 @@
 # HP39/40 2.22 RECEIVE FROM order:
 #   HP39 (IrDA), HP39/40 (USB), HP39/40 (Ser),
 #   USB Disk drive, Ser. Disk drive.
-2000 tap f6
-4000 tap f6
+2000 dismiss f6 ../fixtures/ui/hp39-memory-clear.pgm
 
 # With the USB cable asserted during boot, HP39gs can still be settling its
 # startup state when the historical 7s APLET tap arrives.  Enter HOME first,

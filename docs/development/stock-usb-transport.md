@@ -73,10 +73,24 @@ Stock ROMs, application results and transfer watchdogs are unchanged.
 The server starts with a one-second retransmission timeout
 (`SET SEND TIMEOUT 1 DYNAMIC 1 30`). The bundled sender patch doubles the
 interval after consecutive timeouts, capped at 30 seconds, and returns to
-normal packet-rate timing on an accepted ACK. This preserves fast recovery
+normal packet-rate timing after a clean, unambiguous ACK. This preserves fast recovery
 from an isolated lost notification without exhausting all ten retries while
 a busy Stock receiver is still processing a packet. The existing 90-second
 no-progress and 20-minute total watchdogs still apply.
+
+The timing patch records subsecond timestamps in the estimator's millisecond
+units. Whole-second timestamps made fast exchanges crossing a second boundary
+look slow and prolonged later recovery. ACKs for retransmitted packets cannot
+identify which transmission arrived; those samples retain the backed-off
+interval until a clean exchange supplies a new measurement. This improves
+sender recovery without claiming that Stock's receive-notification pauses are
+eliminated.
+
+`tests/e2e/harness/test-kermit-timers.py` compiles the patched upstream timer
+functions with controlled timestamps during bundle construction. It checks
+second-boundary precision, ambiguous retransmissions, recovery on the next
+clean exchange, and genuinely slow peers. Its source is a bundle cache input.
+The receiver retains its existing one-second timing margin in the new units.
 
 `tests/e2e/harness/test-kermit-server.py` checks the bundled executable over
 a PTY on both cache hits and fresh builds. It verifies idle silence, recovery

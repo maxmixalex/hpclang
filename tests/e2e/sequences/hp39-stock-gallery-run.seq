@@ -1,0 +1,16 @@
+# Shared HP39-family Gallery suffix, relative to the USB host gate.
+# Launch retries end at 61000 ms; Gallery cancels them after publishing state.
+70000 capture gallery-native-mini
+71000 tap enter
+72000 capture gallery-native-mini-other
+73000 tap down
+74000 capture gallery-native-main
+75000 tap enter
+76000 capture gallery-native-main-other
+77000 tap down
+78000 capture gallery-native-editline
+79000 tap enter
+80000 capture gallery-native-editline-other
+81000 tap right
+82000 capture gallery-generated-control
+83000 tap on

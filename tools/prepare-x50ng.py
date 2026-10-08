@@ -127,6 +127,13 @@ def patch_host_usbdev(root: Path, args: argparse.Namespace) -> None:
     """Add the headless S3C2410 UDC + USB byte-stream host bridge."""
     path = root / "src" / "s3c2410" / "s3c2410_usbdev.c"
     support = args.headless_header.parent
+    replace_once(
+        root / "Makefile",
+        "%.o: %.c\n",
+        "src/s3c2410/s3c2410_usbdev.o: src/s3c2410/hpclang-usbdev-host.c "
+        "src/s3c2410/hpclang-usbdev-host.h\n\n%.o: %.c\n",
+        "USB bridge include dependencies",
+    )
     shutil.copy2(
         support / "hpclang-usbdev-host.h",
         root / "src" / "s3c2410" / "hpclang-usbdev-host.h",
@@ -750,6 +757,9 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "key-sample.h",
         "key-sequence.h",
         "key-delivery.h",
+        "view-tap.h",
+        "dialog-sequence.h",
+        "direct-boot.h",
         "lcd-stability.h",
         "frame-checkpoint.h",
     ):

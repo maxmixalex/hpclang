@@ -19,8 +19,8 @@
 
 /*
  * The HP39/40G atlas establishes the record format and character ordering, but
- * HP39gs/40gs 2.22 relocates those exact raster tables inside bank-1 NOR pages
- * 0x7e and 0x7f. Host-side scans of the official update images establish the
+ * each ROM relocates them: HP39g+ D1.55 uses pages 0x6e/0x6f, while
+ * HP39gs/40gs 2.22 uses pages 0x7e/0x7f. Host-side scans establish the
  * model-specific nibble bases below. Bootstrap maps the two physical pages
  * consecutively at HPCLANG_CODE_WINDOW_BASE; runtime translates legacy atlas
  * coordinates to the evidenced model-specific window coordinates.
@@ -46,6 +46,12 @@
     (HP39_MINI_FIRST_NIBBLE + HP39_MINI_GLYPH_COUNT * HP39_MINI_RECORD_NIBBLES)
 #define HP39_MINI_LAST_NIBBLE (HP39_MINI_MAP_FIRST_NIBBLE + HP39_MINI_MAP_COUNT * 2u - 1u)
 
+/* HP39g+ D1.55: independently located in the physical full-NOR fixture,
+ * pages 0x6e/0x6f. Complete tables match the reviewed 2.22 rasters. */
+#define HP39GPLUS_MAIN_WINDOW_FIRST_NIBBLE 0x00000096u
+#define HP39GPLUS_EDITLINE_WINDOW_FIRST_NIBBLE 0x00000e2fu
+#define HP39GPLUS_MINI_WINDOW_FIRST_NIBBLE 0x000020dau
+
 /* HP39gs 2.22: main @ NOR 0x7e574 high nibble, EditLine candidate @
  * NOR 0x7ec41 low nibble, mini @ 0x7f596 high. The EditLine relocation is
  * independently gated against stock NOR by verify-hp39-native-font.py. */
@@ -62,6 +68,16 @@
 #define HP39_MAIN_SPAN_NIBBLES (HP39_MAIN_LAST_NIBBLE - HP39_MAIN_FIRST_NIBBLE)
 #define HP39_EDITLINE_SPAN_NIBBLES (HP39_EDITLINE_LAST_NIBBLE - HP39_EDITLINE_FIRST_NIBBLE)
 #define HP39_MINI_SPAN_NIBBLES (HP39_MINI_LAST_NIBBLE - HP39_MINI_FIRST_NIBBLE)
+
+_Static_assert(HP39GPLUS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_PAGE_NIBBLES,
+               "HP39g+ main font must fit inside first private window page");
+_Static_assert(HP39GPLUS_EDITLINE_WINDOW_FIRST_NIBBLE + HP39_EDITLINE_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_NIBBLES,
+               "HP39g+ EditLine font must fit inside private window");
+_Static_assert(HP39GPLUS_MINI_WINDOW_FIRST_NIBBLE + HP39_MINI_SPAN_NIBBLES <
+                   HP39_FONT_WINDOW_NIBBLES,
+               "HP39g+ mini font must fit inside private window");
 
 _Static_assert(HP39GS_MAIN_WINDOW_FIRST_NIBBLE + HP39_MAIN_SPAN_NIBBLES <
                    HP39_FONT_WINDOW_PAGE_NIBBLES,
@@ -113,8 +129,7 @@ const struct hpclang_font *hpclang_font_big(void)
 
 const struct hpclang_font *hpclang_font_editline(void)
 {
-    uint32_t model = active_model();
-    return model == HPCLANG_MODEL_HP39GS || model == HPCLANG_MODEL_HP40GS ? &hp39_editline : NULL;
+    return hp39_family(active_model()) ? &hp39_editline : NULL;
 }
 
 const struct hpclang_font *hpclang_font_default(void)
@@ -180,8 +195,7 @@ static uint8_t saturn_byte(uint32_t address)
 static uintptr_t hp39_font_window_base(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (boot == NULL ||
-        (boot->model != HPCLANG_MODEL_HP39GS && boot->model != HPCLANG_MODEL_HP40GS))
+    if (boot == NULL || !hp39_family(boot->model))
         return 0u;
 
     if (boot->platform_cookie == (uintptr_t)HPCLANG_CODE_WINDOW_BASE)
@@ -200,6 +214,14 @@ static uintptr_t hp39_font_window_base(void)
 
 static uint32_t hp39_window_font_first_nibble(uint32_t model, uint32_t logical_first)
 {
+    if (model == HPCLANG_MODEL_HP39GPLUS) {
+        if (logical_first == HP39_MAIN_FIRST_NIBBLE)
+            return HP39GPLUS_MAIN_WINDOW_FIRST_NIBBLE;
+        if (logical_first == HP39_EDITLINE_FIRST_NIBBLE)
+            return HP39GPLUS_EDITLINE_WINDOW_FIRST_NIBBLE;
+        if (logical_first == HP39_MINI_FIRST_NIBBLE)
+            return HP39GPLUS_MINI_WINDOW_FIRST_NIBBLE;
+    }
     if (model == HPCLANG_MODEL_HP39GS) {
         if (logical_first == HP39_MAIN_FIRST_NIBBLE)
             return HP39GS_MAIN_WINDOW_FIRST_NIBBLE;
@@ -225,15 +247,11 @@ static uint8_t hp39_font_nibble(uint32_t logical_first, uint32_t address)
 
     /* The legacy HP39 font tables overlap slightly in logical Saturn address
        space. The caller therefore names the concrete ROM font; never infer
-       table identity from the address alone. HP39g+ retains its historical
-       logical Saturn lookup until a real full-flash fixture establishes a
-       physical layout. */
+       table identity from the address alone. Each supported ROM has its own
+       independently verified physical layout. */
     if (address < logical_first)
         return 0u;
-    if (model == HPCLANG_MODEL_HP39GPLUS)
-        return saturn_nibble(address);
-
-    if (model != HPCLANG_MODEL_HP39GS && model != HPCLANG_MODEL_HP40GS)
+    if (!hp39_family(model))
         return 0u;
 
     uintptr_t window_base = hp39_font_window_base();

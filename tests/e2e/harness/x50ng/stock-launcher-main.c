@@ -14,6 +14,7 @@
 #include "ready-window.h"
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
+#include "dialog-sequence.h"
 #include "stock-return-phase.h"
 #include "s3c2410/s3c2410_lcd.h"
 #include "frame-checkpoint.h"
@@ -278,6 +279,17 @@ static int sequence_retry_tap(struct state *s, const struct key_action *down,
                               const struct key_action *up_action, int64_t us)
 {
     return sequence_key(s, down, 1, us) && sequence_key(s, up_action, 1, us + KEY_HOLD_US);
+}
+
+static void dialog_failure(void *context, const char *reason)
+{
+    fail(context, reason);
+}
+
+static int sequence_dismiss(struct state *s, int key, int64_t us, const char *pattern)
+{
+    return hpclang_dialog_add(&s->sequence.events, s->hdw, s->lcd_height, key, us, pattern,
+                              dialog_failure, s);
 }
 
 static int sequence_chord(struct state *s, const struct key_action *mod_down,
@@ -964,6 +976,15 @@ static int schedule_sequence(struct state *s, const char *path)
         if (strcmp(op, "tap") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);
             if (!key || !sequence_tap(s, key->down, key->up, us))
+                goto invalid_action;
+        } else if (strcmp(op, "dismiss") == 0 && fields == 4) {
+            const struct key_pair_ref *key = find_key_pair(first);
+            char pattern[1024];
+            const char *slash = strrchr(path, '/');
+            int length = snprintf(pattern, sizeof pattern, "%.*s/%s",
+                                  slash ? (int)(slash - path) : 1, slash ? path : ".", second);
+            if (!key || length < 0 || length >= (int)sizeof pattern ||
+                !sequence_dismiss(s, key->down->key, us, pattern))
                 goto invalid_action;
         } else if (strcmp(op, "retry") == 0 && fields == 3) {
             const struct key_pair_ref *key = find_key_pair(first);

@@ -1,5 +1,6 @@
 #ifndef HPCLANG_KEY_SEQUENCE_H
 #define HPCLANG_KEY_SEQUENCE_H
+#include <stdio.h>
 #include <stdlib.h>
 #include "emulator_api.h"
 #include "event-queue.h"
@@ -19,8 +20,11 @@ static inline int64_t hpclang_key_poll(struct hpclang_key_delivery *s, int key, 
         else
             release_key(key);
     }
-    if (step < 0)
+    if (step < 0) {
+        fprintf(stderr, "Key delivery failed: key=%d down=%d ready=%d sampled=%u pressed=%d\n", key,
+                down, emulator_key_ready(key), emulator_key_observed(key), is_key_pressed(key));
         return -1;
+    }
     return step == HPCLANG_KEY_DONE ? 0 : 10000LL;
 }
 

@@ -12,7 +12,7 @@ APP_ROOT="$(realpath "$2")"
 export TARGET
 
 case "$TARGET" in
-    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    hp39gplus|hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
     *) NATIVE_FACE_COUNT=2 ;;
 esac
 export NATIVE_FACE_COUNT
@@ -55,7 +55,7 @@ for launcher in "${SHARD_LAUNCHERS[@]}"; do
 
     dst="$ARCHIVE_ROOT/$shard_name"
     mkdir -p "$dst"
-    for suffix in before.pgm before.pgm.png pass.pgm pass.pgm.png return.pgm return.pgm.png e2e.json font-gallery.pgm font-gallery.pgm.png; do
+    for suffix in before.pgm before.pgm.png failure.pgm pass.pgm pass.pgm.png return.pgm return.pgm.png e2e.json font-gallery.pgm font-gallery.pgm.png; do
         src="$ROOT/build/$TARGET-$suffix"
         [[ -f "$src" ]] && cp "$src" "$dst/$suffix"
     done

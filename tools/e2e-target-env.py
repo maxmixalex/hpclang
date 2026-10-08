@@ -45,6 +45,19 @@ def main() -> int:
             return 2
         print(f"HPCLANG_E2E_STOCK_TRANSPORT={value}")
 
+    dialog = data.get("boot_dialog")
+    if dialog is not None:
+        if not isinstance(dialog, str) or not dialog or "\n" in dialog or "\r" in dialog:
+            print(f"{path}: invalid boot_dialog", file=sys.stderr)
+            return 2
+        dialog_path = (path.parent / dialog).resolve()
+        if not dialog_path.is_file():
+            print(f"{path}: boot_dialog does not exist: {dialog_path}", file=sys.stderr)
+            return 2
+        print(f"HPCLANG_E2E_BOOT_DIALOG={dialog_path}")
+    else:
+        print("HPCLANG_E2E_BOOT_DIALOG=")
+
     bootloader = data.get("bootloader")
     if bootloader is not None:
         value = str(bootloader)

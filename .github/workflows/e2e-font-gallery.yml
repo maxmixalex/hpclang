@@ -27,19 +27,23 @@ on:
       - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
       - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950*.sh"
       - "tests/e2e/harness/run-stock-hp48.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
       - "tests/e2e/specs/runtime.json"
       - "tests/e2e/specs/stock-hp4950-usb.json"
       - "tests/e2e/specs/stock-hp48.json"
+      - "tests/e2e/specs/stock-hp39.json"
       - "tests/e2e/verify.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/harness/ckermit-*.patch"
-      - "tests/e2e/harness/test-kermit-server.py"
+      - "tests/e2e/harness/test-kermit-*.py"
       - "runtime/core/datetime.c"
       - "runtime/core/datetime-internal.h"
       - "runtime/core/rtc-decode.c"
@@ -87,19 +91,23 @@ on:
       - "tests/e2e/fixtures/**"
       - "tests/e2e/harness/*gallery*"
       - "tests/e2e/harness/run-stock.sh"
+      - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950*.sh"
       - "tests/e2e/harness/run-stock-hp48.sh"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
       - "tests/e2e/sequences/hp48gii-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp39*-stock-usb-run.seq"
+      - "tests/e2e/sequences/hp40gs-stock-usb-run.seq"
       - "tests/e2e/specs/runtime.json"
       - "tests/e2e/specs/stock-hp4950-usb.json"
       - "tests/e2e/specs/stock-hp48.json"
+      - "tests/e2e/specs/stock-hp39.json"
       - "tests/e2e/verify.py"
       - "tools/hp-rpl-string-wrap.py"
       - "tests/e2e/harness/x50ng/**"
       - "tests/e2e/harness/ckermit-*.patch"
-      - "tests/e2e/harness/test-kermit-server.py"
+      - "tests/e2e/harness/test-kermit-*.py"
       - "runtime/core/datetime.c"
       - "runtime/core/datetime-internal.h"
       - "runtime/core/rtc-decode.c"
@@ -325,6 +333,8 @@ jobs:
       matrix:
         include:
           - family: hp39
+            target: hp39gplus
+          - family: hp39
             target: hp39gs
           - family: hp39
             target: hp40gs
@@ -338,6 +348,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: ${{ matrix.family == 'hp39' }}
 
       - name: Download compact Stock Gallery build
         uses: actions/download-artifact@v7

@@ -56,6 +56,7 @@ class Peer:
     def __init__(self, descriptor: int):
         self.descriptor = descriptor
         self.buffer = bytearray()
+        self.acknowledged_data: bytes | None = None
 
     def send(self, wire: bytes) -> None:
         while wire:
@@ -78,6 +79,14 @@ class Peer:
 
     def expect(self, kind: bytes, check: int = 1, sequence: int = 0) -> bytes:
         wire = self.receive()
+        # A retry can already be in flight when we send the ACK. Accept only
+        # the exact previously acknowledged data packet (including its CRC),
+        # and ACK it again without appending the payload twice.
+        for _ in range(8):
+            if wire != self.acknowledged_data:
+                break
+            self.send(packet(b"Y", sequence=wire[2] - 32, check=3))
+            wire = self.receive()
         if not wire:
             raise AssertionError(f"server did not send {kind!r} within 3 seconds")
         if wire[2:4] != bytes([sequence + 32]) + kind:
@@ -93,6 +102,7 @@ class Peer:
     def fetch(
         self, name: bytes, expected: bytes, *, lose_data_ack: bool, delay_data_ack: float = 0
     ) -> None:
+        self.acknowledged_data = None
         self.send(packet(b"R", name))
         self.expect(b"S")
         self.send(packet(b"Y", b"~* @-# 3"))
@@ -123,6 +133,7 @@ class Peer:
                     raise AssertionError(f"expected bounded retry backoff, got {retries} retries")
                 delay_data_ack = 0
             received.extend(unquote(data))
+            self.acknowledged_data = packet(b"D", data, sequence, 3)
             self.send(packet(b"Y", sequence=sequence, check=3))
             sequence = (sequence + 1) % 64
         if bytes(received) != expected:

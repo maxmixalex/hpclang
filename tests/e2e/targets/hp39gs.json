@@ -7,5 +7,6 @@
     "archive": "hp39gs222.zip",
     "member": "HP39GS_2.22/hp39gs_v2.22.bin"
   },
-  "stock_transport": "usb"
+  "stock_transport": "usb",
+  "boot_dialog": "../fixtures/ui/hp39-memory-clear.pgm"
 }
