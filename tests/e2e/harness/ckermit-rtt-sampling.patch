@@ -1,0 +1,103 @@
+--- a/ckcfn2.c
++++ b/ckcfn2.c
+@@ -302,6 +302,15 @@
+ 
+ /*  R T T I N I T  --  Initialize timers at start of transaction  */
+ 
++static long
++rttclock(void) {
++#ifdef GFTIMER
++    return (long)(gftimer() * RTT_SCALE);
++#else
++    return (long)gtimer() * RTT_SCALE;
++#endif
++}
++
+ VOID
+ rttinit() {				/* Initialize round-trip timing */
+     int i;
+@@ -343,6 +352,7 @@
+ {
+     extern int mintime, maxtime;
+     static int prevz = 0, prevr = 0;
++    int previous_timeout = rcvtimo;
+     int x, y, yy, z = 0, zz = 0;	/* How long did it take to get here? */
+ 
+     rcvtimo = timint;			/* Default timeout is what user said */
+@@ -356,6 +366,17 @@
+     if (!RTT_SCALE)			/* Paranoia... */
+       return(-1);
+ 
++    /* An ACK after retransmission has no unambiguous send timestamp.
++     * Keep the backed-off interval until a clean exchange supplies a sample. */
++    if (!nakstate && n >= 0 && n < 64) {
++        int slot = sseqtbl[n];
++        if (slot >= 0 && s_pkt[slot].pk_rtr > 0) {
++            rcvtimo = previous_timeout;
++            debug(F101,"RTT skip retransmitted packet","",n);
++            return(-1);
++        }
++    }
++
+     /* rtimer() (reset timer) is not called until 1st data packet */
+ #ifdef GFTIMER
+     /* rftimer(); */
+@@ -377,7 +398,7 @@
+ 	    if (x > -1 && y > -1) {	/* Be careful */
+ 		z = x - y;		/* Packet rate */
+ 		zz = x - yy;		/* Round trip time */
+-		z++;			/* So sender & receiver differ */
++		z += RTT_SCALE;		/* Preserve receiver's one-second margin */
+ 		debug(F101,"RTT RECV","",z);
+ 	    } else {			/* This shouldn't happen */
+ 		debug(F101,"RTT RECV ERROR spackets","",spackets);
+@@ -394,16 +415,9 @@
+ 		return(-1);
+ 	    }
+ 	}
+-	if (z < 1)			/* For fast connections */
+-	  z = RTT_SCALE / 2;		/* Convert to scale... */
+-	else
+-	  z *= RTT_SCALE;
+-	debug(F101,"RTT z scaled","",z);
+-
+-	if (zz < 1)			/* For fast connections */
+-	  zz = RTT_SCALE / 2;		/* Convert to scale... */
+-	else
+-	  zz *= RTT_SCALE;
++        if (z < 1) z = 1;
++        if (zz < 1) zz = 1;
++        debug(F101,"RTT z scaled","",z);
+ 
+ 	rttdelay = zz;			/* Round trip time of this packet */
+ #ifdef COMMENT
+@@ -1526,9 +1540,9 @@
+ #ifdef CK_TIMERS
+ 	if (timint > 0) {
+ 	    if (pkttyp == 'N')
+-	      srttbl[n > 0 ? n-1 : 63] = gtimer();
++	      srttbl[n > 0 ? n-1 : 63] = rttclock();
+ 	    else
+-	      srttbl[n] = gtimer();
++	      srttbl[n] = rttclock();
+ 	}
+ #endif /* CK_TIMERS */
+ 	spktl = i;			/* Remember packet length */
+@@ -2086,7 +2100,7 @@
+     /* Everything ok, send the packet */
+ #ifdef CK_TIMERS
+     if (timint > 0)
+-      srttbl[n] = gtimer();		/* Update the timer */
++      srttbl[n] = rttclock();		/* Update the timer */
+ #endif /* CK_TIMERS */
+     x = ttol(s_pkt[j].pk_adr,s_pkt[j].pk_len);
+ 
+@@ -3263,7 +3277,7 @@
+ 
+ #ifdef CK_TIMERS
+     if (timint > 0)
+-      rrttbl[rsn] = gtimer();		/* Timestamp */
++      rrttbl[rsn] = rttclock();		/* Timestamp */
+ #endif /* CK_TIMERS */
+ 
+     rseqtbl[rsn] = k;			/* Make back pointer */

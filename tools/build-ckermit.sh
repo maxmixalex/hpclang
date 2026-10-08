@@ -21,6 +21,9 @@ tar -xzf "$WORK/source.tar.gz" -C "$WORK/source" --strip-components=1
 git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-server-command-wait.patch"
 # Retain rapid first recovery without exhausting retries on a late ACK.
 git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-send-backoff.patch"
+# Fast local links need subsecond samples; retransmitted ACKs are ambiguous.
+git -C "$WORK/source" apply "$ROOT/tests/e2e/harness/ckermit-rtt-sampling.patch"
+python3 "$ROOT/tests/e2e/harness/test-kermit-timers.py" "$WORK/source/ckcfn2.c"
 make -C "$WORK/source" -j2 linux CC=gcc
 mkdir -p "$DEST"
 install -m 755 "$WORK/source/wermit" "$DEST/kermit"
