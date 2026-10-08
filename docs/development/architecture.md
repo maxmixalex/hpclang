@@ -81,7 +81,7 @@ The platform family is the implementation unit for launch and low-level integrat
 
 A model profile is narrower. It records real per-model facts such as model ID, firmware source, bootloader identity, LCD height, or stock transfer sequence. It must not create a runtime fork merely because a calculator has a different product name.
 
-HP39g+ sharing the `hp39` platform does not establish that it shares HP39gs/40gs native physical-font layout. A verified real-machine D1.55 full-NOR fixture now establishes model-1 firmware identity and boot/runtime input; the model-1 font object/page mapping remains a separate evidence task.
+HP39g+ D1.55 has its own font layout, established from the verified real-machine full-NOR fixture: pages `0x0006e000` / `0x0006f000`, versus `0x0007e000` / `0x0007f000` on HP39gs/40gs 2.22. Both use the same owned two-page window and font API. The complete tables match the reviewed atlas; [model-specific pixel validation](validation.md#hp39g-native-font-follow-up) does not infer equality from family membership.
 
 ## Common platform services
 

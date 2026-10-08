@@ -86,7 +86,7 @@ The font design has **two independent source classes** and a common rendering AP
 
 ### Calculator-native fonts
 
-`hpclang_font_mini()`, HP48/49/50-only `hpclang_font_big()`, HP39gs/40gs-only `hpclang_font_editline()`, and the convenience `hpclang_font_default()` return borrowed descriptors over calculator-owned font assets. hpclang does not embed or redistribute HP ROM glyph bitmaps.
+`hpclang_font_mini()`, HP48/49/50-only `hpclang_font_big()`, HP39g+/39gs/40gs-only `hpclang_font_editline()`, and the convenience `hpclang_font_default()` return borrowed descriptors over calculator-owned font assets. hpclang does not embed or redistribute HP ROM glyph bitmaps.
 
 The implementation deliberately differs by platform family:
 

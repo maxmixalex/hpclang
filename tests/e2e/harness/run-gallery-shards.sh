@@ -12,7 +12,7 @@ APP_ROOT="$(realpath "$2")"
 export TARGET
 
 case "$TARGET" in
-    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    hp39gplus|hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
     *) NATIVE_FACE_COUNT=2 ;;
 esac
 export NATIVE_FACE_COUNT

@@ -12,7 +12,7 @@ APP_DIR="$(realpath "$2")"
 export TARGET
 
 case "$TARGET" in
-    hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
+    hp39gplus|hp39gs|hp40gs) NATIVE_FACE_COUNT=3 ;;
     *) NATIVE_FACE_COUNT=2 ;;
 esac
 
@@ -126,7 +126,7 @@ export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
 timeout 330s "$X50" "${X50_ARGS[@]}"
 
-if [[ "$TARGET" == hp39gs || "$TARGET" == hp40gs ]]; then
+if [[ "$HPCLANG_E2E_FAMILY" == hp39 ]]; then
     FLASH="$STATE/flash"
     [[ -s "$FLASH" ]] || {
         echo "missing x50ng Gallery flash backing: $FLASH" >&2
