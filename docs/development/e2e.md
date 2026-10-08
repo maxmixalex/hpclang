@@ -47,13 +47,20 @@ test merely to reuse its launch harness.
 The emulator workflows are split by what they prove, not by which historical
 emulator happens to execute them.
 
-The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run two
-payloads through the same Direct/Stock family harness: `runtime` (including the
-physical keyboard progression) and `system-services` (RTC read/set, deadline
-continuity, timers, sound, contrast, USB detection and bounded input). The latter
-has no keyboard-injection sequence. Keeping its code separate avoids exhausting
-HP48gII's heap with a monolithic payload. Each suite has distinct artifacts and
-published evidence paths; no service probe is skipped to make the large binary fit.
+The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run
+four focused payloads through the same six-model Direct/Stock family harness:
+
+- `runtime`: core C/C++ runtime, drawing and physical keyboard progression.
+- `object-basics`: stack operations, named-object views and HPGCC Saturn compatibility.
+- `system-services`: RTC read/set, deadline continuity, timers, sound, contrast,
+  USB detection and bounded input.
+- `display`: display sessions, restoration and pixel verification described above.
+
+Only `runtime` requires the injected keyboard sequence. Separate payloads reduce
+each Stock upload and avoid exhausting HP48gII's heap with a monolithic binary.
+Each suite has distinct artifacts and evidence paths; moving object checks out
+of `runtime` preserves their assertions and Direct/Stock coverage. Transfer and
+acknowledged-progress deadlines remain unchanged.
 
 The prepared emulator models a writable civil RTC initialized from the host's
 local calendar. Later register reads, alarms and saved-state restoration use its
