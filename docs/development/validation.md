@@ -348,8 +348,19 @@ font-window checks. Clang analysis, formatting, workflow syntax and docs build
 also pass.
 The Stock Gallery now reuses the canonical USB install/launch harness and a
 shared Gallery interaction suffix, adding HP39g+ to the CI matrix. Formal CI
-acceptance is pending. Exhaustive generated-font
-coverage remains the existing 20-shard gate.
+acceptance is complete at `8f79c156`:
+[Gallery](https://github.com/zyf722/hpclang/actions/runs/37739454659),
+[Runtime](https://github.com/zyf722/hpclang/actions/runs/37739454651),
+[Objects](https://github.com/zyf722/hpclang/actions/runs/37739454599),
+[Storage](https://github.com/zyf722/hpclang/actions/runs/37739454593),
+[Core](https://github.com/zyf722/hpclang/actions/runs/37739454634),
+[Quality](https://github.com/zyf722/hpclang/actions/runs/37739454598) and
+[FatFs vendor](https://github.com/zyf722/hpclang/actions/runs/37739454618) pass.
+Storage's first attempt passed both HP49/50 application checks but failed to
+upload evidence with a TLS error; the failed job passed on rerun. Exhaustive
+generated-font coverage retains the existing 20-shard gate. HP39g+ composite
+transfer also exceeded the unchanged 1200-second ceiling in local validation;
+USB receive-notification/throughput reliability remains open despite this CI pass.
 
 ## Native ROM-font API contract
 
