@@ -68,6 +68,8 @@ jobs:
     runs-on: home-docker
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       - name: Run unit tests
         run: |

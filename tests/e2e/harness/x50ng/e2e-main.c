@@ -643,6 +643,9 @@ static void json(struct e2e *s, const char *status)
 static void fail(struct e2e *s, const char *why)
 {
     s->failed = 1;
+    const char *failure_pgm = getenv("HPCLANG_X50NG_FAILURE_PGM");
+    if (failure_pgm)
+        capture_lcd(s->hdw, failure_pgm, s->lcd_height);
     fprintf(stderr, "HPC1 E2E FAIL: %s\n", why);
     json(s, why);
     hdw_stop(s->hdw);

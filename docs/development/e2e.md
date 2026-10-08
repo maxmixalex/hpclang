@@ -34,6 +34,11 @@ tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different
 targets.
 
+Host tests also discover Python `test_*.py` files. The native-font identity test
+uses the Git LFS ROM fixture; fetch it before running the host suite with
+`git lfs pull --include=tests/e2e/fixtures/hp39gplus/flash.bin.xz`. Core CI checks
+out LFS contents for this test.
+
 The canonical runtime application and focused visual/sample applications are
 separate executables. In particular, Font Gallery is a **separate E2E
 application**; it must not grow as extra screens inside the canonical runtime
@@ -76,6 +81,11 @@ the selected-target list consumed by reports and suite-specific verifiers.
 Stock Gallery uses the same 25-minute outer job limit as Runtime/Object Stock:
 its job must not be cancelled before the shared 20-minute transfer watchdog can
 report a result. The 90-second acknowledged-progress idle limit is unchanged.
+
+Direct and Gallery failures retain a `*-failure.pgm` screen alongside the JSON
+result, including failures before payload injection. Key-delivery failures also
+report the key, requested edge, readiness, GPIO sample count and switch state.
+Gallery archives the failure screen with the affected shard.
 
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 

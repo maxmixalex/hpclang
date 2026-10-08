@@ -368,6 +368,9 @@ static void write_json(struct state *s, const char *status)
 static void fail(struct state *s, const char *why)
 {
     s->failed = 1;
+    const char *failure_pgm = getenv("HPCLANG_X50NG_FAILURE_PGM");
+    if (failure_pgm)
+        capture_lcd(s->hdw, failure_pgm, s->lcd_height);
     fprintf(stderr,
             "Font Gallery E2E FAIL: %s (pc=0x%08x lr=0x%08x "
             "dfsr=0x%08x dfar=0x%08x)\n",

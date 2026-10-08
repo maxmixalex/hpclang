@@ -55,7 +55,7 @@ for launcher in "${SHARD_LAUNCHERS[@]}"; do
 
     dst="$ARCHIVE_ROOT/$shard_name"
     mkdir -p "$dst"
-    for suffix in before.pgm before.pgm.png pass.pgm pass.pgm.png return.pgm return.pgm.png e2e.json font-gallery.pgm font-gallery.pgm.png; do
+    for suffix in before.pgm before.pgm.png failure.pgm pass.pgm pass.pgm.png return.pgm return.pgm.png e2e.json font-gallery.pgm font-gallery.pgm.png; do
         src="$ROOT/build/$TARGET-$suffix"
         [[ -f "$src" ]] && cp "$src" "$dst/$suffix"
     done

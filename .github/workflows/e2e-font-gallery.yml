@@ -348,6 +348,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: ${{ matrix.family == 'hp39' }}
 
       - name: Download compact Stock Gallery build
         uses: actions/download-artifact@v7
