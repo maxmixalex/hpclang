@@ -141,7 +141,7 @@ concurrency:
 jobs:
   build:
     name: Build Font Gallery
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -213,7 +213,7 @@ jobs:
 
   x50ng:
     name: Prepare universal x50ng
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -235,7 +235,7 @@ jobs:
   gallery:
     name: Gallery / ${{ matrix.family }}
     needs: [build, x50ng]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -325,7 +325,7 @@ jobs:
   stock:
     name: Stock / ${{ matrix.target }}
     needs: [build, x50ng]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     # Match other Stock jobs: allow the shared transfer ceiling plus verification.
     timeout-minutes: 25
     strategy:
@@ -504,7 +504,7 @@ jobs:
     name: Publish ci-evidence
     if: always() && !cancelled() && github.event_name != 'pull_request'
     needs: [gallery, stock]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     concurrency:
       group: ci-evidence-publisher
       cancel-in-progress: false

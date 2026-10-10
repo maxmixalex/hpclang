@@ -95,7 +95,7 @@ concurrency:
 jobs:
   build:
     name: Build Runtime suite payloads
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     outputs:
       suites: ${{ steps.build.outputs.suites }}
       stock_targets: ${{ steps.build.outputs.stock_targets }}
@@ -139,7 +139,7 @@ jobs:
 
   x50ng:
     name: Prepare universal x50ng
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -161,7 +161,7 @@ jobs:
   stock-assets:
     name: Prepare Stock suite assets
     needs: build
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -215,7 +215,7 @@ jobs:
   direct:
     name: Direct / ${{ matrix.suite.mode }} / ${{ matrix.family }}
     needs: [build, x50ng]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -299,7 +299,7 @@ jobs:
   stock:
     name: Stock / ${{ matrix.suite.mode }} / ${{ matrix.model.target }}
     needs: [build, x50ng, stock-assets]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -395,7 +395,7 @@ jobs:
     name: Publish ci-evidence
     if: always() && !cancelled() && github.event_name != 'pull_request'
     needs: [direct, stock]
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     concurrency:
       group: ci-evidence-publisher
       cancel-in-progress: false

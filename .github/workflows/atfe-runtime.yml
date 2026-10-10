@@ -65,7 +65,7 @@ concurrency:
 jobs:
   runtime:
     name: Runtime and unit tests
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -100,7 +100,7 @@ jobs:
   hp39-package:
     name: HP39 package
     needs: runtime
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 

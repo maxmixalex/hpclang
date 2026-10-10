@@ -44,7 +44,7 @@ concurrency:
 jobs:
   quality:
     name: Lint, format, and Clang analysis
-    runs-on: home-docker
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
