@@ -2,6 +2,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include "clock-internal.h"
+#include "../libc/stdio-lifetime.h"
 
 static const struct hpclang_boot_info *boot_info;
 static jmp_buf exit_context;
@@ -12,7 +13,6 @@ extern unsigned char __tls_base[];
 void _set_tls(void *tls);
 void __libc_init_array(void);
 void __libc_fini_array(void);
-void hpclang_stdio_exit_cleanup(void);
 void hpclang_time_init(void);
 void hpclang_storage_shutdown(void);
 void hpclang_display_end(void);

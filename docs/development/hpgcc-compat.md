@@ -49,7 +49,7 @@ ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
 | Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
 | Persistent HP39 Aplet and native catalogs | HP39-enabled 1.1 Aplet template, checked against native ROM behavior | Aplet data/Reset and Program/Note catalogs; HP39 Stock with portal validation | Aplet packaging/template integration; no invented HOME namespace | Accepted on `6a7f9a28`: 15-invocation Reset and eight-invocation composite lifecycles, independent instances, SAVE and GC boundaries |
 | Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | Not implemented | No adapter claims | Each port's limitation was approved on 2026-10-04; implementation goals remain in the roadmap |
-| Ordinary application termination | HPGCC3 `hplib/sys/exit.c` distinguishes normal saved-stack return from reset/warm recovery; picolibc supplies standard exit callbacks | `main` return / `exit` execute callbacks and return through the launcher; `_Exit` skips callbacks but releases SDK-owned hardware | Standard libc names | Implemented; 71 host tests pass. ARM callback, C++ destructor and hardware-restoration acceptance is in progress |
+| Ordinary application termination | HPGCC3 `hplib/sys/exit.c` distinguishes normal saved-stack return from reset/warm recovery; picolibc supplies standard exit callbacks | `main` return / `exit` execute callbacks, close registered streams and return through the launcher; `_Exit` skips callbacks/buffer flushing but releases SDK-owned hardware | Standard libc names | 72 host tests, sanitizer checks and six-model Direct/Stock termination evidence pass. HP49g+/HP50g Direct/Stock additionally verify buffered exit-time writes after native return. Formal CI is pending |
 | Whole-calculator reset and hardware serial number | `kos_Reset` is reset/panic recovery; all four releases warn that `kos_getSerialNumber` may return garbage / Kinpo copyright data | Not implemented; no reliable serial-number claim | No adapter claims | Retained research goals, explicitly approved as nonblocking for M7 on 2026-10-12; ordinary `exit` remains required in M7 |
 
 Historical `sys_slowOn/sys_slowOff` is also used by real applications to select
@@ -60,15 +60,32 @@ review before the overall M7 capability gate can close.
 
 The current implementation provides typed HOST/ECONOMY profiles, preserving
 PLL and bus configuration while adjusting LCD timing and rebasing monotonic
-time. Active sound excludes clock transitions. Seventy host tests and all six
-Direct System Services targets pass; runtime-exit restoration and coexistence
-with Stock object services and SD files are still being validated. Historical
+time. Active sound excludes clock transitions. All 72 host tests and all six
+Direct/Stock System Services targets pass, including runtime-exit restoration.
+Stock native-object coexistence passes on all six models, and SD file
+coexistence passes on both supported models in Direct/Stock. Formal CI is pending. Historical
 raw speed-register and overclocking interfaces are not exposed by this policy.
 The HPGCC 1.1/2.0 sieve client is now ported in
 `system-services/historical-system.c`, with prime-count/checksum and visible
 report checks. It passes Direct and Stock on all six models; its additional formal CI is pending.
 
 ## Public API stability
+
+### Retained M8 deliverables
+
+The capability ledger does not complete the following source-compatibility and
+SDK delivery work:
+
+- An installable SDK, public examples and a fresh LLVM-only downstream build.
+- Maintained HPGCC adapters, including console/text spellings, further C++
+  wrappers and migration guidance for raw KOS/Saturn/MMU callers.
+- Representative HPGCC3 applications built through those adapters with minimal
+  mechanical changes; M7's clean-service behavioral ports remain their evidence
+  baseline, rather than being relabeled unchanged-source compatibility.
+- The renderer-independent declarative UI and post-HPGCC extensions retained in
+  the [M8 roadmap](roadmap.md#m8-hpgcc-source-compatibility-sdk-ux-and-post-hpgcc-extensions).
+
+### Historical declaration stability
 
 The historical releases are more source-stable than their runtime implementations suggest.
 

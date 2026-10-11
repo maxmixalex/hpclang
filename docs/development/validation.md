@@ -864,17 +864,17 @@ visible prime/iteration report, with a nonblank measured-time line. DMA padding
 outside the physical 131-pixel width is excluded from the pixel comparison.
 Formal CI for this additional client is still pending.
 
-### M7 owned power policy — local validation in progress
+### M7 owned power policy — local validation complete, CI pending
 
 HOST/ECONOMY profiles coordinate CPU clock, LCD divider and monotonic time,
 reject active-sound transitions, and restore borrowed state on runtime exit.
-All 70 host tests and six-model Direct System Services pass locally. The
+All 72 host tests and six-model Direct/Stock System Services pass locally. The
 Direct harness checks clock registers and LCD configuration before restoring
 its own saved Stock state; the application deliberately leaves economy mode
 active at return. HP49g+/HP50g Direct and Stock file operations also pass in
-economy mode, followed by card replacement and stale-handle checks. Stock
-System Services remains under validation; native-object coexistence now passes
-on all six Stock models, including HP39 catalogs and classic composite flows.
+economy mode, followed by card replacement and stale-handle checks.
+Native-object coexistence passes on all six Stock models, including HP39
+catalogs and classic composite flows. Formal CI for this batch remains pending.
 
 The comprehensive System Services payload has less available HP39 Stock heap
 than the dedicated Display payload. Its clock/display release-order checks
@@ -888,7 +888,7 @@ Emulator timing now preserves outstanding PWM counter ticks when PCLK changes.
 Host tests cover scaling, rounding and saturation. These checks establish clock
 selection and state restoration; they do not measure physical battery savings.
 
-### M7 application termination — local validation in progress
+### M7 application termination — local validation complete, CI pending
 
 Normal `main` return and `exit` share picolibc callback dispatch before the
 runtime returns through its launcher boundary. `_Exit` skips that dispatch.
@@ -897,14 +897,15 @@ C callbacks and C++ static destruction. Runtime cleanup also releases an
 active sound session, including termination from a cancellation callback,
 before restoring display, power policy and storage ownership.
 
-All 71 host tests pass, including nested/constructor termination, zero and
+All 72 host tests pass, including nested/constructor termination, zero and
 extreme exit statuses, and cleanup order. Runtime, System Services and Display
 pass Direct on all six models. Runtime requires both reverse-order C callbacks
 and its C++ destructor before publishing PASS; Display rejects callback or
 destructor execution on `_Exit`. System Services exits from an active sound
 callback while in economy mode, and the harness checks clock, PWM and LCD
 configuration before restoring its own saved host. HP49g+/HP50g Direct Storage
-also passes with media replacement enabled. Stock validation is running.
+also passes with media replacement enabled. The initial termination batch
+passes Stock Runtime, System Services and Display on all six models.
 Changed-source Clang analysis, formatting and strict docs pass.
 
 An earlier HP39gs System Services payload failed in the timed-client phase.
@@ -912,7 +913,8 @@ Saved MMU/RAM inspection shows `errno=ENOMEM` and only 16 KiB of writable
 mapping including the boot page and 8 KiB stack. The benchmark now explicitly
 packages printable ASCII, its actual output repertoire, reducing initialized
 image size from 65,328 to 59,848 bytes. Stock revalidation checks this smaller
-payload without reducing stack bounds or weakening the prime/pixel assertions.
+payload without reducing stack bounds or weakening the prime/pixel assertions;
+the previously failing HP39gs/HP40gs checks now pass.
 
 The additional stream-lifetime check found that the pinned ATFE picolibc has
 `__STDIO_EXIT_FLUSH` disabled. The runtime now closes registered streams after
@@ -928,5 +930,8 @@ callback. A Stock experiment demonstrated that VVFAT's directory overlay could
 lose the new file despite successful native return; the identical payload on
 a raw FAT image retained the complete `MAIN-ATEXIT` bytes. The fixture now keeps
 card A mounted after A→B→A, eliminating the final directory-backend swap and
-checking the exit-time file in card A's actual first partition. Final Direct
-and Stock validation of this stream extension is in progress.
+checking the exit-time file in card A's actual first partition. This final
+Storage witness passes Direct and Stock on HP49g+/HP50g. The stream extension
+also passes six-model Direct Runtime/System Services and a focused HP39gs
+Stock System Services recheck with the smaller shared heap. Its changed-source
+analysis, formatting, ShellCheck and strict docs pass. Formal CI is pending.

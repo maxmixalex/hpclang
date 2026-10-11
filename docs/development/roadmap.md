@@ -433,11 +433,17 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 
 ### M7.0 follow-up — capability and evidence ledger
 
-- [ ] Track historical declaration, implementation, clean equivalent, source
+- [x] Track historical declaration, implementation, clean equivalent, source
   adapter and validation separately, per model and execution context.
-- [ ] Give each historical application capability an explicit destination;
+- [x] Give each historical application capability an explicit destination;
   require maintainer approval for an actual omission rather than treating a
   raw historical signature as sufficient reason to omit its useful behavior.
+  - The [capability ledger](hpgcc-compat.md#capability-and-application-evidence)
+    records the four source generations, model/context boundaries and actual
+    application witnesses. CPU policy and ordinary termination stay in M7;
+    native ports, reset and serial-number research retain individually approved
+    follow-ups. Remaining historical spellings and broader UI policy stay in M8.
+    This completes the ledger structure, not the pending functional CI gate.
 - [x] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
   - Accepted on `9489e7d1`: distinguish classic RPL read access from mutation availability,
@@ -618,7 +624,10 @@ Additional source-confirmed application capabilities still to close:
     finalizer section retained by the linker. Local host tests cover nested
     calls, constructor termination and exact status propagation; ARM tests
     check actual C callbacks, C++ destruction and owned hardware restoration.
-    Six-model validation is in progress.
+    Six-model Direct/Stock termination checks pass. The additional buffered
+    stream cleanup passes all 72 host tests, sanitizers, six-model Direct
+    Runtime/System Services, HP39gs Stock System Services and HP49g+/HP50g
+    Direct/Stock exit-time file persistence. Formal CI is pending.
 - [ ] Retain whole-calculator reset (`kos_Reset`) as a subsequent research
   goal. The historical entry is reset/panic recovery, not ordinary app exit.
   The maintainer approved this as nonblocking for M7 on 2026-10-12.
@@ -646,10 +655,10 @@ Additional source-confirmed application capabilities still to close:
   clock-register writes.
   - HOST/ECONOMY profiles are implemented with an unchanged PLL and bus
     divisors, bounded LCD reclocking, monotonic rebasing and active-sound
-    exclusion. Seventy host tests and six-model Direct System Services pass
+    exclusion. All 72 host tests and six-model Direct/Stock System Services pass
     locally, including exit cleanup checked before the harness restores Stock.
-    HP49g+/HP50g Direct and Stock SD file coexistence passes. Stock System
-    Services and object calls remain under validation.
+    HP49g+/HP50g Direct and Stock SD file coexistence and six-model Stock
+    object coexistence pass. Formal CI is pending.
 - [ ] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
   - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
@@ -672,8 +681,8 @@ fix, not a retry or relaxation of the application result checks.
 
 - [ ] Exercise a stateful HP39 Aplet, nested directories, numerical composites,
   files, text/keyboard, graphics and time/system clients on their actual models.
-- [ ] Retain the existing M8 compatibility, C++, migration and declarative-UI
+- [x] Retain the existing M8 compatibility, C++, migration and declarative-UI
   goals; add installable SDK/examples, console/text adapters and representative
   HPGCC3 clients to the compatibility ledger.
-- [ ] Keep missing clean capabilities in M7; reserve M8 for historical spelling,
+- [x] Keep missing clean capabilities in M7; reserve M8 for historical spelling,
   higher-level policy, SDK usability and the already planned extensions.

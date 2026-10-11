@@ -468,7 +468,8 @@ tracks stream constructors and close/reopen through public `FILE` operations;
 it does not inspect the library's private stream layout. A callback binding's
 context must remain valid until it is unbound or normal exit has flushed it.
 
-This behavior is implemented and under local six-model validation. It does
+This behavior has local six-model termination evidence, plus HP49g+/HP50g
+Direct/Stock buffered-file persistence checks; formal CI remains pending. It does
 not recover from arbitrary CPU faults, reset the whole calculator or guarantee
 completion after power loss.
 

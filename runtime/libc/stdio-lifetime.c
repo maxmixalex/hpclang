@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include "stdio-lifetime.h"
 
 struct stream_entry
 {
@@ -15,6 +16,11 @@ struct stream_entry
 static struct stream_entry *streams;
 static int flushing;
 static unsigned closed_standard;
+
+void hpclang_stdio_reset_standard(void)
+{
+    closed_standard = 0;
+}
 
 FILE *__real_fdopen(int fd, const char *mode);
 FILE *__real_fmemopen(void *buffer, size_t size, const char *mode);
