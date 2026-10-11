@@ -451,6 +451,10 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     contract is unchanged.
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
+  - Implemented numeric extension, awaiting CI: exact signed 64-bit and finite
+    double conversion from the bounded editor, full-line syntax/range checking,
+    and correction after a rejected accept attempt. Alpha/Shift text policy,
+    console event/rendering behavior and historical blocking adapters remain open.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

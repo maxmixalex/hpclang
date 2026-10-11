@@ -221,6 +221,25 @@ primitives for historical line-input/error helpers. Buffer ownership, cancellati
 and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
 `readint`/`readline` spelling and global stdio routing remain adapter/UI work.
 
+### Bounded numeric input
+
+All four distribution sources implement `readint()` and `readdouble()` using a
+32-byte local buffer followed by `atoi(gets(buf))` or `atof(gets(buf))`:
+`sources/hplib/stdio/readint.c` / `readdouble.c` in HPGCC 1.0.3, 1.1 and 2.0,
+and `libs_workspace/hplib/stdio/` in HPGCC3. These implementations establish a
+numeric-input application need; they do not establish bounded reads, full-line
+validation, cancellation or distinguishable conversion failures.
+
+| Historical capability | Clean equivalent / model and context | Source adapter | Validation |
+| --- | --- | --- | --- |
+| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Historical blocking `readint` and its narrower `int` range remain an adapter concern | Host exact-boundary/error/re-edit tests and ARM System Services probes; CI pending |
+| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | `readdouble` spelling, modal rendering and console event loop remain adapter/UI work | Host and ARM finite-subnormal, range and correction probes; CI pending |
+
+The clean functions preserve the line and output on errors rather than silently
+accepting a numeric prefix. They do not implement Alpha-lock, a blocking console,
+global stdin/stdout routing or arbitrary-precision calculator numbers. Those
+separate capabilities retain their existing roadmap destinations.
+
 ## File I/O and standard C I/O
 
 The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Insertion/write-protect sampling reads configured GPIO inputs before and during ownership; Stock KOS is retained for `ResetSD` after release. Observed removal or a block-transfer failure invalidates old file/directory objects, and new path operations can remount. Old handles must be closed after `EBADF`; their pending writes are not flushed to a newly mounted volume. This does not establish detection of a complete remove/reinsert cycle between observations or physical hot-plug safety.

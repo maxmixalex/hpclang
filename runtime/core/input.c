@@ -1,4 +1,6 @@
 #include <errno.h>
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <hpclang/input.h>
 
@@ -6,6 +8,99 @@ static int valid(const struct hpclang_text_input *input)
 {
     return input && input->buffer && input->capacity && input->length < input->capacity &&
            input->cursor <= input->length;
+}
+
+static int digit(unsigned char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+/* Validate before conversion so a numeric prefix can never hide bad suffixes.
+ * Read at most length + 1 bytes, including the editor's terminating NUL. */
+static int number_text(const struct hpclang_text_input *input, int real, int *nonzero)
+{
+    if (!valid(input) || input->length == 0u || input->buffer[input->length] != '\0')
+        return 0;
+    const unsigned char *text = (const unsigned char *)input->buffer;
+    size_t i = 0u, digits = 0u;
+    *nonzero = 0;
+    if (text[i] == '+' || text[i] == '-')
+        ++i;
+    while (i < input->length && digit(text[i])) {
+        *nonzero |= text[i] != '0';
+        ++i;
+        ++digits;
+    }
+    if (real && i < input->length && text[i] == '.') {
+        ++i;
+        while (i < input->length && digit(text[i])) {
+            *nonzero |= text[i] != '0';
+            ++i;
+            ++digits;
+        }
+    }
+    if (digits == 0u)
+        return 0;
+    if (real && i < input->length && (text[i] == 'e' || text[i] == 'E')) {
+        ++i;
+        if (i < input->length && (text[i] == '+' || text[i] == '-'))
+            ++i;
+        size_t begin = i;
+        while (i < input->length && digit(text[i]))
+            ++i;
+        if (i == begin)
+            return 0;
+    }
+    return i == input->length;
+}
+
+int hpclang_text_input_parse_int64(const struct hpclang_text_input *input, int64_t *value)
+{
+    int nonzero;
+    if (value == NULL || !number_text(input, 0, &nonzero)) {
+        errno = EINVAL;
+        return -1;
+    }
+    int negative = input->buffer[0] == '-';
+    size_t i = negative || input->buffer[0] == '+' ? 1u : 0u;
+    uint64_t magnitude = 0u;
+    uint64_t limit = (uint64_t)INT64_MAX + (unsigned)negative;
+    for (; i < input->length; ++i) {
+        unsigned d = (unsigned)(input->buffer[i] - '0');
+        if (magnitude > (limit - d) / 10u) {
+            errno = ERANGE;
+            return -1;
+        }
+        magnitude = magnitude * 10u + d;
+    }
+    *value = negative ? (magnitude == (uint64_t)INT64_MAX + 1u ? INT64_MIN : -(int64_t)magnitude)
+                      : (int64_t)magnitude;
+    return 0;
+}
+
+int hpclang_text_input_parse_double(const struct hpclang_text_input *input, double *value)
+{
+    int nonzero;
+    if (value == NULL || !number_text(input, 1, &nonzero)) {
+        errno = EINVAL;
+        return -1;
+    }
+    int saved_errno = errno;
+    char *end;
+    double converted = strtod(input->buffer, &end);
+    if (end != input->buffer + input->length) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!isfinite(converted) || (nonzero && converted == 0.0)) {
+        errno = ERANGE;
+        return -1;
+    }
+    /* Libcs differ on setting ERANGE for representable subnormals. The clean
+     * contract accepts those and reports only overflow or rounding to zero. */
+    *value = converted;
+    errno = saved_errno;
+    return 0;
 }
 static size_t previous(const struct hpclang_text_input *input)
 {

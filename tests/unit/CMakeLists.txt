@@ -35,6 +35,9 @@ target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(numeric_input test_numeric_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
+target_include_directories(test_numeric_input PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(device test_device.c "${HPCLANG_ROOT}/runtime/core/device.c"
     "${HPCLANG_ROOT}/runtime/core/contrast.c" "${HPCLANG_ROOT}/runtime/core/power.c")
 target_include_directories(test_device PRIVATE "${HPCLANG_ROOT}/include")

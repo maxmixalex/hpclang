@@ -101,10 +101,45 @@ explicit Unicode insertion. It does not introduce a global terminal or change
 stdin/stdout behavior. The application chooses rendering, event polling and
 whether to retain a cancelled working line.
 
+An on-screen standard-I/O console is still missing: the current default `stdin`
+returns EOF and `stdout`/`stderr` discard output. File-backed `FILE *` support in
+M7.2 does not supply an interactive terminal. Console routing, text-plane mapping
+and rendering/event policy remain explicit M7 follow-ups.
+
 `hpclang_surface_draw_text_n()` renders bounded message/error text without requiring
 a terminator, exiting, waiting for a key or clearing the caller's surface.
 Both services have host tests and accepted six-model Direct/Stock ARM E2E
 coverage in [M7.4](validation.md#m74-formal-acceptance).
+
+The numeric-input extension adds `hpclang_text_input_parse_int64()` and
+`hpclang_text_input_parse_double()` (implemented; CI acceptance pending). They
+validate the entire current line and write an output only on success. This lets
+an application reject an invalid Enter/accept attempt and continue editing the
+same buffer. Cancellation remains the application's decision.
+
+| Conversion | Accepted syntax | Failure |
+| --- | --- | --- |
+| Signed 64-bit integer | Optional leading sign, then decimal digits | `EINVAL` for incomplete/invalid text; `ERANGE` outside `INT64_MIN..INT64_MAX` |
+| C `double` | Optional sign, decimal mantissa with optional `.`, at least one mantissa digit, optional `e/E` and signed decimal exponent | `EINVAL` for incomplete/invalid text; `ERANGE` for overflow or a nonzero mantissa rounded to zero |
+
+Whitespace, grouping separators, expressions, hexadecimal, NaN and infinity are
+rejected. Integer conversion is exact; floating conversion uses the SDK C-locale
+`strtod` rounding, including finite subnormals and signed zero. Neither conversion
+changes the text/cursor, consumes keyboard events, chooses an Alpha/Shift policy,
+nor accepts the editor automatically. Successful conversion preserves `errno`;
+failure preserves the output value. A valid binary floating-point result does
+not imply exact decimal calculator-object precision.
+
+For example, after the editor reports `HPCLANG_INPUT_ACCEPTED`:
+
+```c
+int64_t value;
+if (hpclang_text_input_parse_int64(&input, &value) == 0) {
+    /* Commit value to the application. */
+} else {
+    /* Show EINVAL/ERANGE and keep editing input. */
+}
+```
 
 ## Display and surfaces
 
