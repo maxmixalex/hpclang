@@ -9,7 +9,9 @@ ordinary launch/PASS/return checks.
 
 The payload tests actual allocator exhaustion/recovery, 2/4/16-level sessions,
 two page exchanges per mode, status segments, explicit restoration and automatic
-cleanup on return from `main`. A public-API-only HPG feasibility witness covers
+cleanup through `_Exit` with an owned session still active. Both an `atexit`
+callback and a static finalizer fail the test if mistakenly invoked on that
+immediate-exit path. A public-API-only HPG feasibility witness covers
 clip intersections, PAINT/XOR, repeating patterns, line masks and transparent
 RGB XPM import. Broad historical source adapters remain M8.
 
@@ -37,6 +39,13 @@ Frame 199 proves the initial screen is clear; frames 200/201 compare the input
 text with independently rendered literals for single/held and locked Alpha.
 The same protocol runs under Direct and Stock, with the ordinary strict return
 checks retained.
+
+System Services also runs the source-anchored timed-sieve client and exercises
+HOST/ECONOMY clock policy, monotonic continuity and clock/display ownership in
+both release orders. Its final action calls ordinary `exit` from a sound
+cancellation callback while economy mode is active. Direct checks clock, timer
+and LCD configuration before the harness restores its saved host state; Stock
+requires the same payload checks and a settled native return.
 
 The physical sequence also leaves pending keyboard interrupts before the
 contrast query. Stock's syscall dispatcher enables IRQ/FIQ internally, so the
@@ -74,10 +83,11 @@ emulator happens to execute them.
 The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run
 four focused payloads through the same six-model Direct/Stock family harness:
 
-- `runtime`: core C/C++ runtime, drawing and physical keyboard progression.
+- `runtime`: core C/C++ runtime, drawing, physical keyboard progression and
+  ordinary termination callbacks.
 - `object-basics`: stack operations, named-object views and HPGCC Saturn compatibility.
 - `system-services`: RTC read/set, deadline continuity, timers, sound, contrast,
-  USB detection and bounded input.
+  USB detection, bounded input, historical timed client and owned power policy.
 - `display`: display sessions, restoration and pixel verification described above.
 
 Only `runtime` requires the injected keyboard sequence. Separate payloads reduce
@@ -190,6 +200,12 @@ Return validation has three distinct observations:
 1. **payload PASS** — the guest reaches machine-readable `0x50415353`;
 2. **control-flow restoration** — stage0 leaves HPC1 and the stock address space / saved machine state becomes active again;
 3. **visible Stock-UI restoration** — after a harmless native UI action, the LCD is visibly redrawn by the stock OS rather than merely retaining the last hpclang framebuffer.
+
+The common Runtime/Storage fixture publishes PASS only after both reverse-order
+C `atexit` callbacks and its C++ static-object destructor have executed. Thus
+returning from `main` without picolibc finalizer dispatch cannot pass merely by
+reaching the launcher. The focused System Services and Display fixtures cover
+explicit `exit` and `_Exit`, respectively, with owned hardware still active.
 
 A nonblank stale hpclang frame proves neither item 2 nor item 3. The harness
 must not copy the pre-launch framebuffer back into place and call that a return.
