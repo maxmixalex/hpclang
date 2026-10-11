@@ -16,6 +16,11 @@
 
 unsigned hpclang_e2e_console_test(void);
 
+/* Exercise Stock's transfer decoding independently of incidental machine-code
+ * bytes. Both nibble alignments contain CRLF after HP39 Aplet packaging.
+ * Volatile reads keep the witness in the image and check the received bytes. */
+static const volatile uint8_t transfer_octets[] = {0x0d, 0x0a, 0, 0xd0, 0xa0, 0, 0xff, 0x80};
+
 static int numeric_line(struct hpclang_text_input *input, char *buffer, size_t capacity,
                         const char *text)
 {
@@ -30,6 +35,10 @@ static int numeric_line(struct hpclang_text_input *input, char *buffer, size_t c
 
 static unsigned numeric_test(void)
 {
+    if (transfer_octets[0] != 0x0d || transfer_octets[1] != 0x0a || transfer_octets[2] != 0 ||
+        transfer_octets[3] != 0xd0 || transfer_octets[4] != 0xa0 || transfer_octets[5] != 0 ||
+        transfer_octets[6] != 0xff || transfer_octets[7] != 0x80)
+        return 9u;
     char buffer[32];
     struct hpclang_text_input input;
     int64_t whole = 7;
@@ -169,6 +178,22 @@ uint32_t hpclang_e2e_system_test(void)
         REG32(0x07100004) != interrupt_mode || REG32(0x07100008) != interrupt_mask ||
         (REG32(0x07100000) & interrupt_pending) != interrupt_pending)
         return 0x79;
+    for (unsigned level = 0; level <= 15; ++level)
+        if (hpclang_display_contrast_set(level) || hpclang_display_contrast_read(&contrast_again) ||
+            contrast_again != level)
+            return 0x7901;
+    if (hpclang_display_contrast_set(16) != -1 || errno != EINVAL ||
+        hpclang_display_contrast_restore() || hpclang_display_contrast_read(&contrast_again) ||
+        contrast_again != contrast)
+        return 0x7902;
+    if (hpclang_display_contrast_set((contrast + 1) % 16))
+        return 0x7903;
+    hpclang_display_end();
+    if (hpclang_display_contrast_read(&contrast_again) || contrast_again != contrast ||
+        hpclang_display_contrast_restore() || REG32(0x07100004) != interrupt_mode ||
+        REG32(0x07100008) != interrupt_mask ||
+        (REG32(0x07100000) & interrupt_pending) != interrupt_pending)
+        return 0x7904;
     uint32_t gpio_config = REG32(0x07a00050);
     uint32_t gpio_pullup = REG32(0x07a00058);
     int usb = hpclang_power_usb_present();

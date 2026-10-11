@@ -33,6 +33,11 @@ int hpclang_text_input_run(struct hpclang_text_input *input,
     }
     int saved_errno = errno;
     const struct hpclang_text_input_callbacks io = *callbacks;
+    if (io.mode && !io.edit) {
+        struct hpclang_text_mode_status status;
+        if (hpclang_text_mode_get(io.mode, &status))
+            return -1;
+    }
     if (update(&io, input, HPCLANG_INPUT_EDITING, 0) != 0)
         return -1;
     for (;;) {
@@ -47,8 +52,9 @@ int hpclang_text_input_run(struct hpclang_text_input *input,
             return failure();
         }
         errno = 0;
-        int result =
-            io.edit ? io.edit(io.context, input, &event) : hpclang_text_input_key(input, &event);
+        int result = io.edit   ? io.edit(io.context, input, &event)
+                     : io.mode ? hpclang_text_input_event(input, io.mode, &event)
+                               : hpclang_text_input_key(input, &event);
         int error = 0;
         if (result == -1) {
             if (errno != ENOSPC)

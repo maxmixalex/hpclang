@@ -83,6 +83,18 @@ static unsigned checks(void)
             if (frame(levels * 2 + reverse))
                 return 50 + m;
         }
+        uint32_t front = reg(4);
+        struct hpclang_surface *back = hpclang_display_surface();
+        if (hpclang_display_set_enabled(0, 200000) || (reg(0) & 1u) ||
+            hpclang_display_present(200000) != -1 || errno != ENODEV || reg(4) != front ||
+            hpclang_display_surface() != back)
+            return 70 + m;
+        if (hpclang_display_set_enabled(1, 200000) || !(reg(0) & 1u) ||
+            hpclang_display_wait_frame(200000) || reg(4) != front)
+            return 80 + m;
+        /* Cleanup must also recover the host when the application exits dark. */
+        if (hpclang_display_set_enabled(0, 200000))
+            return 90 + m;
         hpclang_display_end();
         hpclang_display_end();
         if (!restored())

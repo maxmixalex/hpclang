@@ -46,16 +46,16 @@ hpclang_kos_swi3:
     movs pc, lr
 .size hpclang_kos_swi3, .-hpclang_kos_swi3
 
-/* Only for bounded, synchronous queries which do not need interrupts. Stock's
+/* Only for bounded, synchronous operations which do not need interrupts. Stock's
    dispatcher enables IRQ/FIQ even when the native caller masked both. Keep
    pending events for Stock after return, without letting its handlers run in
    the application's temporary address space. Temporarily route FIQ sources
    through the masked IRQ path as well. The caller must have IRQ/FIQ masked
    before entering this helper, as required by the native runtime. */
-.section .text.hpclang_kos_query3,"ax",%progbits
-.global hpclang_kos_query3
-.type hpclang_kos_query3,%function
-hpclang_kos_query3:
+.section .text.hpclang_kos_sync3,"ax",%progbits
+.global hpclang_kos_sync3
+.type hpclang_kos_sync3,%function
+hpclang_kos_sync3:
     stmfd sp!, {r4-r6, lr}
     ldr r4, =0x07100000
     ldr r5, [r4, #8]
@@ -73,4 +73,4 @@ hpclang_kos_query3:
     str r6, [r4, #4]
     str r5, [r4, #8]
     ldmfd sp!, {r4-r6, pc}
-.size hpclang_kos_query3, .-hpclang_kos_query3
+.size hpclang_kos_sync3, .-hpclang_kos_sync3

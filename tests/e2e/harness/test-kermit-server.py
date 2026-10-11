@@ -110,7 +110,11 @@ class Peer:
         self.send(packet(b"Y", sequence=1, check=3))
         received = bytearray()
         sequence = 2
-        while len(received) < len(expected):
+        # Stock's serial-disk receiver contracts decoded CRLF to LF even for
+        # binary HP39BinB objects. Include the wire expansion in the bound, then
+        # apply the receiver conversion across packet boundaries below.
+        wire_length = len(expected) + expected.count(b"\n")
+        while len(received) < wire_length:
             data = self.expect(b"D", 3, sequence)
             if lose_data_ack:
                 # Deliberately lose an ACK. The retransmission must preserve
@@ -136,7 +140,7 @@ class Peer:
             self.acknowledged_data = packet(b"D", data, sequence, 3)
             self.send(packet(b"Y", sequence=sequence, check=3))
             sequence = (sequence + 1) % 64
-        if bytes(received) != expected:
+        if bytes(received).replace(b"\r\n", b"\n") != expected:
             raise AssertionError("binary payload differs from the served file")
         self.expect(b"Z", 3, sequence)
         self.send(packet(b"Y", sequence=sequence, check=3))
@@ -151,7 +155,10 @@ def verify(tools: Path) -> None:
     environment = dict(os.environ, PATH=f"{tools.resolve()}{os.pathsep}{os.environ['PATH']}")
     with tempfile.TemporaryDirectory(prefix="hpclang-kermit-test-") as directory:
         root = Path(directory)
-        payload = bytes(range(256)) * 2
+        # The byte census alone lacks CRLF adjacency. These runs reproduce the
+        # deterministic one-byte loss that made a valid Aplet unloadable while
+        # the old binary-mode server reported successful delivery.
+        payload = bytes(range(256)) * 2 + b"\r\n\r\r\n\n\r\r\r\r\n\n" * 16
         (root / "FIRST.BIN").write_bytes(payload)
         (root / "NEXT.BIN").write_bytes(b"next transaction\x00\xff")
         master, slave = pty.openpty()
@@ -222,7 +229,7 @@ def verify(tools: Path) -> None:
         finally:
             os.close(master)
             os.close(slave)
-    print("PASS: Kermit idle, init recovery, CRC, retransmission, delayed ACK, and next file")
+    print("PASS: Kermit idle, recovery, CRC, byte-exact Stock decoding, retries, and next file")
 
 
 if __name__ == "__main__":

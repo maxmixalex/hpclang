@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <hpclang/abi.h>
 #include <hpclang/console.h>
 #include <hpclang/device.h>
 #include <hpclang/display.h>
@@ -11,6 +12,46 @@
 
 extern volatile uint32_t hpclang_e2e_result;
 extern const struct hpclang_font hpclang_system_font;
+
+static int native_symbols(void)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot->model >= HPCLANG_MODEL_HP48GII && !boot->saturn_state)
+        return 0; /* Direct classic launchers do not fabricate a live font map. */
+    struct hpclang_surface *surface = hpclang_surface_create_mono(24, 12);
+    if (!surface)
+        return -1;
+    const uint32_t unicode[] = {0x03b1, 0x03b2, 0x0394, 0x03b8, 0x03bc, 0x03a0,
+                                0x03c0, 0x03a3, 0x2220, 0x2192, 0x221a};
+    const uint8_t native[] = {0x8c, 0xdf, 0x9b, 0x95, 0xb5, 0x9c, 0x87, 0x85, 0x80, 0x8d, 0x83};
+    const struct hpclang_font *fonts[] = {hpclang_font_mini(), hpclang_font_big(),
+                                          hpclang_font_editline()};
+    int result = -1;
+    for (unsigned f = 0; f < 3; ++f) {
+        if (!fonts[f])
+            continue;
+        unsigned differences = 0;
+        for (unsigned i = 0; i < sizeof(native); ++i) {
+            hpclang_surface_clear(surface, 0);
+            hpclang_surface_draw_codepoint(surface, fonts[f], 0, 0, unicode[i], 255);
+            hpclang_surface_draw_char(surface, fonts[f], 8, 0, native[i], 255);
+            hpclang_surface_draw_char(surface, fonts[f], 16, 0, '?', 255);
+            for (int y = 0; y < 12; ++y)
+                for (int x = 0; x < 8; ++x) {
+                    uint8_t pixel = hpclang_surface_get_pixel(surface, x, y);
+                    if (pixel != hpclang_surface_get_pixel(surface, x + 8, y))
+                        goto done;
+                    differences += pixel != hpclang_surface_get_pixel(surface, x + 16, y);
+                }
+        }
+        if (!differences)
+            goto done;
+    }
+    result = 0;
+done:
+    hpclang_surface_destroy(surface);
+    return result;
+}
 
 static int mailbox(uint32_t request, uint32_t acknowledgement)
 {
@@ -40,6 +81,36 @@ static int physical_event(unsigned scan, unsigned down, struct hpclang_keyboard_
         return -1;
     }
     return 0;
+}
+
+static int physical_symbols(uint32_t model)
+{
+    int hp39 = model <= HPCLANG_MODEL_HP40GS;
+    /* Electrical matrix positions, independent of the SDK's key lookup.
+     * Classic RS remains held across 6 to distinguish degree from angle. */
+    static const uint8_t hp39_events[][2] = {{58, 1}, {58, 0}, {27, 1}, {27, 0}, {59, 1}, {59, 0},
+                                             {4, 1},  {4, 0},  {59, 1}, {59, 0}, {12, 1}, {12, 0}};
+    static const uint8_t classic_events[][2] = {
+        {57, 1}, {57, 0}, {59, 1}, {59, 0}, {35, 1}, {35, 0}, {57, 1}, {57, 0}, {59, 1},
+        {11, 1}, {11, 0}, {59, 0}, {58, 1}, {58, 0}, {3, 1},  {3, 0},  {19, 1}, {19, 0}};
+    const uint8_t (*events)[2] = hp39 ? hp39_events : classic_events;
+    unsigned count = hp39 ? sizeof(hp39_events) / sizeof(hp39_events[0])
+                          : sizeof(classic_events) / sizeof(classic_events[0]);
+    char text[24];
+    struct hpclang_text_input input;
+    struct hpclang_text_mode mode;
+    if (hpclang_text_input_init(&input, text, sizeof(text)) || hpclang_text_mode_init(&mode, model))
+        return -1;
+    for (unsigned i = 0; i < count; ++i) {
+        struct hpclang_keyboard_event event;
+        if (physical_event(events[i][0], events[i][1], &event) ||
+            hpclang_text_input_event(&input, &mode, &event))
+            return -1;
+    }
+    const char *expected = hp39 ? "\xce\xb8\xe2\x88\xa0\xcf\x80" : "\xce\xb1\xc2\xb0[2]";
+    struct hpclang_keyboard_state keys;
+    hpclang_keyboard_read(&keys);
+    return strcmp(text, expected) || hpclang_keyboard_any_is_down(&keys) ? -1 : 0;
 }
 
 struct reader
@@ -221,25 +292,7 @@ static int alpha_edit(void *context, struct hpclang_text_input *input,
         }
         return 0;
     }
-    enum hpclang_text_plane plane;
-    int result = hpclang_text_mode_event(&s->mode, event, &plane);
-    if (result <= 0)
-        return result;
-    if (plane == HPCLANG_TEXT_ALPHA_UPPER || plane == HPCLANG_TEXT_ALPHA_LOWER) {
-        uint32_t cp;
-        result =
-            hpclang_text_alpha_lookup(s->model, event->key, plane == HPCLANG_TEXT_ALPHA_LOWER, &cp);
-        if (result < 0)
-            return -1;
-        if (result)
-            return hpclang_text_input_edit(input, HPCLANG_INPUT_INSERT, cp);
-    } else if (plane != HPCLANG_TEXT_PLAIN) {
-        errno = ENOSYS;
-        return -1;
-    }
-    struct hpclang_keyboard_event plain = *event;
-    plain.modifiers = 0;
-    return hpclang_text_input_key(input, &plain);
+    return hpclang_text_input_event(input, &s->mode, event);
 }
 static int alpha_update(void *context, const struct hpclang_text_input *input, int result,
                         int error)
@@ -250,6 +303,8 @@ static int alpha_update(void *context, const struct hpclang_text_input *input, i
 
 unsigned hpclang_e2e_console_test(void)
 {
+    if (native_symbols())
+        return 13;
     /* Direct RPL-family runs have no live Saturn font context. Use the same
      * explicitly packaged font in both Direct and Stock. */
     const struct hpclang_font *font = &hpclang_system_font;
@@ -318,8 +373,8 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     result = 8;
     struct line_session session = {.console = c};
-    struct hpclang_text_input_callbacks line_callbacks = {line_next, NULL, line_accept, line_update,
-                                                          &session};
+    struct hpclang_text_input_callbacks line_callbacks = {
+        .next = line_next, .accept = line_accept, .update = line_update, .context = &session};
     if (hpclang_text_input_init(&input, edit, sizeof(edit)) != 0 ||
         hpclang_text_input_run(&input, &line_callbacks) != HPCLANG_INPUT_ACCEPTED ||
         strcmp(edit, HPCLANG_UI_TEXT("-12")) != 0 || session.rejected != 1 ||
@@ -336,8 +391,8 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     result = 10;
     struct alpha_session alpha = {.line = {.console = c}, .model = model};
-    struct hpclang_text_input_callbacks alpha_callbacks = {alpha_next, alpha_edit, NULL,
-                                                           alpha_update, &alpha};
+    struct hpclang_text_input_callbacks alpha_callbacks = {
+        .next = alpha_next, .update = alpha_update, .context = &alpha, .mode = &alpha.mode};
     struct hpclang_text_mode_status mode_status;
     if (hpclang_text_mode_init(&alpha.mode, model) != 0 ||
         hpclang_text_input_init(&input, edit, sizeof(edit)) != 0 ||
@@ -385,6 +440,7 @@ unsigned hpclang_e2e_console_test(void)
     hpclang_surface_clear(screen, 0);
     alpha =
         (struct alpha_session){.line = {.console = c}, .model = model, .physical = 1, .locks = 1};
+    alpha_callbacks.edit = alpha_edit;
     if (hpclang_text_mode_init(&alpha.mode, model) ||
         hpclang_text_input_init(&input, edit, sizeof(edit)) ||
         hpclang_text_input_run(&input, &alpha_callbacks) != HPCLANG_INPUT_ACCEPTED ||
@@ -398,6 +454,9 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     hpclang_surface_draw_text_n(screen, font, 2, 20, HPCLANG_UI_TEXT("ABcD2D2"), 7, 255);
     if (mailbox(0x465200c9u, 0x464b00c9u))
+        goto done;
+    result = 14;
+    if (physical_symbols(model))
         goto done;
     result = 0;
 done:

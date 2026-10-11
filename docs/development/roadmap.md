@@ -466,35 +466,35 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     binding with read/write/flush callbacks, distinct EOF/error/cancellation and
     reset on ownership changes. Alpha/Shift text maps and a ready-made keyboard
     line-input loop remain open; physical keyboard semantics are unchanged.
-  - Implemented line-session extension, awaiting CI: callback-driven
+  - Line-session extension accepted on `c7451364`: callback-driven
     event/edit/accept/update loop, recoverable capacity/validation errors and
-    explicit cancellation. Model-specific Alpha maps and physical-key-driven
-    text rendering acceptance remain open; the scripted session test does not
-    close those requirements.
-  - Implemented explicit Latin Alpha lookup, awaiting CI: all six models'
+    explicit cancellation. The scripted session test supplies callback coverage;
+    physical-key integration has separate acceptance below.
+  - Explicit Latin Alpha lookup accepted on `c7451364`: all six models'
     printed A-Z/a-z and Alpha-space positions, checked against their manual
     diagrams and tested through physical key identities. Punctuation/symbol
-    planes and physical interactive acceptance remain
-    open; no implicit modifier state is added to the keyboard core.
+    lookup remains open; no implicit modifier state is added to the keyboard core.
   - Default text-plane behavior follows each Stock system's one-shot, held and
     locked Alpha rules. HP39 note-editor lock is an application action; do not
     substitute the HP48/49/50 double-Alpha lock gesture. The Latin HP39 map is
     cross-checked against actual Stock input on all three models as well as
-    the below-key manual legends; physical interactive SDK acceptance remains open.
-  - Implemented caller-owned native text-mode state, awaiting CI: per-model
+    the below-key manual legends; physical integration is accepted below.
+  - Caller-owned native text-mode state accepted on `c7451364`: per-model
     one-shot/held Alpha, classic double-Alpha lock and case selection, HP39
     menu lock with temporary suspension, explicit symbol/command planes and
     status for application rendering. Native ROM probes establish the transition
     cases; host tests cover all six models and simultaneous-event ordering.
-    The scripted editor/console composition is additional integration coverage,
-    not the still-required physical keyboard-to-text acceptance. Full symbol
+    The scripted editor/console composition is additional integration coverage.
+    Full symbol
     lookup and a ready-made keyboard editor remain open.
-  - Physical text integration added in `m7-physical-text-input`, awaiting CI:
+  - Physical text integration accepted on `c7451364`, integrated into main:
     acknowledged GPIO transitions pass through the SDK scanner/debounce queue,
     native text mode, bounded editor and console. Single/held Alpha and a
     separate model-native lock sequence have independent pixel references;
     every injected key must be released before PASS. This extends the earlier
     scripted coverage; full symbol lookup and a ready-made editor remain open.
+    Runtime, Core, Gallery, Storage, Quality and Objects all pass on that head.
+    The merged text-input, text-mode and physical-input branches are retired.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT
@@ -514,7 +514,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     and reject old file/directory objects without flushing them to the new volume.
     Host tests exercise these transitions; Storage, Runtime, Objects, Core and
     Quality CI pass. Cycles entirely between observations
-    and physical hot-plug validation remain open.
+    and physical hot-plug validation remain open. On 2026-10-11 the maintainer
+    confirmed an HP49g+ and SD card are available, requested a reproducible
+    hardware test package, and designated the later physical run as a
+    nonblocking follow-up. Preparing that package remains part of M7 closure;
+    emulator results must not be reported as physical hot-plug evidence.
 
 ### M7.3g–j — object-service capability completion
 
@@ -565,6 +569,14 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
   that existing geometry is sufficient for a future adapter.
 
 ### M7 final audit / M8 follow-up
+
+Current `m7-parity-completion` work adds model-native Unicode symbol lookup,
+the default bounded keyboard editor, contrast mutation/restoration and owned
+LCD enable/disable. Local validation is in progress; these additions do not
+close the remaining capability ledger, historical client or media-change goals.
+The HP39 transport regression now covers embedded CRLF bytes: all three Stock
+models pass the corrected newline transport locally. This is a byte-preservation
+fix, not a retry or relaxation of the application result checks.
 
 - [ ] Exercise a stateful HP39 Aplet, nested directories, numerical composites,
   files, text/keyboard, graphics and time/system clients on their actual models.

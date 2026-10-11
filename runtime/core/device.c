@@ -51,6 +51,7 @@ int hpclang_device_capability(enum hpclang_capability capability)
     case HPCLANG_CAPABILITY_USB_POWER_DETECT:
     case HPCLANG_CAPABILITY_CIVIL_TIME_SET:
     case HPCLANG_CAPABILITY_CONTRAST_READ:
+    case HPCLANG_CAPABILITY_CONTRAST_SET:
         return family != HPCLANG_FAMILY_UNKNOWN ? HPCLANG_CAPABILITY_SUPPORTED
                                                 : HPCLANG_CAPABILITY_UNSUPPORTED;
     case HPCLANG_CAPABILITY_STREAM_STORAGE:

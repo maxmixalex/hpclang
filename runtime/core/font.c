@@ -277,6 +277,49 @@ static uint8_t hp39_font_byte(uint32_t logical_first, uint32_t address)
 
 static uint32_t native_byte_codepoint(uint32_t codepoint)
 {
+    /* Stock keyboard symbols use HP character bytes. The UTF-8 editor and
+     * generated fonts use Unicode; translate their scalar values at the native
+     * font boundary. Retain the existing byte entry points. */
+    switch (codepoint) {
+    case 0x0394u:
+        return 0x9bu; /* Delta */
+    case 0x03a0u:
+        return 0x9cu; /* Pi */
+    case 0x03a3u:
+        return 0x85u; /* Sigma */
+    case 0x03b1u:
+        return 0x8cu;
+    case 0x03b2u:
+        return 0xdfu;
+    case 0x03b4u:
+        return 0x92u;
+    case 0x03b5u:
+        return 0x93u;
+    case 0x03b8u:
+        return 0x95u;
+    case 0x03bbu:
+        return 0x96u;
+    case 0x03bcu:
+        return 0xb5u;
+    case 0x03c0u:
+        return 0x87u;
+    case 0x03c1u:
+        return 0x97u;
+    case 0x03c3u:
+        return 0x98u;
+    case 0x03c4u:
+        return 0x99u;
+    case 0x03c9u:
+        return 0x9au;
+    case 0x2192u:
+        return 0x8du;
+    case 0x221au:
+        return 0x83u;
+    case 0x2220u:
+        return 0x80u;
+    default:
+        break;
+    }
     return codepoint <= 0xffu ? codepoint : (uint32_t)'?';
 }
 

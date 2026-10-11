@@ -15,6 +15,8 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 }
 
 static uint32_t contrast;
+static int reject_contrast;
+static unsigned contrast_writes;
 static struct hpclang_hp39_platform_context portal = {.magic = HPCLANG_HP39_PLATFORM_MAGIC,
                                                       .portal_entry = 1u};
 static struct hpclang_rpl_memory_bounds bounds = {.magic = HPCLANG_RPL_BOUNDS_MAGIC,
@@ -62,9 +64,17 @@ static void mutation_context_test(void)
     boot.saturn_state = 1u;
     mutation_state(HPCLANG_CAPABILITY_SUPPORTED);
 }
-uint32_t hpclang_kos_query3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
+uint32_t hpclang_kos_sync3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
 {
-    assert(index == 13 && a == 0 && b == 0 && c == 0);
+    assert(b == 0 && c == 0);
+    if (index == 127) {
+        assert(a <= 15);
+        ++contrast_writes;
+        if (!reject_contrast)
+            contrast = a;
+        return 0;
+    }
+    assert(index == 13 && a == 0);
     return contrast;
 }
 
@@ -76,6 +86,8 @@ int main(void)
     for (unsigned model = HPCLANG_MODEL_HP39GPLUS; model <= HPCLANG_MODEL_HP50G; ++model) {
         boot.model = model;
         assert(hpclang_device_info()->model == model);
+        assert(hpclang_device_capability(HPCLANG_CAPABILITY_CONTRAST_SET) ==
+               HPCLANG_CAPABILITY_SUPPORTED);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_SOUND) == HPCLANG_CAPABILITY_SUPPORTED);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_DISPLAY_MODES) ==
                HPCLANG_CAPABILITY_SUPPORTED);
@@ -148,5 +160,28 @@ int main(void)
     contrast = 16;
     assert(hpclang_display_contrast_read(&level) == -1 && errno == EIO && level == 8);
     assert(hpclang_display_contrast_read(NULL) == -1 && errno == EINVAL);
+    contrast = 8;
+    errno = EDOM;
+    assert(hpclang_display_contrast_set(8) == 0 && contrast_writes == 0 && errno == EDOM);
+    assert(hpclang_display_contrast_set(16) == -1 && errno == EINVAL && contrast == 8);
+    for (unsigned value = 0; value <= 15; ++value) {
+        errno = EDOM;
+        assert(hpclang_display_contrast_set(value) == 0 && contrast == value && errno == EDOM);
+    }
+    assert(hpclang_display_contrast_restore() == 0 && contrast == 8);
+    unsigned writes = contrast_writes;
+    assert(hpclang_display_contrast_restore() == 0 && contrast_writes == writes);
+    reject_contrast = 1;
+    assert(hpclang_display_contrast_set(3) == -1 && errno == EIO && contrast == 8);
+    reject_contrast = 0;
+    assert(hpclang_display_contrast_set(4) == 0 && contrast == 4);
+    reject_contrast = 1;
+    assert(hpclang_display_contrast_restore() == -1 && errno == EIO && contrast == 4);
+    reject_contrast = 0;
+    assert(hpclang_display_contrast_restore() == 0 && contrast == 8);
+    boot.model = HPCLANG_MODEL_UNKNOWN;
+    assert(hpclang_display_contrast_set(5) == -1 && errno == ENOSYS && contrast == 8);
+    assert(hpclang_device_capability(HPCLANG_CAPABILITY_CONTRAST_SET) ==
+           HPCLANG_CAPABILITY_UNSUPPORTED);
     return 0;
 }

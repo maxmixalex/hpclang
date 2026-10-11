@@ -227,6 +227,12 @@ cancellation and restoration. Emulator success does not establish audible
 frequency or speaker volume on physical hardware.
 
 Stock contrast queries use the historical KOS getter on all six validated models.
+The clean temporary setter now uses the corresponding KOS setter with readback,
+retains the original setting and restores it explicitly or during display/runtime
+cleanup. This supplies the ordinary application behavior of `kos_LCDSetContrast`
+and HPGCC3 `lcd_setcontrast` without exposing GPIO/DAC wiring. Local unit and
+six-model Direct checks pass; Stock acceptance is in progress. This establishes
+setting ownership, not physical-panel luminance calibration.
 USB voltage detection is read-only and deliberately does not claim battery
 percentage or power-source selection. Capability discovery distinguishes model
 support from a missing RPL launch context; resource/media errors remain the
@@ -306,7 +312,7 @@ HP39 letters are printed below and to the right of their keys: A is VARS,
 E is SIN, Y is 2, Z is 3, and Alpha-space is Plus. Enter is not Alpha-space.
 
 The new caller-owned `hpclang_text_mode` follows native one-shot/held/locked
-Alpha policy above the physical event API, pending CI. HP39 Notes-style locking
+Alpha policy above the physical event API, accepted on `c7451364`. HP39 Notes-style locking
 is selected explicitly by the application; classic double-Alpha locks and
 left-Shift case changes follow the native keyboard. Right-shift Alpha symbols
 remain a distinct plane, not an alias for lowercase. Source-specific historical
@@ -315,8 +321,16 @@ symbol lookup, the ready-made physical keyboard editor and historical blocking
 compatibility spellings remain separate unfinished work.
 System Services now drives physical GPIO input through the native mode,
 editor and console for single/held and locked Alpha, with independent pixel
-references and strict return checks (awaiting CI). Punctuation/symbol planes
+references and strict return checks (accepted on `c7451364`). Punctuation/symbol planes
 and the complete ready-made interactive editor remain separate acceptance work.
+
+The current extension adds a default mode-aware editor and native Unicode
+symbols. ROM probes across all six models distinguish HP39's π/∠ shortcuts
+from classic Alpha-right-Shift Π and other Greek/math characters. Native font
+rendering now maps those Unicode scalars back to the verified HP glyph bytes.
+This avoids passing an HP character byte to a UTF-8 editor as if it were a
+Unicode value. Remaining shifted/held punctuation and full interactive
+acceptance are still being completed.
 
 ## File I/O and standard C I/O
 
@@ -501,7 +515,7 @@ build dependencies or copying their implementations into hpclang.
 | HP39 named Program/Note/Aplet lifecycle | Native catalogs and ROM descriptor/context evidence; public generic HPGCC variable-definition CRUD has not been established | `hpclang_catalog_*` implements Program/Note CRUD, including compiler/editor records. `hpclang_aplet_list/clone/remove` provides owned name lists and named native copies, preserves caller contexts, protects active/default Aplets and maintains the cached display list on removal. The dedicated catalog fixture passes on all three HP39 models; CI acceptance is complete on `6a7f9a28`. |
 | Port namespaces | HPGCC3 `libs_workspace/headers/sat3.h` describes Port 0 main RAM, Port 1 extended RAM and Port 2 Flash; only libraries/backups, without subdirectories | On 2026-10-04 the maintainer accepted each port's lack of read/write services as an M7.3j limitation. All three retain explicit implementation goals; HOME CRUD does not imply port support. |
 | File attribute mutation and timestamp coverage | 2.0 `fsystem.h`: `FSChAttr`, `FSGetCreatTime`, `FSGetAccessDate` | Implemented over the clean metadata API; `FSCreate` accepts read-only/hidden/system/archive. Stored FAT access-date queries do not maintain atime. Persistence/error unit tests and six-model Direct plus HP49g+/HP50g Stock Storage pass locally; formal CI accepted on `6a7f9a28`. |
-| Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | M7.4 accepts civil clock read/set/conversion, cancellable tones, contrast observation and cooperative timers. Contrast mutation and low-level interrupt callbacks are not supplied by these APIs |
+| Clock, sound, contrast and scheduled events | 1.1/2.0 `hpsys.h`; HPGCC3 `sys.h`, `time.h`: `sys_tm_RTC`, `lcd_setcontrast`, `tmr_eventcreate/kill` | M7.4 accepts civil clock read/set/conversion, cancellable tones, contrast observation and cooperative timers. Temporary contrast mutation/restoration is implemented with local validation in progress. Low-level interrupt callbacks remain a migration boundary |
 | Text input and console behavior | Historical `readint/readdouble/_gets`, key-plane helpers; HPGCC3 `keyb_setalphalock/shiftplane` and message API | Physical DOWN/UP/REPEAT is not text entry, Alpha-lock policy, numeric input or an on-screen console |
 | Physical grayscale, flip, compositing and status | HPG/GGL/display headers and implementations | M7.5 implements owned gray2/4/16 sessions, page exchange, bounded frame waiting and six status segments; six-model Direct/Stock pixel/register gates pass locally. Public-API-only prototypes exercise clipping, PAINT/XOR, transparent anchored/relative patterns and RGB XPM. Formal CI accepted on `6a7f9a28`; broad HPG spelling/parser compatibility remains M8 |
 
@@ -510,6 +524,17 @@ application requirements, not proof they work on all six Stock ROMs. Likewise,
 the HP39 template proves a saved-data channel, not arbitrary creation of system
 variable definitions. Every proposed cross-model API needs its own execution
 and restoration evidence.
+
+### Owned LCD enable and historical delays
+
+HPGCC3's `lcd_off/lcd_on` implementation stops and resumes the LCD controller's
+ENVID bit. The clean equivalent is `hpclang_display_set_enabled` within an owned
+display session: bounded frame waiting, retained pages, and host-state restoration
+on exit. It does not change the application clock or put the CPU to sleep.
+
+HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based seconds delay in the reviewed
+implementation. Its ordinary behavior maps to the clean monotonic delay service;
+the historical name is not evidence of a missing low-power CPU suspend service.
 
 ### SD media discovery and replacement
 

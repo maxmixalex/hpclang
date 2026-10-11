@@ -42,6 +42,13 @@ extern "C"
      */
     int hpclang_display_present(uint32_t timeout_us);
 
+    /* Enable/disable LCD scanout within an owned display session (EPERM without
+     * display_begin). Disabling waits for a frame boundary; timeout_us must be
+     * 1..1000000. Timeout leaves scanout unchanged. Pixels and page ownership
+     * are retained; present/wait_frame return ENODEV while disabled. Re-enabling
+     * resumes the same front page. display_end restores the original host state. */
+    int hpclang_display_set_enabled(int enabled, uint32_t timeout_us);
+
     /*
      * Wait for the next frame-counter rollover without changing the LCD.
      * Same timeout range; ENODEV if disabled, ETIMEDOUT on expiry,
@@ -162,6 +169,15 @@ extern "C"
      * or -1 with EINVAL (NULL), ENOSYS (unknown model), EIO (invalid result).
      * The setting is an ordinal level, not a measured LCD luminance. */
     int hpclang_display_contrast_read(unsigned *level);
+    /* Temporarily set Stock's contrast (0..15), preserving the first changed
+     * setting until restore/display_end/normal runtime cleanup. No display-mode
+     * session is required. EINVAL for an invalid level, ENOSYS for an unknown
+     * model, EIO if readback fails. A failed write attempts rollback; ownership
+     * remains until a successful restore. These operations preserve errno on
+     * success, do not allocate, and must not run in an interrupt handler. */
+    int hpclang_display_contrast_set(unsigned level);
+    /* Idempotent verified restoration; on EIO retain ownership for retry. */
+    int hpclang_display_contrast_restore(void);
 
 #ifdef __cplusplus
 }

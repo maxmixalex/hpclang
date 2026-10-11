@@ -15,6 +15,11 @@ static unsigned tick, frozen, disabled, clock_error, frozen_line;
 static uint64_t now;
 static void *owned[2];
 
+int hpclang_display_contrast_restore(void)
+{
+    return 0;
+}
+
 const struct hpclang_device_info *hpclang_device_info(void)
 {
     return &device;
@@ -109,6 +114,8 @@ int main(void)
     assert(hpclang_display_begin(3) == -1 && errno == EINVAL);
     assert(hpclang_display_begin(4) == -1 && errno == ENOSYS);
     assert(hpclang_display_present(1000) == -1 && errno == EPERM);
+    assert(hpclang_display_set_enabled(0, 1000) == -1 && errno == EPERM);
+    assert(hpclang_display_set_enabled(2, 1000) == -1 && errno == EINVAL);
     device.family = HPCLANG_FAMILY_HP39;
     device.display_width = 131;
     device.display_height = 64;
@@ -151,6 +158,17 @@ int main(void)
         assert(registers[5] != address && hpclang_display_back() != back);
         assert(hpclang_surface_get_pixel(hpclang_display_back(), 0, 0) == 0);
         assert(hpclang_display_present(100000) == 0 && hpclang_display_back() == back);
+        assert(hpclang_display_set_enabled(0, 0) == -1 && errno == EINVAL);
+        assert(hpclang_display_set_enabled(0, 1) == -1 && errno == ETIMEDOUT);
+        assert(registers[0] & 1u);
+        address = registers[5];
+        assert(hpclang_display_set_enabled(0, 100000) == 0 && !(registers[0] & 1u));
+        assert(hpclang_display_set_enabled(0, 100000) == 0);
+        assert(hpclang_display_present(100000) == -1 && errno == ENODEV);
+        assert(registers[5] == address && hpclang_display_back() == back);
+        assert(hpclang_display_set_enabled(1, 100000) == 0 && (registers[0] & 1u));
+        assert(hpclang_display_set_enabled(1, 100000) == 0);
+        assert(hpclang_display_set_enabled(0, 100000) == 0);
         hpclang_display_end();
         hpclang_display_end();
         assert(!live && !hpclang_display_back());

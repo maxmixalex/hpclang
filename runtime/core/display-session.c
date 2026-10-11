@@ -95,6 +95,29 @@ int hpclang_display_present(uint32_t timeout_us)
     return result;
 }
 
+int hpclang_display_set_enabled(int enabled, uint32_t timeout_us)
+{
+    if ((enabled != 0 && enabled != 1) || !timeout_us || timeout_us > 1000000u) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!saved.owned) {
+        errno = EPERM;
+        return -1;
+    }
+    const struct hpclang_lcd_bus *bus = &hpclang_display_bus;
+    uint32_t control = bus->read(bus->context, LCD_CONTROL1);
+    if ((control & 1u) == (unsigned)enabled)
+        return 0;
+    if (!enabled && hpclang_display_wait_frame(timeout_us))
+        return -1;
+    uint32_t irq = hpclang_irq_save_disable();
+    control = bus->read(bus->context, LCD_CONTROL1);
+    bus->write(bus->context, LCD_CONTROL1, (control & 0x3fffeu) | (unsigned)enabled);
+    hpclang_irq_restore(irq);
+    return 0;
+}
+
 int hpclang_display_indicator_set(unsigned segment, uint8_t intensity)
 {
     if (segment >= 6u) {
@@ -118,6 +141,7 @@ int hpclang_display_indicator_set(unsigned segment, uint8_t intensity)
 
 void hpclang_display_end(void)
 {
+    (void)hpclang_display_contrast_restore();
     if (!saved.owned)
         return;
     uint32_t irq = hpclang_irq_save_disable();

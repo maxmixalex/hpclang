@@ -100,8 +100,9 @@ The expanded discovery checks await CI acceptance.
 | `hpclang::delay()` | ✅ | C++23 chrono duration wrapper. |
 | `hpclang_power_usb_present()` | 🧪 | USB voltage-detect input; does not infer battery percentage, enumeration or actual power-source selection. |
 | `hpclang_display_contrast_read()` | 🧪 | Stock contrast ordinal 0–15, queried without changing the setting. |
+| `hpclang_display_contrast_set/restore()` | 🧪 | Temporary ordinal 0–15, verified by readback. First change retains the original setting; explicit restore, display end and normal runtime cleanup restore it. No display session is required. Local validation in progress. |
 
-These M7.4 services are formally accepted at functional head `06ab4deb`, including
+The original M7.4 services are formally accepted at functional head `06ab4deb`, including
 the six-model Direct/Stock gate and cross-workflow regressions.
 Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
 
@@ -227,11 +228,10 @@ is consumed by the first key even when Alpha stays held: native HP39
 Shift-then-held-Alpha with two presses of 2 produces `yY`.
 
 The result plane is plain, left/right shifted, uppercase/lowercase Alpha or
-Alpha symbols. For the two Latin planes, call `hpclang_text_alpha_lookup()` and
-insert the resulting scalar with `hpclang_text_input_edit()`. The application
-still routes editing actions, symbols and commands. A symbol plane must not be
-passed to Latin lookup as though it were lowercase. This state layer does not
-yet supply a complete symbol/command mapper or ready-made keyboard editor.
+Alpha symbols. `hpclang_text_key_lookup()` maps a selected plane to a Unicode
+scalar; `hpclang_text_alpha_lookup()` remains the narrower Latin-only lookup.
+A symbol plane must not be passed to Latin lookup as though it were lowercase.
+The state layer itself executes no editor or calculator command.
 
 One-shot state is consumed by the key even if translation or insertion fails;
 retrying an edit must not feed the same physical event twice. Repeat timing
@@ -242,19 +242,48 @@ In addition to scripted events, its physical GPIO sequences produce `AaZZ2`
 and `ABcD2D2` through the real scanner and debounce queue. They cover single,
 held and locked Alpha, temporary lowercase, ordinary input and leaving a lock;
 captured text is compared with independently rendered literal references.
-Full symbol lookup and a ready-made keyboard editor remain separate work.
+The default editor adapter and symbol extension below are undergoing local
+validation; the complete punctuation/held-shift acceptance remains open.
+
+### Default text editor and symbols
+
+`hpclang_text_input_event(input, mode, event)` combines native text-mode
+selection, Unicode lookup and bounded editing. Feed the full ordered physical
+event stream. Enter accepts, ON cancels, left/right move the cursor and the
+model's delete key backspaces. Unmapped calculator commands are ignored.
+Applications can still supply menu actions, custom editing and explicit locks.
+An insertion rejected with `ENOSPC` retains the text but consumes the one-shot
+mode selected by that physical key.
+
+The symbol lookup distinguishes native character codes from Unicode. For
+example, classic Alpha-right-Shift P produces **Π** (U+03A0, native byte 9C),
+whereas HP39 Shift-3 produces **π** (U+03C0, byte 87). HP39 Shift-minus is **∠**.
+Native font rendering translates these Greek/math scalars to the corresponding
+ROM glyphs; generated fonts continue to use their ordinary Unicode maps.
+`hpclang_text_key_lookup(model, key, plane, held_modifiers, &codepoint)` returns
+one scalar. Pass the event's physical modifier snapshot; zero represents a
+released one-shot shift. Classic Alpha-right-Shift 6 yields **∠**, whereas
+holding right Shift yields **°**. Holding it also selects **¡**, **¿** and
+semicolon instead of exclamation, question mark and comma.
+
+The default editor additionally inserts classic shifted bracket, quote, colon
+and guillemet pairs with the cursor inside. Insufficient space inserts neither
+half. HP39 bracket keys remain separate. This bounded single-line editor does
+not expand calculator commands or insert Stock's multiline program indentation.
+Physical symbol integration is undergoing local six-model validation.
 
 ### Bounded line sessions
 
 `hpclang_text_input_run(input, callbacks)` supplies a synchronous event/edit/
-validation/render loop over an initialized editor. This extension is implemented
-and awaiting CI acceptance. It retains prefilled text and allocates
+validation/render loop over an initialized editor. The callback-driven baseline
+is accepted on `c7451364`. It retains prefilled text and allocates
 nothing. The caller supplies the event source and owns the display/context.
 
 | Callback | Contract |
 | --- | --- |
 | `next` (required) | Return 1 with an event, 0 when idle, or -1 with errno to abort; may poll or wait |
-| `edit` (optional) | Replace the basic `hpclang_text_input_key()` policy, e.g. with model-specific Alpha translation; same result/error contract |
+| `edit` (optional) | Replace the default editor; same result/error contract |
+| `mode` (optional state pointer) | Use the initialized native text mode with the default editor when `edit` is absent; otherwise the basic physical-key editor remains the default |
 | `accept` (optional) | Validate the proposed line: 0 accepts, 1 with errno rejects for correction, -1 with errno aborts |
 | `update` (optional) | Initial notification and each event, including accept/cancel and recoverable errors; render/present as desired; 0 succeeds, -1 aborts |
 
@@ -391,6 +420,14 @@ image. Neither page aliases Stock's saved framebuffer. Indicator writes change
 display segments only, not native Alpha/Shift/battery state. Classic HPG numbers
 0–5 mean remote, left shift, right shift, alpha, battery, wait; HP39 applications
 must interpret their own panel's printed symbols.
+
+`hpclang_display_set_enabled(enabled, timeout_us)` temporarily stops or resumes
+scanout within an owned session. Disabling waits for a frame boundary; a timeout
+leaves the display running. Both pages retain their pixels, and re-enabling
+resumes the same front page. While disabled, `present` and `wait_frame` report
+`ENODEV`. Calls without a session report `EPERM`; the timeout range is 1–1000000
+microseconds. `display_end` restores the host even when the application leaves
+its own screen disabled.
 
 The runtime cleans framebuffer cache lines before DMA reads, restores only
 writable LCD configuration, and never forces an originally disabled LCD on.

@@ -30,6 +30,11 @@ endif()
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")
 target_link_libraries(test_softfloat PRIVATE m)
 
+hpclang_unit(font_symbols test_font_symbols.c
+    "${HPCLANG_ROOT}/runtime/core/font.c" "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_font_symbols PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpg_graphics test_hpg_graphics.c
     "${HPCLANG_ROOT}/tests/e2e/display/hpg-prototype.c"
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
@@ -37,11 +42,24 @@ target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
-hpclang_unit(input_session test_input_session.c "${HPCLANG_ROOT}/runtime/core/input.c" "${HPCLANG_ROOT}/runtime/core/input-session.c")
+hpclang_unit(input_session test_input_session.c "${HPCLANG_ROOT}/runtime/core/input.c"
+    "${HPCLANG_ROOT}/runtime/core/input-session.c"
+    "${HPCLANG_ROOT}/runtime/core/input-mode.c"
+    "${HPCLANG_ROOT}/runtime/core/input-alpha.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keymap.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keyboard.c")
 target_include_directories(test_input_session PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(input_alpha test_input_alpha.c "${HPCLANG_ROOT}/runtime/core/input-alpha.c" "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_input_alpha PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 hpclang_unit(input_mode test_input_mode.c "${HPCLANG_ROOT}/runtime/core/input-mode.c")
+hpclang_unit(input_keyboard test_input_keyboard.c
+    "${HPCLANG_ROOT}/runtime/core/input.c"
+    "${HPCLANG_ROOT}/runtime/core/input-session.c"
+    "${HPCLANG_ROOT}/runtime/core/input-mode.c"
+    "${HPCLANG_ROOT}/runtime/core/input-alpha.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keymap.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keyboard.c")
+target_include_directories(test_input_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 target_include_directories(test_input_mode PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(numeric_input test_numeric_input.c "${HPCLANG_ROOT}/runtime/core/input.c")

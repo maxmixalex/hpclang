@@ -93,6 +93,16 @@ extern "C"
         HPCLANG_TEXT_LOCK_UPPER,
         HPCLANG_TEXT_LOCK_LOWER
     };
+    /* Map a text plane and physical key to one Unicode scalar. Returns 1 for
+     * a character, 0 for a command/unmapped key, -1/EINVAL for invalid arguments
+     * or -1/ENOSYS for an unknown model. Output changes only on 1; success
+     * preserves errno. held_modifiers is the physical event's modifier snapshot;
+     * zero selects a released one-shot shift. No command execution, paired
+     * delimiters or global mode.
+     * Latin planes use printed letters; classic Alpha-right-Shift supplies
+     * native Greek/math characters. Plain keys supply digits and punctuation. */
+    int hpclang_text_key_lookup(uint32_t model, uint16_t key, enum hpclang_text_plane plane,
+                                uint32_t held_modifiers, uint32_t *codepoint);
     /* Caller-owned state; fields are private. Initialize per input session and
      * feed its complete ordered event stream, including modifier UP events.
      * No global keyboard state, allocation, polling or Stock UI is changed. */
@@ -132,11 +142,24 @@ extern "C"
                                 const struct hpclang_keyboard_event *event,
                                 enum hpclang_text_plane *plane);
 
+    /* Default bounded editor adapter over the native text-mode state. Feed all
+     * ordered physical events. Modifier state advances even if insertion fails
+     * with ENOSPC, matching a consumed one-shot key. Invalid editor/event/mode
+     * arguments change nothing. Navigation, Enter/accept and ON/cancel remain
+     * editor actions; unmapped commands are ignored. The application supplies
+     * explicit menu locks through text_mode_set_lock(). Classic shifted bracket,
+     * quote, colon and guillemet pairs leave the cursor inside; ENOSPC inserts neither
+     * half. HP39 bracket keys insert separately. No polling or drawing. */
+    int hpclang_text_input_event(struct hpclang_text_input *input, struct hpclang_text_mode *mode,
+                                 const struct hpclang_keyboard_event *event);
+
     /* Synchronous bounded line session. The caller owns input/buffer and context.
      * next returns 1/event, 0/idle or -1/errno; it may wait, or poll the physical
      * event service. Idle calls do not redraw. No global keyboard reset/timing,
      * display acquisition, allocation or implicit stdio binding is performed.
-     * edit optionally replaces text_input_key (e.g. model-specific Alpha policy),
+     * With mode set, the default editor is text_input_event; otherwise it is
+     * text_input_key. The borrowed mode must remain live for the session.
+     * edit optionally replaces that default (e.g. application menu actions),
      * returning the same input_result or -1/errno. ENOSPC is recoverable.
      * accept optionally validates the proposed line: 0 accepts, 1 rejects with
      * errno, -1 aborts. Rejection preserves the editor for correction.
@@ -156,6 +179,7 @@ extern "C"
         int (*accept)(void *context, const struct hpclang_text_input *input);
         int (*update)(void *context, const struct hpclang_text_input *input, int result, int error);
         void *context;
+        struct hpclang_text_mode *mode;
     };
     int hpclang_text_input_run(struct hpclang_text_input *input,
                                const struct hpclang_text_input_callbacks *callbacks);

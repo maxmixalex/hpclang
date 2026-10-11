@@ -71,7 +71,8 @@ int main(void)
                              HPCLANG_KEY_2,     HPCLANG_KEY_3,     HPCLANG_KEY_HP48_BACKSPACE,
                              HPCLANG_KEY_3,     HPCLANG_KEY_ENTER};
     struct session s = {.keys = keys, .count = sizeof(keys) / sizeof(keys[0]), .idle = 3};
-    struct hpclang_text_input_callbacks io = {next, NULL, accept, update, &s};
+    struct hpclang_text_input_callbacks io = {
+        .next = next, .accept = accept, .update = update, .context = &s};
     errno = EDOM;
     assert(hpclang_text_input_run(&input, &io) == HPCLANG_INPUT_ACCEPTED);
     assert(errno == EDOM && s.value == -13 && !strcmp(buffer, "-13"));
@@ -99,7 +100,7 @@ int main(void)
     assert(hpclang_text_input_init(&input, buffer, sizeof(buffer)) == 0);
     const unsigned unicode[] = {HPCLANG_KEY_F1, HPCLANG_KEY_ENTER};
     s = (struct session){.keys = unicode, .count = 2};
-    io = (struct hpclang_text_input_callbacks){next, unicode_edit, NULL, NULL, &s};
+    io = (struct hpclang_text_input_callbacks){.next = next, .edit = unicode_edit, .context = &s};
     assert(hpclang_text_input_run(&input, &io) == HPCLANG_INPUT_ACCEPTED);
     assert(!strcmp(buffer, "\xce\xa9"));
     return 0;

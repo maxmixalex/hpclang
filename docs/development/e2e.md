@@ -44,6 +44,15 @@ bounded query protects the interrupt-controller boundary, preserves source
 pending bits, and restores routing and masks. System Services checks those
 invariants; the LCD return gate catches unintended ROM wake/clock changes.
 
+HP39 serial-disk transfer applies CRLF-to-LF conversion inside received files,
+including binary Aplets. The Kermit server therefore sends transparent eight-bit
+text with LF line endings in manual mode: its LF-to-CRLF expansion is the inverse
+of Stock's conversion. Input files remain unchanged. The PTY regression models
+Stock decoding, covers all byte values and adjacent CR/LF runs, and rejects the
+previous binary-mode configuration. System Services embeds a retained byte
+witness with CRLF in both possible Aplet nibble alignments. A successful Kermit
+EOF alone is insufficient evidence that Stock can load the resulting object.
+
 The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
 tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different
