@@ -15,7 +15,8 @@ add_executable(hpclang_system_services_e2e
     ${HPCLANG_LIBC}
     main.c
     checks.c
-    console.c)
+    console.c
+    historical-system.c)
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
@@ -31,3 +32,7 @@ set_target_properties(
 
 hpclang_target_font(hpclang_system_services_e2e
     NAME hpclang_system_font FONT @mini MODE STATIC_AUTO FALLBACK NONE)
+
+# Benchmark output contains arbitrary measured decimal values.
+hpclang_target_font(hpclang_system_services_e2e
+    NAME hpclang_benchmark_font FONT @mini MODE FULL FALLBACK NONE)

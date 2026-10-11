@@ -12,6 +12,7 @@
 
 extern volatile uint32_t hpclang_e2e_result;
 extern const struct hpclang_font hpclang_system_font;
+unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t));
 
 static int native_symbols(void)
 {
@@ -527,6 +528,9 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     result = 15;
     if (historical_keyboard(model))
+        goto done;
+    result = 16;
+    if (hpclang_historical_system(mailbox))
         goto done;
     result = 0;
 done:

@@ -31,7 +31,20 @@ class TextPixelTests(unittest.TestCase):
                 pressed[48 * 132 + 16] = 0
                 Path(f"{prefix}-202.pgm").write_bytes(header + pressed)
                 Path(f"{prefix}-203.pgm").write_bytes(header + keyboard)
+                timed = blank.copy()
+                timed[1] = timed[32 * 132 + 1] = timed[12 * 132] = 0
+                timed[5 * 132 + 131] = 0  # DMA padding is not visible text.
+                Path(f"{prefix}-204.pgm").write_bytes(header + timed)
                 pixels.verify(prefix, height)
+                no_time = timed.copy()
+                no_time[12 * 132] = 255
+                bad_report = timed.copy()
+                bad_report[1] = 255
+                for data in (no_time, bad_report, blank, timed[:-1]):
+                    Path(f"{prefix}-204.pgm").write_bytes(header + data)
+                    with self.assertRaises(AssertionError):
+                        pixels.verify(prefix, height)
+                Path(f"{prefix}-204.pgm").write_bytes(header + timed)
                 unrelated = keyboard.copy()
                 unrelated[20 * 132 + 60] = 0
                 for data in (pressed, blank, unrelated, keyboard[:-1]):
