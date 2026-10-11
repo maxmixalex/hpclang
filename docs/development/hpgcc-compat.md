@@ -302,6 +302,8 @@ The N/O positions use the SDK's existing model-specific physical identities
 (HP49 CAT/EQW versus HP50 EVAL/QUOTE). The manual diagrams establish letter
 positions, not a change to that accepted physical-key ABI. All 26 letters in
 both cases and space are tested per model through the existing electrical map.
+HP39 letters are printed below and to the right of their keys: A is VARS,
+E is SIN, Y is 2, Z is 3, and Alpha-space is Plus. Enter is not Alpha-space.
 Sticky/held Alpha, punctuation/symbol planes and complete interactive flows
 remain separate acceptance work.
 

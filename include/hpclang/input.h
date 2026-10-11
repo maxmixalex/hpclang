@@ -73,7 +73,7 @@ extern "C"
      * unknown model. Output changes only on 1; success preserves errno.
      * Pure lookup: no event polling, held-modifier inference, sticky Alpha,
      * punctuation/command planes or Stock UI state. The caller chooses when an
-     * Alpha plane applies. HP39 Alpha-Enter maps to space, not line acceptance. */
+     * Alpha plane applies. HP39 Alpha-Plus maps to space. Enter has no letter. */
     int hpclang_text_alpha_lookup(uint32_t model, uint16_t key, int lowercase, uint32_t *codepoint);
 
     /* Synchronous bounded line session. The caller owns input/buffer and context.

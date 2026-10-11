@@ -149,8 +149,8 @@ unsigned hpclang_e2e_console_test(void)
     result = 9;
     uint32_t model = hpclang_device_info()->model;
     int hp39 = hpclang_device_info()->family == HPCLANG_FAMILY_HP39;
-    uint16_t a = hp39 ? HPCLANG_KEY_HP39_SIN : HPCLANG_KEY_F1;
-    uint16_t z = hp39 ? HPCLANG_KEY_HP39_NEGATE : HPCLANG_KEY_DIVIDE;
+    uint16_t a = hp39 ? HPCLANG_KEY_HP39_VARS : HPCLANG_KEY_F1;
+    uint16_t z = hp39 ? HPCLANG_KEY_3 : HPCLANG_KEY_DIVIDE;
     if (hpclang_text_alpha_lookup(model, a, 0, &cp) != 1 || cp != 'A' ||
         hpclang_text_alpha_lookup(model, z, 1, &cp) != 1 || cp != 'z' ||
         hpclang_text_alpha_lookup(model, HPCLANG_KEY_UNKNOWN, 0, &cp) != 0 || cp != 'z')

@@ -179,8 +179,9 @@ output untouched. Invalid arguments return -1/`EINVAL`; unknown models return
 -1/`ENOSYS`. Successful calls preserve errno.
 
 This pure text-layer helper does not consume events or decide whether Alpha is
-held, latched or locked. The caller selects the plane. HP39 Alpha-Enter maps to
-space; HP48/49/50 use their dedicated space key. Modifier keys, editing commands,
+held, latched or locked. The caller selects the plane. HP39 Alpha-Plus maps to
+space; Enter has no Alpha letter. HP48/49/50 use their dedicated space key.
+Modifier keys, editing commands,
 digits without Alpha letters, punctuation planes and non-Latin symbols are not
 mapped by this helper. Call it only for the chosen text plane and DOWN/REPEAT
 events, before falling back to editing controls. It is implemented pending CI;

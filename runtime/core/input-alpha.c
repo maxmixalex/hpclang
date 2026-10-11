@@ -3,7 +3,11 @@
 
 /* Printed Latin legends, in alphabet order. Source keyboard diagrams are
  * cited in hpgcc-compat.md. These are text-layer maps, not scan-code maps. */
-static const uint16_t hp39[] = {HPCLANG_KEY_HP39_SIN,
+static const uint16_t hp39[] = {HPCLANG_KEY_HP39_VARS,
+                                HPCLANG_KEY_HP39_MATH,
+                                HPCLANG_KEY_HP39_DERIVATIVE,
+                                HPCLANG_KEY_HP39_X_THETA_T,
+                                HPCLANG_KEY_HP39_SIN,
                                 HPCLANG_KEY_HP39_COS,
                                 HPCLANG_KEY_HP39_TAN,
                                 HPCLANG_KEY_HP39_LN,
@@ -24,11 +28,7 @@ static const uint16_t hp39[] = {HPCLANG_KEY_HP39_SIN,
                                 HPCLANG_KEY_MINUS,
                                 HPCLANG_KEY_1,
                                 HPCLANG_KEY_2,
-                                HPCLANG_KEY_3,
-                                HPCLANG_KEY_PLUS,
-                                HPCLANG_KEY_0,
-                                HPCLANG_KEY_PERIOD,
-                                HPCLANG_KEY_HP39_NEGATE};
+                                HPCLANG_KEY_3};
 static const uint16_t hp48[] = {HPCLANG_KEY_F1,
                                 HPCLANG_KEY_F2,
                                 HPCLANG_KEY_F3,
@@ -94,7 +94,7 @@ int hpclang_text_alpha_lookup(uint32_t model, uint16_t key, int lowercase, uint3
     case HPCLANG_MODEL_HP39GS:
     case HPCLANG_MODEL_HP40GS:
         letters = hp39;
-        space = HPCLANG_KEY_ENTER;
+        space = HPCLANG_KEY_PLUS;
         break;
     case HPCLANG_MODEL_HP48GII:
         letters = hp48;
