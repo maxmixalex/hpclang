@@ -455,7 +455,7 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
-| `hpclang_font_available()` | Implemented; acceptance in progress | Checks whether the descriptor's source is accessible in this launch context. Direct classic launches can explicitly choose packaged fonts when the native Stock map is absent. Preserves `errno`; font availability is separate from glyph coverage. |
+| `hpclang_font_available()` | Local validation complete; CI pending | Checks whether the descriptor's source is accessible in this launch context. Direct classic launches can explicitly choose packaged fonts when the native Stock map is absent. Preserves `errno`; font availability is separate from glyph coverage. |
 
 No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/bigfont objects are resolved through the live Saturn logical mapping supplied by the launcher. HPGCC3 documents bigfont as an 8-row raster with normal advance 6; its raw record is eight bytes per character, so “8×8” describes storage/raster capacity rather than a fixed 8-pixel text advance.
 
@@ -517,7 +517,7 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
 | `hpclang_stream_volume_count()` | Local validation complete; CI pending | Number of usable FAT primary partitions, or one for an unpartitioned FAT card. Acquires the same SD lease as file I/O. |
 | `hpclang_stream_volume_query()` | Local validation complete; CI pending | Versioned logical index, actual MBR slot (1–4, or 0 for unpartitioned media), starting sector, and per-volume space/media information. |
-| `hpclang_stream_media_identity_query()` | Implemented; acceptance in progress | Versioned snapshot of the physical SD card's 16-byte CID, most significant byte first. Compare CID bytes to recognize the same card after reinsertion; this never revives old handles. Requires readable FAT media and uses the same owned namespace. Failure leaves the output unchanged. |
+| `hpclang_stream_media_identity_query()` | Local validation complete; CI pending | Versioned snapshot of the physical SD card's 16-byte CID, most significant byte first. Compare CID bytes to recognize the same card after reinsertion; this never revives old handles. Requires readable FAT media and uses the same owned namespace. Failure leaves the output unchanged. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
 Unqualified paths and `/` use the first usable FAT volume. `N:/path` explicitly

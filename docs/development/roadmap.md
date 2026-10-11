@@ -593,6 +593,17 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
 
 ### M7 final audit / M8 follow-up
 
+Historical-client and card-identity batch, local validation complete:
+`a6be226c` adds the source-anchored HPG animation/mixed-font, physical keyboard
+and file application flows, explicit native-font availability and correct
+historical file-volume metadata. Display and System Services pass on all six
+models in Direct and Stock; Storage passes on both SD models in both contexts.
+`0d755f11` adds stable CID queries, with all 68 host tests, six-model Direct
+Storage and HP49g+/HP50g Stock replacement tests passing. Changed-source Clang
+analysis, formatting/lint and strict docs pass. Formal CI remains pending.
+The detailed per-capability evidence is in
+[HPGCC compatibility](hpgcc-compat.md#capability-and-application-evidence).
+
 Additional source-confirmed application capabilities still to close:
 
 - [ ] Expose stable SD card identity so an application can distinguish the same
