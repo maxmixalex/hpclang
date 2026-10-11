@@ -16,6 +16,7 @@ endfunction()
 
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
+        "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"
         "${HPCLANG_ROOT}/runtime/libc/stdio-lifetime.c")
     target_link_options(test_stdio_lifetime PRIVATE
         "LINKER:--wrap=fdopen,--wrap=freopen,--wrap=fclose,--wrap=fflush,--wrap=fmemopen,--wrap=malloc")

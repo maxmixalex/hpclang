@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include "stdio-lifetime.h"
+#include "../core/exit-hooks.h"
 
 struct stream_entry
 {
@@ -17,9 +18,12 @@ static struct stream_entry *streams;
 static int flushing;
 static unsigned closed_standard;
 
+static void close_streams(void);
+
 void hpclang_stdio_reset_standard(void)
 {
     closed_standard = 0;
+    hpclang_exit_hooks.stdio = close_streams;
 }
 
 FILE *__real_fdopen(int fd, const char *mode);
@@ -50,6 +54,7 @@ static FILE *track(struct stream_entry *entry, FILE *stream)
     }
     *entry = (struct stream_entry){stream, streams, 0};
     streams = entry;
+    hpclang_exit_hooks.stdio = close_streams;
     return stream;
 }
 
@@ -166,7 +171,7 @@ int __wrap_fflush(FILE *stream)
     return error ? EOF : 0;
 }
 
-void hpclang_stdio_exit_cleanup(void)
+static void close_streams(void)
 {
     (void)flush_standard();
     while (streams)

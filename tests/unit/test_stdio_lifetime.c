@@ -7,6 +7,9 @@
 #include <unistd.h>
 
 void hpclang_stdio_exit_cleanup(void);
+void hpclang_stdio_reset_standard(void);
+FILE *__real_fmemopen(void *buffer, size_t size, const char *mode);
+int __real_fclose(FILE *stream);
 FILE *__wrap_fdopen(int fd, const char *mode);
 /* Exercise the ownership entry explicitly. The ARM E2E calls ordinary fopen
  * and proves the linker's fdopen interception against actual picolibc. */
@@ -20,6 +23,21 @@ void *__wrap_malloc(size_t size)
 
 int main(void)
 {
+    /* A standard-stream binding must opt into exit flushing even when the app
+     * has never opened a tracked FILE. Use a real buffer to observe the flush. */
+    hpclang_stdio_exit_cleanup();
+    char routed[32] = {0};
+    FILE *previous_stdout = stdout;
+    stdout = __real_fmemopen(routed, sizeof routed, "w");
+    assert(stdout);
+    hpclang_stdio_reset_standard();
+    assert(fputs("bound", stdout) >= 0);
+    hpclang_stdio_exit_cleanup();
+    assert(strcmp(routed, "bound") == 0);
+    assert(__real_fclose(stdout) == 0);
+    stdout = previous_stdout;
+    hpclang_stdio_reset_standard();
+
     char path[] = "/tmp/hpclang-stdio-XXXXXX";
     int fd = mkstemp(path);
     assert(fd >= 0);

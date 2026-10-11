@@ -944,8 +944,36 @@ successfully with the normal profile and remain within their launcher budgets.
 This is a build/size check, not a replacement for Gallery's CI pixel gates.
 
 At pushed functional head `216bb5d5`, [Core](https://github.com/maxmixalex/hpclang/actions/runs/38160477777),
-[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38160477820) and
-[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38160477797) pass.
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38160477820),
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38160477797) and
+[Gallery](https://github.com/maxmixalex/hpclang/actions/runs/38160477819) pass.
 The Storage CI hardware-check artifact's two launchers, installer and instructions
-are byte-for-byte identical to the locally prepared manual package. Runtime,
-Objects and Gallery acceptance is still pending; M7 is not yet marked closed.
+matched the manual package prepared for that head byte-for-byte. Runtime's
+HP39gs USB transfer stopped before application entry after 90 seconds without
+acknowledged packet progress; only the failed job was rerun. Objects failed at
+the first copied-Aplet launch in mutation/composite on all three HP39 models.
+The unchanged CI mutation artifact reproduces the failure locally: saved RAM
+contains `errno=ENOMEM`, a 16 KiB writable mapping, and only 3,064 bytes between
+static data and the reserved stack. Its 3,496-byte rejected-write probe cannot
+even allocate the input buffer. Single-instance success therefore does not
+establish the two-instance lifecycle budget. M7 remains open pending repair
+and formal acceptance of these gates.
+
+The repair keeps optional service cleanup behind acquisition-time registration.
+It removes the forced link from every application's exit path to unused CPU
+policy and FILE management. With the normal compiler profile and unchanged
+test assertions, the HP39 mutation/composite HPC1 files shrink from 39,624/41,896
+to 36,224/38,488 bytes. The copied-Aplet lifecycle still exercises large writes,
+native collection, independent snapshots, instance isolation and Reset.
+All 72 host tests pass, including standard-stream-only exit flushing; the
+stream-lifetime and runtime-exit tests also pass ASan/UBSan. Changed-source
+Clang analysis and formatting pass. Six-model Direct Runtime/System Services,
+six-model Stock mutation/composite tests (including every HP39 lifecycle),
+HP39gs Stock Runtime and both SD models' Direct/Stock exit-time file witnesses
+pass locally. Stock System Services pass on five models; HP39g+ is being
+rechecked after an installation-only transfer ceiling under concurrent load.
+
+The optional physical SD package has been rebuilt through the same build and
+packaging inputs used by CI, with 49,824-byte launchers for HP49g+/HP50g. Its
+updated runtime still requires the next CI acceptance; the maintainer's later
+physical card test remains nonblocking.

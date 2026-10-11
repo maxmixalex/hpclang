@@ -40,6 +40,15 @@ hpclang separates **service semantics** from **hardware ownership policy**.
 
 The validated stock-hosted environment borrows the HP OS and must return control afterwards. Platform code should therefore preserve IRQ/timer/clock/display state where practical and restore temporary changes. A future hpclang-controlled bootloader or OS may legitimately own those peripherals while exposing the same application-facing services.
 
+Exit cleanup must preserve that ownership without forcing unused services into
+every application. CPU-profile ownership and tracked/standard-stream bindings
+register private cleanup hooks when acquired. Dispatch remains separate from
+the service implementations so ordinary object-only programs can discard the
+unused clock-policy and FILE-management code at link time. Normal exit still
+runs language callbacks before flushing streams; immediate exit skips those
+steps while retaining hardware restoration. Memory validation includes copied
+Aplets with both instances resident, not only single-instance launches.
+
 Do not freeze a public execution-environment enum until code genuinely needs one. Do not make downstream firmware, operating systems, or applications named hpclang targets or dependencies.
 
 ## Core API rules

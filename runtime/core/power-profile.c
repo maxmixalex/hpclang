@@ -6,6 +6,7 @@
 #include "clock-internal.h"
 #include "display-internal.h"
 #include "power-clock.h"
+#include "exit-hooks.h"
 
 #define POWER_REG(address) (*(volatile uint32_t *)(uintptr_t)(address))
 #define POWER_PLL POWER_REG(0x07200004u)
@@ -17,6 +18,8 @@ static struct
     uint32_t slow, pll, div, lcd_clock;
     int owned;
 } profile;
+
+static void restore_profile(void);
 
 static int power_supported(void)
 {
@@ -104,14 +107,16 @@ int hpclang_power_set_profile(enum hpclang_power_profile requested)
         profile.div = div;
         profile.lcd_clock = lcd & 0x3ff00u;
         profile.owned = 1;
+        hpclang_exit_hooks.power = restore_profile;
     } else {
         profile.owned = 0;
+        hpclang_exit_hooks.power = 0;
     }
     hpclang_irq_restore(irq);
     return 0;
 }
 
-void hpclang_power_restore(void)
+static void restore_profile(void)
 {
     if (!profile.owned)
         return;
@@ -123,6 +128,7 @@ void hpclang_power_restore(void)
         uint32_t lcd = hpclang_display_bus.read(hpclang_display_bus.context, LCD_CONTROL1);
         apply_clock(profile.slow, (lcd & 0xffu) | profile.lcd_clock);
         profile.owned = 0;
+        hpclang_exit_hooks.power = 0;
         hpclang_irq_restore(irq);
     }
     errno = saved_errno;
