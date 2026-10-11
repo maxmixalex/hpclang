@@ -353,6 +353,13 @@ infrastructure.
 
 The same rule applies to the focused **Storage** gate. `E2E / Storage` builds the storage-enabled payload separately from the canonical keyboard/runtime payload so storage timing and fixtures do not perturb the canonical Runtime gate. Its hp4950 Stock path creates the named-directory VVFAT fixture after ARMToolbox installation but before the run-phase emulator opens the card, arms result monitoring before `PrRUN`, and requires payload PASS, ARMToolbox stage ownership release, and settled Stock repaint on both HP49g+ and HP50g.
 
+Directory-backed cards enumerate host names in byte order before building FAT
+entries, independent of host filesystem enumeration and locale. The Stock File
+Manager groups directories first; the storage sequence selects the first regular
+file after the volume label. A regression creates identical trees in opposite
+orders and checks identical enumeration. This ordering applies to emulator card
+construction, not to the public SDK's directory-iteration contract.
+
 Storage #22 (`35378151818`) is the M7.2b historical closure evidence for the earlier KOS-backed stream/metadata bridge. Storage #23 then independently proved that Stock KOS syscall 19 can safely rebuild the calculator filesystem after direct ownership is released.
 
 The integrated M7.2 implementation goes further: the first byte-stream operation acquires the process-wide SD/FAT lease, and all stdio, metadata, capacity, namespace mutation, and owned directory iteration use hpclang's S3C2410 SDI + FatFs backend until runtime shutdown. The focused payload verifies missing-file semantics, create/truncate/append, seek/tell, metadata and FAT timestamps, capacity/free space, rename/mkdir/rmdir, UTF-8 long filenames, case-insensitive lookup with preserved stored case, simultaneous independent iterators, ordinary stdio while an iterator is live, and final reopen/read before the runtime unmounts/releases the controller and invokes Stock ResetSD.
