@@ -15,6 +15,10 @@ function(hpclang_unit name)
 endfunction()
 
 if(UNIX)
+    hpclang_unit(stdio_lifetime test_stdio_lifetime.c
+        "${HPCLANG_ROOT}/runtime/libc/stdio-lifetime.c")
+    target_link_options(test_stdio_lifetime PRIVATE
+        "LINKER:--wrap=fdopen,--wrap=freopen,--wrap=fclose,--wrap=fflush,--wrap=fmemopen,--wrap=malloc")
     hpclang_unit(directory_order test_directory_order.c)
     target_include_directories(test_directory_order PRIVATE
         "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

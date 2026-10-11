@@ -77,6 +77,7 @@ set(HPCLANG_RUNTIME_SOFTFLOAT
 set(HPCLANG_LIBC
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/sbrk.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/platform.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/stdio-lifetime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-media.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-volumes.c"
@@ -103,4 +104,7 @@ set(HPCLANG_PACKER
     "${CMAKE_CURRENT_LIST_DIR}/../../tools/hpclang-pack.py")
 
 set(HPCLANG_ABI "hpc1" CACHE STRING "hpclang executable ABI")
+add_link_options(
+    "LINKER:--wrap=fdopen,--wrap=freopen,--wrap=fclose,--wrap=fflush"
+    "LINKER:--wrap=fmemopen,--wrap=funopen,--wrap=fdevopen")
 set(HPCLANG_CODE_MODEL "fixed-virtual" CACHE STRING "hpclang code model")

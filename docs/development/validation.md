@@ -852,6 +852,10 @@ source-anchored graphics/keyboard/file clients and stable SD CID snapshots.
 The earlier HP39g+ catalog transport failure on `11d85077` passes both exact
 payload replay and its failed-job rerun. That failure occurred before
 application entry and does not establish a calculator-object failure.
+The subsequent main integration on the same `7303a3d6` also passes all eight
+workflows: Runtime `38154282156`, Storage `38154282179`, Objects `38154282149`,
+Gallery `38154282146`, Core `38154282199`, Quality `38154282143`, FatFs vendor
+`38154282148` and Documentation `38154282141`.
 
 The additional HPGCC 1.1/2.0 timed-sieve client passes six-model Direct and
 Stock locally. Its bounded allocation/work checks 168 primes below 1000,
@@ -909,3 +913,20 @@ mapping including the boot page and 8 KiB stack. The benchmark now explicitly
 packages printable ASCII, its actual output repertoire, reducing initialized
 image size from 65,328 to 59,848 bytes. Stock revalidation checks this smaller
 payload without reducing stack bounds or weakening the prime/pixel assertions.
+
+The additional stream-lifetime check found that the pinned ATFE picolibc has
+`__STDIO_EXIT_FLUSH` disabled. The runtime now closes registered streams after
+normal exit callbacks and implements `fflush(NULL)` over those streams and
+live standard streams. `_Exit` continues to skip buffered-stream cleanup.
+Host tests cover actual file/memory buffers, reopen, explicit close, allocation
+failure and failed close/reopen; all 72 host tests pass, and the lifetime/exit
+tests pass AddressSanitizer and UndefinedBehaviorSanitizer. Changed-source
+Clang analysis passes.
+
+The new Storage witness leaves a buffered file open and appends from an exit
+callback. A Stock experiment demonstrated that VVFAT's directory overlay could
+lose the new file despite successful native return; the identical payload on
+a raw FAT image retained the complete `MAIN-ATEXIT` bytes. The fixture now keeps
+card A mounted after A→B→A, eliminating the final directory-backend swap and
+checking the exit-time file in card A's actual first partition. Final Direct
+and Stock validation of this stream extension is in progress.

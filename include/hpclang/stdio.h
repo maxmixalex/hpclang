@@ -23,6 +23,8 @@ extern "C"
         void *context;
     };
     /* Copies callbacks, borrows context until unbind; must have read or write.
+     * Normal exit flushes live standard streams. Keep the context alive until
+     * then, or unbind before leaving its scope. _Exit skips this flushing.
      * One binding at a time: EBUSY rather than silently replacing another owner.
      * Clears standard-stream EOF/error flags and pushback on success. Single-threaded/IRQ-unsafe.
      * Default streams discard output and return EOF. Return 0 or -1/errno. */

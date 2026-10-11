@@ -3,8 +3,10 @@
 
 #include "s3c2410/s3c2410_sdi.h"
 
-/* SD(1): enter raw card A; SD(2): replace with B; SD(3): return A;
- * SD(4): restore the launch card. Both physical transitions
+/* SD(1): enter raw card A; SD(2): replace with B; SD(3): return A.
+ * Keep raw card A through application exit and Stock return, so exit-time
+ * buffered writes can be checked independently of VVFAT overlay commits.
+ * Both physical transitions
  * happen before the guest resumes, so a GPIO-presence-only driver misses them.
  * Use the emulator's card API: it changes both block media and the detect pin. */
 static int media_checkpoint(hdw_t *hdw, uint32_t address, uint32_t value, unsigned *phase)
@@ -14,11 +16,10 @@ static int media_checkpoint(hdw_t *hdw, uint32_t address, uint32_t value, unsign
     unsigned request = value & 65535u;
     const char *replacement = getenv("HPCLANG_E2E_REPLACEMENT_CARD");
     const char *storage = getenv("HPCLANG_E2E_STORAGE_CARD");
-    const char *original = getenv("HPCLANG_X50NG_SD_DIR");
-    if (!replacement || !*replacement || !original || !*original || !storage || !*storage ||
-        request != *phase + 1 || request > 4 || !s3c2410_sdi_is_mounted(hdw))
+    if (!replacement || !*replacement || !storage || !*storage || request != *phase + 1 ||
+        request > 3 || !s3c2410_sdi_is_mounted(hdw))
         return -1;
-    const char *path = request == 2 ? replacement : request == 4 ? original : storage;
+    const char *path = request == 2 ? replacement : storage;
     if (s3c2410_sdi_mount(hdw, (char *)path) || !s3c2410_sdi_is_mounted(hdw))
         return -1;
     *phase = request;
@@ -31,7 +32,7 @@ static int media_checkpoint(hdw_t *hdw, uint32_t address, uint32_t value, unsign
 static int media_checkpoint_complete(unsigned phase)
 {
     const char *replacement = getenv("HPCLANG_E2E_REPLACEMENT_CARD");
-    return !replacement || !*replacement || phase == 4;
+    return !replacement || !*replacement || phase == 3;
 }
 
 #endif

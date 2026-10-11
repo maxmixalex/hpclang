@@ -318,7 +318,7 @@ static uint32_t storage_replacement_test(void)
     secondary = NULL;
     if (closed || remove("1:/STALE.BIN"))
         goto done;
-    result = media_swap(4) ? 0xc9u : 0;
+    result = 0;
 done:
     if (secondary)
         fclose(secondary);
@@ -1057,6 +1057,10 @@ static void hold_failure_result(void)
 }
 
 static unsigned exit_checks_ready, exit_checks_seen;
+#ifdef HPCLANG_E2E_STORAGE
+static FILE *exit_stream;
+static char exit_buffer[64];
+#endif
 
 void hpclang_e2e_exit_event(unsigned event)
 {
@@ -1078,6 +1082,12 @@ void hpclang_e2e_exit_event(unsigned event)
 
 static void exit_first(void)
 {
+#ifdef HPCLANG_E2E_STORAGE
+    if (exit_stream && fputs("-ATEXIT", exit_stream) < 0) {
+        hpclang_e2e_result = 0x46410014u;
+        hold_failure_result();
+    }
+#endif
     hpclang_e2e_exit_event(1u);
 }
 static void exit_second(void)
@@ -1089,6 +1099,17 @@ static int finish(uint32_t failure, uint32_t model)
 {
     (void)model;
     struct hpclang_surface *surface = hpclang_display_surface();
+
+#ifdef HPCLANG_E2E_STORAGE
+    if (!failure && hpclang_device_info()->family == HPCLANG_FAMILY_HP4950) {
+        /* Keep a genuinely buffered FILE open through all exit callbacks.
+         * The host inspects the restored card after runtime/Stock return. */
+        exit_stream = fopen("EXIT.BIN", "wb");
+        if (!exit_stream || setvbuf(exit_stream, exit_buffer, _IOFBF, sizeof exit_buffer) ||
+            fputs("MAIN", exit_stream) < 0)
+            failure = 0x14u;
+    }
+#endif
 
     hpclang_surface_clear(surface, 0u);
     if (failure == 0) {

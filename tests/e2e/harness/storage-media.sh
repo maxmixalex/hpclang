@@ -42,5 +42,20 @@ PY
 verify_storage_media() {
     cmp -s <(printf 'SAFE') <(mtype -i "$HPCLANG_E2E_REPLACEMENT_CARD" ::/STALE.BIN)
     cmp -s <(printf 'NEW') <(mtype -i "$HPCLANG_E2E_REPLACEMENT_CARD" ::/NEW.BIN)
+    # Card A is partitioned. Read its first primary volume from the MBR rather
+    # than assuming a particular partition offset in the persistence oracle.
+    local offset
+    offset="$(python3 - "$HPCLANG_E2E_STORAGE_CARD" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+with Path(sys.argv[1]).open('rb') as card:
+    mbr = card.read(512)
+assert mbr[510:] == b'\x55\xaa'
+print(struct.unpack_from('<I', mbr, 446 + 8)[0] * 512)
+PY
+    )"
+    cmp -s <(printf 'MAIN-ATEXIT') <(mtype -i "$HPCLANG_E2E_STORAGE_CARD@@$offset" ::/EXIT.BIN)
     printf 'PASS: replacement card retains its sentinel and newly written file\n'
 }

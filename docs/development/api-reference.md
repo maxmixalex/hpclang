@@ -454,12 +454,19 @@ electrical timing still require hardware measurement.
 ### Application termination
 
 Returning from `main` and calling ordinary `exit(status)` run registered
-`atexit` callbacks and C++ static-object destructors before returning through
-the launcher. `_Exit(status)` skips those callbacks and destructors. Both paths
+`atexit` callbacks and C++ static-object destructors, then flush and close
+remaining registered C streams before returning through the launcher.
+`fflush(NULL)` flushes all registered streams and live standard streams.
+`_Exit(status)` skips callbacks, destructors and buffered-stream flushing. Both paths
 release owned sound, display, CPU power policy and storage state; neither
 resets the calculator. Exit status is preserved at the runtime/launcher
 boundary, although the calculator UI need not display it. Calls from a sound
 cancellation callback also release the active PWM resources.
+
+The pinned picolibc disables automatic exit flushing. The runtime therefore
+tracks stream constructors and close/reopen through public `FILE` operations;
+it does not inspect the library's private stream layout. A callback binding's
+context must remain valid until it is unbound or normal exit has flushed it.
 
 This behavior is implemented and under local six-model validation. It does
 not recover from arbitrary CPU faults, reset the whole calculator or guarantee

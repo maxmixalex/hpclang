@@ -396,15 +396,18 @@ The same rule applies to the focused **Storage** gate. `E2E / Storage` builds th
 Storage file operations run on raw FAT16 card images created by `dosfstools` and
 `mtools`, installed explicitly by the Storage workflow. Once the payload starts,
 an acknowledged media checkpoint inserts card A before the first storage call.
-Later checkpoints replace A with B, return A, then restore the original launch
-card before exit. Each replacement uses x50ng's actual card mount API, including
+Later checkpoints replace A with B and return A, keeping that raw card mounted
+through application exit and Stock return. Each replacement uses x50ng's actual card mount API, including
 the falling/rising detect-pin transitions, while the guest is paused: a driver
 that samples only current presence cannot observe the removal.
 
 The guest must reject an old dirty stream and directory, preserve the replacement
 card's sentinel, write a fresh file, and recover the original card's bytes. The
-host independently reads card B's FAT image after unmount and requires all four
-checkpoint phases before accepting PASS. Raw images avoid VVFAT's delayed
+host independently reads card B's FAT image after unmount and requires all three
+checkpoint phases before accepting PASS. Card A must additionally contain
+`MAIN-ATEXIT`: the application leaves a buffered file open, then appends from an
+exit callback; normal termination must flush and close it. The oracle obtains
+the partition offset from the MBR. Raw images avoid VVFAT's delayed
 directory-overlay commit semantics obscuring real persistence. The same workflow
 builds an optional [physical SD-card check](sd-media-check.md); hardware execution
 remains a separate, nonblocking follow-up.

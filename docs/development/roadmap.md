@@ -207,7 +207,7 @@ M7.1 font closure checklist:
 
 **Complete.**
 
-M7.2 covers the HP49g+/HP50g **SD-card FAT namespace** and byte-stream semantics only. HOME/Port 0, Port 1 and Port 2 are calculator-object stores, not FAT volumes; they remain M7.3 work.
+M7.2 covers the HP49g+/HP50g **SD-card FAT namespace** and byte-stream semantics only. HOME and native Port 0/1/2 are calculator-object namespaces, not FAT volumes. HOME services are accepted under M7.3; the individually approved native-port implementation goals remain below.
 
 The final ownership model is deliberately simpler than the historical bring-up path:
 
@@ -257,7 +257,7 @@ The pinned namespace backend is independently implemented. Historical HPGCC3 FSy
 
 #### M7.2 completion criterion
 
-The accepted M7.2 stream/directory subset supports typical HP49g+/HP50g file flows; attribute mutation and creation/access timestamp coverage remain open below, while hpclang applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. Final focused evidence is **E2E / Storage #53 (`35428824540`)**, fully green across Build, Direct hp39/hp48/hp4950 and Stock hp4950 on `c4b827fe`; **CI / Core runtime #254 (`35428824495`)** is also green on the same head. The representative HPGCC adapter flow includes HP-style/standard paths, read/write/seek/truncate, local cwd, LFN enumeration, metadata, volume size/free queries and cleanup. POSIX `ftruncate()` extension is explicitly zero-filled and regression-tested.
+The accepted M7.2 stream/directory subset supports typical HP49g+/HP50g file flows. Attribute mutation and creation/access timestamp queries were subsequently accepted on `6a7f9a28`; four-volume and media-identity acceptance is recorded below. Applications use standard C/POSIX semantics or cleaner typed queries rather than KOS internals. The original focused evidence is **E2E / Storage #53 (`35428824540`)**, fully green across Build, Direct hp39/hp48/hp4950 and Stock hp4950 on `c4b827fe`; **CI / Core runtime #254 (`35428824495`)** is also green on the same head. The representative HPGCC adapter flow includes HP-style/standard paths, read/write/seek/truncate, local cwd, LFN enumeration, metadata, volume size/free queries and cleanup. POSIX `ftruncate()` extension is explicitly zero-filled and regression-tested.
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 

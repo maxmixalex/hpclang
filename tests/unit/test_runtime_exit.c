@@ -12,6 +12,7 @@ static int status;
 
 int hpclang_start(const struct hpclang_boot_info *boot);
 __attribute__((noreturn)) void fixture_immediate_exit(int value);
+__attribute__((noreturn)) void fixture_exit(int value);
 
 static void event(char value)
 {
@@ -46,11 +47,13 @@ void hpclang_storage_shutdown(void)
     event('N');
 }
 
-__attribute__((noreturn)) void fixture_exit(int value)
+void __libc_fini_array(void)
 {
-    /* ARM E2E tests exercise actual picolibc callbacks and finalizers. */
     event('F');
-    fixture_immediate_exit(value);
+}
+void hpclang_stdio_exit_cleanup(void)
+{
+    event('C');
 }
 
 void __libc_init_array(void)
@@ -80,7 +83,7 @@ int fixture_main(void)
 
 int main(void)
 {
-    static const char *const expected[] = {"STIMFODPN", "STIMFODPN", "STIMODPN", "STIFODPN",
+    static const char *const expected[] = {"STIMFCODPN", "STIMFCODPN", "STIMODPN", "STIFCODPN",
                                            "STIODPN"};
     const int statuses[] = {0, 1, -1, INT_MIN, INT_MAX};
     const struct hpclang_boot_info boot = {0};
