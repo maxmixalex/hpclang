@@ -942,3 +942,10 @@ bytes. The new shard is 95,160 bytes; Stock's compact native-font/control-face
 payload is 24,232 bytes, with 3,168 bytes of static writable data. Both build
 successfully with the normal profile and remain within their launcher budgets.
 This is a build/size check, not a replacement for Gallery's CI pixel gates.
+
+At pushed functional head `216bb5d5`, [Core](https://github.com/maxmixalex/hpclang/actions/runs/38160477777),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38160477820) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38160477797) pass.
+The Storage CI hardware-check artifact's two launchers, installer and instructions
+are byte-for-byte identical to the locally prepared manual package. Runtime,
+Objects and Gallery acceptance is still pending; M7 is not yet marked closed.
