@@ -11,6 +11,7 @@
 #include <hpstdio.h>
 #include <hpclang/abi.h>
 #include <hpclang/device.h>
+#include <hpclang/power.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/keyboard.h>
@@ -990,7 +991,17 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (volumes)
         return volumes;
     unsigned historical = hpclang_historical_files();
-    return historical ? 0xe0u + historical : storage_replacement_test();
+    if (historical)
+        return 0xe0u + historical;
+    /* The owned SD controller retains its divider while PCLK scales. Its bus
+     * stays at or below the original rate, and ordinary files remain usable. */
+    if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
+        return 0xf0u;
+    historical = hpclang_historical_files();
+    int restored = hpclang_power_set_profile(HPCLANG_POWER_HOST);
+    if (historical || restored)
+        return 0xf1u;
+    return storage_replacement_test();
 }
 #endif
 

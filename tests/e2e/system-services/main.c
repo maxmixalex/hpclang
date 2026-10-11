@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include <hpclang/power.h>
 
 extern const struct hpclang_font hpclang_system_font;
 static const char pass_label[] = HPCLANG_UI_TEXT("SYSTEM PASS");
@@ -23,5 +24,12 @@ int main(void)
             __asm__ volatile("nop");
     for (volatile uint32_t n = 12000000u; n != 0u; --n)
         __asm__ volatile("nop");
+    /* Leave the borrowed profile to runtime cleanup. The Direct harness checks
+     * the original clock and LCD registers before restoring its saved host. */
+    if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY)) {
+        hpclang_e2e_result = UINT32_C(0x4641750a);
+        for (;;)
+            __asm__ volatile("nop");
+    }
     return 0;
 }

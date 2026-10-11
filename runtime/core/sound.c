@@ -20,6 +20,11 @@ static void write_reg(void *context, enum hpclang_sound_reg reg, uint32_t value)
 static const struct hpclang_sound_bus bus = {read_reg, write_reg, 0};
 static struct hpclang_sound_saved saved;
 
+int hpclang_sound_active(void)
+{
+    return saved.owned;
+}
+
 int hpclang_sound_play(uint32_t frequency_hz, uint32_t duration_ms, hpclang_sound_cancel_fn cancel,
                        void *context)
 {

@@ -958,6 +958,73 @@ def patch_lcd_scanout(root: Path) -> None:
     )
 
 
+def patch_power_clock(root: Path, args: argparse.Namespace) -> None:
+    """A changed PCLK changes future timer tick duration, not the current count."""
+    shutil.copy2(args.headless_header.parent / "timer-clock.h", root / "src/timer-clock.h")
+    header = root / "src/s3c2410/s3c2410_timer.h"
+    replace_once(
+        header,
+        "extern int s3c2410_init_module_timer( hdw_t* hdw_state );",
+        "extern int s3c2410_init_module_timer( hdw_t* hdw_state );\n"
+        "extern void s3c2410_timer_clock_changed( hdw_t* hdw_state, uint32_t old_pclk );",
+        "timer clock transition API",
+    )
+    timer = root / "src/s3c2410/s3c2410_timer.c"
+    replace_once(
+        timer,
+        '#include "s3c2410_timer.h"',
+        '#include "s3c2410_timer.h"\n#include "../timer-clock.h"',
+        "timer clock arithmetic",
+    )
+    replace_once(
+        timer,
+        "static uint32_t s3c2410_timer_read( void* opaque, target_phys_addr_t offset )",
+        """void s3c2410_timer_clock_changed( hdw_t* hdw_state, uint32_t old_pclk )
+{
+    s3c2410_timer_t* timer = hdw_state->s3c2410_timer;
+    uint32_t new_pclk = hdw_state->PCLK;
+    if (!timer || !old_pclk || !new_pclk || old_pclk == new_pclk)
+        return;
+    int64_t now = timer_get_clock();
+    for (unsigned i = 0; i < 5; ++i) {
+        struct s3c2410_timeout* t = &timer->timeout[i];
+        if (!t->timer || !t->tconfig || !(timer->tcon & t->tconfig->start_bit) ||
+            ((timer->tcfg1 >> (4 * i)) & 15u) >= 4 || !is_timer_pendinig(t->timer))
+            continue;
+        int64_t expires = timer_expires_when(t->timer);
+        uint64_t remaining = expires > now ? (uint64_t)(expires - now) : 0;
+        remaining = timer_clock_remaining(remaining, old_pclk, new_pclk);
+        int64_t next = remaining > (uint64_t)(INT64_MAX - now)
+                          ? INT64_MAX : now + (int64_t)remaining;
+        timer_mod(t->timer, next);
+    }
+}
+
+static uint32_t s3c2410_timer_read( void* opaque, target_phys_addr_t offset )""",
+        "preserve running timer counts on clock change",
+    )
+    power = root / "src/s3c2410/s3c2410_power.c"
+    replace_once(
+        power,
+        '#include "s3c2410_power.h"',
+        '#include "s3c2410_power.h"\n#include "s3c2410_timer.h"',
+        "power timer notification API",
+    )
+    replace_once(
+        power,
+        "    uint32_t slow_bit, slow_val;",
+        "    uint32_t slow_bit, slow_val;\n    uint32_t old_pclk = hdw_state->PCLK;",
+        "capture previous peripheral clock",
+    )
+    replace_once(
+        power,
+        '#ifdef DEBUG_S3C2410_POWER\n    printf( "%s: EXTCLK',
+        "    s3c2410_timer_clock_changed(hdw_state, old_pclk);\n\n"
+        '#ifdef DEBUG_S3C2410_POWER\n    printf( "%s: EXTCLK',
+        "notify peripheral clock change",
+    )
+
+
 def patch_sd_card_identity(root: Path) -> None:
     """Keep a virtual card's serial tied to its backing file, not its contents."""
     path = root / "src/s3c2410/s3c2410_sdi.c"
@@ -1055,6 +1122,7 @@ def main() -> None:
     patch_key_observation(root)
     patch_lcd_scanout(root)
     patch_sd_card_identity(root)
+    patch_power_clock(root, args)
 
 
 if __name__ == "__main__":

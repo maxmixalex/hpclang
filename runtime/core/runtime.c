@@ -10,6 +10,7 @@ void __libc_fini_array(void);
 void hpclang_time_init(void);
 void hpclang_storage_shutdown(void);
 void hpclang_display_end(void);
+void hpclang_power_restore(void);
 
 int main(void);
 
@@ -25,6 +26,7 @@ int hpclang_start(const struct hpclang_boot_info *boot)
 
     __libc_fini_array();
     hpclang_display_end();
+    hpclang_power_restore();
     hpclang_storage_shutdown();
     return result;
 }

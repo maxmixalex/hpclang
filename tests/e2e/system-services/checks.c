@@ -15,6 +15,7 @@
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
 unsigned hpclang_e2e_console_test(void);
+unsigned hpclang_e2e_power_test(void);
 
 /* Exercise Stock's transfer decoding independently of incidental machine-code
  * bytes. Both nibble alignments contain CRLF after HP39 Aplet packaging.
@@ -276,5 +277,8 @@ uint32_t hpclang_e2e_system_test(void)
             return 0x7a33;
 
     int sound_result = sound_test();
-    return sound_result ? 0x7600u + (uint32_t)sound_result : 0;
+    if (sound_result)
+        return 0x7600u + (uint32_t)sound_result;
+    unsigned power_failure = hpclang_e2e_power_test();
+    return power_failure ? 0x7500u + power_failure : 0;
 }

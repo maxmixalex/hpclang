@@ -527,8 +527,8 @@ static int snapshot_stock(struct e2e *s)
         return 0;
 
     /*
-     * Read-only clock/timer evidence for M7 time-service design. These values
-     * do not affect PASS and are never written by the host frontend.
+     * Observe borrowed clock/timer configuration. Clock restoration is checked
+     * at the return sentinel before the host frontend restores any saved state.
      */
     (void)guest_read32(s->hdw, POWER_MPLLCON_VA, &s->stock_mpllcon);
     (void)guest_read32(s->hdw, POWER_CLKSLOW_VA, &s->stock_clkslow);
@@ -765,6 +765,14 @@ static void monitor(void *arg)
     }
 
     if (s->saw_pass && s->hdw->cpu->regs[15] == SENTINEL_VA) {
+        uint32_t pll, slow, div;
+        if (!guest_read32(s->hdw, POWER_MPLLCON_VA, &pll) ||
+            !guest_read32(s->hdw, POWER_CLKSLOW_VA, &slow) ||
+            !guest_read32(s->hdw, POWER_CLKDIVN_VA, &div) || pll != s->stock_mpllcon ||
+            slow != s->stock_clkslow || div != s->stock_clkdivn) {
+            fail(s, "clock-state");
+            return;
+        }
         s->lcd_state_diff = check_lcd_state(s);
         if (s->lcd_state_diff != 0u) {
             fail(s, "lcd-state");

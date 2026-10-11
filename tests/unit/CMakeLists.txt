@@ -399,3 +399,9 @@ target_include_directories(test_key_delivery PRIVATE "${HPCLANG_ROOT}/tests/e2e/
 
 hpclang_unit(view_tap test_view_tap.c)
 target_include_directories(test_view_tap PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+hpclang_unit(power_clock test_power_clock.c "${HPCLANG_ROOT}/runtime/core/power-clock.c")
+target_include_directories(test_power_clock PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(timer_clock test_timer_clock.c)
+target_include_directories(test_timer_clock PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")

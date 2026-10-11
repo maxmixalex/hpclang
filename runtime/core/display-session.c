@@ -10,6 +10,12 @@ static struct hpclang_dma_buffer pages[2];
 static struct hpclang_surface surfaces[2];
 static unsigned back;
 
+void hpclang_display_reclock_saved(uint32_t control)
+{
+    if (saved.owned)
+        saved.control1 = (saved.control1 & ~0x3ff00u) | (control & 0x3ff00u);
+}
+
 struct hpclang_surface *hpclang_display_back(void)
 {
     return saved.owned ? &surfaces[back] : 0;

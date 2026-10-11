@@ -3,6 +3,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include <hpclang/power.h>
 
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_catalog(void);
@@ -14,8 +15,17 @@ static const char fail_label[] = HPCLANG_UI_TEXT("CATALOG FAIL");
 int main(void)
 {
     uint32_t failure = hpclang_e2e_catalog_variables();
-    if (failure == 0u && hpclang_boot_info()->saturn_state != 0u)
-        failure = hpclang_e2e_catalog();
+    if (failure == 0u && hpclang_boot_info()->saturn_state != 0u) {
+        if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
+            failure = 0x3e1u;
+        else
+            failure = hpclang_e2e_catalog();
+        uint32_t frequency;
+        if (!failure && (hpclang_power_cpu_frequency_hz(&frequency) || frequency > 12000000u))
+            failure = 0x3e2u;
+        if (hpclang_power_set_profile(HPCLANG_POWER_HOST) && !failure)
+            failure = 0x3e3u;
+    }
     struct hpclang_surface *surface = hpclang_display_surface();
     hpclang_surface_clear(surface, 0u);
     hpclang_surface_draw_text(surface, &hpclang_catalog_ui_font, 28, 28,

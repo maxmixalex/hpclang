@@ -17,6 +17,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/power.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/power-clock.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/power-profile.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display-session.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/display-hardware.c"

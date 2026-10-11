@@ -240,6 +240,38 @@ void hpclang_delay_us(uint64_t microseconds)
     }
 }
 
+int hpclang_time_clock_prepare(struct hpclang_clock_epoch *epoch)
+{
+    if (hpclang_time_read_us(&epoch->microseconds) || !rtc_seconds(&epoch->rtc)) {
+        errno = EIO;
+        return -1;
+    }
+    epoch->count = TCNTO0;
+    return 0;
+}
+
+void hpclang_time_clock_commit(const struct hpclang_clock_epoch *epoch)
+{
+    /* Timer0 configuration is unchanged during the IRQ-guarded transaction.
+     * Sample first, before doing rate arithmetic. Mixed-rate transition ticks
+     * are bounded using the faster rate; never invent a forward clock jump. */
+    uint16_t count = TCNTO0;
+    uint64_t old_num = state.freq_num, old_den = state.freq_den;
+    (void)timer_frequency(&state.freq_num, &state.freq_den);
+    uint64_t num = state.freq_num, den = state.freq_den;
+    if (old_num * den > num * old_den) {
+        num = old_num;
+        den = old_den;
+    }
+    uint64_t elapsed = hpclang_time_elapsed_us(0, epoch->count, count, state.period, num, den);
+    uint64_t base =
+        elapsed > UINT64_MAX - epoch->microseconds ? UINT64_MAX : epoch->microseconds + elapsed;
+    state.origin_count = count;
+    state.origin_rtc = epoch->rtc;
+    state.base_us = base;
+    state.last_us = base;
+}
+
 int hpclang_datetime_set(const struct hpclang_datetime *value)
 {
     if (!hpclang_datetime_valid(value)) {

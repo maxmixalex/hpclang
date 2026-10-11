@@ -15,6 +15,7 @@ add_executable(hpclang_system_services_e2e
     ${HPCLANG_LIBC}
     main.c
     checks.c
+    power.c
     console.c
     historical-system.c)
 

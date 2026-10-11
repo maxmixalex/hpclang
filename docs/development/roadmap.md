@@ -438,7 +438,7 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 - [ ] Give each historical application capability an explicit destination;
   require maintainer approval for an actual omission rather than treating a
   raw historical signature as sufficient reason to omit its useful behavior.
-- [ ] Define runtime discovery for supported operations and context-dependent
+- [x] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
   - Accepted on `9489e7d1`: distinguish classic RPL read access from mutation availability,
     share launcher-bound validation with the mutation backend, and validate the
@@ -527,7 +527,7 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     from source by Storage CI, with the launcher installer and instructions;
     emulator results must not be reported as physical hot-plug evidence.
 
-- [ ] Provide clean access to multiple FAT partitions on one SD card. The
+- [x] Provide clean access to multiple FAT partitions on one SD card. The
   HPGCC3 `fsystem/common/fsinit.c` implementation actually mounts up to four
   primary volumes; HPGCC 2.0's `fsystem/examples/example1.c` exercises that flow.
   The existing classification of historical global volume state does not close
@@ -541,7 +541,8 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     validation and all-volume invalidation. All 68 host tests, six-model
     Direct Storage and HP49g+/HP50g Stock Storage pass locally, including
     dirty streams on both partitions during replacement. Static analysis,
-    formatting, lint and strict documentation build pass; formal CI pending.
+    formatting, lint and strict documentation build pass. Formal CI passes on
+    `7303a3d6`, now integrated into main; the topic branch is retired.
 
 ### M7.3g–j — object-service capability completion
 
@@ -593,20 +594,21 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
 
 ### M7 final audit / M8 follow-up
 
-Historical-client and card-identity batch, local validation complete:
+Historical-client and card-identity batch, accepted on main `7303a3d6`:
 `a6be226c` adds the source-anchored HPG animation/mixed-font, physical keyboard
 and file application flows, explicit native-font availability and correct
 historical file-volume metadata. Display and System Services pass on all six
 models in Direct and Stock; Storage passes on both SD models in both contexts.
 `0d755f11` adds stable CID queries, with all 68 host tests, six-model Direct
 Storage and HP49g+/HP50g Stock replacement tests passing. Changed-source Clang
-analysis, formatting/lint and strict docs pass. Formal CI remains pending.
+analysis, formatting/lint and strict docs pass. Runtime, Storage, Objects,
+Font Gallery, Core and Quality CI all pass on `7303a3d6`.
 The detailed per-capability evidence is in
 [HPGCC compatibility](hpgcc-compat.md#capability-and-application-evidence).
 
 Additional source-confirmed application capabilities still to close:
 
-- [ ] Expose stable SD card identity so an application can distinguish the same
+- [x] Expose stable SD card identity so an application can distinguish the same
   card reinserted from a replacement. HPGCC3 `FSVolumePresent` actually compares
   CID; removal detection alone does not provide this information. Keep stale
   handles invalid even if the same card returns.
@@ -615,15 +617,26 @@ Additional source-confirmed application capabilities still to close:
     All 68 host tests, six-model Direct Storage and HP49g+/HP50g Stock Storage
     pass locally, including A→B→A CID comparisons and stale-handle rejection.
     The emulator's serial follows its backing inode, not mutable file contents.
-    Formal CI remains pending; historical `FS_CHANGED` spelling is adapter work.
+    Formal CI is accepted on `7303a3d6`; historical `FS_CHANGED` spelling is
+    adapter work.
 - [ ] Review and provide safe CPU performance/power policy for the ordinary
   application behavior behind `sys_slowOn/sys_slowOff`. Historical benchmarks,
   games and interactive examples use this to change speed or reduce power;
   replacing busy delays with monotonic waits does not establish power parity.
   Coordinate clock consumers and restore host state rather than exposing raw
   clock-register writes.
+  - HOST/ECONOMY profiles are implemented with an unchanged PLL and bus
+    divisors, bounded LCD reclocking, monotonic rebasing and active-sound
+    exclusion. Seventy host tests and six-model Direct System Services pass
+    locally, including exit cleanup checked before the harness restores Stock.
+    HP49g+/HP50g Direct and Stock SD file coexistence passes. Stock System
+    Services and object calls remain under validation.
 - [ ] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
+  - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
+    example with bounded allocation/work, independently checked prime results
+    and a visible elapsed-time report. Direct and Stock pass on all six models;
+    formal CI remains pending for this additional client.
 
 Accepted on `41d75dec`: model-native Unicode symbol lookup,
 the default bounded keyboard editor, contrast mutation/restoration and owned

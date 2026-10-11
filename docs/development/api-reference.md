@@ -99,12 +99,22 @@ The expanded discovery checks await CI acceptance.
 | `hpclang::monotonic_time()` | ✅ | C++23 chrono wrapper returning `std::chrono::microseconds`. |
 | `hpclang::delay()` | ✅ | C++23 chrono duration wrapper. |
 | `hpclang_power_usb_present()` | 🧪 | USB voltage-detect input; does not infer battery percentage, enumeration or actual power-source selection. |
+| `hpclang_power_set_profile/get_profile()` | 🧪 | Owned HOST/ECONOMY policy; economy selects at most 12 MHz, retaining an already slower host setting. Restores the borrowed clock and LCD divider on HOST or runtime cleanup. Local validation is in progress. |
+| `hpclang_power_cpu_frequency_hz()` | 🧪 | Reads the current CPU frequency in Hz; this is not a battery or power-consumption measurement. |
 | `hpclang_display_contrast_read()` | 🧪 | Stock contrast ordinal 0–15, queried without changing the setting. |
-| `hpclang_display_contrast_set/restore()` | 🧪 | Temporary ordinal 0–15, verified by readback. First change retains the original setting; explicit restore, display end and normal runtime cleanup restore it. No display session is required. Local validation in progress. |
+| `hpclang_display_contrast_set/restore()` | 🧪 | Temporary ordinal 0–15, verified by readback. First change retains the original setting; explicit restore, display end and normal runtime cleanup restore it. No display session is required. Accepted on `41d75dec`. |
 
 The original M7.4 services are formally accepted at functional head `06ab4deb`, including
 the six-model Direct/Stock gate and cross-workflow regressions.
 Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
+
+The power profile leaves PLL configuration and bus divisors unchanged. LCD
+timing is adjusted without increasing the panel scan rate; its minimum divider
+may lower the refresh rate. Monotonic timers retain their deadlines across a
+profile change. Active sound rejects a transition with `EBUSY`; unsupported
+host clock/LCD configurations return `ENOTSUP` before changing hardware.
+These are application-thread operations. They do not establish interrupt-safe
+clock control, overclocking, CPU suspend, or measured battery savings.
 
 ## Keyboard
 
@@ -119,22 +129,23 @@ Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
 | `hpclang_keyboard_event_poll()` | ✅ | Polled DOWN, UP and REPEAT event with timestamp, held modifiers, raw scan code, and physical key identity. |
 | `enum hpclang_key` / `event.key` | ✅ | Complete physical-key identities for HP39g+/39gs/40gs, HP48gII, HP49g+, and HP50g. Model 1 passes the same strict 51-key Direct transition gate against its verified D1.55 full-NOR fixture rather than a sibling inference. |
 | `HPCLANG_KEYBOARD_MOD_SHIFT` | ✅ | Portable physical “a Shift key is held” bit. HP48/49/50 retain left/right detail; HP39 has one Shift. |
-| text / Alpha / Shift-plane translation | ⬜ | Higher layer, not part of the raw/debounce core. |
+| text / Alpha / Shift-plane translation | ✅ | Accepted text layer (`c7451364`); physical keyboard events retain their original meaning. See native text-mode state below. |
 
 ### Bounded application input
 
 `hpclang_text_input_init/edit/key()` provide allocation-free UTF-8 line editing in
 an explicitly sized caller buffer, Unicode-scalar cursor movement/deletion,
 capacity errors, accept and cancel. The key helper covers common numeric/editing
-keys; applications or future HPG adapters supply Alpha/Shift-plane text through
-explicit Unicode insertion. It does not introduce a global terminal or change
+keys; the native text layer and application adapters supply Alpha/Shift-plane text
+through explicit Unicode insertion. It does not introduce a global terminal or change
 stdin/stdout behavior. The application chooses rendering, event polling and
 whether to retain a cancelled working line.
 
 The default `stdin` returns EOF and `stdout`/`stderr` discard output until an
 application explicitly binds them. The console/standard-stream extension below
-supplies that routing; text-plane mapping and a ready-made keyboard line-input
-loop remain separate follow-ups. File-backed `FILE *` support is unaffected.
+supplies that routing. Native text-plane mapping and the bounded keyboard
+line-input loop are accepted on `c7451364` and `41d75dec` respectively.
+File-backed `FILE *` support is unaffected.
 
 `hpclang_surface_draw_text_n()` renders bounded message/error text without requiring
 a terminator, exiting, waiting for a key or clearing the caller's surface.
@@ -185,13 +196,13 @@ space; Enter has no Alpha letter. HP48/49/50 use their dedicated space key.
 Modifier keys, editing commands,
 digits without Alpha letters, punctuation planes and non-Latin symbols are not
 mapped by this helper. Call it only for the chosen text plane and DOWN/REPEAT
-events, before falling back to editing controls. It is implemented pending CI;
-physical-input acceptance remains open.
+events, before falling back to editing controls. Physical-input acceptance is
+complete on `c7451364` across all six models.
 
 ### Native text-mode state
 
 The caller-owned `hpclang_text_mode` selects a text plane from the complete
-physical event stream. It is implemented pending CI. Initialize a fresh mode
+physical event stream. It is accepted on `c7451364`. Initialize a fresh mode
 for each input session; feed modifier releases as well as key presses. It does
 not poll/reset the keyboard, insert characters, acquire a display or change
 Stock's own state.
@@ -243,7 +254,7 @@ and `ABcD2D2` through the real scanner and debounce queue. They cover single,
 held and locked Alpha, temporary lowercase, ordinary input and leaving a lock;
 captured text is compared with independently rendered literal references.
 The default editor and symbol extension pass local six-model Direct checks and
-Stock checks on HP39g+, HP48gII, HP49g+ and HP50g. Formal CI remains pending.
+Stock checks on HP39g+, HP48gII, HP49g+ and HP50g. Formal CI is accepted on `41d75dec`.
 
 ### Default text editor and symbols
 
@@ -308,9 +319,10 @@ static int next_key(void *context, struct hpclang_keyboard_event *event)
 Applications should provide `update` to display the working line, cursor and
 errors, and optionally validate numeric input with the checked parsers. The
 session does not reset keyboard events, select repeat timing, acquire a screen,
-bind stdin, or invent Alpha/Shift mappings. The default editing policy retains
-the previously documented basic keys. Full model-specific Alpha mapping and a
-physical-key-driven rendering acceptance test remain open.
+bind stdin, or invent Alpha/Shift mappings. Without a mode pointer the default
+editor retains the basic-key policy. With an initialized mode it uses the
+accepted model-native text policy; physical-key rendering is accepted on
+`c7451364` and `41d75dec`.
 
 ### Console and standard streams
 
@@ -455,7 +467,7 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
-| `hpclang_font_available()` | Local validation complete; CI pending | Checks whether the descriptor's source is accessible in this launch context. Direct classic launches can explicitly choose packaged fonts when the native Stock map is absent. Preserves `errno`; font availability is separate from glyph coverage. |
+| `hpclang_font_available()` | Accepted on `7303a3d6` | Checks whether the descriptor's source is accessible in this launch context. Direct classic launches can explicitly choose packaged fonts when the native Stock map is absent. Preserves `errno`; font availability is separate from glyph coverage. |
 
 No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/bigfont objects are resolved through the live Saturn logical mapping supplied by the launcher. HPGCC3 documents bigfont as an 8-row raster with normal advance 6; its raw record is eight bytes per character, so “8×8” describes storage/raster capacity rather than a fixed 8-pixel text advance.
 
@@ -515,9 +527,9 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 | `hpclang_stream_path_set_attributes(path, attributes, mask)` | ✅ Accepted on `6a7f9a28` | Updates only masked read-only/hidden/system/archive bits and synchronizes before success. Unknown bits or attributes outside the mask fail with `EINVAL`; other families return `ENOSYS`. Existing descriptors retain their access rights; new write opens respect read-only. |
 | `hpclang_stream_storage_query()` | ✅; owned-media refresh accepted on `56e4a9dd` | Media-present/read-only flags plus free bytes and total capacity from FatFs. GPIO sampling continues during ownership without KOS re-entry. Observed removal or block-transfer failure invalidates old objects; new path operations can remount. Old descriptors/directories fail with `EBADF`; live write protection rejects writes with `EROFS`. The new EINT3 removal latch also covers reinsertion between observations; HP49g+/HP50g Direct/Stock raw-image tests and all CI workflows pass on `cada0f2e`, integrated into main. The separate physical check is a nonblocking follow-up. |
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
-| `hpclang_stream_volume_count()` | Local validation complete; CI pending | Number of usable FAT primary partitions, or one for an unpartitioned FAT card. Acquires the same SD lease as file I/O. |
-| `hpclang_stream_volume_query()` | Local validation complete; CI pending | Versioned logical index, actual MBR slot (1–4, or 0 for unpartitioned media), starting sector, and per-volume space/media information. |
-| `hpclang_stream_media_identity_query()` | Local validation complete; CI pending | Versioned snapshot of the physical SD card's 16-byte CID, most significant byte first. Compare CID bytes to recognize the same card after reinsertion; this never revives old handles. Requires readable FAT media and uses the same owned namespace. Failure leaves the output unchanged. |
+| `hpclang_stream_volume_count()` | Accepted on `7303a3d6` | Number of usable FAT primary partitions, or one for an unpartitioned FAT card. Acquires the same SD lease as file I/O. |
+| `hpclang_stream_volume_query()` | Accepted on `7303a3d6` | Versioned logical index, actual MBR slot (1–4, or 0 for unpartitioned media), starting sector, and per-volume space/media information. |
+| `hpclang_stream_media_identity_query()` | Accepted on `7303a3d6` | Versioned snapshot of the physical SD card's 16-byte CID, most significant byte first. Compare CID bytes to recognize the same card after reinsertion; this never revives old handles. Requires readable FAT media and uses the same owned namespace. Failure leaves the output unchanged. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
 Unqualified paths and `/` use the first usable FAT volume. `N:/path` explicitly

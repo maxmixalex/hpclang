@@ -2,6 +2,7 @@
 #include <hpclang/display.h>
 #include <hpclang/stdio.h>
 #include "../core/stdio-routing.h"
+#include "../core/clock-internal.h"
 
 static int console_putc(char c, FILE *stream)
 {
@@ -45,6 +46,7 @@ __attribute__((noreturn)) void _exit(int status)
 {
     (void)status;
     hpclang_display_end();
+    hpclang_power_restore();
     for (;;)
         ;
 }

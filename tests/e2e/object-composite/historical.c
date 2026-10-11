@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <hpclang/object.h>
+#include <hpclang/power.h>
 #include <saturn.h>
 
 /* HPGCC 1.0.3 examples/libtests/stack.c inspects the incoming top entry.
@@ -108,13 +109,26 @@ done:
 
 uint32_t hpclang_e2e_historical_objects(void)
 {
-    if (!inspect_argument())
-        return 0x395u;
-    if (!textual_arguments())
-        return 0x396u;
-    if (!integer_application())
-        return 0x397u;
-    if (!list_application())
-        return 0x398u;
-    return 0u;
+    uint32_t failure = 0;
+    for (unsigned economy = 0; economy < 2 && !failure; ++economy) {
+        if (hpclang_power_set_profile(economy ? HPCLANG_POWER_ECONOMY : HPCLANG_POWER_HOST)) {
+            failure = 0x399u;
+            break;
+        }
+        if (!inspect_argument())
+            failure = 0x395u;
+        else if (!textual_arguments())
+            failure = 0x396u;
+        else if (!integer_application())
+            failure = 0x397u;
+        else if (!list_application())
+            failure = 0x398u;
+        uint32_t frequency;
+        if (!failure && economy &&
+            (hpclang_power_cpu_frequency_hz(&frequency) || frequency > 12000000u))
+            failure = 0x39au;
+    }
+    if (hpclang_power_set_profile(HPCLANG_POWER_HOST) && !failure)
+        failure = 0x39bu;
+    return failure;
 }
