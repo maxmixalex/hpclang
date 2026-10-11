@@ -31,6 +31,9 @@ on:
       - "tests/e2e/harness/run-stock.sh"
       - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950.sh"
+      - "tests/e2e/harness/storage-media.sh"
+      - "tests/e2e/sd-media-manual/**"
+      - "docs/development/sd-media-check.md"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
       - "runtime/core/datetime.c"
@@ -81,6 +84,9 @@ on:
       - "tests/e2e/harness/run-stock.sh"
       - "tests/e2e/harness/run-stock-hp39.sh"
       - "tests/e2e/harness/run-stock-hp4950.sh"
+      - "tests/e2e/harness/storage-media.sh"
+      - "tests/e2e/sd-media-manual/**"
+      - "docs/development/sd-media-check.md"
       - "tests/e2e/harness/setup-runtime.sh"
       - "tests/e2e/harness/x50ng/**"
       - "runtime/core/datetime.c"
@@ -134,6 +140,18 @@ jobs:
             build/e2e-storage/launchers/*.hp
           if-no-files-found: error
 
+      - name: Build manual SD-card check
+        run: bash tools/build-e2e.sh sd-media-manual build/sd-media-manual hp4950
+      - name: Upload manual SD-card check
+        uses: actions/upload-artifact@v7
+        with:
+          name: sd-media-manual-build
+          retention-days: 1
+          path: |
+            build/sd-media-manual/launchers/hp49gplus.hp
+            build/sd-media-manual/launchers/hp50g.hp
+          if-no-files-found: error
+
   x50ng:
     name: Prepare universal x50ng
     runs-on: ubuntu-24.04
@@ -154,6 +172,7 @@ jobs:
 
   stock-assets:
     name: Prepare HP49/50 Stock assets
+    needs: build
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -179,6 +198,22 @@ jobs:
           name: e2e-storage-stock-assets
           retention-days: 1
           path: build/assets/
+          if-no-files-found: error
+
+      - name: Download manual SD-card payloads
+        uses: actions/download-artifact@v7
+        with:
+          name: sd-media-manual-build
+          path: build/sd-media-check
+      - name: Include installer and instructions
+        run: |
+          cp build/assets/hp4950/SETUP.BIN docs/development/sd-media-check.md build/sd-media-check/
+      - name: Upload manual SD-card package
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp4950-sd-media-check
+          retention-days: 14
+          path: build/sd-media-check/
           if-no-files-found: error
 
   direct:
@@ -213,7 +248,11 @@ jobs:
           mkdir -p build/x50ng
           tar -xzf build/x50ng-universal.tar.gz -C build/x50ng
       - name: Prepare platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
+        run: |
+          if [[ "$FAMILY" == hp4950 ]]; then
+            bash tools/install-ci-packages.sh dosfstools mtools
+          fi
+          bash tests/e2e/harness/setup-runtime.sh direct "$FAMILY"
       - name: Execute Direct storage family
         run: bash tests/e2e/harness/run-family.sh direct "$FAMILY" build/e2e
       - name: Generate LCD evidence
@@ -276,7 +315,9 @@ jobs:
           name: e2e-storage-stock-assets
           path: build/assets
       - name: Prepare platform runtime
-        run: bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
+        run: |
+          bash tools/install-ci-packages.sh dosfstools mtools
+          bash tests/e2e/harness/setup-runtime.sh stock "$FAMILY"
       - name: Execute Stock storage family
         run: bash tests/e2e/harness/run-family.sh stock "$FAMILY" build/e2e build/assets
       - name: Generate LCD evidence

@@ -20,6 +20,7 @@
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
 #include "input-checkpoint.h"
+#include "media-checkpoint.h"
 
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
@@ -68,6 +69,7 @@ struct state
     int payload_started;
     int payload_keyboard_scheduled;
     uint64_t input_held;
+    unsigned media_phase;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
     int return_mapping_restored;
@@ -716,6 +718,13 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        int media = media_checkpoint(s->hdw, s->result_addr, value, &s->media_phase);
+        if (media < 0) {
+            fail(s, "media-checkpoint");
+            return;
+        }
+        if (media > 0)
+            s->payload_started = 1;
         int input = input_checkpoint(s->hdw, s->result_addr, value, &s->input_held);
         if (input < 0) {
             fail(s, "input-checkpoint");
@@ -754,6 +763,10 @@ static void monitor(void *arg)
             (!s->require_object_phase || s->object_store_phase != 0u)) {
             if (s->input_held) {
                 fail(s, "input-held-at-pass");
+                return;
+            }
+            if (!media_checkpoint_complete(s->media_phase)) {
+                fail(s, "media-checkpoint-incomplete");
                 return;
             }
             size_t keyboard_count =

@@ -8,6 +8,7 @@
 #include "hp4950-fatfs-diskio.h"
 #include "s3c2410-sdio-card.h"
 #include "storage-media.h"
+#include "storage-media-events.h"
 #include "storage-mmio.h"
 
 #define REG32(address) hpclang_storage_mmio_read32(address)
@@ -24,6 +25,7 @@
 struct hp4950_fatfs_state
 {
     struct hpclang_s3c2410_sdio_card card;
+    struct hpclang_storage_media_events events;
     uint32_t saved_clkcon;
     uint8_t owned;
     uint8_t initialized;
@@ -80,6 +82,9 @@ int hpclang_hp4950_fatfs_controller_acquire(int read_only)
     if (state.owned)
         return -1;
 
+    if (hpclang_storage_media_events_acquire(&state.events))
+        return -1;
+
     state.saved_clkcon = CLKCON;
     hpclang_storage_mmio_write32(UINT32_C(0x0720000c), state.saved_clkcon | CLKCON_SDI);
     state.owned = 1u;
@@ -99,6 +104,7 @@ void hpclang_hp4950_fatfs_controller_release(void)
     state.initialized = 0u;
     state.read_only = 0u;
     hpclang_storage_mmio_write32(UINT32_C(0x0720000c), state.saved_clkcon);
+    hpclang_storage_media_events_release(&state.events);
     state.owned = 0u;
 }
 
@@ -120,6 +126,8 @@ static DSTATUS refresh_media(int *usable)
         *usable = 0;
     if (!state.owned)
         return STA_NOINIT;
+    if (hpclang_storage_media_events_changed(&state.events) != 0)
+        invalidate_card();
     int present = 0, read_only = 0;
     int queried = hpclang_storage_media_query(&present, &read_only);
     if (queried != 0 || !present) {
@@ -158,6 +166,10 @@ DSTATUS disk_initialize(BYTE pdrv)
         return STA_NOINIT;
 
     state.initialized = 1u;
+    if (hpclang_storage_media_events_changed(&state.events) != 0) {
+        invalidate_card();
+        return STA_NOINIT;
+    }
     return state.read_only ? STA_PROTECT : 0u;
 }
 
@@ -186,6 +198,8 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
             invalidate_card();
             return RES_ERROR;
         }
+        if (disk_status(pdrv) & STA_NOINIT)
+            return RES_NOTRDY;
     }
     return RES_OK;
 }
@@ -211,6 +225,8 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
             invalidate_card();
             return RES_ERROR;
         }
+        if (disk_status(pdrv) & STA_NOINIT)
+            return RES_NOTRDY;
     }
     return RES_OK;
 }

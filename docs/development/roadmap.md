@@ -513,11 +513,15 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     observed removal or block-transfer failure, remount for new path operations,
     and reject old file/directory objects without flushing them to the new volume.
     Host tests exercise these transitions; Storage, Runtime, Objects, Core and
-    Quality CI pass. Cycles entirely between observations
-    and physical hot-plug validation remain open. On 2026-10-11 the maintainer
+    Quality CI pass. `m7-media-events` now adds the EINT3 removal latch, rejects
+    stale buffered writes even after reinsertion between observations, and
+    restores leased card pin/interrupt configuration before Stock rescan.
+    The 68 host tests and raw-FAT-image replacement tests pass locally in Direct
+    and Stock on HP49g+/HP50g; formal CI remains pending. On 2026-10-11 the maintainer
     confirmed an HP49g+ and SD card are available, requested a reproducible
     hardware test package, and designated the later physical run as a
-    nonblocking follow-up. Preparing that package remains part of M7 closure;
+    nonblocking follow-up. The [manual test package](sd-media-check.md) is built
+    from source by Storage CI, with the launcher installer and instructions;
     emulator results must not be reported as physical hot-plug evidence.
 
 ### M7.3g–j — object-service capability completion

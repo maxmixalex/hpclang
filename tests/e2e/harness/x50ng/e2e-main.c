@@ -20,6 +20,7 @@
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
 #include "input-checkpoint.h"
+#include "media-checkpoint.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
 
@@ -155,6 +156,7 @@ struct e2e
     int saw_pass;
     int payload_keyboard_scheduled;
     uint64_t input_held;
+    unsigned media_phase;
     int returned;
     int failed;
     int lcd_height;
@@ -717,6 +719,10 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (media_checkpoint(s->hdw, s->result_addr, v, &s->media_phase) < 0) {
+            fail(s, "media-checkpoint");
+            return;
+        }
         if (input_checkpoint(s->hdw, s->result_addr, v, &s->input_held) < 0) {
             fail(s, "input-checkpoint");
             return;
@@ -731,6 +737,10 @@ static void monitor(void *arg)
                 return;
             }
         } else if (!s->saw_pass && v == PASS_WORD) {
+            if (!media_checkpoint_complete(s->media_phase)) {
+                fail(s, "media-checkpoint-incomplete");
+                return;
+            }
             if (s->input_held) {
                 fail(s, "input-held-at-pass");
                 return;

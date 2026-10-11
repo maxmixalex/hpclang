@@ -209,6 +209,86 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+static int media_swap(unsigned phase)
+{
+    hpclang_e2e_result = 0x53440000u | phase;
+    uint64_t start = hpclang_time_monotonic_us();
+    while (hpclang_e2e_result != (0x53450000u | phase))
+        if (hpclang_time_monotonic_us() - start > 2000000u)
+            return -1;
+    return 0;
+}
+
+static uint32_t storage_replacement_test(void)
+{
+    uint32_t result = 0xc0u;
+    struct hpclang_stream_directory *directory = NULL;
+    char dirty[32], bytes[4];
+    FILE *file = fopen("STALE.BIN", "wb");
+    if (!file || fwrite("OLD", 1, 3, file) != 3)
+        goto done;
+    int closed = fclose(file);
+    file = NULL;
+    if (closed)
+        goto done;
+    result = 0xc1u;
+    file = fopen("STALE.BIN", "r+b");
+    directory = hpclang_stream_directory_open("/");
+    if (!file || !directory || setvbuf(file, dirty, _IOFBF, sizeof dirty) ||
+        fwrite("BAD", 1, 3, file) != 3)
+        goto done;
+    result = 0xc2u;
+    if (media_swap(2))
+        goto done;
+    /* No storage query ran between removal and reinsertion. Closing the old
+     * dirty stdio stream must reject its flush, leaving the new card untouched. */
+    result = 0xc3u;
+    closed = fclose(file);
+    file = NULL;
+    if (closed != EOF || errno != EBADF)
+        goto done;
+    result = 0xc4u;
+    struct hpclang_stream_directory_entry entry;
+    if (hpclang_stream_directory_read(directory, &entry) != -1 || errno != EBADF)
+        goto done;
+    (void)hpclang_stream_directory_close(directory);
+    directory = NULL;
+    result = 0xc5u;
+    file = fopen("STALE.BIN", "rb");
+    if (!file || fread(bytes, 1, 4, file) != 4 || memcmp(bytes, "SAFE", 4))
+        goto done;
+    closed = fclose(file);
+    file = NULL;
+    if (closed)
+        goto done;
+    result = 0xc6u;
+    file = fopen("NEW.BIN", "wb");
+    if (!file || fwrite("NEW", 1, 3, file) != 3)
+        goto done;
+    closed = fclose(file);
+    file = NULL;
+    if (closed)
+        goto done;
+    result = 0xc7u;
+    if (media_swap(3))
+        goto done;
+    result = 0xc8u;
+    file = fopen("STALE.BIN", "rb");
+    if (!file || fread(bytes, 1, 4, file) != 3 || memcmp(bytes, "OLD", 3))
+        goto done;
+    closed = fclose(file);
+    file = NULL;
+    if (closed || remove("STALE.BIN"))
+        goto done;
+    result = media_swap(4) ? 0xc9u : 0;
+done:
+    if (file)
+        fclose(file);
+    if (directory)
+        (void)hpclang_stream_directory_close(directory);
+    return result;
+}
+
 static uint32_t storage_metadata_test(void)
 {
     const char *path = "META/flags.txt";
@@ -326,6 +406,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0u;
     }
 
+    if (media_swap(1))
+        return 0xcau;
     static const char input_expected[] = "HPCLANG-STORAGE\n";
     static const char output_expected[] = "stream-write-seek";
     char buffer[32];
@@ -808,7 +890,8 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         memcmp(buffer, input_expected, sizeof(input_expected) - 1u) != 0)
         return 0x6eu;
 
-    return storage_metadata_test();
+    uint32_t metadata = storage_metadata_test();
+    return metadata ? metadata : storage_replacement_test();
 }
 #endif
 

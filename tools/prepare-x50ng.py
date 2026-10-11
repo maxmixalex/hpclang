@@ -808,6 +808,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "lcd-stability.h",
         "frame-checkpoint.h",
         "input-checkpoint.h",
+        "media-checkpoint.h",
     ):
         shutil.copy2(args.stock_frontend.parent / header, root / "src" / header)
 

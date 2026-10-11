@@ -67,8 +67,10 @@ printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
 printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
 
 if [[ "$STORAGE_WITNESS" == 1 ]]; then
+    source "$ROOT/tests/e2e/harness/storage-media.sh"
     export TZ=UTC
     touch -d '2024-01-02 03:04:06 UTC' "$SD/HPCLANG.TST"
+    prepare_storage_media "$SD"
 fi
 
 # x50ng's VVFAT backend indexes --sd-dir when the run-phase emulator opens
@@ -97,6 +99,9 @@ export HPCLANG_STOCK_JSON="$ROOT/build/$TARGET-run.json"
 
 timeout 45s "$ROOT/build/x50ng/dist/x50ng" \
     "${COMMON_ARGS[@]}"
+if [[ "$STORAGE_WITNESS" == 1 ]]; then
+    verify_storage_media
+fi
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue

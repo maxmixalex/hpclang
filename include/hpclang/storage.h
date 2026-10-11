@@ -102,10 +102,15 @@ extern "C"
      * observed removal or block-transfer error invalidates the card; a later
      * path operation may remount it, while old file/directory objects fail with
      * EBADF and must be closed. Dirty old buffers are never flushed to a newly
-     * mounted volume. No polling guarantee covers a remove/reinsert cycle that
-     * completes between observations; physical hot-plug remains unvalidated.
+     * mounted volume. During ownership, the card-detect pin's EINT3 falling-edge
+     * latch also detects removal/reinsertion between software observations.
+     * The lease masks/routes this card interrupt, consumes its notifications,
+     * and restores the borrowed pin/trigger/mask/routing fields before Stock
+     * ResetSD reconciles the current card. Other interrupt sources are retained.
+     * Physical hot-plug remains a separate hardware-validation follow-up.
      * Unsupported pin modes fail before takeover with ENOTSUP; during ownership
-     * an unreadable media state invalidates the card. No pin is repurposed.
+     * an unreadable media state invalidates the card. Only the owned card-detect
+     * pin changes from GPIO input to its equivalent external-interrupt input.
      */
     struct hpclang_stream_storage_info
     {

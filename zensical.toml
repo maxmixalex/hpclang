@@ -14,6 +14,7 @@ nav = [
     "development/api-reference.md",
     "development/hpgcc-compat.md",
     "development/e2e.md",
+    "development/sd-media-check.md",
     "development/fixtures.md",
     "development/roadmap.md",
     "development/object-service.md",

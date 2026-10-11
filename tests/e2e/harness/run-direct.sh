@@ -84,8 +84,10 @@ case "$HPCLANG_E2E_FAMILY" in
         printf 'HPCLANG-STORAGE\n' > "$SD/HPCLANG.TST"
         printf 'OLD-CONTENT-MUST-BE-TRUNCATED\n' > "$SD/HPCLANG.OUT"
         if [[ "${HPCLANG_E2E_STORAGE_WITNESS:-0}" == 1 ]]; then
+            source "$ROOT/tests/e2e/harness/storage-media.sh"
             export TZ=UTC
             touch -d '2024-01-02 03:04:06 UTC' "$SD/HPCLANG.TST"
+            prepare_storage_media "$SD"
         fi
         X50_ARGS+=(
             --style="$ROOT/build/x50ng/dist/style-50g.css"
@@ -113,6 +115,9 @@ export HPCLANG_X50NG_E2E_JSON="$ROOT/build/$TARGET-e2e.json"
 export HPCLANG_X50NG_LCD_HEIGHT="$HPCLANG_E2E_LCD_HEIGHT"
 
 timeout 35s "$X50" "${X50_ARGS[@]}"
+if [[ "${HPCLANG_E2E_STORAGE_WITNESS:-0}" == 1 && "$HPCLANG_E2E_FAMILY" == hp4950 ]]; then
+    verify_storage_media
+fi
 
 for pgm in "$ROOT"/build/"$TARGET"-*.pgm; do
     [[ -f "$pgm" ]] || continue
