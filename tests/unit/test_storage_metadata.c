@@ -23,6 +23,8 @@
 static BYTE disk[SECTORS * 512u];
 static int protected_media;
 static int inserted_media;
+static int initialized_media;
+static unsigned media_writes;
 static unsigned controller_acquires;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 
@@ -56,14 +58,20 @@ uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
 }
 DSTATUS disk_status(BYTE drive)
 {
-    return drive ? STA_NOINIT : (protected_media ? STA_PROTECT : 0);
+    if (!inserted_media)
+        initialized_media = 0;
+    return drive || !initialized_media ? STA_NOINIT : (protected_media ? STA_PROTECT : 0);
 }
 DSTATUS disk_initialize(BYTE drive)
 {
+    if (!drive && inserted_media)
+        initialized_media = 1;
     return disk_status(drive);
 }
 DRESULT disk_read(BYTE drive, BYTE *buffer, LBA_t sector, UINT count)
 {
+    if (disk_status(drive) & STA_NOINIT)
+        return RES_NOTRDY;
     if (drive || sector >= SECTORS || count > SECTORS - sector)
         return RES_PARERR;
     memcpy(buffer, disk + sector * 512u, count * 512u);
@@ -71,10 +79,13 @@ DRESULT disk_read(BYTE drive, BYTE *buffer, LBA_t sector, UINT count)
 }
 DRESULT disk_write(BYTE drive, const BYTE *buffer, LBA_t sector, UINT count)
 {
+    if (disk_status(drive) & STA_NOINIT)
+        return RES_NOTRDY;
     if (protected_media)
         return RES_WRPRT;
     if (drive || sector >= SECTORS || count > SECTORS - sector)
         return RES_PARERR;
+    ++media_writes;
     memcpy(disk + sector * 512u, buffer, count * 512u);
     return RES_OK;
 }
@@ -171,6 +182,46 @@ int main(void)
     hpclang_storage_shutdown();
     protected_media = 1;
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, hidden) < 0 && errno == EROFS);
+    hpclang_storage_shutdown();
+    protected_media = 0;
+    // Keep dirty file and directory objects alive across an observed removal.
+    fd = hpclang_namespace_open("NEW.TXT", O_RDWR);
+    CHECK(fd >= 0);
+    CHECK(hpclang_namespace_write(fd, "old", 3) == 3);
+    struct hpclang_stream_directory *old_directory = hpclang_stream_directory_open("/");
+    CHECK(old_directory != NULL);
+    unsigned before_removal = media_writes;
+    inserted_media = 0;
+    char old_byte = '?';
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    CHECK(old_byte == '?');
+    CHECK(hpclang_namespace_lseek(fd, 0, SEEK_SET) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_write(fd, "bad", 3) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_ftruncate(fd, 0) == -1 && errno == EBADF);
+    // Replacement has different contents at the same path/cluster location.
+    BYTE *replacement_data = disk + (ROOT_SECTOR + 4u) * 512u;
+    CHECK(memcmp(replacement_data, "abc", 3) == 0);
+    memcpy(replacement_data, "xyz", 3);
+    inserted_media = 1;
+    int fresh = hpclang_namespace_open("NEW.TXT", O_RDWR);
+    CHECK(fresh >= 0 && fresh != fd);
+    char persisted[3];
+    CHECK(hpclang_namespace_read(fresh, persisted, sizeof persisted) == 3);
+    CHECK(memcmp(persisted, "xyz", 3) == 0);
+    CHECK(hpclang_namespace_lseek(fresh, 0, SEEK_SET) == 0);
+    CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
+    struct hpclang_stream_directory_entry dir_entry;
+    CHECK(hpclang_stream_directory_read(old_directory, &dir_entry) == -1 && errno == EBADF);
+    CHECK(media_writes == before_removal);
+    CHECK(hpclang_namespace_path_set_attributes("NEW.TXT", 0, hidden) == 0);
+    CHECK(hpclang_namespace_close(fd) == -1 && errno == EBADF);
+    CHECK(hpclang_stream_directory_close(old_directory) == -1 && errno == EBADF);
+    protected_media = 1;
+    CHECK(hpclang_namespace_write(fresh, "bad", 3) == -1 && errno == EROFS);
+    CHECK(hpclang_namespace_ftruncate(fresh, 0) == -1 && errno == EROFS);
+    protected_media = 0;
+    CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
+    CHECK(hpclang_namespace_close(fresh) == 0);
     hpclang_storage_shutdown();
     device.family = HPCLANG_FAMILY_HP39;
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, hidden) < 0 && errno == ENOSYS);

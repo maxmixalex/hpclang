@@ -184,8 +184,13 @@ static int namespace_acquire(void)
 
     namespace_init();
 
-    if (namespace_lease.state == HPCLANG_NAMESPACE_DIRECT)
-        return 0;
+    if (namespace_lease.state == HPCLANG_NAMESPACE_DIRECT) {
+        if ((disk_status(0u) & STA_NOINIT) == 0u && namespace_fatfs.fs_type != 0u)
+            return 0;
+        /* Rebuild the volume without flushing objects belonging to removed media.
+         * Keep the controller lease until normal shutdown restores Stock. */
+        return set_fatfs_errno(f_mount(&namespace_fatfs, "", 1u));
+    }
     if (namespace_lease.state != HPCLANG_NAMESPACE_STOCK) {
         errno = EIO;
         return -1;
@@ -258,6 +263,23 @@ static struct direct_fd_state *direct_fd_claim(int *fd)
 
     errno = EMFILE;
     return NULL;
+}
+
+static int direct_file_ready(struct direct_fd_state *slot, int writing)
+{
+    /* Even cached EOF/seek operations must reject a removed or replaced card.
+     * FatFs gives each remount a new ID, leaving old open objects invalid. */
+    DSTATUS status = disk_status(0u);
+    if ((status & STA_NOINIT) != 0u || slot->file.obj.fs != &namespace_fatfs ||
+        namespace_fatfs.fs_type == 0u || slot->file.obj.id != namespace_fatfs.id) {
+        errno = EBADF;
+        return 0;
+    }
+    if (writing && (status & STA_PROTECT) != 0u) {
+        errno = EROFS;
+        return 0;
+    }
+    return 1;
 }
 
 int hpclang_namespace_open(const char *path, int flags)
@@ -371,6 +393,8 @@ ssize_t hpclang_namespace_read(int fd, void *buffer, size_t count)
         errno = EINVAL;
         return -1;
     }
+    if (!direct_file_ready(slot, 0))
+        return -1;
     if (count == 0u)
         return 0;
 
@@ -406,6 +430,8 @@ ssize_t hpclang_namespace_write(int fd, const void *buffer, size_t count)
         errno = EINVAL;
         return -1;
     }
+    if (!direct_file_ready(slot, 1))
+        return -1;
     if (count == 0u)
         return 0;
 
@@ -431,6 +457,8 @@ off_t hpclang_namespace_lseek(int fd, off_t offset, int whence)
         return (off_t)-1;
     }
 
+    if (!direct_file_ready(slot, 0))
+        return (off_t)-1;
     int64_t base;
     switch (whence) {
     case SEEK_SET:
@@ -475,6 +503,8 @@ int hpclang_namespace_ftruncate(int fd, off_t length)
         return -1;
     }
 
+    if (!direct_file_ready(slot, 1))
+        return -1;
     FSIZE_t target = (FSIZE_t)length;
     FSIZE_t original_size = f_size(&slot->file);
     FRESULT fr;
@@ -651,7 +681,8 @@ int hpclang_namespace_path_set_attributes(const char *path, uint32_t attributes,
     // Publish pending file metadata before changing its directory attributes.
     // This also handles a different spelling of an open long/short FAT name.
     for (unsigned i = 0; i < DIRECT_FD_SLOTS; ++i) {
-        if (direct_fds[i].used) {
+        if (direct_fds[i].used && direct_fds[i].file.obj.fs == &namespace_fatfs &&
+            direct_fds[i].file.obj.id == namespace_fatfs.id) {
             FRESULT fr = f_sync(&direct_fds[i].file);
             if (fr != FR_OK)
                 return set_fatfs_errno(fr);

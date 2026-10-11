@@ -7,6 +7,7 @@
 
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 static int stock = 1;
+static int direct;
 static uint32_t gpfcon = 0x80u, gpfdat, gpdcon, gpddat = 8u;
 static unsigned reads, protect_reads;
 
@@ -17,6 +18,10 @@ const struct hpclang_device_info *hpclang_device_info(void)
 int hpclang_namespace_stock_active(void)
 {
     return stock;
+}
+int hpclang_namespace_direct_active(void)
+{
+    return direct;
 }
 uint32_t hpclang_storage_media_read32(unsigned offset)
 {
@@ -74,6 +79,17 @@ int main(void)
     unsigned calls = reads;
     stock = 0;
     fails(EBUSY);
+    assert(reads == calls);
+    direct = 1;
+    assert(hpclang_storage_media_query(&present, &read_only) == 0 && present == 1);
+    gpfdat = 0;
+    assert(hpclang_storage_media_query(&present, &read_only) == 0 && present == 0);
+    gpfdat = 8;
+    gpddat = 0;
+    assert(hpclang_storage_media_query(&present, &read_only) == 0 && read_only == 1);
+    direct = 0;
+    assert(hpclang_storage_media_query(&present, &read_only) == -1 && errno == EBUSY);
+    calls = reads;
     stock = 1;
     device.family = HPCLANG_FAMILY_HP39;
     fails(ENOSYS);

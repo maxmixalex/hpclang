@@ -465,6 +465,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     on `256e8496` (Storage, Runtime, Objects, Core and Quality).
     Replacement of an already mounted card, stale handles and recovery remain
     required follow-ups. This does not close the media-change goal.
+  - In progress: resample presence/protection during owned I/O, invalidate on
+    observed removal or block-transfer failure, remount for new path operations,
+    and reject old file/directory objects without flushing them to the new volume.
+    Host tests exercise these transitions; cycles entirely between observations
+    and physical hot-plug validation remain open.
 
 ### M7.3g–j — object-service capability completion
 

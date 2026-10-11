@@ -98,10 +98,14 @@ extern "C"
      * is retained for post-release ResetSD. Pre-takeover insertion/protect
      * sampling reads existing GPIO inputs without changing their configuration.
      * Before takeover, an absent card can be inserted and a later call retried.
-     * After takeover, the mounted volume and its protection state remain fixed
-     * until shutdown: removing/replacing that card is not supported. Pin
-     * configurations that cannot be read without reconfiguration fail with
-     * ENOTSUP; the runtime does not silently repurpose Stock-owned pins.
+     * During ownership, backend operations resample presence/protection. An
+     * observed removal or block-transfer error invalidates the card; a later
+     * path operation may remount it, while old file/directory objects fail with
+     * EBADF and must be closed. Dirty old buffers are never flushed to a newly
+     * mounted volume. No polling guarantee covers a remove/reinsert cycle that
+     * completes between observations; physical hot-plug remains unvalidated.
+     * Unsupported pin modes fail before takeover with ENOTSUP; during ownership
+     * an unreadable media state invalidates the card. No pin is repurposed.
      */
     struct hpclang_stream_storage_info
     {

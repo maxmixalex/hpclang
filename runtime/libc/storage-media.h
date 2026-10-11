@@ -12,5 +12,6 @@ enum
 };
 
 uint32_t hpclang_storage_media_read32(unsigned offset);
+int hpclang_storage_media_query(int *present, int *read_only);
 
 #endif
