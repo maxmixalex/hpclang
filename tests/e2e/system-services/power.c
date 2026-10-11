@@ -57,8 +57,14 @@ unsigned hpclang_e2e_power_test(void)
         hpclang_power_set_profile(HPCLANG_POWER_HOST))
         goto done;
     hpclang_display_end();
-    failure = 6;
-    if (hpclang_display_begin(16) || hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
+    /* Keep this combined service client's heap bounded. Two gray16 pages do
+     * not fit its HP39 Stock heap; the dedicated Display client covers gray16.
+     * This second session checks the opposite clock/display release order. */
+    failure = 0x61;
+    if (hpclang_display_begin(4))
+        goto done;
+    failure = 0x62;
+    if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
         goto done;
     hpclang_display_end();
     int sound_checked = 0;

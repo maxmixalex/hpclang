@@ -838,3 +838,48 @@ packaging, not the core implementation, and does not select the Core workflow.
 This closes M7.4's documented application-service and emulator acceptance.
 Physical audible output remains unverified. Expanded M7.3 object services and
 M7.5 display/runtime work remain open.
+
+### M7 historical clients, volumes and card identity
+
+Main `7303a3d6` accepts four FAT volumes, explicit native-font availability,
+source-anchored graphics/keyboard/file clients and stable SD CID snapshots.
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38152315900),
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38152315893),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38152315907),
+[Gallery](https://github.com/maxmixalex/hpclang/actions/runs/38152315888),
+[Core](https://github.com/maxmixalex/hpclang/actions/runs/38152315899) and
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38152315901) all pass.
+The earlier HP39g+ catalog transport failure on `11d85077` passes both exact
+payload replay and its failed-job rerun. That failure occurred before
+application entry and does not establish a calculator-object failure.
+
+The additional HPGCC 1.1/2.0 timed-sieve client passes six-model Direct and
+Stock locally. Its bounded allocation/work checks 168 primes below 1000,
+the final prime 997 and checksum 76127. Independent console bands check the
+visible prime/iteration report, with a nonblank measured-time line. DMA padding
+outside the physical 131-pixel width is excluded from the pixel comparison.
+Formal CI for this additional client is still pending.
+
+### M7 owned power policy — local validation in progress
+
+HOST/ECONOMY profiles coordinate CPU clock, LCD divider and monotonic time,
+reject active-sound transitions, and restore borrowed state on runtime exit.
+All 70 host tests and six-model Direct System Services pass locally. The
+Direct harness checks clock registers and LCD configuration before restoring
+its own saved Stock state; the application deliberately leaves economy mode
+active at return. HP49g+/HP50g Direct and Stock file operations also pass in
+economy mode, followed by card replacement and stale-handle checks. Stock
+System Services and HP39 native-catalog coexistence are still being validated;
+classic object flows pass on HP48gII, HP49g+ and HP50g.
+
+The comprehensive System Services payload has less available HP39 Stock heap
+than the dedicated Display payload. Its clock/display release-order checks
+therefore use two gray4 pages. An initial gray16 request correctly failed with
+`ENOMEM` before the second clock transition; the saved RAM/TLS value established
+the allocation failure. Gray16 rendering remains covered by the dedicated
+Display suite. The power test separately waits for the timer's actual deadline,
+rather than a timestamp sampled before that timer was started.
+
+Emulator timing now preserves outstanding PWM counter ticks when PCLK changes.
+Host tests cover scaling, rounding and saturation. These checks establish clock
+selection and state restoration; they do not measure physical battery savings.
