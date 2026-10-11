@@ -317,12 +317,14 @@ target_compile_features(hpclang_fatfs_vendor PRIVATE c_std_11)
 target_include_directories(hpclang_fatfs_vendor PUBLIC
     "${HPCLANG_ROOT}/third_party/fatfs")
 
-hpclang_unit(fatfs_config test_fatfs_config.c)
+hpclang_unit(fatfs_config test_fatfs_config.c
+    "${HPCLANG_ROOT}/runtime/libc/storage-volumes.c")
 target_include_directories(test_fatfs_config PRIVATE
     "${HPCLANG_ROOT}/third_party/fatfs")
 target_link_libraries(test_fatfs_config PRIVATE hpclang_fatfs_vendor)
 
 hpclang_unit(storage_metadata test_storage_metadata.c
+    "${HPCLANG_ROOT}/runtime/libc/storage-volumes.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace.c"
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")
 target_include_directories(test_storage_metadata PRIVATE

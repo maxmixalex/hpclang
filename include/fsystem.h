@@ -7,7 +7,9 @@
  * This is an independently implemented adapter over hpclang's clean storage
  * service. It does not expose historical SD-controller/FAT internals or binary
  * compatibility. Only semantics that can be represented honestly by the
- * hpclang single-SD-volume namespace are declared here.
+ * hpclang SD FAT-volume namespace are declared here. Volume numbers retain
+ * historical primary MBR slots (0..3), with per-volume adapter working
+ * directories; standard-C paths keep their independent volume-zero default.
  */
 
 #include <time.h>

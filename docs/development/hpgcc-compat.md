@@ -329,8 +329,9 @@ symbols. ROM probes across all six models distinguish HP39's π/∠ shortcuts
 from classic Alpha-right-Shift Π and other Greek/math characters. Native font
 rendering now maps those Unicode scalars back to the verified HP glyph bytes.
 This avoids passing an HP character byte to a UTF-8 editor as if it were a
-Unicode value. Remaining shifted/held punctuation and full interactive
-acceptance are still being completed.
+Unicode value. Shifted/held punctuation and the default keyboard editor are
+accepted on `41d75dec`, with all six CI workflows green and integration into
+main at `cada0f2e`.
 
 ## File I/O and standard C I/O
 
@@ -343,7 +344,18 @@ The M7.2d source adapter now provides a deliberately bounded historical surface:
 - `hpstdio.h` delegates standard I/O to libc and maps `fdelete()` to the clean stream namespace;
 - `fsystem.h` covers useful file, seek/read/write, rename/delete, mkdir/rmdir, volume-space, metadata and directory-iteration patterns over the clean core;
 - common visible `FS_FILE` metadata fields are retained for source ports, but the historical binary layout and direct FAT/controller state are not reproduced;
-- the single real hpclang SD volume accepts legacy SD path aliases while multi-volume mutable state is not reintroduced.
+- up to four primary FAT partitions are exposed through the clean volume API;
+  legacy `C:` through `F:` and `:3:` through `:6:` select historical MBR slots,
+  including holes. An unpartitioned FAT card uses slot zero. Current-volume
+  selection and per-volume working directories belong only to the source
+  adapter; they do not change Stock state or unqualified standard-C paths.
+
+Clean `N:/path` indexes enumerate usable FAT partitions densely in MBR order.
+For example, primary slots 1 and 3 become clean volumes 0 and 1, but retain
+historical aliases `C:` and `E:`. Cross-volume rename fails with `EXDEV`
+(`FS_BADVOLUME` through the adapter). Card replacement invalidates handles on
+every volume. MBR overlap and out-of-card partition extents are rejected;
+extended partitions, GPT and exFAT are outside this FAT primary-partition API.
 
 Raw KOS filesystem calls, raw filesystem handles, global `chdir/getcwd` state, FSystem sleep/wakeup/controller ownership, and timestamp setters remain Migration/Internal rather than canonical compatibility APIs.
 

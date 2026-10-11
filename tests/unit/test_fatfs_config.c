@@ -7,8 +7,8 @@
 #if FFCONF_DEF != 80386
 #error unexpected FatFs configuration revision
 #endif
-#if FF_VOLUMES != 1 || FF_MULTI_PARTITION != 0
-#error M7.2c requires one logical FAT volume
+#if FF_VOLUMES != 4 || FF_MULTI_PARTITION != 1
+#error SD namespace requires up to four primary FAT volumes
 #endif
 #if FF_MIN_SS != 512 || FF_MAX_SS != 512
 #error hp4950 SD namespace requires fixed 512-byte sectors

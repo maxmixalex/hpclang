@@ -12,6 +12,8 @@ extern "C"
 #define HPCLANG_STREAM_STORAGE_INFO_VERSION 1u
 #define HPCLANG_STREAM_DIRECTORY_ENTRY_VERSION 2u
 #define HPCLANG_STREAM_NAME_CAPACITY 256u
+#define HPCLANG_STREAM_VOLUME_INFO_VERSION 1u
+#define HPCLANG_STREAM_VOLUME_LIMIT 4u
 
     enum hpclang_stream_path_type
     {
@@ -121,6 +123,26 @@ extern "C"
         uint64_t free_bytes;
         uint64_t capacity_bytes;
     };
+
+    /* Mounted FAT volumes are numbered densely in primary-partition order.
+     * Unqualified paths retain volume 0 (the first usable FAT volume); an
+     * explicit "N:/path" selects volume N. Each volume has an independent root.
+     * MBR partition numbers are 1..4; zero denotes an unpartitioned FAT card.
+     * Discovery acquires the same process-wide SD lease as file I/O. Volume
+     * indexes must be discovered again after card replacement. No card-global
+     * current-volume or current-directory state is changed in Stock. */
+    struct hpclang_stream_volume_info
+    {
+        uint32_t size;
+        uint32_t version;
+        uint32_t index;
+        uint32_t partition;
+        uint64_t first_sector;
+        struct hpclang_stream_storage_info storage;
+    };
+
+    int hpclang_stream_volume_count(unsigned *count);
+    int hpclang_stream_volume_query(unsigned index, struct hpclang_stream_volume_info *info);
 
     /*
      * These services address the HP49g+/HP50g SD-card FAT volume. HOME/Port 0,

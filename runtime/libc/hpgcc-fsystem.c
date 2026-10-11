@@ -75,7 +75,41 @@ static int compat_error(void)
     }
 }
 
-static char compat_cwd[HPCLANG_STREAM_NAME_CAPACITY] = "/";
+static char compat_cwd[4][HPCLANG_STREAM_NAME_CAPACITY] = {"/", "/", "/", "/"};
+static int compat_volume = -1;
+
+static int current_volume(void)
+{
+    if (compat_volume < 0) {
+        struct hpclang_stream_volume_info info;
+        if (hpclang_stream_volume_query(0, &info))
+            return -1;
+        compat_volume = info.partition ? (int)info.partition - 1 : 0;
+    }
+    return compat_volume;
+}
+
+/* HPGCC identifies primary MBR slots, while the clean API enumerates usable
+ * FAT volumes densely. Keep that translation inside this adapter. */
+static int resolve_volume(int volume, struct hpclang_stream_volume_info *info)
+{
+    if (volume < 0 || volume >= 4) {
+        errno = EXDEV;
+        return -1;
+    }
+    unsigned count;
+    if (hpclang_stream_volume_count(&count))
+        return -1;
+    for (unsigned i = 0; i < count; ++i) {
+        if (hpclang_stream_volume_query(i, info))
+            return -1;
+        unsigned slot = info->partition ? info->partition - 1u : 0u;
+        if (slot == (unsigned)volume)
+            return 0;
+    }
+    errno = EXDEV;
+    return -1;
+}
 
 static int valid_volume_char(char value)
 {
@@ -83,12 +117,7 @@ static int valid_volume_char(char value)
            (value >= 'c' && value <= 'f');
 }
 
-static int supported_volume_char(char value)
-{
-    return value == '3' || value == 'C' || value == 'c';
-}
-
-static int parse_volume_prefix(const char **source)
+static int parse_volume_prefix(const char **source, int *selected)
 {
     const char *p = *source;
     char volume = 0;
@@ -109,13 +138,12 @@ static int parse_volume_prefix(const char **source)
         p += 2;
     }
 
-    if (volume != 0 && !supported_volume_char(volume)) {
-        errno = EXDEV;
-        return -1;
-    }
+    *selected = volume == 0                      ? current_volume()
+                : volume >= '3' && volume <= '6' ? volume - '3'
+                                                 : toupper(volume) - 'C';
 
     *source = p;
-    return 0;
+    return *selected < 0 ? -1 : 0;
 }
 
 static int pop_component(char *path, size_t *length)
@@ -167,7 +195,11 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
     }
 
     const char *p = source;
-    if (parse_volume_prefix(&p) != 0)
+    int selected;
+    if (parse_volume_prefix(&p, &selected) != 0)
+        return -1;
+    struct hpclang_stream_volume_info volume;
+    if (resolve_volume(selected, &volume))
         return -1;
 
     int absolute = *p == '/' || *p == '\\';
@@ -183,12 +215,12 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
             return -1;
         }
     } else {
-        size_t cwd_length = strlen(compat_cwd);
+        size_t cwd_length = strlen(compat_cwd[selected]);
         if (cwd_length >= capacity) {
             errno = ENAMETOOLONG;
             return -1;
         }
-        memcpy(dest, compat_cwd, cwd_length + 1u);
+        memcpy(dest, compat_cwd[selected], cwd_length + 1u);
         out = cwd_length;
     }
 
@@ -233,6 +265,16 @@ static int normalize_path(const char *source, char *dest, size_t capacity)
     if (out == 0u) {
         dest[0] = '/';
         dest[1] = '\0';
+    }
+    if (volume.index != 0) {
+        size_t length = strlen(dest);
+        if (length + 2u >= capacity) {
+            errno = ENAMETOOLONG;
+            return -1;
+        }
+        memmove(dest + 2, dest, length + 1u);
+        dest[0] = (char)('0' + volume.index);
+        dest[1] = ':';
     }
     return 0;
 }
@@ -641,25 +683,31 @@ int FSChdir(char *name)
     if (info.type != HPCLANG_STREAM_PATH_TYPE_DIRECTORY)
         return FS_BADNAME;
 
-    size_t length = strlen(path);
-    if (length >= sizeof(compat_cwd))
+    const char *source = name;
+    int selected;
+    if (parse_volume_prefix(&source, &selected))
+        return compat_error();
+    const char *body = path[1] == ':' ? path + 2 : path;
+    size_t length = strlen(body);
+    if (length >= sizeof(compat_cwd[selected]))
         return FS_BADNAME;
-    memcpy(compat_cwd, path, length + 1u);
+    memcpy(compat_cwd[selected], body, length + 1u);
     return FS_OK;
 }
 
 char *FSGetcwd(int volume)
 {
-    if (volume != 0)
+    struct hpclang_stream_volume_info info;
+    if (resolve_volume(volume, &info))
         return NULL;
 
-    size_t length = strlen(compat_cwd);
+    size_t length = strlen(compat_cwd[volume]);
     char *result = malloc(length + 1u);
     if (result == NULL)
         return NULL;
 
     for (size_t i = 0u; i < length; ++i)
-        result[i] = compat_cwd[i] == '/' ? '\\' : compat_cwd[i];
+        result[i] = compat_cwd[volume][i] == '/' ? '\\' : compat_cwd[volume][i];
     result[length] = '\0';
     return result;
 }
@@ -826,10 +874,10 @@ int FSChAttr(FS_FILE *file, int newattr)
 
 static int volume_info(int volume, struct hpclang_stream_storage_info *info)
 {
-    if (volume != 0)
-        return FS_BADVOLUME;
-    if (hpclang_stream_storage_query(info) != 0)
+    struct hpclang_stream_volume_info selected;
+    if (resolve_volume(volume, &selected))
         return compat_error();
+    *info = selected.storage;
     if ((info->flags & HPCLANG_STREAM_STORAGE_MEDIA_PRESENT) == 0u)
         return FS_NOCARD;
     return FS_OK;
@@ -849,12 +897,16 @@ int FSVolumeInserted(int volume)
 
 int FSSetCurrentVolume(int volume)
 {
-    return volume == 0 ? FS_OK : FS_BADVOLUME;
+    struct hpclang_stream_volume_info info;
+    if (resolve_volume(volume, &info))
+        return compat_error();
+    compat_volume = volume;
+    return FS_OK;
 }
 
 int FSGetCurrentVolume(void)
 {
-    return 0;
+    return current_volume();
 }
 
 int FSGetVolumeSize(int volume)
@@ -1007,10 +1059,17 @@ int FSGetNameType(char *name)
 
 char *FSGetFileName(FS_FILE *file, int pathflags)
 {
-    if (file == NULL || file->Name == NULL)
+    if (file == NULL || file->Name == NULL || file->Name[0] == '\0')
         return NULL;
 
     const char *source = file->Name;
+    unsigned index = source[1] == ':' ? (unsigned)(source[0] - '0') : 0u;
+    struct hpclang_stream_volume_info info;
+    if (hpclang_stream_volume_query(index, &info))
+        return NULL;
+    unsigned selected = info.partition ? info.partition - 1u : 0u;
+    if (source[1] == ':')
+        source += 2;
     char relative[HPCLANG_STREAM_NAME_CAPACITY];
     const char *body = source;
 
@@ -1019,9 +1078,9 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
         if (slash != NULL)
             body = slash + 1;
     } else if ((pathflags & FSNAME_ABSPATH) == 0) {
-        size_t cwd_length = strlen(compat_cwd);
-        if (strncmp(source, compat_cwd, cwd_length) == 0 &&
-            (compat_cwd[cwd_length - 1u] == '/' || source[cwd_length] == '/' ||
+        size_t cwd_length = strlen(compat_cwd[selected]);
+        if (strncmp(source, compat_cwd[selected], cwd_length) == 0 &&
+            (compat_cwd[selected][cwd_length - 1u] == '/' || source[cwd_length] == '/' ||
              source[cwd_length] == '\0')) {
             body = source + cwd_length;
             if (*body == '/')
@@ -1031,7 +1090,17 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
 
     size_t prefix = 0u;
     if ((pathflags & FSNAME_HASVOL) != 0) {
-        const char *volume = (pathflags & FSNAME_VOLHP) != 0 ? ":3:" : "C:";
+        char volume[4];
+        if ((pathflags & FSNAME_VOLHP) != 0) {
+            volume[0] = ':';
+            volume[1] = (char)('3' + selected);
+            volume[2] = ':';
+            volume[3] = '\0';
+        } else {
+            volume[0] = (char)('C' + selected);
+            volume[1] = ':';
+            volume[2] = '\0';
+        }
         prefix = strlen(volume);
         memcpy(relative, volume, prefix);
     }

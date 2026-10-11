@@ -513,16 +513,33 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     observed removal or block-transfer failure, remount for new path operations,
     and reject old file/directory objects without flushing them to the new volume.
     Host tests exercise these transitions; Storage, Runtime, Objects, Core and
-    Quality CI pass. `m7-media-events` now adds the EINT3 removal latch, rejects
+    Quality CI pass. Accepted on `cada0f2e`: the EINT3 removal latch rejects
     stale buffered writes even after reinsertion between observations, and
     restores leased card pin/interrupt configuration before Stock rescan.
     The 68 host tests and raw-FAT-image replacement tests pass locally in Direct
-    and Stock on HP49g+/HP50g; formal CI remains pending. On 2026-10-11 the maintainer
+    and Stock on HP49g+/HP50g; Runtime, Storage, Objects, Gallery, Core and Quality
+    CI all pass, and the changes are integrated into main. On 2026-10-11 the maintainer
     confirmed an HP49g+ and SD card are available, requested a reproducible
     hardware test package, and designated the later physical run as a
     nonblocking follow-up. The [manual test package](sd-media-check.md) is built
     from source by Storage CI, with the launcher installer and instructions;
     emulator results must not be reported as physical hot-plug evidence.
+
+- [ ] Provide clean access to multiple FAT partitions on one SD card. The
+  HPGCC3 `fsystem/common/fsinit.c` implementation actually mounts up to four
+  primary volumes; HPGCC 2.0's `fsystem/examples/example1.c` exercises that flow.
+  The existing classification of historical global volume state does not close
+  this data-access capability. Preserve unqualified paths for the default volume,
+  add explicit volume discovery/paths, isolate open objects across volumes,
+  reject cross-volume rename with `EXDEV`, and invalidate every volume on card
+  replacement. This concerns SD FAT partitions, not the separately approved
+  Port 0/1/2 calculator-object limitations.
+  - Implemented on `m7-storage-volumes`: dense clean indexes, primary-slot
+    source aliases, independent adapter working directories, overlap/extent
+    validation and all-volume invalidation. All 68 host tests, six-model
+    Direct Storage and HP49g+/HP50g Stock Storage pass locally, including
+    dirty streams on both partitions during replacement. Static analysis,
+    formatting, lint and strict documentation build pass; formal CI pending.
 
 ### M7.3g–j — object-service capability completion
 
@@ -574,13 +591,15 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
 
 ### M7 final audit / M8 follow-up
 
-Current `m7-parity-completion` work adds model-native Unicode symbol lookup,
+Accepted on `41d75dec`: model-native Unicode symbol lookup,
 the default bounded keyboard editor, contrast mutation/restoration and owned
 LCD enable/disable. All 67 host tests, six-model Direct System Services and
 Display, and Stock System Services/Display on HP39g+, HP48gII, HP49g+ and HP50g
 pass locally. Contrast and the corrected HP39 transport additionally pass
-Stock on HP39gs and HP40gs. Formal CI is pending; these additions do not
-close the remaining capability ledger, historical client or media-change goals.
+Stock on HP39gs and HP40gs. Runtime, Storage, Objects, Gallery, Core and Quality
+CI all pass. This work and the media-event extension are integrated into main
+at `cada0f2e`; their topic branches are retired. These additions do not close
+the remaining capability ledger or historical-client goals.
 The HP39 transport regression now covers embedded CRLF bytes: all three Stock
 models pass the corrected newline transport locally. This is a byte-preservation
 fix, not a retry or relaxation of the application result checks.

@@ -11,7 +11,8 @@
 #include "ff.h"
 #include "diskio.h"
 
-#define SECTORS 2048u
+#define VOLUME_SECTORS 2048u
+#define SECTORS (VOLUME_SECTORS * 5u)
 #define ROOT_SECTOR 7u
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
@@ -91,7 +92,10 @@ DRESULT disk_write(BYTE drive, const BYTE *buffer, LBA_t sector, UINT count)
 }
 DRESULT disk_ioctl(BYTE drive, BYTE command, void *buffer)
 {
-    (void)buffer;
+    if (!drive && command == GET_SECTOR_COUNT) {
+        *(LBA_t *)buffer = SECTORS;
+        return RES_OK;
+    }
     return !drive && command == CTRL_SYNC ? RES_OK : RES_PARERR;
 }
 DWORD get_fattime(void)
@@ -102,6 +106,80 @@ static void put16(BYTE *p, unsigned value)
 {
     p[0] = (BYTE)value;
     p[1] = (BYTE)(value >> 8);
+}
+static void put32(BYTE *p, uint32_t value)
+{
+    put16(p, value & 0xffffu);
+    put16(p + 2, value >> 16);
+}
+
+static int partition_checks(void)
+{
+    // Preserve a real FAT volume, then put copies in nonadjacent MBR slots.
+    memmove(disk + VOLUME_SECTORS * 512u, disk, VOLUME_SECTORS * 512u);
+    memcpy(disk + VOLUME_SECTORS * 3u * 512u, disk + VOLUME_SECTORS * 512u, VOLUME_SECTORS * 512u);
+    memset(disk, 0, 512);
+    put16(disk + 510, 0xaa55);
+    BYTE *first = disk + 446;
+    BYTE *third = first + 32;
+    first[4] = third[4] = 1;
+    put32(first + 8, VOLUME_SECTORS);
+    put32(first + 12, VOLUME_SECTORS);
+    put32(third + 8, VOLUME_SECTORS * 3u);
+    put32(third + 12, VOLUME_SECTORS);
+    unsigned count = 99;
+    CHECK(hpclang_stream_volume_count(&count) == 0 && count == 2);
+    struct hpclang_stream_volume_info info;
+    CHECK(hpclang_stream_volume_query(0, &info) == 0 && info.partition == 1 &&
+          info.first_sector == VOLUME_SECTORS);
+    CHECK(hpclang_stream_volume_query(1, &info) == 0 && info.partition == 3 &&
+          info.first_sector == VOLUME_SECTORS * 3u);
+    CHECK(info.storage.capacity_bytes == VOLUME_SECTORS * 512u);
+    CHECK(hpclang_stream_volume_query(2, &info) == -1 && errno == ENODEV);
+    CHECK(hpclang_namespace_open("2:/NEW.TXT", O_RDONLY) == -1 && errno == ENODEV);
+    CHECK(hpclang_stream_directory_open("2:/") == NULL && errno == ENODEV);
+    int left = hpclang_namespace_open("0:/NEW.TXT", O_RDWR);
+    int right = hpclang_namespace_open("1:/NEW.TXT", O_RDWR);
+    CHECK(left >= 0 && right >= 0);
+    CHECK(hpclang_namespace_write(left, "one", 3) == 3);
+    CHECK(hpclang_namespace_write(right, "two", 3) == 3);
+    CHECK(hpclang_namespace_close(left) == 0 && hpclang_namespace_close(right) == 0);
+    CHECK(hpclang_namespace_rename("0:/NEW.TXT", "1:/MOVED.TXT") == -1 && errno == EXDEV);
+    left = hpclang_namespace_open("NEW.TXT", O_RDONLY);
+    right = hpclang_namespace_open("1:/NEW.TXT", O_RDWR);
+    char bytes[3];
+    CHECK(hpclang_namespace_read(left, bytes, 3) == 3 && !memcmp(bytes, "one", 3));
+    CHECK(hpclang_namespace_read(right, bytes, 3) == 3 && !memcmp(bytes, "two", 3));
+    CHECK(hpclang_namespace_write(right, "dirty", 5) == 5);
+    unsigned writes = media_writes;
+    initialized_media = 0; // Card changed between observations while still inserted.
+    CHECK(hpclang_stream_volume_count(&count) == 0 && count == 2);
+    CHECK(hpclang_namespace_close(left) == -1 && errno == EBADF);
+    CHECK(hpclang_namespace_close(right) == -1 && errno == EBADF);
+    CHECK(media_writes == writes);
+    hpclang_storage_shutdown();
+    // Overlapping partitions must not expose two caches over the same sectors.
+    put32(third + 8, VOLUME_SECTORS);
+    count = 99;
+    CHECK(hpclang_stream_volume_count(&count) == -1 && count == 99);
+    hpclang_storage_shutdown();
+    put32(third + 8, VOLUME_SECTORS * 3u);
+    // Exercise the fourth slot and the exact physical-card boundary.
+    memcpy(disk + VOLUME_SECTORS * 2u * 512u, disk + VOLUME_SECTORS * 512u, VOLUME_SECTORS * 512u);
+    memcpy(disk + VOLUME_SECTORS * 4u * 512u, disk + VOLUME_SECTORS * 512u, VOLUME_SECTORS * 512u);
+    for (unsigned slot = 1; slot < 4; slot += 2) {
+        BYTE *partition = first + slot * 16;
+        partition[4] = 1;
+        put32(partition + 8, (slot + 1u) * VOLUME_SECTORS);
+        put32(partition + 12, VOLUME_SECTORS);
+    }
+    CHECK(hpclang_stream_volume_count(&count) == 0 && count == 4);
+    CHECK(hpclang_stream_volume_query(3, &info) == 0 && info.partition == 4);
+    hpclang_storage_shutdown();
+    put32(first + 3u * 16u + 12u, VOLUME_SECTORS + 1u);
+    CHECK(hpclang_stream_volume_count(&count) == -1);
+    hpclang_storage_shutdown();
+    return EXIT_SUCCESS;
 }
 static unsigned date(unsigned year, unsigned month, unsigned day)
 {
@@ -117,7 +195,7 @@ int main(void)
     put16(disk + 14, 1);
     disk[16] = 1;
     put16(disk + 17, 64);
-    put16(disk + 19, SECTORS);
+    put16(disk + 19, VOLUME_SECTORS);
     disk[21] = 0xf8;
     put16(disk + 22, 6);
     disk[38] = 0x29;
@@ -223,6 +301,7 @@ int main(void)
     CHECK(hpclang_namespace_write(fresh, "new", 3) == 3);
     CHECK(hpclang_namespace_close(fresh) == 0);
     hpclang_storage_shutdown();
+    CHECK(partition_checks() == EXIT_SUCCESS);
     device.family = HPCLANG_FAMILY_HP39;
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, hidden) < 0 && errno == ENOSYS);
     return EXIT_SUCCESS;

@@ -223,6 +223,8 @@ static uint32_t storage_replacement_test(void)
 {
     uint32_t result = 0xc0u;
     struct hpclang_stream_directory *directory = NULL;
+    FILE *secondary = NULL;
+    char secondary_dirty[32];
     char dirty[32], bytes[4];
     FILE *file = fopen("STALE.BIN", "wb");
     if (!file || fwrite("OLD", 1, 3, file) != 3)
@@ -230,6 +232,17 @@ static uint32_t storage_replacement_test(void)
     int closed = fclose(file);
     file = NULL;
     if (closed)
+        goto done;
+    secondary = fopen("1:/STALE.BIN", "wb");
+    if (!secondary || fwrite("OTHER", 1, 5, secondary) != 5)
+        goto done;
+    closed = fclose(secondary);
+    secondary = NULL;
+    if (closed)
+        goto done;
+    secondary = fopen("1:/STALE.BIN", "r+b");
+    if (!secondary || setvbuf(secondary, secondary_dirty, _IOFBF, sizeof secondary_dirty) ||
+        fwrite("WRONG", 1, 5, secondary) != 5)
         goto done;
     result = 0xc1u;
     file = fopen("STALE.BIN", "r+b");
@@ -245,6 +258,10 @@ static uint32_t storage_replacement_test(void)
     result = 0xc3u;
     closed = fclose(file);
     file = NULL;
+    if (closed != EOF || errno != EBADF)
+        goto done;
+    closed = fclose(secondary);
+    secondary = NULL;
     if (closed != EOF || errno != EBADF)
         goto done;
     result = 0xc4u;
@@ -280,13 +297,77 @@ static uint32_t storage_replacement_test(void)
     file = NULL;
     if (closed || remove("STALE.BIN"))
         goto done;
+    secondary = fopen("1:/STALE.BIN", "rb");
+    char other[5];
+    if (!secondary || fread(other, 1, 5, secondary) != 5 || memcmp(other, "OTHER", 5))
+        goto done;
+    closed = fclose(secondary);
+    secondary = NULL;
+    if (closed || remove("1:/STALE.BIN"))
+        goto done;
     result = media_swap(4) ? 0xc9u : 0;
 done:
+    if (secondary)
+        fclose(secondary);
     if (file)
         fclose(file);
     if (directory)
         (void)hpclang_stream_directory_close(directory);
     return result;
+}
+
+static uint32_t storage_volumes_test(void)
+{
+    unsigned count;
+    struct hpclang_stream_volume_info info;
+    if (hpclang_stream_volume_count(&count) || count != 2 ||
+        hpclang_stream_volume_query(1, &info) || info.partition != 3 ||
+        !info.storage.capacity_bytes || !info.storage.free_bytes)
+        return 0xd0u;
+    FILE *left = fopen("0:/VOLUME.TST", "wb");
+    if (!left)
+        return 0xd1u;
+    int wrote = fwrite("FIRST", 1, 5, left) == 5;
+    if (fclose(left) || !wrote)
+        return 0xd2u;
+    FS_FILE *right = NULL;
+    if (FSSetCurrentVolume(2) != FS_OK || FSGetCurrentVolume() != 2 ||
+        FSCreate("E:/VOLUME.TST", 0, &right) != FS_OK)
+        return 0xd3u;
+    wrote = FSWrite("SECOND", 6, right) == 6;
+    char *name = FSGetFileName(right, FSNAME_HASVOL | FSNAME_VOLHP | FSNAME_ABSPATH);
+    int named = name && !strcmp(name, ":5:/VOLUME.TST");
+    free(name);
+    if (FSClose(right) != FS_OK || !wrote || !named)
+        return 0xd4u;
+    if (FSMkdir("SUB") != FS_OK || FSChdir("SUB") != FS_OK)
+        return 0xd5u;
+    char *cwd = FSGetcwd(2);
+    int correct = cwd && !strcmp(cwd, "\\SUB");
+    free(cwd);
+    if (!correct || FSSetCurrentVolume(0) != FS_OK)
+        return 0xd6u;
+    cwd = FSGetcwd(0);
+    correct = cwd && !strcmp(cwd, "\\");
+    free(cwd);
+    if (!correct || FSChdir("E:/") != FS_OK || FSRmdir("E:/SUB") != FS_OK)
+        return 0xd7u;
+    const char *paths[] = {"0:/VOLUME.TST", "1:/VOLUME.TST"};
+    const char *expected[] = {"FIRST", "SECOND"};
+    for (unsigned i = 0; i < 2; ++i) {
+        left = fopen(paths[i], "rb");
+        if (!left)
+            return 0xd8u;
+        char bytes[8] = {0};
+        size_t n = fread(bytes, 1, sizeof bytes, left);
+        int closed = fclose(left);
+        if (closed || n != strlen(expected[i]) || strcmp(bytes, expected[i]))
+            return 0xd9u;
+    }
+    if (rename(paths[0], "1:/MOVED.TST") != -1 || errno != EXDEV || remove(paths[0]) ||
+        remove(paths[1]))
+        return 0xdau;
+    return 0;
 }
 
 static uint32_t storage_metadata_test(void)
@@ -891,7 +972,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
         return 0x6eu;
 
     uint32_t metadata = storage_metadata_test();
-    return metadata ? metadata : storage_replacement_test();
+    if (metadata)
+        return metadata;
+    uint32_t volumes = storage_volumes_test();
+    return volumes ? volumes : storage_replacement_test();
 }
 #endif
 

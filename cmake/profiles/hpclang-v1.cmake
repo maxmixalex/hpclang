@@ -77,6 +77,7 @@ set(HPCLANG_LIBC
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/platform.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-media.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-volumes.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-media-events.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/hpgcc-fsystem.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/libc/storage-namespace.c"

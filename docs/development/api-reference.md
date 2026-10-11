@@ -512,9 +512,19 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 | `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable attributes and validity-gated modification, creation and stored access dates. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
 | `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID`, `HPCLANG_STREAM_PATH_CREATED_VALID`, `HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID` | ✅ | Each date is usable only with its corresponding validity bit. No timezone or epoch is invented. |
 | `hpclang_stream_path_set_attributes(path, attributes, mask)` | ✅ Accepted on `6a7f9a28` | Updates only masked read-only/hidden/system/archive bits and synchronizes before success. Unknown bits or attributes outside the mask fail with `EINVAL`; other families return `ENOSYS`. Existing descriptors retain their access rights; new write opens respect read-only. |
-| `hpclang_stream_storage_query()` | ✅; owned-media refresh accepted on `56e4a9dd` | Media-present/read-only flags plus free bytes and total capacity from FatFs. GPIO sampling continues during ownership without KOS re-entry. Observed removal or block-transfer failure invalidates old objects; new path operations can remount. Old descriptors/directories fail with `EBADF`; live write protection rejects writes with `EROFS`. The new EINT3 removal latch also covers reinsertion between observations; local HP49g+/HP50g Direct/Stock raw-image tests pass, with CI pending. The separate physical check is a nonblocking follow-up. |
+| `hpclang_stream_storage_query()` | ✅; owned-media refresh accepted on `56e4a9dd` | Media-present/read-only flags plus free bytes and total capacity from FatFs. GPIO sampling continues during ownership without KOS re-entry. Observed removal or block-transfer failure invalidates old objects; new path operations can remount. Old descriptors/directories fail with `EBADF`; live write protection rejects writes with `EROFS`. The new EINT3 removal latch also covers reinsertion between observations; HP49g+/HP50g Direct/Stock raw-image tests and all CI workflows pass on `cada0f2e`, integrated into main. The separate physical check is a nonblocking follow-up. |
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
+| `hpclang_stream_volume_count()` | Local validation complete; CI pending | Number of usable FAT primary partitions, or one for an unpartitioned FAT card. Acquires the same SD lease as file I/O. |
+| `hpclang_stream_volume_query()` | Local validation complete; CI pending | Versioned logical index, actual MBR slot (1–4, or 0 for unpartitioned media), starting sector, and per-volume space/media information. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
+
+Unqualified paths and `/` use the first usable FAT volume. `N:/path` explicitly
+selects logical volume N (0–3); the indexes are dense in primary MBR order.
+Discover them again after replacing the card. Each volume has its own root;
+cross-volume rename returns `EXDEV`. Historical `fsystem.h` aliases instead
+retain MBR slots (`C:`/`:3:` through `F:`/`:6:`), so an empty partition slot
+does not shift the old names. `FSSetCurrentVolume` and `FSChdir` change only
+adapter state. An unpartitioned FAT card uses volume/legacy slot zero.
 
 Path-info version 3 and directory-entry version 2 append `created` and
 `last_accessed`; rebuild applications against the matching SDK headers/runtime.

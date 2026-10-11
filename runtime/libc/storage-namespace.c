@@ -15,6 +15,7 @@
 #include "hp4950-fatfs-diskio.h"
 #include "storage-namespace-lease.h"
 #include "storage-namespace.h"
+#include "storage-volumes.h"
 
 enum
 {
@@ -43,7 +44,7 @@ struct direct_fd_state
     uint8_t append;
 };
 
-static FATFS namespace_fatfs;
+static struct hpclang_storage_volumes namespace_volumes;
 static struct hpclang_namespace_lease namespace_lease;
 static struct direct_fd_state direct_fds[DIRECT_FD_SLOTS];
 static uint8_t namespace_ready;
@@ -106,7 +107,9 @@ static int path_valid(const char *path)
         errno = EFAULT;
         return 0;
     }
-    if (path[0] == '\0' || strchr(path, ':') != NULL) {
+    const char *colon = strchr(path, ':');
+    if (path[0] == '\0' || (colon && (colon != path + 1 || path[0] < '0' || path[0] > '3' ||
+                                      path[2] != '/' || strchr(path + 2, ':')))) {
         errno = EINVAL;
         return 0;
     }
@@ -133,14 +136,14 @@ static int lease_direct_acquire(void *context)
 static int lease_direct_mount(void *context)
 {
     (void)context;
-    memset(&namespace_fatfs, 0, sizeof(namespace_fatfs));
-    return f_mount(&namespace_fatfs, "", 1u) == FR_OK ? 0 : -1;
+    return hpclang_storage_volumes_mount(&namespace_volumes) == FR_OK ? 0 : -1;
 }
 
 static int lease_direct_unmount(void *context)
 {
     (void)context;
-    return f_mount(NULL, "", 0u) == FR_OK ? 0 : -1;
+    hpclang_storage_volumes_unmount(&namespace_volumes);
+    return 0;
 }
 
 static int lease_direct_release(void *context)
@@ -185,11 +188,11 @@ static int namespace_acquire(void)
     namespace_init();
 
     if (namespace_lease.state == HPCLANG_NAMESPACE_DIRECT) {
-        if ((disk_status(0u) & STA_NOINIT) == 0u && namespace_fatfs.fs_type != 0u)
+        if ((disk_status(0u) & STA_NOINIT) == 0u && namespace_volumes.count)
             return 0;
         /* Rebuild the volume without flushing objects belonging to removed media.
          * Keep the controller lease until normal shutdown restores Stock. */
-        return set_fatfs_errno(f_mount(&namespace_fatfs, "", 1u));
+        return set_fatfs_errno(hpclang_storage_volumes_mount(&namespace_volumes));
     }
     if (namespace_lease.state != HPCLANG_NAMESPACE_STOCK) {
         errno = EIO;
@@ -270,8 +273,8 @@ static int direct_file_ready(struct direct_fd_state *slot, int writing)
     /* Even cached EOF/seek operations must reject a removed or replaced card.
      * FatFs gives each remount a new ID, leaving old open objects invalid. */
     DSTATUS status = disk_status(0u);
-    if ((status & STA_NOINIT) != 0u || slot->file.obj.fs != &namespace_fatfs ||
-        namespace_fatfs.fs_type == 0u || slot->file.obj.id != namespace_fatfs.id) {
+    if ((status & STA_NOINIT) != 0u ||
+        !hpclang_storage_volume_object_valid(&namespace_volumes, &slot->file.obj)) {
         errno = EBADF;
         return 0;
     }
@@ -282,11 +285,11 @@ static int direct_file_ready(struct direct_fd_state *slot, int writing)
     return 1;
 }
 
+static int one_shot_begin(const char *path);
+
 int hpclang_namespace_open(const char *path, int flags)
 {
-    if (!path_valid(path))
-        return -1;
-    if (namespace_acquire() != 0)
+    if (one_shot_begin(path) != 0)
         return -1;
 
     int access = flags & O_ACCMODE;
@@ -622,7 +625,14 @@ static int one_shot_begin(const char *path)
 {
     if (!path_valid(path))
         return -1;
-    return namespace_acquire();
+    if (namespace_acquire())
+        return -1;
+    unsigned volume = path[1] == ':' ? (unsigned)(path[0] - '0') : 0u;
+    if (volume >= namespace_volumes.count) {
+        errno = ENODEV;
+        return -1;
+    }
+    return 0;
 }
 
 int hpclang_namespace_path_query(const char *path, struct hpclang_stream_path_info *info)
@@ -635,7 +645,7 @@ int hpclang_namespace_path_query(const char *path, struct hpclang_stream_path_in
         return -1;
 
     int result = 0;
-    if (strcmp(path, "/") == 0) {
+    if (strcmp(path, "/") == 0 || (path[1] == ':' && strcmp(path + 2, "/") == 0)) {
         memset(info, 0, sizeof(*info));
         info->size = sizeof(*info);
         info->version = HPCLANG_STREAM_PATH_INFO_VERSION;
@@ -681,8 +691,10 @@ int hpclang_namespace_path_set_attributes(const char *path, uint32_t attributes,
     // Publish pending file metadata before changing its directory attributes.
     // This also handles a different spelling of an open long/short FAT name.
     for (unsigned i = 0; i < DIRECT_FD_SLOTS; ++i) {
-        if (direct_fds[i].used && direct_fds[i].file.obj.fs == &namespace_fatfs &&
-            direct_fds[i].file.obj.id == namespace_fatfs.id) {
+        unsigned volume = path[1] == ':' ? (unsigned)(path[0] - '0') : 0u;
+        if (direct_fds[i].used &&
+            direct_fds[i].file.obj.fs == &namespace_volumes.filesystems[volume] &&
+            hpclang_storage_volume_object_valid(&namespace_volumes, &direct_fds[i].file.obj)) {
             FRESULT fr = f_sync(&direct_fds[i].file);
             if (fr != FR_OK)
                 return set_fatfs_errno(fr);
@@ -691,7 +703,7 @@ int hpclang_namespace_path_set_attributes(const char *path, uint32_t attributes,
     return set_fatfs_errno(f_chmod(path, import_attributes(attributes), import_attributes(mask)));
 }
 
-int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
+static int namespace_volume_stats(unsigned volume, struct hpclang_stream_storage_info *info)
 {
     if (info == NULL) {
         errno = EFAULT;
@@ -699,6 +711,10 @@ int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
     }
     if (namespace_acquire() != 0)
         return -1;
+    if (volume >= namespace_volumes.count) {
+        errno = ENODEV;
+        return -1;
+    }
 
     memset(info, 0, sizeof(*info));
     info->size = sizeof(*info);
@@ -710,7 +726,9 @@ int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
 
     DWORD free_clusters = 0u;
     FATFS *fs = NULL;
-    FRESULT fr = f_getfree("/", &free_clusters, &fs);
+    char root[] = "0:/";
+    root[0] += (char)volume;
+    FRESULT fr = f_getfree(root, &free_clusters, &fs);
     int result = 0;
     if (fr != FR_OK) {
         result = set_fatfs_errno(fr);
@@ -736,6 +754,45 @@ int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
     }
 
     return result;
+}
+
+int hpclang_namespace_storage_query(struct hpclang_stream_storage_info *info)
+{
+    return namespace_volume_stats(0, info);
+}
+
+int hpclang_stream_volume_count(unsigned *count)
+{
+    if (!count) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (namespace_acquire())
+        return -1;
+    *count = namespace_volumes.count;
+    return 0;
+}
+
+int hpclang_stream_volume_query(unsigned index, struct hpclang_stream_volume_info *info)
+{
+    if (!info) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (index >= HPCLANG_STREAM_VOLUME_LIMIT) {
+        errno = EINVAL;
+        return -1;
+    }
+    struct hpclang_stream_volume_info result = {0};
+    if (namespace_volume_stats(index, &result.storage))
+        return -1;
+    result.size = sizeof(result);
+    result.version = HPCLANG_STREAM_VOLUME_INFO_VERSION;
+    result.index = index;
+    result.partition = namespace_volumes.partitions[index];
+    result.first_sector = namespace_volumes.filesystems[index].volbase;
+    *info = result;
+    return 0;
 }
 
 static int fatfs_unlink(const char *path, int require_directory)
@@ -786,10 +843,14 @@ int hpclang_namespace_mkdir(const char *path)
 
 int hpclang_namespace_rename(const char *old_path, const char *new_path)
 {
-    if (!path_valid(old_path) || !path_valid(new_path))
+    if (one_shot_begin(old_path) != 0 || one_shot_begin(new_path) != 0)
         return -1;
-    if (namespace_acquire() != 0)
+    unsigned old_volume = old_path[1] == ':' ? (unsigned)(old_path[0] - '0') : 0u;
+    unsigned new_volume = new_path[1] == ':' ? (unsigned)(new_path[0] - '0') : 0u;
+    if (old_volume != new_volume) {
+        errno = EXDEV;
         return -1;
+    }
 
     FRESULT fr = f_rename(old_path, new_path);
     int result = fr == FR_OK ? 0 : set_fatfs_errno(fr);
@@ -798,9 +859,7 @@ int hpclang_namespace_rename(const char *old_path, const char *new_path)
 
 struct hpclang_stream_directory *hpclang_stream_directory_open(const char *path)
 {
-    if (!path_valid(path))
-        return NULL;
-    if (namespace_acquire() != 0)
+    if (one_shot_begin(path) != 0)
         return NULL;
 
     struct hpclang_stream_directory *directory = malloc(sizeof(*directory));

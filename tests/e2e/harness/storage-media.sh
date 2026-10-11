@@ -14,6 +14,29 @@ prepare_storage_media() {
     mcopy -m -i "$HPCLANG_E2E_STORAGE_CARD" "$1/HPCLANG.TST" "$1/HPCLANG.OUT" ::/
     mmd -i "$HPCLANG_E2E_STORAGE_CARD" ::/ZZHPDIR
     printf 'SAFE' | mcopy -i "$HPCLANG_E2E_REPLACEMENT_CARD" - ::/STALE.BIN
+    # Two independent FAT volumes in primary slots 1 and 3. The hole makes
+    # dense clean-API indexes and historical partition-slot aliases differ.
+    python3 - "$HPCLANG_E2E_STORAGE_CARD" <<'PY'
+import pathlib
+import struct
+import sys
+
+path = pathlib.Path(sys.argv[1])
+volume = path.read_bytes()
+sectors = len(volume) // 512
+starts = (2048, 2048 + sectors)
+mbr = bytearray(512)
+for slot, start in zip((0, 2), starts):
+    entry = 446 + slot * 16
+    mbr[entry + 4] = 6  # FAT16
+    struct.pack_into("<II", mbr, entry + 8, start, sectors)
+mbr[510:512] = b"\x55\xaa"
+with path.open("wb") as card:
+    card.write(mbr)
+    for start in starts:
+        card.seek(start * 512)
+        card.write(volume)
+PY
 }
 
 verify_storage_media() {
