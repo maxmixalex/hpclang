@@ -1,6 +1,6 @@
 # hpclang roadmap
 
-Live short-term work is tracked in [issue #1](https://github.com/zyf722/hpclang/issues/1). This page records durable milestones, completed evidence, and completion criteria.
+Live short-term work is tracked in [issue #1](https://github.com/maxmixalex/hpclang/issues/1). This page records durable milestones, completed evidence, and completion criteria.
 
 ## Scope of the completed milestones
 

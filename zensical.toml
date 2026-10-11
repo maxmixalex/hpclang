@@ -1,8 +1,8 @@
 [project]
 site_name = "hpclang Development"
-site_url = "https://zyf722.github.io/hpclang/"
-repo_url = "https://github.com/zyf722/hpclang"
-repo_name = "zyf722/hpclang"
+site_url = "https://maxmixalex.github.io/hpclang/"
+repo_url = "https://github.com/maxmixalex/hpclang"
+repo_name = "maxmixalex/hpclang"
 nav = [
   { "Development" = [
     "index.md",
