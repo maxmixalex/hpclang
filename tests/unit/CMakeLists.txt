@@ -34,6 +34,10 @@ target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(input_session test_input_session.c "${HPCLANG_ROOT}/runtime/core/input.c" "${HPCLANG_ROOT}/runtime/core/input-session.c")
+target_include_directories(test_input_session PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(input_alpha test_input_alpha.c "${HPCLANG_ROOT}/runtime/core/input-alpha.c" "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
+target_include_directories(test_input_alpha PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(numeric_input test_numeric_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_numeric_input PRIVATE "${HPCLANG_ROOT}/include")

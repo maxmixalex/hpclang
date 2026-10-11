@@ -170,6 +170,61 @@ if (hpclang_text_input_parse_int64(&input, &value) == 0) {
 }
 ```
 
+### Explicit Alpha letter lookup
+
+`hpclang_text_alpha_lookup(model, key, lowercase, &codepoint)` maps a physical
+key to its printed Latin letter on all six models. `lowercase` is explicitly 0
+or 1. Return 1 means a letter/space was found; 0 means no mapping and leaves the
+output untouched. Invalid arguments return -1/`EINVAL`; unknown models return
+-1/`ENOSYS`. Successful calls preserve errno.
+
+This pure text-layer helper does not consume events or decide whether Alpha is
+held, latched or locked. The caller selects the plane. HP39 Alpha-Enter maps to
+space; HP48/49/50 use their dedicated space key. Modifier keys, editing commands,
+digits without Alpha letters, punctuation planes and non-Latin symbols are not
+mapped by this helper. Call it only for the chosen text plane and DOWN/REPEAT
+events, before falling back to editing controls. It is implemented pending CI;
+the broader sticky-plane and physical-input acceptance requirements remain open.
+
+### Bounded line sessions
+
+`hpclang_text_input_run(input, callbacks)` supplies a synchronous event/edit/
+validation/render loop over an initialized editor. This extension is implemented
+and awaiting CI acceptance. It retains prefilled text and allocates
+nothing. The caller supplies the event source and owns the display/context.
+
+| Callback | Contract |
+| --- | --- |
+| `next` (required) | Return 1 with an event, 0 when idle, or -1 with errno to abort; may poll or wait |
+| `edit` (optional) | Replace the basic `hpclang_text_input_key()` policy, e.g. with model-specific Alpha translation; same result/error contract |
+| `accept` (optional) | Validate the proposed line: 0 accepts, 1 with errno rejects for correction, -1 with errno aborts |
+| `update` (optional) | Initial notification and each event, including accept/cancel and recoverable errors; render/present as desired; 0 succeeds, -1 aborts |
+
+Buffer exhaustion (`ENOSPC`) and validation rejection return to editing, with an
+error notification for the UI. Other errors abort. Idle polls do not redraw.
+Accept/cancel preserve the line and entry errno; failures retain the current
+working line. Descriptors are copied and callback context is borrowed until the
+call returns. Callbacks must not reenter the session or free its state; `update`
+and `accept` must not mutate the editor. A failed callback without errno becomes
+`EIO`; a result outside its contract becomes `EINVAL`.
+
+For physical input, the event-source adapter can simply call the existing poller:
+
+```c
+static int next_key(void *context, struct hpclang_keyboard_event *event)
+{
+    (void)context;
+    return hpclang_keyboard_event_poll(event);
+}
+```
+
+Applications should provide `update` to display the working line, cursor and
+errors, and optionally validate numeric input with the checked parsers. The
+session does not reset keyboard events, select repeat timing, acquire a screen,
+bind stdin, or invent Alpha/Shift mappings. The default editing policy retains
+the previously documented basic keys. Full model-specific Alpha mapping and a
+physical-key-driven rendering acceptance test remain open.
+
 ### Console and standard streams
 
 The numeric-input, console and stream-binding extensions passed CI on `b92e2a7d`.

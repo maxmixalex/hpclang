@@ -466,6 +466,16 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     binding with read/write/flush callbacks, distinct EOF/error/cancellation and
     reset on ownership changes. Alpha/Shift text maps and a ready-made keyboard
     line-input loop remain open; physical keyboard semantics are unchanged.
+  - Implemented line-session extension, awaiting CI: callback-driven
+    event/edit/accept/update loop, recoverable capacity/validation errors and
+    explicit cancellation. Model-specific Alpha maps and physical-key-driven
+    text rendering acceptance remain open; the scripted session test does not
+    close those requirements.
+  - Implemented explicit Latin Alpha lookup, awaiting CI: all six models'
+    printed A-Z/a-z and Alpha-space positions, checked against their manual
+    diagrams and tested through physical key identities. Sticky/held plane
+    policy, punctuation/symbol planes and physical interactive acceptance remain
+    open; no implicit modifier state is added to the keyboard core.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

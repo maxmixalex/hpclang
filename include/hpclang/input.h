@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <hpclang/keyboard.h>
+#include <hpclang/target.h>
 #ifdef __cplusplus
 extern "C"
 {
@@ -65,6 +66,43 @@ extern "C"
      * do not accept/cancel the editor or select any keyboard/text-plane policy. */
     int hpclang_text_input_parse_int64(const struct hpclang_text_input *input, int64_t *value);
     int hpclang_text_input_parse_double(const struct hpclang_text_input *input, double *value);
+
+    /* Look up the printed Latin Alpha letter (A-Z/a-z) or Alpha-space for a
+     * physical key on an explicit model. lowercase must be 0 or 1. Returns
+     * 1/mapped, 0/no letter, -1/EINVAL for invalid arguments, -1/ENOSYS for an
+     * unknown model. Output changes only on 1; success preserves errno.
+     * Pure lookup: no event polling, held-modifier inference, sticky Alpha,
+     * punctuation/command planes or Stock UI state. The caller chooses when an
+     * Alpha plane applies. HP39 Alpha-Enter maps to space, not line acceptance. */
+    int hpclang_text_alpha_lookup(uint32_t model, uint16_t key, int lowercase, uint32_t *codepoint);
+
+    /* Synchronous bounded line session. The caller owns input/buffer and context.
+     * next returns 1/event, 0/idle or -1/errno; it may wait, or poll the physical
+     * event service. Idle calls do not redraw. No global keyboard reset/timing,
+     * display acquisition, allocation or implicit stdio binding is performed.
+     * edit optionally replaces text_input_key (e.g. model-specific Alpha policy),
+     * returning the same input_result or -1/errno. ENOSPC is recoverable.
+     * accept optionally validates the proposed line: 0 accepts, 1 rejects with
+     * errno, -1 aborts. Rejection preserves the editor for correction.
+     * update is optional: initial notification and each non-idle event, with
+     * result EDITING/ACCEPTED/CANCELLED and error 0 or the recoverable errno.
+     * It may render/present; return 0 or -1/errno to abort. It must not mutate
+     * input. All callbacks must not reenter this session or free its state.
+     * Callback descriptors are copied; borrowed context stays live until return.
+     * Run returns ACCEPTED/CANCELLED or -1/errno, retaining text on every path.
+     * Missing callback errno becomes EIO; invalid callback results become EINVAL.
+     * Success/cancel preserve entry errno. next is required. */
+    struct hpclang_text_input_callbacks
+    {
+        int (*next)(void *context, struct hpclang_keyboard_event *event);
+        int (*edit)(void *context, struct hpclang_text_input *input,
+                    const struct hpclang_keyboard_event *event);
+        int (*accept)(void *context, const struct hpclang_text_input *input);
+        int (*update)(void *context, const struct hpclang_text_input *input, int result, int error);
+        void *context;
+    };
+    int hpclang_text_input_run(struct hpclang_text_input *input,
+                               const struct hpclang_text_input_callbacks *callbacks);
 #ifdef __cplusplus
 }
 #endif

@@ -268,6 +268,12 @@ file-backed stream implementation is not replaced.
 
 ### Historical text-input policies
 
+The clean `hpclang_text_input_run()` extension supplies a bounded synchronous
+line session with an explicit event source, editing policy, acceptance validator
+and rendering callback. It retains the line after cancellation and permits
+correction after capacity/validation errors. It is awaiting CI acceptance and does
+not yet establish historical Alpha mapping or a ready-made modal screen.
+
 The distributions do not establish one portable Alpha/Shift policy:
 
 | Source | Observed behavior | Remaining evidence / clean destination |
@@ -281,6 +287,23 @@ mapping, editing/accept/cancel, bounded input and rendering through a complete
 keyboard-driven flow. The existing scripted standard-input E2E verifies stream
 routing, not Alpha-key translation. Historical blocking spellings remain M8
 adapter work; the usable clean input behavior remains an M7 requirement.
+
+`hpclang_text_alpha_lookup()` now supplies the printed Latin letters and
+Alpha-space for explicit model/key/case inputs, pending CI. It does not copy a
+historical raw scan table or infer a global modifier mode. Letter positions were
+checked against the keyboard diagrams in the official
+[HP39g+ guide, 1-3](https://h10032.www1.hp.com/ctg/Manual/c00045564.pdf),
+[HP39gs guide, 1-3](https://h10032.www1.hp.com/ctg/Manual/c00751802.pdf),
+[HP40gs guide, 1-3](https://h10032.www1.hp.com/ctg/Manual/c00748685.pdf),
+[HP48gII manual, 1-5](https://literature.hpcalc.org/official/hp48gii-um-en.pdf),
+[HP49g+ manual, 1-6](https://literature.hpcalc.org/official/hp49gplus-um-en.pdf), and
+[HP50g manual, 1-5](https://literature.hpcalc.org/official/hp50g-um-en.pdf).
+The N/O positions use the SDK's existing model-specific physical identities
+(HP49 CAT/EQW versus HP50 EVAL/QUOTE). The manual diagrams establish letter
+positions, not a change to that accepted physical-key ABI. All 26 letters in
+both cases and space are tested per model through the existing electrical map.
+Sticky/held Alpha, punctuation/symbol planes and complete interactive flows
+remain separate acceptance work.
 
 ## File I/O and standard C I/O
 

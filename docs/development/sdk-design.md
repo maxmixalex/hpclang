@@ -150,6 +150,15 @@ ASCII decimal grammar and finite-double range policy are independent of any
 calculator's Alpha/Shift mode. No terminal, Stock modal dialog, or global stdio
 redirection is acquired by these helpers.
 
+The optional synchronous line-session runner reuses the same caller-owned editor.
+It copies callbacks for event acquisition, editing policy, validation and update
+notifications, and borrows their context only until return. Capacity errors and
+rejected values keep the session editable; input/render failures abort without
+discarding the working line. The runner neither resets the physical event queue
+nor selects an Alpha plane. An application can supply its own event source or
+adapt the existing keyboard poller, and can redraw through the console or other
+surface operations without acquiring implicit global screen state.
+
 The console layer owns a bounded Unicode cell grid and drawing buffers. It
 renders an explicit viewport onto a caller-selected surface and does not retain
 that destination across page flips. Standard-I/O routing is a separate explicit

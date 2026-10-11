@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <hpclang/console.h>
+#include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/input.h>
@@ -32,6 +33,42 @@ static int flush(void *context, unsigned stream)
 {
     struct reader *r = context;
     return hpclang_console_stdio_flush(r->console, stream);
+}
+
+struct line_session
+{
+    struct hpclang_console *console;
+    unsigned next, rejected, updates;
+};
+static int line_next(void *context, struct hpclang_keyboard_event *event)
+{
+    struct line_session *s = context;
+    static const unsigned keys[] = {HPCLANG_KEY_MINUS, HPCLANG_KEY_ENTER, HPCLANG_KEY_1,
+                                    HPCLANG_KEY_2, HPCLANG_KEY_ENTER};
+    if (s->next == sizeof(keys) / sizeof(keys[0])) {
+        errno = EIO;
+        return -1;
+    }
+    *event = (struct hpclang_keyboard_event){.type = HPCLANG_KEYBOARD_EVENT_DOWN,
+                                             .key = keys[s->next++]};
+    return 1;
+}
+static int line_accept(void *context, const struct hpclang_text_input *input)
+{
+    (void)context;
+    int64_t value;
+    return hpclang_text_input_parse_int64(input, &value) == 0 ? 0 : 1;
+}
+static int line_update(void *context, const struct hpclang_text_input *input, int result, int error)
+{
+    (void)result;
+    struct line_session *s = context;
+    ++s->updates;
+    s->rejected += error == EINVAL;
+    if (hpclang_console_clear(s->console) != 0 ||
+        hpclang_console_write(s->console, input->buffer, input->length) != 0)
+        return -1;
+    return hpclang_console_render(s->console, hpclang_display_surface(), 2, 2);
 }
 
 unsigned hpclang_e2e_console_test(void)
@@ -99,6 +136,24 @@ unsigned hpclang_e2e_console_test(void)
     reader.offset = 0;
     reader.cancel = 0;
     if (hpclang_stdio_bind(&callbacks) != 0 || getchar() != '1')
+        goto done;
+    result = 8;
+    struct line_session session = {.console = c};
+    struct hpclang_text_input_callbacks line_callbacks = {line_next, NULL, line_accept, line_update,
+                                                          &session};
+    if (hpclang_text_input_init(&input, edit, sizeof(edit)) != 0 ||
+        hpclang_text_input_run(&input, &line_callbacks) != HPCLANG_INPUT_ACCEPTED ||
+        strcmp(edit, "-12") != 0 || session.rejected != 1 || session.updates != 6 ||
+        hpclang_console_cell(c, 2, 0, &cp) != 0 || cp != '2')
+        goto done;
+    result = 9;
+    uint32_t model = hpclang_device_info()->model;
+    int hp39 = hpclang_device_info()->family == HPCLANG_FAMILY_HP39;
+    uint16_t a = hp39 ? HPCLANG_KEY_HP39_SIN : HPCLANG_KEY_F1;
+    uint16_t z = hp39 ? HPCLANG_KEY_HP39_NEGATE : HPCLANG_KEY_DIVIDE;
+    if (hpclang_text_alpha_lookup(model, a, 0, &cp) != 1 || cp != 'A' ||
+        hpclang_text_alpha_lookup(model, z, 1, &cp) != 1 || cp != 'z' ||
+        hpclang_text_alpha_lookup(model, HPCLANG_KEY_UNKNOWN, 0, &cp) != 0 || cp != 'z')
         goto done;
     result = 0;
 done:
