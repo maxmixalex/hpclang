@@ -40,6 +40,51 @@ def verify_ui_build_inheritance(root: Path) -> None:
         )
 
 
+def patch_directory_order(root: Path, args: argparse.Namespace) -> None:
+    """Give directory-backed cards reproducible FAT entries on every host."""
+    path = root / "src/s3c2410/block-vvfat.c"
+    shutil.copyfile(
+        args.headless_header.parent / "directory-order.h", path.parent / "directory-order.h"
+    )
+    replace_once(
+        path,
+        "#include <dirent.h>",
+        '#include <dirent.h>\n#include "directory-order.h"',
+        "directory ordering helper",
+    )
+    replace_once(
+        path,
+        "    DIR* dir = opendir( dirname );",
+        "    struct dirent** entries = NULL;\n    int count = scandir( dirname, &entries, NULL, hpclang_directory_compare );",
+        "directory snapshot",
+    )
+    replace_once(path, "    if ( !dir ) {", "    if ( count < 0 ) {", "directory snapshot error")
+    replace_once(
+        path,
+        "    while ( ( entry = readdir( dir ) ) ) {",
+        "    for ( int index = 0; index < count; ++index ) {\n        entry = entries[index];",
+        "ordered directory iteration",
+    )
+    replace_once(
+        path,
+        "            return -2;",
+        "            hpclang_directory_free( entries, count );\n            return -2;",
+        "directory error cleanup",
+    )
+    replace_once(
+        path,
+        "    closedir( dir );",
+        "    hpclang_directory_free( entries, count );",
+        "directory cleanup",
+    )
+    replace_once(
+        root / "Makefile",
+        "%.o: %.c",
+        "src/s3c2410/block-vvfat.o: src/s3c2410/directory-order.h\n\n%.o: %.c",
+        "directory helper dependency",
+    )
+
+
 def patch_universal_flash(root: Path) -> None:
     replace_once(
         root / "src" / "flash.c",
@@ -962,6 +1007,7 @@ def main() -> None:
     patch_execution_clock(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
+    patch_directory_order(root, args)
     patch_runtime_sram(root)
     patch_host_usbdev(root, args)
     patch_host_uart0(root)

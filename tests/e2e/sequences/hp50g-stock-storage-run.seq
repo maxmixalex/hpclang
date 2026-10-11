@@ -1,7 +1,7 @@
 # HP50g storage E2E launch through the original UI and ARMToolbox.
 # ZZHPDIR is present in the run-phase VVFAT root, so File Manager starts on
-# that directory. Move down through the volume label and HPCLANG.TST to select
-# HPCLANG.HP before following the normal copy/RCL/ARMToolbox choreography.
+# that directory. The directory-backed card has byte-sorted FAT entries;
+# move past the volume label to HPCLANG.HP, the first regular file.
 # Copy HPCLANG.HP from SD to HOME, recall the native object from File Manager,
 # return to the stack with HALT, then follow the hardware-verified library menu:
 # RS+LIB exposes ARMTo on F1, and ARMTo exposes PrRUN on F1.
@@ -13,7 +13,6 @@
 6900 tap enter
 7200 tap down
 7500 tap down
-7800 tap down
 8200 capture sd-payload
 8500 tap f2
 9700 capture copy-destination

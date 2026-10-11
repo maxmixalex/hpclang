@@ -15,6 +15,9 @@ function(hpclang_unit name)
 endfunction()
 
 if(UNIX)
+    hpclang_unit(directory_order test_directory_order.c)
+    target_include_directories(test_directory_order PRIVATE
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
     hpclang_unit(execution_clock test_execution_clock.c
         "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/execution-clock.c")
     target_include_directories(test_execution_clock PRIVATE

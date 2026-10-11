@@ -34,7 +34,7 @@ The current documentation is an internal Development site built with Zensical:
 
 - source: [`docs/`](docs/);
 - configuration: [`zensical.toml`](zensical.toml);
-- published site: <https://zyf722.github.io/hpclang/>;
+- published site: <https://maxmixalex.github.io/hpclang/>;
 - API progress/parity: [`docs/development/api-reference.md`](docs/development/api-reference.md), including HPGCC 1.0.3 / 1.1 / 2.0 SP2 / HPGCC3 comparison.
 
 Historical HPGCC source is used as implementation evidence only. A normal hpclang build does not depend on GCC, historical HPGCC runtime objects, or a replacement calculator ROM.
