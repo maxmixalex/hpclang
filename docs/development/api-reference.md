@@ -242,8 +242,8 @@ In addition to scripted events, its physical GPIO sequences produce `AaZZ2`
 and `ABcD2D2` through the real scanner and debounce queue. They cover single,
 held and locked Alpha, temporary lowercase, ordinary input and leaving a lock;
 captured text is compared with independently rendered literal references.
-The default editor adapter and symbol extension below are undergoing local
-validation; the complete punctuation/held-shift acceptance remains open.
+The default editor and symbol extension pass local six-model Direct checks and
+Stock checks on HP39g+, HP48gII, HP49g+ and HP50g. Formal CI remains pending.
 
 ### Default text editor and symbols
 
@@ -270,7 +270,7 @@ The default editor additionally inserts classic shifted bracket, quote, colon
 and guillemet pairs with the cursor inside. Insufficient space inserts neither
 half. HP39 bracket keys remain separate. This bounded single-line editor does
 not expand calculator commands or insert Stock's multiline program indentation.
-Physical symbol integration is undergoing local six-model validation.
+Physical symbol integration has the local Direct/Stock coverage described above.
 
 ### Bounded line sessions
 

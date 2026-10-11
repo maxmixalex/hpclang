@@ -572,7 +572,10 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
 
 Current `m7-parity-completion` work adds model-native Unicode symbol lookup,
 the default bounded keyboard editor, contrast mutation/restoration and owned
-LCD enable/disable. Local validation is in progress; these additions do not
+LCD enable/disable. All 67 host tests, six-model Direct System Services and
+Display, and Stock System Services/Display on HP39g+, HP48gII, HP49g+ and HP50g
+pass locally. Contrast and the corrected HP39 transport additionally pass
+Stock on HP39gs and HP40gs. Formal CI is pending; these additions do not
 close the remaining capability ledger, historical client or media-change goals.
 The HP39 transport regression now covers embedded CRLF bytes: all three Stock
 models pass the corrected newline transport locally. This is a byte-preservation

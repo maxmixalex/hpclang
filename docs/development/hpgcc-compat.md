@@ -231,7 +231,7 @@ The clean temporary setter now uses the corresponding KOS setter with readback,
 retains the original setting and restores it explicitly or during display/runtime
 cleanup. This supplies the ordinary application behavior of `kos_LCDSetContrast`
 and HPGCC3 `lcd_setcontrast` without exposing GPIO/DAC wiring. Local unit and
-six-model Direct checks pass; Stock acceptance is in progress. This establishes
+six-model Direct checks pass; local Stock checks cover all six models. This establishes
 setting ownership, not physical-panel luminance calibration.
 USB voltage detection is read-only and deliberately does not claim battery
 percentage or power-source selection. Capability discovery distinguishes model
