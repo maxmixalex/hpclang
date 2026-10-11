@@ -235,7 +235,7 @@ responsibility of the individual service call.
 Bounded UTF-8 editing and length-bounded message rendering provide the clean
 primitives for historical line-input/error helpers. Buffer ownership, cancellation
 and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
-`readint`/`readline` spelling and global stdio routing remain adapter/UI work.
+`readint`/`readline` spelling remain adapter/UI work. Explicit standard-stream routing is available through `hpclang/stdio.h`.
 
 ### Bounded numeric input
 
@@ -248,8 +248,8 @@ validation, cancellation or distinguishable conversion failures.
 
 | Historical capability | Clean equivalent / model and context | Source adapter | Validation |
 | --- | --- | --- | --- |
-| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Historical blocking `readint` and its narrower `int` range remain an adapter concern | Host exact-boundary/error/re-edit tests and ARM System Services probes; CI pending |
-| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | `readdouble` spelling, modal rendering and console event loop remain adapter/UI work | Host and ARM finite-subnormal, range and correction probes; CI pending |
+| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Historical blocking `readint` and its narrower `int` range remain an adapter concern | Host exact-boundary/error/re-edit tests and ARM System Services probes; CI accepted on `b92e2a7d` |
+| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | `readdouble` spelling, modal rendering and console event loop remain adapter/UI work | Host and ARM finite-subnormal, range and correction probes; CI accepted on `b92e2a7d` |
 
 The clean functions preserve the line and output on errors rather than silently
 accepting a numeric prefix. They do not implement Alpha-lock, a blocking console,
@@ -265,6 +265,22 @@ numbering. The application still supplies Alpha/Shift translation, its input
 event loop, and rendering/presentation policy; historical blocking `readint` and
 `readdouble` adapters remain to be built over these clean services. The existing
 file-backed stream implementation is not replaced.
+
+### Historical text-input policies
+
+The distributions do not establish one portable Alpha/Shift policy:
+
+| Source | Observed behavior | Remaining evidence / clean destination |
+| --- | --- | --- |
+| HPGCC 1.0.3 `sources/hplib/stdio/getchar.c` and `_gets.c` | The former contains an unfinished reader; the latter defines a reader using `keyb_getkey(1)` and a CR-terminated echo/backspace loop | Determine the selected build implementation before treating either definition as the shipped behavior |
+| HPGCC 1.1 and 2.0 `sources/hplib/stdio/getchar.c`, `gets.c` | Explicit HP49 character table, left-shift lowercase conversion, LF-terminated echo/backspace loop without a capacity argument | Model-specific text maps and bounded line input belong above the physical-keyboard core; the HP49 table does not prove HP39 support |
+| HPGCC3 `libs_workspace/hplib/stdio/getchar.c`, `gets.c` | The old console retains the HP49 table; `gets` dispatches by console type, with a separate grayscale GUI implementation | Validate old and GUI console paths separately; their declaration alone does not establish six-model behavior |
+
+Next acceptance must cover an explicit text-plane state, model-specific character
+mapping, editing/accept/cancel, bounded input and rendering through a complete
+keyboard-driven flow. The existing scripted standard-input E2E verifies stream
+routing, not Alpha-key translation. Historical blocking spellings remain M8
+adapter work; the usable clean input behavior remains an M7 requirement.
 
 ## File I/O and standard C I/O
 

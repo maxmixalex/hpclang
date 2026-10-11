@@ -141,7 +141,7 @@ Both services have host tests and accepted six-model Direct/Stock ARM E2E
 coverage in [M7.4](validation.md#m74-formal-acceptance).
 
 The numeric-input extension adds `hpclang_text_input_parse_int64()` and
-`hpclang_text_input_parse_double()` (implemented; CI acceptance pending). They
+`hpclang_text_input_parse_double()` (accepted on `b92e2a7d`). They
 validate the entire current line and write an output only on success. This lets
 an application reject an invalid Enter/accept attempt and continue editing the
 same buffer. Cancellation remains the application's decision.
