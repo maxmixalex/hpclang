@@ -62,7 +62,7 @@ static void mutation_context_test(void)
     boot.saturn_state = 1u;
     mutation_state(HPCLANG_CAPABILITY_SUPPORTED);
 }
-uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
+uint32_t hpclang_kos_query3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
 {
     assert(index == 13 && a == 0 && b == 0 && c == 0);
     return contrast;

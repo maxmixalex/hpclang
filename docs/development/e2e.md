@@ -29,6 +29,21 @@ image comparison at PASS, before runtime cleanup can restore Stock's buffer.
 CPU/MMU return and nonblank stable Stock output remain separate required gates.
 Emulator evidence does not measure physical-panel flicker, contrast or luminance.
 
+System Services uses a test-only physical-input mailbox: `KI` requests one
+electrical key transition and `KJ` acknowledges delivery. The guest obtains
+events from the real SDK scanner/debounce queue; the harness supplies neither
+characters nor SDK events. Duplicate edges and keys held at PASS fail the run.
+Frame 199 proves the initial screen is clear; frames 200/201 compare the input
+text with independently rendered literals for single/held and locked Alpha.
+The same protocol runs under Direct and Stock, with the ordinary strict return
+checks retained.
+
+The physical sequence also leaves pending keyboard interrupts before the
+contrast query. Stock's syscall dispatcher enables IRQ/FIQ internally, so the
+bounded query protects the interrupt-controller boundary, preserves source
+pending bits, and restores routing and masks. System Services checks those
+invariants; the LCD return gate catches unintended ROM wake/clock changes.
+
 The test tree has two layers. `tests/unit/` contains host-side `test_*.c`
 tests for pure implementation logic. `tests/e2e/` contains calculator-side
 HPC1 applications plus the harness data used to launch them through different

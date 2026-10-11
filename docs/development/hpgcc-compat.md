@@ -313,8 +313,10 @@ remain a distinct plane, not an alias for lowercase. Source-specific historical
 console policies are not copied into the physical keyboard service. Complete
 symbol lookup, the ready-made physical keyboard editor and historical blocking
 compatibility spellings remain separate unfinished work.
-Sticky/held Alpha, punctuation/symbol planes and complete interactive flows
-remain separate acceptance work.
+System Services now drives physical GPIO input through the native mode,
+editor and console for single/held and locked Alpha, with independent pixel
+references and strict return checks (awaiting CI). Punctuation/symbol planes
+and the complete ready-made interactive editor remain separate acceptance work.
 
 ## File I/O and standard C I/O
 

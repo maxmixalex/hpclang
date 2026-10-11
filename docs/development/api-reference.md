@@ -237,9 +237,12 @@ One-shot state is consumed by the key even if translation or insertion fails;
 retrying an edit must not feed the same physical event twice. Repeat timing
 remains the physical event service's configuration. Enter/ON are routed to the
 application, which owns accept/cancel and the next session's initialization.
-The scripted system-service test composes this layer with the bounded editor
-and console to produce `AaZZ2` on all models. It does not close the separate
-physical keyboard-to-text rendering acceptance requirement.
+System Services composes this layer with the bounded editor and console.
+In addition to scripted events, its physical GPIO sequences produce `AaZZ2`
+and `ABcD2D2` through the real scanner and debounce queue. They cover single,
+held and locked Alpha, temporary lowercase, ordinary input and leaving a lock;
+captured text is compared with independently rendered literal references.
+Full symbol lookup and a ready-made keyboard editor remain separate work.
 
 ### Bounded line sessions
 

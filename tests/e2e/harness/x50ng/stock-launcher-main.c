@@ -17,7 +17,9 @@
 #include "dialog-sequence.h"
 #include "stock-return-phase.h"
 #include "s3c2410/s3c2410_lcd.h"
+#include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
+#include "input-checkpoint.h"
 
 #define LCD_W 131
 #define KEY_HOLD_US 100000LL
@@ -65,6 +67,7 @@ struct state
     int require_object_phase;
     int payload_started;
     int payload_keyboard_scheduled;
+    uint64_t input_held;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
     int return_mapping_restored;
@@ -713,6 +716,13 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        int input = input_checkpoint(s->hdw, s->result_addr, value, &s->input_held);
+        if (input < 0) {
+            fail(s, "input-checkpoint");
+            return;
+        }
+        if (input > 0)
+            s->payload_started = 1;
         int checkpoint = frame_checkpoint(s->hdw, s->result_addr, value, s->lcd_height);
         if (checkpoint < 0) {
             fail(s, "frame-checkpoint");
@@ -742,6 +752,10 @@ static void monitor(void *arg)
          */
         if (!s->saw_pass && value == PASS_WORD &&
             (!s->require_object_phase || s->object_store_phase != 0u)) {
+            if (s->input_held) {
+                fail(s, "input-held-at-pass");
+                return;
+            }
             size_t keyboard_count =
                 sizeof(payload_keyboard_codes) / sizeof(payload_keyboard_codes[0]);
             s->saw_pass = 1;

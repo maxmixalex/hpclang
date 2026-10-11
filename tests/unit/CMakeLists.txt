@@ -22,6 +22,9 @@ if(UNIX)
         "${HPCLANG_ROOT}/tests/e2e/harness/x50ng/execution-clock.c")
     target_include_directories(test_execution_clock PRIVATE
         "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+    hpclang_unit(input_checkpoint test_input_checkpoint.c)
+    target_include_directories(test_input_checkpoint PRIVATE
+        "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 endif()
 
 hpclang_unit(softfloat test_softfloat.c "${HPCLANG_ROOT}/runtime/core/armv4t-softfloat.c")

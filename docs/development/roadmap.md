@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/maxmixalex/hpcl
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–g object/stack/directory services. M7.3h–j composite objects, HP39 Aplet persistence/Reset and native catalogs are implemented and locally validated, awaiting formal CI acceptance. M7.4 common system services are accepted. M7.5 display/runtime services are implemented and locally validated, awaiting formal CI; the final parity audit remains open; the individually reviewed native-port limitations retain implementation goals below.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–j object/stack/directory, composite-object, HP39 Aplet persistence/Reset and native-catalog services. M7.4 common system services and M7.5 display/runtime services are accepted. The final parity work remains open; the individually reviewed native-port limitations retain implementation goals below.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -489,6 +489,12 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     The scripted editor/console composition is additional integration coverage,
     not the still-required physical keyboard-to-text acceptance. Full symbol
     lookup and a ready-made keyboard editor remain open.
+  - Physical text integration added in `m7-physical-text-input`, awaiting CI:
+    acknowledged GPIO transitions pass through the SDK scanner/debounce queue,
+    native text mode, bounded editor and console. Single/held Alpha and a
+    separate model-native lock sequence have independent pixel references;
+    every injected key must be released before PASS. This extends the earlier
+    scripted coverage; full symbol lookup and a ready-made editor remain open.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

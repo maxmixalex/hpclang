@@ -161,8 +161,13 @@ uint32_t hpclang_e2e_system_test(void)
         return 0x7b;
 
     unsigned contrast, contrast_again;
+    uint32_t interrupt_mode = REG32(0x07100004);
+    uint32_t interrupt_mask = REG32(0x07100008);
+    uint32_t interrupt_pending = REG32(0x07100000);
     if (hpclang_display_contrast_read(&contrast) != 0 || contrast > 15 ||
-        hpclang_display_contrast_read(&contrast_again) != 0 || contrast != contrast_again)
+        hpclang_display_contrast_read(&contrast_again) != 0 || contrast != contrast_again ||
+        REG32(0x07100004) != interrupt_mode || REG32(0x07100008) != interrupt_mask ||
+        (REG32(0x07100000) & interrupt_pending) != interrupt_pending)
         return 0x79;
     uint32_t gpio_config = REG32(0x07a00050);
     uint32_t gpio_pullup = REG32(0x07a00058);

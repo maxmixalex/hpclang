@@ -7,6 +7,40 @@
 #include <hpclang/font.h>
 #include <hpclang/input.h>
 #include <hpclang/stdio.h>
+#include <hpclang/time.h>
+
+extern volatile uint32_t hpclang_e2e_result;
+extern const struct hpclang_font hpclang_system_font;
+
+static int mailbox(uint32_t request, uint32_t acknowledgement)
+{
+    hpclang_e2e_result = request;
+    uint64_t start = hpclang_time_monotonic_us();
+    while (hpclang_e2e_result != acknowledgement)
+        if (hpclang_time_monotonic_us() - start > 2000000u) {
+            errno = ETIMEDOUT;
+            return -1;
+        }
+    return 0;
+}
+static int physical_event(unsigned scan, unsigned down, struct hpclang_keyboard_event *event)
+{
+    unsigned argument = scan | (down << 8);
+    if (mailbox(0x4b490000u | argument, 0x4b4a0000u | argument))
+        return -1;
+    uint64_t start = hpclang_time_monotonic_us();
+    while (!hpclang_keyboard_event_poll(event))
+        if (hpclang_time_monotonic_us() - start > 2000000u) {
+            errno = ETIMEDOUT;
+            return -1;
+        }
+    if (event->scan_code != scan ||
+        event->type != (down ? HPCLANG_KEYBOARD_EVENT_DOWN : HPCLANG_KEYBOARD_EVENT_UP)) {
+        errno = EIO;
+        return -1;
+    }
+    return 0;
+}
 
 struct reader
 {
@@ -76,15 +110,33 @@ struct alpha_session
     struct line_session line;
     struct hpclang_text_mode mode;
     uint32_t model;
+    int physical;
+    int locks;
 };
 static int alpha_next(void *context, struct hpclang_keyboard_event *event)
 {
     struct alpha_session *s = context;
     int hp39 = s->model <= HPCLANG_MODEL_HP40GS;
+    if (s->locks) {
+        /* HP39 Notes exposes its lock as an application menu action. Classic
+         * models enter it by double Alpha. Both produce ABcD2D2, exercising a
+         * temporary lowercase letter, ordinary input, and leaving the lock. */
+        static const unsigned hp39_scans[] = {39, 28, 21, 59, 14, 7, 58, 19, 7, 39, 19, 6};
+        static const unsigned classic_scans[] = {57, 57, 35, 36, 58, 37, 38, 57, 19, 57, 38, 19, 6};
+        unsigned count = hp39 ? sizeof(hp39_scans) / sizeof(hp39_scans[0])
+                              : sizeof(classic_scans) / sizeof(classic_scans[0]);
+        unsigned index = s->line.next++;
+        if (index / 2 >= count) {
+            errno = EIO;
+            return -1;
+        }
+        unsigned scan = (hp39 ? hp39_scans : classic_scans)[index / 2];
+        return physical_event(scan, !(index & 1), event) ? -1 : 1;
+    }
     uint16_t a = hp39 ? HPCLANG_KEY_HP39_VARS : HPCLANG_KEY_F1;
     uint16_t z = hp39 ? HPCLANG_KEY_3 : HPCLANG_KEY_DIVIDE;
     uint16_t left = hp39 ? HPCLANG_KEY_HP39_SHIFT : HPCLANG_KEY_LEFT_SHIFT;
-    uint32_t left_bit = hp39 ? HPCLANG_KEYBOARD_MOD_SHIFT : HPCLANG_KEYBOARD_MOD_LEFT_SHIFT;
+    uint32_t left_bit = HPCLANG_KEYBOARD_MOD_SHIFT | (hp39 ? 0 : HPCLANG_KEYBOARD_MOD_LEFT_SHIFT);
     /* Scripted integration: single A, model-native lowercase a, held ZZ,
      * release, ordinary 2, accept. Physical event delivery has its own gate. */
 #define DOWN(k, m) {.key = (k), .type = HPCLANG_KEYBOARD_EVENT_DOWN, .modifiers = (m)}
@@ -118,13 +170,57 @@ static int alpha_next(void *context, struct hpclang_keyboard_event *event)
         errno = EIO;
         return -1;
     }
-    *event = events[s->line.next++];
+    unsigned index = s->line.next++;
+    if (s->physical) {
+        /* Independent electrical positions from the model keyboard diagrams.
+         * Only the emulator drives them; events come from the real SDK poller. */
+        unsigned alpha = hp39 ? 58 : 57, shift = hp39 ? 59 : 58;
+        unsigned letter_a = hp39 ? 28 : 35, letter_z = hp39 ? 12 : 2;
+        const unsigned scans[] = {alpha,
+                                  alpha,
+                                  letter_a,
+                                  letter_a,
+                                  hp39 ? shift : alpha,
+                                  hp39 ? shift : alpha,
+                                  hp39 ? alpha : shift,
+                                  hp39 ? alpha : shift,
+                                  letter_a,
+                                  letter_a,
+                                  alpha,
+                                  letter_z,
+                                  letter_z,
+                                  letter_z,
+                                  letter_z,
+                                  alpha,
+                                  19,
+                                  19,
+                                  6};
+        if (physical_event(scans[index], events[index].type == HPCLANG_KEYBOARD_EVENT_DOWN, event))
+            return -1;
+        if (event->key != events[index].key || event->modifiers != events[index].modifiers) {
+            errno = EIO;
+            return -1;
+        }
+    } else {
+        *event = events[index];
+    }
     return 1;
 }
 static int alpha_edit(void *context, struct hpclang_text_input *input,
                       const struct hpclang_keyboard_event *event)
 {
     struct alpha_session *s = context;
+    if (s->locks && s->model <= HPCLANG_MODEL_HP40GS && event->key == HPCLANG_KEY_F5) {
+        if (event->type == HPCLANG_KEYBOARD_EVENT_DOWN) {
+            struct hpclang_text_mode_status status;
+            if (hpclang_text_mode_get(&s->mode, &status))
+                return -1;
+            return hpclang_text_mode_set_lock(&s->mode, status.lock == HPCLANG_TEXT_UNLOCKED
+                                                            ? HPCLANG_TEXT_LOCK_UPPER
+                                                            : HPCLANG_TEXT_UNLOCKED);
+        }
+        return 0;
+    }
     enum hpclang_text_plane plane;
     int result = hpclang_text_mode_event(&s->mode, event, &plane);
     if (result <= 0)
@@ -154,7 +250,9 @@ static int alpha_update(void *context, const struct hpclang_text_input *input, i
 
 unsigned hpclang_e2e_console_test(void)
 {
-    const struct hpclang_font *font = hpclang_font_mini();
+    /* Direct RPL-family runs have no live Saturn font context. Use the same
+     * explicitly packaged font in both Direct and Stock. */
+    const struct hpclang_font *font = &hpclang_system_font;
     unsigned w = hpclang_font_advance(font), h = hpclang_font_height(font);
     struct hpclang_console *c = hpclang_console_create(8, 2, font);
     struct hpclang_surface *expected = hpclang_surface_create_mono(8 * w, 2 * h);
@@ -207,7 +305,7 @@ unsigned hpclang_e2e_console_test(void)
     clearerr(stdin);
     reader.cancel = 1;
     if (getchar() != EOF || !ferror(stdin) || feof(stdin) || errno != ECANCELED ||
-        fputs("!", stdout) == EOF || ferror(stdout))
+        fputs(HPCLANG_UI_TEXT("!"), stdout) == EOF || ferror(stdout))
         goto done;
     result = 7;
     clearerr(stdin);
@@ -224,8 +322,8 @@ unsigned hpclang_e2e_console_test(void)
                                                           &session};
     if (hpclang_text_input_init(&input, edit, sizeof(edit)) != 0 ||
         hpclang_text_input_run(&input, &line_callbacks) != HPCLANG_INPUT_ACCEPTED ||
-        strcmp(edit, "-12") != 0 || session.rejected != 1 || session.updates != 6 ||
-        hpclang_console_cell(c, 2, 0, &cp) != 0 || cp != '2')
+        strcmp(edit, HPCLANG_UI_TEXT("-12")) != 0 || session.rejected != 1 ||
+        session.updates != 6 || hpclang_console_cell(c, 2, 0, &cp) != 0 || cp != '2')
         goto done;
     result = 9;
     uint32_t model = hpclang_device_info()->model;
@@ -248,6 +346,58 @@ unsigned hpclang_e2e_console_test(void)
         hpclang_text_mode_get(&alpha.mode, &mode_status) != 0 ||
         mode_status.plane != HPCLANG_TEXT_PLAIN || mode_status.lock != HPCLANG_TEXT_UNLOCKED ||
         hpclang_console_cell(c, 4, 0, &cp) != 0 || cp != '2')
+        goto done;
+    result = 11;
+    /* Begin with released hardware, including the Stock launcher key. Capture
+     * the empty screen first so Stock knows the payload owns subsequent input. */
+    hpclang_surface_clear(screen, 0);
+    if (mailbox(0x465200c7u, 0x464b00c7u))
+        goto done;
+    struct hpclang_keyboard_state keys;
+    uint64_t start = hpclang_time_monotonic_us();
+    do {
+        hpclang_keyboard_read(&keys);
+        if (hpclang_time_monotonic_us() - start > 2000000u)
+            goto done;
+    } while (hpclang_keyboard_any_is_down(&keys));
+    hpclang_keyboard_events_set_timing(20000, 0, 0);
+    hpclang_keyboard_events_reset();
+    alpha = (struct alpha_session){.line = {.console = c}, .model = model, .physical = 1};
+    if (hpclang_text_mode_init(&alpha.mode, model) ||
+        hpclang_text_input_init(&input, edit, sizeof(edit)) ||
+        hpclang_text_input_run(&input, &alpha_callbacks) != HPCLANG_INPUT_ACCEPTED ||
+        strcmp(edit, "AaZZ2") != 0 || alpha.line.next != 19)
+        goto done;
+    struct hpclang_keyboard_event released;
+    enum hpclang_text_plane unused;
+    if (physical_event(6, 0, &released) ||
+        hpclang_text_mode_event(&alpha.mode, &released, &unused) != 0)
+        goto done;
+    hpclang_keyboard_read(&keys);
+    if (hpclang_keyboard_any_is_down(&keys))
+        goto done;
+    /* The reference comes from a literal, not from the edited buffer. The host
+     * compares both visible bands and rejects an all-blank capture. */
+    hpclang_surface_draw_text_n(screen, font, 2, 20, HPCLANG_UI_TEXT("AaZZ2"), 5, 255);
+    if (mailbox(0x465200c8u, 0x464b00c8u))
+        goto done;
+    result = 12;
+    hpclang_surface_clear(screen, 0);
+    alpha =
+        (struct alpha_session){.line = {.console = c}, .model = model, .physical = 1, .locks = 1};
+    if (hpclang_text_mode_init(&alpha.mode, model) ||
+        hpclang_text_input_init(&input, edit, sizeof(edit)) ||
+        hpclang_text_input_run(&input, &alpha_callbacks) != HPCLANG_INPUT_ACCEPTED ||
+        strcmp(edit, "ABcD2D2") != 0 || physical_event(6, 0, &released) ||
+        hpclang_text_mode_event(&alpha.mode, &released, &unused) != 0 ||
+        hpclang_text_mode_get(&alpha.mode, &mode_status) ||
+        mode_status.plane != HPCLANG_TEXT_PLAIN || mode_status.lock != HPCLANG_TEXT_UNLOCKED)
+        goto done;
+    hpclang_keyboard_read(&keys);
+    if (hpclang_keyboard_any_is_down(&keys))
+        goto done;
+    hpclang_surface_draw_text_n(screen, font, 2, 20, HPCLANG_UI_TEXT("ABcD2D2"), 7, 255);
+    if (mailbox(0x465200c9u, 0x464b00c9u))
         goto done;
     result = 0;
 done:

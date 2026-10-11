@@ -17,7 +17,9 @@
 #include "headless-ui-init.h"
 #include "lcd-quiescence.h"
 #include "s3c2410/s3c2410_lcd.h"
+#include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
+#include "input-checkpoint.h"
 #include "qemu/cpu-common.h"
 #include "qemu/exec-all.h"
 
@@ -152,6 +154,7 @@ struct e2e
     uint32_t result;
     int saw_pass;
     int payload_keyboard_scheduled;
+    uint64_t input_held;
     int returned;
     int failed;
     int lcd_height;
@@ -714,6 +717,10 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (input_checkpoint(s->hdw, s->result_addr, v, &s->input_held) < 0) {
+            fail(s, "input-checkpoint");
+            return;
+        }
         if (frame_checkpoint(s->hdw, s->result_addr, v, s->lcd_height) < 0) {
             fail(s, "frame-checkpoint");
             return;
@@ -724,6 +731,10 @@ static void monitor(void *arg)
                 return;
             }
         } else if (!s->saw_pass && v == PASS_WORD) {
+            if (s->input_held) {
+                fail(s, "input-held-at-pass");
+                return;
+            }
             s->result = v;
             s->saw_pass = 1;
             if (!capture_lcd(s->hdw, s->pass_pgm, s->lcd_height)) {
