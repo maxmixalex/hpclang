@@ -51,6 +51,8 @@ SECTIONS
         __fini_array_start = .;
         KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
         KEEP(*(.fini_array .dtors))
+        /* Picolibc places atexit dispatch in .fini_array_onexit. */
+        KEEP(*(.fini_array*))
         __fini_array_end = .;
 
         KEEP(*(.fini .fini.*))

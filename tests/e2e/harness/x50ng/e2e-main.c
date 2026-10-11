@@ -773,6 +773,15 @@ static void monitor(void *arg)
             fail(s, "clock-state");
             return;
         }
+        uint32_t cfg0, cfg1, control, count;
+        if (!guest_read32(s->hdw, TIMER_TCFG0_VA, &cfg0) ||
+            !guest_read32(s->hdw, TIMER_TCFG1_VA, &cfg1) ||
+            !guest_read32(s->hdw, TIMER_TCON_VA, &control) ||
+            !guest_read32(s->hdw, TIMER_TCNTB0_VA, &count) || cfg0 != s->stock_tcfg0 ||
+            cfg1 != s->stock_tcfg1 || control != s->stock_tcon || count != s->stock_tcntb0) {
+            fail(s, "timer-state");
+            return;
+        }
         s->lcd_state_diff = check_lcd_state(s);
         if (s->lcd_state_diff != 0u) {
             fail(s, "lcd-state");

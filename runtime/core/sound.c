@@ -25,6 +25,11 @@ int hpclang_sound_active(void)
     return saved.owned;
 }
 
+void hpclang_sound_restore(void)
+{
+    hpclang_sound_release(&bus, &saved);
+}
+
 int hpclang_sound_play(uint32_t frequency_hz, uint32_t duration_ms, hpclang_sound_cancel_fn cancel,
                        void *context)
 {

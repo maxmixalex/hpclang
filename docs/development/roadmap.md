@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**The existing M7.1/M7.2 acceptance remains valid for its tested scope. M7.3a–j object services, M7.4 common system services and M7.5 display/runtime services are accepted. Overall M7 remains open for the capability/evidence ledger, complete text/numeric/console behavior, media-change coverage and representative historical application flows listed below. Native Port 0/1/2 limitations remain individually approved follow-ups.**
+**The existing M7.1/M7.2 acceptance remains valid for its tested scope. M7.3a–j object services, M7.4 common system services and M7.5 display/runtime services are accepted. Text/numeric/console behavior, media-change handling and historical graphics/keyboard/file/object clients are now accepted through `7303a3d6`. Overall M7 remains open for final ledger acceptance and the timed-client, owned CPU power policy and ordinary application termination batch below. Native Port 0/1/2, whole-calculator reset and reliable hardware serial-number discovery remain individually approved follow-ups.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -565,8 +565,11 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
   - Port 0 (main RAM), Port 1 (extended RAM) and Port 2 (Flash): the maintainer
     accepted each port's current lack of read/write services as an M7.3j
     limitation on 2026-10-04. This does not mark port services implemented.
-- [ ] Validate genuine historical application flows using the four HPGCC
+- [x] Validate genuine historical application flows using the four HPGCC
   generations and HP39 Aplet template, not only scalar API probes.
+  - Accepted on `6a7f9a28`: four-generation object/stack clients and HP39
+    multi-invocation Aplet persistence/Reset/composite lifecycles. The broader
+    time/power/termination batch has its separate acceptance gate below.
 
 ### Native port services — retained follow-up
 
@@ -608,6 +611,22 @@ The detailed per-capability evidence is in
 
 Additional source-confirmed application capabilities still to close:
 
+- [ ] Complete ordinary application termination: returning from `main` and
+  `exit()` must execute registered cleanup and return to the calculator;
+  `_Exit()` must skip language callbacks while restoring SDK-owned hardware.
+  - Implemented with a shared launcher return boundary and the picolibc
+    finalizer section retained by the linker. Local host tests cover nested
+    calls, constructor termination and exact status propagation; ARM tests
+    check actual C callbacks, C++ destruction and owned hardware restoration.
+    Six-model validation is in progress.
+- [ ] Retain whole-calculator reset (`kos_Reset`) as a subsequent research
+  goal. The historical entry is reset/panic recovery, not ordinary app exit.
+  The maintainer approved this as nonblocking for M7 on 2026-10-12.
+- [ ] Retain reliable hardware serial-number discovery as a subsequent
+  research goal. All four HPGCC header versions warn that
+  `kos_getSerialNumber` returns questionable data; a declaration alone is not
+  evidence of usable identification. The maintainer approved this as
+  nonblocking for M7 on 2026-10-12. SD CID remains a separate implemented API.
 - [x] Expose stable SD card identity so an application can distinguish the same
   card reinserted from a replacement. HPGCC3 `FSVolumePresent` actually compares
   CID; removal detection alone does not provide this information. Keep stale

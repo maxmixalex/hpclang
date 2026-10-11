@@ -869,8 +869,8 @@ Direct harness checks clock registers and LCD configuration before restoring
 its own saved Stock state; the application deliberately leaves economy mode
 active at return. HP49g+/HP50g Direct and Stock file operations also pass in
 economy mode, followed by card replacement and stale-handle checks. Stock
-System Services and HP39 native-catalog coexistence are still being validated;
-classic object flows pass on HP48gII, HP49g+ and HP50g.
+System Services remains under validation; native-object coexistence now passes
+on all six Stock models, including HP39 catalogs and classic composite flows.
 
 The comprehensive System Services payload has less available HP39 Stock heap
 than the dedicated Display payload. Its clock/display release-order checks
@@ -883,3 +883,29 @@ rather than a timestamp sampled before that timer was started.
 Emulator timing now preserves outstanding PWM counter ticks when PCLK changes.
 Host tests cover scaling, rounding and saturation. These checks establish clock
 selection and state restoration; they do not measure physical battery savings.
+
+### M7 application termination — local validation in progress
+
+Normal `main` return and `exit` share picolibc callback dispatch before the
+runtime returns through its launcher boundary. `_Exit` skips that dispatch.
+The linker now retains `.fini_array_onexit`, which picolibc uses for registered
+C callbacks and C++ static destruction. Runtime cleanup also releases an
+active sound session, including termination from a cancellation callback,
+before restoring display, power policy and storage ownership.
+
+All 71 host tests pass, including nested/constructor termination, zero and
+extreme exit statuses, and cleanup order. Runtime, System Services and Display
+pass Direct on all six models. Runtime requires both reverse-order C callbacks
+and its C++ destructor before publishing PASS; Display rejects callback or
+destructor execution on `_Exit`. System Services exits from an active sound
+callback while in economy mode, and the harness checks clock, PWM and LCD
+configuration before restoring its own saved host. HP49g+/HP50g Direct Storage
+also passes with media replacement enabled. Stock validation is running.
+Changed-source Clang analysis, formatting and strict docs pass.
+
+An earlier HP39gs System Services payload failed in the timed-client phase.
+Saved MMU/RAM inspection shows `errno=ENOMEM` and only 16 KiB of writable
+mapping including the boot page and 8 KiB stack. The benchmark now explicitly
+packages printable ASCII, its actual output repertoire, reducing initialized
+image size from 65,328 to 59,848 bytes. Stock revalidation checks this smaller
+payload without reducing stack bounds or weakening the prime/pixel assertions.

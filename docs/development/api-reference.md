@@ -443,12 +443,27 @@ its own screen disabled.
 
 The runtime cleans framebuffer cache lines before DMA reads, restores only
 writable LCD configuration, and never forces an originally disabled LCD on.
-`end` runs after normal `main`/destructor completion, and before `_exit` halts.
+`end` runs during runtime cleanup after normal `main`/destructor completion,
+or when an application terminates through `exit()` or `_Exit()`.
 It does not recover from arbitrary CPU faults or power loss. Frame waiting reports
 disabled output, timeout or a failed/stalled clock instead of spinning forever.
 Flipping stops and restarts DMA to discard FIFO prefetch. Emulator scanout tests
 prove pixel packing and state restoration; real-panel flicker, brightness and
 electrical timing still require hardware measurement.
+
+### Application termination
+
+Returning from `main` and calling ordinary `exit(status)` run registered
+`atexit` callbacks and C++ static-object destructors before returning through
+the launcher. `_Exit(status)` skips those callbacks and destructors. Both paths
+release owned sound, display, CPU power policy and storage state; neither
+resets the calculator. Exit status is preserved at the runtime/launcher
+boundary, although the calculator UI need not display it. Calls from a sound
+cancellation callback also release the active PWM resources.
+
+This behavior is implemented and under local six-model validation. It does
+not recover from arbitrary CPU faults, reset the whole calculator or guarantee
+completion after power loss.
 
 ## Fonts and text
 
@@ -655,7 +670,7 @@ HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented hel
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
 | arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
 | blocking wait | `keyb_waitKeyPressed` | ◐ Can be built by polling event/time services; no canonical blocking helper yet. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Physical DOWN/UP/REPEAT exists; historical key-plane/text translation does not. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Physical events, model-native text planes and bounded editing are implemented; historical return-code adapters remain M8. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 
 ## Time, system and machine control
@@ -665,13 +680,13 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
 | elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Monotonic microseconds + explicit delay; source adapter absent. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | 🧪 Civil read/set/conversion and computed weekday; historical source adapters remain pending. |
-| clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✕ canonical app API unless a real generic policy use case appears. |
+| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; historical source adapters remain pending. |
+| clock speed | `sys_slowOn/off`, `sys_clksave/restore` | 🧪 Typed HOST/ECONOMY policy preserves PLL/bus setup and restores borrowed clocks; local validation in progress. Historical raw register interfaces remain backend details. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
 | virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
 | physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ raw application API; display sessions own and publish validated DMA buffers internally. |
-| tone/beep | `sys_playTone*`, `kos_beep` | 🧪 Clean PWM playback and cancellation; source adapters absent. |
+| tone/beep | `sys_playTone*`, `kos_beep` | ✅ Clean PWM playback and cancellation, accepted on `6a7f9a28`; source adapters absent. |
 
 ## Files, stdio and storage
 

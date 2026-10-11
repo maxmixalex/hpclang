@@ -13,6 +13,13 @@ volatile unsigned hpclang_display_failure;
 static uint32_t baseline[9];
 static const unsigned offsets[] = {0, 1, 2, 4, 5, 6, 7, 10, 19};
 
+__attribute__((destructor)) static void skipped_on_immediate_exit(void)
+{
+    hpclang_e2e_result = 0x46410072u;
+    for (;;)
+        __asm__ volatile("nop");
+}
+
 static uint32_t reg(unsigned i)
 {
     uint32_t value = ((volatile uint32_t *)0x07300000)[offsets[i]];
@@ -107,6 +114,8 @@ int main(void)
 {
     hpclang_e2e_result = 0x4f530001;
     unsigned failure = checks();
+    if (!failure && atexit(skipped_on_immediate_exit))
+        failure = 72;
     if (!failure) {
         unsigned graphics = hpclang_hpg_graphics_witness(NULL);
         if (graphics)
@@ -137,5 +146,7 @@ int main(void)
     hpclang_delay_us(100000);
     /* Deliberately leave the last session active: runtime shutdown must restore
      * Stock before releasing its allocations and returning to the launcher. */
-    return 0;
+    /* _Exit skips both callbacks and static finalizers, but must still release
+     * hpclang's borrowed display before returning through the launcher. */
+    _Exit(0);
 }

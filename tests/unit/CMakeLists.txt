@@ -405,3 +405,13 @@ target_include_directories(test_power_clock PRIVATE "${HPCLANG_ROOT}/runtime/cor
 
 hpclang_unit(timer_clock test_timer_clock.c)
 target_include_directories(test_timer_clock PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+# Rename only the application/libc boundary, keeping the real runtime control
+# transfer and cleanup logic while the unit executable uses the host libc.
+add_library(runtime_exit_fixture OBJECT "${HPCLANG_ROOT}/runtime/core/runtime.c")
+target_include_directories(runtime_exit_fixture PRIVATE "${HPCLANG_ROOT}/include")
+target_compile_options(runtime_exit_fixture PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(runtime_exit_fixture PRIVATE
+    main=fixture_main exit=fixture_exit _exit=fixture_immediate_exit)
+hpclang_unit(runtime_exit test_runtime_exit.c $<TARGET_OBJECTS:runtime_exit_fixture>)
+target_include_directories(test_runtime_exit PRIVATE "${HPCLANG_ROOT}/include")

@@ -1,8 +1,6 @@
 #include <stdio.h>
-#include <hpclang/display.h>
 #include <hpclang/stdio.h>
 #include "../core/stdio-routing.h"
-#include "../core/clock-internal.h"
 
 static int console_putc(char c, FILE *stream)
 {
@@ -40,13 +38,4 @@ void hpclang_stdio_clear_streams(void)
     input_stream = (FILE)FDEV_SETUP_STREAM(NULL, console_getc, NULL, _FDEV_SETUP_READ);
     output_stream = (FILE)FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
     error_stream = (FILE)FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
-}
-
-__attribute__((noreturn)) void _exit(int status)
-{
-    (void)status;
-    hpclang_display_end();
-    hpclang_power_restore();
-    for (;;)
-        ;
 }

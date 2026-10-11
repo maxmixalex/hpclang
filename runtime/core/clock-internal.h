@@ -11,5 +11,6 @@ struct hpclang_clock_epoch
 int hpclang_time_clock_prepare(struct hpclang_clock_epoch *epoch);
 void hpclang_time_clock_commit(const struct hpclang_clock_epoch *epoch);
 int hpclang_sound_active(void);
+void hpclang_sound_restore(void);
 void hpclang_power_restore(void);
 #endif

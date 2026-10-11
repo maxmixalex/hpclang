@@ -1056,6 +1056,35 @@ static void hold_failure_result(void)
         __asm__ volatile("nop");
 }
 
+static unsigned exit_checks_ready, exit_checks_seen;
+
+void hpclang_e2e_exit_event(unsigned event)
+{
+    if (!exit_checks_ready)
+        return;
+    if ((exit_checks_seen & event) || (event == 1u && !(exit_checks_seen & 2u)) ||
+        (event == 2u && (exit_checks_seen & 1u))) {
+        hpclang_e2e_result = 0x46410013u;
+        hold_failure_result();
+    }
+    exit_checks_seen |= event;
+    if (exit_checks_seen == 7u) {
+        /* Both reverse-order C callbacks and the C++ global destructor must
+         * run before success is visible. Their relative C/C++ order is free. */
+        hpclang_e2e_result = 0x50415353u;
+        hold_result();
+    }
+}
+
+static void exit_first(void)
+{
+    hpclang_e2e_exit_event(1u);
+}
+static void exit_second(void)
+{
+    hpclang_e2e_exit_event(2u);
+}
+
 static int finish(uint32_t failure, uint32_t model)
 {
     (void)model;
@@ -1071,9 +1100,12 @@ static int finish(uint32_t failure, uint32_t model)
 #ifdef HPCLANG_E2E_WAIT_FOR_ENTER
         text(surface, 39, 40, "ENTER TO EXIT");
 #endif
-        hpclang_e2e_result = 0x50415353u;
-        hold_result();
-        return 0;
+        if (atexit(exit_first) || atexit(exit_second)) {
+            failure = 0x13u;
+        } else {
+            exit_checks_ready = 1u;
+            return 0;
+        }
     }
 
 #ifdef HPCLANG_E2E_KEYBOARD

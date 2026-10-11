@@ -17,12 +17,17 @@ extern "C" const struct hpclang_font hpclang_e2e_ui_font;
 static const char hpclang_e2e_ui_probe[] = HPCLANG_UI_TEXT("Hp");
 
 volatile int hpclang_e2e_cxx_ctor_probe;
+extern "C" void hpclang_e2e_exit_event(unsigned event);
 
 struct hpclang_e2e_probe
 {
     hpclang_e2e_probe()
     {
         hpclang_e2e_cxx_ctor_probe = 42;
+    }
+    ~hpclang_e2e_probe()
+    {
+        hpclang_e2e_exit_event(4u);
     }
 };
 static hpclang_e2e_probe hpclang_e2e_global_probe;
