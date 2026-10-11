@@ -211,9 +211,11 @@ int hpclang_s3c2410_sdio_card_open(struct hpclang_s3c2410_sdio_card *card,
     }
     card->high_capacity = (version2 && (ocr & (UINT32_C(1) << 30)) != 0u) ? 1u : 0u;
 
-    rc = send_command(card, 2u, 0u, HPCLANG_SDIO_RESPONSE_LONG, 0, 1, NULL);
+    rc = send_command(card, 2u, 0u, HPCLANG_SDIO_RESPONSE_LONG, 0, 1, &response);
     if (rc != HPCLANG_SDIO_OK)
         goto fail;
+    for (unsigned i = 0; i < sizeof card->cid; ++i)
+        card->cid[i] = (uint8_t)(response.response[i / 4u] >> (24u - 8u * (i % 4u)));
 
     rc = send_command(card, 3u, 0u, HPCLANG_SDIO_RESPONSE_SHORT, 0, 1, &response);
     if (rc != HPCLANG_SDIO_OK)

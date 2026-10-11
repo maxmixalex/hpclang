@@ -773,6 +773,24 @@ int hpclang_stream_volume_count(unsigned *count)
     return 0;
 }
 
+int hpclang_stream_media_identity_query(struct hpclang_stream_media_identity *identity)
+{
+    if (!identity) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (namespace_acquire())
+        return -1;
+    struct hpclang_stream_media_identity result = {
+        .size = sizeof result,
+        .version = HPCLANG_STREAM_MEDIA_IDENTITY_VERSION,
+    };
+    if (hpclang_hp4950_fatfs_card_identity(result.cid))
+        return -1;
+    *identity = result;
+    return 0;
+}
+
 int hpclang_stream_volume_query(unsigned index, struct hpclang_stream_volume_info *info)
 {
     if (!info) {

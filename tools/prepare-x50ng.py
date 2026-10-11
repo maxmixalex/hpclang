@@ -958,6 +958,42 @@ def patch_lcd_scanout(root: Path) -> None:
     )
 
 
+def patch_sd_card_identity(root: Path) -> None:
+    """Keep a virtual card's serial tied to its backing file, not its contents."""
+    path = root / "src/s3c2410/s3c2410_sdi.c"
+    replace_once(
+        path,
+        "    int card_state;",
+        "    int card_state;\n    uint32_t card_serial;",
+        "SD media serial storage",
+    )
+    replace_once(
+        path,
+        """                        sdi->sdirsp2 = 0x34011234;
+                        sdi->sdirsp3 = 0x567813ff;""",
+        """                        sdi->sdirsp2 = 0x34010000u | (sdi->card_serial >> 16);
+                        sdi->sdirsp3 = (sdi->card_serial << 16) | 0x13ffu;""",
+        "SD CID serial response",
+    )
+    replace_once(
+        path,
+        """    if ( strcmp( filename, "" ) && ( stat( filename, &st ) == 0 ) ) {
+        if ( S_ISDIR( st.st_mode ) ) {""",
+        """    if ( strcmp( filename, "" ) && ( stat( filename, &st ) == 0 ) ) {
+        /* A raw image or directory represents one physical virtual card.
+         * Writes, renames and reinsertion retain its identity; replacing the
+         * backing inode represents another card. Do not hash mutable FAT data. */
+        uint64_t identity[2] = {(uint64_t)st.st_dev, (uint64_t)st.st_ino};
+        uint32_t serial = 2166136261u;
+        for (unsigned word = 0; word < 2; ++word)
+            for (unsigned byte = 0; byte < 8; ++byte)
+                serial = (serial ^ (uint8_t)(identity[word] >> (byte * 8))) * 16777619u;
+        sdi->card_serial = serial;
+        if ( S_ISDIR( st.st_mode ) ) {""",
+        "SD backing-media identity",
+    )
+
+
 def patch_execution_clock(root: Path, args: argparse.Namespace) -> None:
     """Keep headless guest timers and input on CPU time plus intentional idle."""
     for name in ("execution-clock.c", "execution-clock.h"):
@@ -1018,6 +1054,7 @@ def main() -> None:
     patch_optional_state_logging(root)
     patch_key_observation(root)
     patch_lcd_scanout(root)
+    patch_sd_card_identity(root)
 
 
 if __name__ == "__main__":

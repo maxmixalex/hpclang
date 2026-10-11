@@ -599,6 +599,12 @@ Additional source-confirmed application capabilities still to close:
   card reinserted from a replacement. HPGCC3 `FSVolumePresent` actually compares
   CID; removal detection alone does not provide this information. Keep stale
   handles invalid even if the same card returns.
+  - Implemented through `hpclang_stream_media_identity_query`: the SD driver
+    retains the card's CID and returns it through an owned versioned snapshot.
+    All 68 host tests, six-model Direct Storage and HP49g+/HP50g Stock Storage
+    pass locally, including A→B→A CID comparisons and stale-handle rejection.
+    The emulator's serial follows its backing inode, not mutable file contents.
+    Formal CI remains pending; historical `FS_CHANGED` spelling is adapter work.
 - [ ] Review and provide safe CPU performance/power policy for the ordinary
   application behavior behind `sys_slowOn/sys_slowOff`. Historical benchmarks,
   games and interactive examples use this to change speed or reduce power;

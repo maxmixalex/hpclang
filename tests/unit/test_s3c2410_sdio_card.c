@@ -64,6 +64,12 @@ static void fake_command(struct fake_sdi *fake, uint32_t control)
     memset(fake->response, 0, sizeof(fake->response));
 
     switch (command) {
+    case 2u:
+        fake->response[0] = UINT32_C(0x10234567);
+        fake->response[1] = UINT32_C(0x89abcdef);
+        fake->response[2] = UINT32_C(0xfedcba98);
+        fake->response[3] = UINT32_C(0x76543211);
+        break;
     case 8u:
         if (fake->high_capacity) {
             fake->response[0] = UINT32_C(0x1aa);
@@ -198,6 +204,10 @@ static int exercise_card(int high_capacity)
     if (hpclang_s3c2410_sdio_card_open(&card, &bus, 66000000u) != HPCLANG_SDIO_OK)
         return 0;
     if (card.rca != UINT32_C(0x1234) || card.high_capacity != (uint8_t)(high_capacity != 0))
+        return 0;
+    static const uint8_t cid[16] = {0x10, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+                                    0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x11};
+    if (memcmp(card.cid, cid, sizeof cid))
         return 0;
     if ((!high_capacity && card.sector_count != UINT32_C(2097152)) ||
         (high_capacity && card.sector_count != UINT32_C(4096)))

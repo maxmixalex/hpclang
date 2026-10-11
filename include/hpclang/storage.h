@@ -14,6 +14,7 @@ extern "C"
 #define HPCLANG_STREAM_NAME_CAPACITY 256u
 #define HPCLANG_STREAM_VOLUME_INFO_VERSION 1u
 #define HPCLANG_STREAM_VOLUME_LIMIT 4u
+#define HPCLANG_STREAM_MEDIA_IDENTITY_VERSION 1u
 
     enum hpclang_stream_path_type
     {
@@ -143,6 +144,23 @@ extern "C"
 
     int hpclang_stream_volume_count(unsigned *count);
     int hpclang_stream_volume_query(unsigned index, struct hpclang_stream_volume_info *info);
+
+    /* Identity of the physical SD card underlying every mounted FAT volume.
+     * cid is the 128-bit card identification register, most significant byte
+     * first. Compare all 16 bytes to recognize a returning card; this is not a
+     * filesystem content/version check or a cryptographic identity. A matching
+     * CID never makes old handles valid again after removal.
+     * Query acquires/remounts the same namespace as volume discovery. Requires
+     * present, readable FAT media; other models return ENOSYS. The output is
+     * unchanged on failure, including EFAULT for a null pointer. */
+    struct hpclang_stream_media_identity
+    {
+        uint32_t size;
+        uint32_t version;
+        uint8_t cid[16];
+    };
+
+    int hpclang_stream_media_identity_query(struct hpclang_stream_media_identity *identity);
 
     /*
      * These services address the HP49g+/HP50g SD-card FAT volume. HOME/Port 0,

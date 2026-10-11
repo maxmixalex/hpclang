@@ -27,6 +27,7 @@ static int inserted_media;
 static int initialized_media;
 static unsigned media_writes;
 static unsigned controller_acquires;
+static uint8_t card_identity = 0x37;
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 
 const struct hpclang_device_info *hpclang_device_info(void)
@@ -48,6 +49,12 @@ int hpclang_hp4950_fatfs_controller_acquire(int read_only)
 }
 void hpclang_hp4950_fatfs_controller_release(void)
 {
+}
+int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16])
+{
+    assert(inserted_media && initialized_media);
+    memset(cid, card_identity, 16);
+    return 0;
 }
 uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
 {
@@ -214,9 +221,18 @@ int main(void)
     CHECK(hpclang_namespace_stock_active());
     CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == -1 && errno == ENODEV);
     CHECK(controller_acquires == 0 && hpclang_namespace_stock_active());
+    struct hpclang_stream_media_identity original = {.size = 99}, observed;
+    CHECK(hpclang_stream_media_identity_query(&original) == -1 && errno == ENODEV);
+    CHECK(original.size == 99 && controller_acquires == 0);
     inserted_media = 1;
     CHECK(hpclang_namespace_path_query("STAMP.TXT", &info) == 0);
     CHECK(controller_acquires == 1 && !hpclang_namespace_stock_active());
+    CHECK(hpclang_stream_media_identity_query(&original) == 0);
+    CHECK(original.size == sizeof original &&
+          original.version == HPCLANG_STREAM_MEDIA_IDENTITY_VERSION);
+    CHECK(original.cid[0] == 0x37 && original.cid[15] == 0x37);
+    CHECK(hpclang_stream_media_identity_query(&observed) == 0 &&
+          !memcmp(original.cid, observed.cid, sizeof original.cid));
     CHECK(info.time_validity == 7u && info.created.year == 2020 && info.created.day == 29);
     CHECK(info.created.hour == 12 && info.created.minute == 34 && info.created.second == 56);
     CHECK(info.last_accessed.year == 2021 && info.last_accessed.month == 4 &&
@@ -270,6 +286,8 @@ int main(void)
     CHECK(old_directory != NULL);
     unsigned before_removal = media_writes;
     inserted_media = 0;
+    CHECK(hpclang_stream_media_identity_query(&observed) == -1 && errno == ENODEV);
+    CHECK(!memcmp(original.cid, observed.cid, sizeof original.cid));
     char old_byte = '?';
     CHECK(hpclang_namespace_read(fd, &old_byte, 1) == -1 && errno == EBADF);
     CHECK(old_byte == '?');
@@ -282,6 +300,9 @@ int main(void)
     memcpy(replacement_data, "xyz", 3);
     inserted_media = 1;
     int fresh = hpclang_namespace_open("NEW.TXT", O_RDWR);
+    card_identity = 0x58;
+    CHECK(hpclang_stream_media_identity_query(&observed) == 0 && observed.cid[0] == 0x58);
+    CHECK(memcmp(original.cid, observed.cid, sizeof original.cid) != 0);
     CHECK(fresh >= 0 && fresh != fd);
     char persisted[3];
     CHECK(hpclang_namespace_read(fresh, persisted, sizeof persisted) == 3);
@@ -303,6 +324,10 @@ int main(void)
     hpclang_storage_shutdown();
     CHECK(partition_checks() == EXIT_SUCCESS);
     device.family = HPCLANG_FAMILY_HP39;
+    struct hpclang_stream_media_identity identity = {.size = 123};
+    CHECK(hpclang_stream_media_identity_query(NULL) == -1 && errno == EFAULT);
+    CHECK(hpclang_stream_media_identity_query(&identity) == -1 && errno == ENOSYS);
+    CHECK(identity.size == 123);
     CHECK(hpclang_namespace_path_set_attributes("STAMP.TXT", 0, hidden) < 0 && errno == ENOSYS);
     return EXIT_SUCCESS;
 }

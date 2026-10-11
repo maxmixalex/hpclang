@@ -21,6 +21,7 @@ extern "C"
         uint32_t pclk_hz;
         uint32_t rca;
         uint32_t sector_count;
+        uint8_t cid[16];
         uint8_t high_capacity;
         uint8_t initialized;
     };

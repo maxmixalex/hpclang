@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 #include "ff.h"
@@ -63,6 +64,7 @@ int hpclang_s3c2410_sdio_card_open(struct hpclang_s3c2410_sdio_card *card,
     ++opens;
     card->initialized = 1;
     card->sector_count = 32;
+    memset(card->cid, (int)opens, sizeof card->cid);
     media_event |= remove_during_open;
     return HPCLANG_SDIO_OK;
 }
@@ -103,6 +105,9 @@ int main(void)
     assert(disk_status(0) == STA_NOINIT && queries == 0);
     assert(hpclang_hp4950_fatfs_controller_acquire(0) == 0);
     assert(disk_initialize(0) == 0 && opens == 1);
+    uint8_t cid[16];
+    assert(hpclang_hp4950_fatfs_card_identity(NULL) == -1 && errno == EFAULT);
+    assert(hpclang_hp4950_fatfs_card_identity(cid) == 0 && cid[0] == 1 && cid[15] == 1);
     read_only = 1;
     assert(disk_status(0) == STA_PROTECT);
     assert(disk_write(0, buffer, 0, 1) == RES_WRPRT && writes == 0);
@@ -110,12 +115,15 @@ int main(void)
     remove_after_read = 1;
     assert(disk_read(0, buffer, 0, 2) == RES_NOTRDY && reads == 1 && closes == 1);
     assert(disk_status(0) == (STA_NOINIT | STA_NODISK));
+    assert(hpclang_hp4950_fatfs_card_identity(cid) == -1 && errno == ENODEV);
+    assert(cid[0] == 1 && cid[15] == 1);
     assert(disk_initialize(0) & STA_NOINIT);
     assert(opens == 1);
     present = 1;
     remove_after_read = 0;
     assert(disk_status(0) == STA_NOINIT);
     assert(disk_initialize(0) == 0 && opens == 2);
+    assert(hpclang_hp4950_fatfs_card_identity(cid) == 0 && cid[0] == 2 && cid[15] == 2);
     protect_after_write = 1;
     assert(disk_write(0, buffer, 0, 2) == RES_WRPRT && writes == 1);
     protect_after_write = read_only = 0;

@@ -517,6 +517,7 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
 | `hpclang_stream_volume_count()` | Local validation complete; CI pending | Number of usable FAT primary partitions, or one for an unpartitioned FAT card. Acquires the same SD lease as file I/O. |
 | `hpclang_stream_volume_query()` | Local validation complete; CI pending | Versioned logical index, actual MBR slot (1–4, or 0 for unpartitioned media), starting sector, and per-volume space/media information. |
+| `hpclang_stream_media_identity_query()` | Implemented; acceptance in progress | Versioned snapshot of the physical SD card's 16-byte CID, most significant byte first. Compare CID bytes to recognize the same card after reinsertion; this never revives old handles. Requires readable FAT media and uses the same owned namespace. Failure leaves the output unchanged. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
 Unqualified paths and `/` use the first usable FAT volume. `N:/path` explicitly

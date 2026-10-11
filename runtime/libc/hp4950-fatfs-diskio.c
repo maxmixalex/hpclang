@@ -1,5 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <errno.h>
+#include <string.h>
 
 #include "../core/datetime-internal.h"
 
@@ -178,6 +180,20 @@ DSTATUS disk_status(BYTE pdrv)
     if (pdrv != 0u)
         return STA_NOINIT;
     return refresh_media(NULL);
+}
+
+int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16])
+{
+    if (!cid) {
+        errno = EFAULT;
+        return -1;
+    }
+    if (refresh_media(NULL) & STA_NOINIT) {
+        errno = ENODEV;
+        return -1;
+    }
+    memcpy(cid, state.card.cid, sizeof state.card.cid);
+    return 0;
 }
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)

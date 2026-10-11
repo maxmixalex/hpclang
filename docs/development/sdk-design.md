@@ -211,6 +211,16 @@ The selected FAT baseline is upstream FatFs R0.16 with official patch-1 and patc
 
 The internal HP49g+/50g HOME/Port 0, Port 1 and Port 2 stores are **not FAT volumes**. They hold calculator/RPL objects and therefore belong to the typed-object service below rather than to `FILE *` or FatFs.
 
+`hpclang_stream_media_identity_query()` returns an owned snapshot of the physical
+card's CID through the same mounted namespace. Applications can compare CID
+bytes across reinsertion without relying on a partition index or mutable FAT
+serial/content. Every partition on a card has the same card identity. Matching
+identity does not revive old file or directory objects, and failure leaves the
+caller output unchanged. The emulator assigns a stable serial to each backing
+file/directory inode, so ordinary writes preserve identity and A→B→A replacement
+tests exercise different-card and returning-card observations independently of
+stale-handle checks. Physical CID is not a cryptographic authentication token.
+
 ### Calculator objects
 
 HP39gs/40gs have typed native calculator objects, but Stock does not present them as one HOME-like directory namespace. The internal model is context-oriented: the Aplet directory is the top-level catalog; Program and Note catalogs use the current `PGMCXT` / `NOTESCXT` bindings; ordinary variables live in whichever Aplet/topic context is active. The generic named-store mapping therefore remains unfrozen on HP39 instead of inventing a synthetic hierarchy.

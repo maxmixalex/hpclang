@@ -1,6 +1,8 @@
 #ifndef HPCLANG_HP4950_FATFS_DISKIO_H
 #define HPCLANG_HP4950_FATFS_DISKIO_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -9,6 +11,7 @@ extern "C"
     int hpclang_hp4950_fatfs_controller_acquire(int read_only);
     void hpclang_hp4950_fatfs_controller_release(void);
     int hpclang_hp4950_fatfs_controller_owned(void);
+    int hpclang_hp4950_fatfs_card_identity(uint8_t cid[16]);
 
 #ifdef __cplusplus
 }

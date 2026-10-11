@@ -224,6 +224,10 @@ static int media_swap(unsigned phase)
 static uint32_t storage_replacement_test(void)
 {
     uint32_t result = 0xc0u;
+    struct hpclang_stream_media_identity original, observed;
+    if (hpclang_stream_media_identity_query(&original) || original.size != sizeof original ||
+        original.version != HPCLANG_STREAM_MEDIA_IDENTITY_VERSION)
+        return 0xb8u;
     struct hpclang_stream_directory *directory = NULL;
     FILE *secondary = NULL;
     char secondary_dirty[32];
@@ -273,6 +277,9 @@ static uint32_t storage_replacement_test(void)
     (void)hpclang_stream_directory_close(directory);
     directory = NULL;
     result = 0xc5u;
+    if (hpclang_stream_media_identity_query(&observed) ||
+        memcmp(original.cid, observed.cid, sizeof original.cid) == 0)
+        goto done;
     file = fopen("STALE.BIN", "rb");
     if (!file || fread(bytes, 1, 4, file) != 4 || memcmp(bytes, "SAFE", 4))
         goto done;
@@ -292,6 +299,9 @@ static uint32_t storage_replacement_test(void)
     if (media_swap(3))
         goto done;
     result = 0xc8u;
+    if (hpclang_stream_media_identity_query(&observed) ||
+        memcmp(original.cid, observed.cid, sizeof original.cid) != 0)
+        goto done;
     file = fopen("STALE.BIN", "rb");
     if (!file || fread(bytes, 1, 4, file) != 3 || memcmp(bytes, "OLD", 3))
         goto done;
