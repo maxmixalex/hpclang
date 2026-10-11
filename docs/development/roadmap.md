@@ -214,7 +214,7 @@ The final ownership model is deliberately simpler than the historical bring-up p
 - the first hpclang byte-stream storage operation acquires a **whole-process direct namespace lease**;
 - hpclang then owns the S3C2410 SDI controller and mounts the card with the pinned FatFs R0.16 + official patch-1/patch-2 baseline;
 - all ordinary `open/read/write/lseek/unlink/stat/rename/mkdir/rmdir`, picolibc `FILE *` operations, metadata, capacity and directory traversal use that same FatFs namespace;
-- Stock KOS is **not** a second file-I/O backend. It is retained only at the host-coordination boundary: insertion/write-protect sampling before takeover and syscall 19 (`ResetSD`) after FatFs is unmounted and the controller is released;
+- insertion/write-protect sampling reads configured GPIO inputs before and during ownership; Stock KOS is retained only for syscall 19 (`ResetSD`) after FatFs is unmounted and the controller is released;
 - the direct namespace remains active until native-process shutdown, preventing live KOS and FatFs handles from observing/mutating the same FAT state concurrently;
 - HP39/40 and HP48 continue to return deterministic `ENOSYS` for byte-stream storage rather than flattening their native calculator-object stores into POSIX files.
 
@@ -440,6 +440,10 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   raw historical signature as sufficient reason to omit its useful behavior.
 - [ ] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
+  - In progress: distinguish classic RPL read access from mutation availability,
+    share launcher-bound validation with the mutation backend, and validate the
+    HP39 portal before reporting Aplet services. Host and calculator probes cover
+    model/context differences; the broader historical capability ledger remains open.
 
 ### M7.1 / M7.2 follow-up — uncovered application behavior
 
@@ -451,6 +455,9 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     contract is unchanged.
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
+  - The bounded UTF-8 editor in `hpclang/input.h` already supports insertion,
+    deletion, navigation, accept/cancel and basic physical-key editing. Alpha/Shift
+    text policy, numeric-input semantics and console behavior remain to be completed.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

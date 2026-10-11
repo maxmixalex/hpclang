@@ -48,13 +48,23 @@ int main(void)
         return finish(0xe0u);
 #if HPCLANG_E2E_HP39
     if (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
-        boot->model == HPCLANG_MODEL_HP40GS)
+        boot->model == HPCLANG_MODEL_HP40GS) {
+        if (hpclang_device_capability(HPCLANG_CAPABILITY_APLET_VARIABLES) !=
+            HPCLANG_CAPABILITY_SUPPORTED)
+            return finish(0xe1u);
         return finish(hpclang_e2e_hp39_mutation());
+    }
 #endif
 #if HPCLANG_E2E_CLASSIC
     if (boot->model == HPCLANG_MODEL_HP48GII || boot->model == HPCLANG_MODEL_HP49GPLUS ||
-        boot->model == HPCLANG_MODEL_HP50G)
+        boot->model == HPCLANG_MODEL_HP50G) {
+        if (hpclang_device_capability(HPCLANG_CAPABILITY_RPL_STACK_MUTATION) !=
+                HPCLANG_CAPABILITY_SUPPORTED ||
+            hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION) !=
+                HPCLANG_CAPABILITY_SUPPORTED)
+            return finish(0xe2u);
         return finish(hpclang_e2e_classic_mutation());
+    }
 #endif
     return finish(0xe0u);
 }

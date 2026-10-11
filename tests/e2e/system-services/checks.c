@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#include <hpclang/abi.h>
 #include <hpclang/datetime.h>
 #include <hpclang/device.h>
 #include <hpclang/input.h>
@@ -62,6 +63,23 @@ static int sound_test(void)
 
 uint32_t hpclang_e2e_system_test(void)
 {
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    uint32_t family = hpclang_device_info()->family;
+    int live = boot != NULL && boot->saturn_state != 0u ? HPCLANG_CAPABILITY_SUPPORTED
+                                                        : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
+    int classic = family == HPCLANG_FAMILY_HP48 || family == HPCLANG_FAMILY_HP4950;
+    const enum hpclang_capability classic_services[] = {
+        HPCLANG_CAPABILITY_RPL_STACK, HPCLANG_CAPABILITY_RPL_OBJECT_STORE,
+        HPCLANG_CAPABILITY_RPL_STACK_MUTATION, HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION};
+    for (unsigned i = 0u; i < sizeof(classic_services) / sizeof(classic_services[0]); ++i)
+        if (hpclang_device_capability(classic_services[i]) !=
+            (classic ? live : HPCLANG_CAPABILITY_UNSUPPORTED))
+            return 0x7c;
+    for (int id = HPCLANG_CAPABILITY_APLET_DATA; id <= HPCLANG_CAPABILITY_APLET_CATALOG; ++id)
+        if (hpclang_device_capability((enum hpclang_capability)id) !=
+            (family == HPCLANG_FAMILY_HP39 ? live : HPCLANG_CAPABILITY_UNSUPPORTED))
+            return 0x7d;
+
     if (hpclang_device_capability(HPCLANG_CAPABILITY_CIVIL_TIME_READ) !=
             HPCLANG_CAPABILITY_SUPPORTED ||
         hpclang_device_capability(HPCLANG_CAPABILITY_POLL_TIMERS) != HPCLANG_CAPABILITY_SUPPORTED ||

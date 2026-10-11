@@ -2,6 +2,7 @@
 #include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
+#include "launch-services.h"
 
 #define DEVICE(model_, family_, width_, height_)                                                   \
     {sizeof(struct hpclang_device_info),                                                           \
@@ -63,15 +64,20 @@ int hpclang_device_capability(enum hpclang_capability capability)
         return boot && boot->saturn_state ? HPCLANG_CAPABILITY_SUPPORTED
                                           : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     }
+    case HPCLANG_CAPABILITY_RPL_STACK_MUTATION:
+    case HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION:
+        if (family != HPCLANG_FAMILY_HP48 && family != HPCLANG_FAMILY_HP4950)
+            return HPCLANG_CAPABILITY_UNSUPPORTED;
+        return hpclang_launch_rpl_bounds(hpclang_boot_info()) != NULL
+                   ? HPCLANG_CAPABILITY_SUPPORTED
+                   : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     case HPCLANG_CAPABILITY_APLET_DATA:
     case HPCLANG_CAPABILITY_APLET_VARIABLES:
     case HPCLANG_CAPABILITY_TEXT_CATALOG:
     case HPCLANG_CAPABILITY_APLET_CATALOG: {
         if (family != HPCLANG_FAMILY_HP39)
             return HPCLANG_CAPABILITY_UNSUPPORTED;
-        const struct hpclang_boot_info *boot = hpclang_boot_info();
-        return boot && boot->saturn_state &&
-                       (boot->platform_cookie & (uintptr_t)3u) == HPCLANG_PLATFORM_COOKIE_HP39_TAG
+        return hpclang_launch_hp39_context(hpclang_boot_info()) != NULL
                    ? HPCLANG_CAPABILITY_SUPPORTED
                    : HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE;
     }

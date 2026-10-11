@@ -3,6 +3,7 @@
 #include <hpclang/bootstrap.h>
 #include <hpclang/target.h>
 #include "rpl-stock-memory.h"
+#include "launch-services.h"
 
 int hpclang_rpl_stock_memory_capture(struct hpclang_rpl_stock_memory *memory,
                                      const uint32_t *read_map, uint32_t ram_section)
@@ -58,18 +59,10 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
                                   struct hpclang_rpl_stock_memory *memory)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (io == NULL || memory == NULL || boot == NULL || boot->saturn_state == 0u ||
-        (boot->model != HPCLANG_MODEL_HP48GII && boot->model != HPCLANG_MODEL_HP49GPLUS &&
-         boot->model != HPCLANG_MODEL_HP50G) ||
-        (boot->platform_cookie & HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG) == 0u)
+    if (io == NULL || memory == NULL)
         return 0;
-    uintptr_t raw = boot->platform_cookie & ~HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
-    const struct hpclang_rpl_memory_bounds *bounds = (const void *)raw;
-    if (bounds == NULL || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
-        bounds->temp_limit <= 0x80000u || bounds->temp_limit > 0x100000u ||
-        bounds->user_limit < 0x80000u || bounds->user_limit >= 0x100000u ||
-        bounds->stack_reserve_nibbles > 0x100000u - bounds->user_limit ||
-        (bounds->stack_reserve_nibbles % 5u) != 0u)
+    const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
+    if (bounds == NULL)
         return 0;
     volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
     if (!hpclang_rpl_stock_memory_capture(memory, (const void *)boot->saturn_state, l1[0x80]))

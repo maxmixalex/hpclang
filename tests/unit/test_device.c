@@ -15,6 +15,53 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 }
 
 static uint32_t contrast;
+static struct hpclang_hp39_platform_context portal = {.magic = HPCLANG_HP39_PLATFORM_MAGIC,
+                                                      .portal_entry = 1u};
+static struct hpclang_rpl_memory_bounds bounds = {.magic = HPCLANG_RPL_BOUNDS_MAGIC,
+                                                  .temp_limit = 0xe0000u,
+                                                  .user_limit = 0xf0000u,
+                                                  .stack_reserve_nibbles = 10u};
+
+static void mutation_state(int expected)
+{
+    errno = EDOM;
+    assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_STACK_MUTATION) == expected);
+    assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION) == expected);
+    assert(errno == EDOM);
+}
+
+static void mutation_context_test(void)
+{
+    boot.platform_cookie = 0u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    boot.platform_cookie = HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    mutation_state(HPCLANG_CAPABILITY_SUPPORTED);
+    struct hpclang_rpl_memory_bounds saved = bounds;
+    bounds.magic = 0u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds = saved;
+    bounds.temp_limit = 0x80000u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds.temp_limit = 0x100001u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds = saved;
+    bounds.user_limit = 0x7ffffu;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds.user_limit = 0x100000u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds = saved;
+    bounds.stack_reserve_nibbles = 1u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds.stack_reserve_nibbles = UINT32_MAX;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    bounds = saved;
+    boot.saturn_state = 0u;
+    mutation_state(HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE);
+    boot.saturn_state = 1u;
+    mutation_state(HPCLANG_CAPABILITY_SUPPORTED);
+}
 uint32_t hpclang_kos_swi3(uint32_t index, uint32_t a, uint32_t b, uint32_t c)
 {
     assert(index == 13 && a == 0 && b == 0 && c == 0);
@@ -49,6 +96,10 @@ int main(void)
                                                        : HPCLANG_CAPABILITY_UNSUPPORTED;
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_STACK) == available);
         assert(hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE) == available);
+        if (model >= HPCLANG_MODEL_HP48GII)
+            mutation_context_test();
+        else
+            mutation_state(HPCLANG_CAPABILITY_UNSUPPORTED);
         for (int capability = HPCLANG_CAPABILITY_APLET_DATA;
              capability <= HPCLANG_CAPABILITY_APLET_CATALOG; ++capability) {
             int hp39 = model <= HPCLANG_MODEL_HP40GS;
@@ -57,6 +108,20 @@ int main(void)
                 hpclang_device_capability((enum hpclang_capability)capability) ==
                 (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
             boot.platform_cookie = HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+            assert(
+                hpclang_device_capability((enum hpclang_capability)capability) ==
+                (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            boot.platform_cookie = (uintptr_t)&portal | HPCLANG_PLATFORM_COOKIE_HP39_TAG;
+            portal.magic = 0u;
+            assert(
+                hpclang_device_capability((enum hpclang_capability)capability) ==
+                (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            portal.magic = HPCLANG_HP39_PLATFORM_MAGIC;
+            portal.portal_entry = 0u;
+            assert(
+                hpclang_device_capability((enum hpclang_capability)capability) ==
+                (hp39 ? HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE : HPCLANG_CAPABILITY_UNSUPPORTED));
+            portal.portal_entry = 1u;
             assert(hpclang_device_capability((enum hpclang_capability)capability) ==
                    (hp39 ? HPCLANG_CAPABILITY_SUPPORTED : HPCLANG_CAPABILITY_UNSUPPORTED));
             boot.saturn_state = 0u;
@@ -69,7 +134,7 @@ int main(void)
     boot.model = UINT32_MAX;
     assert(hpclang_device_info()->family == HPCLANG_FAMILY_UNKNOWN);
     for (int capability = HPCLANG_CAPABILITY_DISPLAY;
-         capability <= HPCLANG_CAPABILITY_DISPLAY_INDICATORS; ++capability)
+         capability <= HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION; ++capability)
         assert(hpclang_device_capability((enum hpclang_capability)capability) ==
                HPCLANG_CAPABILITY_UNSUPPORTED);
     assert(hpclang_device_capability((enum hpclang_capability)0) == -1 && errno == EINVAL);

@@ -15,6 +15,22 @@ Installed/public headers were mechanically inventoried, while source trees and e
 
 Primary references include the SourceForge HP-GCC releases, hpcalc's HPGCC 2.0 SP2 archive, and HPGCC3 documentation.
 
+## Runtime availability and source compatibility
+
+A historical declaration or an available compatibility header does not establish
+that an operation can run in the current calculator context. Applications should
+use the [object-service discovery matrix](api-reference.md#object-service-discovery)
+to distinguish classic RPL reads, classic RPL mutations and HP39 Aplet services.
+The mutation queries additionally require the launcher's safe memory bounds;
+HP39 queries require its native service portal. Direct launches do not gain
+Stock object access merely by including `saturn.h` or `satdir.h`.
+
+These queries describe the clean services beneath adapters. They do not claim
+that every historical signature has an adapter, that native Port services exist,
+or that a supported operation has sufficient memory/media at the instant of use.
+The broader declaration/implementation/adapter/application-evidence ledger
+remains an M7.0 follow-up.
+
 ## Public API stability
 
 The historical releases are more source-stable than their runtime implementations suggest.
@@ -143,7 +159,7 @@ The production HP39gs/40gs implementation now exposes only the two required phys
 
 This replaced an experimental long-lived high-L1 section alias. The transient `L1[A0]`/section mapping was sufficient to acquire the real HP39g+ NOR, but the one-shot dumper source has since been retired. The mechanism was not safe as persistent runtime storage on HP39gs/40gs: diagnostics proved that the active LCD framebuffer can occupy bytes inside the physical L1-table region and overwrite a descriptor word during ordinary drawing. A descriptor that reads zero is therefore not necessarily a safe long-lived slot.
 
-The verified 1 MiB HP39g+ D1.55 full-NOR fixture independently establishes main/mini/EditLine at physical nibble addresses `0x0DC096` / `0x0DE0DA` / `0x0DCE2F`, in pages `0x6e`/`0x6f`. The runtime uses those pages through the same private window. All three complete tables match the reviewed gs atlas, including the mini extended-character map. The model-specific ROM pixel oracle and new Stock USB Gallery entry cover this extension; formal acceptance is pending. These offsets come from ROM analysis, not historical HPGCC declarations.
+The verified 1 MiB HP39g+ D1.55 full-NOR fixture independently establishes main/mini/EditLine at physical nibble addresses `0x0DC096` / `0x0DE0DA` / `0x0DCE2F`, in pages `0x6e`/`0x6f`. The runtime uses those pages through the same private window. All three complete tables match the reviewed gs atlas, including the mini extended-character map. The model-specific ROM pixel oracle and new Stock USB Gallery entry cover this extension; formal acceptance is complete on `8f79c156`. These offsets come from ROM analysis, not historical HPGCC declarations.
 
 Compatibility consequence:
 
