@@ -51,6 +51,20 @@ extern "C"
      * resulting scalar through text_input_edit(). No keyboard state is consumed. */
     int hpclang_text_input_key(struct hpclang_text_input *input,
                                const struct hpclang_keyboard_event *event);
+    /* Convert the entire current line without changing text, cursor or edit
+     * state. Call after ACCEPT, or while editing to validate a proposed value.
+     * Return 0 on success (preserving errno), -1/EINVAL for invalid arguments
+     * or incomplete/invalid syntax, -1/ERANGE for a value outside the range.
+     * Errors leave the output unchanged. No whitespace, separators, expressions,
+     * hex, NaN or infinity are accepted. Signs are optional leading '+'/'-'.
+     * int64: one or more ASCII decimal digits, with exact signed 64-bit bounds.
+     * double: decimal digits with an optional '.', at least one mantissa digit,
+     * and optional e/E followed by a signed decimal exponent. Uses the SDK's
+     * C-locale strtod rounding; finite subnormals and signed zero are supported.
+     * Overflow and a nonzero mantissa rounded to zero are ERANGE. These calls
+     * do not accept/cancel the editor or select any keyboard/text-plane policy. */
+    int hpclang_text_input_parse_int64(const struct hpclang_text_input *input, int64_t *value);
+    int hpclang_text_input_parse_double(const struct hpclang_text_input *input, double *value);
 #ifdef __cplusplus
 }
 #endif

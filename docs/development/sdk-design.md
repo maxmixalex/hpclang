@@ -141,6 +141,25 @@ All 51 physical positions pass the established Direct E2E on HP39g+, HP39gs, HP4
 
 The service stops at physical key identity plus modifier state. Model/UI shortcuts and text/Alpha/Shift-plane translation belong above it.
 
+Bounded text editing and numeric conversion live in `hpclang/input.h`, above the
+physical event layer. The caller owns the buffer, event loop, rendering and
+accept/cancel policy. An accept event does not commit a number: the application
+converts the entire line with `hpclang_text_input_parse_int64/double`, handles
+`EINVAL` or `ERANGE`, and can keep editing after a rejected value. The strict
+ASCII decimal grammar and finite-double range policy are independent of any
+calculator's Alpha/Shift mode. No terminal, Stock modal dialog, or global stdio
+redirection is acquired by these helpers.
+
+The console layer owns a bounded Unicode cell grid and drawing buffers. It
+renders an explicit viewport onto a caller-selected surface and does not retain
+that destination across page flips. Standard-I/O routing is a separate explicit
+process-wide lease: callbacks are copied, their context is borrowed, and a second
+binder fails with `EBUSY`. Input callbacks own any waiting/editing policy. Separate
+stdin/stdout/stderr status and reset-on-rebind prevent an input EOF or pushed-back
+byte from leaking between owners. Unbind flushes and releases the route even on
+output error. Neither layer reconfigures the physical keyboard or acquires an
+LCD mode; the application still owns event polling and presentation.
+
 ## Time
 
 All time APIs name their unit. Monotonic microseconds form the basis for delays, deadlines, and event timing. The stock backend observes existing timer/RTC state instead of taking hardware ownership.

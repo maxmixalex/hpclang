@@ -35,6 +35,16 @@ target_include_directories(test_hpg_graphics PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(input test_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
 target_include_directories(test_input PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(numeric_input test_numeric_input.c "${HPCLANG_ROOT}/runtime/core/input.c")
+target_include_directories(test_numeric_input PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(console test_console.c "${HPCLANG_ROOT}/runtime/core/console.c"
+    "${HPCLANG_ROOT}/runtime/core/font.c" "${HPCLANG_ROOT}/runtime/core/saturn-view.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_console PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(stdio_routing test_stdio_routing.c "${HPCLANG_ROOT}/runtime/core/stdio-routing.c")
+target_include_directories(test_stdio_routing PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(device test_device.c "${HPCLANG_ROOT}/runtime/core/device.c"
     "${HPCLANG_ROOT}/runtime/core/contrast.c" "${HPCLANG_ROOT}/runtime/core/power.c")
 target_include_directories(test_device PRIVATE "${HPCLANG_ROOT}/include")

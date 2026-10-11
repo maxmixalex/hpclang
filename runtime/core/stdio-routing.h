@@ -1,0 +1,8 @@
+#ifndef HPCLANG_STDIO_ROUTING_H
+#define HPCLANG_STDIO_ROUTING_H
+int hpclang_stdio_route_write(unsigned stream, unsigned char byte);
+int hpclang_stdio_route_read(void);
+int hpclang_stdio_route_flush(unsigned stream);
+/* Supplied by the libc bridge, or by a host test fixture. */
+void hpclang_stdio_clear_streams(void);
+#endif

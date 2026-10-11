@@ -440,7 +440,7 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   raw historical signature as sufficient reason to omit its useful behavior.
 - [ ] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
-  - In progress: distinguish classic RPL read access from mutation availability,
+  - Accepted on `9489e7d1`: distinguish classic RPL read access from mutation availability,
     share launcher-bound validation with the mutation backend, and validate the
     HP39 portal before reporting Aplet services. Host and calculator probes cover
     model/context differences; the broader historical capability ledger remains open.
@@ -456,8 +456,16 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
   - The bounded UTF-8 editor in `hpclang/input.h` already supports insertion,
-    deletion, navigation, accept/cancel and basic physical-key editing. Alpha/Shift
-    text policy, numeric-input semantics and console behavior remain to be completed.
+    deletion, navigation, accept/cancel and basic physical-key editing.
+  - Numeric extension accepted on `b92e2a7d`: exact signed 64-bit and finite
+    double conversion from the bounded editor, full-line syntax/range checking,
+    and correction after a rejected accept attempt. Alpha/Shift text policy,
+    console event/rendering behavior and historical blocking adapters remain open.
+  - Console extension accepted on `b92e2a7d`: owned fixed-cell UTF-8 output,
+    wrapping/scrolling, clipped viewport rendering and explicit standard-stream
+    binding with read/write/flush callbacks, distinct EOF/error/cancellation and
+    reset on ownership changes. Alpha/Shift text maps and a ready-made keyboard
+    line-input loop remain open; physical keyboard semantics are unchanged.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

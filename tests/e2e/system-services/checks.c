@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <float.h>
 #include <stdint.h>
 #include <string.h>
 #include <hpclang/abi.h>
@@ -12,6 +13,59 @@
 #include <hpclang/time.h>
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
+
+unsigned hpclang_e2e_console_test(void);
+
+static int numeric_line(struct hpclang_text_input *input, char *buffer, size_t capacity,
+                        const char *text)
+{
+    if (hpclang_text_input_init(input, buffer, capacity) != 0)
+        return -1;
+    for (; *text; ++text)
+        if (hpclang_text_input_edit(input, HPCLANG_INPUT_INSERT, (unsigned char)*text) !=
+            HPCLANG_INPUT_EDITING)
+            return -1;
+    return 0;
+}
+
+static unsigned numeric_test(void)
+{
+    char buffer[32];
+    struct hpclang_text_input input;
+    int64_t whole = 7;
+    double real = 7.0;
+    if (numeric_line(&input, buffer, sizeof(buffer), "-9223372036854775808") != 0 ||
+        hpclang_text_input_parse_int64(&input, &whole) != 0 || whole != INT64_MIN)
+        return 1u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "9223372036854775808") != 0 ||
+        hpclang_text_input_parse_int64(&input, &whole) != -1 || errno != ERANGE ||
+        whole != INT64_MIN)
+        return 2u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "-1.25e") != 0 ||
+        hpclang_text_input_edit(&input, HPCLANG_INPUT_ACCEPT, 0) != HPCLANG_INPUT_ACCEPTED ||
+        hpclang_text_input_parse_double(&input, &real) != -1 || errno != EINVAL || real != 7.0)
+        return 3u;
+    struct hpclang_keyboard_event key = {.type = HPCLANG_KEYBOARD_EVENT_DOWN, .key = HPCLANG_KEY_2};
+    if (hpclang_text_input_key(&input, &key) != HPCLANG_INPUT_EDITING ||
+        hpclang_text_input_parse_double(&input, &real) != 0 || real != -125.0 ||
+        strcmp(buffer, "-1.25e2") != 0)
+        return 4u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "4.9406564584124654e-324") != 0 ||
+        hpclang_text_input_parse_double(&input, &real) != 0 || real != DBL_TRUE_MIN)
+        return 5u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "1e-324") != 0 ||
+        hpclang_text_input_parse_double(&input, &real) != -1 || errno != ERANGE ||
+        real != DBL_TRUE_MIN)
+        return 6u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "1e309") != 0 ||
+        hpclang_text_input_parse_double(&input, &real) != -1 || errno != ERANGE ||
+        real != DBL_TRUE_MIN)
+        return 7u;
+    if (numeric_line(&input, buffer, sizeof(buffer), "12x") != 0 ||
+        hpclang_text_input_parse_double(&input, &real) != -1 || errno != EINVAL)
+        return 8u;
+    return 0u;
+}
 
 static int cancel_tone(void *context)
 {
@@ -80,6 +134,12 @@ uint32_t hpclang_e2e_system_test(void)
             (family == HPCLANG_FAMILY_HP39 ? live : HPCLANG_CAPABILITY_UNSUPPORTED))
             return 0x7d;
 
+    unsigned console_failure = hpclang_e2e_console_test();
+    if (console_failure != 0u)
+        return 0xb0u + console_failure;
+    unsigned numeric_failure = numeric_test();
+    if (numeric_failure != 0u)
+        return 0xa0u + numeric_failure;
     if (hpclang_device_capability(HPCLANG_CAPABILITY_CIVIL_TIME_READ) !=
             HPCLANG_CAPABILITY_SUPPORTED ||
         hpclang_device_capability(HPCLANG_CAPABILITY_POLL_TIMERS) != HPCLANG_CAPABILITY_SUPPORTED ||

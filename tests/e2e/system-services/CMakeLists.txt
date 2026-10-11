@@ -14,7 +14,8 @@ add_executable(hpclang_system_services_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
-    checks.c)
+    checks.c
+    console.c)
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")

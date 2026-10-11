@@ -1,23 +1,45 @@
 #include <stdio.h>
 #include <hpclang/display.h>
+#include <hpclang/stdio.h>
+#include "../core/stdio-routing.h"
 
-static int discard_putc(char c, FILE *stream)
+static int console_putc(char c, FILE *stream)
 {
-    (void)stream;
-    return (unsigned char)c;
+    return hpclang_stdio_route_write(stream == stderr ? 2u : 1u, (unsigned char)c) == 0
+               ? (unsigned char)c
+               : _FDEV_ERR;
 }
 
-static int eof_getc(FILE *stream)
+static int console_getc(FILE *stream)
 {
     (void)stream;
-    return EOF;
+    int result = hpclang_stdio_route_read();
+    return result == HPCLANG_STDIO_EOF     ? _FDEV_EOF
+           : result == HPCLANG_STDIO_ERROR ? _FDEV_ERR
+                                           : result;
 }
 
-static FILE null_stdio = FDEV_SETUP_STREAM(discard_putc, eof_getc, NULL, _FDEV_SETUP_RW);
+static int console_flush(FILE *stream)
+{
+    return hpclang_stdio_route_flush(stream == stderr ? 2u : 1u);
+}
 
-FILE *const stdin = &null_stdio;
-FILE *const stdout = &null_stdio;
-FILE *const stderr = &null_stdio;
+static FILE input_stream = FDEV_SETUP_STREAM(NULL, console_getc, NULL, _FDEV_SETUP_READ);
+static FILE output_stream = FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
+static FILE error_stream = FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
+
+FILE *const stdin = &input_stream;
+FILE *const stdout = &output_stream;
+FILE *const stderr = &error_stream;
+
+void hpclang_stdio_clear_streams(void)
+{
+    /* These runtime-owned, unbuffered streams have no outstanding I/O here.
+     * Reset pushback/orientation as well as EOF/error on ownership changes. */
+    input_stream = (FILE)FDEV_SETUP_STREAM(NULL, console_getc, NULL, _FDEV_SETUP_READ);
+    output_stream = (FILE)FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
+    error_stream = (FILE)FDEV_SETUP_STREAM(console_putc, NULL, console_flush, _FDEV_SETUP_WRITE);
+}
 
 __attribute__((noreturn)) void _exit(int status)
 {
