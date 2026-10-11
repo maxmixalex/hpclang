@@ -214,7 +214,7 @@ The final ownership model is deliberately simpler than the historical bring-up p
 - the first hpclang byte-stream storage operation acquires a **whole-process direct namespace lease**;
 - hpclang then owns the S3C2410 SDI controller and mounts the card with the pinned FatFs R0.16 + official patch-1/patch-2 baseline;
 - all ordinary `open/read/write/lseek/unlink/stat/rename/mkdir/rmdir`, picolibc `FILE *` operations, metadata, capacity and directory traversal use that same FatFs namespace;
-- Stock KOS is **not** a second file-I/O backend. It is retained only at the host-coordination boundary: insertion/write-protect sampling before takeover and syscall 19 (`ResetSD`) after FatFs is unmounted and the controller is released;
+- insertion/write-protect sampling reads configured GPIO inputs before and during ownership; Stock KOS is retained only for syscall 19 (`ResetSD`) after FatFs is unmounted and the controller is released;
 - the direct namespace remains active until native-process shutdown, preventing live KOS and FatFs handles from observing/mutating the same FAT state concurrently;
 - HP39/40 and HP48 continue to return deterministic `ENOSYS` for byte-stream storage rather than flattening their native calculator-object stores into POSIX files.
 
