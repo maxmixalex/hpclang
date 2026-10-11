@@ -398,7 +398,7 @@ rejection, removes empty directories and restores the original namespace before
 requiring settled Stock return. M7.3g is accepted by the subsequent Object
 mutation regressions, including main `3ad37ac6`; see the validation record.
 
-## M7.3h — HP39 Aplet-owned data (in progress)
+## M7.3h — HP39 Aplet-owned data (accepted)
 
 `<hpclang/aplet.h>` provides `hpclang_aplet_data_get()`,
 `hpclang_aplet_data_set()` and `hpclang_aplet_data_clear()` for HP39 Stock
@@ -435,7 +435,7 @@ The eight-invocation contract then saves a second instance through Stock SAVE.
 Alternating between the two instances verifies independent writes and clears,
 without lowering native stack requirements or dropping the GC stress checks.
 All three HP39 models pass this contract locally. The expanded Reset contract
-below also passes; formal CI acceptance remains required before M7.3h closes.
+below also passes; formal CI acceptance is complete on `6a7f9a28`.
 
 The historical template does not connect its reset entry by default: its
 `_Reset` routine contains a data-clear operation, but `=Common.h` defines the
@@ -454,7 +454,7 @@ The mutation lifecycle adds cancellation, confirmed clear, relaunch and
 two-instance isolation checks. HP39g+, HP39gs and HP40gs pass all 15 invocations
 locally; CI acceptance is complete on `6a7f9a28`.
 
-## M7.3i — composite objects and stack reorder (in progress)
+## M7.3i — composite objects and stack reorder (accepted)
 
 The implementation provides owned classic complex values and homogeneous
 REAL/COMPLEX numeric vectors and matrices. Arrays have rank one or two,
@@ -523,7 +523,7 @@ stack depth. This is workflow evidence, not a claim that old raw-pointer source
 or binaries run unchanged. HP39's original `_Entry`/`_Action`/`_Exit` protocol
 is exercised by the native Aplet lifecycle tests.
 
-## M7.3j — native catalogs (in progress)
+## M7.3j — native catalogs (accepted)
 
 `hpclang/catalog.h` exposes Program and Note catalogs on HP39g+/39gs/40gs Stock.
 `list()` returns an owned list of global identifiers; `get()` returns an owned

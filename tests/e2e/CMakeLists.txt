@@ -47,6 +47,7 @@ if(HPCLANG_E2E_KEYBOARD)
 endif()
 if(HPCLANG_E2E_STORAGE)
     target_compile_definitions(hpclang_e2e PRIVATE HPCLANG_E2E_STORAGE=1)
+    target_sources(hpclang_e2e PRIVATE historical-files.c)
 endif()
 
 target_link_options(hpclang_e2e PRIVATE

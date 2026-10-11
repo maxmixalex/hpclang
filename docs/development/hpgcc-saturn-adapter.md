@@ -148,8 +148,8 @@ matching every declaration in `saturn.h`.
 
 ## Historical M7.3e boundary and remaining capability work
 
-M7.3e accepted a bounded 1.1/2.0 scalar/read adapter. The following capabilities
-remain required in the clean object service before overall parity closure:
+M7.3e accepted a bounded 1.1/2.0 scalar/read adapter. The following clean
+capabilities were subsequently completed and accepted on `6a7f9a28`:
 
 - transactional stack swap/nip, with preflight preventing partial updates;
 - owned list construction and element access;
@@ -162,7 +162,8 @@ Historical pointer-table edits, borrowed addresses and raw nibble builders
 remain migration interfaces. Their representation is not required in public
 APIs, but their useful application behavior must have a clean equivalent.
 An omitted capability requires an individually documented, maintainer-approved
-limitation. M7.3g–j in [Roadmap](roadmap.md) track the remaining work.
+limitation. M7.3g–j in [Roadmap](roadmap.md) record this acceptance and the
+separately approved native Port 0/1/2 follow-up.
 
 ### Migration/Internal `saturn.h` area
 

@@ -7,6 +7,7 @@
 #include "saturn-view.h"
 
 static struct hpclang_boot_info boot;
+static int mapping_available = 1;
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return &boot;
@@ -16,13 +17,16 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
  * indices without requiring proprietary fixtures in the portable host suite. */
 int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *value)
 {
+    if (!mapping_available)
+        return 0;
     *value = (uint8_t)(((address.nibble >> 4) ^ (address.nibble >> 8) ^ address.nibble) & 15);
     return 1;
 }
 int hpclang_saturn_read_byte(struct hpclang_saturn_address address, uint8_t *value)
 {
     uint8_t low, high;
-    hpclang_saturn_read_nibble(address, &low);
+    if (!hpclang_saturn_read_nibble(address, &low))
+        return 0;
     ++address.nibble;
     hpclang_saturn_read_nibble(address, &high);
     *value = low | (uint8_t)(high << 4);
@@ -46,6 +50,10 @@ int main(void)
         for (unsigned f = 0; f < 3; ++f) {
             if (!fonts[f])
                 continue;
+            assert(hpclang_font_available(fonts[f]));
+            mapping_available = 0;
+            assert(!hpclang_font_available(fonts[f]));
+            mapping_available = 1;
             unsigned differences = 0;
             for (unsigned i = 0; i < sizeof(native); ++i) {
                 hpclang_surface_clear(surface, 0);

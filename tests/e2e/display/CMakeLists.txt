@@ -14,7 +14,8 @@ add_executable(hpclang_display_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
-    hpg-prototype.c)
+    hpg-prototype.c
+    historical-clients.c)
 
 target_include_directories(
     hpclang_display_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
@@ -30,3 +31,5 @@ set_target_properties(
 
 hpclang_target_font(hpclang_display_e2e
     NAME hpclang_system_font FONT @mini MODE STATIC_AUTO FALLBACK NONE)
+hpclang_target_font(hpclang_display_e2e
+    NAME hpclang_historical_big_font FONT @normal MODE STATIC_AUTO FALLBACK NONE)

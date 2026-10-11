@@ -25,7 +25,20 @@ class TextPixelTests(unittest.TestCase):
                     good[(y + 1) * 132 + 3] = 0
                 Path(f"{prefix}-200.pgm").write_bytes(header + good)
                 Path(f"{prefix}-201.pgm").write_bytes(header + good)
+                keyboard = blank.copy()
+                keyboard[132 : 132 + 40] = bytes(40)
+                pressed = keyboard.copy()
+                pressed[48 * 132 + 16] = 0
+                Path(f"{prefix}-202.pgm").write_bytes(header + pressed)
+                Path(f"{prefix}-203.pgm").write_bytes(header + keyboard)
                 pixels.verify(prefix, height)
+                unrelated = keyboard.copy()
+                unrelated[20 * 132 + 60] = 0
+                for data in (pressed, blank, unrelated, keyboard[:-1]):
+                    Path(f"{prefix}-203.pgm").write_bytes(header + data)
+                    with self.assertRaises(AssertionError):
+                        pixels.verify(prefix, height)
+                Path(f"{prefix}-203.pgm").write_bytes(header + keyboard)
                 bad = good.copy()
                 bad[2 * 132 + 2] = 255
                 for data in (bad, blank, good[:-1]):

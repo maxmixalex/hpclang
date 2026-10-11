@@ -49,6 +49,14 @@ extern "C"
     const struct hpclang_font *hpclang_font_big(void);
     const struct hpclang_font *hpclang_font_editline(void);
 
+    /* Return 1 when this font's source is accessible in the current launch
+     * context, otherwise 0 (also for NULL/unknown descriptors). Native accessors
+     * describe a model's font even when Direct execution has no Stock mapping;
+     * this query lets applications select an explicit packaged fallback.
+     * It reads mapping/source metadata, does not acquire display ownership,
+     * and preserves errno. Availability does not imply coverage of every glyph. */
+    int hpclang_font_available(const struct hpclang_font *font);
+
     /* Line metrics. advance is the nominal/fixed advance; proportional bitmap
      * fonts should use hpclang_font_codepoint_advance() when laying out text. */
     uint32_t hpclang_font_height(const struct hpclang_font *font);

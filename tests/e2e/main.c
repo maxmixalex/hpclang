@@ -209,6 +209,8 @@ static int display_height(uint32_t model)
 }
 
 #ifdef HPCLANG_E2E_STORAGE
+unsigned hpclang_historical_files(void);
+
 static int media_swap(unsigned phase)
 {
     hpclang_e2e_result = 0x53440000u | phase;
@@ -975,7 +977,10 @@ static uint32_t stock_stream_storage_test(uint32_t model)
     if (metadata)
         return metadata;
     uint32_t volumes = storage_volumes_test();
-    return volumes ? volumes : storage_replacement_test();
+    if (volumes)
+        return volumes;
+    unsigned historical = hpclang_historical_files();
+    return historical ? 0xe0u + historical : storage_replacement_test();
 }
 #endif
 

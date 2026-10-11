@@ -453,19 +453,19 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     all three HP39 models; formal CI acceptance is complete on `8f79c156`.
     HP39 USB transfer reliability remains a separate follow-up. The physical keyboard
     contract is unchanged.
-- [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
+- [x] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
   - The bounded UTF-8 editor in `hpclang/input.h` already supports insertion,
     deletion, navigation, accept/cancel and basic physical-key editing.
   - Numeric extension accepted on `b92e2a7d`: exact signed 64-bit and finite
     double conversion from the bounded editor, full-line syntax/range checking,
-    and correction after a rejected accept attempt. Alpha/Shift text policy,
-    console event/rendering behavior and historical blocking adapters remain open.
+    and correction after a rejected accept attempt. Subsequent text/console
+    acceptance is recorded below; historical spellings remain M8 adapter work.
   - Console extension accepted on `b92e2a7d`: owned fixed-cell UTF-8 output,
     wrapping/scrolling, clipped viewport rendering and explicit standard-stream
     binding with read/write/flush callbacks, distinct EOF/error/cancellation and
-    reset on ownership changes. Alpha/Shift text maps and a ready-made keyboard
-    line-input loop remain open; physical keyboard semantics are unchanged.
+    reset on ownership changes. Subsequent Alpha/Shift and keyboard line-input
+    acceptance is recorded below; physical keyboard semantics are unchanged.
   - Line-session extension accepted on `c7451364`: callback-driven
     event/edit/accept/update loop, recoverable capacity/validation errors and
     explicit cancellation. The scripted session test supplies callback coverage;
@@ -473,7 +473,8 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   - Explicit Latin Alpha lookup accepted on `c7451364`: all six models'
     printed A-Z/a-z and Alpha-space positions, checked against their manual
     diagrams and tested through physical key identities. Punctuation/symbol
-    lookup remains open; no implicit modifier state is added to the keyboard core.
+    lookup was subsequently accepted on `41d75dec`; no implicit modifier state
+    is added to the keyboard core.
   - Default text-plane behavior follows each Stock system's one-shot, held and
     locked Alpha rules. HP39 note-editor lock is an application action; do not
     substitute the HP48/49/50 double-Alpha lock gesture. The Latin HP39 map is
@@ -485,14 +486,15 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     status for application rendering. Native ROM probes establish the transition
     cases; host tests cover all six models and simultaneous-event ordering.
     The scripted editor/console composition is additional integration coverage.
-    Full symbol
-    lookup and a ready-made keyboard editor remain open.
+    Full symbol lookup and a ready-made keyboard editor were subsequently
+    accepted on `41d75dec`.
   - Physical text integration accepted on `c7451364`, integrated into main:
     acknowledged GPIO transitions pass through the SDK scanner/debounce queue,
     native text mode, bounded editor and console. Single/held Alpha and a
     separate model-native lock sequence have independent pixel references;
     every injected key must be released before PASS. This extends the earlier
-    scripted coverage; full symbol lookup and a ready-made editor remain open.
+    scripted coverage; full symbol lookup and a ready-made editor were
+    subsequently accepted on `41d75dec`.
     Runtime, Core, Gallery, Storage, Quality and Objects all pass on that head.
     The merged text-input, text-mode and physical-input branches are retired.
 - [x] Cover historical file attribute mutation and creation/access timestamp
@@ -590,6 +592,21 @@ host/ARM static analysis. See [Validation](validation.md#m73h-j-local-completion
   that existing geometry is sufficient for a future adapter.
 
 ### M7 final audit / M8 follow-up
+
+Additional source-confirmed application capabilities still to close:
+
+- [ ] Expose stable SD card identity so an application can distinguish the same
+  card reinserted from a replacement. HPGCC3 `FSVolumePresent` actually compares
+  CID; removal detection alone does not provide this information. Keep stale
+  handles invalid even if the same card returns.
+- [ ] Review and provide safe CPU performance/power policy for the ordinary
+  application behavior behind `sys_slowOn/sys_slowOff`. Historical benchmarks,
+  games and interactive examples use this to change speed or reduce power;
+  replacing busy delays with monotonic waits does not establish power parity.
+  Coordinate clock consumers and restore host state rather than exposing raw
+  clock-register writes.
+- [ ] Add a genuine source-anchored historical time/system client alongside
+  the accepted focused RTC, timer and sound tests.
 
 Accepted on `41d75dec`: model-native Unicode symbol lookup,
 the default bounded keyboard editor, contrast mutation/restoration and owned

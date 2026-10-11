@@ -50,7 +50,30 @@ def verify(prefix: Path, height: int) -> None:
             assert start >> 22 == end >> 22, f"{stem}: bank boundary"
             addresses.append(start)
         assert addresses[-1] != addresses[-2], f"{prefix}: no page exchange"
-    print(f"PASS: {prefix}: six frames, pixels/status/DMA layout/page exchange")
+    for frame in (100, 101, 102):
+        data = Path(f"{prefix}-{frame}.pgm").read_bytes()
+        header = f"P5\n132 {height}\n255\n".encode()
+        assert data.startswith(header) and len(data) == len(header) + 132 * height
+        pixels = data[len(header) :]
+        if frame == 100:
+            assert pixels[130] == pixels[(height - 1) * 132] == 0
+            assert pixels[65] == 255
+        elif frame == 101:
+            # Original example ends at x=131, outside the 131-pixel display.
+            # The endpoint is clipped before rasterization with integer y.
+            clipped_y = (height - 1) * 130 // 131
+            assert pixels[0] == pixels[clipped_y * 132 + 130] == 0
+            assert pixels[65] == 255
+        else:
+            assert pixels[5 * 132 + 55] == 255 - 0x88
+            assert pixels[(height - 10) * 132 + 70] == 255 - 0x55
+            assert pixels[15 * 132 + 70] == 0
+            assert pixels[(height - 20) * 132 + 50] == 0
+            for top, bottom in ((0, 10), (20, 30), (35, 43)):
+                assert any(
+                    pixels[y * 132 + x] == 0 for y in range(top, bottom) for x in range(45)
+                ), f"{prefix}: missing historical font band {top}"
+    print(f"PASS: {prefix}: gray/DMA checks and historical animation/font/shape clients")
 
 
 def main() -> None:

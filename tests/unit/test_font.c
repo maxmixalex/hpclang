@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,6 +89,10 @@ int main(void)
     const struct hpclang_font *mini = hpclang_font_mini();
     const struct hpclang_font *big = hpclang_font_big();
     const struct hpclang_font *editline = hpclang_font_editline();
+    errno = EDOM;
+    if (hpclang_font_available(mini) || hpclang_font_available(big) ||
+        hpclang_font_available(NULL) || !hpclang_font_available(&test_font) || errno != EDOM)
+        fail("font source availability without a live mapping");
     if (hpclang_font_default() != big || editline != NULL || hpclang_font_height(mini) != 6u ||
         hpclang_font_advance(mini) != 4u || hpclang_font_height(big) != 8u ||
         hpclang_font_advance(big) != 6u)
@@ -116,7 +121,7 @@ int main(void)
     for (unsigned i = 0; i < sizeof(hp39_models) / sizeof(hp39_models[0]); ++i) {
         fake_boot.model = hp39_models[i];
         fake_boot.platform_cookie = 0u;
-        if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
+        if (hpclang_font_available(mini) || hpclang_font_codepoint_advance(mini, 'A') != 4u)
             fail("HP39 missing font-window cookie");
         fake_boot.platform_cookie = HPCLANG_CODE_WINDOW_BASE + HPCLANG_PAGE_SIZE;
         if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
@@ -124,6 +129,10 @@ int main(void)
         fake_boot.platform_cookie = 0x0a000000u;
         if (hpclang_font_codepoint_advance(mini, 'A') != 4u)
             fail("HP39 retired section-alias cookie");
+        fake_boot.platform_cookie = HPCLANG_CODE_WINDOW_BASE;
+        if (!hpclang_font_available(mini) || !hpclang_font_available(main_font) ||
+            !hpclang_font_available(editline))
+            fail("HP39 valid private font-window descriptor");
     }
     fake_boot.platform_cookie = 0u;
 

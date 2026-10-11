@@ -55,6 +55,7 @@ static int compat_error(void)
 #endif
         return FS_NOCARD;
     case EMFILE:
+    case ENOMEM:
 #ifdef ENFILE
     case ENFILE:
 #endif
@@ -367,6 +368,10 @@ static int refresh_file_metadata(FS_FILE *file)
 
 static FS_FILE *alloc_file(const char *name, unsigned mode)
 {
+    unsigned index = name[1] == ':' ? (unsigned)(name[0] - '0') : 0u;
+    struct hpclang_stream_volume_info info;
+    if (hpclang_stream_volume_query(index, &info))
+        return NULL;
     FS_FILE *file = calloc(1u, sizeof(*file));
     if (file == NULL)
         return NULL;
@@ -377,7 +382,7 @@ static FS_FILE *alloc_file(const char *name, unsigned mode)
         return NULL;
     }
 
-    file->Volume = 0u;
+    file->Volume = info.partition ? info.partition - 1u : 0u;
     file->Mode = mode;
     file->_hpclang_fd = -1;
     file->_hpclang_owned = 1u;
@@ -416,7 +421,7 @@ int FSOpen(char *name, int mode, FS_FILE **fileptr)
 
     FS_FILE *file = alloc_file(path, (unsigned)mode);
     if (file == NULL)
-        return FS_MAXFILES;
+        return compat_error();
 
     int fd = open(path, open_flags(mode), 0666);
     if (fd < 0) {
@@ -460,7 +465,7 @@ int FSCreate(char *name, int attr, FS_FILE **fileptr)
 
     FS_FILE *file = alloc_file(path, FSMODE_WRITE);
     if (file == NULL)
-        return FS_MAXFILES;
+        return compat_error();
 
     int fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0666);
     if (fd < 0) {
@@ -728,8 +733,9 @@ int FSOpenDir(char *name, FS_FILE **fileptr)
 
     FS_FILE *file = alloc_file(path, FSMODE_READ);
     if (file == NULL) {
+        int error = compat_error();
         (void)hpclang_stream_directory_close(directory);
-        return FS_MAXFILES;
+        return error;
     }
 
     file->_hpclang_kind = HPCLANG_HPGCC_FS_DIRECTORY;
@@ -774,7 +780,7 @@ int FSGetNextEntry(FS_FILE *entry, FS_FILE *dir)
         return FS_MAXFILES;
     }
     (void)snprintf(entry->_hpclang_entry_path, path_size, "%s/%s", dir->Name, raw.name);
-    entry->Volume = 0u;
+    entry->Volume = dir->Volume;
     entry->Mode = FSMODE_READ;
     entry->Attr = compat_attrs(raw.type, raw.attributes);
     entry->FileSize = raw.byte_size > UINT_MAX ? UINT_MAX : (unsigned int)raw.byte_size;
@@ -906,7 +912,8 @@ int FSSetCurrentVolume(int volume)
 
 int FSGetCurrentVolume(void)
 {
-    return current_volume();
+    int volume = current_volume();
+    return volume < 0 ? compat_error() : volume;
 }
 
 int FSGetVolumeSize(int volume)
@@ -1063,11 +1070,9 @@ char *FSGetFileName(FS_FILE *file, int pathflags)
         return NULL;
 
     const char *source = file->Name;
-    unsigned index = source[1] == ':' ? (unsigned)(source[0] - '0') : 0u;
-    struct hpclang_stream_volume_info info;
-    if (hpclang_stream_volume_query(index, &info))
+    if (file->Volume >= 4)
         return NULL;
-    unsigned selected = info.partition ? info.partition - 1u : 0u;
+    unsigned selected = file->Volume;
     if (source[1] == ':')
         source += 2;
     char relative[HPCLANG_STREAM_NAME_CAPACITY];

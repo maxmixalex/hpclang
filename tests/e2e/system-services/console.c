@@ -113,6 +113,73 @@ static int physical_symbols(uint32_t model)
     return strcmp(text, expected) || hpclang_keyboard_any_is_down(&keys) ? -1 : 0;
 }
 
+/* HPGCC 1.0.3 examples/libtests/keyboard.c application flow: scan the physical
+ * matrix, print its columns and ON input, pace repeated snapshots, exit on
+ * Alpha. Clean snapshots replace raw GPIO/IRQ writes; standard text replaces
+ * the historical nonstandard printf("%b"). The test drives real switches. */
+static int historical_keyboard(uint32_t model)
+{
+    const struct hpclang_font *font = &hpclang_system_font;
+    struct hpclang_surface *surface = hpclang_display_surface();
+    unsigned rows = hpclang_surface_height(surface) / hpclang_font_height(font);
+    struct hpclang_console *console = hpclang_console_create(16, rows, font);
+    if (!console)
+        return -1;
+    unsigned alpha = model <= HPCLANG_MODEL_HP40GS ? 58 : 57;
+    const unsigned scans[] = {0, 0, 56, 56, alpha};
+    const unsigned down[] = {1, 0, 1, 0, 1};
+    const uint64_t expected[] = {UINT64_C(1), 0, UINT64_C(1) << 56, 0};
+    int result = -1;
+    unsigned frames = 0;
+    for (unsigned step = 0; step < 5; ++step) {
+        struct hpclang_keyboard_event event;
+        if (physical_event(scans[step], down[step], &event))
+            goto done;
+        if (event.key == HPCLANG_KEY_ALPHA)
+            break;
+        if (step >= 4)
+            goto done;
+        struct hpclang_keyboard_state keys;
+        hpclang_keyboard_read(&keys);
+        if (keys.bits != expected[step] || hpclang_console_clear(console))
+            goto done;
+        for (unsigned column = 0; column < HPCLANG_KEYBOARD_COLUMNS; ++column) {
+            static const char digits[] = HPCLANG_UI_TEXT("01234567");
+            char line[16] = HPCLANG_UI_TEXT("Con0: ");
+            line[3] = digits[column];
+            int n = 6;
+            for (unsigned row = 0; row < HPCLANG_KEYBOARD_ROWS; ++row)
+                line[n++] = hpclang_keyboard_matrix_is_down(&keys, column, row) ? '1' : '0';
+            line[n++] = '\n';
+            if (hpclang_console_write(console, line, (size_t)n))
+                goto done;
+        }
+        const char *on = hpclang_keyboard_dedicated_is_down(&keys, HPCLANG_KEYBOARD_ON)
+                             ? HPCLANG_UI_TEXT("ON: 1")
+                             : HPCLANG_UI_TEXT("ON: 0");
+        if (hpclang_console_write(console, on, 5) || hpclang_console_render(console, surface, 0, 0))
+            goto done;
+        uint32_t cell;
+        unsigned last = rows < 9 ? rows - 1 : 8;
+        if (hpclang_console_cell(console, 4, last, &cell) || cell != (step == 2 ? '1' : '0'))
+            goto done;
+        if (step >= 2 && mailbox(0x465200cau + step - 2, 0x464b00cau + step - 2))
+            goto done;
+        uint64_t before = hpclang_time_monotonic_us();
+        hpclang_delay_us(1000);
+        if (hpclang_time_monotonic_us() - before < 1000)
+            goto done;
+        ++frames;
+    }
+    struct hpclang_keyboard_event released;
+    if (frames != 4 || physical_event(alpha, 0, &released))
+        goto done;
+    result = 0;
+done:
+    hpclang_console_destroy(console);
+    return result;
+}
+
 struct reader
 {
     struct hpclang_console *console;
@@ -457,6 +524,9 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     result = 14;
     if (physical_symbols(model))
+        goto done;
+    result = 15;
+    if (historical_keyboard(model))
         goto done;
     result = 0;
 done:

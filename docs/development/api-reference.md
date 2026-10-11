@@ -455,6 +455,7 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |
+| `hpclang_font_available()` | Implemented; acceptance in progress | Checks whether the descriptor's source is accessible in this launch context. Direct classic launches can explicitly choose packaged fonts when the native Stock map is absent. Preserves `errno`; font availability is separate from glyph coverage. |
 
 No HP glyph bitmap is linked into the application. HP48gII/49g+/50g minifont/bigfont objects are resolved through the live Saturn logical mapping supplied by the launcher. HPGCC3 documents bigfont as an 8-row raster with normal advance 6; its raw record is eight bytes per character, so “8×8” describes storage/raster capacity rather than a fixed 8-pixel text advance.
 
@@ -543,7 +544,7 @@ parent iterator. This metadata extension is formally accepted on `6a7f9a28`.
 
 `HP39DIR.000` / `HP39DIR.CUR` describe the external HP39/40G typed transfer/disk protocol, not the calculator's internal object-store root. HP39 internal objects live behind native Stock catalogs/contexts. The private HP39 runtime uses the real Stock model rather than one generic HOME namespace: Aplets are native DORRP snapshots below `'apletdir`, Program/Note bodies use the current `PGMCXT` / `NOTESCXT` directories, and Aplet Variables use the current `ApletVars#` schema plus native recall/type/store descriptors. Descriptor-driven Variable recall now quotes the genuine extended variable ID and invokes Stock `@`; no generic HOME/current mapping or public HP39 catalog hierarchy is claimed.
 
-## Aplet-owned data (M7.3h, in progress)
+## Aplet-owned data (M7.3h, accepted)
 
 `<hpclang/aplet.h>` adds `hpclang_aplet_data_get/set/clear` for the current
 HP39 Stock Aplet under the supported HPGCC39 template. Reads return owned
@@ -554,7 +555,7 @@ HP39g+/39gs/40gs have local GC, instance-isolation and exit/relaunch evidence;
 The packaged Aplet exposes Stock's selected-Aplet Reset confirmation. Local
 HP39g+/HP39gs/HP40gs evidence covers cancellation, data reset, relaunch and isolation
 from another saved instance. Formal M7.3h acceptance is complete on `6a7f9a28`.
-See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-in-progress).
+See the [object-service contract](object-service.md#m73h-hp39-aplet-owned-data-accepted).
 
 `hpclang_aplet_list/clone/remove` manage the native HP39 Stock Aplet catalog.
 List returns an owned list of display-name strings; names contain 1–254 raw

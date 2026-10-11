@@ -29,7 +29,32 @@ These queries describe the clean services beneath adapters. They do not claim
 that every historical signature has an adapter, that native Port services exist,
 or that a supported operation has sufficient memory/media at the instant of use.
 The broader declaration/implementation/adapter/application-evidence ledger
-remains an M7.0 follow-up.
+is tracked below. Rows distinguish a working service from the remaining source
+adapter and application evidence; they are not a blanket parity claim.
+
+### Capability and application evidence
+
+`D/S` means Direct and Stock execution. Native calculator objects require Stock;
+SD streams exist only on HP49g+/HP50g. The source examples below are behavioral
+ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
+
+| Application capability | Historical declaration and implementation evidence | Clean service / context | Source adapter | Application evidence / remaining work |
+| --- | --- | --- | --- | --- |
+| Drawing, gray pages and animated presentation | HPGCC 1.1 `hpgraphics.h` and `sources/hpg/examples/testdoublebuf.c`; HPGCC3 `hpgraphics.h` mixed-font example | Owned surfaces, display sessions and frame synchronization; all six models D/S | Installed HPG names remain M8; the existing HPG prototype covers clip/style/pattern/XPM composition | `display/historical-clients.c` preserves five animation cycles and the mixed-font/shape layout. Local Direct passes on six models; Stock acceptance is in progress. Busy loops become frame synchronization; captures replace manual pauses |
+| Native or packaged text | Four releases' native-font helpers and HPG examples; HP39 ROM tables independently verified | Native font accessors plus `hpclang_font_available`, packaged fallback selected explicitly by the caller | Historical font-role/global selection stays in adapters | Gallery acceptance `8f79c156`, native symbols `41d75dec`; mixed-font application additionally detects missing native fonts in Direct classic launches. Availability-query acceptance is in progress |
+| Physical keyboard and bounded console input | HPGCC 1.0.3 `examples/libtests/keyboard.c`; 1.1/2.0 `hpkeyb49.h` implementations | Physical snapshots/events, separate native text mode, editor and owned console; all six models D/S | Historical modal/blocking spellings remain M8 | Text/input acceptance `c7451364` and `41d75dec`; `system-services/console.c` additionally ports the eight-column matrix/ON display and Alpha exit, with real GPIO transitions. Direct six-model checks pass; Stock acceptance is in progress |
+| Civil time, elapsed time, deadlines and sound | 1.1/2.0 `hpsys.h` implementations; HPGCC3 RTC/timer sources; benchmark and game examples | Stable civil snapshots, explicit conversion/set, monotonic time, polling timers and owned PWM; all six models D/S | Ordinary callback dispatch belongs to the application loop; historical names remain M8 | M7.4 System Services covers forward/backward clock adjustment without deadline drift, cancellation and shared-register restoration. A source-anchored historical time client remains to be added |
+| Files, directories, metadata and partition selection | HPGCC2 `fsystem/examples/example2.c`/`example3.c`; HPGCC3 `fsinit.c` implements four primary volumes | libc streams, owned directory snapshots, masked FAT metadata and explicit volume paths; HP49g+/HP50g D/S, other models `ENOSYS` | Bounded `fsystem.h` adapter, local cwd and historical MBR-slot aliases | `historical-files.c` ports the create/append/modify/move/read/enumerate/delete flow on both FAT volumes. HP49g+/HP50g D/S passes locally; formal acceptance is pending. The original example's excessive literal write length is corrected |
+| Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; public stable card identity remains open | `FSVolumeInserted` currently reports presence/volume errors, not the full historical `FS_CHANGED` distinction | Raw A→B→A image replacement covers old dirty streams and directory handles. Same-card versus different-card identity remains an M7 capability gap. Physical SD test is a maintainer-approved nonblocking follow-up |
+| Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
+| Persistent HP39 Aplet and native catalogs | HP39-enabled 1.1 Aplet template, checked against native ROM behavior | Aplet data/Reset and Program/Note catalogs; HP39 Stock with portal validation | Aplet packaging/template integration; no invented HOME namespace | Accepted on `6a7f9a28`: 15-invocation Reset and eight-invocation composite lifecycles, independent instances, SAVE and GC boundaries |
+| Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | Not implemented | No adapter claims | Each port's limitation was approved on 2026-10-04; implementation goals remain in the roadmap |
+
+Historical `sys_slowOn/sys_slowOff` is also used by real applications to select
+CPU speed and reduce power consumption. Monotonic delays and display frame
+synchronization cover timing, but do not by themselves provide that power
+behavior. A clean policy and its hardware ownership/restoration still require
+review before the overall M7 capability gate can close.
 
 ## Public API stability
 
@@ -95,7 +120,10 @@ The 1.1/2.0 keyboard API is source-stable but mixes layers that hpclang separate
 
 Compatibility decision: **Adapter**, with selected queries becoming effectively Direct.
 
-The hpclang core already supplies raw state, 51-key physical identity, DOWN/UP/REPEAT, and modifier state. Historical key-plane/text translation and blocking helpers remain adapter work.
+The hpclang core supplies raw state, 51-key physical identity, DOWN/UP/REPEAT,
+and modifier state. Separate caller-owned text mode, model-native character
+lookup and a bounded synchronous editor are accepted on `c7451364` and
+`41d75dec`. Historical names and modal-screen policy remain M8 adapter work.
 
 HPGCC3's asynchronous queue is useful comparative evidence but does not require hpclang's stock-hosted backend to install global keyboard IRQ ownership.
 
@@ -240,8 +268,10 @@ responsibility of the individual service call.
 
 Bounded UTF-8 editing and length-bounded message rendering provide the clean
 primitives for historical line-input/error helpers. Buffer ownership, cancellation
-and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
-`readint`/`readline` spelling remain adapter/UI work. Explicit standard-stream routing is available through `hpclang/stdio.h`.
+and errors are explicit. Historical modal screen policy and
+`readint`/`readline` spelling remain adapter/UI work. Model-native Alpha/Shift
+translation is implemented in the clean input layer. Explicit standard-stream
+routing is available through `hpclang/stdio.h`.
 
 ### Bounded numeric input
 
@@ -267,8 +297,9 @@ standard-stream routing: `printf/fprintf/fflush` can feed an owned console, and
 `getchar/fgets` can consume an application-supplied byte source. EOF, cancellation,
 output failures and ownership changes are separate tested cases. This supplies
 console primitives without importing historical global screen state or raw-key
-numbering. The application still supplies Alpha/Shift translation, its input
-event loop, and rendering/presentation policy; historical blocking `readint` and
+numbering. Applications can use the accepted model-native Alpha/Shift state and
+default keyboard editor; they supply the event source and rendering/presentation
+policy. Historical blocking `readint` and
 `readdouble` adapters remain to be built over these clean services. The existing
 file-backed stream implementation is not replaced.
 
@@ -277,8 +308,9 @@ file-backed stream implementation is not replaced.
 The clean `hpclang_text_input_run()` extension supplies a bounded synchronous
 line session with an explicit event source, editing policy, acceptance validator
 and rendering callback. It retains the line after cancellation and permits
-correction after capacity/validation errors. It is awaiting CI acceptance and does
-not yet establish historical Alpha mapping or a ready-made modal screen.
+correction after capacity/validation errors. It is accepted on `c7451364`;
+`41d75dec` adds native symbols and the default keyboard editor. A ready-made
+modal screen remains UI policy above these services.
 
 The distributions do not establish one portable Alpha/Shift policy:
 
@@ -288,14 +320,14 @@ The distributions do not establish one portable Alpha/Shift policy:
 | HPGCC 1.1 and 2.0 `sources/hplib/stdio/getchar.c`, `gets.c` | Explicit HP49 character table, left-shift lowercase conversion, LF-terminated echo/backspace loop without a capacity argument | Model-specific text maps and bounded line input belong above the physical-keyboard core; the HP49 table does not prove HP39 support |
 | HPGCC3 `libs_workspace/hplib/stdio/getchar.c`, `gets.c` | The old console retains the HP49 table; `gets` dispatches by console type, with a separate grayscale GUI implementation | Validate old and GUI console paths separately; their declaration alone does not establish six-model behavior |
 
-Next acceptance must cover an explicit text-plane state, model-specific character
-mapping, editing/accept/cancel, bounded input and rendering through a complete
-keyboard-driven flow. The existing scripted standard-input E2E verifies stream
-routing, not Alpha-key translation. Historical blocking spellings remain M8
-adapter work; the usable clean input behavior remains an M7 requirement.
+Acceptance on `c7451364` and `41d75dec` covers explicit text-plane state,
+model-specific character mapping, editing/accept/cancel, bounded input and
+rendering through actual GPIO-driven keyboard flows. Scripted standard-input
+coverage separately verifies stream routing. Historical blocking spellings
+remain M8 adapter work; the clean input behavior has passed M7 acceptance.
 
 `hpclang_text_alpha_lookup()` now supplies the printed Latin letters and
-Alpha-space for explicit model/key/case inputs, pending CI. It does not copy a
+Alpha-space for explicit model/key/case inputs, accepted on `c7451364`. It does not copy a
 historical raw scan table or infer a global modifier mode. Letter positions were
 checked against the keyboard diagrams in the official
 [HP39g+ guide, 1-3](https://h10032.www1.hp.com/ctg/Manual/c00045564.pdf),
@@ -317,12 +349,13 @@ is selected explicitly by the application; classic double-Alpha locks and
 left-Shift case changes follow the native keyboard. Right-shift Alpha symbols
 remain a distinct plane, not an alias for lowercase. Source-specific historical
 console policies are not copied into the physical keyboard service. Complete
-symbol lookup, the ready-made physical keyboard editor and historical blocking
-compatibility spellings remain separate unfinished work.
+symbol lookup and the ready-made physical keyboard editor are accepted on
+`41d75dec`; historical blocking compatibility spellings remain M8 adapter work.
 System Services now drives physical GPIO input through the native mode,
 editor and console for single/held and locked Alpha, with independent pixel
-references and strict return checks (accepted on `c7451364`). Punctuation/symbol planes
-and the complete ready-made interactive editor remain separate acceptance work.
+references and strict return checks (accepted on `c7451364`). Punctuation/symbol
+planes and the complete ready-made interactive editor extend that acceptance
+on `41d75dec`.
 
 The current extension adds a default mode-aware editor and native Unicode
 symbols. ROM probes across all six models distinguish HP39's π/∠ shortcuts
@@ -365,7 +398,7 @@ HP39gs/40gs have typed internal calculator objects, but the native storage model
 
 `HP39DIR.000` / `HP39DIR.CUR`, `HP39AscA`, and `HP39BinX` are a different layer: the typed external Disk Drive/Conn3x transfer protocol used to import/export Aplets, Programs, Notes and related records. Historical `DoGetObFrSto`, `DoSendObToSto`, `OpenIO`, and `StdIOProc` belong to this transfer/I/O path and must not be treated as proof that `HP39DIR.*` is the internal calculator namespace.
 
-Compatibility code may preserve that transfer protocol privately, while canonical internal object access goes through the Saturn/System-RPL portal and native catalog/context primitives. The bridge normalizes Aplet, Program and Note catalogs into owned list snapshots without exposing ROM addresses or leaving its temporary RPL stack cell behind. Public Program/Note services live in `hpclang/catalog.h`; Aplet lifecycle services live in `hpclang/aplet.h`. Their M7.3 acceptance is still being validated. HP39 is not flattened into `FILE *` or a fabricated HOME tree.
+Compatibility code may preserve that transfer protocol privately, while canonical internal object access goes through the Saturn/System-RPL portal and native catalog/context primitives. The bridge normalizes Aplet, Program and Note catalogs into owned list snapshots without exposing ROM addresses or leaving its temporary RPL stack cell behind. Public Program/Note services live in `hpclang/catalog.h`; Aplet lifecycle services live in `hpclang/aplet.h`. Their M7.3 acceptance is complete on `6a7f9a28`. HP39 is not flattened into `FILE *` or a fabricated HOME tree.
 
 ## Saturn / RPL object bridge
 
@@ -423,7 +456,7 @@ copying the large launcher merely as a test fixture.
 **M7.3a-e are complete at the intended HPGCC 1.1/2.0 object/stack adapter
 baseline.** M7.3f public named-store and native-variable writes are implemented and accepted in the clean core.
 Historical raw signatures remain Migration interfaces. Clean directory, composite,
-precision and stack-reorder equivalents remain required M7.3 work.
+precision and stack-reorder equivalents are accepted on `6a7f9a28`.
 
 HPGCC3's `SAT_OBJECT` direction remains useful design evidence but is not an ABI target; hpclang deliberately replaces borrowed raw addresses with owned snapshots.
 
@@ -521,7 +554,7 @@ build dependencies or copying their implementations into hpclang.
 | --- | --- | --- |
 | Create a directory; remove an entire directory tree | HPGCC3 `libs_workspace/headers/sat3.h`: `sat3_crdir`, `sat3_pgdir`; implemented in `hplib/sat3/sat3_dir.c` | Clean `mkdir/rmdir` accepted with reference/cwd safety; see M7.3g validation |
 | Aplet-owned persistent data | 1.1 `sources/HP39-Aplet/Skeleton/hpgccaplet.s`: `CustomData@`, `_Entry`, `_Action`, `_Exit`, `_Reset` | Clean `hpclang_aplet_data_get/set/clear`; all three HP39 models pass the 15-invocation local contract, including native GC, instance isolation, exit/relaunch and menu Reset cancellation/confirmation. Formal CI acceptance is complete on `6a7f9a28`. |
-| Lists, real/complex arrays and matrices | 1.1/2.0 `saturn.h` construction/push helpers; HPGCC3 `sat3_createlist`, list operations, `sat3_createrarray/carray/matrix`; corresponding list/matrix sources exist | M7.3i locally implements owned lists, homogeneous numeric arrays and heterogeneous symbolic matrices, with construction, access and independent edits. Raw historical signatures are not thereby declared compatible. See [composite object progress](object-service.md#m73i-composite-objects-and-stack-reorder-in-progress). |
+| Lists, real/complex arrays and matrices | 1.1/2.0 `saturn.h` construction/push helpers; HPGCC3 `sat3_createlist`, list operations, `sat3_createrarray/carray/matrix`; corresponding list/matrix sources exist | M7.3i, accepted on `6a7f9a28`, implements owned lists, homogeneous numeric arrays and heterogeneous symbolic matrices, with construction, access and independent edits. Raw historical signatures are not thereby declared compatible. See [composite object progress](object-service.md#m73i-composite-objects-and-stack-reorder-accepted). |
 | Complex, identifiers/tags, binary and wider numeric values | HPGCC3 `sat3_createcplx_*`, `sat3_createid_str`, `sat3_createtag_str`, `sat3_createhxs_*`, decNumber/XREAL conversion families | M7.3i adds clean complex, identifier, tagged and width-preserving binary objects, arbitrary-length ZINT decimal exchange and exact 12-digit REAL coefficient/exponent exchange. HPGCC3's reviewed REAL decNumber/XREAL adapters still target classic REAL; distinct EREAL/LONGREAL formats and arithmetic are not implied. |
 | Stack rearrangement and Boolean exchange | 1.1/2.0 `sat_stack_swap/nip`; 2.0 `sat_pushtruefalse`; HPGCC3 `sat3_swap`, `sat3_pushtruefalse` | M7.3i implements allocation-free transactional swap/nip and genuine SysRPL TRUE/FALSE exchange. The 1.1/2.0 reorder and 2.0 Boolean push signatures have bounded adapters; formal CI is complete on `6a7f9a28`. |
 | HP39 named Program/Note/Aplet lifecycle | Native catalogs and ROM descriptor/context evidence; public generic HPGCC variable-definition CRUD has not been established | `hpclang_catalog_*` implements Program/Note CRUD, including compiler/editor records. `hpclang_aplet_list/clone/remove` provides owned name lists and named native copies, preserves caller contexts, protects active/default Aplets and maintains the cached display list on removal. The dedicated catalog fixture passes on all three HP39 models; CI acceptance is complete on `6a7f9a28`. |
@@ -562,7 +595,8 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 | --- | --- | --- | --- |
 | Query an absent card, insert it, retry before controller acquisition | HP49g+/HP50g: fresh GPIO sampling; no pin reconfiguration or repeated Stock `CHECKINSERT`. HP39/40 and HP48: `ENOSYS` | `FSVolumeInserted` uses the clean media query | Host register-transition and ownership tests; formal regression accepted on `256e8496` |
 | Observe write protection before acquisition | HP49g+/HP50g: GPD3 sampled per attempt; absent media does not require a protection read | Existing open/attribute/volume adapters inherit the mounted policy | Host polarity/change/error tests; formal regression accepted on `256e8496` |
-| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Existing stream adapters inherit recovery; broad historical reinitialization adapters remain unimplemented | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension passes 68 host tests and HP49g+/HP50g Direct/Stock raw-image swap tests locally; CI is pending. A manual hardware-check package is provided, with physical execution nonblocking |
+| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Existing stream adapters inherit recovery; broad historical reinitialization adapters remain unimplemented | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. The EINT3 extension is accepted on `cada0f2e`: 68 host tests, HP49g+/HP50g Direct/Stock raw-image swap tests and all six CI workflows pass. A manual hardware-check package is provided, with physical execution nonblocking |
 
-The new pre-acquisition sampling is separate from the accepted metadata and
-normal file-I/O contract. It does not claim safe hot swapping of a mounted card.
+Pre-acquisition sampling and the owned removal latch are separate stages of
+the same media lifecycle. Emulator tests establish stale-handle rejection and
+remount behavior; the later physical card test remains a nonblocking follow-up.

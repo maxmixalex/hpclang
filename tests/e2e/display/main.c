@@ -7,6 +7,7 @@
 
 extern const struct hpclang_font hpclang_system_font;
 unsigned hpclang_hpg_graphics_witness(struct hpclang_surface *destination);
+unsigned hpclang_historical_graphics(int (*checkpoint)(unsigned));
 volatile uint32_t hpclang_e2e_result;
 volatile unsigned hpclang_display_failure;
 static uint32_t baseline[9];
@@ -112,6 +113,13 @@ int main(void)
             failure = 80u + graphics;
     }
     hpclang_display_end();
+    if (!failure) {
+        unsigned historical = hpclang_historical_graphics(frame);
+        if (historical)
+            failure = 100u + historical;
+        else if (!restored())
+            failure = 104u;
+    }
     if (!failure && hpclang_display_begin(16))
         failure = 70;
     struct hpclang_surface *surface = hpclang_display_surface();

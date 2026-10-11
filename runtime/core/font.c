@@ -466,6 +466,36 @@ static uint32_t hp4950_big_bitmap_base(void)
     return object + skip_bytes * 2u;
 }
 
+int hpclang_font_available(const struct hpclang_font *font)
+{
+    if (font == NULL || font->abi != HPCLANG_FONT_PACKAGE_ABI)
+        return 0;
+    const struct hpclang_bitmap_font_data *bitmap = bitmap_data(font);
+    if (bitmap)
+        return bitmap->line_height != 0 && bitmap->nominal_advance != 0;
+    if (font->kind == FONT_KIND_HP39_MINI || font->kind == FONT_KIND_HP39_MAIN ||
+        font->kind == FONT_KIND_HP39_EDITLINE)
+        return hp39_font_window_base() != 0;
+    uint32_t model = active_model();
+    if (model < HPCLANG_MODEL_HP48GII || model > HPCLANG_MODEL_HP50G)
+        return 0;
+    uint32_t first, last;
+    uint8_t ignored;
+    if (font->kind == FONT_KIND_HP4950_MINI) {
+        first = 0x0812c8u + 7u;
+        last = first + 256u * 6u - 1u;
+    } else if (font->kind == FONT_KIND_HP4950_BIG) {
+        if (!hpclang_saturn_read_byte(hpclang_saturn_address_make(0x084d82u + 14u), &ignored))
+            return 0;
+        first = hp4950_big_bitmap_base();
+        last = first + 256u * 16u - 1u;
+    } else {
+        return 0;
+    }
+    return hpclang_saturn_read_nibble(hpclang_saturn_address_make(first), &ignored) &&
+           hpclang_saturn_read_nibble(hpclang_saturn_address_make(last), &ignored);
+}
+
 static void draw_hp4950_big(struct hpclang_surface *surface, int32_t x, int32_t y,
                             uint32_t codepoint, uint8_t intensity)
 {

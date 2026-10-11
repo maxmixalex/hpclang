@@ -23,7 +23,21 @@ def verify(prefix: Path, height: int) -> None:
         expected = bytes(final[y * 132 + x] for y in range(20, 36) for x in range(131))
         assert actual == expected, f"{prefix}/{frame}: input text differs from reference band"
         assert min(expected) < max(expected), f"{prefix}/{frame}: blank reference band"
-    print(f"PASS: {prefix}: physical-input text and reference pixels agree")
+    snapshots = []
+    for frame in (202, 203):
+        data = Path(f"{prefix}-{frame}.pgm").read_bytes()
+        assert data.startswith(header) and len(data) == len(header) + 132 * height
+        pixels = data[len(header) :]
+        assert pixels.count(0) > 30, f"{prefix}: blank historical keyboard console"
+        snapshots.append(pixels)
+    differences = [i for i, pair in enumerate(zip(*snapshots)) if pair[0] != pair[1]]
+    assert differences, f"{prefix}: ON press/release did not change the console"
+    # The fixture explicitly packages newRPL 6a (4x6 cells): ON's digit is
+    # column 4 of the ninth line, after eight physical matrix columns.
+    assert all(48 <= i // 132 < 54 and 16 <= i % 132 < 20 for i in differences), (
+        f"{prefix}: non-ON text changed between otherwise identical snapshots"
+    )
+    print(f"PASS: {prefix}: physical-input references and historical keyboard console")
 
 
 def main() -> None:
