@@ -935,3 +935,10 @@ Storage witness passes Direct and Stock on HP49g+/HP50g. The stream extension
 also passes six-model Direct Runtime/System Services and a focused HP39gs
 Stock System Services recheck with the smaller shared heap. Its changed-source
 analysis, formatting, ShellCheck and strict docs pass. Formal CI is pending.
+
+The public-runtime size increase was also checked against the last accepted
+Gallery build: shard 13 was its largest Direct payload at 91,768 initialized
+bytes. The new shard is 95,160 bytes; Stock's compact native-font/control-face
+payload is 24,232 bytes, with 3,168 bytes of static writable data. Both build
+successfully with the normal profile and remain within their launcher budgets.
+This is a build/size check, not a replacement for Gallery's CI pixel gates.

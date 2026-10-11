@@ -95,7 +95,7 @@ The implementation deliberately differs by platform family:
 
 This difference is not an hpclang invention. Historical HPGCC's calculator-native helper path explicitly resolves the HP48-compatible minifont at Saturn `0x812c8` and bigfont object at `0x84d82` through `sat_map_s2a()`, whose implementation indexes `_saturn_cpu->Read[]`. The HPGCC HP39 Aplet/Library 275 support instead binds HP39 stock ROM text entries such as `Put3x5` and `Put5x7`.
 
-The exact hpclang HP39 raster locations (`0x07E695` mini and `0x07C651` main in physical Saturn nibble space) come from independent HP39 stock-ROM reverse engineering and pixel/renderer validation. They must not be described as HPGCC constants.
+The legacy atlas coordinates (`0x07E695` mini and `0x07C651` main) are internal reference coordinates, not universal physical ROM locations. HP39g+ D1.55 and HP39gs/HP40gs 2.22 relocate the tables differently; the runtime translates them through independently verified model-specific NOR windows. The [native-font API reference](api-reference.md#calculator-native-fonts) records those physical locations and pixel evidence. These coordinates must not be described as HPGCC constants.
 
 This distinction is implementation-only. Applications receive the same opaque font interface and must not learn physical ROM addresses or `Read[]` internals.
 

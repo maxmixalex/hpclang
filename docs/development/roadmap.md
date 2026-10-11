@@ -138,7 +138,11 @@ Planned dependency order after M7.1:
 - [x] publish a progress-oriented API reference with per-service validation and HPGCC comparison;
 - [x] define the C ABI boundary and C++ wrapper policy;
 - [x] establish common conventions through the implemented device/time/keyboard/display/storage slices;
-- [ ] finish conventions only when remaining object/UI services expose genuinely new ownership, error, string/buffer, or capability-query requirements.
+- [x] finish conventions only when remaining object/UI services expose genuinely new ownership, error, string/buffer, or capability-query requirements.
+  - M7's implemented object, catalog, input, power and termination services now
+    document ownership, supported contexts, error channels and buffer lifetimes.
+    Normal termination includes registered-stream cleanup; immediate termination
+    retains hardware restoration. Future declarative-UI policy remains in M8.
 
 See [SDK API design](sdk-design.md).
 
