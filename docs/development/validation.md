@@ -970,8 +970,11 @@ stream-lifetime and runtime-exit tests also pass ASan/UBSan. Changed-source
 Clang analysis and formatting pass. Six-model Direct Runtime/System Services,
 six-model Stock mutation/composite tests (including every HP39 lifecycle),
 HP39gs Stock Runtime and both SD models' Direct/Stock exit-time file witnesses
-pass locally. Stock System Services pass on five models; HP39g+ is being
-rechecked after an installation-only transfer ceiling under concurrent load.
+pass locally. Stock System Services also pass on all six models. HP39g+ first
+hit the installation-only absolute transfer ceiling under concurrent local
+load, then passed unchanged with lower parallel load and the same watchdog
+limits. These supplementary checks complete local acceptance of `2988e1de`;
+formal CI acceptance and main integration remain pending.
 
 The optional physical SD package has been rebuilt through the same build and
 packaging inputs used by CI, with 49,824-byte launchers for HP49g+/HP50g. Its
