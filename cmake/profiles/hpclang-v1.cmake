@@ -48,6 +48,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/console.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/stdio-routing.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-key-map.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-events.c"

@@ -455,6 +455,11 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     double conversion from the bounded editor, full-line syntax/range checking,
     and correction after a rejected accept attempt. Alpha/Shift text policy,
     console event/rendering behavior and historical blocking adapters remain open.
+  - Implemented console extension, awaiting CI: owned fixed-cell UTF-8 output,
+    wrapping/scrolling, clipped viewport rendering and explicit standard-stream
+    binding with read/write/flush callbacks, distinct EOF/error/cancellation and
+    reset on ownership changes. Alpha/Shift text maps and a ready-made keyboard
+    line-input loop remain open; physical keyboard semantics are unchanged.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

@@ -240,6 +240,16 @@ accepting a numeric prefix. They do not implement Alpha-lock, a blocking console
 global stdin/stdout routing or arbitrary-precision calculator numbers. Those
 separate capabilities retain their existing roadmap destinations.
 
+The console extension now supplies bounded Unicode output and explicit C
+standard-stream routing: `printf/fprintf/fflush` can feed an owned console, and
+`getchar/fgets` can consume an application-supplied byte source. EOF, cancellation,
+output failures and ownership changes are separate tested cases. This supplies
+console primitives without importing historical global screen state or raw-key
+numbering. The application still supplies Alpha/Shift translation, its input
+event loop, and rendering/presentation policy; historical blocking `readint` and
+`readdouble` adapters remain to be built over these clean services. The existing
+file-backed stream implementation is not replaced.
+
 ## File I/O and standard C I/O
 
 The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Insertion/write-protect sampling reads configured GPIO inputs before and during ownership; Stock KOS is retained for `ResetSD` after release. Observed removal or a block-transfer failure invalidates old file/directory objects, and new path operations can remount. Old handles must be closed after `EBADF`; their pending writes are not flushed to a newly mounted volume. This does not establish detection of a complete remove/reinsert cycle between observations or physical hot-plug safety.

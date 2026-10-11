@@ -13,6 +13,8 @@
 
 #define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
 
+unsigned hpclang_e2e_console_test(void);
+
 static int numeric_line(struct hpclang_text_input *input, char *buffer, size_t capacity,
                         const char *text)
 {
@@ -114,6 +116,9 @@ static int sound_test(void)
 
 uint32_t hpclang_e2e_system_test(void)
 {
+    unsigned console_failure = hpclang_e2e_console_test();
+    if (console_failure != 0u)
+        return 0xb0u + console_failure;
     unsigned numeric_failure = numeric_test();
     if (numeric_failure != 0u)
         return 0xa0u + numeric_failure;

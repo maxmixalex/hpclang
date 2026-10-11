@@ -33,6 +33,8 @@ The application-facing surface currently includes:
 - `<hpclang/time.h>` and `<hpclang/time.hpp>`
 - `<hpclang/datetime.h>`, `<hpclang/timer.h>`, `<hpclang/sound.h>` and `<hpclang/power.h>`
 - `<hpclang/input.h>` for bounded UTF-8 line editing
+- `<hpclang/console.h>` for an owned Unicode console viewport
+- `<hpclang/stdio.h>` for explicit standard-stream callback binding
 - `<hpclang/keyboard.h>`
 - `<hpclang/display.h>` and `<hpclang/display.hpp>`
 - `<hpclang/font.h>`
@@ -101,10 +103,10 @@ explicit Unicode insertion. It does not introduce a global terminal or change
 stdin/stdout behavior. The application chooses rendering, event polling and
 whether to retain a cancelled working line.
 
-An on-screen standard-I/O console is still missing: the current default `stdin`
-returns EOF and `stdout`/`stderr` discard output. File-backed `FILE *` support in
-M7.2 does not supply an interactive terminal. Console routing, text-plane mapping
-and rendering/event policy remain explicit M7 follow-ups.
+The default `stdin` returns EOF and `stdout`/`stderr` discard output until an
+application explicitly binds them. The console/standard-stream extension below
+supplies that routing; text-plane mapping and a ready-made keyboard line-input
+loop remain separate follow-ups. File-backed `FILE *` support is unaffected.
 
 `hpclang_surface_draw_text_n()` renders bounded message/error text without requiring
 a terminator, exiting, waiting for a key or clearing the caller's surface.
@@ -140,6 +142,62 @@ if (hpclang_text_input_parse_int64(&input, &value) == 0) {
     /* Show EINVAL/ERANGE and keep editing input. */
 }
 ```
+
+### Console and standard streams
+
+The console and stream-binding extension is implemented and awaiting CI acceptance.
+
+| API | Contract |
+| --- | --- |
+| `hpclang_console_create/destroy()` | Own a fixed-cell Unicode grid and drawing buffers; borrow the selected font; no display session or hardware acquisition |
+| `hpclang_console_write/flush/clear()` | Incremental UTF-8, wrapping, scrolling, LF/CR/BS/TAB/FF; flush replaces an unfinished sequence; clear resets text and decoder |
+| `hpclang_console_cell()` | Inspect a visible cell as a Unicode scalar; scrolled-away text is not retained |
+| `hpclang_console_render()` | Opaque black-on-white viewport, each glyph clipped to its cell; clip to destination; caller chooses when to draw and present |
+| `hpclang_stdio_bind/unbind()` | One explicit binding for the C standard streams; callbacks are copied and context is borrowed; file-backed streams and raw file descriptors are unaffected |
+
+Each Unicode scalar occupies one cell using the font's nominal advance and line
+height. This is not ANSI escape parsing, double-width/grapheme layout or an
+unbounded transcript. Invalid UTF-8 becomes U+FFFD. A filled final column uses
+delayed wrapping, so the last screenful remains visible until more output arrives.
+`\b` moves left without erasing, tabs insert spaces to four-cell stops, and
+unrecognized C0/C1 controls are ignored.
+
+The output adapter below updates the text model; drawing/presentation remains
+explicit. Dynamic console text needs a suitable font repertoire rather than
+assuming `STATIC_AUTO` can discover future input.
+
+```c
+struct hpclang_console *console = hpclang_console_create(20, 8, hpclang_font_mini());
+if (console != NULL) {
+    struct hpclang_stdio_callbacks io = {
+        .write = hpclang_console_stdio_write,
+        .flush = hpclang_console_stdio_flush,
+        .context = console,
+    };
+    if (hpclang_stdio_bind(&io) == 0) {
+        printf("Value: %d\n", 12);
+        fflush(stdout);
+        hpclang_console_render(console, hpclang_display_surface(), 0, 0);
+        hpclang_stdio_unbind();
+    }
+    hpclang_console_destroy(console);
+}
+```
+
+An optional read callback supplies bytes to `getchar/fgets/scanf`. It may obtain
+an edited line using the bounded editor and the application's event/render loop.
+It returns `HPCLANG_STDIO_EOF` for normal end-of-input, or
+`HPCLANG_STDIO_ERROR` with `errno` for a failure/cancellation (`ECANCELED`).
+These map to distinct `feof`/`ferror` states. No implicit Alpha-lock or Stock
+modal dialog is selected. Callbacks may use direct console/drawing operations,
+but must not recursively call standard I/O or change its binding; recursion is
+rejected with `EBUSY`.
+
+Unbind before releasing the callback context or console. Unbind flushes both
+output channels and detaches even if a flush fails, returning the first error.
+Bind/unbind reset EOF, errors and pushback so old input cannot leak to a new
+source. stdout and stderr have separate C stream status; the console adapters
+deliberately combine their bytes into one ordered UTF-8 output stream.
 
 ## Display and surfaces
 
