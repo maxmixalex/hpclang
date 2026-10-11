@@ -296,6 +296,11 @@ hpclang_unit(storage_media test_storage_media.c "${HPCLANG_ROOT}/runtime/libc/st
 target_include_directories(test_storage_media PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc")
 
+hpclang_unit(storage_diskio test_storage_diskio.c "${HPCLANG_ROOT}/runtime/libc/hp4950-fatfs-diskio.c")
+target_include_directories(test_storage_diskio PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/libc" "${HPCLANG_ROOT}/runtime/core"
+    "${HPCLANG_ROOT}/third_party/fatfs")
+
 hpclang_unit(namespace_lease
     test_namespace_lease.c
     "${HPCLANG_ROOT}/runtime/libc/storage-namespace-lease.c")

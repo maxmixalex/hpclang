@@ -7,8 +7,10 @@
 #include "../../third_party/fatfs/diskio.h"
 #include "hp4950-fatfs-diskio.h"
 #include "s3c2410-sdio-card.h"
+#include "storage-media.h"
+#include "storage-mmio.h"
 
-#define REG32(address) (*(volatile uint32_t *)(uintptr_t)(address))
+#define REG32(address) hpclang_storage_mmio_read32(address)
 
 #define MPLLCON REG32(UINT32_C(0x07200004))
 #define CLKCON REG32(UINT32_C(0x0720000c))
@@ -39,7 +41,7 @@ static uint32_t mmio_read32(void *context, uint32_t offset)
 static void mmio_write32(void *context, uint32_t offset, uint32_t value)
 {
     (void)context;
-    REG32(SDI_BASE + offset) = value;
+    hpclang_storage_mmio_write32(SDI_BASE + offset, value);
 }
 
 static uint32_t hp4950_pclk_hz(void)
@@ -79,7 +81,7 @@ int hpclang_hp4950_fatfs_controller_acquire(int read_only)
         return -1;
 
     state.saved_clkcon = CLKCON;
-    CLKCON = state.saved_clkcon | CLKCON_SDI;
+    hpclang_storage_mmio_write32(UINT32_C(0x0720000c), state.saved_clkcon | CLKCON_SDI);
     state.owned = 1u;
     state.initialized = 0u;
     state.read_only = read_only != 0;
@@ -96,7 +98,7 @@ void hpclang_hp4950_fatfs_controller_release(void)
 
     state.initialized = 0u;
     state.read_only = 0u;
-    CLKCON = state.saved_clkcon;
+    hpclang_storage_mmio_write32(UINT32_C(0x0720000c), state.saved_clkcon);
     state.owned = 0u;
 }
 
@@ -105,10 +107,41 @@ int hpclang_hp4950_fatfs_controller_owned(void)
     return state.owned != 0u;
 }
 
+static void invalidate_card(void)
+{
+    if (state.initialized)
+        hpclang_s3c2410_sdio_card_close(&state.card);
+    state.initialized = 0u;
+}
+
+static DSTATUS refresh_media(int *usable)
+{
+    if (usable)
+        *usable = 0;
+    if (!state.owned)
+        return STA_NOINIT;
+    int present = 0, read_only = 0;
+    int queried = hpclang_storage_media_query(&present, &read_only);
+    if (queried != 0 || !present) {
+        /* Discard card/controller state without flushing cached filesystem data.
+         * A later mount must initialize the card and obtain a new FatFs identity. */
+        invalidate_card();
+        return STA_NOINIT | (queried == 0 ? STA_NODISK : 0u);
+    }
+    if (usable)
+        *usable = 1;
+    state.read_only = read_only != 0;
+    return (state.initialized ? 0u : STA_NOINIT) | (state.read_only ? STA_PROTECT : 0u);
+}
+
 DSTATUS disk_initialize(BYTE pdrv)
 {
     if (pdrv != 0u || !state.owned)
         return STA_NOINIT;
+    int usable;
+    DSTATUS status = refresh_media(&usable);
+    if (!usable)
+        return status;
     if (state.initialized)
         return state.read_only ? STA_PROTECT : 0u;
 
@@ -130,25 +163,29 @@ DSTATUS disk_initialize(BYTE pdrv)
 
 DSTATUS disk_status(BYTE pdrv)
 {
-    if (pdrv != 0u || !state.owned || !state.initialized)
+    if (pdrv != 0u)
         return STA_NOINIT;
-    return state.read_only ? STA_PROTECT : 0u;
+    return refresh_media(NULL);
 }
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
 {
     if (pdrv != 0u || buff == 0 || count == 0u)
         return RES_PARERR;
-    if ((disk_status(pdrv) & STA_NOINIT) != 0u)
-        return RES_NOTRDY;
-
     for (UINT i = 0u; i < count; ++i) {
+        if ((disk_status(pdrv) & STA_NOINIT) != 0u)
+            return RES_NOTRDY;
         uint64_t current = (uint64_t)sector + i;
         if (current > UINT32_MAX)
             return RES_PARERR;
-        if (hpclang_s3c2410_sdio_read_sector(&state.card, (uint32_t)current,
-                                             buff + (size_t)i * 512u) != HPCLANG_SDIO_OK)
+        int result = hpclang_s3c2410_sdio_read_sector(&state.card, (uint32_t)current,
+                                                      buff + (size_t)i * 512u);
+        if (result == HPCLANG_SDIO_RANGE_ERROR)
+            return RES_PARERR;
+        if (result != HPCLANG_SDIO_OK) {
+            invalidate_card();
             return RES_ERROR;
+        }
     }
     return RES_OK;
 }
@@ -157,19 +194,23 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {
     if (pdrv != 0u || buff == 0 || count == 0u)
         return RES_PARERR;
-    DSTATUS status = disk_status(pdrv);
-    if ((status & STA_NOINIT) != 0u)
-        return RES_NOTRDY;
-    if ((status & STA_PROTECT) != 0u)
-        return RES_WRPRT;
-
     for (UINT i = 0u; i < count; ++i) {
+        DSTATUS status = disk_status(pdrv);
+        if ((status & STA_NOINIT) != 0u)
+            return RES_NOTRDY;
+        if ((status & STA_PROTECT) != 0u)
+            return RES_WRPRT;
         uint64_t current = (uint64_t)sector + i;
         if (current > UINT32_MAX)
             return RES_PARERR;
-        if (hpclang_s3c2410_sdio_write_sector(&state.card, (uint32_t)current,
-                                              buff + (size_t)i * 512u) != HPCLANG_SDIO_OK)
+        int result = hpclang_s3c2410_sdio_write_sector(&state.card, (uint32_t)current,
+                                                       buff + (size_t)i * 512u);
+        if (result == HPCLANG_SDIO_RANGE_ERROR)
+            return RES_PARERR;
+        if (result != HPCLANG_SDIO_OK) {
+            invalidate_card();
             return RES_ERROR;
+        }
     }
     return RES_OK;
 }

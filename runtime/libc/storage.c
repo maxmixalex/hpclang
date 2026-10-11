@@ -12,12 +12,13 @@
 
 #include "storage-namespace.h"
 #include "storage-media.h"
+#include "storage-mmio.h"
 
 /*
  * HP49g+/HP50g byte-stream storage policy.
  *
  * Application file I/O is served by hpclang's owned FatFs namespace for the
- * whole native-process lifetime. Media pins are sampled before taking direct
+ * whole native-process lifetime. Media pins are sampled before and during direct
  * controller ownership; Stock ResetSD runs only after releasing it.
  */
 
@@ -36,6 +37,16 @@ static int unsupported(void)
 uint32_t hpclang_storage_media_read32(unsigned offset)
 {
     return *(volatile uint32_t *)(uintptr_t)(UINT32_C(0x07a00000) + offset);
+}
+
+uint32_t hpclang_storage_mmio_read32(uintptr_t address)
+{
+    return *(volatile uint32_t *)address;
+}
+
+void hpclang_storage_mmio_write32(uintptr_t address, uint32_t value)
+{
+    *(volatile uint32_t *)address = value;
 }
 
 int open(const char *path, int flags, ...)

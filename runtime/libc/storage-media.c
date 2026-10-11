@@ -4,7 +4,7 @@
 #include "storage-media.h"
 #include "storage-namespace.h"
 
-int hpclang_storage_stock_media_query(int *present, int *read_only)
+int hpclang_storage_media_query(int *present, int *read_only)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
     if (!device || device->family != HPCLANG_FAMILY_HP4950) {
@@ -15,7 +15,7 @@ int hpclang_storage_stock_media_query(int *present, int *read_only)
         errno = EFAULT;
         return -1;
     }
-    if (!hpclang_namespace_stock_active()) {
+    if (!hpclang_namespace_stock_active() && !hpclang_namespace_direct_active()) {
         errno = EBUSY;
         return -1;
     }
@@ -39,4 +39,13 @@ int hpclang_storage_stock_media_query(int *present, int *read_only)
     *present = inserted;
     *read_only = write_protected;
     return 0;
+}
+
+int hpclang_storage_stock_media_query(int *present, int *read_only)
+{
+    if (!hpclang_namespace_stock_active()) {
+        errno = EBUSY;
+        return -1;
+    }
+    return hpclang_storage_media_query(present, read_only);
 }

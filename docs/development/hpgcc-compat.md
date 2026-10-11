@@ -223,7 +223,7 @@ and errors are explicit. HPG Alpha/Shift translation, modal screen policy,
 
 ## File I/O and standard C I/O
 
-The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g now route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Stock KOS is retained only for insertion/write-protect sampling before takeover and `ResetSD` after release.
+The stable historical standard-C names remain standard C where semantics fit. HP49g+/HP50g route ordinary `open/read/write/lseek/unlink` and picolibc `FILE *` operations through one process-wide hpclang-owned FatFs namespace. Insertion/write-protect sampling reads configured GPIO inputs before and during ownership; Stock KOS is retained for `ResetSD` after release. Observed removal or a block-transfer failure invalidates old file/directory objects, and new path operations can remount. Old handles must be closed after `EBADF`; their pending writes are not flushed to a newly mounted volume. This does not establish detection of a complete remove/reinsert cycle between observations or physical hot-plug safety.
 
 M7.2's clean core covers path metadata, masked FAT attribute mutation, modification/creation civil time and stored access-date queries, media state, free/total capacity, rename/mkdir/rmdir, UTF-8 LFN, and independent owned directory iterators. HP39/40 and HP48 continue to return clean `ENOSYS` rather than treating calculator-object stores as files. Access-date queries do not imply automatic atime maintenance: reads leave the stored date unchanged and FatFs clears it on writes. Creation/modification queries expose two-second precision; missing dates are explicitly invalid.
 
