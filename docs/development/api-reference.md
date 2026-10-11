@@ -185,7 +185,61 @@ Modifier keys, editing commands,
 digits without Alpha letters, punctuation planes and non-Latin symbols are not
 mapped by this helper. Call it only for the chosen text plane and DOWN/REPEAT
 events, before falling back to editing controls. It is implemented pending CI;
-the broader sticky-plane and physical-input acceptance requirements remain open.
+physical-input acceptance remains open.
+
+### Native text-mode state
+
+The caller-owned `hpclang_text_mode` selects a text plane from the complete
+physical event stream. It is implemented pending CI. Initialize a fresh mode
+for each input session; feed modifier releases as well as key presses. It does
+not poll/reset the keyboard, insert characters, acquire a display or change
+Stock's own state.
+
+| Operation | Contract |
+| --- | --- |
+| `hpclang_text_mode_init(&mode, model)` | Start unlocked, with no pending shift. Unknown model: `ENOSYS`. |
+| `hpclang_text_mode_event(&mode, &event, &plane)` | 1: route this DOWN/REPEAT through the selected plane; 0: consumed modifier or release; -1: invalid argument. Output changes only on 1. |
+| `hpclang_text_mode_set_lock(&mode, lock)` | Explicit application/menu selection: unlocked, uppercase lock or lowercase lock. Consumes pending/held modifiers used to select the action. |
+| `hpclang_text_mode_get(&mode, &status)` | Read the effective plane and persistent lock for the application's display. |
+
+Successful calls preserve errno; invalid arguments return `EINVAL` without
+changing state/output. The mode fields are private despite caller-owned storage.
+Events remain unchanged, including their **physical** modifier bits. Simultaneous
+presses are handled even when the key event precedes the modifier's own queued
+DOWN event. Modifier REPEAT events do not cycle locks.
+
+The default transitions follow the native model:
+
+| Input | HP39g+/39gs/40gs | HP48gII/49g+/50g |
+| --- | --- | --- |
+| Alpha once | Next key uses Alpha; another Alpha cancels | Next key uses Alpha; another Alpha locks uppercase |
+| Hold Alpha | Alpha remains effective while held | Alpha remains effective while held |
+| Lowercase once | Shift before or after Alpha | Alpha, then left Shift |
+| Shift while Alpha is locked | Temporarily invert letter case | Left Shift temporarily inverts case; right Shift selects symbols |
+| Alpha while locked | Suspend lock for one ordinary key, as in Notes | Unlock |
+| Left Shift, Alpha | Single lowercase entry with the HP39 Shift key | Toggle case only when already locked; otherwise a shifted command, clearing a pending single Alpha |
+| Right Shift, Alpha | No separate right Shift key | Shifted command; preserves an existing lock |
+
+HP39 locking is an application/menu action, like Notes' A..Z menu, rather than
+a double-Alpha gesture. Use `set_lock()` for that action; selecting lowercase
+lock while Shift is held does not immediately invert it again. A one-shot Shift
+is consumed by the first key even when Alpha stays held: native HP39
+Shift-then-held-Alpha with two presses of 2 produces `yY`.
+
+The result plane is plain, left/right shifted, uppercase/lowercase Alpha or
+Alpha symbols. For the two Latin planes, call `hpclang_text_alpha_lookup()` and
+insert the resulting scalar with `hpclang_text_input_edit()`. The application
+still routes editing actions, symbols and commands. A symbol plane must not be
+passed to Latin lookup as though it were lowercase. This state layer does not
+yet supply a complete symbol/command mapper or ready-made keyboard editor.
+
+One-shot state is consumed by the key even if translation or insertion fails;
+retrying an edit must not feed the same physical event twice. Repeat timing
+remains the physical event service's configuration. Enter/ON are routed to the
+application, which owns accept/cancel and the next session's initialization.
+The scripted system-service test composes this layer with the bounded editor
+and console to produce `AaZZ2` on all models. It does not close the separate
+physical keyboard-to-text rendering acceptance requirement.
 
 ### Bounded line sessions
 

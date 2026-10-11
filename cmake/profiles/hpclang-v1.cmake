@@ -50,6 +50,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input-session.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input-alpha.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input-mode.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/console.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/stdio-routing.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard-event-engine.c"

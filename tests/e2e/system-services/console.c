@@ -71,6 +71,87 @@ static int line_update(void *context, const struct hpclang_text_input *input, in
     return hpclang_console_render(s->console, hpclang_display_surface(), 2, 2);
 }
 
+struct alpha_session
+{
+    struct line_session line;
+    struct hpclang_text_mode mode;
+    uint32_t model;
+};
+static int alpha_next(void *context, struct hpclang_keyboard_event *event)
+{
+    struct alpha_session *s = context;
+    int hp39 = s->model <= HPCLANG_MODEL_HP40GS;
+    uint16_t a = hp39 ? HPCLANG_KEY_HP39_VARS : HPCLANG_KEY_F1;
+    uint16_t z = hp39 ? HPCLANG_KEY_3 : HPCLANG_KEY_DIVIDE;
+    uint16_t left = hp39 ? HPCLANG_KEY_HP39_SHIFT : HPCLANG_KEY_LEFT_SHIFT;
+    uint32_t left_bit = hp39 ? HPCLANG_KEYBOARD_MOD_SHIFT : HPCLANG_KEYBOARD_MOD_LEFT_SHIFT;
+    /* Scripted integration: single A, model-native lowercase a, held ZZ,
+     * release, ordinary 2, accept. Physical event delivery has its own gate. */
+#define DOWN(k, m) {.key = (k), .type = HPCLANG_KEYBOARD_EVENT_DOWN, .modifiers = (m)}
+#define UP(k, m)                                                                                   \
+    {                                                                                              \
+        .key = (k), .type = HPCLANG_KEYBOARD_EVENT_UP, .modifiers = (m)                            \
+    }
+    const struct hpclang_keyboard_event events[] = {
+        DOWN(HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+        UP(HPCLANG_KEY_ALPHA, 0),
+        DOWN(a, 0),
+        UP(a, 0),
+        DOWN(hp39 ? left : HPCLANG_KEY_ALPHA, hp39 ? left_bit : HPCLANG_KEYBOARD_MOD_ALPHA),
+        UP(hp39 ? left : HPCLANG_KEY_ALPHA, 0),
+        DOWN(hp39 ? HPCLANG_KEY_ALPHA : left, hp39 ? HPCLANG_KEYBOARD_MOD_ALPHA : left_bit),
+        UP(hp39 ? HPCLANG_KEY_ALPHA : left, 0),
+        DOWN(a, 0),
+        UP(a, 0),
+        DOWN(HPCLANG_KEY_ALPHA, HPCLANG_KEYBOARD_MOD_ALPHA),
+        DOWN(z, HPCLANG_KEYBOARD_MOD_ALPHA),
+        UP(z, HPCLANG_KEYBOARD_MOD_ALPHA),
+        DOWN(z, HPCLANG_KEYBOARD_MOD_ALPHA),
+        UP(z, HPCLANG_KEYBOARD_MOD_ALPHA),
+        UP(HPCLANG_KEY_ALPHA, 0),
+        DOWN(HPCLANG_KEY_2, 0),
+        UP(HPCLANG_KEY_2, 0),
+        DOWN(HPCLANG_KEY_ENTER, 0)};
+#undef DOWN
+#undef UP
+    if (s->line.next >= sizeof(events) / sizeof(events[0])) {
+        errno = EIO;
+        return -1;
+    }
+    *event = events[s->line.next++];
+    return 1;
+}
+static int alpha_edit(void *context, struct hpclang_text_input *input,
+                      const struct hpclang_keyboard_event *event)
+{
+    struct alpha_session *s = context;
+    enum hpclang_text_plane plane;
+    int result = hpclang_text_mode_event(&s->mode, event, &plane);
+    if (result <= 0)
+        return result;
+    if (plane == HPCLANG_TEXT_ALPHA_UPPER || plane == HPCLANG_TEXT_ALPHA_LOWER) {
+        uint32_t cp;
+        result =
+            hpclang_text_alpha_lookup(s->model, event->key, plane == HPCLANG_TEXT_ALPHA_LOWER, &cp);
+        if (result < 0)
+            return -1;
+        if (result)
+            return hpclang_text_input_edit(input, HPCLANG_INPUT_INSERT, cp);
+    } else if (plane != HPCLANG_TEXT_PLAIN) {
+        errno = ENOSYS;
+        return -1;
+    }
+    struct hpclang_keyboard_event plain = *event;
+    plain.modifiers = 0;
+    return hpclang_text_input_key(input, &plain);
+}
+static int alpha_update(void *context, const struct hpclang_text_input *input, int result,
+                        int error)
+{
+    struct alpha_session *s = context;
+    return line_update(&s->line, input, result, error);
+}
+
 unsigned hpclang_e2e_console_test(void)
 {
     const struct hpclang_font *font = hpclang_font_mini();
@@ -154,6 +235,19 @@ unsigned hpclang_e2e_console_test(void)
     if (hpclang_text_alpha_lookup(model, a, 0, &cp) != 1 || cp != 'A' ||
         hpclang_text_alpha_lookup(model, z, 1, &cp) != 1 || cp != 'z' ||
         hpclang_text_alpha_lookup(model, HPCLANG_KEY_UNKNOWN, 0, &cp) != 0 || cp != 'z')
+        goto done;
+    result = 10;
+    struct alpha_session alpha = {.line = {.console = c}, .model = model};
+    struct hpclang_text_input_callbacks alpha_callbacks = {alpha_next, alpha_edit, NULL,
+                                                           alpha_update, &alpha};
+    struct hpclang_text_mode_status mode_status;
+    if (hpclang_text_mode_init(&alpha.mode, model) != 0 ||
+        hpclang_text_input_init(&input, edit, sizeof(edit)) != 0 ||
+        hpclang_text_input_run(&input, &alpha_callbacks) != HPCLANG_INPUT_ACCEPTED ||
+        strcmp(edit, "AaZZ2") != 0 || alpha.line.next != 19 || alpha.line.updates != 20 ||
+        hpclang_text_mode_get(&alpha.mode, &mode_status) != 0 ||
+        mode_status.plane != HPCLANG_TEXT_PLAIN || mode_status.lock != HPCLANG_TEXT_UNLOCKED ||
+        hpclang_console_cell(c, 4, 0, &cp) != 0 || cp != '2')
         goto done;
     result = 0;
 done:

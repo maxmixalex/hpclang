@@ -76,6 +76,62 @@ extern "C"
      * Alpha plane applies. HP39 Alpha-Plus maps to space. Enter has no letter. */
     int hpclang_text_alpha_lookup(uint32_t model, uint16_t key, int lowercase, uint32_t *codepoint);
 
+    /* Text planes are application policy, separate from physical held modifiers.
+     * A shifted command or symbol plane is not a Latin-letter lookup. */
+    enum hpclang_text_plane
+    {
+        HPCLANG_TEXT_PLAIN = 0,
+        HPCLANG_TEXT_LEFT_SHIFT,
+        HPCLANG_TEXT_RIGHT_SHIFT,
+        HPCLANG_TEXT_ALPHA_UPPER,
+        HPCLANG_TEXT_ALPHA_LOWER,
+        HPCLANG_TEXT_ALPHA_SYMBOL
+    };
+    enum hpclang_text_lock
+    {
+        HPCLANG_TEXT_UNLOCKED = 0,
+        HPCLANG_TEXT_LOCK_UPPER,
+        HPCLANG_TEXT_LOCK_LOWER
+    };
+    /* Caller-owned state; fields are private. Initialize per input session and
+     * feed its complete ordered event stream, including modifier UP events.
+     * No global keyboard state, allocation, polling or Stock UI is changed. */
+    struct hpclang_text_mode
+    {
+        uint32_t model;
+        uint32_t alpha;
+        uint32_t lowercase;
+        uint32_t shift;
+        uint32_t held;
+        uint32_t used;
+        uint32_t suppressed;
+        uint32_t suspended;
+    };
+    struct hpclang_text_mode_status
+    {
+        enum hpclang_text_plane plane;
+        enum hpclang_text_lock lock;
+    };
+    /* Unknown model: ENOSYS. Invalid arguments: EINVAL. Errors change nothing;
+     * all successful mode operations preserve errno. */
+    int hpclang_text_mode_init(struct hpclang_text_mode *mode, uint32_t model);
+    /* Explicit application/menu action, including HP39 Notes-style A..Z lock.
+     * Clears pending one-shot shifts and Alpha suspension. Held modifiers used
+     * to select this action are suppressed until released. */
+    int hpclang_text_mode_set_lock(struct hpclang_text_mode *mode, enum hpclang_text_lock lock);
+    int hpclang_text_mode_get(const struct hpclang_text_mode *mode,
+                              struct hpclang_text_mode_status *status);
+    /* Return 1 with the selected plane for a non-modifier DOWN/REPEAT event;
+     * 0 for consumed modifiers/UP; -1/EINVAL for invalid input. Output changes
+     * only on 1. The original physical event is never changed. Shift+Alpha
+     * outside classic Alpha mode is a shifted command and also returns 1.
+     * One-shot state is consumed by the key even if the application cannot
+     * translate/insert it. This layer selects planes; it does not insert text,
+     * map symbols/commands, or decide how Enter/ON changes an editor session. */
+    int hpclang_text_mode_event(struct hpclang_text_mode *mode,
+                                const struct hpclang_keyboard_event *event,
+                                enum hpclang_text_plane *plane);
+
     /* Synchronous bounded line session. The caller owns input/buffer and context.
      * next returns 1/event, 0/idle or -1/errno; it may wait, or poll the physical
      * event service. Idle calls do not redraw. No global keyboard reset/timing,

@@ -159,6 +159,16 @@ nor selects an Alpha plane. An application can supply its own event source or
 adapt the existing keyboard poller, and can redraw through the console or other
 surface operations without acquiring implicit global screen state.
 
+`hpclang_text_mode` is the optional model-specific policy layer over that event
+stream. It owns pending Alpha/Shift and text locks in caller storage, leaving
+physical modifiers unchanged. HP39 menu locks and classic double-Alpha locks
+are distinct transitions. The result explicitly separates Latin case, symbols
+and shifted commands so a renderer/editor cannot accidentally interpret every
+shift as lowercase. Mode selection consumes a key independently of whether the
+editor accepts its character; the application owns symbol/command dispatch,
+accept/cancel and session lifetime. No general Stock keyboard shortcut table is
+added to the physical-key API.
+
 The console layer owns a bounded Unicode cell grid and drawing buffers. It
 renders an explicit viewport onto a caller-selected surface and does not retain
 that destination across page flips. Standard-I/O routing is a separate explicit

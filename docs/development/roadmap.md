@@ -473,14 +473,22 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     close those requirements.
   - Implemented explicit Latin Alpha lookup, awaiting CI: all six models'
     printed A-Z/a-z and Alpha-space positions, checked against their manual
-    diagrams and tested through physical key identities. Sticky/held plane
-    policy, punctuation/symbol planes and physical interactive acceptance remain
+    diagrams and tested through physical key identities. Punctuation/symbol
+    planes and physical interactive acceptance remain
     open; no implicit modifier state is added to the keyboard core.
   - Default text-plane behavior follows each Stock system's one-shot, held and
     locked Alpha rules. HP39 note-editor lock is an application action; do not
     substitute the HP48/49/50 double-Alpha lock gesture. The Latin HP39 map is
     cross-checked against actual Stock input on all three models as well as
     the below-key manual legends; physical interactive SDK acceptance remains open.
+  - Implemented caller-owned native text-mode state, awaiting CI: per-model
+    one-shot/held Alpha, classic double-Alpha lock and case selection, HP39
+    menu lock with temporary suspension, explicit symbol/command planes and
+    status for application rendering. Native ROM probes establish the transition
+    cases; host tests cover all six models and simultaneous-event ordering.
+    The scripted editor/console composition is additional integration coverage,
+    not the still-required physical keyboard-to-text acceptance. Full symbol
+    lookup and a ready-made keyboard editor remain open.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

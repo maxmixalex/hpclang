@@ -304,6 +304,15 @@ positions, not a change to that accepted physical-key ABI. All 26 letters in
 both cases and space are tested per model through the existing electrical map.
 HP39 letters are printed below and to the right of their keys: A is VARS,
 E is SIN, Y is 2, Z is 3, and Alpha-space is Plus. Enter is not Alpha-space.
+
+The new caller-owned `hpclang_text_mode` follows native one-shot/held/locked
+Alpha policy above the physical event API, pending CI. HP39 Notes-style locking
+is selected explicitly by the application; classic double-Alpha locks and
+left-Shift case changes follow the native keyboard. Right-shift Alpha symbols
+remain a distinct plane, not an alias for lowercase. Source-specific historical
+console policies are not copied into the physical keyboard service. Complete
+symbol lookup, the ready-made physical keyboard editor and historical blocking
+compatibility spellings remain separate unfinished work.
 Sticky/held Alpha, punctuation/symbol planes and complete interactive flows
 remain separate acceptance work.
 
