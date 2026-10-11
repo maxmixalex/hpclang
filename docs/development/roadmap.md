@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**The existing M7.1/M7.2 acceptance and M7.3a–g gates remain valid for their tested scope. Overall M7.3 remains open: complete composite-object, Aplet-owned data and namespace acceptance. M7.4 common system services are accepted. Additional M7.1/M7.2 coverage is listed below.**
+**The existing M7.1/M7.2 acceptance remains valid for its tested scope. M7.3a–j object services, M7.4 common system services and M7.5 display/runtime services are accepted. Overall M7 remains open for the capability/evidence ledger, complete text/numeric/console behavior, media-change coverage and representative historical application flows listed below. Native Port 0/1/2 limitations remain individually approved follow-ups.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -261,7 +261,7 @@ The accepted M7.2 stream/directory subset supports typical HP49g+/HP50g file flo
 
 ### M7.3 — Calculator objects, Saturn/RPL and stack integration
 
-**M7.3a-g are complete and accepted.** The ownership/API boundary is frozen in
+**M7.3a–j are complete and accepted for their documented scope.** Historical application-flow validation and the individually approved Port 0/1/2 follow-ups remain listed below. The ownership/API boundary is frozen in
 [Calculator object service design](object-service.md). The closed M7.3a-e baseline provides a
 runtime-private Saturn view, conservative proven-boundary parsing, opaque owned
 snapshots, typed construction/conversion, read-only stack observation, bounded
@@ -463,12 +463,13 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   - Pre-takeover insertion/protection refresh now uses read-only GPIO sampling
     instead of repeating Stock `CHECKINSERT`; regression acceptance is complete
     on `256e8496` (Storage, Runtime, Objects, Core and Quality).
-    Replacement of an already mounted card, stale handles and recovery remain
-    required follow-ups. This does not close the media-change goal.
-  - In progress: resample presence/protection during owned I/O, invalidate on
+    The owned-media extension below covers observed removal and recovery;
+    this does not close the complete media-change goal.
+  - Accepted on `56e4a9dd`: resample presence/protection during owned I/O, invalidate on
     observed removal or block-transfer failure, remount for new path operations,
     and reject old file/directory objects without flushing them to the new volume.
-    Host tests exercise these transitions; cycles entirely between observations
+    Host tests exercise these transitions; Storage, Runtime, Objects, Core and
+    Quality CI pass. Cycles entirely between observations
     and physical hot-plug validation remain open.
 
 ### M7.3g–j — object-service capability completion

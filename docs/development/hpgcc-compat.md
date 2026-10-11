@@ -272,7 +272,7 @@ Compatibility decision and current implementation:
   stack descriptors, native-BCD complex/vector/array helpers and raw list
   builders. M7.3i adds bounded `sat_stack_swap/nip` adapters over the clean
   transactional reorder service and HPGCC 2.0 `sat_pushtruefalse` over native
-  Boolean exchange; their formal CI acceptance is still pending;
+  Boolean exchange; their formal CI acceptance is complete on `6a7f9a28`;
 - HPGCC 1.1/2.0 adapter parity does not itself require general named-object
   mutation because historical `satdir.h` is read/search/recall oriented.
   However, hpclang's M7 capability plan still includes that write side as
@@ -428,7 +428,7 @@ presence and active-low GPD3 write protection. x50ng models the same pins.
 | --- | --- | --- | --- |
 | Query an absent card, insert it, retry before controller acquisition | HP49g+/HP50g: fresh GPIO sampling; no pin reconfiguration or repeated Stock `CHECKINSERT`. HP39/40 and HP48: `ENOSYS` | `FSVolumeInserted` uses the clean media query | Host register-transition and ownership tests; formal regression accepted on `256e8496` |
 | Observe write protection before acquisition | HP49g+/HP50g: GPD3 sampled per attempt; absent media does not require a protection read | Existing open/attribute/volume adapters inherit the mounted policy | Host polarity/change/error tests; formal regression accepted on `256e8496` |
-| Remove/replace a mounted card and recover stale handles | Required M7 follow-up; the current process-lifetime namespace does not implement media-generation tracking or recovery | `FS_CHANGED` is a declared error value, not proof of detection; broad historical reinitialization adapters remain unimplemented | Keep removal, replacement, stale-descriptor rejection and safe Stock return as explicit acceptance requirements |
+| Remove/replace a mounted card and recover stale handles | HP49g+/HP50g: observed absence or transfer failure invalidates the mount; new path operations remount and stale objects fail without flushing old data | Existing stream adapters inherit recovery; broad historical reinitialization adapters remain unimplemented | Host replacement/stale-handle/driver tests and six-model Direct plus HP49/50 Stock Storage pass; formal CI accepted on `56e4a9dd`. Cycles entirely between observations and physical hot-plug validation remain open |
 
 The new pre-acquisition sampling is separate from the accepted metadata and
 normal file-I/O contract. It does not claim safe hot swapping of a mounted card.

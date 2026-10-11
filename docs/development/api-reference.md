@@ -72,8 +72,8 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `hpclang_power_usb_present()` | 🧪 | USB voltage-detect input; does not infer battery percentage, enumeration or actual power-source selection. |
 | `hpclang_display_contrast_read()` | 🧪 | Stock contrast ordinal 0–15, queried without changing the setting. |
 
-These M7.4 services pass the six-model Direct/Stock Runtime workflow at `4a1d7115`.
-Acceptance of the complete branch after integrating main's E2E synchronization fixes is pending.
+These M7.4 services are formally accepted at functional head `06ab4deb`, including
+the six-model Direct/Stock gate and cross-workflow regressions.
 Battery percentage/voltage is not inferred from an uncalibrated ADC reading.
 
 ## Keyboard
@@ -242,7 +242,7 @@ The byte-stream metadata layer is also public and typed rather than exposing KOS
 | `hpclang_stream_path_query()` | ✅ | Versioned FAT size/type/portable attributes and validity-gated modification, creation and stored access dates. `/` is the SD volume root; explicit paths never mutate Stock global cwd. |
 | `HPCLANG_STREAM_PATH_LAST_MODIFIED_VALID`, `HPCLANG_STREAM_PATH_CREATED_VALID`, `HPCLANG_STREAM_PATH_LAST_ACCESSED_VALID` | ✅ | Each date is usable only with its corresponding validity bit. No timezone or epoch is invented. |
 | `hpclang_stream_path_set_attributes(path, attributes, mask)` | ✅ Accepted on `6a7f9a28` | Updates only masked read-only/hidden/system/archive bits and synchronizes before success. Unknown bits or attributes outside the mask fail with `EINVAL`; other families return `ENOSYS`. Existing descriptors retain their access rights; new write opens respect read-only. |
-| `hpclang_stream_storage_query()` | ✅; owned-media refresh awaiting CI | Media-present/read-only flags plus free bytes and total capacity from FatFs. GPIO sampling continues during ownership without KOS re-entry. Observed removal or block-transfer failure invalidates old objects; new path operations can remount. Old descriptors/directories fail with `EBADF`; live write protection rejects writes with `EROFS`. Removal/reinsertion entirely between observations and physical hot-plug validation remain open. |
+| `hpclang_stream_storage_query()` | ✅; owned-media refresh accepted on `56e4a9dd` | Media-present/read-only flags plus free bytes and total capacity from FatFs. GPIO sampling continues during ownership without KOS re-entry. Observed removal or block-transfer failure invalidates old objects; new path operations can remount. Old descriptors/directories fail with `EBADF`; live write protection rejects writes with `EROFS`. Removal/reinsertion entirely between observations and physical hot-plug validation remain open. |
 | `hpclang_stream_storage_free_bytes()` | ✅ | Convenience free-space query over the direct FAT volume. |
 | `rename()` / `mkdir()` / `rmdir()` | ✅ | Implemented directly in the owned FatFs namespace; the broken/absent Stock KOS namespace primitives are not used. |
 
