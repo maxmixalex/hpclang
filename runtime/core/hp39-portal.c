@@ -19,6 +19,7 @@
 #include "../../platform/armtoolbox/hp39-portal-private.h"
 #include "saturn-view.h"
 #include "rpl-stock-memory.h"
+#include "launch-services.h"
 
 #define HP39_RPL_DOLIST UINT32_C(0x00002a74)
 #define HP39_SUPPORTED_ENTRY UINT32_C(0x00011111)
@@ -119,18 +120,8 @@ static int hp39_portal_result(uint32_t kind, const uint8_t *name, size_t name_le
     *prologue = 0u;
 
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (boot == NULL ||
-        (boot->model != HPCLANG_MODEL_HP39GPLUS && boot->model != HPCLANG_MODEL_HP39GS &&
-         boot->model != HPCLANG_MODEL_HP40GS) ||
-        boot->saturn_state == 0u ||
-        (boot->platform_cookie & (uintptr_t)3u) != HPCLANG_PLATFORM_COOKIE_HP39_TAG) {
-        errno = ENOSYS;
-        return -1;
-    }
-
-    const struct hpclang_hp39_platform_context *context =
-        (const struct hpclang_hp39_platform_context *)(boot->platform_cookie & ~(uintptr_t)3u);
-    if (context->magic != HPCLANG_HP39_PLATFORM_MAGIC || context->portal_entry == 0u) {
+    const struct hpclang_hp39_platform_context *context = hpclang_launch_hp39_context(boot);
+    if (context == NULL) {
         errno = ENOSYS;
         return -1;
     }
@@ -622,17 +613,12 @@ int hpclang_hp39_catalog_edit(enum hpclang_catalog catalog, const uint8_t *name,
 static struct hpclang_hp39_portal_context *hp39_aplet_context(uint32_t *slot)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (!hp39_live_stock_available() ||
-        (boot->platform_cookie & (uintptr_t)3u) != HPCLANG_PLATFORM_COOKIE_HP39_TAG) {
+    const struct hpclang_hp39_platform_context *context = hpclang_launch_hp39_context(boot);
+    if (context == NULL) {
         errno = ENOSYS;
         return NULL;
     }
-    struct hpclang_hp39_portal_context *portal = (void *)(boot->platform_cookie & ~(uintptr_t)3u);
-    if (portal->public_context.magic != HPCLANG_HP39_PLATFORM_MAGIC ||
-        portal->public_context.portal_entry == 0u) {
-        errno = ENOSYS;
-        return NULL;
-    }
+    struct hpclang_hp39_portal_context *portal = (void *)(uintptr_t)context;
     if (portal->active != 0u) {
         errno = EBUSY;
         return NULL;

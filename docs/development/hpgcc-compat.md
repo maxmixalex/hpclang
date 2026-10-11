@@ -15,6 +15,22 @@ Installed/public headers were mechanically inventoried, while source trees and e
 
 Primary references include the SourceForge HP-GCC releases, hpcalc's HPGCC 2.0 SP2 archive, and HPGCC3 documentation.
 
+## Runtime availability and source compatibility
+
+A historical declaration or an available compatibility header does not establish
+that an operation can run in the current calculator context. Applications should
+use the [object-service discovery matrix](api-reference.md#object-service-discovery)
+to distinguish classic RPL reads, classic RPL mutations and HP39 Aplet services.
+The mutation queries additionally require the launcher's safe memory bounds;
+HP39 queries require its native service portal. Direct launches do not gain
+Stock object access merely by including `saturn.h` or `satdir.h`.
+
+These queries describe the clean services beneath adapters. They do not claim
+that every historical signature has an adapter, that native Port services exist,
+or that a supported operation has sufficient memory/media at the instant of use.
+The broader declaration/implementation/adapter/application-evidence ledger
+remains an M7.0 follow-up.
+
 ## Public API stability
 
 The historical releases are more source-stable than their runtime implementations suggest.

@@ -50,7 +50,9 @@ extern "C"
         HPCLANG_CAPABILITY_TEXT_CATALOG,
         HPCLANG_CAPABILITY_APLET_CATALOG,
         HPCLANG_CAPABILITY_DISPLAY_MODES,
-        HPCLANG_CAPABILITY_DISPLAY_INDICATORS
+        HPCLANG_CAPABILITY_DISPLAY_INDICATORS,
+        HPCLANG_CAPABILITY_RPL_STACK_MUTATION,
+        HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION
     };
 
     enum hpclang_capability_state
@@ -66,6 +68,10 @@ extern "C"
      * Service calls still report their own runtime errors. Unknown capability
      * IDs return -1/EINVAL; otherwise return a hpclang_capability_state.
      * This describes services, not compatibility-header/function availability.
+     * RPL_STACK and RPL_OBJECT_STORE describe read access. Their MUTATION
+     * counterparts additionally require launcher-provided safe memory bounds.
+     * HP39 services require a valid launcher portal. Queries inspect private
+     * launcher RAM, never invoke that portal, and preserve errno on success.
      */
     int hpclang_device_capability(enum hpclang_capability capability);
 

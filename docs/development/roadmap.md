@@ -440,6 +440,10 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   raw historical signature as sufficient reason to omit its useful behavior.
 - [ ] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
+  - In progress: distinguish classic RPL read access from mutation availability,
+    share launcher-bound validation with the mutation backend, and validate the
+    HP39 portal before reporting Aplet services. Host and calculator probes cover
+    model/context differences; the broader historical capability ledger remains open.
 
 ### M7.1 / M7.2 follow-up — uncovered application behavior
 
@@ -451,6 +455,9 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     contract is unchanged.
 - [ ] Specify text/Alpha-plane, bounded text/numeric input and console behavior
   above the accepted physical keyboard core.
+  - The bounded UTF-8 editor in `hpclang/input.h` already supports insertion,
+    deletion, navigation, accept/cancel and basic physical-key editing. Alpha/Shift
+    text policy, numeric-input semantics and console behavior remain to be completed.
 - [x] Cover historical file attribute mutation and creation/access timestamp
   queries, including persistence after close/reopen and unsupported cases.
   Implemented in `m72-file-metadata`: clean masked attribute updates, stored FAT

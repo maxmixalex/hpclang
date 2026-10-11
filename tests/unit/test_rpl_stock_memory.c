@@ -3,11 +3,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
+#include <hpclang/target.h>
 #include "rpl-stock-memory.h"
 
+static const struct hpclang_boot_info *active_boot;
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
-    return NULL;
+    return active_boot;
 }
 
 int main(void)
@@ -48,5 +51,15 @@ int main(void)
     assert(!hpclang_rpl_stock_memory_write(&memory, 0x81000u, 16u));
     assert(bytes[2048] == 0xa7u);
     assert(!hpclang_rpl_stock_mutation_io(NULL, &memory));
+    struct hpclang_rpl_mutation_io io = {0};
+    struct hpclang_boot_info boot = {.model = HPCLANG_MODEL_HP50G, .saturn_state = 1u};
+    active_boot = &boot;
+    assert(!hpclang_rpl_stock_mutation_io(&io, &memory));
+    boot.platform_cookie = HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    assert(!hpclang_rpl_stock_mutation_io(&io, &memory));
+    struct hpclang_rpl_memory_bounds bounds = {0};
+    boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    assert(!hpclang_rpl_stock_mutation_io(&io, &memory));
+    assert(io.read_nibble == NULL && io.write_nibble == NULL);
     return 0;
 }

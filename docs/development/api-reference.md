@@ -54,6 +54,33 @@ Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<
 | `hpclang_device_info()` | ✅ | Model, family and visible LCD geometry. |
 | `hpclang_device_capability()` | 🧪 | Service support by model/launch context; distinguishes missing RPL context from unsupported hardware. Does not reserve resources or guarantee current media/hardware readiness. |
 
+### Object-service discovery
+
+Use `hpclang_device_capability()` rather than decoding the private launch cookie.
+`RPL_STACK` and `RPL_OBJECT_STORE` describe read access; their new
+`RPL_STACK_MUTATION` and `RPL_OBJECT_STORE_MUTATION` counterparts also require
+the launcher's validated memory bounds. Existing capability IDs retain their
+values. HP39 queries validate the portal prefix and entry before reporting support.
+
+| Capability | HP39g+ / HP39gs / HP40gs | HP48gII / HP49g+ / HP50g |
+| --- | --- | --- |
+| `RPL_STACK`, `RPL_OBJECT_STORE` | Unsupported | Supported with a live Saturn context; otherwise context unavailable |
+| `RPL_STACK_MUTATION`, `RPL_OBJECT_STORE_MUTATION` | Unsupported | Supported with a live Saturn context and valid mutation bounds; otherwise context unavailable |
+| `APLET_DATA`, `APLET_VARIABLES`, `TEXT_CATALOG`, `APLET_CATALOG` | Supported with a live Saturn context and valid Aplet portal; otherwise context unavailable | Unsupported |
+
+Normal Stock launchers provide these family-specific contexts. Direct launches
+do not provide calculator-object access. Queries read launcher-owned RAM without
+calling Stock, accessing hardware, allocating memory or changing `errno` for a
+known capability. They do not validate every live object or promise free space:
+the requested operation still checks its arguments, mapping, resources and data.
+Unknown IDs return `-1` with `EINVAL`. Native Port 0/1/2 services are not covered
+by the HOME object-store capabilities.
+
+Host regression tests cover all six models, absent contexts, invalid portal
+prefixes and invalid mutation bounds. System-service E2E checks discovery under
+Direct and Stock; object-mutation E2E checks support before exercising writes.
+The expanded discovery checks await CI acceptance.
+
 ## Time and system services
 
 | API | Status | Contract |
