@@ -14,6 +14,7 @@ add_compile_options(
 set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/exit-hooks.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"

@@ -480,6 +480,13 @@ M8.1 delivery remain pending; see [SDK getting started](../sdk/getting-started.m
 
 #### M8.2 — Declarative UI core
 
+The local declaration slice provides caller-owned fixed storage, transactional
+frames, parent/key/kind identity, owned text and interruption-safe C scopes.
+Host tests, sanitizers and ARM compilation cover the initial contract; see the
+[working C sketch](../sdk/declarative-ui.md). Layout, controlled inputs, effects,
+canvas, rendering and target acceptance are still pending. This is not M8.2
+closure or a frozen public API.
+
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
 preserve node identity when that view is declared again. C functions suffice

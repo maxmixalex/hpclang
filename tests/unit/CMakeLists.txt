@@ -14,6 +14,9 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(ui test_ui.c "${HPCLANG_ROOT}/runtime/core/ui.c")
+target_include_directories(test_ui PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"
