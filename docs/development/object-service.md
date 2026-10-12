@@ -587,6 +587,18 @@ This establishes backup-format evidence, not completed public port services.
 HP48gII's Port 0 produces the same backup encoding. All three local probe runs
 retain the existing object-mutation PASS and settled native-return gates.
 
+The bounded RAM-port iterator validates library/backup records and their CRCs,
+copies names and library IDs into invocation-local metadata, and stops at the
+native zero prologue. It has been checked against all three captured Port 0
+chains, including HP48gII's library immediately followed by the new backup.
+That adjacency exposed an older library-span bug: the length field already
+includes the CRC, so adding four extra nibbles crosses into the next object.
+The corrected parser agrees with the 2404-byte L275_48 transfer file (eight-byte
+header plus 4792 object nibbles) and the native next-object address. All 74 host
+tests and the three affected parser tests under ASan/UBSan pass locally.
+Flash allocation records still require their own traversal and transaction
+implementation; the RAM iterator must not be applied to raw Flash records.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports
