@@ -15,8 +15,6 @@ case "$FAMILY" in
     *) echo "unsupported E2E family: $FAMILY" >&2; exit 2 ;;
 esac
 ATFE="${ATFE:?set ATFE to the extracted Arm Toolchain for Embedded root}"
-CC="$ATFE/bin/clang"
-LD="$ATFE/bin/ld.lld"
 NM="$ATFE/bin/llvm-nm"
 
 # The exhaustive Gallery exceeds the v1 code window when linked monolithically.
@@ -161,115 +159,14 @@ if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
     exit 1
 fi
 
-TARGET_FLAGS=(
-    --target=arm-none-eabi
-    -march=armv4t
-    -mfpu=none
-    -mfloat-abi=soft
-    -mabi=aapcs
-)
-COMMON=(
-    "${TARGET_FLAGS[@]}"
-    -marm
-    -fno-stack-protector
-    -fno-unwind-tables
-    -fno-asynchronous-unwind-tables
-    -fno-pic
-    -fno-pie
-    -ffunction-sections
-    -fdata-sections
-    -I"$ROOT/include"
-)
-
-"$CC" "${COMMON[@]}" -Os -c "$ROOT/runtime/bootstrap/mmu.c" -o "$OUT/bootstrap-mmu.o"
-"$CC" "${COMMON[@]}" -Os -c "$ROOT/runtime/bootstrap/run.c" -o "$OUT/bootstrap-run.o"
-"$CC" "${COMMON[@]}" -c "$ROOT/runtime/bootstrap/sync.S" -o "$OUT/bootstrap-sync.o"
-"$CC" "${COMMON[@]}" -c "$ROOT/runtime/bootstrap/enter.S" -o "$OUT/bootstrap-enter.o"
-
-"$LD" -m armelf -r \
-    "$OUT/bootstrap-mmu.o" "$OUT/bootstrap-run.o" \
-    "$OUT/bootstrap-sync.o" "$OUT/bootstrap-enter.o" \
-    -o "$OUT/bootstrap.o"
-if "$NM" -u "$OUT/bootstrap.o" | grep .; then
-    echo "unexpected undefined bootstrap symbols" >&2
-    exit 1
+LAUNCHER_ARGS=()
+if (( ! WRAP_LAUNCHERS )); then
+    LAUNCHER_ARGS+=(--raw-only)
 fi
-
-"$CC" "${COMMON[@]}" -Os -c "$ROOT/platform/armtoolbox/stage1.c" -o "$OUT/stage1.o"
-"$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/stage1-entry.S" -o "$OUT/stage1-entry.o"
-"$CC" "${COMMON[@]}" -c "$ROOT/platform/armtoolbox/hp39-portal.S" -o "$OUT/stage1-hp39-portal.o"
-"$CC" -E -P -x c "$ROOT/platform/armtoolbox/stage1.ld" -o "$OUT/stage1.ld"
-"$LD" -m armelf -T "$OUT/stage1.ld" \
-    "$OUT/stage1-entry.o" "$OUT/stage1.o" "$OUT/stage1-hp39-portal.o" \
-    "$OUT/bootstrap-mmu.o" "$OUT/bootstrap-run.o" \
-    "$OUT/bootstrap-sync.o" "$OUT/bootstrap-enter.o" \
-    -o "$OUT/stage1.elf"
-if "$NM" -u "$OUT/stage1.elf" | grep .; then
-    echo "unexpected undefined stage1 symbols" >&2
-    exit 1
+if [[ "$MODE" == runtime ]]; then
+    LAUNCHER_ARGS+=(--hp39-armsys-probe)
 fi
-"$ATFE/bin/llvm-objcopy" -O binary "$OUT/stage1.elf" "$OUT/stage1.bin"
-
-stage1_memory_size="$("$NM" "$OUT/stage1.elf" |
-    awk '$3 == "__stage1_size" {print "0x"$1}')"
-[[ "$stage1_memory_size" =~ ^0x[0-9a-fA-F]+$ ]]
-if (( $(stat -c '%s' "$OUT/stage1.bin") > stage1_memory_size )); then
-    echo "stage1 file exceeds its reserved memory extent" >&2
-    exit 1
-fi
-
-cat > "$OUT/stage0-bundle.S" <<EOF
-.section .rodata.hpclang.bundle,"a",%progbits
-.align 2
-.global __stage1_blob_start
-.global __stage1_blob_end
-.global __stage1_blob_size
-.global __stage1_memory_size
-.set __stage1_memory_size, $stage1_memory_size
-.global __hpc1_blob_start
-.global __hpc1_blob_end
-__stage1_blob_start:
-.incbin "$OUT/stage1.bin"
-__stage1_blob_end:
-.set __stage1_blob_size, __stage1_blob_end - __stage1_blob_start
-.align 2
-__hpc1_blob_start:
-.incbin "$OUT/e2e.hpc"
-__hpc1_blob_end:
-EOF
-"$CC" "${COMMON[@]}" -c "$OUT/stage0-bundle.S" -o "$OUT/stage0-bundle.o"
-
-while read -r target model; do
-    stage0_extra_defs=()
-    if [[ "$MODE" == runtime &&
-          ( "$target" == hp39gplus || "$target" == hp39gs || "$target" == hp40gs ) ]]; then
-        # Runtime Stock E2E alone proves the HP39 ARMSYS reverse edge. Direct
-        # launchers share this binary but skip the probe because their
-        # synthetic ARMSYS block deliberately has no live Saturn Read[] map.
-        stage0_extra_defs=(-DHPCLANG_STAGE0_ARMSYS_PROBE=1)
-    fi
-
-    "$CC" "${COMMON[@]}" \
-        -DHPCLANG_STAGE0_MODEL="$model" \
-        "${stage0_extra_defs[@]}" \
-        -c "$ROOT/platform/armtoolbox/stage0.S" \
-        -o "$OUT/launchers/$target.o"
-
-    "$LD" -m armelf -T "$ROOT/platform/armtoolbox/stage0.ld" \
-        "$OUT/launchers/$target.o" \
-        "$OUT/stage0-bundle.o" \
-        -o "$OUT/launchers/$target.elf"
-
-    "$ATFE/bin/llvm-objcopy" -O binary \
-        "$OUT/launchers/$target.elf" \
-        "$OUT/launchers/$target.bin"
-
-    if (( WRAP_LAUNCHERS )); then
-        python3 "$ROOT/tools/armtoolbox-wrap.py" \
-            "$OUT/launchers/$target.bin" \
-            "$OUT/launchers/$target.hp"
-    fi
-done < <(
+mapfile -t LAUNCHER_MODELS < <(
     python3 - "$ROOT/tests/e2e/targets" "$FAMILY" <<'PY'
 import json
 import sys
@@ -278,9 +175,11 @@ from pathlib import Path
 for path in sorted(Path(sys.argv[1]).glob("*.json")):
     data = json.loads(path.read_text(encoding="utf-8"))
     if sys.argv[2] == "all" or data["family"] == sys.argv[2]:
-        print(data["target"], data["model"])
+        print(data["target"])
 PY
 )
+python3 "$ROOT/tools/build-launchers.py" "$OUT/e2e.hpc" "$OUT/launchers" \
+    --tool-bin "$ATFE/bin" --models "${LAUNCHER_MODELS[@]}" "${LAUNCHER_ARGS[@]}"
 
 if [[ "$MODE" == font-gallery ]]; then
     # The Gallery frontend provides a synthetic injection mapping of 224

@@ -55,7 +55,21 @@ def main():
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
-        print("Installed SDK: external C/C++ builds, fonts, HPC1 packaging and relocation PASS")
+            for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
+                launcher = build / f"{name}-launchers" / model
+                binary = launcher.with_suffix(".bin").read_bytes()
+                wrapped = launcher.with_suffix(".hp").read_bytes()
+                if hpc not in binary or binary not in wrapped or wrapped[:8] != b"HPHP49-C":
+                    raise AssertionError(
+                        f"{name}/{model}: application missing from native launcher"
+                    )
+        # A missing declared output must be regenerated without touching source.
+        missing = build / "hello_c-launchers/hp50g.hp"
+        missing.unlink()
+        run("cmake", "--build", str(build), "--parallel", "2", env=env)
+        if not missing.is_file():
+            raise AssertionError("incremental build did not restore a missing launcher")
+        print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
 
 
 if __name__ == "__main__":

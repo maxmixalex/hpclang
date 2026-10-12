@@ -1,7 +1,7 @@
 # Build an application with the installed SDK
 
 The initial M8 SDK is a relocatable source package. It includes public headers,
-runtime sources, generated fonts, CMake integration and the HPC1 packer. The
+runtime sources, generated fonts, CMake integration and launcher packaging tools. The
 runtime library is compiled once in each application build with the selected
 toolchain. Prebuilt runtime archives and complete Stock installation bundles
 are not yet part of this package.
@@ -47,10 +47,15 @@ cmake -S hello -B build/hello \
 cmake --build build/hello
 ```
 
-This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`.
+This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`,
+plus `hello_c-launchers/` and `hello_cpp-launchers/` with all six model launchers.
 The HPC1 payload is model-independent; it is not a calculator transfer file.
-Model-specific Stock wrapping, the HP39 Aplet installer and external packaging
-dependencies remain part of the next SDK delivery slice. The small examples
+Each launcher directory contains raw `.bin` images and wrapped `.hp` objects.
+HP48gII/HP49g+/HP50g use the wrapped object with the corresponding installed
+ARMToolbox library. HP39g+/HP39gs/HP40gs need an additional Aplet envelope;
+the `.hp` file is an intermediate input, not a directly installable Aplet.
+The HP39 Aplet installer and external packaging dependencies remain part of
+the next SDK delivery slice. The small examples
 draw a greeting and return immediately; they are build examples, not interactive
 applications or calculator execution acceptance tests.
 
@@ -62,6 +67,7 @@ project(my_application LANGUAGES C CXX ASM)
 find_package(hpclang CONFIG REQUIRED)
 hpclang_add_application(my_application main.cpp)
 target_compile_features(my_application PRIVATE cxx_std_23)
+hpclang_target_launchers(my_application MODELS hp49gplus hp50g)
 ```
 
 `hpclang_add_application` supplies the startup, runtime library, linker script
@@ -70,8 +76,14 @@ the installed examples demonstrate `STATIC_AUTO` with `HPCLANG_UI_TEXT`.
 The C++ profile has no exceptions or RTTI. Declare external dependencies in the
 application rather than referring back to an hpclang checkout.
 
+`hpclang_target_launchers` is optional. Omitting `MODELS` builds all six models;
+an explicit list limits the output. It uses the selected compiler's matching
+LLVM linker and binary tools and shares its bootstrap builder with repository
+E2E. Changing the payload or bootstrap sources, or removing an output file,
+causes CMake to regenerate the launchers.
+
 The Core CI gate installs to a temporary prefix, relocates it, copies out the
 examples and builds both languages from the installed package, including fonts
-and HPC1 output. It rejects compile commands referring to the source checkout
+and HPC1/launcher output. It rejects compile commands referring to the source checkout
 or the old install prefix. This establishes build/relocation acceptance;
 calculator launch and return have separate E2E gates.

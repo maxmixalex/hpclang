@@ -467,8 +467,12 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 The first source-SDK slice provides installation, relocation, an external C/C++
 build API, generated font selection and HPC1 packaging. Local relocation/build,
 format/lint, ARM example analysis and strict docs pass. Core CI now exercises
-the installed package. Formal CI, complete Stock launcher bundles and full
-M8.1 delivery remain pending; see [SDK getting started](../sdk/getting-started.md).
+the installed package. The first slice is accepted by Core, Quality, Runtime,
+Objects and Storage CI on `9faa4882` and integrated into main. The next local
+slice adds six-model raw/wrapped launchers through one builder shared with E2E;
+relocated external C/C++ builds and missing-output regeneration pass. HP39 Aplet
+envelopes, complete installation bundles and full M8.1 delivery remain pending;
+see [SDK getting started](../sdk/getting-started.md).
 
 - [ ] Package the public headers, libraries, fonts/assets, target configuration
   and launcher/packaging tools with an explicit supported toolchain contract.

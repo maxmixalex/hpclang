@@ -7,9 +7,10 @@ endif()
 install(DIRECTORY include runtime platform DESTINATION "${sdk_root}")
 install(DIRECTORY third_party/fatfs DESTINATION "${sdk_root}/third_party")
 install(DIRECTORY cmake/profiles cmake/toolchains DESTINATION "${sdk_root}/cmake")
-install(FILES cmake/fonts.cmake cmake/ui-text.cmake cmake/hpclangConfig.cmake
+install(FILES cmake/fonts.cmake cmake/ui-text.cmake cmake/hpclangConfig.cmake cmake/launchers.cmake
     DESTINATION "${sdk_root}/cmake")
-install(FILES tools/hpclang-pack.py DESTINATION "${sdk_root}/tools")
+install(FILES tools/hpclang-pack.py tools/build-launchers.py tools/armtoolbox-wrap.py
+    DESTINATION "${sdk_root}/tools")
 install(FILES LICENSE DESTINATION "${sdk_root}")
 install(DIRECTORY examples DESTINATION "${sdk_root}")
 install(FILES docs/sdk/getting-started.md DESTINATION "${sdk_root}/docs")
