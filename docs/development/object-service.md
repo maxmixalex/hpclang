@@ -621,6 +621,21 @@ reads installed libraries (including ARMToolbox on HP48gII). The same harness
 and application pass locally on all three classic models. Port writes and
 Flash transactions remain required; remote acceptance is still pending.
 
+`hpclang_port_backup_create` prepares a complete owned backup encoding before
+changing native storage. Port 0 creation opens space at the HOME/port boundary
+using the existing validated USEROB relocation machinery, writes the record,
+then publishes the new port start. Existing port objects and libraries remain
+at their original addresses. Exact duplicate names return `EEXIST`; native
+space exhaustion returns `ENOSPC`. This first write operation does not replace
+or remove an existing backup, install a library or implement Port 1/2 writes.
+Those operations remain M8.0 requirements. As with HOME mutation, the captured
+RAM mapping must remain stable during commit; preflight does not promise
+rollback for an artificial backend that fails writes midway through commit.
+The three classic Stock models locally pass creation/readback of integer 987,
+duplicate rejection, the subsequent HOME mutation suite and settled return.
+Saved native RAM retains both the newly created backup and pre-existing port
+objects. Native RPL recall after a separate relaunch remains a distinct gate.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports

@@ -35,6 +35,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-backup.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-port.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/port.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/port-write.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-port-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stack-view.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-snapshot.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-construct.c"

@@ -7,9 +7,11 @@
 #include <hpclang/port.h>
 #include <hpclang/target.h>
 #include "saturn-view.h"
+#include "rpl-stock-memory.h"
 
 static uint8_t memory[0x100000];
 static int unavailable;
+static int writable = 1;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -26,6 +28,38 @@ int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *v
         return 0;
     *value = memory[address.nibble];
     return 1;
+}
+
+static int mapped_read(void *context, uint32_t address, uint8_t *value)
+{
+    (void)context;
+    return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
+}
+
+static int mapped_write(void *context, uint32_t address, uint8_t value)
+{
+    (void)context;
+    if (address >= sizeof(memory))
+        return 0;
+    memory[address] = value;
+    return 1;
+}
+
+int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
+                                  struct hpclang_rpl_stock_memory *view)
+{
+    (void)view;
+    *io = (struct hpclang_rpl_mutation_io){.read_nibble = mapped_read,
+                                           .write_nibble = mapped_write,
+                                           .temp_limit = 0x86000,
+                                           .user_limit = 0x88000};
+    return writable;
+}
+
+static void put_word(uint32_t address, uint32_t value)
+{
+    for (uint32_t i = 0; i < 5; ++i)
+        memory[address + i] = (value >> (4 * i)) & 15;
 }
 
 static void fixture(void)
@@ -106,6 +140,32 @@ int main(void)
     assert(object);
     memset(memory, 0, sizeof(memory));
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(object);
+    fixture();
+    object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);
+    assert(object);
+    memset(memory, 0, sizeof(memory));
+    put_word(0x806ee, 0x84000);
+    put_word(0x806f3, 0x85000);
+    put_word(0x806f8, 0x90000);
+    put_word(0x806fd, 0x90005);
+    put_word(0x80e9b, (0x90000 - 0x85000) / 5);
+    put_word(0x80711, 0x92000);
+    put_word(0x8071b, 0x92000);
+    put_word(0x92000, 0x02a96);
+    put_word(0x80716, 0x9200d);
+    assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == 0);
+    assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == -1 &&
+           errno == EEXIST);
+    struct hpclang_object *copy = hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    assert(hpclang_port_backup_create(0, NULL, 1, object) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_create(3, NULL, 0, object) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_create(1, NULL, 0, object) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_create(0, NULL, 0, NULL) == -1 && errno == EINVAL);
+    writable = 0;
+    assert(hpclang_port_backup_create(0, NULL, 0, object) == -1 && errno == ENOSYS);
     hpclang_object_release(object);
     return 0;
 }

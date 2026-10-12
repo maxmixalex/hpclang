@@ -52,6 +52,12 @@ extern "C"
      * This does not attach, install or execute the library. */
     struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_number);
 
+    /* Create a new named backup from an owned snapshot. An existing exact name
+     * returns EEXIST; insufficient native space returns ENOSPC. Existing port
+     * objects remain at their original addresses. Currently Port 0 only. */
+    int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
+                                   const struct hpclang_object *value);
+
 #ifdef __cplusplus
 }
 #endif

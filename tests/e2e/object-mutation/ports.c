@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <errno.h>
 #include <string.h>
 #include <hpclang/abi.h>
 #include <hpclang/port.h>
@@ -37,5 +38,21 @@ uint32_t hpclang_e2e_port_reads(void)
     int64_t integer;
     int correct = hpclang_object_integer_i64(value, &integer) == 0 && integer == 123;
     hpclang_object_release(value);
-    return correct ? 0 : 0xd3;
+    if (!correct)
+        return 0xd3;
+    struct hpclang_object *created = NULL;
+    if (hpclang_object_create_integer_i64(987, &created))
+        return 0xd5;
+    int written = hpclang_port_backup_create(0, (const uint8_t *)"PORTNEW", 7, created);
+    hpclang_object_release(created);
+    if (written)
+        return 0xd6;
+    value = hpclang_port_backup_get(0, (const uint8_t *)"PORTNEW", 7);
+    if (!value)
+        return 0xd7;
+    correct = hpclang_object_integer_i64(value, &integer) == 0 && integer == 987;
+    int duplicate = hpclang_port_backup_create(0, (const uint8_t *)"PORTNEW", 7, value);
+    int rejected = duplicate == -1 && errno == EEXIST;
+    hpclang_object_release(value);
+    return correct && rejected ? 0 : 0xd8;
 }
