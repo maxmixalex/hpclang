@@ -158,6 +158,11 @@ hpclang_unit(rpl_object_span
 target_include_directories(test_rpl_object_span PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_backup test_rpl_backup.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_backup PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_stack_view
     test_rpl_stack_view.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c")

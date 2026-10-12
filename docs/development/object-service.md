@@ -573,3 +573,21 @@ HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
 areas explicitly. None has HOME-style subdirectories. Acceptance of these
 limits does not claim implemented port APIs or remove the follow-up goals in
 the roadmap.
+
+#### M8 native-port implementation
+
+Native port implementation is scheduled under M8.0. Initial local Stock 2.15
+fixtures on HP49g+ and HP50g store an exact integer through each of `:0:PORTZERO`,
+`:1:PORTONE` and `:2:PORTTWO`; the resulting named DOBAK envelopes are captured
+from RAM/Flash after the existing object-mutation application passes and returns.
+The private decoder checks paired name lengths, contained-object extent,
+checksum-object structure and the native nibble CRC. Host tests retain those
+three independently Stock-generated encodings, truncation and corruption cases.
+This establishes backup-format evidence, not completed public port services.
+HP48gII's Port 0 produces the same backup encoding. All three local probe runs
+retain the existing object-mutation PASS and settled native-return gates.
+
+The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
+(Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
+preserve this difference from HP49g+/HP50g rather than fabricating three ports
+on every model. HP39 Aplet/catalog namespaces remain separate.
