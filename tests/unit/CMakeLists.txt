@@ -321,6 +321,9 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"

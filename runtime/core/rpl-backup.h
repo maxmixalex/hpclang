@@ -21,4 +21,17 @@ struct hpclang_rpl_backup_view
 int hpclang_rpl_backup_view(const struct hpclang_rpl_reader *reader, uint32_t address,
                             uint32_t limit, struct hpclang_rpl_backup_view *view);
 
+enum
+{
+    HPCLANG_RPL_BACKUP_NOMEM = -6
+};
+
+/* Build an owned packed DOBAK from one bounded source object. The caller frees
+ * *packed. Output arguments are unchanged on failure. The source must remain
+ * stable throughout this call; no native memory is written. Result codes are
+ * hpclang_rpl_span_result or HPCLANG_RPL_BACKUP_NOMEM. */
+int hpclang_rpl_backup_encode(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t value_span, const uint8_t *name, uint32_t name_length,
+                              uint8_t **packed, uint32_t *span);
+
 #endif

@@ -6,6 +6,8 @@
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
 #include "rpl-object-store.h"
+#include "rpl-port-mutation.h"
+#include "rpl-port.h"
 
 enum
 {
@@ -1079,8 +1081,65 @@ static void test_stack_reorder(void)
     }
 }
 
+static void test_port0_create_preserves_home_and_library(void)
+{
+    const char *backup = "26b20130008005f42545a55425f48041620900003210119200f9e3";
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    uint8_t packed[27] = {0};
+    for (uint32_t i = 0; i < 54; ++i) {
+        uint8_t n = backup[i] <= '9' ? backup[i] - '0' : backup[i] - 'a' + 10;
+        packed[i / 2] |= n << (4 * (i & 1));
+    }
+    for (int failure_case = 0; failure_case < 4; ++failure_case) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        uint32_t object = prepare_named_char('A');
+        uint32_t port = object + 7;
+        put_word(0x80716, 5, port);
+        for (uint32_t i = 0; i < 43; ++i)
+            memory[port + i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+        uint8_t saved_library[48];
+        memcpy(saved_library, memory + port, sizeof(saved_library));
+        uint32_t root = object;
+        uint32_t *roots[] = {&root};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        uint32_t dstk = get_word(DSKTOP, 5);
+        put_word(dstk, 5, object);
+        if (failure_case == 1)
+            io.user_limit = dstk;
+        else if (failure_case == 2)
+            memory[port + 42] ^= 1;
+        else if (failure_case == 3)
+            rejected_read = port - 1;
+        int result = hpclang_rpl_port0_create_backup(&io, packed, 54);
+        if (failure_case) {
+            assert(result != HPCLANG_RPL_MUTATION_OK && writes == 0);
+            assert(get_word(DSKTOP, 5) == dstk && get_word(0x80716, 5) == port);
+            continue;
+        }
+        assert(result == HPCLANG_RPL_MUTATION_OK);
+        assert(get_word(0x80716, 5) == port - 54);
+        assert(get_word(DSKTOP, 5) == dstk - 54);
+        assert(get_word(dstk - 54, 5) == object - 54 && root == object - 54);
+        assert_char_at(root, 'A');
+        assert(memcmp(saved_library, memory + port, sizeof(saved_library)) == 0);
+        const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        struct hpclang_rpl_port_cursor cursor = {port - 54, NIBBLES, 0};
+        struct hpclang_rpl_port_entry entry;
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+        assert(entry.prologue == 0x02b62 && entry.name_length == 8);
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+        assert(entry.library_number == 123 && entry.address == port);
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+        uint32_t saved_writes = writes;
+        assert(hpclang_rpl_port0_create_backup(&io, packed, 54) == HPCLANG_RPL_MUTATION_EXISTS);
+        assert(writes == saved_writes);
+    }
+}
+
 int main(void)
 {
+    test_port0_create_preserves_home_and_library();
     test_stack_reorder();
     test_native_arena_pins_prefix_without_overwriting_payload();
     test_push_transaction();
