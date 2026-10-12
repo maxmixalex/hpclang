@@ -1081,6 +1081,33 @@ static void test_stack_reorder(void)
     }
 }
 
+static void test_overwrite_port_value_preserves_references(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    prepare_named_char('H');
+    const uint32_t address = 0xf0000;
+    put_word(address, 5, 0x029bf);
+    put_word(address + 5, 2, 'A');
+    uint32_t root = address;
+    uint32_t *roots[] = {&root};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    put_word(get_word(DSKTOP, 5), 5, address);
+    struct hpclang_object *value = make_char('B');
+    assert(hpclang_rpl_mutation_overwrite_value(&io, address, value) == HPCLANG_RPL_MUTATION_OK);
+    assert_char_at(address, 'B');
+    assert(root != address && root < io.temp_limit);
+    assert(get_word(get_word(DSKTOP, 5), 5) == root);
+    assert_char_at(root, 'A');
+    uint32_t before = writes;
+    assert(hpclang_rpl_mutation_overwrite_value(&io, address, value) == HPCLANG_RPL_MUTATION_OK);
+    assert(writes == before);
+    assert(hpclang_rpl_mutation_overwrite_value(&io, NIBBLES - 2, value) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(writes == before);
+    free(value);
+}
+
 static void test_port0_create_preserves_home_and_library(void)
 {
     const char *backup = "26b20130008005f42545a55425f48041620900003210119200f9e3";
@@ -1139,6 +1166,7 @@ static void test_port0_create_preserves_home_and_library(void)
 
 int main(void)
 {
+    test_overwrite_port_value_preserves_references();
     test_port0_create_preserves_home_and_library();
     test_stack_reorder();
     test_native_arena_pins_prefix_without_overwriting_payload();
