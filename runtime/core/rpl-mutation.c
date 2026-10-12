@@ -1207,6 +1207,36 @@ static int store_replace_target(const struct hpclang_rpl_mutation_io *io, uint32
                                          : object_span_result_to_mutation(result);
 }
 
+int hpclang_rpl_mutation_overwrite_value(const struct hpclang_rpl_mutation_io *io, uint32_t address,
+                                         const struct hpclang_object *object)
+{
+    if (!io_ready(io) || !object)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (address < RPL_MAIN_FIRST || address >= RPL_MAIN_END ||
+        object->nibble_count > RPL_MAIN_END - address)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    int result = snapshot_preflight(object);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    uint32_t span;
+    result = hpclang_rpl_object_span(&reader, address, object->nibble_count, &span);
+    if (result != HPCLANG_RPL_SPAN_OK)
+        return object_span_result_to_mutation(result);
+    if (span != object->nibble_count)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    int identical = 0;
+    result = snapshot_matches_saturn(io, address, object, &identical);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    if (identical)
+        return HPCLANG_RPL_MUTATION_OK;
+    result = preserve_userob_references_to_temp(io, address, address + span, 0, NULL);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return snapshot_copy_to_saturn(io, address, object);
+}
+
 int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io, uint32_t directory,
                                        const uint8_t *name, uint32_t name_length,
                                        const struct hpclang_object *object)
@@ -1225,20 +1255,8 @@ int hpclang_rpl_mutation_store_replace(const struct hpclang_rpl_mutation_io *io,
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
 
-    if (span == object->nibble_count) {
-        int identical = 0;
-        result = snapshot_matches_saturn(io, entry.object_address, object, &identical);
-        if (result != HPCLANG_RPL_MUTATION_OK)
-            return result;
-
-        if (!identical) {
-            result = preserve_userob_references_to_temp(io, entry.object_address,
-                                                        entry.object_address + span, 0, NULL);
-            if (result != HPCLANG_RPL_MUTATION_OK)
-                return result;
-        }
-        return snapshot_copy_to_saturn(io, entry.object_address, object);
-    }
+    if (span == object->nibble_count)
+        return hpclang_rpl_mutation_overwrite_value(io, entry.object_address, object);
 
     uint32_t old_end = 0u;
     if (!checked_add(entry.object_address, span, &old_end))

@@ -166,22 +166,6 @@ static int name_span(const struct hpclang_rpl_reader *reader, uint32_t address, 
 static int parse_object(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
                         uint32_t depth, uint32_t *span);
 
-static int library_span(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t limit,
-                        uint32_t *span)
-{
-    uint32_t without_crc = 0u;
-    int result = length_prefixed_span(reader, address, limit, &without_crc);
-    if (result != HPCLANG_RPL_SPAN_OK)
-        return result;
-
-    uint32_t total = 0u;
-    if (!checked_add(without_crc, 4u, &total) || total > limit)
-        return HPCLANG_RPL_SPAN_BOUNDS;
-
-    *span = total;
-    return HPCLANG_RPL_SPAN_OK;
-}
-
 static int long_number_span(const struct hpclang_rpl_reader *reader, uint32_t address,
                             uint32_t limit, uint32_t component_count, uint32_t *span)
 {
@@ -507,15 +491,13 @@ static int parse_object(const struct hpclang_rpl_reader *reader, uint32_t addres
     case RPL_DOCSTR:
     case RPL_DOHSTR:
     case RPL_DOGROB:
+    case RPL_DOLIB:
     case RPL_DOBAK:
     case RPL_DOEXT0:
     case RPL_DOEXT2:
     case RPL_DOCODE:
     case RPL_DOMINIFONT:
         return length_prefixed_span(reader, address, limit, span);
-
-    case RPL_DOLIB:
-        return library_span(reader, address, limit, span);
 
     case RPL_DOLNGREAL:
         return long_number_span(reader, address, limit, 2u, span);

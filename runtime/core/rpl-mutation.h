@@ -53,7 +53,8 @@ extern "C"
         HPCLANG_RPL_MUTATION_UNSUPPORTED = -9,
         HPCLANG_RPL_MUTATION_EXISTS = -10,
         HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
-        HPCLANG_RPL_MUTATION_NOT_EMPTY = -12
+        HPCLANG_RPL_MUTATION_NOT_EMPTY = -12,
+        HPCLANG_RPL_MUTATION_NOMEM = -13
     };
 
     /* Bootstrap-only: turn the native page interval into a rooted opaque
@@ -92,6 +93,13 @@ extern "C"
      */
     int hpclang_rpl_mutation_replace(const struct hpclang_rpl_mutation_io *io, uint32_t level,
                                      const struct hpclang_object *object);
+
+    /* Replace one exact-size native value, preserving old live references in
+     * TEMPOB before overwrite. The caller validates namespace ownership and
+     * maintains its enclosing metadata/checksum. Structural directory/library
+     * objects must not be passed as ordinary values. */
+    int hpclang_rpl_mutation_overwrite_value(const struct hpclang_rpl_mutation_io *io,
+                                             uint32_t address, const struct hpclang_object *object);
 
     /*
      * Replace an existing non-directory USEROB object from an owned snapshot.

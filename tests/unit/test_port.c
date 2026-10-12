@@ -1,0 +1,171 @@
+#include <assert.h>
+#include <errno.h>
+#include <stdint.h>
+#include <string.h>
+#include <hpclang/abi.h>
+#include <hpclang/device.h>
+#include <hpclang/port.h>
+#include <hpclang/target.h>
+#include "saturn-view.h"
+#include "rpl-stock-memory.h"
+
+static uint8_t memory[0x100000];
+static int unavailable;
+static int writable = 1;
+static struct hpclang_boot_info boot = {.saturn_state = 1};
+static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
+const struct hpclang_boot_info *hpclang_boot_info(void)
+{
+    return &boot;
+}
+const struct hpclang_device_info *hpclang_device_info(void)
+{
+    return &device;
+}
+int hpclang_saturn_read_nibble(struct hpclang_saturn_address address, uint8_t *value)
+{
+    if (unavailable || address.nibble >= sizeof(memory))
+        return 0;
+    *value = memory[address.nibble];
+    return 1;
+}
+
+static int mapped_read(void *context, uint32_t address, uint8_t *value)
+{
+    (void)context;
+    return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
+}
+
+static int mapped_write(void *context, uint32_t address, uint8_t value)
+{
+    (void)context;
+    if (address >= sizeof(memory))
+        return 0;
+    memory[address] = value;
+    return 1;
+}
+
+int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
+                                  struct hpclang_rpl_stock_memory *view)
+{
+    (void)view;
+    *io = (struct hpclang_rpl_mutation_io){.read_nibble = mapped_read,
+                                           .write_nibble = mapped_write,
+                                           .temp_limit = 0x86000,
+                                           .user_limit = 0x88000};
+    return writable;
+}
+
+static void put_word(uint32_t address, uint32_t value)
+{
+    for (uint32_t i = 0; i < 5; ++i)
+        memory[address + i] = (value >> (4 * i)) & 15;
+}
+
+static void fixture(void)
+{
+    const char *hex = "26b20130008005f42545a55425f48041620900003210119200f9e3";
+    memset(memory, 0, sizeof(memory));
+    for (uint32_t i = 0; i < 5; ++i)
+        memory[0x80716 + i] = (0xfffc0u >> (4 * i)) & 15;
+    for (uint32_t i = 0; hex[i]; ++i)
+        memory[0xfffc0 + i] = (uint8_t)(hex[i] <= '9' ? hex[i] - '0' : hex[i] - 'a' + 10);
+}
+
+int main(void)
+{
+    fixture();
+    struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(0);
+    assert(iterator);
+    struct hpclang_object *object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);
+    assert(object);
+    /* Existing snapshots must survive loss of the original mapping. */
+    memset(memory, 0, sizeof(memory));
+    unavailable = 1;
+    struct hpclang_port_entry entry = {.size = sizeof(entry),
+                                       .version = HPCLANG_PORT_ENTRY_VERSION};
+    assert(hpclang_port_iterator_read(iterator, &entry) == 1);
+    assert(entry.kind == HPCLANG_PORT_BACKUP && entry.name_length == 8);
+    assert(memcmp(entry.name, "PORTZERO", 8) == 0);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 0);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 0);
+    int64_t value;
+    assert(hpclang_object_integer_i64(object, &value) == 0 && value == 123);
+    hpclang_object_release(object);
+    hpclang_port_iterator_close(iterator);
+    hpclang_port_iterator_close(NULL);
+    assert(!hpclang_port_iterator_open(0) && errno == EIO);
+    unavailable = 0;
+    fixture();
+    assert(!hpclang_port_backup_get(0, (const uint8_t *)"portzero", 8) && errno == ENOENT);
+    assert(!hpclang_port_backup_get(0, NULL, 1) && errno == EINVAL);
+    assert(!hpclang_port_iterator_open(3) && errno == EINVAL);
+    assert(!hpclang_port_iterator_open(1) && errno == ENOSYS);
+    assert(!hpclang_port_iterator_open(2) && errno == ENOSYS);
+    boot.saturn_state = 0;
+    assert(!hpclang_port_iterator_open(0) && errno == ENOSYS);
+    boot.saturn_state = 1;
+    device.family = HPCLANG_FAMILY_HP39;
+    assert(!hpclang_port_iterator_open(0) && errno == ENOSYS);
+    device.family = HPCLANG_FAMILY_HP48;
+    iterator = hpclang_port_iterator_open(0);
+    assert(iterator);
+    entry.version = 0;
+    assert(hpclang_port_iterator_read(iterator, &entry) == -1 && errno == EINVAL);
+    entry.version = HPCLANG_PORT_ENTRY_VERSION;
+    assert(hpclang_port_iterator_read(iterator, &entry) == 1);
+    hpclang_port_iterator_close(iterator);
+    memory[0xfffc0 + 15] ^= 1;
+    assert(!hpclang_port_iterator_open(0) && errno == EILSEQ);
+    assert(!hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8) && errno == EILSEQ);
+    memset(memory, 0, sizeof(memory));
+    assert(!hpclang_port_iterator_open(0) && errno == EILSEQ);
+    fixture();
+    memory[0xfffc0] = 0;
+    memory[0xfffc1] = 0;
+    memory[0xfffc2] = 0;
+    memory[0xfffc3] = 0;
+    memory[0xfffc4] = 0;
+    iterator = hpclang_port_iterator_open(0);
+    assert(iterator && hpclang_port_iterator_read(iterator, &entry) == 0);
+    hpclang_port_iterator_close(iterator);
+    assert(!hpclang_port_library_get(0, 123) && errno == ENOENT);
+    assert(!hpclang_port_library_get(0, 0x1000) && errno == EINVAL);
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    for (uint32_t i = 0; library[i]; ++i)
+        memory[0xfffc0 + i] =
+            (uint8_t)(library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10);
+    memset(memory + 0xfffc0 + 43, 0, 5);
+    object = hpclang_port_library_get(0, 123);
+    assert(object);
+    memset(memory, 0, sizeof(memory));
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(object);
+    fixture();
+    object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);
+    assert(object);
+    memset(memory, 0, sizeof(memory));
+    put_word(0x806ee, 0x84000);
+    put_word(0x806f3, 0x85000);
+    put_word(0x806f8, 0x90000);
+    put_word(0x806fd, 0x90005);
+    put_word(0x80e9b, (0x90000 - 0x85000) / 5);
+    put_word(0x80711, 0x92000);
+    put_word(0x8071b, 0x92000);
+    put_word(0x92000, 0x02a96);
+    put_word(0x80716, 0x9200d);
+    assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == 0);
+    assert(hpclang_port_backup_create(0, (const uint8_t *)"NEW", 3, object) == -1 &&
+           errno == EEXIST);
+    struct hpclang_object *copy = hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    assert(hpclang_port_backup_create(0, NULL, 1, object) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_create(3, NULL, 0, object) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_create(1, NULL, 0, object) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_create(0, NULL, 0, NULL) == -1 && errno == EINVAL);
+    writable = 0;
+    assert(hpclang_port_backup_create(0, NULL, 0, object) == -1 && errno == ENOSYS);
+    hpclang_object_release(object);
+    return 0;
+}

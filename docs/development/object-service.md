@@ -565,7 +565,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | No public port read/write service; implement native enumeration, ownership and mutation separately. |
+| Port 0 | Main RAM, containing library/backup objects | Metadata enumeration, owned backup/library reads and backup creation have local Stock coverage; replacement, removal and library mutation remain in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
@@ -573,3 +573,74 @@ HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
 areas explicitly. None has HOME-style subdirectories. Acceptance of these
 limits does not claim implemented port APIs or remove the follow-up goals in
 the roadmap.
+
+#### M8 native-port implementation
+
+Native port implementation is scheduled under M8.0. Initial local Stock 2.15
+fixtures on HP49g+ and HP50g store an exact integer through each of `:0:PORTZERO`,
+`:1:PORTONE` and `:2:PORTTWO`; the resulting named DOBAK envelopes are captured
+from RAM/Flash after the existing object-mutation application passes and returns.
+The private decoder checks paired name lengths, contained-object extent,
+checksum-object structure and the native nibble CRC. Host tests retain those
+three independently Stock-generated encodings, truncation and corruption cases.
+This establishes backup-format evidence, not completed public port services.
+HP48gII's Port 0 produces the same backup encoding. All three local probe runs
+retain the existing object-mutation PASS and settled native-return gates.
+
+The bounded RAM-port iterator validates library/backup records and their CRCs,
+copies names and library IDs into invocation-local metadata, and stops at the
+native zero prologue. It has been checked against all three captured Port 0
+chains, including HP48gII's library immediately followed by the new backup.
+That adjacency exposed an older library-span bug: the length field already
+includes the CRC, so adding four extra nibbles crosses into the next object.
+The corrected parser agrees with the 2404-byte L275_48 transfer file (eight-byte
+header plus 4792 object nibbles) and the native next-object address. All 74 host
+tests and the three affected parser tests under ASan/UBSan pass locally.
+Flash allocation records still require their own traversal and transaction
+implementation; the RAM iterator must not be applied to raw Flash records.
+
+The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
+and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
+independent `hpclang_object` snapshots released with `hpclang_object_release`.
+Backup names are exact calculator bytes, while library metadata includes its
+numeric identifier. `hpclang_port_library_get` copies a complete library by
+number without installing, attaching or executing it. The current backend
+reads classic Stock Port 0 only.
+Other valid port indices and unavailable runtime contexts return `ENOSYS`,
+which describes this implementation rather than hardware absence. Invalid
+indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
+and mapping failures `EIO`. Local Stock execution on HP48gII, HP49g+ and HP50g
+verifies public enumeration and the exact integer backup read before the
+existing object-mutation application passes and returns. Library retrieval
+also passes a native HP48gII probe against the installed ARMToolbox library,
+followed by the existing application and return gates. Host ownership/error
+tests pass with ASan/UBSan, and Clang static analysis passes for the public backend.
+The object-mutation suite now prepares `PORTZERO` through its versioned
+`stock-setup.json`, enumerates it and checks its exact integer value. It also
+reads installed libraries (including ARMToolbox on HP48gII). The same harness
+and application pass locally on all three classic models. Port writes and
+Flash transactions remain required; remote acceptance is still pending.
+
+`hpclang_port_backup_create` prepares a complete owned backup encoding before
+changing native storage. Port 0 creation opens space at the HOME/port boundary
+using the existing validated USEROB relocation machinery, writes the record,
+then publishes the new port start. Existing port objects and libraries remain
+at their original addresses. Exact duplicate names return `EEXIST`; native
+space exhaustion returns `ENOSPC`. This first write operation does not replace
+or remove an existing backup, install a library or implement Port 1/2 writes.
+Those operations remain M8.0 requirements. As with HOME mutation, the captured
+RAM mapping must remain stable during commit; preflight does not promise
+rollback for an artificial backend that fails writes midway through commit.
+The three classic Stock models locally pass creation/readback of integer 987,
+duplicate rejection, the subsequent HOME mutation suite and settled return.
+Saved native RAM retains both the newly created backup and pre-existing port
+objects. Independent local relaunch probes on all three classic models use
+Stock Kermit commands to recall both backups through native RPL and store the
+results in a native directory; the recorded values are 987 and 123. Resumed
+USB enumeration requires restoring the saved interrupt-enable masks into the
+protocol backend. The reusable CI relaunch gate remains to be integrated.
+
+The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
+(Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
+preserve this difference from HP49g+/HP50g rather than fabricating three ports
+on every model. HP39 Aplet/catalog namespaces remain separate.

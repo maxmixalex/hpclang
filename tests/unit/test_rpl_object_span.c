@@ -159,12 +159,14 @@ static void test_library_crc_extent(void)
     uint32_t span = 0u;
 
     /*
-     * Library length excludes the five-nibble prologue and the trailing
-     * four-nibble CRC.  A parser returning only 5+length would truncate it.
+     * The length includes the trailing CRC, excluding only the prologue.
+     * Stock HP48gII's L275_48 transfer file is 2404 bytes including its
+     * eight-byte transfer header: 4792 nibbles, with length field 4787.
+     * In Port 0 the next backup starts exactly 4792 nibbles after the library.
      */
     put_nibbles(&image, 0u, 0x02b40u, 5u);
-    put_nibbles(&image, 5u, 9u, 5u);
-    image.used = 18u; /* 5 + 9 + 4 */
+    put_nibbles(&image, 5u, 13u, 5u);
+    image.used = 18u; /* 5 + 13, including CRC */
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_OK);
     assert(span == 18u);
     assert(hpclang_rpl_object_span(&reader, 0u, 17u, &span) == HPCLANG_RPL_SPAN_BOUNDS);

@@ -161,6 +161,17 @@ hpclang_unit(rpl_object_span
 target_include_directories(test_rpl_object_span PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_backup test_rpl_backup.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_backup PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_port test_rpl_port.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_port PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_stack_view
     test_rpl_stack_view.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c")
@@ -272,6 +283,21 @@ target_include_directories(test_object_store PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(port
+    test_port.c
+    "${HPCLANG_ROOT}/runtime/core/port-write.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"
+    "${HPCLANG_ROOT}/runtime/core/port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_port PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpgcc_satdir
     test_hpgcc_satdir.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-satdir.c")
@@ -303,6 +329,9 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-stack-view.c"

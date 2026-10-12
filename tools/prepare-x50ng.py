@@ -44,7 +44,8 @@ def patch_directory_order(root: Path, args: argparse.Namespace) -> None:
     """Give directory-backed cards reproducible FAT entries on every host."""
     path = root / "src/s3c2410/block-vvfat.c"
     shutil.copyfile(
-        args.headless_header.parent / "directory-order.h", path.parent / "directory-order.h"
+        args.headless_header.parent / "directory-order.h",
+        path.parent / "directory-order.h",
     )
     replace_once(
         path,
@@ -378,6 +379,24 @@ static void s3c2410_usbdev_write(
 
 """
     path.write_text(text[:read_start] + host_impl + text[load_start:])
+
+    # A resumed guest already enabled its USB interrupts. The host protocol
+    # core is new, so restore the readiness masks before it initiates a fresh
+    # bus reset/enumeration. Missing/partial state must still wait for firmware
+    # initialization; importing reset defaults there starts enumeration too soon.
+    replace_once(
+        path,
+        "    return error;\n}\n\nstatic int s3c2410_usbdev_save",
+        """    if ( error == 0 && usbdev->host_fd >= 0 ) {
+        hpusb_write( &usbdev->host, HPUSB_EP_INT_EN, usbdev->ep_int_en_reg );
+        hpusb_write( &usbdev->host, HPUSB_USB_INT_EN, usbdev->usb_int_en_reg );
+    }
+    return error;
+}
+
+static int s3c2410_usbdev_save""",
+        "USB resumed interrupt readiness",
+    )
 
     # x50ng resets all modules after a missing/partial state file and on
     # guest software reset. Preserve the open host bridge, but reset the UDC

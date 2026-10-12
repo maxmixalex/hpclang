@@ -9,6 +9,7 @@
 
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_classic_mutation(void);
+uint32_t hpclang_e2e_port_reads(void);
 uint32_t hpclang_e2e_hp39_mutation(void);
 
 static void hold_success(void)
@@ -63,7 +64,8 @@ int main(void)
             hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION) !=
                 HPCLANG_CAPABILITY_SUPPORTED)
             return finish(0xe2u);
-        return finish(hpclang_e2e_classic_mutation());
+        uint32_t port_failure = hpclang_e2e_port_reads();
+        return finish(port_failure ? port_failure : hpclang_e2e_classic_mutation());
     }
 #endif
     return finish(0xe0u);
