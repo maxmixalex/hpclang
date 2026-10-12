@@ -469,9 +469,11 @@ build API, generated font selection and HPC1 packaging. Local relocation/build,
 format/lint, ARM example analysis and strict docs pass. Core CI now exercises
 the installed package. The first slice is accepted by Core, Quality, Runtime,
 Objects and Storage CI on `9faa4882` and integrated into main. The next local
-slice adds six-model raw/wrapped launchers through one builder shared with E2E;
-relocated external C/C++ builds and missing-output regeneration pass. HP39 Aplet
-envelopes, complete installation bundles and full M8.1 delivery remain pending;
+slice adds six-model raw/wrapped launchers and HP39 Aplet envelopes through
+builders shared with E2E. Relocated external C/C++ builds, missing-output
+regeneration and all three HP39 Aplet packages pass locally with declared
+historical dependencies and a Clang-built host packager. CI acceptance of
+this complete packaging slice and full M8.1 delivery remain pending;
 see [SDK getting started](../sdk/getting-started.md).
 
 - [ ] Package the public headers, libraries, fonts/assets, target configuration

@@ -10,6 +10,7 @@ install(DIRECTORY cmake/profiles cmake/toolchains DESTINATION "${sdk_root}/cmake
 install(FILES cmake/fonts.cmake cmake/ui-text.cmake cmake/hpclangConfig.cmake cmake/launchers.cmake
     DESTINATION "${sdk_root}/cmake")
 install(FILES tools/hpclang-pack.py tools/build-launchers.py tools/armtoolbox-wrap.py
+    tools/package-aplet.py tools/prepare-hp39-aplet.py
     DESTINATION "${sdk_root}/tools")
 install(FILES LICENSE DESTINATION "${sdk_root}")
 install(DIRECTORY examples DESTINATION "${sdk_root}")

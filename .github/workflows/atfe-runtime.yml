@@ -31,6 +31,7 @@ on:
       - "tools/prepare-hp39-aplet.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
+      - "tools/package-aplet.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
@@ -63,6 +64,7 @@ on:
       - "tools/prepare-hp39-aplet.py"
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
+      - "tools/package-aplet.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 
@@ -88,8 +90,29 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
+      - name: Restore prepared HPGCC39 cache
+        uses: actions/cache@v6
+        with:
+          path: .cache/hp39-aplet
+          key: hpclang-hpgcc39-aplet-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bootstrap-hp39-aplet.sh', 'tools/prepare-hp39-aplet.py') }}
+
       - name: Verify installed SDK with external applications
-        run: python3 tests/sdk/check.py
+        run: |
+          dependencies=()
+          command -v clang >/dev/null 2>&1 || dependencies+=(clang)
+          if [[ ! -f .cache/hp39-aplet/sdk/.hpclang-prepared ]] && \
+             ! command -v innoextract >/dev/null 2>&1; then
+            dependencies+=(innoextract)
+          fi
+          if (( ${#dependencies[@]} )); then
+            bash tools/install-ci-packages.sh "${dependencies[@]}"
+          fi
+          bash tools/bootstrap-hp39-aplet.sh
+          host_tool="$(mktemp -d)"
+          trap 'rm -rf "$host_tool"' EXIT
+          clang -O2 .cache/hp39-aplet/sdk/src/hp2aplet.c -o "$host_tool/hp2aplet"
+          python3 tests/sdk/check.py --aplet-tool "$host_tool/hp2aplet" \
+            --aplet-assets .cache/hp39-aplet/sdk/data
 
       - name: Build hardware-validation E2E
         run: |
