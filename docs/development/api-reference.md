@@ -469,7 +469,7 @@ it does not inspect the library's private stream layout. A callback binding's
 context must remain valid until it is unbound or normal exit has flushed it.
 
 This behavior has local six-model termination evidence, plus HP49g+/HP50g
-Direct/Stock buffered-file persistence checks; formal CI remains pending. It does
+Direct/Stock buffered-file persistence checks; formal CI is accepted on `2988e1de`. It does
 not recover from arbitrary CPU faults, reset the whole calculator or guarantee
 completion after power loss.
 
@@ -486,7 +486,7 @@ The public core does **not** define a semantic font-role taxonomy. These accesso
 | `hpclang_font_default()` | ✅ | Borrow the calculator's normal default native selection. On HP39g+/39gs/40gs this is the stock 5×8 main raster; on HP48gII/49g+/50g it is the stock bigfont. This convenience alias is not a semantic role. |
 | `hpclang_font_mini()` | ✅ | Borrow the stock minifont. HP39/40 uses its proportional five-row small font; HP48/49/50 uses the historical six-row minifont. |
 | `hpclang_font_big()` | ✅ | Expose the historical HP48/49/50 bigfont only: eight raster rows with nominal advance 6. HP39-family calculators return `NULL` rather than aliasing the 5×8 main font. |
-| `hpclang_font_editline()` | ✅ | Expose the dedicated HP39g+/39gs/40gs fixed 6×10 EditLine ROM font using each model’s own ROM. It is unavailable on HP48gII/49g+/50g. The HP39g+ extension awaits formal CI acceptance. |
+| `hpclang_font_editline()` | ✅ | Expose the dedicated HP39g+/39gs/40gs fixed 6×10 EditLine ROM font using each model’s own ROM. It is unavailable on HP48gII/49g+/50g. The HP39g+ extension is accepted by Gallery on `216bb5d5`. |
 | `hpclang_font_height()` | ✅ | Line height without exposing bitmap storage; `NULL` reports 0. |
 | `hpclang_font_advance()` | ✅ | Nominal/fixed advance; `NULL` reports 0. |
 | `hpclang_font_codepoint_advance()` | ✅ | Per-codepoint advance where the native/generated font is proportional. |

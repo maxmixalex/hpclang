@@ -1,5 +1,34 @@
 # Validation
 
+## M7 final acceptance
+
+M7 is complete within its individually approved scope. Functional head
+`2988e1de` passes [Core](https://github.com/maxmixalex/hpclang/actions/runs/38184717670),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38184717687),
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38184717682),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38184717711) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38184717704).
+This accepts ordinary application termination, owned CPU power policy, the
+historical timed client and the copied-Aplet memory repair, in addition to
+the previously accepted services and capability ledger.
+
+[Gallery](https://github.com/maxmixalex/hpclang/actions/runs/38160477819)
+passed on `216bb5d5`; its path filter did not trigger on the final optional
+cleanup-dispatch repair. This is retained prior-head evidence, not a Gallery
+run on `2988e1de`. The earlier Runtime transfer failure also passed its rerun.
+Final local acceptance includes 72 host tests, exit/stream sanitizers,
+six-model Direct Runtime/System Services, six-model Stock System Services
+and both object lifecycle suites, plus HP49g+/HP50g Direct/Stock exit-time
+file persistence. Historical pending statements below are superseded by
+this acceptance for the implemented scope.
+
+Native Port 0/1/2 services, whole-calculator reset and reliable hardware
+serial-number discovery retain their individually approved future goals.
+The prepared HP49g+ physical SD test remains nonblocking and unexecuted;
+emulator success does not establish physical hot-plug safety. Optional USB
+stability measurements and transport reliability investigation remain open.
+M8 retains broad source adapters, SDK delivery and higher-level UI work.
+
 ## M7.2 metadata / M7.3h–j / M7.5 integrated acceptance
 
 Accepted on 2026-10-07 at functional head `6a7f9a28`. This integrated tree

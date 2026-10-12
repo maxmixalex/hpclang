@@ -6,7 +6,7 @@ Live short-term work is tracked in [issue #1](https://github.com/maxmixalex/hpcl
 
 M0–M6 describe the **execution foundation**: compiler/runtime viability, the HPC1 ABI, calculator launch paths, stock-system return, packaging, fixtures, and automated E2E.
 
-They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–j object/stack/directory, composite-object, HP39 Aplet persistence/Reset and native-catalog services. M7.4 common system services and M7.5 display/runtime services are accepted. The final parity work remains open; the individually reviewed native-port limitations retain implementation goals below.
+They do **not** mean that hpclang already reproduces the application-facing feature set of HPGCC 1.x, HPGCC 2.x, or HPGCC3. M7 now provides stable device facts, monotonic time, the complete six-model physical keyboard/event core, opaque 2/4/16-level software surfaces, geometry, native/generated font and text rendering, hp4950 stream stdio through picolibc, and accepted M7.3a–j object/stack/directory, composite-object, HP39 Aplet persistence/Reset and native-catalog services. M7.4 common system services and M7.5 display/runtime services are accepted. M7 capability parity is accepted at functional head `2988e1de`; the individually reviewed native-port limitations retain implementation goals below.
 
 The project target is stronger than "substantial calculator-facing functionality":
 
@@ -116,7 +116,7 @@ Direct runtime owns common-bootstrap execution and return correctness. Stock-lau
 
 ## M7 — Application-facing calculator services
 
-**The existing M7.1/M7.2 acceptance remains valid for its tested scope. M7.3a–j object services, M7.4 common system services and M7.5 display/runtime services are accepted. Text/numeric/console behavior, media-change handling and historical graphics/keyboard/file/object clients are now accepted through `7303a3d6`. Overall M7 remains open for final ledger acceptance and the timed-client, owned CPU power policy and ordinary application termination batch below. Native Port 0/1/2, whole-calculator reset and reliable hardware serial-number discovery remain individually approved follow-ups.**
+**The existing M7.1/M7.2 acceptance remains valid for its tested scope. M7.3a–j object services, M7.4 common system services and M7.5 display/runtime services are accepted. Text/numeric/console behavior, media-change handling and historical graphics/keyboard/file/object clients are now accepted through `7303a3d6`. Overall M7 is complete within the individually approved scope: functional head `2988e1de` passes Core, Quality, Runtime, Objects and Storage; Gallery passed on `216bb5d5` and was not retriggered by the final cleanup-only repair. See [final acceptance](validation.md#m7-final-acceptance). Native Port 0/1/2, whole-calculator reset and reliable hardware serial-number discovery remain individually approved follow-ups.**
 
 M7 is where hpclang becomes a practical calculator SDK rather than only a validated native execution environment. Its completion criterion is **clean-core capability parity with the ordinary application-facing jobs of HPGCC**, not an arbitrary count of APIs.
 
@@ -400,12 +400,12 @@ See [M7.5 validation](validation.md#m75-display-runtime-local-acceptance).
 
 ### M7 parity closure
 
-Before calling M7 complete:
+M7 closure gates, accepted on `2988e1de`:
 
-- [ ] every proven ordinary HPGCC application capability has a working clean equivalent; any omitted capability has an individually documented, maintainer-approved limitation. A Migration/Unsupported signature label alone does not close the capability;
-- [ ] representative historical applications cover graphics/text, keyboard, time/system, filesystem, and calculator-object/stack flows;
-- [ ] all supported hardware families expose coherent capability queries and deterministic failure for absent services;
-- [ ] Stock E2E proves host-state restoration for every service that temporarily touches calculator-owned state.
+- [x] every proven ordinary HPGCC application capability has a working clean equivalent; any omitted capability has an individually documented, maintainer-approved limitation. A Migration/Unsupported signature label alone does not close the capability;
+- [x] representative historical applications cover graphics/text, keyboard, time/system, filesystem, and calculator-object/stack flows;
+- [x] all supported hardware families expose coherent capability queries and deterministic failure for absent services;
+- [x] Stock E2E proves host-state restoration for every service that temporarily touches calculator-owned state.
 
 M7 completion therefore means **practical HPGCC capability parity**, not binary compatibility and not literal reproduction of every unsafe low-level API.
 
@@ -447,13 +447,13 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
     application witnesses. CPU policy and ordinary termination stay in M7;
     native ports, reset and serial-number research retain individually approved
     follow-ups. Remaining historical spellings and broader UI policy stay in M8.
-    This completes the ledger structure, not the pending functional CI gate.
+    The ledger and functional CI gate are accepted on `2988e1de`.
 - [x] Define runtime discovery for supported operations and context-dependent
   availability before new object/system services proliferate.
   - Accepted on `9489e7d1`: distinguish classic RPL read access from mutation availability,
     share launcher-bound validation with the mutation backend, and validate the
     HP39 portal before reporting Aplet services. Host and calculator probes cover
-    model/context differences; the broader historical capability ledger remains open.
+    model/context differences; the broader historical capability ledger is accepted on `2988e1de`.
 
 ### M7.1 / M7.2 follow-up — uncovered application behavior
 
@@ -514,7 +514,7 @@ accepted M7.3a–f evidence. Historical source evidence is recorded in
   adapters. Local persistence/error tests, six-model Direct and both SD-model
   Stock Storage pass; integrated CI acceptance is complete on `6a7f9a28`. This does not add
   automatic access-date maintenance or timestamp setters.
-- [ ] Audit media-change and ownership behavior; retain the unresolved Stock
+- [x] Audit media-change and ownership behavior; retain the unresolved Stock
   HP49/50 Storage launch intermittency as a reliability investigation.
   - Pre-takeover insertion/protection refresh now uses read-only GPIO sampling
     instead of repeating Stock `CHECKINSERT`; regression acceptance is complete
@@ -619,9 +619,9 @@ Font Gallery, Core and Quality CI all pass on `7303a3d6`.
 The detailed per-capability evidence is in
 [HPGCC compatibility](hpgcc-compat.md#capability-and-application-evidence).
 
-Additional source-confirmed application capabilities still to close:
+Final source-confirmed application capabilities and retained follow-ups:
 
-- [ ] Complete ordinary application termination: returning from `main` and
+- [x] Complete ordinary application termination: returning from `main` and
   `exit()` must execute registered cleanup and return to the calculator;
   `_Exit()` must skip language callbacks while restoring SDK-owned hardware.
   - Implemented with a shared launcher return boundary and the picolibc
@@ -631,7 +631,7 @@ Additional source-confirmed application capabilities still to close:
     Six-model Direct/Stock termination checks pass. The additional buffered
     stream cleanup passes all 72 host tests, sanitizers, six-model Direct
     Runtime/System Services, HP39gs Stock System Services and HP49g+/HP50g
-    Direct/Stock exit-time file persistence. Formal CI is pending.
+    Direct/Stock exit-time file persistence. Formal CI is accepted on `2988e1de`.
 - [ ] Retain whole-calculator reset (`kos_Reset`) as a subsequent research
   goal. The historical entry is reset/panic recovery, not ordinary app exit.
   The maintainer approved this as nonblocking for M7 on 2026-10-12.
@@ -651,7 +651,7 @@ Additional source-confirmed application capabilities still to close:
     The emulator's serial follows its backing inode, not mutable file contents.
     Formal CI is accepted on `7303a3d6`; historical `FS_CHANGED` spelling is
     adapter work.
-- [ ] Review and provide safe CPU performance/power policy for the ordinary
+- [x] Review and provide safe CPU performance/power policy for the ordinary
   application behavior behind `sys_slowOn/sys_slowOff`. Historical benchmarks,
   games and interactive examples use this to change speed or reduce power;
   replacing busy delays with monotonic waits does not establish power parity.
@@ -662,13 +662,13 @@ Additional source-confirmed application capabilities still to close:
     exclusion. All 72 host tests and six-model Direct/Stock System Services pass
     locally, including exit cleanup checked before the harness restores Stock.
     HP49g+/HP50g Direct and Stock SD file coexistence and six-model Stock
-    object coexistence pass. Formal CI is pending.
-- [ ] Add a genuine source-anchored historical time/system client alongside
+    object coexistence pass. Formal CI is accepted on `2988e1de`.
+- [x] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
   - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
     example with bounded allocation/work, independently checked prime results
     and a visible elapsed-time report. Direct and Stock pass on all six models;
-    formal CI remains pending for this additional client.
+    formal CI is accepted on `2988e1de` for this additional client.
 
 Accepted on `41d75dec`: model-native Unicode symbol lookup,
 the default bounded keyboard editor, contrast mutation/restoration and owned
@@ -683,7 +683,7 @@ The HP39 transport regression now covers embedded CRLF bytes: all three Stock
 models pass the corrected newline transport locally. This is a byte-preservation
 fix, not a retry or relaxation of the application result checks.
 
-- [ ] Exercise a stateful HP39 Aplet, nested directories, numerical composites,
+- [x] Exercise a stateful HP39 Aplet, nested directories, numerical composites,
   files, text/keyboard, graphics and time/system clients on their actual models.
 - [x] Retain the existing M8 compatibility, C++, migration and declarative-UI
   goals; add installable SDK/examples, console/text adapters and representative
