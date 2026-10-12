@@ -53,7 +53,8 @@ extern "C"
         HPCLANG_RPL_MUTATION_UNSUPPORTED = -9,
         HPCLANG_RPL_MUTATION_EXISTS = -10,
         HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
-        HPCLANG_RPL_MUTATION_NOT_EMPTY = -12
+        HPCLANG_RPL_MUTATION_NOT_EMPTY = -12,
+        HPCLANG_RPL_MUTATION_NOMEM = -13
     };
 
     /* Bootstrap-only: turn the native page interval into a rooted opaque
