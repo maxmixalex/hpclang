@@ -2,22 +2,29 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-    echo "usage: $0 <tty> <send-directory> <debug-log> [--remote-host <RPL>] <file> [file ...]" >&2
+    echo "usage: $0 <tty> <send-directory> <debug-log> [--remote-host <RPL> | --remote-host-file <setup.json>] <file> [file ...]" >&2
     exit 2
 fi
 
 TTY="$1"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SEND_DIR="$(realpath "$2")"
 LOG="$(realpath -m "$3")"
 shift 3
 
 remote_commands=()
-while [[ "${1:-}" == --remote-host ]]; do
+while [[ "${1:-}" == --remote-host || "${1:-}" == --remote-host-file ]]; do
     [[ $# -ge 3 && -n "$2" && "$2" != *,* ]] || {
-        echo "--remote-host requires a comma-free RPL command and at least one file" >&2
+        echo "remote setup requires a nonempty comma-free argument and at least one file" >&2
         exit 2
     }
-    remote_commands+=("$2")
+    if [[ "$1" == --remote-host-file ]]; then
+        setup_text="$(python3 "$ROOT/tools/stock-setup.py" "$2")"
+        mapfile -t setup_commands <<< "$setup_text"
+        remote_commands+=("${setup_commands[@]}")
+    else
+        remote_commands+=("$2")
+    fi
     shift 2
 done
 

@@ -39,6 +39,10 @@ cp "$APP_DIR/launchers/$TARGET.hp" "$SEND/HPCLANG.HP"
 
 # Focused applications may supply additional named Stock objects.
 EXTRA_SEND=()
+SETUP_ARGS=()
+if [[ -f "$APP_DIR/e2e.stock-setup.json" ]]; then
+    SETUP_ARGS=(--remote-host-file "$APP_DIR/e2e.stock-setup.json")
+fi
 for fixture in "$APP_DIR/stock-fixtures/"*.hp; do
     [[ -f "$fixture" ]] || continue
     filename="$(basename "$fixture")"
@@ -133,6 +137,7 @@ python3 "$ROOT/tools/kermit_watchdog.py" run "$ROOT/build/$TARGET-kermit-debug.l
     "$ROOT/tools/run-hp48-kermit-send.sh" \
     "$KERMIT_TTY" "$SEND" "$ROOT/build/$TARGET-kermit-debug.log" \
     --remote-host "-95 CF -95 FC?" \
+    "${SETUP_ARGS[@]}" \
     "${EXTRA_SEND[@]}" ZZE2E.HP=ZZE2E L275_48=L275 HPCLANG.HP=HPCLANG \
     > "$ROOT/build/$TARGET-kermit.out" 2>&1
 : > "$HOST_GATE"

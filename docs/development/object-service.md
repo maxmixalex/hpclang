@@ -565,7 +565,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | Initial metadata enumeration and owned backup/library reads; reusable CI fixtures and mutation remain in M8.0. |
+| Port 0 | Main RAM, containing library/backup objects | Initial metadata enumeration and owned backup/library reads with Stock E2E coverage; mutation remains in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
@@ -615,8 +615,11 @@ existing object-mutation application passes and returns. Library retrieval
 also passes a native HP48gII probe against the installed ARMToolbox library,
 followed by the existing application and return gates. Host ownership/error
 tests pass with ASan/UBSan, and Clang static analysis passes for the public backend.
-The reusable CI setup for these port fixtures, writes and Flash transactions
-remain required.
+The object-mutation suite now prepares `PORTZERO` through its versioned
+`stock-setup.json`, enumerates it and checks its exact integer value. It also
+reads installed libraries (including ARMToolbox on HP48gII). The same harness
+and application pass locally on all three classic models. Port writes and
+Flash transactions remain required; remote acceptance is still pending.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must

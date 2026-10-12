@@ -300,6 +300,7 @@ fi
 
 if [[ "$MODE" == object-mutation ]]; then
     python3 "$ROOT/tests/e2e/object-mutation/fixtures.py" "$OUT/stock-fixtures"
+    cp "$ROOT/tests/e2e/object-mutation/stock-setup.json" "$OUT/e2e.stock-setup.json"
 fi
 
 if [[ ( "$FAMILY" == all || "$FAMILY" == hp39 ) &&

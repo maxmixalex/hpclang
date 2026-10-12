@@ -1,5 +1,16 @@
 # Validation
 
+## Stock setup contracts
+
+Focused classic Stock applications may provide `stock-setup.json` with exactly
+`version: 1` and a nonempty `commands` array. Build packaging copies it to
+`e2e.stock-setup.json`. The Kermit harness evaluates the commands after file
+transfer and before releasing the launcher gate. Commands must be printable,
+comma-free ASCII because C-Kermit uses commas to separate host-side commands;
+invalid contracts fail before transfer. Application assertions must verify the
+prepared values: a transport acknowledgement alone does not prove RPL success.
+The object-mutation suite uses this mechanism for Port 0 backup/read acceptance.
+
 ## M7 final acceptance
 
 M7 is complete within its individually approved scope. Functional head
