@@ -634,7 +634,11 @@ rollback for an artificial backend that fails writes midway through commit.
 The three classic Stock models locally pass creation/readback of integer 987,
 duplicate rejection, the subsequent HOME mutation suite and settled return.
 Saved native RAM retains both the newly created backup and pre-existing port
-objects. Native RPL recall after a separate relaunch remains a distinct gate.
+objects. Independent local relaunch probes on all three classic models use
+Stock Kermit commands to recall both backups through native RPL and store the
+results in a native directory; the recorded values are 987 and 123. Resumed
+USB enumeration requires restoring the saved interrupt-enable masks into the
+protocol backend. The reusable CI relaunch gate remains to be integrated.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
