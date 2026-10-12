@@ -271,6 +271,64 @@ A canvas/custom-paint escape hatch is part of the boundary: declarative layout o
 
 Public C names, node storage limits, layout units, focus traversal rules, and renderer ABI remain deliberately unfrozen until a focused design/fixture slice begins.
 
+### Declarative application contract
+
+The maintainer's original application sketch establishes the following behavior
+for the planned engine. The example names describe the intended use; they do
+not freeze public API spelling or turn illustrative platform code into an ABI.
+
+- **Declaration in ordinary C:** `AppView(ui, const_model)` describes the desired
+  view with nested row/column/component scopes, ordinary `if/switch`, and loops.
+  It does not draw the LCD, start effects, or require the application to manually
+  create/destroy persistent widgets. Ordinary C functions compose reusable
+  components, including multiple independent instances of the same function.
+- **Scoped identity:** a key need only be unique among siblings. The complete
+  parent/component/key path identifies a node. Dynamic lists use persistent
+  item IDs, not array positions, so insertion and reordering preserve the
+  surviving items' focus and editing state. Define removal/filtering, same-key
+  type changes, duplicate keys and collision handling explicitly.
+- **Controlled values and actions:** model values flow into the view; typed
+  actions and edit events flow back to application updates. Text edits have
+  explicit capacity and UTF-8 rules, with event-text ownership and lifetime
+  defined. Rendering does not silently mutate application state.
+- **Explicit asynchronous state:** idle/loading/ready/error lives in the model.
+  An update may request an effect; starting the operation and delivering its
+  result are separate from declaring the view. Loading indicators, failure and
+  retry are ordinary conditional UI. The implementation must additionally
+  define cancellation and stale-completion handling.
+- **Custom canvas:** a declared node supplies identity, bounds, paint callback,
+  application state and revision. The framework invokes paint only when the
+  revision changes or its region is damaged; exposure, movement and resize must
+  cause the appropriate damage. Specialized drawing remains inside the owned,
+  clipped rendering boundary.
+- **Bounded execution:** fixed-capacity node storage, bounded identity paths
+  and explicit capacity errors support predictable ARM920T memory/time usage.
+  Frame requests can be coalesced, and reconciliation/layout precede painting
+  only the damaged regions.
+
+The sketch's `UI_SCOPE` uses a `for` increment to close a scope. That alone does
+not close it on `break`, `return` or `goto`. Before accepting a C declaration
+syntax, specify and test its supported control flow, balanced-scope validation
+and failed-frame recovery. An interrupted or over-capacity declaration must not
+silently corrupt the last accepted tree. Public macro spelling remains open.
+
+The illustrative native surface is RGB565 and the canvas includes a pointer
+callback. The six calculator targets require their real monochrome/grayscale
+surface contracts and keyboard operation; pointer input remains an optional
+backend capability. Preserve custom drawing and input routing without imposing
+RGB565 storage or claiming touch hardware. Any native drawing lease must define
+clipping, lifetime, publication/cache synchronization and release through the
+existing owned display/surface services.
+
+The application fixture must cover conditional connection controls, two
+instances of a reusable status component, controlled filtering, stable-ID list
+insertion/reversal, idle/loading/failure/retry/completion and revision-driven
+waveform canvas updates. Its scan operation is an illustrative asynchronous
+workload, not a promise of a new device-discovery service. A deterministic test
+provider can exercise effect transitions, alongside real calculator input and
+display verification. This fixture preserves the original application model
+while fitting each target's screen and input capabilities.
+
 ## Modern C++ profile
 
 hpclang uses Clang/LLVM, libc++, libc++abi, compiler-rt, and picolibc with `-fno-exceptions` and `-fno-rtti`. This is a modern embedded C++ profile, not unrestricted hosted C++.

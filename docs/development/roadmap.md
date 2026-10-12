@@ -429,6 +429,155 @@ M8 goals:
 - consider replacing the remaining ARMToolbox/library-275 stock-launch boundary with a minimal independent launcher if it materially improves packaging or portability;
 - separate public application documentation from this internal Development reference.
 
+### M8 stages
+
+The following decomposition was approved for implementation on 2026-10-12. It adds
+delivery and acceptance boundaries to the goals above; it does not remove any
+existing goal or reopen the accepted M7 scope. The native-port follow-up is
+scheduled explicitly, and declarative UI receives early independent stages.
+Public UI names and renderer contracts remain unfrozen until M8.2 design review.
+
+| Stage | Deliverable | Completion evidence |
+| --- | --- | --- |
+| M8.0 | Native Port 0/1/2 object services | Model-specific native enumeration/read/store/remove, ownership and persistence tests; explicit unsupported contexts |
+| M8.1 | Consumable SDK foundation | An external C and C++ application builds from an installed SDK in a clean container, without source-tree paths or local tools |
+| M8.2 | Declarative UI state, layout and interaction core | Stable identity, deterministic layout, focus/input and effect lifecycle tested independently of pixels; a small interactive calculator application |
+| M8.3 | UI components and renderer/theme backends | Reusable controls, a usable default renderer, a second backend demonstrating visual independence, and six-model interaction/rendering evidence |
+| M8.4 | Maintained HPGCC source adapters | Historical graphics, input, system, file and object applications compile through adapters with documented mechanical changes |
+| M8.5 | Modern C++ and migration experience | Owned C++ wrappers, actionable migration guidance/tooling and public examples exercise the same clean contracts |
+| M8.6 | Integrated applications and SDK release acceptance | Non-trivial downstream applications, packaging/documentation and cross-family resource/return acceptance |
+
+#### M8.0 — Native port services
+
+- [ ] Recheck each model's native port representation and supported contexts
+  against historical implementations and Stock behavior; do not extrapolate a
+  single model's mapping to all six calculators.
+- [ ] Define typed port discovery, object enumeration/read/store/remove and
+  owned snapshot lifetimes for native backup/library objects. Keep the
+  [retained per-port requirements](#native-port-services-retained-follow-up).
+- [ ] Implement and accept Port 0 RAM ownership and active-library safety,
+  then Port 1 banked-memory/ARM-allocator coexistence, then Port 2 Flash
+  erase/write, full-media failure and persistence. Each port has its own gate.
+- [ ] Verify original-system visibility after return/relaunch, mutation failure
+  without unrelated data loss, and coexistence with HOME objects and normal
+  application exit. Flash failure/recovery claims require explicit evidence.
+
+#### M8.1 — Installable SDK foundation
+
+- [ ] Package the public headers, libraries, fonts/assets, target configuration
+  and launcher/packaging tools with an explicit supported toolchain contract.
+- [ ] Build and package external C and C++ examples using only the installed
+  SDK and declared dependencies in a fresh LLVM-only environment.
+- [ ] Start application-facing installation, build and capability documentation
+  separately from the internal Development reference. Keep examples usable
+  without depending on repository research or test infrastructure.
+
+#### M8.2 — Declarative UI core
+
+The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
+applications describe the current view, events update state, and stable keys
+preserve node identity when that view is declared again. C functions suffice
+for composition; later C++ syntax builds on the same core.
+
+Deliver and review this core in the following slices, using the retained
+[declarative application contract](sdk-design.md#declarative-application-contract):
+
+- [ ] **M8.2a — C declaration and identity:** nested scopes, ordinary conditional
+  and loop syntax, function components and complete parent/key paths. Exercise
+  two component instances and stable-ID list insertion/reversal, including
+  duplicate keys, scope interruption and fixed-pool exhaustion.
+- [ ] **M8.2b — Layout, input and application updates:** row/column measurement,
+  focus and navigation, controlled text/filter events and model-driven views.
+  Define what happens when filtering removes the focused item and when the
+  application accepts, transforms or rejects an edit.
+- [ ] **M8.2c — Effects, canvas and incremental frames:** explicit asynchronous
+  states, loading/error/retry, cancellation, revision-driven custom painting
+  and damaged-region updates. Accept the original sketch's six application
+  patterns as one stateful example, with a deterministic asynchronous provider
+  and real calculator keyboard/display evidence.
+
+- [ ] Review a small public application sketch before freezing API names:
+  nested rows/columns, conditional children, a keyed changing list, controlled
+  text input, a custom canvas and an asynchronous operation with cancellation.
+- [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
+  stable-key reconciliation and predictable allocation-failure behavior.
+  Measure actual memory and update cost on the smallest supported target.
+- [ ] Implement focus retention/traversal, keyboard navigation and event/action
+  routing above the unchanged physical-keyboard API. Text entry uses the
+  model-aware input service rather than duplicating Alpha/Shift rules.
+- [ ] Define controlled-input edits and selection, explicit effect start/cancel
+  ownership, stale-result rejection after removal, and cleanup at application
+  exit. Integrate with the cooperative application loop.
+- [ ] Track damaged regions and bounded canvas revisions; exercise identity,
+  layout, focus and effect lifecycle in host tests, then validate an interactive
+  stateful example on calculator targets.
+
+#### M8.3 — Components, rendering and themes
+
+- [ ] Provide reusable text, action, selection, scrolling/list and editing
+  components with composable containers; confirm the initial component set
+  through real example screens rather than application-specific dialogs.
+- [ ] Implement a usable default surface/font renderer and explicit theme
+  inputs. Keep widget appearance, font choices and rasterization outside the
+  state/layout engine. Measurement and drawing must agree across backends.
+- [ ] Demonstrate the same application tree with a second renderer/theme,
+  including focus and input behavior. Preserve the downstream 39gsX native
+  appearance use case; a claim of faithful HP39 reproduction requires separate
+  reverse-engineering and visual evidence.
+- [ ] Adapt the original sketch's illustrative native drawing/pointer boundary
+  to actual monochrome/grayscale surfaces and keyboard-only operation. Keep
+  pointer support optional and test clipped drawing ownership/publication;
+  RGB565 and device scanning in the sketch do not imply new target hardware.
+- [ ] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
+  partial redraw and custom canvas, including low-memory failure and clean
+  Stock return. Record frame/update and memory budgets.
+
+#### M8.4 — Historical source compatibility
+
+- [ ] Deliver the common 59-function HPG graphics surface and maintained
+  keyboard, console/text, system, filesystem and object adapters in focused
+  groups. Expand the four-generation declaration/implementation/evidence ledger.
+- [ ] Compile representative original historical applications, recording each
+  required source edit; distinguish these from M7's clean-API behavioral ports.
+- [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
+  semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
+  preserve unsupported-context errors rather than supplying silent stubs.
+
+#### M8.5 — Modern C++ and migration
+
+- [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
+  the supported no-exceptions/no-RTTI embedded profile; keep C applications
+  first-class and exercise destruction/exit behavior.
+- [ ] Provide migration guidance and useful tooling for historical APIs,
+  precision/ownership differences, target capabilities, UTF-8/font selection
+  and retired raw hardware access.
+- [ ] Publish C/C++ application examples, stable public API conventions and
+  deterministic resource generation as part of the installable SDK.
+
+#### M8.6 — Application and release acceptance
+
+- [ ] Exercise non-trivial downstream applications combining UI, object data,
+  time/system services and, where supported, files and native ports. Cover each
+  hardware family and state exactly which scenarios were emulated or physical.
+- [ ] Validate release installation, reproducible assets, resource limits,
+  error handling and Stock restoration; finish public documentation separately
+  from internal design/history.
+- [ ] Evaluate the retained independent-launcher option against concrete
+  packaging/portability benefits. Any scope decision remains explicit; M8
+  does not silently turn this evaluation into an implemented launcher claim.
+
+Suggested work order: M8.0 and the M8.1 packaging foundation first, followed by
+M8.2/M8.3 as the early UI track. UI design and host fixtures need not wait for
+Port 2 Flash work. Adapter groups may progress once their clean services are
+stable; `win*` follows the UI contract. M8.5 and M8.6 integrate the accepted
+pieces. Stage numbers are acceptance boundaries, not a requirement to postpone
+all UI work until every earlier optional investigation is exhausted.
+
+For each stage, implement and validate locally before batching a meaningful
+CI submission. Keep host semantic tests separate from calculator integration
+and pixel witnesses, select affected E2E suites, and preserve normal PASS and
+return gates. A pushed CI run is not a reason to stop independent work or poll.
+
 ## Additional M7–M8 acceptance requirements
 
 The following requirements supplement the existing milestones and preserve the
