@@ -166,3 +166,29 @@ struct hpclang_object *hpclang_port_backup_get(uint32_t port, const uint8_t *nam
         errno = ENOENT;
     return NULL;
 }
+
+struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_number)
+{
+    if (library_number > 0xfff) {
+        errno = EINVAL;
+        return NULL;
+    }
+    struct hpclang_rpl_port_cursor cursor;
+    if (open_cursor(port, &cursor))
+        return NULL;
+    struct hpclang_rpl_port_entry entry;
+    int result;
+    while ((result = hpclang_rpl_port_next(&reader, &cursor, &entry)) > 0) {
+        if (entry.prologue != 0x02b40 || entry.library_number != library_number)
+            continue;
+        struct hpclang_object *object = NULL;
+        if (hpclang_object_snapshot_copy(&reader, entry.value_address, entry.value_span, &object))
+            return NULL;
+        return object;
+    }
+    if (result < 0)
+        port_error(result);
+    else
+        errno = ENOENT;
+    return NULL;
+}

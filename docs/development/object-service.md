@@ -565,7 +565,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | Initial metadata enumeration and owned backup reads; native execution acceptance, library reads and mutation remain in M8.0. |
+| Port 0 | Main RAM, containing library/backup objects | Initial metadata enumeration and owned backup/library reads; reusable CI fixtures and mutation remain in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
@@ -603,13 +603,20 @@ The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/clo
 and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
 independent `hpclang_object` snapshots released with `hpclang_object_release`.
 Backup names are exact calculator bytes, while library metadata includes its
-numeric identifier. The current backend reads classic Stock Port 0 only.
+numeric identifier. `hpclang_port_library_get` copies a complete library by
+number without installing, attaching or executing it. The current backend
+reads classic Stock Port 0 only.
 Other valid port indices and unavailable runtime contexts return `ENOSYS`,
 which describes this implementation rather than hardware absence. Invalid
 indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
-and mapping failures `EIO`. This API has host ownership/error coverage and an
-ARM compilation check; execution of these new public calls in Stock is still
-pending. Port writes, library retrieval and Flash transactions remain required.
+and mapping failures `EIO`. Local Stock execution on HP48gII, HP49g+ and HP50g
+verifies public enumeration and the exact integer backup read before the
+existing object-mutation application passes and returns. Library retrieval
+also passes a native HP48gII probe against the installed ARMToolbox library,
+followed by the existing application and return gates. Host ownership/error
+tests pass with ASan/UBSan, and Clang static analysis passes for the public backend.
+The reusable CI setup for these port fixtures, writes and Flash transactions
+remain required.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must

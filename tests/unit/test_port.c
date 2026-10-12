@@ -95,5 +95,17 @@ int main(void)
     iterator = hpclang_port_iterator_open(0);
     assert(iterator && hpclang_port_iterator_read(iterator, &entry) == 0);
     hpclang_port_iterator_close(iterator);
+    assert(!hpclang_port_library_get(0, 123) && errno == ENOENT);
+    assert(!hpclang_port_library_get(0, 0x1000) && errno == EINVAL);
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    for (uint32_t i = 0; library[i]; ++i)
+        memory[0xfffc0 + i] =
+            (uint8_t)(library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10);
+    memset(memory + 0xfffc0 + 43, 0, 5);
+    object = hpclang_port_library_get(0, 123);
+    assert(object);
+    memset(memory, 0, sizeof(memory));
+    assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(object);
     return 0;
 }
