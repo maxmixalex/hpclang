@@ -131,7 +131,7 @@ jobs:
           path: |
             build/e2e/*/*/e2e.hpc
             build/e2e/*/*/e2e.result-address
-            build/e2e/*/*/e2e.stock-lifecycle.json
+            build/e2e/*/*/e2e.stock-*.json
             build/e2e/*/*/launchers/*.bin
             build/e2e/*/*/launchers/*.hp
             build/e2e/*/*/stock-fixtures/*.hp
