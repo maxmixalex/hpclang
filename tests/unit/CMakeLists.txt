@@ -280,6 +280,16 @@ target_include_directories(test_object_store PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(port
+    test_port.c
+    "${HPCLANG_ROOT}/runtime/core/port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_port PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpgcc_satdir
     test_hpgcc_satdir.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-satdir.c")

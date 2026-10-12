@@ -565,7 +565,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | No public port read/write service; implement native enumeration, ownership and mutation separately. |
+| Port 0 | Main RAM, containing library/backup objects | Initial metadata enumeration and owned backup reads; native execution acceptance, library reads and mutation remain in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
@@ -598,6 +598,18 @@ header plus 4792 object nibbles) and the native next-object address. All 74 host
 tests and the three affected parser tests under ASan/UBSan pass locally.
 Flash allocation records still require their own traversal and transaction
 implementation; the RAM iterator must not be applied to raw Flash records.
+
+The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
+and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
+independent `hpclang_object` snapshots released with `hpclang_object_release`.
+Backup names are exact calculator bytes, while library metadata includes its
+numeric identifier. The current backend reads classic Stock Port 0 only.
+Other valid port indices and unavailable runtime contexts return `ENOSYS`,
+which describes this implementation rather than hardware absence. Invalid
+indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
+and mapping failures `EIO`. This API has host ownership/error coverage and an
+ARM compilation check; execution of these new public calls in Stock is still
+pending. Port writes, library retrieval and Flash transactions remain required.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
