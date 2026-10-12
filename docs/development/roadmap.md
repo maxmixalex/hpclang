@@ -464,6 +464,12 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 
 #### M8.1 — Installable SDK foundation
 
+The first source-SDK slice provides installation, relocation, an external C/C++
+build API, generated font selection and HPC1 packaging. Local relocation/build,
+format/lint, ARM example analysis and strict docs pass. Core CI now exercises
+the installed package. Formal CI, complete Stock launcher bundles and full
+M8.1 delivery remain pending; see [SDK getting started](../sdk/getting-started.md).
+
 - [ ] Package the public headers, libraries, fonts/assets, target configuration
   and launcher/packaging tools with an explicit supported toolchain contract.
 - [ ] Build and package external C and C++ examples using only the installed

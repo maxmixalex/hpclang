@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
-project(hpclang LANGUAGES C CXX ASM)
+project(hpclang LANGUAGES NONE)
 
 # Repository tests are intentionally separate projects:
 #   cmake -S tests/unit -B build/unit
 #   tools/build-e2e.sh
-# The SDK itself is consumed through cmake/toolchains and cmake/profiles.
+# Installing the source SDK does not require a host or cross compiler.
+include(cmake/install-sdk.cmake)

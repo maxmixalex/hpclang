@@ -2,7 +2,7 @@
 
 `fonts.zip` is the canonical custom-font source bundle for hpclang. It is tracked with Git LFS and kept as the auditable source archive rather than being repacked into a build-specific format.
 
-The archive is **not** consumed by normal application builds. Python code under `tools/` is repository-maintenance tooling only: maintainers use it to inspect bitmap sources or regenerate checked-in assets. SDK users compiling C/C++ applications do not need Python, Pillow, fontTools, or anything from `tools/`.
+The archive is **not** consumed by normal application builds. Font-related Python code under `tools/` is repository-maintenance tooling: maintainers use it to inspect bitmap sources or regenerate checked-in assets. Font compilation needs no Python, Pillow or fontTools. The SDK's separate HPC1 executable-packaging step uses Python's standard library.
 
 The pipeline is:
 
