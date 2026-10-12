@@ -3,6 +3,9 @@ name: CI / Core runtime
 on:
   push:
     paths:
+      - "CMakeLists.txt"
+      - "examples/**"
+      - "tests/sdk/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
@@ -31,6 +34,9 @@ on:
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
     paths:
+      - "CMakeLists.txt"
+      - "examples/**"
+      - "tests/sdk/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
@@ -79,6 +85,9 @@ jobs:
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
+
+      - name: Verify installed SDK with external applications
+        run: python3 tests/sdk/check.py
 
       - name: Build hardware-validation E2E
         run: |
