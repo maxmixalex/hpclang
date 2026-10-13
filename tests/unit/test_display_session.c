@@ -177,6 +177,33 @@ int main(void)
             break;
     }
     assert(clean_count >= 6);
+    assert(hpclang_display_begin_pages(2, 0) == -1 && errno == EINVAL);
+    assert(hpclang_display_begin_pages(2, 3) == -1 && errno == EINVAL);
+    assert(hpclang_display_publish() == -1 && errno == EPERM);
+    for (unsigned levels = 2; levels <= 16; levels = levels == 2 ? 4 : 16) {
+        fail_allocation = allocations + 1;
+        assert(hpclang_display_begin_pages(levels, 1) == -1 && errno == ENOMEM && !live);
+        assert(memcmp(registers, original, sizeof original) == 0);
+        fail_allocation = 0;
+        assert(hpclang_display_begin_pages(levels, 1) == 0 && live == 1);
+        struct hpclang_surface *front = hpclang_display_back();
+        assert(front && front->levels == levels);
+        uint32_t address = registers[5];
+        unsigned cleaned = clean_count;
+        hpclang_surface_set_pixel(front, 1, 1, 255);
+        assert(hpclang_display_publish() == 0 && clean_count == cleaned + 1);
+        assert(registers[5] == address && hpclang_display_back() == front);
+        assert(hpclang_display_present(100000) == 0);
+        assert(registers[5] == address && hpclang_display_back() == front);
+        assert(hpclang_surface_get_pixel(front, 1, 1) == 255);
+        assert(hpclang_display_indicator_set(3, 255) == 0);
+        assert(hpclang_display_publish() == 0);
+        hpclang_display_end();
+        assert(!live && !hpclang_display_back());
+        assert(memcmp(registers, original, sizeof original) == 0);
+        if (levels == 16)
+            break;
+    }
     clock_error = 1;
     assert(hpclang_display_wait_frame(1000) == -1 && errno == EIO);
     clock_error = 0;
