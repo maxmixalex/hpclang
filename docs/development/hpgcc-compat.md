@@ -169,6 +169,17 @@ The hpclang core already provides opaque physical/software surfaces, clipped pix
 
 Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter.
 
+`hpg_set_mode_mono/gray4/gray16` now acquire one scanout page when `dbuf` is
+zero, or two pages otherwise. Single-page drawing publishes CPU writes at the
+end of each adapter operation; double-page drawing stays hidden until
+`hpg_flip()` exchanges pages. A failed mode replacement keeps the old pages,
+pixels, and LCD state. Drawing state survives successful replacement, while
+new pages start white. `hpg_cleanup()` restores the original host LCD only
+when HPG acquired ownership and is registered for normal application exit.
+An already-owned clean display session causes initial HPG acquisition to
+fail with `EBUSY`; it is not released by HPG cleanup. Target-side acceptance
+and the historical indicator adapter remain open.
+
 The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean
 Unicode font API. Default-font integration is in progress: prefer live native

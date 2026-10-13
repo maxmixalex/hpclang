@@ -1,10 +1,12 @@
 #include "hpg-internal.h"
+#include "display-internal.h"
 #include <errno.h>
 #include <stdlib.h>
 
 static struct hpg_graphics screen;
 hpg_t *hpg_stdscreen = &screen;
 static int initialized;
+static int owns_display, double_buffered, cleanup_registered;
 
 static void initialize(hpg_t *g, struct hpclang_surface *surface)
 {
@@ -25,14 +27,60 @@ void hpg_init(void)
         return;
     }
     initialize(&screen, surface);
+    if (!cleanup_registered) {
+        if (atexit(hpg_cleanup)) {
+            errno = ENOMEM;
+            return;
+        }
+        cleanup_registered = 1;
+    }
     initialized = 1;
 }
 void hpg_cleanup(void)
 {
+    if (owns_display)
+        hpclang_display_end();
+    owns_display = double_buffered = 0;
     hpclang_surface_destroy(screen.mask);
     screen = (hpg_t){0};
     hpg_stdscreen = &screen;
     initialized = 0;
+}
+void hpclang_hpg_finish(hpg_t *g)
+{
+    if (g == &screen && owns_display && !double_buffered)
+        (void)hpclang_display_publish();
+}
+static void screen_mode(unsigned levels, int dbuf)
+{
+    hpg_init();
+    if (!initialized)
+        return;
+    int result = owns_display ? hpclang_display_replace_pages(levels, dbuf ? 2 : 1)
+                              : hpclang_display_begin_pages(levels, dbuf ? 2 : 1);
+    if (result)
+        return;
+    owns_display = 1;
+    double_buffered = !!dbuf;
+    screen.surface = hpclang_display_surface();
+}
+void hpg_set_mode_mono(int dbuf)
+{
+    screen_mode(2, dbuf);
+}
+void hpg_set_mode_gray4(int dbuf)
+{
+    screen_mode(4, dbuf);
+}
+void hpg_set_mode_gray16(int dbuf)
+{
+    screen_mode(16, dbuf);
+}
+void hpg_flip(void)
+{
+    hpg_init();
+    if (owns_display && double_buffered)
+        (void)hpclang_display_present(100000);
 }
 hpg_t *hpclang_hpg_resolve(hpg_t *g)
 {
@@ -105,8 +153,10 @@ int hpg_get_height(hpg_t *g)
 void hpg_clear_on(hpg_t *g)
 {
     g = hpclang_hpg_resolve(g);
-    if (g)
+    if (g) {
         hpclang_surface_clear(hpclang_hpg_surface(g), 0);
+        hpclang_hpg_finish(g);
+    }
 }
 void hpg_clear(void)
 {

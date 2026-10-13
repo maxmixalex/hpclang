@@ -30,6 +30,7 @@ void hpg_draw_pixel_on(hpg_t *g, int x, int y)
     if (!g || x < g->left || x >= g->right || y < g->top || y >= g->bottom)
         return;
     pixel(g, hpclang_hpg_surface(g), x, y);
+    hpclang_hpg_finish(g);
 }
 void hpg_draw_pixel(int x, int y)
 {
@@ -59,6 +60,7 @@ void hpg_fill_rect_on(hpg_t *g, int x1, int y1, int x2, int y2)
                 continue;
             pixel(g, surface, x, y);
         }
+    hpclang_hpg_finish(g);
 }
 void hpg_fill_rect(int x1, int y1, int x2, int y2)
 {
@@ -87,6 +89,7 @@ static void composite(hpg_t *g, int patterned, int64_t origin_x, int64_t origin_
             if (hpclang_surface_get_pixel(g->mask, x, y) &&
                 (!patterned || ink(g->pattern, x, y, origin_x, origin_y)))
                 pixel(g, surface, x, y);
+    hpclang_hpg_finish(g);
 }
 void hpg_draw_line_on(hpg_t *g, int x1, int y1, int x2, int y2)
 {
@@ -250,6 +253,7 @@ void hpg_blit(hpg_t *src, int sx, int sy, int width, int height, hpg_t *dst, int
             hpclang_surface_set_pixel(to, (int)(dx + x), (int)(dy + y), color);
         }
     }
+    hpclang_hpg_finish(dst);
 }
 
 static void letter(hpg_t *g, unsigned char code, int64_t x, int64_t y)
@@ -293,6 +297,7 @@ void hpg_draw_letter_on(hpg_t *g, char code, int x, int y)
     if (!g->font)
         g->font = hpg_get_minifont();
     letter(g, (unsigned char)code, x, y);
+    hpclang_hpg_finish(g);
 }
 void hpg_draw_letter(char code, int x, int y)
 {
@@ -321,6 +326,7 @@ void hpg_draw_text_on(hpg_t *g, char *text, int x, int y)
                 cursor_x += g->font->advance;
         }
     }
+    hpclang_hpg_finish(g);
 }
 void hpg_draw_text(char *text, int x, int y)
 {

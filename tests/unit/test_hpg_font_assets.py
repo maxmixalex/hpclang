@@ -94,6 +94,11 @@ DRIVER = r"""
 static struct hpclang_boot_info boot;
 const struct hpclang_boot_info *hpclang_boot_info(void) { return &boot; }
 struct hpclang_surface *hpclang_display_surface(void) { return NULL; }
+int hpclang_display_begin_pages(uint32_t l, unsigned n) { (void)l; (void)n; return -1; }
+int hpclang_display_replace_pages(uint32_t l, unsigned n) { (void)l; (void)n; return -1; }
+int hpclang_display_publish(void) { return -1; }
+int hpclang_display_present(uint32_t t) { (void)t; return -1; }
+void hpclang_display_end(void) {}
 int hpclang_saturn_read_nibble(struct hpclang_saturn_address a, uint8_t *v)
 { (void)a; (void)v; return 0; }
 int hpclang_saturn_read_byte(struct hpclang_saturn_address a, uint8_t *v)

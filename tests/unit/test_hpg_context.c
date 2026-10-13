@@ -126,10 +126,102 @@ static void pixmaps(void)
 
 static struct hpclang_surface *display;
 static unsigned borrowed;
+static struct hpclang_surface *pages[2];
+static unsigned page_count, back, published, flips, ended;
+static int mode_failure;
+static int configure(unsigned levels, unsigned count)
+{
+    if (mode_failure) {
+        errno = ENOMEM;
+        return -1;
+    }
+    for (unsigned i = 0; i < 2; ++i) {
+        hpclang_surface_destroy(pages[i]);
+        pages[i] = i < count ? hpclang_surface_create(8, 6, levels) : NULL;
+        assert(i >= count || pages[i]);
+    }
+    page_count = count;
+    back = count - 1;
+    return 0;
+}
+int hpclang_display_begin_pages(uint32_t levels, unsigned count)
+{
+    if (page_count) {
+        errno = EBUSY;
+        return -1;
+    }
+    return configure(levels, count);
+}
+int hpclang_display_replace_pages(uint32_t levels, unsigned count)
+{
+    assert(page_count);
+    return configure(levels, count);
+}
+int hpclang_display_publish(void)
+{
+    assert(page_count);
+    ++published;
+    return 0;
+}
+int hpclang_display_present(uint32_t timeout)
+{
+    assert(timeout && page_count == 2);
+    back ^= 1;
+    ++flips;
+    return 0;
+}
+void hpclang_display_end(void)
+{
+    for (unsigned i = 0; i < 2; ++i) {
+        hpclang_surface_destroy(pages[i]);
+        pages[i] = NULL;
+    }
+    page_count = 0;
+    ++ended;
+}
 struct hpclang_surface *hpclang_display_surface(void)
 {
     ++borrowed;
-    return display;
+    return page_count ? pages[back] : display;
+}
+
+static void modes(void)
+{
+    hpg_set_mode_gray4(0);
+    assert(page_count == 1 && hpclang_surface_levels(pages[0]) == 4);
+    hpg_set_color(NULL, 85);
+    hpg_draw_pixel(1, 1);
+    assert(hpg_get_pixel(NULL, 1, 1) == 85 && published == 1);
+    hpg_fill_rect(0, 0, 2, 2);
+    assert(published == 2);
+    hpg_flip();
+    assert(flips == 0);
+    mode_failure = 1;
+    hpg_set_mode_gray16(1);
+    assert(errno == ENOMEM && page_count == 1 && hpg_get_pixel(NULL, 1, 1) == 85);
+    mode_failure = 0;
+    hpg_set_mode_gray16(1);
+    assert(page_count == 2 && hpg_get_color(NULL) == 85);
+    hpg_draw_pixel(1, 1);
+    assert(published == 2);
+    hpg_flip();
+    assert(flips == 1 && hpg_get_pixel(NULL, 1, 1) == 0);
+    hpg_draw_pixel(2, 2);
+    hpg_flip();
+    assert(hpg_get_pixel(NULL, 1, 1) == 85 && hpg_get_pixel(NULL, 2, 2) == 0);
+    hpg_set_mode_mono(0);
+    hpg_clear();
+    assert(page_count == 1 && published == 3);
+    hpg_cleanup();
+    assert(!page_count && ended == 1);
+    hpg_cleanup();
+    assert(ended == 1);
+    assert(hpclang_display_begin_pages(2, 2) == 0);
+    hpg_set_mode_gray4(0);
+    assert(errno == EBUSY && page_count == 2);
+    hpg_cleanup();
+    assert(ended == 1 && page_count == 2); /* Other owner's session survives. */
+    hpclang_display_end();
 }
 
 static void copies(void)
@@ -320,6 +412,7 @@ int main(void)
     assert(errno == EINVAL && hpg_get_width(NULL) == 8);
     hpg_cleanup();
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
+    modes();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

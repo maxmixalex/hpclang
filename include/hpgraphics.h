@@ -36,6 +36,14 @@ extern "C"
 #define HPG_STDSCREEN hpg_stdscreen
     void hpg_init(void);
     void hpg_cleanup(void);
+    /* Nonzero dbuf selects page exchange; zero publishes each completed draw.
+     * Mode changes preserve drawing state. On failure errno describes the
+     * error and the previous mode/pages remain usable. Cleanup restores only
+     * display ownership acquired by HPG, and also runs on normal exit. */
+    void hpg_set_mode_mono(int dbuf);
+    void hpg_set_mode_gray4(int dbuf);
+    void hpg_set_mode_gray16(int dbuf);
+    void hpg_flip(void);
     int hpg_get_width(hpg_t *g);
     int hpg_get_height(hpg_t *g);
     hpg_t *hpg_alloc_mono_image(int width, int height);
