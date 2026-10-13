@@ -146,9 +146,12 @@ int hpclang_ui_paint(struct hpclang_ui *ui, struct hpclang_ui_rect surface,
                 node->kind == HPCLANG_UI_KEY)
                 continue;
             errno = 0;
-            result = node->kind == HPCLANG_UI_CANVAS
-                         ? node->paint(ops.canvas_context, node->canvas_state, node->bounds, clip)
-                         : ops.node(ops.context, node, clip, node->id == ui->focused);
+            if (node->kind == HPCLANG_UI_CANVAS)
+                result = ops.canvas ? ops.canvas(ops.context, node, clip)
+                                    : node->paint(ops.canvas_context, node->canvas_state,
+                                                  node->bounds, clip);
+            else
+                result = ops.node(ops.context, node, clip, node->id == ui->focused);
             if (result) {
                 error = callback_error(result, errno);
                 break;

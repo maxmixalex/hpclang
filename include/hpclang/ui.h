@@ -181,6 +181,10 @@ extern "C"
         int (*end)(void *context, int completed);
         void *context;
         void *canvas_context;
+        /* Optional backend wrapper establishes its canvas drawing lease. If
+         * NULL, the core calls the node's paint function with canvas_context. */
+        int (*canvas)(void *context, const struct hpclang_ui_node *node,
+                      struct hpclang_ui_rect clip);
     };
     /* Commit, focus and selection changes accumulate bounded damage. Explicit
      * invalidation covers exposure/theme changes. Paint clips to the complete

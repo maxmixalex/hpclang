@@ -3,8 +3,9 @@
 The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
-tracking and bounded asynchronous effects. Concrete calculator renderers and
-the integrated loading/error/retry application are still being implemented.
+tracking and bounded asynchronous effects. A surface/font renderer is available
+for host validation; the integrated calculator loading/error/retry application
+is still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -207,11 +208,72 @@ or publish an LCD page. The concrete renderer must enforce clipping and manage
 its own surface ownership, page contents and presentation. A host pixel backend
 currently verifies idle behavior, partial updates, move/delete cleanup,
 failure/retry, focus/cursor invalidation and clipping. The standard grayscale
-renderer and calculator execution tests remain pending. Its internal surface
-lease now intersects nested write clips without copying pixels or changing the
+renderer now uses an internal surface lease that intersects nested write clips
+without copying pixels or changing the
 owner's descriptor. Clear, geometry and font drawing respect the lease; aliased
 blits retain overlap semantics. These are renderer building blocks, not a new
 public framebuffer or mutable global clipping API.
+
+## Surface/font renderer
+
+`hpclang/ui-surface.h` provides an explicitly owned renderer. Create it once with
+the viewport dimensions, 2/4/16 levels, a background intensity and a style table.
+Each style supplies a font, foreground/background/disabled/accent intensities,
+padding, container gap, grow weight and minimum dimensions. Style IDs index the
+copied table; fonts remain borrowed. Invalid fonts/styles fail explicitly.
+
+Use `hpclang_ui_surface_measure` as the layout callback, with the renderer as
+context. Font measurement uses the same UTF-8 decoder, fallback and newline
+rules as drawing, including proportional advances. Text is top-left aligned;
+buttons and inputs have outlines, focus uses the accent color, and disabled
+controls use the disabled color. Focused inputs invert selected text and scroll
+horizontally to retain the cursor. Container/list scrolling is separate pending
+work. Changing font/geometry themes requires layout again.
+
+`hpclang_ui_surface_render(renderer, ui)` returns one after an update, zero
+when clean, or minus one with errno. The renderer owns two raster pages: each
+update starts from the accepted image, repaints damage into the other page and
+accepts it only after every callback succeeds. Failed canvas drawing leaves the
+accepted image unchanged and the UI retains damage for retry. No per-frame
+allocation occurs. The two pixel buffers use
+`2 * height * ceil(width * log2(levels) / 8)` bytes, plus descriptors/styles;
+the declaration pool and any LCD DMA pages are additional memory.
+
+For this backend, Canvas `paint_context` is a temporary clipped
+`struct hpclang_surface *`. Use ordinary surface/font drawing APIs. Even clear
+is restricted to the callback's clip. Do not destroy or retain that borrowed
+surface. A custom painter can wrap Canvas dispatch using its optional `canvas`
+callback; without it, the core retains direct `canvas_context` dispatch.
+
+After successful rendering, `hpclang_ui_surface_copy(renderer, target)` copies
+the complete accepted image to a same-sized surface. This is deliberately
+separate from LCD acquisition and publication:
+
+```c
+int changed = hpclang_ui_surface_render(renderer, ui);
+if (changed > 0) {
+    struct hpclang_surface *back = hpclang_display_surface();
+    if (hpclang_ui_surface_copy(renderer, back) == 0) {
+        /* Handle timeout/failure; retain the accepted image for retry. */
+        hpclang_display_present(100000);
+    }
+}
+```
+
+The example assumes an acquired display session. A failed present requires an
+explicit retry even if the UI is now clean. Reborrow the back surface after each
+successful present. The complete copy preserves unchanged pixels when LCD pages
+exchange; copying only current damage would leave older pixels in the next back
+page. Rendering itself still skips unchanged controls/canvases. Stock's borrowed
+surface can also receive a copy without acquiring a display session.
+
+Use one active painter per UI damage stream. Explicitly invalidate the viewport
+when switching back to a previously used renderer or after exposure. Destroy
+the renderer after callbacks finish; it does not own the UI or display session.
+Host pixel tests cover all three level counts, canvas confinement, partial
+updates, failed-frame retry, complete-page copying, input selection and an
+inverted theme. Six-model execution, low-memory acceptance and timing budgets
+remain required before closing the renderer milestone.
 
 ## Asynchronous effects and cleanup
 

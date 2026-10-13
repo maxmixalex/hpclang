@@ -20,6 +20,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-input.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-paint.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-effect.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-surface.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/exit-hooks.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"

@@ -508,7 +508,11 @@ ARM compilation and Clang analysis pass. Bounded effects now provide fair pollin
 copied completion/error events, owner-lifetime cancellation and exactly-once
 cleanup, including ordinary process exit. Host tests cover provider failures,
 pool exhaustion and removal/reappearance without stale results. Concrete
-grayscale rendering and interactive loading/error/retry acceptance remain pending.
+grayscale rendering now has a local surface/font backend with explicit style
+inputs, UTF-8 measurement, bounded canvas leases, selection/cursor drawing and
+transactional raster pages. Host pixel tests cover 2/4/16 levels, failed-frame
+preservation/retry, complete-page copying and an inverted theme. Scrolling,
+interactive loading/error/retry, target memory and six-model acceptance remain pending.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys

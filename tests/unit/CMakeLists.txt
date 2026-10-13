@@ -31,6 +31,13 @@ foreach(name ui ui_effect_exit)
     target_include_directories(test_${name} PRIVATE "${HPCLANG_ROOT}/include")
 endforeach()
 
+hpclang_unit(ui_surface test_ui_surface.c ${HPCLANG_UI_TEST_SOURCES}
+    "${HPCLANG_ROOT}/runtime/core/ui-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/font.c"
+    "${HPCLANG_ROOT}/runtime/core/saturn-view.c")
+target_include_directories(test_ui_surface PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"

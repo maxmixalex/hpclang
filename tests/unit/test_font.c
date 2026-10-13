@@ -144,6 +144,11 @@ int main(void)
         fail("bitmap metrics or fallback");
 
     struct hpclang_surface *surface = hpclang_surface_create_mono(32u, 20u);
+    uint32_t measured_width, measured_height;
+    if (hpclang_font_measure_text_n(&test_font, "A\xce\xa9\nA", 5, &measured_width,
+                                    &measured_height) ||
+        measured_width != 11 || measured_height != 12)
+        fail("proportional multiline measurement");
     if (surface == NULL)
         fail("surface allocation");
 

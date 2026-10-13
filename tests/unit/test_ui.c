@@ -433,7 +433,11 @@ static void canvas_view(struct hpclang_ui *ui, const char *title, const unsigned
 static void painting(struct hpclang_ui *ui)
 {
     struct painter_test test = {.ui = ui};
-    struct hpclang_ui_painter painter = {paint_begin, paint_node, paint_end, &test, &test};
+    struct hpclang_ui_painter painter = {.begin = paint_begin,
+                                         .node = paint_node,
+                                         .end = paint_end,
+                                         .context = &test,
+                                         .canvas_context = &test};
     struct hpclang_ui_rect surface = {0, 0, 8, 8};
     unsigned char state = 7;
     canvas_view(ui, "A", &state, 1);
