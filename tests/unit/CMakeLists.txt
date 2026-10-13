@@ -14,6 +14,12 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpg-context.c"
+    "${HPCLANG_ROOT}/runtime/core/hpg-draw.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"

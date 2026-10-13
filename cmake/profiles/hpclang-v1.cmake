@@ -51,6 +51,8 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-store.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-catalog.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-satdir.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-context.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-draw.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-saturn.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
