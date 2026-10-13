@@ -687,6 +687,17 @@ containing two integer literals also recalls as a byte-for-byte main-RAM copy.
 This establishes copy semantics for those values, not for attached libraries, executing programs or
 extended bank pointers; those cases still need independent relocation checks.
 
+A native Port 1 program that purges its own backup still completes its two
+remaining integer literals. A separate program halted through the calculator
+UI retains a return-stack address inside a main-RAM copy of the program.
+These probes cover ordinary program execution; library and other banked
+references still require their own checks before public replacement/removal.
+Internal ERAM edit primitives now validate complete backup chains, resize or
+remove records within the launcher ownership fence, and refuse to move a
+following library. Their caller must establish reference safety; they are not
+yet connected to the public write API. Host/sanitizer tests cover growth,
+shrinkage, same-size replacement, removal, CRC damage, I/O failure and bounds.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports
