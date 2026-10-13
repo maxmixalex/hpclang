@@ -490,7 +490,13 @@ launches. HP39 discovery checks now run in the catalog suite (Direct and Stock),
 while classic discovery stays beside port mutation. The common probe preserves
 the same medium/operation assertions. All three HP39 Direct catalog targets and
 all 15 HP39gs and all 15 HP40gs Stock mutation launches pass locally; the
-Stock catalog check is being verified before the follow-up push.
+Stock catalog check is being verified before the follow-up push. Two HP40gs
+attempts received an Aplet missing one byte from a doubled backslash, despite
+successful Kermit completion. Quoting backslashes in the transfer copy makes
+the same payload pass Stock. The server now applies that quoting without
+changing source packages; PTY tests cover byte preservation and cleanup.
+Formal-server Stock checks and an explicit retained byte witness are in local
+verification before submission.
 
 Internal Port 1 replacement/removal now requires an explicit read-only reference
 guard before any write. Missing guards, live-reference rejection and guard read
