@@ -7,6 +7,7 @@
 
 enum
 {
+    RPL_TEMPBOTTOM = 0x000806e9u,
     RPL_TEMPTOP = 0x000806eeu,
     RPL_RSKTOP = 0x000806f3u,
     RPL_DSKTOP = 0x000806f8u,
@@ -547,6 +548,51 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
     return scan_library_references(io, request);
+}
+
+int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
+                                    hpclang_rpl_temp_visit_fn visit, void *context)
+{
+    if (!io_ready(io) || !visit)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    uint32_t bottom, top, sentinel;
+    int result = read_word(io, RPL_TEMPBOTTOM, 5, &bottom);
+    if (result)
+        return result;
+    result = read_word(io, RPL_TEMPTOP, 5, &top);
+    if (result)
+        return result;
+    if (bottom < RPL_MAIN_FIRST || bottom > RPL_MAIN_END - 5 || top < bottom + 5 ||
+        top > RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, bottom, 5, &sentinel);
+    if (result)
+        return result;
+    if (sentinel)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    bottom += 5;
+    /* First validate every allocation; a malformed old footer must not leave
+     * callers believing that a newer partial prefix is the entire TEMP arena. */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        uint32_t cursor = top;
+        while (cursor > bottom) {
+            if (cursor - bottom < 11)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            uint32_t extent;
+            result = read_word(io, cursor - 5, 5, &extent);
+            if (result)
+                return result;
+            if (extent < 11 || extent > cursor - bottom)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            if (pass) {
+                result = visit(context, cursor - extent + 1, extent - 6);
+                if (result)
+                    return result;
+            }
+            cursor -= extent;
+        }
+    }
+    return 0;
 }
 
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,

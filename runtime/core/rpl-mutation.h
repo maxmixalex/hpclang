@@ -70,6 +70,15 @@ extern "C"
     int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                          hpclang_rpl_root_visit_fn visit, void *context);
 
+    /* Enumerate TEMP allocation payloads, newest first, after validating the
+     * complete footer chain. Payloads can contain private execution data beyond
+     * the first typed object's span; these are allocation bounds, not proof of
+     * a single object. The callback is read-only and its nonzero result stops
+     * traversal. Keep the native memory mapping stable throughout the call. */
+    typedef int (*hpclang_rpl_temp_visit_fn)(void *context, uint32_t first, uint32_t nibbles);
+    int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
+                                        hpclang_rpl_temp_visit_fn visit, void *context);
+
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin
      * the compact pre-existing TEMP prefix as well, so Stock

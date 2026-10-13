@@ -1666,8 +1666,60 @@ static void test_read_only_root_visit(void)
     free(before);
 }
 
+struct temp_visit_state
+{
+    uint32_t count;
+    int stop;
+};
+
+static int visit_temp(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct temp_visit_state *state = context;
+    assert(state->count < 2);
+    assert(first == (state->count ? 0x83006u : 0x83013u));
+    assert(nibbles == (state->count ? 7u : 11u));
+    ++state->count;
+    return state->stop;
+}
+
+static void test_temp_allocation_visit(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(0);
+    put_word(TEMPTOP - 5, 5, 0x83000);
+    put_word(0x83000, 5, 0);
+    put_word(TEMPTOP, 5, 0x83023);
+    put_word(0x8300d, 5, 13);
+    put_word(0x8301e, 5, 17);
+    struct temp_visit_state state = {0};
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
+    assert(state.count == 2 && writes == 0);
+    state = (struct temp_visit_state){.stop = 81};
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 81);
+    assert(state.count == 1 && writes == 0);
+    const uint32_t bad[] = {0, 10, 14, 0xfffff};
+    for (uint32_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        put_word(0x8300d, 5, bad[i]);
+        state = (struct temp_visit_state){0};
+        assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(state.count == 0 && writes == 0);
+    }
+    put_word(0x8300d, 5, 13);
+    rejected_read = 0x8300d;
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) != 0);
+    assert(state.count == 0 && writes == 0);
+    rejected_read = UINT32_MAX;
+    put_word(TEMPTOP, 5, 0x83005);
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
+    assert(state.count == 0);
+    put_word(0x83000, 5, 1);
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+}
+
 int main(void)
 {
+    test_temp_allocation_visit();
     test_read_only_root_visit();
     test_port1_append_respects_native_pool();
     test_port1_edit_owned_suffix();
