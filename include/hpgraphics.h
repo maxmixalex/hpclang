@@ -54,6 +54,14 @@ extern "C"
     void hpg_draw_circle(int cx, int cy, int radius);
     void hpg_fill_circle_on(hpg_t *g, int cx, int cy, int radius);
     void hpg_fill_circle(int cx, int cy, int radius);
+    void hpg_draw_polygon_on(hpg_t *g, int vx[], int vy[], int len);
+    void hpg_draw_polygon(int vx[], int vy[], int len);
+    void hpg_fill_polygon_on(hpg_t *g, int vx[], int vy[], int len);
+    void hpg_fill_polygon(int vx[], int vy[], int len);
+    /* Copies source pixels without using its clip. Destination clip and PAINT/XOR
+     * apply; color/font/pattern state is preserved. Overlap uses snapshot-equivalent
+     * traversal, including XOR. Out-of-surface source/destination regions are clipped. */
+    void hpg_blit(hpg_t *src, int sx, int sy, int width, int height, hpg_t *dst, int dx, int dy);
     void hpg_fill_rect_on(hpg_t *g, int x1, int y1, int x2, int y2);
     void hpg_fill_rect(int x1, int y1, int x2, int y2);
     unsigned char hpg_get_pixel(hpg_t *g, int x, int y);

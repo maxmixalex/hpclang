@@ -1,6 +1,7 @@
 #include "hpg-internal.h"
 #include <stdint.h>
 #include <errno.h>
+#include <stdlib.h>
 
 static int ink(const hpg_pattern_t *pattern, int x, int y, int64_t origin_x, int64_t origin_y)
 {
@@ -148,4 +149,104 @@ void hpg_fill_circle_on(hpg_t *g, int cx, int cy, int radius)
 void hpg_fill_circle(int cx, int cy, int radius)
 {
     circle(NULL, cx, cy, radius, 1);
+}
+
+static void polygon(hpg_t *g, int vx[], int vy[], int len, int filled)
+{
+    if (len < 0 || (len && (!vx || !vy))) {
+        errno = EINVAL;
+        return;
+    }
+    if (!len)
+        return;
+    g = hpclang_hpg_resolve(g);
+    if (!g)
+        return;
+    if ((size_t)len > SIZE_MAX / sizeof(struct hpclang_point)) {
+        errno = EOVERFLOW;
+        return;
+    }
+    struct hpclang_point *points = malloc((size_t)len * sizeof(*points));
+    if (!points) {
+        errno = ENOMEM;
+        return;
+    }
+    int left = vx[0], top = vy[0];
+    for (int i = 0; i < len; ++i) {
+        points[i] = (struct hpclang_point){vx[i], vy[i]};
+        if (vx[i] < left)
+            left = vx[i];
+        if (vy[i] < top)
+            top = vy[i];
+    }
+    struct hpclang_surface *coverage = mask(g);
+    if (coverage) {
+        if (filled)
+            hpclang_surface_fill_polygon(coverage, points, (unsigned)len, 255);
+        else
+            hpclang_surface_draw_polygon(coverage, points, (unsigned)len, 255);
+        composite(g, filled, left, top);
+    }
+    free(points);
+}
+void hpg_draw_polygon_on(hpg_t *g, int vx[], int vy[], int len)
+{
+    polygon(g, vx, vy, len, 0);
+}
+void hpg_draw_polygon(int vx[], int vy[], int len)
+{
+    polygon(NULL, vx, vy, len, 0);
+}
+void hpg_fill_polygon_on(hpg_t *g, int vx[], int vy[], int len)
+{
+    polygon(g, vx, vy, len, 1);
+}
+void hpg_fill_polygon(int vx[], int vy[], int len)
+{
+    polygon(NULL, vx, vy, len, 1);
+}
+
+void hpg_blit(hpg_t *src, int sx, int sy, int width, int height, hpg_t *dst, int dx, int dy)
+{
+    if (width < 0 || height < 0) {
+        errno = EINVAL;
+        return;
+    }
+    if (!width || !height)
+        return;
+    src = hpclang_hpg_resolve(src);
+    dst = hpclang_hpg_resolve(dst);
+    if (!src || !dst)
+        return;
+    int64_t left = 0, top = 0, right = width, bottom = height;
+    if (left < -(int64_t)sx)
+        left = -(int64_t)sx;
+    if (top < -(int64_t)sy)
+        top = -(int64_t)sy;
+    if (left < (int64_t)dst->left - dx)
+        left = (int64_t)dst->left - dx;
+    if (top < (int64_t)dst->top - dy)
+        top = (int64_t)dst->top - dy;
+    if (right > (int64_t)src->width - sx)
+        right = (int64_t)src->width - sx;
+    if (bottom > (int64_t)src->height - sy)
+        bottom = (int64_t)src->height - sy;
+    if (right > (int64_t)dst->right - dx)
+        right = (int64_t)dst->right - dx;
+    if (bottom > (int64_t)dst->bottom - dy)
+        bottom = (int64_t)dst->bottom - dy;
+    if (left >= right || top >= bottom)
+        return;
+    struct hpclang_surface *from = hpclang_hpg_surface(src), *to = hpclang_hpg_surface(dst);
+    int reverse_x = from == to && dx > sx, reverse_y = from == to && dy > sy;
+    for (int64_t row = 0; row < bottom - top; ++row) {
+        int64_t y = reverse_y ? bottom - 1 - row : top + row;
+        for (int64_t col = 0; col < right - left; ++col) {
+            int64_t x = reverse_x ? right - 1 - col : left + col;
+            unsigned char color = hpclang_surface_get_pixel(from, (int)(sx + x), (int)(sy + y));
+            if (dst->mode == HPG_MODE_XOR)
+                color ^= hpclang_surface_get_pixel(to, (int)(dx + x), (int)(dy + y));
+            hpclang_surface_set_pixel(to, (int)(dx + x), (int)(dy + y), color);
+        }
+    }
 }

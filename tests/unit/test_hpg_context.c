@@ -13,6 +13,53 @@ struct hpclang_surface *hpclang_display_surface(void)
     return display;
 }
 
+static void copies(void)
+{
+    hpg_t *g = hpg_alloc_gray16_image(8, 6);
+    assert(g);
+    unsigned char before[48];
+    for (int mode = 0; mode < 2; ++mode)
+        for (int direction = 0; direction < 4; ++direction) {
+            hpg_set_mode(g, HPG_MODE_PAINT);
+            for (int y = 0; y < 6; ++y)
+                for (int x = 0; x < 8; ++x) {
+                    unsigned char value = (unsigned char)(((y * 8 + x) % 16) * 17);
+                    before[y * 8 + x] = value;
+                    hpg_set_color(g, value);
+                    hpg_draw_pixel_on(g, x, y);
+                }
+            int sx = direction & 1 ? 2 : 0, dx = 2 - sx;
+            int sy = direction & 2 ? 2 : 0, dy = 2 - sy;
+            hpg_set_color(g, 51);
+            hpg_set_mode(g, (unsigned char)mode);
+            hpg_blit(g, sx, sy, 6, 4, g, dx, dy);
+            assert(hpg_get_color(g) == 51);
+            for (int y = 0; y < 6; ++y)
+                for (int x = 0; x < 8; ++x) {
+                    unsigned char expected = before[y * 8 + x];
+                    if (x >= dx && x < dx + 6 && y >= dy && y < dy + 4) {
+                        unsigned char source = before[(y - dy + sy) * 8 + x - dx + sx];
+                        expected = mode ? source ^ expected : source;
+                    }
+                    assert(hpg_get_pixel(g, x, y) == expected);
+                }
+        }
+    hpg_t *mono = hpg_alloc_mono_image(8, 6);
+    assert(mono);
+    hpg_set_mode(g, HPG_MODE_PAINT);
+    hpg_set_color(g, 170);
+    hpg_fill_rect_on(g, 0, 0, 7, 5);
+    hpg_clip(g, 0, 0, 1, 1); /* Source clip does not restrict reading. */
+    hpg_clip(mono, 2, 1, 6, 5);
+    hpg_blit(g, 0, 0, INT_MAX, INT_MAX, mono, 0, 0);
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x)
+            assert(hpg_get_pixel(mono, x, y) == (x >= 2 && x < 6 && y >= 1 && y < 5 ? 255 : 0));
+    hpg_blit(g, INT_MIN, 0, INT_MAX, 1, mono, INT_MAX, 0);
+    hpg_free_image(mono);
+    hpg_free_image(g);
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -73,6 +120,16 @@ int main(void)
     hpg_draw_circle_on(g, 3, 3, 2);
     assert(hpg_get_pixel(g, 3, 3) == 0 && hpg_get_pixel(g, 1, 3) == 255);
     hpg_draw_circle_on(g, INT_MAX, INT_MAX, INT_MAX);
+    hpg_clear_on(g);
+    int vx[] = {1, 6, 1}, vy[] = {1, 1, 5};
+    hpg_fill_polygon_on(g, vx, vy, 3);
+    assert(hpg_get_pixel(g, 2, 2) == 255 && hpg_get_pixel(g, 7, 5) == 0);
+    hpg_fill_polygon_on(g, vx, vy, 3);
+    assert(hpg_get_pixel(g, 2, 2) == 0 && vx[1] == 6 && vy[2] == 5);
+    hpg_draw_polygon_on(g, vx, vy, 3);
+    assert(hpg_get_pixel(g, 1, 1) == 255 && hpg_get_pixel(g, 2, 2) == 0);
+    hpg_fill_polygon_on(g, NULL, vy, 3);
+    assert(errno == EINVAL);
     char font_bits[] = {1, 2, 4, 1, 2, 4};
     hpg_font_t *f = hpg_alloc_font(font_bits, 2, 3, 4);
     assert(f && hpg_font_get_height(f) == 3 && hpg_font_get_advance(f) == 4);
@@ -96,5 +153,6 @@ int main(void)
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);
+    copies();
     return 0;
 }
