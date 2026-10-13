@@ -4,10 +4,12 @@
 #include <hpclang/time.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 extern const struct hpclang_font demo_font;
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_ui_witness[5];
+static unsigned key_failure;
 
 static int frame(unsigned id)
 {
@@ -31,18 +33,24 @@ static int press(struct demo_app *app, struct hpclang_ui_surface *r, struct hpcl
         hpclang_e2e_result = 0x4b490000u | argument;
         uint64_t start = hpclang_time_monotonic_us();
         while (hpclang_e2e_result != (0x4b4a0000u | argument))
-            if (hpclang_time_monotonic_us() - start > 2000000)
+            if (hpclang_time_monotonic_us() - start > 2000000) {
+                key_failure = 0x10000u | argument;
                 return -1;
+            }
         struct hpclang_keyboard_event key;
         int got;
         do {
             got = hpclang_keyboard_event_poll(&key);
-            if (got < 0 || hpclang_time_monotonic_us() - start > 2000000)
+            if (got < 0 || hpclang_time_monotonic_us() - start > 2000000) {
+                key_failure = 0x20000u | argument;
                 return -1;
+            }
         } while (!got);
         if (key.scan_code != scan ||
-            key.type != (down ? HPCLANG_KEYBOARD_EVENT_DOWN : HPCLANG_KEYBOARD_EVENT_UP))
+            key.type != (down ? HPCLANG_KEYBOARD_EVENT_DOWN : HPCLANG_KEYBOARD_EVENT_UP)) {
+            key_failure = 0x30000u | ((unsigned)key.type << 8) | key.scan_code;
             return -1;
+        }
         struct hpclang_ui_event event;
         int result = hpclang_ui_key(app->ui, mode, &key, &event);
         if (result < 0)
@@ -78,7 +86,7 @@ static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned 
 static unsigned checks(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    struct hpclang_ui_config config = {64, 1024};
+    struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES};
     size_t bytes = hpclang_ui_storage_size(config);
     hpclang_ui_witness[0] = (uint32_t)bytes;
     hpclang_ui_witness[1] = hpclang_boot_info()->rw_bytes;
@@ -126,15 +134,35 @@ static unsigned checks(void)
     failure = 9;
     if (hpclang_text_mode_init(&mode, device->model))
         goto done;
+    /* Stock can enter the application while its launch key is still held.
+     * Hand off the physical keyboard only after that real key-up, rather than
+     * confusing it with the first scripted transition or dropping events. */
+    start = hpclang_time_monotonic_us();
+    for (;;) {
+        struct hpclang_keyboard_state keys;
+        hpclang_keyboard_read(&keys);
+        if (!hpclang_keyboard_any_is_down(&keys))
+            break;
+        if (hpclang_time_monotonic_us() - start > 2000000)
+            goto done;
+    }
     hpclang_keyboard_events_reset();
     failure = 10;
     if (press(&app, r, &mode, 6) || !app.model.connected)
         goto done;
-    failure = 11;
     /* Replacing Connect retires its lifetime and falls forward to the filter.
      * Traverse down and back before typing, exercising real navigation. */
-    if (press(&app, r, &mode, 44) || press(&app, r, &mode, 42) || press(&app, r, &mode, 17) ||
-        app.model.filter[0] != '8')
+    failure = 0x1101;
+    if (press(&app, r, &mode, 44))
+        goto done;
+    failure = 0x1102;
+    if (press(&app, r, &mode, 42))
+        goto done;
+    failure = 0x1103;
+    if (press(&app, r, &mode, 17))
+        goto done;
+    failure = 0x1104;
+    if (app.model.filter[0] != '8')
         goto done;
     failure = 12;
     if (hpclang_ui_select(ui, 0, 1) || press(&app, r, &mode, 0) || app.model.filter[0])
@@ -186,7 +214,17 @@ int main(void)
     unsigned failure = checks();
     struct hpclang_surface *screen = hpclang_display_surface();
     hpclang_surface_clear(screen, 0);
-    hpclang_surface_draw_text(screen, &demo_font, 20, 24, failure ? "UI FAIL" : "UI PASS", 255);
+    char line[48];
+    snprintf(line, sizeof(line), "POOL %lu RW %lu", (unsigned long)hpclang_ui_witness[0],
+             (unsigned long)hpclang_ui_witness[1]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 0, line, 255);
+    snprintf(line, sizeof(line), "N %lu US %lu", (unsigned long)hpclang_ui_witness[2],
+             (unsigned long)hpclang_ui_witness[3]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 8, line, 255);
+    snprintf(line, sizeof(line), "ERR %lu KEY %lx", (unsigned long)hpclang_ui_witness[4],
+             (unsigned long)key_failure);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 16, line, 255);
+    hpclang_surface_draw_text(screen, &demo_font, 20, 32, failure ? "UI FAIL" : "UI PASS", 255);
     hpclang_e2e_result = failure ? 0x46410000u | failure : 0x50415353u;
     if (failure)
         for (;;)

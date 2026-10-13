@@ -39,7 +39,7 @@ Enter accepts. Connect, then scan; choose Retry after the intentional first
 failure. Toggle devices, insert another or reverse the order. Change wave
 updates the plot. Exit returns to Stock; ON exits outside text editing.
 
-The application owns a fixed 64-node/1024-byte declaration configuration and
+The application owns a fixed 56-node/512-byte declaration configuration and
 creates its renderer once. Its display session is explicitly acquired and
 released. It retries display timeouts from the accepted image, reborrowing the
 LCD back page each time. Startup/allocation failures return an error to the

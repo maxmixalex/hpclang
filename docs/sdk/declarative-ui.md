@@ -287,6 +287,15 @@ updates, failed-frame retry, complete-page copying, input selection and an
 inverted theme. Six-model execution, low-memory acceptance and timing budgets
 remain required before closing the renderer milestone.
 
+The device-manager example budgets 56 nodes and 512 text bytes for its complete
+eight-device view (54 live nodes). Its ARM declaration pool is 21,240 bytes;
+renderer pages, LCD DMA pages, application state and the stack are additional.
+This replaces unused capacity in the earlier 25,560-byte pool. Host allocation
+fault injection covers every renderer-construction allocation, checks cleanup
+and recovery, and proves declaration/layout/render/copy still work with further
+allocation disabled. Stock memory and keyboard-handoff acceptance remain in
+progress; host recovery alone does not establish target suitability.
+
 ## Vertical scrolling
 
 Use `HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, key, style, height))` to declare

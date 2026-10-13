@@ -43,6 +43,9 @@ hpclang_unit(ui_demo test_ui_demo.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
 target_include_directories(test_ui_demo PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)
+    hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
+    target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
+    target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"
         "${HPCLANG_ROOT}/runtime/libc/stdio-lifetime.c")
