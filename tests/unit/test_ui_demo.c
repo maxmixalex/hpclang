@@ -44,16 +44,13 @@ static void settle(struct demo_app *app)
         assert(demo_poll(app) == 0);
     assert(demo_poll(app) == 1);
 }
-int main(void)
+static void run(unsigned levels, int inverted)
 {
     struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES, DEMO_UI_EFFECTS};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
-    struct hpclang_ui_surface_style styles[2] = {
-        {.font = &font, .foreground = 255, .accent = 255, .gap = 2},
-        {.font = &font, .foreground = 255, .accent = 255, .padding_x = 2, .padding_y = 1}};
-    struct hpclang_ui_surface *r = hpclang_ui_surface_create(131, 64, 2, styles, 2, 0);
+    struct hpclang_ui_surface *r = demo_renderer(131, 64, levels, &font, inverted);
     assert(ui && r);
     struct demo_app app;
     demo_init(&app, ui);
@@ -73,6 +70,14 @@ int main(void)
     assert(demo_view(&app, r, 131, 64) == 0);
     uint32_t id = app.model.devices[1].id;
     uint32_t lifetime = control(&app, DEMO_TOGGLE, id);
+    assert(hpclang_ui_focus(ui, lifetime) == 0);
+    /* Appearance can be replaced while the application and focused lifetime survive. */
+    hpclang_ui_surface_destroy(r);
+    r = demo_renderer(131, 64, levels, &font, !inverted);
+    assert(r && demo_view(&app, r, 131, 64) == 0);
+    assert(control(&app, DEMO_TOGGLE, id) == lifetime);
+    assert(hpclang_ui_focused(ui) == lifetime);
+    assert(hpclang_ui_surface_render(r, ui) == 1);
     activate(&app, DEMO_TOGGLE, id);
     assert(app.model.devices[1].enabled == 0);
     assert(demo_view(&app, r, 131, 64) == 0);
@@ -106,5 +111,12 @@ int main(void)
     assert(hpclang_ui_shutdown(ui) == 0);
     hpclang_ui_surface_destroy(r);
     free(storage);
+}
+int main(void)
+{
+    const unsigned levels[] = {2, 4, 16};
+    for (unsigned i = 0; i < 3; ++i)
+        for (int inverted = 0; inverted < 2; ++inverted)
+            run(levels[i], inverted);
     return 0;
 }

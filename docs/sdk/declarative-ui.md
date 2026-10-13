@@ -13,6 +13,13 @@ into the original device-manager patterns. It uses two status-card instances,
 conditional connection controls, a controlled filter, keyed insertion/reversal,
 a simulated asynchronous scan with failure/retry/cancel, and a revision-driven
 waveform. Its host flow test exercises the actual application update/view code.
+The example's `demo_renderer` keeps palette/font selection outside its view and
+update functions. Build options select an inverted palette and a native default
+font with an explicit packaged fallback. Host flow tests run both palettes at
+2/4/16 levels and replace the renderer without losing the focused node's lifetime.
+The calculator test adds a second-theme LCD checkpoint, independently checks
+the surrounding UI's inverse pixels and the unchanged custom canvas, then
+continues keyboard-driven scan/cancel actions with the replacement renderer.
 The installed SDK builds its ARM image and all six model launchers. The complete
 application flow also passes local Direct execution on all six models with
 electrical key injection, six display checkpoints and normal return. HP39g+

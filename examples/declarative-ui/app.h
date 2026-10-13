@@ -52,6 +52,8 @@ struct demo_app
     unsigned attempts, polls, cleanups;
 };
 void demo_init(struct demo_app *app, struct hpclang_ui *ui);
+struct hpclang_ui_surface *demo_renderer(unsigned width, unsigned height, unsigned levels,
+                                         const struct hpclang_font *font, int inverted);
 int demo_view(struct demo_app *app, struct hpclang_ui_surface *renderer, int width, int height);
 int demo_update(struct demo_app *app, const struct hpclang_ui_event *event);
 int demo_poll(struct demo_app *app);

@@ -27,6 +27,13 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=MinSizeRel \
 cmake --build build
 ```
 
+Configure with `-DHPCLANG_DEMO_INVERTED=ON` for the alternate palette and
+`-DHPCLANG_DEMO_NATIVE_FONT=ON` to prefer the calculator's default ROM font.
+When ROM glyphs are unavailable in the launch context, the explicit packaged
+font remains the fallback. Both choices use the same application model,
+declarations, layout engine and keyboard actions. The custom waveform keeps
+its own palette. These options do not claim to reproduce the Stock interface.
+
 The build produces the HPC1 image and six-model launchers. HP39 Aplet packaging
 uses the SDK's separate `hpclang_target_aplet` helper and its declared historical
 tool/assets dependencies.

@@ -94,16 +94,8 @@ static unsigned checks(void)
     if (!storage)
         return 1;
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
-    struct hpclang_ui_surface_style styles[2] = {
-        {.font = &demo_font, .foreground = 255, .disabled = 85, .accent = 255, .gap = 2},
-        {.font = &demo_font,
-         .foreground = 255,
-         .disabled = 85,
-         .accent = 255,
-         .padding_x = 2,
-         .padding_y = 1}};
     struct hpclang_ui_surface *r =
-        hpclang_ui_surface_create(device->display_width, device->display_height, 2, styles, 2, 0);
+        demo_renderer(device->display_width, device->display_height, 2, &demo_font, 0);
     unsigned failure = 2;
     if (!ui || !r)
         goto done;
@@ -197,6 +189,12 @@ static unsigned checks(void)
     hpclang_ui_witness[2] = (uint32_t)hpclang_ui_node_count(ui);
     failure = 17;
     if (activate(&app, r, &mode, DEMO_WAVE) || capture(&app, r, 6))
+        goto done;
+    failure = 0x1701;
+    uint32_t focused = hpclang_ui_focused(ui);
+    hpclang_ui_surface_destroy(r);
+    r = demo_renderer(device->display_width, device->display_height, 2, &demo_font, 1);
+    if (!r || capture(&app, r, 7) || hpclang_ui_focused(ui) != focused)
         goto done;
     failure = 18;
     if (activate(&app, r, &mode, DEMO_SCAN) || demo_poll(&app) < 0 ||

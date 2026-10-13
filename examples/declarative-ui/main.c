@@ -13,21 +13,11 @@ int main(void)
     size_t bytes = hpclang_ui_storage_size(capacity);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : NULL;
-    struct hpclang_ui_surface_style styles[2] = {{.font = &demo_font,
-                                                  .foreground = 255,
-                                                  .background = 0,
-                                                  .disabled = 85,
-                                                  .accent = 255,
-                                                  .gap = 2},
-                                                 {.font = &demo_font,
-                                                  .foreground = 255,
-                                                  .background = 0,
-                                                  .disabled = 85,
-                                                  .accent = 255,
-                                                  .padding_x = 2,
-                                                  .padding_y = 1}};
-    struct hpclang_ui_surface *renderer =
-        hpclang_ui_surface_create(device->display_width, device->display_height, 2, styles, 2, 0);
+    const struct hpclang_font *font = &demo_font;
+    if (HPCLANG_DEMO_NATIVE_FONT && hpclang_font_available(hpclang_font_default()))
+        font = hpclang_font_default();
+    struct hpclang_ui_surface *renderer = demo_renderer(
+        device->display_width, device->display_height, 2, font, HPCLANG_DEMO_INVERTED);
     int result = 1, display = 0;
     if (!ui || !renderer)
         goto done;

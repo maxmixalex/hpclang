@@ -3,6 +3,26 @@
 #include <stdio.h>
 #include <string.h>
 
+struct hpclang_ui_surface *demo_renderer(unsigned width, unsigned height, unsigned levels,
+                                         const struct hpclang_font *font, int inverted)
+{
+    uint8_t foreground = inverted ? 0 : 255, background = inverted ? 255 : 0;
+    struct hpclang_ui_surface_style styles[2] = {{.font = font,
+                                                  .foreground = foreground,
+                                                  .background = background,
+                                                  .disabled = inverted ? 170 : 85,
+                                                  .accent = foreground,
+                                                  .gap = 2},
+                                                 {.font = font,
+                                                  .foreground = foreground,
+                                                  .background = background,
+                                                  .disabled = inverted ? 170 : 85,
+                                                  .accent = foreground,
+                                                  .padding_x = 2,
+                                                  .padding_y = 1}};
+    return hpclang_ui_surface_create(width, height, levels, styles, 2, background);
+}
+
 static const char *scan_name(enum demo_scan scan)
 {
     switch (scan) {
