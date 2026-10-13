@@ -156,6 +156,7 @@ struct e2e
     int saw_pass;
     int payload_keyboard_scheduled;
     uint64_t input_held;
+    struct input_sequence input_sequence;
     unsigned media_phase;
     int returned;
     int failed;
@@ -723,7 +724,7 @@ static void monitor(void *arg)
             fail(s, "media-checkpoint");
             return;
         }
-        if (input_checkpoint(s->hdw, s->result_addr, v, &s->input_held) < 0) {
+        if (input_checkpoint(s->hdw, s->result_addr, v, &s->input_held, &s->input_sequence) < 0) {
             fail(s, "input-checkpoint");
             return;
         }
@@ -741,7 +742,7 @@ static void monitor(void *arg)
                 fail(s, "media-checkpoint-incomplete");
                 return;
             }
-            if (s->input_held) {
+            if (s->input_held || s->input_sequence.remaining) {
                 fail(s, "input-held-at-pass");
                 return;
             }
