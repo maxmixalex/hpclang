@@ -655,7 +655,7 @@ for composition; later C++ syntax builds on the same core.
 Deliver and review this core in the following slices, using the retained
 [declarative application contract](sdk-design.md#declarative-application-contract):
 
-- [ ] **M8.2a — C declaration and identity:** nested scopes, ordinary conditional
+- [x] **M8.2a — C declaration and identity:** nested scopes, ordinary conditional
   and loop syntax, function components and complete parent/key paths. Exercise
   two component instances and stable-ID list insertion/reversal, including
   duplicate keys, scope interruption and fixed-pool exhaustion.
@@ -724,8 +724,8 @@ Aplet package families with the system adapter included. The installed
 gate; it demonstrates the five historical calls and documents their units.
 The follow-up calendar adapter adds `sys_tm_RTC`, the `hptime.h` include spelling
 and date output in the installed timer example. Calendar conversion/failure
-tests and all six Direct targets pass; Stock and updated SDK acceptance are
-in progress. The original void signature is retained with errno and unchanged
+tests, all six Direct targets and the updated relocated SDK acceptance pass;
+Stock acceptance is in progress. The original void signature is retained with errno and unchanged
 output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
