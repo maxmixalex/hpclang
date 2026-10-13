@@ -603,11 +603,13 @@ Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass, including independent
 pixel checks for the combined payload. HP39gs then exposed insufficient heap
 for its clock/display check. The timed-sieve client now has a separate
 `hpgcc-system` payload and pixel verifier in the shared Runtime suite manifest;
-all six Direct runs and HP39gs Stock pass with independent report checks.
-Validation of the split System Services payload and the remaining historical
-client Stock targets, followed by formal CI, are pending.
+both split payloads pass all six Direct targets and HP39gs Stock, including
+their independent pixel checks. Remaining Stock targets and formal CI are
+still being verified.
 The relocated SDK build passes C/C++, all six launchers and all three HP39
-Aplet package families with the system adapter included.
+Aplet package families with the system adapter included. The installed
+`examples/hpgcc-timer` migration client passes that same relocation/packaging
+gate; it demonstrates the five historical calls and documents their units.
 The remaining historical system, timer and console interfaces remain open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
