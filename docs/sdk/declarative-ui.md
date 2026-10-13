@@ -3,9 +3,8 @@
 The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
-tracking and bounded asynchronous effects. A surface/font renderer is available
-for host validation; the integrated calculator loading/error/retry application
-is still being implemented.
+tracking and bounded asynchronous effects. A surface/font renderer and integrated
+loading/error/retry application are undergoing calculator acceptance.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -14,8 +13,11 @@ into the original device-manager patterns. It uses two status-card instances,
 conditional connection controls, a controlled filter, keyed insertion/reversal,
 a simulated asynchronous scan with failure/retry/cancel, and a revision-driven
 waveform. Its host flow test exercises the actual application update/view code.
-The installed SDK builds its ARM image and all six model launchers. Calculator
-execution and memory/interaction evidence are still pending.
+The installed SDK builds its ARM image and all six model launchers. The complete
+application flow also passes local Direct execution on all six models with
+electrical key injection, six display checkpoints and normal return. HP39g+
+Stock first-screen execution passes; complete Stock interaction, formal CI
+integration and resource budgets are still pending.
 
 An application owns its model and describes the current view with ordinary C
 functions, loops and conditions. Separate component instances scope their keys:

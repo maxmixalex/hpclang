@@ -519,7 +519,11 @@ six-model acceptance remain pending. The installed `examples/declarative-ui`
 device manager now assembles the original application patterns with a deterministic
 simulated provider. Its host flow covers failure/retry/cancel, all eight devices,
 stable insertion/reversal, controlled filtering and waveform changes; the installed
-SDK builds the ARM image and all six launchers. Target execution remains open.
+SDK builds the ARM image and all six launchers. Local Direct execution now passes
+the complete flow on all six models, with electrical key injection, six LCD
+checkpoints and normal Stock return. HP39g+ Stock USB installation, initial
+render/idle and return pass in the smaller first-screen probe; the complete Stock
+flow, formal CI integration and resource-budget acceptance remain open.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
