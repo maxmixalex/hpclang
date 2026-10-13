@@ -434,13 +434,17 @@ perform shutdown; the existing context/provider lifetime rules still apply.
 Host tests exercise early return, two component instances, stable identity
 after reordering, duplicate frame acquisition and fixed-pool failure, with
 exceptions and RTTI disabled. This is the first M8.5 helper slice; complete
-owned-resource wrappers and target-side C++ application acceptance remain open.
+broader owned-resource wrappers and full target-side C++ acceptance remain open.
 
 The installed `examples/declarative-ui-cpp` counter demonstrates these guards
 with keyboard navigation and the ordinary surface renderer. The SDK relocation
 gate builds it outside the installed tree, checks its ARM/HPC1 output and all
 six launchers, and packages all three HP39 Aplets when the packaging dependencies
 are supplied. It complements the larger C device-manager example.
+The UI E2E also links the counter's actual view and checks guard rollback,
+stable focus across model updates and owned-image moves before executing the
+full device-manager flow. All six Direct models pass locally; Stock acceptance
+of this C++ extension is still pending.
 
 For offscreen drawing, `<hpclang/display.hpp>` also provides a C++20
 `hpclang::owned_surface{width, height, levels}`. Check its Boolean conversion

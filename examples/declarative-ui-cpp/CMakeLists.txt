@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(hpclang_declarative_ui_cpp LANGUAGES C CXX ASM)
 find_package(hpclang CONFIG REQUIRED)
-hpclang_add_application(declarative_ui_cpp main.cpp)
+hpclang_add_application(declarative_ui_cpp main.cpp app.cpp)
 target_compile_features(declarative_ui_cpp PRIVATE cxx_std_20)
 hpclang_target_launchers(declarative_ui_cpp)
 set(ascii)

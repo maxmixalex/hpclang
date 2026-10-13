@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - "examples/declarative-ui/**"
+      - "examples/declarative-ui-cpp/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
@@ -52,6 +53,7 @@ on:
   pull_request:
     paths:
       - "examples/declarative-ui/**"
+      - "examples/declarative-ui-cpp/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"

@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
-project(hpclang_ui_e2e LANGUAGES C ASM)
+project(hpclang_ui_e2e LANGUAGES C CXX ASM)
 if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 endif()
 find_package(hpclang CONFIG REQUIRED PATHS "${HPCLANG_ROOT}/cmake" NO_DEFAULT_PATH)
-hpclang_add_application(hpclang_ui_e2e main.c "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
+hpclang_add_application(hpclang_ui_e2e main.c cpp.cpp
+    "${HPCLANG_ROOT}/examples/declarative-ui/app.c"
+    "${HPCLANG_ROOT}/examples/declarative-ui-cpp/app.cpp")
+target_compile_features(hpclang_ui_e2e PRIVATE cxx_std_20)
 set_target_properties(hpclang_ui_e2e PROPERTIES OUTPUT_NAME hpclang-ui-e2e)
 target_include_directories(hpclang_ui_e2e PRIVATE "${HPCLANG_ROOT}/examples/declarative-ui")
 hpclang_target_launchers(hpclang_ui_e2e)

@@ -223,7 +223,10 @@ done:
 }
 int main(void)
 {
-    unsigned failure = checks();
+    extern unsigned hpclang_cpp_ui_test(void);
+    unsigned failure = hpclang_cpp_ui_test();
+    if (!failure)
+        failure = checks();
     struct hpclang_surface *screen = hpclang_display_surface();
     hpclang_surface_clear(screen, 0);
     char line[48];
