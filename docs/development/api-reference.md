@@ -672,13 +672,26 @@ Zero HPG source-compatibility wrappers are claimed merely because the clean prim
 
 HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented helpers and reaches 17; all 17 remain signature-identical in 2.0. HPGCC3 reorganizes keyboard handling around raw state plus an asynchronous message queue.
 
+The installed `hpkeyb49.h` adapter currently implements the eleven physical
+queries and press/release wait functions. Named queries follow the model's
+physical keys: HP39's single Shift answers `keyb_isLS`, while `keyb_isRS`
+returns false. Coordinates use zero-based hardware columns and rows.
+`keyb_waitKeyPressed` accepts an already-held key and returns only after all
+keys are released; it neither consumes queued events nor changes RTC settings.
+Invalid coordinates return false with `EINVAL`; unsupported models return
+false (or return immediately from the wait) with `ENOSYS`.
+Local unit tests cover all 56 matrix coordinates and dedicated keys on six
+models, plus simultaneous-key release and already-held-key waits. Sanitizer
+and ARM compilation checks pass; adapter-specific target acceptance remains
+pending. The remaining six matrix/code-return functions are not yet installed.
+
 | Historical behavior | HPGCC calls | hpclang status |
 | --- | --- | --- |
 | raw physical matrix | `keyb_getmatrix`, `keyb_isKeyPressed` | ✅ Native raw snapshot and coordinate query. Historical logical matrix numbering is not reused. |
 | any key | `keyb_isAnyKeyPressed` | ✅ |
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
 | arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
-| blocking wait | `keyb_waitKeyPressed` | ◐ Can be built by polling event/time services; no canonical blocking helper yet. |
+| blocking wait | `keyb_waitKeyPressed` | ◐ Installed physical press/all-release adapter; local tests pass, target acceptance pending. |
 | logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Physical events, model-native text planes and bounded editing are implemented; historical return-code adapters remain M8. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 

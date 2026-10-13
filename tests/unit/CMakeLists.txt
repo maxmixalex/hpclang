@@ -14,6 +14,11 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
+target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"
