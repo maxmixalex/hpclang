@@ -37,6 +37,9 @@ extern "C"
         uint32_t stack_reserve_nibbles;
         uint32_t **native_roots;
         uint32_t native_root_count;
+        /* Optional classic ROM-part table: 3-nibble count, 16-nibble records.
+         * Zero disables this model-specific source of native references. */
+        uint32_t library_table;
     };
 
     enum hpclang_rpl_mutation_result

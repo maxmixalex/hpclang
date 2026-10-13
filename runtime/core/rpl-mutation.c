@@ -480,6 +480,37 @@ static int scan_system_references(const struct hpclang_rpl_mutation_io *io,
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+static int scan_library_references(const struct hpclang_rpl_mutation_io *io,
+                                   const struct pointer_scan_request *request)
+{
+    if (!io->library_table)
+        return HPCLANG_RPL_MUTATION_OK;
+    if (io->library_table < RPL_MAIN_FIRST || io->library_table > RPL_MAIN_END - 3u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t count;
+    int result = read_word(io, io->library_table, 3u, &count);
+    if (result)
+        return result;
+    uint32_t records = io->library_table + 3u;
+    if (count > (RPL_MAIN_END - records) / 16u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = records + i * 16u;
+        uint32_t bank;
+        result = read_word(io, record + 8u, 5u, &bank);
+        if (result)
+            return result;
+        /* A nonzero bank-switch entry denotes Flash/ERAM. Its address belongs
+         * to another mapping even when its number overlaps main RAM. */
+        if (!bank) {
+            result = scan_pointer_slot(io, record + 3u, request);
+            if (result)
+                return result;
+        }
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
                                const struct pointer_scan_request *request)
 {
@@ -506,7 +537,10 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     result = scan_vger_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
-    return scan_system_references(io, request);
+    result = scan_system_references(io, request);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    return scan_library_references(io, request);
 }
 
 static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,

@@ -1236,6 +1236,43 @@ static void test_port_remove_preserves_backup_references(void)
     }
 }
 
+static void test_library_table_reference_preservation(void)
+{
+    for (unsigned failure = 0; failure < 3; ++failure) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        uint32_t object = prepare_named_char('A');
+        io.library_table = 0x8611du;
+        put_word(io.library_table, 3, 2);
+        const uint32_t record = io.library_table + 3;
+        put_word(record, 3, 123);
+        put_word(record + 3, 5, object);
+        put_word(record + 8, 5, 0);
+        put_word(record + 16, 3, 124);
+        put_word(record + 19, 5, object);
+        put_word(record + 24, 5, 0x22f18);
+        if (failure == 1)
+            rejected_read = record + 24;
+        if (failure == 2)
+            io.library_table = NIBBLES - 2;
+        struct hpclang_object *replacement = make_char('B');
+        int result = hpclang_rpl_mutation_overwrite_value(&io, object, replacement);
+        free(replacement);
+        if (failure) {
+            assert(result != 0 && writes == 0);
+            assert_char_at(object, 'A');
+            assert(get_word(record + 3, 5) == object);
+            continue;
+        }
+        assert(result == 0);
+        uint32_t retained = get_word(record + 3, 5);
+        assert(retained != object && retained < io.temp_limit);
+        assert_char_at(retained, 'A');
+        assert_char_at(object, 'B');
+        assert(get_word(record + 19, 5) == object);
+        assert(get_word(record, 3) == 123 && get_word(record + 16, 3) == 124);
+    }
+}
+
 static void test_overwrite_port_value_preserves_references(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1);
@@ -1344,6 +1381,7 @@ static void test_port0_create_preserves_home_and_library(void)
 
 int main(void)
 {
+    test_library_table_reference_preservation();
     test_port_remove_preserves_backup_references();
     test_backup_overwrite_preserves_old_value_and_crc();
     test_overwrite_port_value_preserves_references();
