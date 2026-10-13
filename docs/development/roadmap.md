@@ -597,7 +597,8 @@ Deliver and review this core in the following slices, using the retained
 
 The system adapter now includes four `hpsys.h` entry points for seconds delays,
 750 kHz tick delays, civil seconds-of-day and midnight-wrapped differences.
-Host boundary/error tests pass; System Services device acceptance is pending.
+Host boundary/error tests and HP39g+ Direct System Services (including pixel
+checks) pass locally; remaining device contexts and formal CI are pending.
 The remaining historical system, timer and console interfaces remain open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration

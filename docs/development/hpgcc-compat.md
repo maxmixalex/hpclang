@@ -688,7 +688,8 @@ inputs as `-1/EINVAL`. This is a partial system adapter: legacy timer structures
 timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
 Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
 RTC errors; the System Services E2E also exercises both delay spellings and RTC
-access. Device acceptance of this adapter addition remains pending.
+access. HP39g+ Direct execution and the independent System Services pixel
+checks pass locally. Other device contexts and formal CI remain pending.
 
 ### SD media discovery and replacement
 
