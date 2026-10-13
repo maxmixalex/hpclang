@@ -676,6 +676,20 @@ HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based seconds delay in the review
 implementation. Its ordinary behavior maps to the clean monotonic delay service;
 the historical name is not evidence of a missing low-power CPU suspend service.
 
+The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`,
+`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves the reviewed
+implementation's seconds unit, despite the old declaration's `millis` parameter
+name. `sys_waitTicks` implements the documented 750 kHz duration, rounded up to
+microseconds, without requiring slow mode or changing interrupt/PWM registers.
+Both delays inherit the clean service's early return if the clock is unavailable.
+RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
+The one-day difference helper accepts seconds in 0..86399 and reports invalid
+inputs as `-1/EINVAL`. This is a partial system adapter: legacy timer structures,
+timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
+Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
+RTC errors; the System Services E2E also exercises both delay spellings and RTC
+access. Device acceptance of this adapter addition remains pending.
+
 ### SD media discovery and replacement
 
 Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3

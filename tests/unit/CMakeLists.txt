@@ -14,6 +14,10 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(hpgcc_system test_hpgcc_system.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c")
+target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")

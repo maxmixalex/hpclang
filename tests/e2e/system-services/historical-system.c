@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <hpsys.h>
 #include <hpclang/console.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
@@ -17,6 +18,19 @@ extern const struct hpclang_font hpclang_benchmark_font;
 
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
+    uint64_t delay_start, delay_end;
+    int seconds = sys_RTC_seconds();
+    if (seconds < 0 || seconds >= 86400 || sys_delta_seconds(86399, 1) != 2 ||
+        hpclang_time_read_us(&delay_start))
+        return 4;
+    sys_sleep(1);
+    if (hpclang_time_read_us(&delay_end) || delay_end - delay_start < 1000000u)
+        return 5;
+    if (hpclang_time_read_us(&delay_start))
+        return 6;
+    sys_waitTicks(7500);
+    if (hpclang_time_read_us(&delay_end) || delay_end - delay_start < 10000u)
+        return 7;
     enum
     {
         LIMIT = 1000,
