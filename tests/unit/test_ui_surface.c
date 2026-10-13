@@ -13,9 +13,13 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 static const uint8_t bitmap[] = {0xe0, 0xa0, 0xe0};
 static const struct hpclang_bitmap_glyph glyph = {
     .codepoint = '?', .bitmap = bitmap, .width = 3, .height = 3, .advance = 4, .stride = 1};
-static const struct hpclang_bitmap_glyph *const glyphs[] = {&glyph};
+static const uint8_t x_bitmap[] = {0xa0, 0x40, 0xa0};
+static const struct hpclang_bitmap_glyph space_glyph = {.codepoint = ' ', .advance = 4};
+static const struct hpclang_bitmap_glyph x_glyph = {
+    .codepoint = 'x', .bitmap = x_bitmap, .width = 3, .height = 3, .advance = 4, .stride = 1};
+static const struct hpclang_bitmap_glyph *const glyphs[] = {&space_glyph, &glyph, &x_glyph};
 static const struct hpclang_bitmap_font_data data = {.glyphs = glyphs,
-                                                     .glyph_count = 1,
+                                                     .glyph_count = 3,
                                                      .fallback_codepoint = '?',
                                                      .ascent = 3,
                                                      .line_height = 4,
@@ -132,6 +136,22 @@ static void run(uint32_t levels)
     assert(hpclang_ui_surface_copy(r, target) == 0);
     assert(hpclang_surface_get_pixel(target, 1, 5) == 255); /* Revealed focus border. */
     assert(hpclang_surface_get_pixel(target, 1, 12) == 0);  /* Viewport confines children. */
+    for (unsigned checked = 0; checked < 2; ++checked) {
+        assert(hpclang_ui_begin(ui) == 0);
+        assert(hpclang_ui_toggle(ui, 90, 0, "A", checked, (struct hpclang_ui_action){1, 0}, 1) ==
+               0);
+        assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 16, 16},
+                                 hpclang_ui_surface_measure, r) == 0);
+        assert(hpclang_ui_commit(ui) == 0);
+        assert(hpclang_ui_surface_render(r, ui) == 1);
+        assert(hpclang_ui_surface_copy(r, target) == 0);
+        assert(hpclang_surface_get_pixel(target, 6, 2) == (checked ? 255 : 0));
+        if (!checked) {
+            struct hpclang_ui_event event;
+            assert(hpclang_ui_activate(ui, &event) == 1);
+            assert(event.kind == HPCLANG_UI_CHANGE && event.value == 1);
+        }
+    }
     assert(hpclang_ui_shutdown(ui) == 0);
     hpclang_ui_surface_destroy(r);
     hpclang_surface_destroy(target);

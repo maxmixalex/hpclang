@@ -73,6 +73,9 @@ int main(void)
     assert(demo_view(&app, r, 131, 64) == 0);
     uint32_t id = app.model.devices[1].id;
     uint32_t lifetime = control(&app, DEMO_TOGGLE, id);
+    activate(&app, DEMO_TOGGLE, id);
+    assert(app.model.devices[1].enabled == 0);
+    assert(demo_view(&app, r, 131, 64) == 0);
     activate(&app, DEMO_REVERSE, 0);
     assert(demo_view(&app, r, 131, 64) == 0 && control(&app, DEMO_TOGGLE, id) == lifetime);
     for (unsigned i = 3; i < 8; ++i) {

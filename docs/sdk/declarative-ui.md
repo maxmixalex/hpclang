@@ -125,6 +125,16 @@ candidate to change the tree. Layout itself performs no drawing.
 the application performs its update and declares the resulting model again.
 Disabled buttons retain identity but cannot receive focus or activation.
 
+`hpclang_ui_toggle` declares a controlled boolean with a caption, checked state,
+action and enabled state. Both checked and enabled must be zero or one.
+Activation emits `HPCLANG_UI_CHANGE` with the proposed boolean in `event.value`;
+it leaves the accepted view unchanged. The application updates its model and
+declares another frame to accept, reject or transform the proposal. Further
+edits and activations return `EBUSY` until a successful commit; aborting a frame
+does not consume the proposal. Stable keys preserve the control's identity
+when a list is reordered. The surface renderer uses `[x]` / `[ ]` markers with
+equal reserved width, alongside the same focus and disabled styles as buttons.
+
 Focus survives reordering by lifetime ID. If its node disappears or becomes
 disabled, the next surviving eligible node in the old order is preferred,
 then the previous one, then the first eligible new node. Initial focus chooses

@@ -44,7 +44,8 @@ static void device_row(struct hpclang_ui *ui, const struct demo_device *device)
         HPCLANG_UI_WITH(ui, 1, HPCLANG_UI_ROW, 0)
         {
             hpclang_ui_text(ui, 1, 0, device->name);
-            button(ui, 2, device->enabled ? "Disable" : "Enable", DEMO_TOGGLE, device->id, 1);
+            hpclang_ui_toggle(ui, 2, 1, "Enabled", device->enabled,
+                              (struct hpclang_ui_action){DEMO_TOGGLE, device->id}, 1);
         }
     }
 }
@@ -193,6 +194,16 @@ int demo_update(struct demo_app *app, const struct hpclang_ui_event *event)
         strcpy(m->filter, event->text);
         return 1;
     }
+    if (event->action.type == DEMO_TOGGLE && event->kind == HPCLANG_UI_CHANGE) {
+        if (event->value > 1) {
+            errno = EINVAL;
+            return -1;
+        }
+        for (unsigned i = 0; i < m->count; ++i)
+            if (m->devices[i].id == event->action.arg)
+                m->devices[i].enabled = (int)event->value;
+        return 1;
+    }
     if (event->kind != HPCLANG_UI_ACTIVATE)
         return 0;
     switch (event->action.type) {
@@ -232,11 +243,6 @@ int demo_update(struct demo_app *app, const struct hpclang_ui_event *event)
             m->devices[i] = m->devices[m->count - 1 - i];
             m->devices[m->count - 1 - i] = temp;
         }
-        break;
-    case DEMO_TOGGLE:
-        for (unsigned i = 0; i < m->count; ++i)
-            if (m->devices[i].id == event->action.arg)
-                m->devices[i].enabled ^= 1;
         break;
     case DEMO_WAVE:
         update_wave(m);

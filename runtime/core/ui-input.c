@@ -83,7 +83,7 @@ int hpclang_ui_text_input(struct hpclang_ui *ui, uint32_t key, uint16_t style, c
         size_t cursor = previous->cursor, anchor = previous->anchor;
         /* An unchanged value rejects the proposal. An accepted or transformed
          * value uses its proposed selection, clamped to valid new boundaries. */
-        if (ui->edit_pending == node->id && strcmp(value, previous->text)) {
+        if (ui->proposal_owner == node->id && strcmp(value, previous->text)) {
             cursor = ui->edit_cursor;
             anchor = ui->edit_anchor;
         }
@@ -109,7 +109,7 @@ int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor)
 {
     if (!ui || ui->closed)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->proposal_owner)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -132,7 +132,7 @@ static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
     if (!ui || ui->closed || !event || action < HPCLANG_INPUT_INSERT ||
         action > HPCLANG_INPUT_CANCEL)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->proposal_owner)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -165,7 +165,7 @@ static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
         kind = HPCLANG_UI_CANCEL;
     else if (strcmp(input.buffer, node->text)) {
         kind = HPCLANG_UI_CHANGE;
-        ui->edit_pending = node->id;
+        ui->proposal_owner = node->id;
         ui->edit_cursor = ui->edit_anchor = input.cursor;
     } else {
         if (input.cursor == node->cursor && node->anchor == input.cursor)
@@ -197,7 +197,7 @@ int hpclang_ui_key(struct hpclang_ui *ui, struct hpclang_text_mode *mode,
 {
     if (!ui || ui->closed || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->proposal_owner)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_input_plan plan;
     int result = hpclang_input_plan_event(mode, key, &plan);

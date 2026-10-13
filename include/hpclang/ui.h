@@ -37,7 +37,8 @@ extern "C"
         HPCLANG_UI_BUTTON,
         HPCLANG_UI_INPUT,
         HPCLANG_UI_CANVAS,
-        HPCLANG_UI_SCROLL
+        HPCLANG_UI_SCROLL,
+        HPCLANG_UI_TOGGLE
     };
 
     struct hpclang_ui_config
@@ -89,7 +90,11 @@ extern "C"
         size_t capacity, cursor, anchor;
         hpclang_ui_canvas_paint_fn paint;
         const void *canvas_state;
-        uint32_t revision;
+        union
+        {
+            uint32_t revision; /* CANVAS */
+            uint32_t value;    /* TOGGLE: zero or one */
+        };
         int32_t preferred_height;
         int32_t scroll_y;
     };
@@ -131,6 +136,11 @@ extern "C"
     int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text);
     int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
                           struct hpclang_ui_action action, int enabled);
+    /* Controlled boolean selection. Activation emits CHANGE/value without
+     * changing the displayed value. Commit acceptance/rejection before another
+     * activation, as for controlled text proposals. */
+    int hpclang_ui_toggle(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
+                          int checked, struct hpclang_ui_action action, int enabled);
     /* State is borrowed through painting/removal; update revision when mutable
      * state changes. Callback/state addresses are not dereferenced during
      * declaration. Bounds are layout-owned; painting must honor clip. */

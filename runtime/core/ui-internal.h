@@ -35,7 +35,7 @@ struct hpclang_ui
     unsigned current;
     int building, error, measuring, arranged, focus_cleared;
     char *edit_text;
-    uint32_t edit_pending;
+    uint32_t proposal_owner;
     size_t edit_cursor, edit_anchor;
     int painting, dirty;
     int64_t damage_left, damage_top, damage_right, damage_bottom;

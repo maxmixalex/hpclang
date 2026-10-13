@@ -185,6 +185,9 @@ static unsigned checks(void)
             goto done;
     if (app.model.scan != DEMO_READY || app.model.count != 3 || capture(&app, r, 4))
         goto done;
+    failure = 0x1501;
+    if (activate(&app, r, &mode, DEMO_TOGGLE) || app.model.devices[0].enabled)
+        goto done;
     failure = 16;
     for (unsigned i = 3; i < 8; ++i)
         if (activate(&app, r, &mode, DEMO_ADD))

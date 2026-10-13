@@ -736,6 +736,40 @@ static void scrolling(struct hpclang_ui *ui)
     assert(hpclang_ui_scroll_to(ui, outer, 20) == -1 && errno == EOVERFLOW);
 }
 
+static void toggle_view(struct hpclang_ui *ui, int checked, int enabled)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_toggle(ui, 1, 0, "Choice", checked, (struct hpclang_ui_action){9, 4},
+                             enabled) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+}
+
+static void toggles(struct hpclang_ui *ui)
+{
+    toggle_view(ui, 0, 1);
+    uint32_t id = hpclang_ui_node_at(ui, 0)->id;
+    assert(hpclang_ui_focus(ui, id) == 0);
+    struct hpclang_ui_event event;
+    assert(hpclang_ui_activate(ui, &event) == 1 && event.kind == HPCLANG_UI_CHANGE);
+    assert(event.source == id && event.action.arg == 4 && event.value == 1 && !event.text);
+    assert(hpclang_ui_node_at(ui, 0)->value == 0);
+    assert(hpclang_ui_activate(ui, &event) == -1 && errno == EBUSY);
+    assert(hpclang_ui_begin(ui) == 0);
+    hpclang_ui_abort(ui);
+    assert(hpclang_ui_activate(ui, &event) == -1 && errno == EBUSY);
+    toggle_view(ui, 0, 1); /* Rejection retains the displayed value. */
+    assert(hpclang_ui_activate(ui, &event) == 1 && event.value == 1);
+    toggle_view(ui, (int)event.value, 1);
+    assert(hpclang_ui_node_at(ui, 0)->id == id && hpclang_ui_node_at(ui, 0)->value == 1);
+    assert(hpclang_ui_activate(ui, &event) == 1 && event.value == 0);
+    toggle_view(ui, 1, 0);
+    assert(hpclang_ui_activate(ui, &event) == 0);
+    assert(hpclang_ui_focus(ui, id) == -1 && errno == ENOENT);
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_toggle(ui, 1, 0, "Choice", 2, (struct hpclang_ui_action){0}, 1) == -1);
+    assert(hpclang_ui_commit(ui) == -1 && hpclang_ui_node_at(ui, 0)->value == 1);
+}
+
 int main(void)
 {
     struct hpclang_ui_config config = {32, 256};
@@ -753,6 +787,7 @@ int main(void)
     painting(ui);
     effects(ui);
     scrolling(ui);
+    toggles(ui);
     free(storage);
     capacity();
     return 0;

@@ -72,8 +72,8 @@ static int changed(const struct hpclang_ui_node *a, const struct hpclang_ui_node
     return !equal(a->bounds, b->bounds) || !equal(a->clip, b->clip) || a->style != b->style ||
            a->enabled != b->enabled || a->cursor != b->cursor || a->anchor != b->anchor ||
            a->paint != b->paint || a->canvas_state != b->canvas_state ||
-           a->revision != b->revision || (!!a->text != !!b->text) ||
-           (a->text && strcmp(a->text, b->text));
+           (a->kind == HPCLANG_UI_TOGGLE ? a->value != b->value : a->revision != b->revision) ||
+           (!!a->text != !!b->text) || (a->text && strcmp(a->text, b->text));
 }
 
 void hpclang_ui_damage_commit(struct hpclang_ui *ui, uint32_t old_focus)

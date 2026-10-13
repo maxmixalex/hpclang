@@ -3,7 +3,9 @@
 
 static int eligible(const struct hpclang_ui_node *node)
 {
-    return (node->kind == HPCLANG_UI_BUTTON || node->kind == HPCLANG_UI_INPUT) && node->enabled;
+    return (node->kind == HPCLANG_UI_BUTTON || node->kind == HPCLANG_UI_INPUT ||
+            node->kind == HPCLANG_UI_TOGGLE) &&
+           node->enabled;
 }
 
 static uint32_t find(const struct frame *frame, uint32_t id)
@@ -97,7 +99,7 @@ int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event)
 {
     if (!ui || ui->closed || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->dispatching)
+    if (ui->building || ui->painting || ui->dispatching || ui->proposal_owner)
         return hpclang_ui_fail(NULL, EBUSY);
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);
@@ -106,6 +108,14 @@ int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event)
     const struct hpclang_ui_node *node = &frame->nodes[index].view;
     if (node->kind == HPCLANG_UI_INPUT)
         return hpclang_ui_edit(ui, HPCLANG_INPUT_ACCEPT, 0, event);
+    if (node->kind == HPCLANG_UI_TOGGLE) {
+        ui->proposal_owner = node->id;
+        *event = (struct hpclang_ui_event){.source = node->id,
+                                           .action = node->action,
+                                           .kind = HPCLANG_UI_CHANGE,
+                                           .value = !node->value};
+        return 1;
+    }
     *event = (struct hpclang_ui_event){
         .source = node->id, .action = node->action, .kind = HPCLANG_UI_ACTIVATE};
     return 1;

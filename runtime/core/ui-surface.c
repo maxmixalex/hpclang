@@ -74,6 +74,16 @@ void hpclang_ui_surface_destroy(struct hpclang_ui_surface *r)
     free(r);
 }
 
+static int toggle_width(const struct hpclang_font *font, uint32_t *width)
+{
+    uint32_t a, b, ignored;
+    if (hpclang_font_measure_text_n(font, "[x] ", 4, &a, &ignored) ||
+        hpclang_font_measure_text_n(font, "[ ] ", 4, &b, &ignored))
+        return -1;
+    *width = a > b ? a : b;
+    return 0;
+}
+
 int hpclang_ui_surface_measure(void *context, const struct hpclang_ui_node *node,
                                struct hpclang_ui_metrics *metrics)
 {
@@ -90,6 +100,12 @@ int hpclang_ui_surface_measure(void *context, const struct hpclang_ui_node *node
     int container = node->kind == HPCLANG_UI_ROW || node->kind == HPCLANG_UI_COLUMN ||
                     node->kind == HPCLANG_UI_SCROLL;
     int64_t w = width, h = height;
+    if (node->kind == HPCLANG_UI_TOGGLE) {
+        uint32_t prefix;
+        if (toggle_width(s->font, &prefix))
+            return -1;
+        w += prefix;
+    }
     if (!container) {
         w += 2u * s->padding_x;
         h += 2u * s->padding_y;
@@ -129,7 +145,7 @@ static int node(void *context, const struct hpclang_ui_node *n, struct hpclang_u
     struct hpclang_surface lease;
     hpclang_surface_clip(&lease, r->work, clip.x, clip.y, clip.width, clip.height);
     hpclang_surface_clear(&lease, s->background);
-    if (n->kind == HPCLANG_UI_BUTTON || n->kind == HPCLANG_UI_INPUT)
+    if (n->kind == HPCLANG_UI_BUTTON || n->kind == HPCLANG_UI_INPUT || n->kind == HPCLANG_UI_TOGGLE)
         hpclang_surface_draw_rect(&lease, n->bounds.x, n->bounds.y, n->bounds.width,
                                   n->bounds.height, focused ? s->accent : s->disabled);
     if (!n->text)
@@ -161,6 +177,16 @@ static int node(void *context, const struct hpclang_ui_node *n, struct hpclang_u
     if (x < INT32_MIN || height > INT32_MAX)
         return fail(EOVERFLOW);
     uint8_t ink = n->kind == HPCLANG_UI_TEXT || n->enabled ? s->foreground : s->disabled;
+    if (n->kind == HPCLANG_UI_TOGGLE) {
+        uint32_t prefix;
+        if (toggle_width(s->font, &prefix))
+            return -1;
+        hpclang_surface_draw_text(&lease, s->font, (int32_t)x, (int32_t)y,
+                                  n->value ? "[x] " : "[ ] ", ink);
+        x += prefix;
+        if (x > INT32_MAX)
+            return 0;
+    }
     hpclang_surface_draw_text(&lease, s->font, (int32_t)x, (int32_t)y, n->text, ink);
     if (n->kind == HPCLANG_UI_INPUT && focused) {
         /* Invert the selection after glyphs, retaining legibility at every level. */

@@ -103,7 +103,7 @@ int hpclang_ui_commit(struct hpclang_ui *ui)
     hpclang_ui_damage_commit(ui, old_focus);
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
-    ui->edit_pending = 0;
+    ui->proposal_owner = 0;
     hpclang_ui_effect_reconcile(ui);
     return 0;
 }
@@ -238,6 +238,21 @@ int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const
     struct frame *next = &ui->frames[ui->current ^ 1u];
     next->nodes[next->count - 1].view.action = action;
     next->nodes[next->count - 1].view.enabled = enabled;
+    return 0;
+}
+
+int hpclang_ui_toggle(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
+                      int checked, struct hpclang_ui_action action, int enabled)
+{
+    if (!text || (checked != 0 && checked != 1) || (enabled != 0 && enabled != 1))
+        return hpclang_ui_fail(ui, EINVAL);
+    if (hpclang_ui_add(ui, key, HPCLANG_UI_TOGGLE, style, text))
+        return -1;
+    struct hpclang_ui_node *node =
+        &ui->frames[ui->current ^ 1u].nodes[ui->frames[ui->current ^ 1u].count - 1].view;
+    node->action = action;
+    node->enabled = enabled;
+    node->value = (uint32_t)checked;
     return 0;
 }
 
