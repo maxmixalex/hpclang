@@ -5,7 +5,7 @@
 
 #define NOTEBOOK_CAPACITY 192u
 
-/* UTF-8 is stored as opaque bytes inside a native string object. These helpers
+/* Printable single-line UTF-8 is stored as bytes inside a native string object. These helpers
  * never change the caller's buffer on failure. ENOENT means no saved note;
  * EILSEQ means existing data does not belong to this example. */
 int notebook_load(char text[NOTEBOOK_CAPACITY]);

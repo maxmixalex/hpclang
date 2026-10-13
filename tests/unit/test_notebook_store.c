@@ -141,7 +141,38 @@ static void run(int use_aplet)
     if (!aplet)
         assert(last_mode == HPCLANG_OBJECT_STORE_CREATE_ONLY);
     assert(notebook_load(text) == 0 && !strcmp(text, "hello \xc3\xa9"));
-    assert(notebook_save("") == 0 && writes == 2);
+    const char *valid[] = {"\xc2\xa0", "\xe4\xb8\xad", "\xf0\x9f\x98\x80", "\xf4\x8f\xbf\xbf"};
+    for (size_t i = 0; i < sizeof(valid) / sizeof(valid[0]); ++i) {
+        assert(notebook_save(valid[i]) == 0);
+        assert(notebook_load(text) == 0 && !strcmp(text, valid[i]));
+    }
+    int unicode_writes = writes;
+    const char *invalid[] = {"\n",
+                             "\x7f",
+                             "\xc2\x80",
+                             "\xc0\xaf",
+                             "\x80",
+                             "\xe0\x80\xaf",
+                             "\xed\xa0\x80",
+                             "\xf4\x90\x80\x80",
+                             "\xf5\x80\x80\x80",
+                             "\xf0\x80\x80\xaf",
+                             "\xc2",
+                             "\xe4\xb8",
+                             "\xf0\x9f\x98",
+                             "\xe4?x"};
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        assert(notebook_save(invalid[i]) == -1 && errno == EILSEQ && writes == unicode_writes);
+        struct hpclang_object original = saved;
+        const size_t prefix = sizeof("hpclang-notebook/1\n") - 1;
+        memcpy(saved.bytes + prefix, invalid[i], strlen(invalid[i]));
+        saved.length = prefix + strlen(invalid[i]);
+        strcpy(text, "unchanged");
+        assert(notebook_load(text) == -1 && errno == EILSEQ && !strcmp(text, "unchanged"));
+        assert(notebook_save("no") == -1 && errno == EILSEQ && writes == unicode_writes);
+        saved = original;
+    }
+    assert(notebook_save("") == 0 && writes == unicode_writes + 1);
     assert(notebook_load(text) == 0 && text[0] == 0);
     memset(text, 'x', sizeof(text) - 1);
     text[sizeof(text) - 1] = 0;

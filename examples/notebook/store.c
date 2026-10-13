@@ -8,6 +8,45 @@
 static const uint8_t name[] = "HPCNOTE";
 static const char signature[] = "hpclang-notebook/1\n";
 
+/* The persisted record is a single printable UTF-8 line, matching the editor.
+ * Validate before exposing native bytes to the view or replacing a record. */
+static int valid_line(const char *bytes, size_t length)
+{
+    size_t offset = 0;
+    while (offset < length) {
+        uint32_t scalar = (uint8_t)bytes[offset++];
+        unsigned count = 0;
+        uint32_t minimum = 0;
+        if (scalar >= 0xc2 && scalar <= 0xdf) {
+            scalar &= 31;
+            count = 1;
+            minimum = 0x80;
+        } else if (scalar >= 0xe0 && scalar <= 0xef) {
+            scalar &= 15;
+            count = 2;
+            minimum = 0x800;
+        } else if (scalar >= 0xf0 && scalar <= 0xf4) {
+            scalar &= 7;
+            count = 3;
+            minimum = 0x10000;
+        } else if (scalar >= 0x80) {
+            return 0;
+        }
+        if (count > length - offset)
+            return 0;
+        while (count--) {
+            uint8_t next = (uint8_t)bytes[offset++];
+            if ((next & 0xc0) != 0x80)
+                return 0;
+            scalar = (scalar << 6) | (next & 63);
+        }
+        if (scalar < minimum || scalar < 0x20 || (scalar >= 0x7f && scalar <= 0x9f) ||
+            (scalar >= 0xd800 && scalar <= 0xdfff) || scalar > 0x10ffff)
+            return 0;
+    }
+    return 1;
+}
+
 struct destination
 {
     struct hpclang_object_store *home;
@@ -59,7 +98,8 @@ static int read_note(const struct destination *destination, char *text)
         if (!result)
             result = hpclang_object_string_copy(object, (uint8_t *)bytes, sizeof(bytes));
         if (!result &&
-            (memcmp(bytes, signature, sizeof(signature) - 1) || memchr(bytes, 0, length))) {
+            (memcmp(bytes, signature, sizeof(signature) - 1) ||
+             !valid_line(bytes + sizeof(signature) - 1, length - (sizeof(signature) - 1)))) {
             errno = EILSEQ;
             result = -1;
         }
@@ -103,6 +143,10 @@ int notebook_save(const char *text)
         ++length;
     if (length == NOTEBOOK_CAPACITY) {
         errno = E2BIG;
+        return -1;
+    }
+    if (!valid_line(text, length)) {
+        errno = EILSEQ;
         return -1;
     }
     struct destination destination;
