@@ -161,10 +161,11 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
             row ? (struct hpclang_ui_rect){(int32_t)origin, box.y, (int32_t)size, box.height}
                 : (struct hpclang_ui_rect){box.x, (int32_t)origin, box.width, (int32_t)size};
         node->view.clip = intersect(node->view.bounds, intersect(parent->view.clip, box));
-        node->base_y = node->view.bounds.y;
         parent->offset = (int32_t)(offset + size);
         ++parent->children;
         prepare_children(node);
+        /* Content width is no longer needed once child space is prepared. */
+        node->base_y = node->view.bounds.y;
     }
     ui->arranged = 1;
     frame->viewport = viewport;
