@@ -1,6 +1,4 @@
 #include <stddef.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <string.h>
 #include "rpl-object-store.h"
 #include "rpl-port.h"
@@ -175,8 +173,8 @@ int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, co
     return HPCLANG_RPL_MUTATION_OK;
 }
 
-int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
-                                       const uint8_t *packed, uint32_t span)
+int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
+                                     const uint8_t *packed, uint32_t span)
 {
     if (!io || !io->read_nibble || !io->write_nibble)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -196,7 +194,10 @@ int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
     const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
     struct hpclang_rpl_port_cursor cursor = {start, 0x100000u, 0};
     struct hpclang_rpl_port_entry existing, target = {0};
+    uint32_t first_library = 0x100000u;
     while ((result = hpclang_rpl_port_next(&reader, &cursor, &existing)) > 0) {
+        if (existing.prologue == 0x02b40u && first_library == 0x100000u)
+            first_library = existing.address;
         if (existing.prologue == replacement.prologue &&
             existing.name_length == replacement.name_length &&
             !memcmp(existing.name, replacement.name, replacement.name_length)) {
@@ -209,23 +210,7 @@ int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
         return parse_error(result);
     if (!target.span)
         return HPCLANG_RPL_MUTATION_NOT_FOUND;
-    if (target.span != span)
+    if (target.span != span && first_library < target.address)
         return HPCLANG_RPL_MUTATION_UNSUPPORTED;
-    struct hpclang_object *value = NULL;
-    if (hpclang_object_snapshot_copy_encoded(&input, replacement.value_address,
-                                             replacement.value_span, &value))
-        return errno == ENOMEM ? HPCLANG_RPL_MUTATION_NOMEM : HPCLANG_RPL_MUTATION_MALFORMED;
-    result = hpclang_rpl_mutation_overwrite_value(io, target.value_address, value);
-    free(value);
-    if (result)
-        return result;
-    /* Names and extents are identical; only the contained value and CRC change.
-     * Full port validation above proved these checksum bytes readable before
-     * reference preservation or the first write. */
-    for (uint32_t i = span - 5u; i < span; ++i) {
-        uint8_t nibble = (packed[i / 2u] >> ((i & 1u) * 4u)) & 15u;
-        if (!io->write_nibble(io->context, target.address + i, nibble))
-            return HPCLANG_RPL_MUTATION_IO;
-    }
-    return HPCLANG_RPL_MUTATION_OK;
+    return hpclang_rpl_mutation_port0_replace_record(io, target.address, target.span, packed, span);
 }

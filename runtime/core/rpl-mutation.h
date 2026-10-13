@@ -160,6 +160,12 @@ extern "C"
     int hpclang_rpl_mutation_port0_remove_record(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t address, uint32_t span);
 
+    /* Caller validates both encodings and library movement. Packed bytes must
+     * be owned ARM storage and remain stable throughout the transaction. */
+    int hpclang_rpl_mutation_port0_replace_record(const struct hpclang_rpl_mutation_io *io,
+                                                  uint32_t address, uint32_t old_span,
+                                                  const uint8_t *packed, uint32_t new_span);
+
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 

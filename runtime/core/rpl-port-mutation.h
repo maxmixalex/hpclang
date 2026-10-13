@@ -9,10 +9,11 @@
 int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
                                     uint32_t span);
 
-/* Exact-size replacement primitive. Size changes need the separate resize
- * path. Existing references to the enclosed old value retain a TEMP copy. */
-int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
-                                       const uint8_t *packed, uint32_t span);
+/* Replacement preserves references to the complete old backup in TEMP.
+ * Size changes preceding any library use the backup-prefix movement path;
+ * moving a preceding library still needs the separate library-aware path. */
+int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,
+                                     const uint8_t *packed, uint32_t span);
 
 /* Internal backup-chain geometry. Validate the complete chain and whole-record
  * boundaries before moving a prefix. Libraries must remain at their original

@@ -1085,6 +1085,58 @@ int hpclang_rpl_mutation_port0_remove_record(const struct hpclang_rpl_mutation_i
     return commit_userob_shift(io, &geometry, &directory_plan);
 }
 
+int hpclang_rpl_mutation_port0_replace_record(const struct hpclang_rpl_mutation_io *io,
+                                              uint32_t address, uint32_t old_span,
+                                              const uint8_t *packed, uint32_t new_span)
+{
+    if (!io_ready(io))
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (!packed || !old_span || !new_span || old_span > RPL_MAIN_END || new_span > RPL_MAIN_END ||
+        address > RPL_MAIN_END - old_span)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t end = address + old_span;
+    if (new_span > end || end - new_span < RPL_MAIN_FIRST)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t destination = end - new_span;
+    if (!range_mapped(io, address, old_span) || !range_mapped(io, destination, new_span))
+        return HPCLANG_RPL_MUTATION_IO;
+    int32_t delta = (int32_t)new_span - (int32_t)old_span;
+    if (!delta) {
+        int equal = 1;
+        for (uint32_t i = 0; i < old_span; ++i) {
+            uint8_t actual;
+            if (!io->read_nibble(io->context, address + i, &actual))
+                return HPCLANG_RPL_MUTATION_IO;
+            equal &= actual == ((packed[i / 2] >> (4 * (i & 1))) & 15);
+        }
+        if (equal)
+            return HPCLANG_RPL_MUTATION_OK;
+    }
+    struct userob_shift_geometry geometry = {.port_boundary = 1};
+    struct directory_patch_plan directory_plan;
+    int result;
+    if (delta) {
+        result = plan_userob_shift(io, end, delta, &geometry, &directory_plan, NULL, 1);
+        if (result != HPCLANG_RPL_MUTATION_OK && result != HPCLANG_RPL_MUTATION_BUSY)
+            return result;
+    }
+    /* Preserve the wrapper as well as nested values. TEMP allocation and the
+     * final USEROB geometry are checked together before the first write. */
+    result = preserve_userob_references_to_temp(io, address, end, delta, &geometry);
+    if (result)
+        return result;
+    if (delta) {
+        result = commit_userob_shift(io, &geometry, &directory_plan);
+        if (result)
+            return result;
+    }
+    for (uint32_t i = 0; i < new_span; ++i)
+        if (!io->write_nibble(io->context, destination + i,
+                              (uint8_t)((packed[i / 2] >> (4 * (i & 1))) & 15)))
+            return HPCLANG_RPL_MUTATION_IO;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int snapshot_matches_saturn(const struct hpclang_rpl_mutation_io *io, uint32_t address,
                                    const struct hpclang_object *object, int *matches)
 {
