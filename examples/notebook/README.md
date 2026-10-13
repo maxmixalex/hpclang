@@ -7,6 +7,12 @@ the Aplet envelope. Local host storage tests cover both backend choices. The
 relocated SDK build passes all six launchers and three HP39 Aplet packages;
 device and release acceptance are still pending.
 
+The application view and event update functions are shared with tests rather
+than duplicated in a test-only screen. Host UI tests exercise both 64- and
+80-row displays, the maximum note length with all Port controls present,
+controlled edits, Save/Restore and service failures. Storage and clock services
+are simulated in that UI test; native persistence still needs device evidence.
+
 Use the arrow keys to focus controls, Alpha to enter text and Enter to activate
 buttons. Save writes the current note; Reload replaces edits only after a
 successful read. Exit or ON returns normally without saving further edits.

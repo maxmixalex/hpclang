@@ -74,6 +74,10 @@ hpclang_unit(ui_demo test_ui_demo.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
     "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
 target_include_directories(test_ui_demo PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(notebook_ui test_notebook_ui.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+    "${HPCLANG_ROOT}/examples/notebook/app.c")
+target_include_directories(test_notebook_ui PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
     hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
     target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
