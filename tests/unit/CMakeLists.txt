@@ -14,6 +14,10 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(hpgcc_system test_hpgcc_system.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c")
+target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
@@ -304,6 +308,16 @@ hpclang_unit(object_construct
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+
+hpclang_unit(object_cpp
+    test_object_cpp.cpp
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
+    "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_compile_features(test_object_cpp PRIVATE cxx_std_17)
+target_compile_options(test_object_cpp PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+target_include_directories(test_object_cpp PRIVATE
+    "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(object_catalog
     test_object_catalog.c

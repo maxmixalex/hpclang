@@ -750,8 +750,8 @@ state; applications needing repeat/debounce policy should use clean events.
 | any key | `keyb_isAnyKeyPressed` | ✅ |
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
 | arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
-| blocking wait | `keyb_waitKeyPressed` | ◐ Installed physical press/all-release adapter; local tests pass, target acceptance pending. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Installed return-code adapters with the explicit differences above; local tests pass, target acceptance pending. |
+| blocking wait | `keyb_waitKeyPressed` | ✅ Installed physical press/all-release adapter; accepted at `267dd953`. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ✅ Installed return-code adapters with the explicit differences above; accepted at `267dd953`. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 
 ## Time, system and machine control
@@ -760,8 +760,8 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
-| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Monotonic microseconds + explicit delay; source adapter absent. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; historical source adapters remain pending. |
+| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` now adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay; six Direct models and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally. `sys_waitRTCTicks` remains pending. |
+| RTC wall clock | `sys_RTC_seconds`, `sys_delta_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; `hpsys.h` now adapts seconds-of-day and midnight-wrapped differences. `sys_tm_RTC` remains pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | 🧪 Typed HOST/ECONOMY policy preserves PLL/bus setup and restores borrowed clocks; local validation in progress. Historical raw register interfaces remain backend details. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |

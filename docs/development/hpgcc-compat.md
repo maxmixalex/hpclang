@@ -66,8 +66,11 @@ Stock native-object coexistence passes on all six models, and SD file
 coexistence passes on both supported models in Direct/Stock. Formal CI is accepted on `2988e1de`. Historical
 raw speed-register and overclocking interfaces are not exposed by this policy.
 The HPGCC 1.1/2.0 sieve client is now ported in
-`system-services/historical-system.c`, with prime-count/checksum and visible
-report checks. It passes Direct and Stock on all six models; its additional formal CI is accepted on `2988e1de`.
+`hpgcc-system/historical-system.c`, with prime-count/checksum and visible
+report checks. The earlier clean-service version passed Direct and Stock on
+all six models and formal CI on `2988e1de`. The M8 version adds historical
+timer/delay calls and runs as a separate Runtime-suite payload; its acceptance
+is tracked in M8.4 rather than inherited from that earlier result.
 
 ## Public API stability
 
@@ -672,9 +675,39 @@ ENVID bit. The clean equivalent is `hpclang_display_set_enabled` within an owned
 display session: bounded frame waiting, retained pages, and host-state restoration
 on exit. It does not change the application clock or put the CPU to sleep.
 
-HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based seconds delay in the reviewed
+HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based milliseconds delay in the reviewed
 implementation. Its ordinary behavior maps to the clean monotonic delay service;
 the historical name is not evidence of a missing low-power CPU suspend service.
+The implementation multiplies duration by 1,000,000 because `sys_updateTimer`
+accumulates **nanoseconds**, not microseconds: its 12 MHz base-clock conversion
+uses 250/3 nanoseconds per tick. This confirms the original `millis` declaration.
+
+The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`, `sys_updateTimer`,
+`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves milliseconds
+without the historical 32-bit intermediate multiplication overflow.
+`sys_waitTicks` implements the documented 750 kHz duration, rounded up to
+microseconds, without requiring slow mode or changing interrupt/PWM registers.
+Both delays inherit the clean service's early return if the clock is unavailable.
+RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
+The one-day difference helper accepts seconds in 0..86399 and reports invalid
+inputs as `-1/EINVAL`. `sys_timer_t`, its two initializer macros and
+`sys_updateTimer` preserve elapsed/accumulated nanoseconds and restart through
+`inited = 0`. Timer indices 0..4 are logical stopwatches sharing the clean
+monotonic source; they do not select or reconfigure hardware PWM channels.
+The private `last_val` field is widened for a monotonic sample, so the structure
+is source-compatible for ordinary stopwatch use, not binary-compatible or a raw
+PWM-counter view. Failed samples, regression and overflow leave state unchanged.
+Timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
+Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
+RTC errors; the standalone HPGCC System E2E also exercises both delay spellings and RTC
+access, with both lower and upper delay bounds to catch unit mismatches.
+All six Direct and all six Stock targets pass locally with the corrected
+milliseconds conversion and stopwatch checks, including independent report
+pixel verification. The separate System Services payload also passes that
+full matrix. Formal CI is pending.
+The relocated installed SDK also builds its C/C++ examples, all six native
+launchers and three HP39 Aplet families, including `examples/hpgcc-timer`. Historical
+integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
 
 ### SD media discovery and replacement
 

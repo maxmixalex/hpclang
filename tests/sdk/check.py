@@ -30,14 +30,25 @@ def main():
         prefix = work / "original prefix"
         sdk = work / "relocated sdk"
         run("cmake", "-S", str(root), "-B", str(work / "installer"), env=env)
-        run("cmake", "--install", str(work / "installer"), "--prefix", str(prefix), env=env)
+        run(
+            "cmake",
+            "--install",
+            str(work / "installer"),
+            "--prefix",
+            str(prefix),
+            env=env,
+        )
         prefix.rename(sdk)
         package = sdk / "share/hpclang"
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
+        shutil.copytree(package / "examples/object-cpp", application / "objects")
+        shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
         with (application / "CMakeLists.txt").open("a") as source:
-            source.write("\nadd_subdirectory(counter)\n")
+            source.write(
+                "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
+            )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
@@ -48,13 +59,20 @@ foreach(application IN ITEMS hello_c hello_cpp)
     endforeach()
 endforeach()
 """)
-            with (application / "counter/CMakeLists.txt").open("a") as source:
-                source.write("""
+            for directory, target in (
+                ("counter", "declarative_ui_cpp"),
+                ("objects", "object_cpp"),
+                ("timer", "hpgcc_timer"),
+            ):
+                with (application / directory / "CMakeLists.txt").open("a") as source:
+                    source.write(
+                        """
 foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
-    hpclang_target_aplet(declarative_ui_cpp MODEL ${model} NAME "SDK example"
+    hpclang_target_aplet(TARGET_NAME MODEL ${model} NAME "SDK example"
         AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
 endforeach()
-""")
+""".replace("TARGET_NAME", target)
+                    )
         build = work / "build"
         run(
             "cmake",
@@ -87,6 +105,8 @@ endforeach()
             ("hello_c", build),
             ("hello_cpp", build),
             ("declarative_ui_cpp", build / "counter"),
+            ("object_cpp", build / "objects"),
+            ("hpgcc_timer", build / "timer"),
         ):
             elf = (output / f"{name}.elf").read_bytes()
             hpc = (output / f"{name}.hpc").read_bytes()
@@ -94,7 +114,14 @@ endforeach()
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
-            for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
+            for model in (
+                "hp39gplus",
+                "hp39gs",
+                "hp40gs",
+                "hp48gii",
+                "hp49gplus",
+                "hp50g",
+            ):
                 launcher = output / f"{name}-launchers" / model
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
@@ -107,7 +134,12 @@ endforeach()
                     aplet = (bundle / "HPGCC000.000").read_bytes()
                     if not aplet.startswith(b"HP39BinB\x0bSDK example") or hpc not in aplet:
                         raise AssertionError(f"{name}/{model}: invalid installable Aplet")
-                    for asset in ("HPCRESET.000", "LIB275L.000", "HP39DIR.000", "HP39DIR.CUR"):
+                    for asset in (
+                        "HPCRESET.000",
+                        "LIB275L.000",
+                        "HP39DIR.000",
+                        "HP39DIR.CUR",
+                    ):
                         if not (bundle / asset).stat().st_size:
                             raise AssertionError(f"missing Aplet companion: {asset}")
         # A missing declared output must be regenerated without touching source.

@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(hpclang_object_cpp LANGUAGES C CXX ASM)
+find_package(hpclang CONFIG REQUIRED)
+hpclang_add_application(object_cpp main.cpp)
+target_compile_features(object_cpp PRIVATE cxx_std_17)
+hpclang_target_launchers(object_cpp)

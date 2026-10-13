@@ -678,6 +678,23 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.4 — Historical source compatibility
 
+The system adapter now includes five `hpsys.h` entry points for millisecond delays,
+750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
+midnight-wrapped differences.
+All 87 host tests after integration with the accepted C++ ownership work, six
+Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass, including independent
+pixel checks for the combined payload. HP39gs then exposed insufficient heap
+for its clock/display check. The timed-sieve client now has a separate
+`hpgcc-system` payload and pixel verifier in the shared Runtime suite manifest;
+both split payloads pass all six Direct and all six Stock targets, including
+their independent pixel checks. All 87 host tests, formatting, static analysis,
+focused sanitizers and strict documentation checks pass. Formal CI is pending.
+The relocated SDK build passes C/C++, all six launchers and all three HP39
+Aplet package families with the system adapter included. The installed
+`examples/hpgcc-timer` migration client passes that same relocation/packaging
+gate; it demonstrates the five historical calls and documents their units.
+The remaining historical system, timer and console interfaces remain open.
+
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
 The integrated Display suite passes all six models in Direct and Stock,
@@ -710,6 +727,13 @@ three HP39 Aplet packages. Compact node storage reduces the full ARM declaration
 pool by 3,072 bytes without reducing the eight-device scenario. All six CI
 workflows pass at `e6f04dbd`, now merged into main. Broader owned wrappers and
 the remaining migration/release requirements below stay open.
+
+The next local ownership slice adds C++17 `owned_object`, with move-only
+snapshot ownership and failure-preserving C producer calls. Host and sanitizer
+checks cover transfer, replacement, failure cleanup and destruction. HP39g+ and
+HP50g Direct Runtime tests pass, as does the installed SDK relocation gate with
+the new object example, all six launchers and three HP39 Aplet packages. This
+slice still requires formal CI; broader migration and release goals remain.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
@@ -980,7 +1004,7 @@ Final source-confirmed application capabilities and retained follow-ups:
     object coexistence pass. Formal CI is accepted on `2988e1de`.
 - [x] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
-  - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
+  - `hpgcc-system/historical-system.c` ports the HPGCC 1.1/2.0 sieve
     example with bounded allocation/work, independently checked prime results
     and a visible elapsed-time report. Direct and Stock pass on all six models;
     formal CI is accepted on `2988e1de` for this additional client.
