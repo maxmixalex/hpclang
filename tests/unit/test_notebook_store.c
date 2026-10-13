@@ -5,8 +5,90 @@
 #include <hpclang/port.h>
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+static int open_error, output_error, close_error, interrupted, zero_write;
+static int opens, closes;
+static size_t exported_length;
+static char exported[NOTEBOOK_CAPACITY];
+
+int open(const char *path, int flags, ...)
+{
+    assert(!strcmp(path, "/HPCNOTE.TXT"));
+    assert(flags == (O_WRONLY | O_CREAT | O_EXCL));
+    ++opens;
+    if (open_error) {
+        errno = open_error;
+        return -1;
+    }
+    return 42;
+}
+ssize_t write(int fd, const void *bytes, size_t length)
+{
+    assert(fd == 42);
+    if (interrupted) {
+        interrupted = 0;
+        errno = EINTR;
+        return -1;
+    }
+    if (output_error) {
+        errno = output_error;
+        return -1;
+    }
+    if (zero_write)
+        return 0;
+    size_t count = length > 2 ? 2 : length;
+    assert(exported_length + count <= sizeof(exported));
+    memcpy(exported + exported_length, bytes, count);
+    exported_length += count;
+    return (ssize_t)count;
+}
+int close(int fd)
+{
+    assert(fd == 42);
+    ++closes;
+    errno = close_error;
+    return close_error ? -1 : 0;
+}
+
+static void files(void)
+{
+    assert(notebook_export_file(NULL, "a") == -1 && errno == EINVAL && opens == 0);
+    assert(notebook_export_file("", "a") == -1 && errno == EINVAL && opens == 0);
+    assert(notebook_export_file("/HPCNOTE.TXT", "\n") == -1 && errno == EILSEQ && opens == 0);
+    open_error = EEXIST;
+    assert(notebook_export_file("/HPCNOTE.TXT", "a") == -1 && errno == EEXIST);
+    assert(opens == 1 && closes == 0 && exported_length == 0);
+    open_error = 0;
+    interrupted = 1;
+    assert(notebook_export_file("/HPCNOTE.TXT", "hello \xc3\xa9") == 0);
+    assert(exported_length == 9 && !memcmp(exported, "hello \xc3\xa9\n", 9));
+    assert(opens == 2 && closes == 1);
+    output_error = ENOSPC;
+    close_error = EIO;
+    assert(notebook_export_file("/HPCNOTE.TXT", "a") == -1 && errno == ENOSPC);
+    assert(closes == 2);
+    output_error = close_error = 0;
+    zero_write = 1;
+    assert(notebook_export_file("/HPCNOTE.TXT", "a") == -1 && errno == EIO);
+    assert(closes == 3);
+    zero_write = 0;
+    exported_length = 0;
+    close_error = EIO;
+    assert(notebook_export_file("/HPCNOTE.TXT", "") == -1 && errno == EIO);
+    assert(closes == 4 && exported_length == 1 && exported[0] == '\n');
+    close_error = 0;
+    exported_length = 0;
+    char maximum[NOTEBOOK_CAPACITY];
+    memset(maximum, 'x', sizeof(maximum));
+    maximum[sizeof(maximum) - 1] = 0;
+    assert(notebook_export_file("/HPCNOTE.TXT", maximum) == 0);
+    assert(exported_length == sizeof(exported) && exported[sizeof(exported) - 1] == '\n');
+    assert(!memcmp(exported, maximum, sizeof(maximum) - 1));
+}
 
 struct hpclang_object
 {
@@ -287,5 +369,6 @@ int main(void)
     run(0);
     run(1);
     ports();
+    files();
     return 0;
 }

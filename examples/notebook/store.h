@@ -12,5 +12,7 @@ int notebook_load(char text[NOTEBOOK_CAPACITY]);
 int notebook_save(const char *text);
 int notebook_backup_load(unsigned port, char text[NOTEBOOK_CAPACITY]);
 int notebook_backup_save(unsigned port, const char *text);
+int notebook_text_size(const char *text, size_t *length);
+int notebook_export_file(const char *path, const char *text);
 
 #endif

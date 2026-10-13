@@ -43,5 +43,19 @@ and Port 2 writes remain unavailable).
 
 Host tests cover operation selection and rejected writes for all three port
 indices using simulated service capabilities. Device backup/persistence tests
-and file export remain follow-up work; this example does not establish
-completion of M8.6.
+remain follow-up work; this example does not establish completion of M8.6.
+
+## File export
+
+When stream storage is available, Export creates `/HPCNOTE.TXT` in the active
+filesystem, containing the current UTF-8 note followed by a newline. It does
+not overwrite an existing file. Move or remove a previous export using the
+filesystem tools before exporting again. Service availability does not promise
+that a writable SD card is present.
+
+The write loop handles short writes and interruption, always closes the file
+and reports write or close errors. A failed export can leave a partial new
+file; it is not a transactional file replacement. The application leaves that
+file for inspection rather than deleting a path after a possible media change.
+The edit buffer and primary native object are unaffected. Host fault tests
+cover these cases; raw-media device acceptance is still pending.

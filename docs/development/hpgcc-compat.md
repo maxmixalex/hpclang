@@ -715,8 +715,9 @@ Its historical void signature is retained: failure sets errno and leaves the
 output unchanged. `hptime.h` forwards standard SDK libc time types and this
 adapter; it does not promise the historical time library's binary ABI. Host
 tests cover leap/century dates and failure preservation. The calendar check
-passes all six Direct targets with independent report pixel verification;
-its Stock matrix is still running.
+passes all six Direct and all six Stock targets with independent report pixel
+verification and normal Stock return. The relocated installed-SDK build also
+passes with the calendar example; formal CI for this addition remains pending.
 
 ### SD media discovery and replacement
 

@@ -152,23 +152,32 @@ static int load_note(int port, char text[NOTEBOOK_CAPACITY])
     return result;
 }
 
-static int save_note(int port, const char *text)
+int notebook_text_size(const char *text, size_t *length)
 {
-    if (!text) {
+    if (!text || !length) {
         errno = EINVAL;
         return -1;
     }
-    size_t length = 0;
-    while (length < NOTEBOOK_CAPACITY && text[length])
-        ++length;
-    if (length == NOTEBOOK_CAPACITY) {
+    size_t count = 0;
+    while (count < NOTEBOOK_CAPACITY && text[count])
+        ++count;
+    if (count == NOTEBOOK_CAPACITY) {
         errno = E2BIG;
         return -1;
     }
-    if (!valid_line(text, length)) {
+    if (!valid_line(text, count)) {
         errno = EILSEQ;
         return -1;
     }
+    *length = count;
+    return 0;
+}
+
+static int save_note(int port, const char *text)
+{
+    size_t length;
+    if (notebook_text_size(text, &length))
+        return -1;
     struct destination destination;
     if (open_destination(&destination, 1, port))
         return -1;

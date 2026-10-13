@@ -718,15 +718,17 @@ for its clock/display check. The timed-sieve client now has a separate
 `hpgcc-system` payload and pixel verifier in the shared Runtime suite manifest;
 both split payloads pass all six Direct and all six Stock targets, including
 their independent pixel checks. All 87 host tests, formatting, static analysis,
-focused sanitizers and strict documentation checks pass. Formal CI is pending.
+focused sanitizers and strict documentation checks pass. All six workflows
+accepted this system-adapter batch at `7a30541c`, merged into main at `5e4a12c2`.
 The relocated SDK build passes C/C++, all six launchers and all three HP39
 Aplet package families with the system adapter included. The installed
 `examples/hpgcc-timer` migration client passes that same relocation/packaging
 gate; it demonstrates the five historical calls and documents their units.
 The follow-up calendar adapter adds `sys_tm_RTC`, the `hptime.h` include spelling
 and date output in the installed timer example. Calendar conversion/failure
-tests, all six Direct targets and the updated relocated SDK acceptance pass;
-Stock acceptance is in progress. The original void signature is retained with errno and unchanged
+tests, all six Direct and all six Stock targets (including independent pixels
+and normal return), and the updated relocated SDK acceptance pass. Formal CI
+for this calendar addition is pending. The original void signature is retained with errno and unchanged
 output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
@@ -790,8 +792,10 @@ and static analysis pass. The relocated installed SDK builds the application,
 all six launchers and all three HP39 Aplet packages. Multi-session device
 acceptance is still pending. The application now offers Port backup/restore
 according to queried read/create/replace capabilities, with validated records
-and no delete/recreate fallback. Host tests cover all three indices; device
-Port acceptance and file export remain part of this application track.
+and no delete/recreate fallback. Exclusive file export handles short writes,
+interruption and write/close errors without overwriting an existing file.
+Host tests cover all three port indices and export failures; device Port and
+raw-media export acceptance remain part of this application track.
 
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each

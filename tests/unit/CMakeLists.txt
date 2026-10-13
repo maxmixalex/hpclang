@@ -15,8 +15,11 @@ function(hpclang_unit name)
 endfunction()
 
 hpclang_unit(notebook_store test_notebook_store.c
-    "${HPCLANG_ROOT}/examples/notebook/store.c")
+    "${HPCLANG_ROOT}/examples/notebook/store.c"
+    "${HPCLANG_ROOT}/examples/notebook/export.c")
 target_include_directories(test_notebook_store PRIVATE "${HPCLANG_ROOT}/include")
+target_compile_definitions(test_notebook_store PRIVATE
+    open=notebook_test_open write=notebook_test_write close=notebook_test_close)
 
 hpclang_unit(hpgcc_system test_hpgcc_system.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c"

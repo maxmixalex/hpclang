@@ -19,7 +19,8 @@ enum action
     CLOCK,
     EXIT,
     BACKUP,
-    RESTORE
+    RESTORE,
+    EXPORT
 };
 struct notebook
 {
@@ -67,6 +68,10 @@ static int view(struct hpclang_ui *ui, struct hpclang_ui_surface *renderer,
         hpclang_ui_button(ui, 6, 0, "Save", (struct hpclang_ui_action){SAVE, 0}, 1);
         hpclang_ui_button(ui, 7, 0, "Reload saved note", (struct hpclang_ui_action){LOAD, 0}, 1);
         hpclang_ui_button(ui, 8, 0, "Refresh clock", (struct hpclang_ui_action){CLOCK, 0}, 1);
+        if (hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE) ==
+            HPCLANG_CAPABILITY_SUPPORTED)
+            hpclang_ui_button(ui, 16, 0, "Export HPCNOTE.TXT",
+                              (struct hpclang_ui_action){EXPORT, 0}, 1);
         for (unsigned port = 0; port < 3; ++port) {
             struct hpclang_port_info info = {.size = sizeof(info),
                                              .version = HPCLANG_PORT_INFO_VERSION};
@@ -174,6 +179,15 @@ int main(void)
                         snprintf(note.status, sizeof(note.status), "Restore error %d", errno);
                     else
                         strcpy(note.status, "Restored; Save to keep here");
+                    break;
+                case EXPORT:
+                    if (notebook_export_file("/HPCNOTE.TXT", note.text)) {
+                        if (errno == EEXIST)
+                            strcpy(note.status, "HPCNOTE.TXT already exists");
+                        else
+                            snprintf(note.status, sizeof(note.status), "Export error %d", errno);
+                    } else
+                        strcpy(note.status, "Exported HPCNOTE.TXT");
                     break;
                 case EXIT:
                     quit = 1;

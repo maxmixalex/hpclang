@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(hpclang_notebook LANGUAGES C ASM)
 find_package(hpclang CONFIG REQUIRED)
-hpclang_add_application(notebook main.c store.c)
+hpclang_add_application(notebook main.c store.c export.c)
 hpclang_target_launchers(notebook)
 set(notebook_ascii)
 foreach(codepoint RANGE 32 126)
