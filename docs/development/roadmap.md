@@ -558,6 +558,12 @@ identity and leaves its output unchanged on missing IDs, duplicate matching IDs
 or read/bounds errors. Its C implementation matches all 62 records in the saved
 HP50g catalog. This supplies binding metadata; bank resolution and executable
 target traversal remain separate unfinished steps.
+A bounded command resolver now validates the selected bank's library-ID header
+and relative binary link table, preserves backward links and rejects table/target
+addresses outside the caller's mapping. The actual C implementation resolves
+161/10, 161/6 and 167/1 to the three independently matched HP50g ROM programs.
+Selecting and validating mappings across models and following executable targets
+remain unfinished; successful address resolution is not a mutation safety proof.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

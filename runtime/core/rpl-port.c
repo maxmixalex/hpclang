@@ -61,6 +61,54 @@ int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t
     return found;
 }
 
+int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                uint32_t end, uint32_t header, uint32_t number, uint32_t command,
+                                uint32_t *target)
+{
+    if (!reader || !reader->read_nibble || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (end > 0x100000u || first >= end || header < first || header > end || end - header < 23)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfff || command > 0xfff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t id, relative;
+    int result = word(reader, header, 3, &id);
+    if (result)
+        return result;
+    if (id != number)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(reader, header + 13, 5, &relative);
+    if (result || !relative)
+        return result;
+    uint32_t table = (header + 13 + relative) & 0xfffffu;
+    if (table < first || table > end || end - table < 10)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t prologue, length;
+    result = word(reader, table, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x02a4e)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    result = word(reader, table + 5, 5, &length);
+    if (result)
+        return result;
+    if (length < 5 || (length - 5) % 5)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (length > end - table - 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (command >= (length - 5) / 5)
+        return 0;
+    uint32_t field = table + 10 + 5 * command;
+    result = word(reader, field, 5, &relative);
+    if (result || !relative)
+        return result;
+    uint32_t resolved = (field + relative) & 0xfffffu;
+    if (resolved < first || resolved >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *target = resolved;
+    return 1;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {

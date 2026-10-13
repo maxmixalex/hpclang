@@ -238,8 +238,54 @@ static void test_library_catalog_lookup(void)
     assert(hpclang_rpl_library_lookup(&reader, 0, 35, 161, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void test_library_command_resolution(void)
+{
+    struct image image = {.count = 100, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 161, 3);
+    put_word(&image, 18, 32, 5);
+    put_word(&image, 50, 0x02a4e, 5);
+    put_word(&image, 55, 20, 5);
+    put_word(&image, 60, (30u - 60u) & 0xfffff, 5);
+    put_word(&image, 65, 25, 5);
+    put_word(&image, 70, 0, 5);
+    uint32_t target = 123;
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 0, &target) == 1);
+    assert(target == 30);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 1, &target) == 1);
+    assert(target == 90);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 2, &target) == 0);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 3, &target) == 0);
+    assert(target == 90);
+    assert(hpclang_rpl_library_command(&reader, 0, 74, 5, 161, 0, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 162, 0, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(target == 90);
+    const uint32_t reads[] = {5, 6, 7, 18, 22, 50, 54, 55, 59, 60, 64};
+    for (unsigned i = 0; i < sizeof(reads) / sizeof(reads[0]); ++i) {
+        image.fail_at = reads[i];
+        assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 0, &target) < 0);
+        assert(target == 90);
+    }
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 55, 21, 5);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 0, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&image, 55, 20, 5);
+    put_word(&image, 60, 40, 5);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 0, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    put_word(&image, 18, 0, 5);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 5, 161, 0, &target) == 0);
+    assert(target == 90);
+    assert(hpclang_rpl_library_command(&reader, 0, 100, 99, 161, 0, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+}
+
 int main(void)
 {
+    test_library_command_resolution();
     test_library_catalog_lookup();
     test_library_references();
     test_flash();

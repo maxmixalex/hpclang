@@ -57,6 +57,15 @@ int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t
                                uint32_t limit, uint32_t number,
                                struct hpclang_rpl_library_binding *binding);
 
+/* Resolve one command through a native library ID header's relative link table.
+ * The caller supplies the already selected, stable bank mapping and its half-open
+ * bounds. This does not switch banks, execute code or prove target safety.
+ * Returns 1 for a target, 0 for a missing table/entry/index, negative on malformed
+ * or unreadable metadata. Output remains unchanged except on success. */
+int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                uint32_t end, uint32_t header, uint32_t number, uint32_t command,
+                                uint32_t *target);
+
 /* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
  * discard partial traversal on error. This enumerates structural references;
