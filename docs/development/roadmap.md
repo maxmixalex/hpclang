@@ -632,7 +632,8 @@ layout, and normal system return. Independent LCD checks verify application stat
 32 model-derived waveform vertices, theme inversion and font-dependent geometry.
 All 80 host targets, UI sanitizers, host/ARM Clang analysis and strict docs pass;
 an installed SDK builds the alternate-palette/native-font example and six launchers.
-The full view has 46 nodes; its 48-node/512-byte/one-task ARM pool uses 16,764 bytes.
+The full view has 46 nodes; its 48-node/512-byte/one-task ARM pool uses 13,692 bytes
+after the accepted compact-storage changes (previously 16,764 bytes).
 HP39g+ and HP39gs complete the flow within the observed 36 KiB read/write window.
 Host flow/pixel tests cover both palettes at 2/4/16 levels; emulator timings are
 not physical-device performance guarantees. The shared Runtime matrix includes
@@ -659,7 +660,7 @@ Deliver and review this core in the following slices, using the retained
   and loop syntax, function components and complete parent/key paths. Exercise
   two component instances and stable-ID list insertion/reversal, including
   duplicate keys, scope interruption and fixed-pool exhaustion.
-- [ ] **M8.2b — Layout, input and application updates:** row/column measurement,
+- [x] **M8.2b — Layout, input and application updates:** row/column measurement,
   focus and navigation, controlled text/filter events and model-driven views.
   Define what happens when filtering removes the focused item and when the
   application accepts, transforms or rejects an edit.
@@ -675,10 +676,10 @@ Deliver and review this core in the following slices, using the retained
 - [ ] Define bounded node storage, deterministic sizing/measurement/overflow,
   stable-key reconciliation and predictable allocation-failure behavior.
   Measure actual memory and update cost on the smallest supported target.
-- [ ] Implement focus retention/traversal, keyboard navigation and event/action
+- [x] Implement focus retention/traversal, keyboard navigation and event/action
   routing above the unchanged physical-keyboard API. Text entry uses the
   model-aware input service rather than duplicating Alpha/Shift rules.
-- [ ] Define controlled-input edits and selection, explicit effect start/cancel
+- [x] Define controlled-input edits and selection, explicit effect start/cancel
   ownership, stale-result rejection after removal, and cleanup at application
   exit. Integrate with the cooperative application loop.
 - [ ] Track damaged regions and bounded canvas revisions; exercise identity,

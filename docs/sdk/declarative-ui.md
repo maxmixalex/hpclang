@@ -172,9 +172,11 @@ then the previous one, then the first eligible new node. Initial focus chooses
 the first eligible node. `hpclang_ui_focus_step` traverses declaration order in
 either direction and wraps. Explicitly clearing focus persists across commits
 until the application selects a node or requests traversal. Focus/activation
-operations are rejected while a candidate is being declared. Traversal currently
-includes clipped controls; scroll-to-focus remains part of the subsequent
-interaction work.
+operations are rejected while a candidate is being declared. Traversal includes
+clipped controls and reveals the selected control through its scroll ancestors,
+from the innermost viewport outward. Removing the focused item chooses the
+documented fallback and reveals it in the committed layout. Controls clipped by
+a non-scrolling container retain that container's clipping policy.
 
 ## Controlled text edits
 
@@ -330,7 +332,7 @@ remote CI acceptance remains required before closing the renderer milestone.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
 task for its complete eight-device view (46 live nodes). Its ARM declaration pool
-is 16,764 bytes;
+is 13,692 bytes after compact-storage changes;
 renderer pages, LCD DMA pages, application state and the stack are additional.
 Each device row directly carries its stable key; a separate identity wrapper is
 unnecessary. Independent task sizing avoids one task slot per visual node.
@@ -338,7 +340,8 @@ Host allocation
 fault injection covers every renderer-construction allocation, checks cleanup
 and recovery, and proves declaration/layout/render/copy still work with further
 allocation disabled. Full Stock flows now pass on HP39g+ and HP39gs with this
-pool, physical keyboard handoff and normal return. One HP39g+ emulator run
+pool, physical keyboard handoff and normal return. An earlier HP39g+ emulator run,
+before the pool was reduced from 16,764 bytes,
 reports 36,864 total read/write bytes, 46 peak nodes and 9,585 microseconds for
 the initial paint. This is a single emulator observation, not a hardware timing
 guarantee. The extended font/theme matrix also passes on all six Stock models.
