@@ -592,9 +592,11 @@ unsigned hpclang_e2e_console_test(void)
     result = 17;
     if (historical_keyboard_adapter(model))
         goto done;
-    result = 16;
-    if (hpclang_historical_system(mailbox))
+    unsigned historical_failure = hpclang_historical_system(mailbox);
+    if (historical_failure) {
+        result = 0x100u + historical_failure;
         goto done;
+    }
     result = 0;
 done:
     hpclang_stdio_unbind();

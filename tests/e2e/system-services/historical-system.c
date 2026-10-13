@@ -6,7 +6,6 @@
  * compatibility claim. The original interactive pause becomes a capture. */
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <hpsys.h>
 #include <hpclang/console.h>
@@ -51,11 +50,14 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
         LIMIT = 1000,
         ITERATIONS = 16
     };
-    uint32_t *primes = calloc(LIMIT, sizeof *primes);
+    /* This fixed workload needs a bounded scratch list, not a 4 KiB heap
+     * allocation alongside three live consoles. Small Stock launch arenas
+     * can have less heap than that even with enough reserved stack space. */
+    uint32_t primes[LIMIT];
     struct hpclang_console *console = hpclang_console_create(32, 4, &hpclang_benchmark_font);
     struct hpclang_console *reference = hpclang_console_create(32, 2, &hpclang_benchmark_font);
     unsigned result = 1;
-    if (!primes || !console || !reference)
+    if (!console || !reference)
         goto done;
     uint64_t before, after;
     if (hpclang_time_read_us(&before))
@@ -101,6 +103,5 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 done:
     hpclang_console_destroy(reference);
     hpclang_console_destroy(console);
-    free(primes);
     return result;
 }
