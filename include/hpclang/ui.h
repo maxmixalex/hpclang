@@ -94,9 +94,9 @@ extern "C"
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
      * frames never allocate. Size includes two fixed node/text arenas plus one
-     * text-budget-sized edit buffer. Failed declarations preserve the committed
-     * tree. Zero means invalid size.
-     * Storage must have max_align_t alignment and live as long as the context. */
+     * text-budget-sized edit buffer and config.nodes effect slots. Failed declarations preserve the
+     * committed tree. Zero means invalid size. Storage must have max_align_t alignment and live as
+     * long as the context. */
     size_t hpclang_ui_storage_size(struct hpclang_ui_config config);
     struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes,
                                        struct hpclang_ui_config config);

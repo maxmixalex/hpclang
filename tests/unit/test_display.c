@@ -36,6 +36,53 @@ static void expect_row(unsigned y, uint16_t bits)
     }
 }
 
+static void clipped_leases(void)
+{
+    for (unsigned levels = 2; levels <= 16; levels *= levels) {
+        struct hpclang_surface *owner = hpclang_surface_create(9, 7, levels);
+        if (!owner)
+            fail("clip allocation");
+        struct hpclang_surface lease, nested;
+        hpclang_surface_clip(&lease, owner, 2, 1, 4, 3);
+        hpclang_surface_clear(&lease, 255);
+        for (int y = 0; y < 7; ++y)
+            for (int x = 0; x < 9; ++x)
+                if (hpclang_surface_get_pixel(owner, x, y) !=
+                    (x >= 2 && x < 6 && y >= 1 && y < 4 ? 255 : 0))
+                    fail("clipped clear escaped lease");
+        hpclang_surface_clip(&nested, &lease, 3, 2, INT32_MAX, INT32_MAX);
+        hpclang_surface_clear(&nested, 0);
+        if (hpclang_surface_get_pixel(owner, 2, 2) != 255 ||
+            hpclang_surface_get_pixel(owner, 3, 2) != 0 ||
+            hpclang_surface_get_pixel(owner, 3, 1) != 255)
+            fail("nested clip intersection");
+        hpclang_surface_clear(owner, 0);
+        hpclang_surface_draw_line(&nested, INT32_MIN, 2, INT32_MAX, 2, 255);
+        hpclang_surface_fill_rect(&nested, 0, 3, 9, 4, 255);
+        for (int y = 0; y < 7; ++y)
+            for (int x = 0; x < 9; ++x)
+                if (hpclang_surface_get_pixel(owner, x, y) !=
+                    (x >= 3 && x < 6 && y >= 2 && y < 4 ? 255 : 0))
+                    fail("clipped primitive escaped lease");
+        hpclang_surface_clip(&nested, &lease, INT32_MAX, INT32_MIN, INT32_MAX, 1);
+        hpclang_surface_clear(&nested, 255);
+        hpclang_surface_set_pixel(&nested, 0, 0, 255);
+        if (hpclang_surface_get_pixel(owner, 0, 0))
+            fail("empty clip writes");
+        hpclang_surface_clear(owner, 0);
+        hpclang_surface_set_pixel(owner, 0, 0, 255);
+        hpclang_surface_set_pixel(owner, 2, 0, 255);
+        hpclang_surface_clip(&lease, owner, 1, 0, 5, 1);
+        hpclang_surface_blit(&lease, 1, 0, owner, 0, 0, 5, 1);
+        for (int x = 0; x < 7; ++x)
+            if (hpclang_surface_get_pixel(owner, x, 0) != (x == 0 || x == 1 || x == 3 ? 255 : 0))
+                fail("aliased lease blit");
+        if (owner->clipped)
+            fail("lease changed owner");
+        hpclang_surface_destroy(owner);
+    }
+}
+
 int main(void)
 {
     if (hpclang_surface_width(&surface) != WIDTH || hpclang_surface_height(&surface) != HEIGHT ||
@@ -215,6 +262,7 @@ int main(void)
     hpclang_surface_destroy(owned);
     hpclang_surface_destroy(NULL);
 
+    clipped_leases();
     puts("PASS: opaque surfaces, clipping, shapes, software levels, readback, ownership and blit.");
     return EXIT_SUCCESS;
 }

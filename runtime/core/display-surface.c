@@ -173,6 +173,7 @@ struct hpclang_surface *hpclang_surface_create(uint32_t width, uint32_t height, 
     }
 
     memset(pixels, 0, bytes);
+    memset(surface, 0, sizeof(*surface));
     surface->pixels = pixels;
     surface->width = width;
     surface->height = height;
@@ -184,6 +185,37 @@ struct hpclang_surface *hpclang_surface_create(uint32_t width, uint32_t height, 
 struct hpclang_surface *hpclang_surface_create_mono(uint32_t width, uint32_t height)
 {
     return hpclang_surface_create(width, height, 2u);
+}
+
+void hpclang_surface_clip(struct hpclang_surface *view, const struct hpclang_surface *source,
+                          int32_t x, int32_t y, int32_t width, int32_t height)
+{
+    struct hpclang_surface result = *source;
+    int64_t left = x, top = y;
+    int64_t right = (int64_t)x + (width > 0 ? width : 0);
+    int64_t bottom = (int64_t)y + (height > 0 ? height : 0);
+    int64_t minimum_x = source->clipped ? source->clip_left : 0;
+    int64_t minimum_y = source->clipped ? source->clip_top : 0;
+    int64_t maximum_x = source->clipped ? source->clip_right : source->width;
+    int64_t maximum_y = source->clipped ? source->clip_bottom : source->height;
+    if (left < minimum_x)
+        left = minimum_x;
+    if (top < minimum_y)
+        top = minimum_y;
+    if (right > maximum_x)
+        right = maximum_x;
+    if (bottom > maximum_y)
+        bottom = maximum_y;
+    if (right < left)
+        right = left;
+    if (bottom < top)
+        bottom = top;
+    result.clipped = 1;
+    result.clip_left = left;
+    result.clip_top = top;
+    result.clip_right = right;
+    result.clip_bottom = bottom;
+    *view = result;
 }
 
 void hpclang_surface_destroy(struct hpclang_surface *surface)
@@ -212,6 +244,12 @@ uint32_t hpclang_surface_levels(const struct hpclang_surface *surface)
 
 void hpclang_surface_clear(struct hpclang_surface *surface, uint8_t intensity)
 {
+    if (surface->clipped) {
+        for (int64_t y = surface->clip_top; y < surface->clip_bottom; ++y)
+            for (int64_t x = surface->clip_left; x < surface->clip_right; ++x)
+                hpclang_surface_set_pixel(surface, (int32_t)x, (int32_t)y, intensity);
+        return;
+    }
     uint32_t bits = bits_per_pixel(surface->levels);
     if (bits == 0u)
         return;
@@ -255,6 +293,9 @@ uint8_t hpclang_surface_get_pixel(const struct hpclang_surface *surface, int32_t
 void hpclang_surface_set_pixel(struct hpclang_surface *surface, int32_t x, int32_t y,
                                uint8_t intensity)
 {
+    if (surface->clipped && (x < surface->clip_left || y < surface->clip_top ||
+                             x >= surface->clip_right || y >= surface->clip_bottom))
+        return;
     if (x < 0 || y < 0 || (uint32_t)x >= surface->width || (uint32_t)y >= surface->height)
         return;
 
@@ -599,8 +640,9 @@ void hpclang_surface_blit(struct hpclang_surface *destination, int32_t destinati
     if (x0 >= x1 || y0 >= y1)
         return;
 
-    int reverse_y = source == destination && destination_y > source_y;
-    int reverse_x = source == destination && destination_y == source_y && destination_x > source_x;
+    int aliases = source->pixels == destination->pixels && source->stride == destination->stride;
+    int reverse_y = aliases && destination_y > source_y;
+    int reverse_x = aliases && destination_y == source_y && destination_x > source_x;
 
     int64_t y = reverse_y ? y1 - 1 : y0;
     int64_t y_end = reverse_y ? y0 - 1 : y1;

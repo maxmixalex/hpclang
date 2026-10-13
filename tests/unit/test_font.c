@@ -10,6 +10,7 @@
 #include <hpclang/font.h>
 #include <hpclang/font-package.h>
 #include <hpclang/target.h>
+#include "display-surface.h"
 
 static struct hpclang_boot_info fake_boot = {
     .model = HPCLANG_MODEL_HP50G,
@@ -183,6 +184,14 @@ int main(void)
     hpclang_surface_draw_text_n(surface, &test_font, 1, 1, bounded, 0, 255u);
     expect_pixel(surface, 2, 1, 0u);
 
+    struct hpclang_surface lease;
+    hpclang_surface_clip(&lease, surface, 2, 2, 1, 2);
+    hpclang_surface_clear(surface, 0);
+    hpclang_surface_draw_text(&lease, &test_font, 1, 1, "A", 255);
+    expect_pixel(surface, 2, 3, 255);
+    expect_pixel(surface, 2, 1, 0);
+    expect_pixel(surface, 1, 2, 0);
+    expect_pixel(surface, 3, 2, 0);
     hpclang_surface_destroy(surface);
     puts("PASS: native ROM fonts, packaged bitmap metrics, UTF-8 and fallback.");
     return EXIT_SUCCESS;

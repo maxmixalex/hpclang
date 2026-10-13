@@ -207,7 +207,11 @@ or publish an LCD page. The concrete renderer must enforce clipping and manage
 its own surface ownership, page contents and presentation. A host pixel backend
 currently verifies idle behavior, partial updates, move/delete cleanup,
 failure/retry, focus/cursor invalidation and clipping. The standard grayscale
-renderer and calculator execution tests remain pending.
+renderer and calculator execution tests remain pending. Its internal surface
+lease now intersects nested write clips without copying pixels or changing the
+owner's descriptor. Clear, geometry and font drawing respect the lease; aliased
+blits retain overlap semantics. These are renderer building blocks, not a new
+public framebuffer or mutable global clipping API.
 
 ## Asynchronous effects and cleanup
 
