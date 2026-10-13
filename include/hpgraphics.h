@@ -77,6 +77,8 @@ extern "C"
     hpg_pattern_t *hpg_get_pattern(hpg_t *g);
     void hpg_set_pattern(hpg_t *g, hpg_pattern_t *pattern);
     hpg_font_t *hpg_alloc_font(char *buffer, int count, int height, int advance);
+    hpg_font_t *hpg_get_minifont(void);
+    hpg_font_t *hpg_get_bigfont(void);
     void hpg_free_font(hpg_font_t *font);
     hpg_font_t *hpg_get_font(hpg_t *g);
     void hpg_set_font(hpg_t *g, hpg_font_t *font);

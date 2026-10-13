@@ -263,6 +263,20 @@ static void letter(hpg_t *g, unsigned char code, int64_t x, int64_t y)
         right = g->right;
     if (bottom > g->bottom)
         bottom = g->bottom;
+    if (left >= right || top >= bottom)
+        return;
+    if (!font->buffer) {
+        struct hpclang_surface *coverage = mask(g);
+        if (!coverage)
+            return;
+        hpclang_hpg_builtin_glyph(coverage, g->font, code, (int)x, (int)y);
+        struct hpclang_surface *surface = hpclang_hpg_surface(g);
+        for (int64_t row = top; row < bottom; ++row)
+            for (int64_t col = left; col < right; ++col)
+                if (hpclang_surface_get_pixel(coverage, (int)col, (int)row))
+                    pixel(g, surface, (int)col, (int)row);
+        return;
+    }
     struct hpclang_surface *surface = hpclang_hpg_surface(g);
     for (int64_t row = top; row < bottom; ++row) {
         unsigned char bits = font->buffer[(size_t)code * font->height + (size_t)(row - y)];
@@ -276,12 +290,8 @@ void hpg_draw_letter_on(hpg_t *g, char code, int x, int y)
     g = hpclang_hpg_resolve(g);
     if (!g)
         return;
-    /* Built-in font selection is added separately; explicit legacy descriptors
-     * already have complete byte/row semantics without borrowing ROM glyphs. */
-    if (!g->font) {
-        errno = ENOSYS;
-        return;
-    }
+    if (!g->font)
+        g->font = hpg_get_minifont();
     letter(g, (unsigned char)code, x, y);
 }
 void hpg_draw_letter(char code, int x, int y)
@@ -297,10 +307,8 @@ void hpg_draw_text_on(hpg_t *g, char *text, int x, int y)
     g = hpclang_hpg_resolve(g);
     if (!g)
         return;
-    if (!g->font) {
-        errno = ENOSYS;
-        return;
-    }
+    if (!g->font)
+        g->font = hpg_get_minifont();
     int64_t cursor_x = x, cursor_y = y;
     for (const unsigned char *p = (const unsigned char *)text; *p; ++p) {
         if (*p == '\n') {

@@ -27,4 +27,6 @@ struct hpg_graphics
 };
 struct hpg_graphics *hpclang_hpg_resolve(struct hpg_graphics *g);
 struct hpclang_surface *hpclang_hpg_surface(struct hpg_graphics *g);
+void hpclang_hpg_builtin_glyph(struct hpclang_surface *surface, hpg_font_t *font,
+                               unsigned char code, int x, int y);
 #endif

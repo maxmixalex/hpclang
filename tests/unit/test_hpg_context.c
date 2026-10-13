@@ -4,6 +4,90 @@
 #include <errno.h>
 #include <limits.h>
 #include <stddef.h>
+#include <hpclang/font-package.h>
+
+/* Distinct font providers let this test observe adapter selection and HP-byte
+ * translation independently of the clean font renderer's own raster tests. */
+static const uint8_t wide_bits[] = {0xff, 0x80};
+static const struct hpclang_bitmap_glyph wide_glyph = {
+    .codepoint = 0x03c9, .bitmap = wide_bits, .width = 9, .height = 1, .stride = 2};
+static const struct hpclang_bitmap_glyph *const fixture_glyphs[] = {&wide_glyph};
+static const struct hpclang_bitmap_font_data fixture_data = {.glyphs = fixture_glyphs,
+                                                             .glyph_count = 1};
+const struct hpclang_font hpclang_font_newrpl_font6_menus_full = HPCLANG_BITMAP_FONT(fixture_data);
+const struct hpclang_font hpclang_font_newrpl_font8_styleb_full = HPCLANG_BITMAP_FONT(fixture_data);
+static const struct hpclang_font native_mini = {1, 2, NULL}, native_big = {1, 3, NULL};
+static int classic, available;
+static const struct hpclang_font *drawn_font;
+static uint32_t drawn_code;
+const struct hpclang_font *hpclang_font_big(void)
+{
+    return classic ? &native_big : NULL;
+}
+const struct hpclang_font *hpclang_font_mini(void)
+{
+    return &native_mini;
+}
+const struct hpclang_font *hpclang_font_default(void)
+{
+    return &native_big;
+}
+int hpclang_font_available(const struct hpclang_font *font)
+{
+    return font && available;
+}
+void hpclang_surface_draw_codepoint(struct hpclang_surface *s, const struct hpclang_font *f,
+                                    int32_t x, int32_t y, uint32_t cp, uint8_t color)
+{
+    drawn_font = f;
+    drawn_code = cp;
+    hpclang_surface_set_pixel(s, x, y, color);
+}
+void hpclang_surface_draw_char(struct hpclang_surface *s, const struct hpclang_font *f, int32_t x,
+                               int32_t y, uint8_t cp, uint8_t color)
+{
+    hpclang_surface_draw_codepoint(s, f, x, y, cp, color);
+}
+
+static void defaults(void)
+{
+    hpg_t *g = hpg_alloc_mono_image(16, 16);
+    assert(g);
+    hpg_draw_text_on(g, "AB\nC", 1, 1);
+    assert(hpg_get_font(g) == hpg_get_minifont());
+    assert(hpg_get_pixel(g, 1, 1) == 255 && hpg_get_pixel(g, 5, 1) == 255);
+    assert(hpg_get_pixel(g, 1, 7) == 255);
+    assert(drawn_font == &hpclang_font_newrpl_font6_menus_full);
+    hpg_draw_letter_on(g, (char)0x87, 1, 1);
+    assert(drawn_code == 0x03c0);
+    classic = available = 1;
+    hpg_draw_letter_on(g, (char)0x87, 1, 1);
+    assert(drawn_font == &native_mini && drawn_code == 0x87);
+    classic = 0;
+    hpg_draw_letter_on(g, 'A', 1, 1);
+    assert(drawn_font == &hpclang_font_newrpl_font6_menus_full);
+    hpg_set_font(g, hpg_get_bigfont());
+    assert(hpg_font_get_advance(hpg_get_bigfont()) == 6);
+    assert(hpg_font_get_height(hpg_get_bigfont()) == 8);
+    hpg_draw_letter_on(g, 'A', 1, 1);
+    assert(drawn_font == &native_big);
+    available = 0;
+    hpg_draw_letter_on(g, 'A', 1, 1);
+    assert(drawn_font == &hpclang_font_newrpl_font8_styleb_full);
+    hpg_clear_on(g);
+    hpg_draw_letter_on(g, (char)0x9a, 2, 3);
+    for (int x = 0; x < 16; ++x)
+        assert(hpg_get_pixel(g, x, 3) == (x >= 2 && x < 8 ? 255 : 0));
+    hpg_set_mode(g, HPG_MODE_XOR);
+    hpg_draw_letter_on(g, (char)0x9a, 2, 3);
+    for (int x = 0; x < 16; ++x)
+        assert(hpg_get_pixel(g, x, 3) == 0);
+    hpg_draw_letter_on(g, (char)0x80, 2, 3);
+    assert(hpg_get_pixel(g, 2, 9) == 255 && hpg_get_pixel(g, 6, 5) == 255);
+    hpg_free_font(hpg_get_minifont());
+    hpg_free_font(hpg_get_bigfont());
+    hpg_free_image(g);
+}
 
 static struct hpclang_surface *display;
 static unsigned borrowed;
@@ -206,5 +290,6 @@ int main(void)
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);
     copies();
     text();
+    defaults();
     return 0;
 }

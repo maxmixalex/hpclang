@@ -173,12 +173,18 @@ The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean
 Unicode font API. Default-font integration is in progress: prefer live native
 mini/big fonts on HP48gII/49g+/50g and the native main font on HP39-family models.
-HP39 small text needs a packaged face; newRPL's `Font6_menus` is the closest
-reviewed small-face candidate, fitting the legacy 4-by-6 ASCII cell. Keep the
-legacy advance independently of a packaged face's proportional advance.
+HP39 small text uses newRPL's `Font6_menus`, the closest reviewed small-face
+candidate fitting the legacy 4-by-6 ASCII cell. When native big text is
+unavailable, `Font8_StyleB` supplies a 6-by-8 fallback whose ASCII glyphs fit
+without cropping. The adapter keeps legacy advance independently of a
+packaged face's proportional advance. HP symbol bytes are mapped to Unicode
+for packaged fonts; angle is constructed from two rays, x-bar adds an overbar,
+and oversized symbols are compressed into the cell while retaining source ink.
 Native tables are read from the running calculator, not embedded in the SDK.
-Packaged fallback coverage and HP-byte-to-Unicode mapping still require
-acceptance; default-font pixel identity is not yet an adapter guarantee.
+The portable asset test renders all 256 bytes in both fonts for six models
+without native mappings and compares the pixels with the packaged source.
+Target-side adapter acceptance remains open; default-font pixel identity is
+not an adapter guarantee.
 
 M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
 synchronization and six status segments through the clean display service.
