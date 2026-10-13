@@ -548,6 +548,13 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.4 — Historical source compatibility
 
+Local HPG implementation now covers all 59 public functions. ARM declaration
+checks match all four historical headers (55 functions in 1.0; 59 thereafter).
+The integrated Display suite passes all six Direct models and HP50g Stock,
+including independent single/double-buffer, font, XPM and indicator checks.
+Remaining Stock acceptance and original-source applications are still open;
+the other adapter groups below are retained.
+
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
   groups. Expand the four-generation declaration/implementation/evidence ledger.
