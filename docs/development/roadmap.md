@@ -598,7 +598,8 @@ Deliver and review this core in the following slices, using the retained
 The system adapter now includes five `hpsys.h` entry points for millisecond delays,
 750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
 midnight-wrapped differences.
-All 86 host tests, six Direct targets and HP50g Stock pass, including independent
+All 87 host tests after integration with the accepted C++ ownership work, six
+Direct targets and HP50g Stock pass, including independent
 pixel checks. Remaining Stock contexts and formal CI are pending.
 The remaining historical system, timer and console interfaces remain open.
 
