@@ -570,6 +570,14 @@ all 16 Flash entries and the ERAM entry in saved HP48gII, HP49g+ and HP50g ROMs;
 HP48gII's switch routine addresses differ from the other two models. This verifies
 table interpretation, not physical bank availability or runtime mapping ownership.
 
+The Port development branch now integrates the standalone historical-system client
+and system adapters. Both integrated HP40gs Stock clients pass normal return and
+independent pixel checks, replacing the old combined fixture that failed with
+`0x464100c0`. All 87 host tests, focused sanitizers/static analysis, formatting and
+strict documentation checks pass. Public Port 1 replacement/removal remains open:
+bank-qualified traversal reaches ROM machine-code entries and user-library code
+whose execution references still require classification.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.
