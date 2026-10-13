@@ -46,9 +46,7 @@ SYMBOLS = [
 
 def load_face(name):
     glyphs = {}
-    for line in (
-        (ROOT / "runtime/fonts/generated" / f"{name}.S").read_text().splitlines()
-    ):
+    for line in (ROOT / "runtime/fonts/generated" / f"{name}.S").read_text().splitlines():
         if line.startswith("G "):
             cp, *values = map(int, line[2:].split(","))
             glyphs[cp] = values
@@ -60,25 +58,20 @@ def host_face(name, glyphs):
     lines = []
     for cp, (xo, yo, w, h, a, stride, *bits) in glyphs.items():
         ident = f"{name}_{cp}"
-        lines.append(
-            f"static const uint8_t {ident}_bits[] = {{{','.join(map(str, bits))}}};"
-        )
+        lines.append(f"static const uint8_t {ident}_bits[] = {{{','.join(map(str, bits))}}};")
         lines.append(
             f"static const struct hpclang_bitmap_glyph {ident} = "
             f"{{{cp},{ident}_bits,{xo},{yo},{w},{h},{a},{stride}}};"
         )
     refs = ",".join(f"&{name}_{cp}" for cp in sorted(glyphs))
-    lines.append(
-        f"static const struct hpclang_bitmap_glyph *const {name}_list[] = {{{refs}}};"
-    )
+    lines.append(f"static const struct hpclang_bitmap_glyph *const {name}_list[] = {{{refs}}};")
     height, advance = (6, 4) if name == "newrpl_font6_menus" else (8, 6)
     lines.append(
         f"static const struct hpclang_bitmap_font_data {name}_data = "
         f"{{{name}_list,{len(glyphs)},63,{height},0,{height},{advance}}};"
     )
     lines.append(
-        f"const struct hpclang_font hpclang_font_{name}_full = "
-        f"HPCLANG_BITMAP_FONT({name}_data);"
+        f"const struct hpclang_font hpclang_font_{name}_full = HPCLANG_BITMAP_FONT({name}_data);"
     )
     return "\n".join(lines)
 
@@ -174,9 +167,7 @@ class HpgFontAssets(unittest.TestCase):
             path = Path(directory)
             source = path / "probe.c"
             source.write_text(
-                DRIVER
-                + "\n"
-                + "\n".join(host_face(name, face) for name, face in zip(names, faces))
+                DRIVER + "\n" + "\n".join(host_face(name, face) for name, face in zip(names, faces))
             )
             executable = path / "probe"
             command = [
@@ -199,8 +190,6 @@ class HpgFontAssets(unittest.TestCase):
                     "display-surface",
                 )
             ]
-            subprocess.run(
-                command + ["-o", str(executable)], check=True, capture_output=True
-            )
+            subprocess.run(command + ["-o", str(executable)], check=True, capture_output=True)
             actual = subprocess.check_output([str(executable)])
         self.assertEqual(actual, bytes(expected) * 6)

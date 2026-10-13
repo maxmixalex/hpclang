@@ -34,10 +34,7 @@ def verify(prefix: Path, height: int) -> None:
                     )
             registers = {
                 int(k): int(v, 16)
-                for k, v in (
-                    line.split()
-                    for line in Path(stem + ".lcd").read_text().splitlines()
-                )
+                for k, v in (line.split() for line in Path(stem + ".lcd").read_text().splitlines())
             }
             assert registers[0] & 0x61 == 0x21, f"{stem}: enabled STN"
             assert 1 << ((registers[0] >> 1) & 15) == bits, f"{stem}: hardware bpp"
@@ -74,9 +71,7 @@ def verify(prefix: Path, height: int) -> None:
             assert pixels[(height - 20) * 132 + 50] == 0
             for top, bottom in ((0, 10), (20, 30), (35, 43)):
                 assert any(
-                    pixels[y * 132 + x] == 0
-                    for y in range(top, bottom)
-                    for x in range(45)
+                    pixels[y * 132 + x] == 0 for y in range(top, bottom) for x in range(45)
                 ), f"{prefix}: missing historical font band {top}"
     adapter_frames = {}
     for frame in range(110, 115):
@@ -92,11 +87,7 @@ def verify(prefix: Path, height: int) -> None:
             assert pixels[6 * 132 + 80 : 6 * 132 + 83] == bytes((136, 255, 0))
             assert pixels[3 * 132 + 131] == 0
             for top, bottom in ((0, 6), (10, 18), (20, 28)):
-                assert any(
-                    pixels[y * 132 + x] == 0
-                    for y in range(top, bottom)
-                    for x in range(32)
-                )
+                assert any(pixels[y * 132 + x] == 0 for y in range(top, bottom) for x in range(32))
         else:
             for y in range(height):
                 for x in range(132):
@@ -107,21 +98,12 @@ def verify(prefix: Path, height: int) -> None:
                         segment = 2 if frame == 112 else 1
                         expected = (
                             0
-                            if (
-                                left <= x <= left + 6
-                                and 2 <= y <= 8
-                                or x == 131
-                                and y == segment
-                            )
+                            if (left <= x <= left + 6 and 2 <= y <= 8 or x == 131 and y == segment)
                             else 255
                         )
                     assert pixels[y * 132 + x] == expected, (frame, x, y)
-    assert adapter_frames[111] == adapter_frames[113], (
-        "HPG lost the previous front page"
-    )
-    print(
-        f"PASS: {prefix}: gray/DMA checks, historical clients and installed HPG adapter"
-    )
+    assert adapter_frames[111] == adapter_frames[113], "HPG lost the previous front page"
+    print(f"PASS: {prefix}: gray/DMA checks, historical clients and installed HPG adapter")
 
 
 def main() -> None:
@@ -129,9 +111,7 @@ def main() -> None:
     parser.add_argument("mode", choices=("direct", "stock"))
     parser.add_argument("family", choices=("hp39", "hp48", "hp4950"))
     args = parser.parse_args()
-    for target in (
-        Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines()
-    ):
+    for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         verify(Path(f"build/{target}-frame"), 80 if args.family == "hp4950" else 64)
 
 
