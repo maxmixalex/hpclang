@@ -32,8 +32,9 @@ extern "C"
 
     /* Snapshot port metadata. Names/titles are raw calculator bytes, not UTF-8.
      * Libraries are identified by number, backups by exact name. No native
-     * addresses are retained by the iterator. Currently Port 0 on classic Stock
-     * is implemented; other valid ports/contexts return ENOSYS. This does not
+     * addresses are retained by the iterator. Currently classic Stock Port 0
+     * and HP49g+/HP50g Stock Port 1 reads are implemented; other valid
+     * ports/contexts return ENOSYS. This does not
      * imply that the calculator lacks those ports. Indices above 2 return EINVAL.
      */
     struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port);

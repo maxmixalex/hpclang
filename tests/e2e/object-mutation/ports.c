@@ -45,6 +45,33 @@ uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
 uint32_t hpclang_e2e_port_reads(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G) {
+        struct hpclang_object *port1 = hpclang_port_backup_get(1, (const uint8_t *)"PORTONE", 7);
+        int64_t number;
+        int valid = port1 && hpclang_object_integer_i64(port1, &number) == 0 && number == 456;
+        hpclang_object_release(port1);
+        if (!valid)
+            return 0xb4;
+        struct hpclang_port_iterator *port1_entries = hpclang_port_iterator_open(1);
+        struct hpclang_port_entry port1_entry = {.size = sizeof(port1_entry),
+                                                 .version = HPCLANG_PORT_ENTRY_VERSION};
+        int next, seen = 0;
+        if (!port1_entries)
+            return 0xb5;
+        while ((next = hpclang_port_iterator_read(port1_entries, &port1_entry)) > 0)
+            if (port1_entry.kind == HPCLANG_PORT_BACKUP && port1_entry.name_length == 7 &&
+                !memcmp(port1_entry.name, "PORTONE", 7))
+                ++seen;
+        hpclang_port_iterator_close(port1_entries);
+        if (next != 0 || seen != 1)
+            return 0xb6;
+    } else {
+        struct hpclang_port_iterator *unavailable = hpclang_port_iterator_open(1);
+        int rejected = !unavailable && errno == ENOSYS;
+        hpclang_port_iterator_close(unavailable);
+        if (!rejected)
+            return 0xb7;
+    }
     struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(0);
     if (!iterator)
         return 0xd0;

@@ -5,6 +5,35 @@
 #include "rpl-stock-memory.h"
 #include "launch-services.h"
 
+static int port1_read(void *context, uint32_t address, uint8_t *value)
+{
+    if (!context || !value || address >= HPCLANG_RPL_PORT1_NIBBLES)
+        return 0;
+    const volatile uint8_t *bytes = context;
+    uint8_t packed = bytes[address / 2u];
+    *value = (packed >> (4u * (address & 1u))) & 15u;
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_capture(struct hpclang_rpl_reader *reader,
+                                    const volatile uint8_t *bytes, uint32_t ram_section)
+{
+    if (!reader || !bytes || (ram_section & UINT32_C(0xfff00c03)) != UINT32_C(0x08000c02))
+        return 0;
+    *reader = (struct hpclang_rpl_reader){port1_read, (void *)(uintptr_t)bytes};
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!reader || !boot || !boot->saturn_state ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G))
+        return 0;
+    volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
+    return hpclang_rpl_stock_port1_capture(reader, (const void *)(uintptr_t)0x08020000u, l1[0x80]);
+}
+
 int hpclang_rpl_stock_memory_capture(struct hpclang_rpl_stock_memory *memory,
                                      const uint32_t *read_map, uint32_t ram_section)
 {

@@ -12,6 +12,7 @@
 static uint8_t memory[0x100000];
 static int unavailable;
 static int writable = 1;
+static int port1_available;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -42,6 +43,14 @@ static int mapped_write(void *context, uint32_t address, uint8_t value)
     if (address >= sizeof(memory))
         return 0;
     memory[address] = value;
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
+{
+    if (!port1_available)
+        return 0;
+    *reader = (struct hpclang_rpl_reader){mapped_read, NULL};
     return 1;
 }
 
@@ -97,6 +106,22 @@ int main(void)
     assert(!hpclang_port_iterator_open(0) && errno == EIO);
     unavailable = 0;
     fixture();
+    port1_available = 1;
+    memcpy(memory, memory + 0xfffc0, 54);
+    iterator = hpclang_port_iterator_open(1);
+    assert(iterator && hpclang_port_iterator_read(iterator, &entry) == 1);
+    assert(entry.kind == HPCLANG_PORT_BACKUP && entry.name_length == 8);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 0);
+    hpclang_port_iterator_close(iterator);
+    object = hpclang_port_backup_get(1, (const uint8_t *)"PORTZERO", 8);
+    assert(object && hpclang_object_integer_i64(object, &value) == 0 && value == 123);
+    memory[53] ^= 1;
+    assert(!hpclang_port_iterator_open(1) && errno == EILSEQ);
+    /* A Port 1 snapshot is independent of both native mapping and bank state. */
+    port1_available = 0;
+    memset(memory, 0, 54);
+    assert(hpclang_object_integer_i64(object, &value) == 0 && value == 123);
+    hpclang_object_release(object);
     assert(!hpclang_port_backup_get(0, (const uint8_t *)"portzero", 8) && errno == ENOENT);
     assert(!hpclang_port_backup_get(0, NULL, 1) && errno == EINVAL);
     assert(!hpclang_port_iterator_open(3) && errno == EINVAL);
@@ -138,8 +163,17 @@ int main(void)
     memset(memory + 0xfffc0 + 43, 0, 5);
     object = hpclang_port_library_get(0, 123);
     assert(object);
+    memcpy(memory, memory + 0xfffc0, 48);
+    port1_available = 1;
+    device.family = HPCLANG_FAMILY_HP4950;
+    struct hpclang_object *port1_library = hpclang_port_library_get(1, 123);
+    assert(port1_library && hpclang_object_kind(port1_library) == HPCLANG_OBJECT_LIBRARY);
+    port1_available = 0;
+    device.family = HPCLANG_FAMILY_HP48;
     memset(memory, 0, sizeof(memory));
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
+    assert(hpclang_object_kind(port1_library) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(port1_library);
     hpclang_object_release(object);
     fixture();
     object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);

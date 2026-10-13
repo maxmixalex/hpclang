@@ -177,6 +177,14 @@ remains supported. The shared transport setup validates the complete contract
 and enables only the current family's flow. Invalid contracts fail the run;
 an absent family does not implicitly reuse another model's sequence.
 
+Stock setup commands use the same explicit family selection when needed:
+version 2's `families` map contains command lists, while version 1 retains a
+single `commands` list. Kermit obtains the current family from the target
+environment. All command lists are validated before selection, and a missing
+family is an error. The object-mutation fixture creates `PORTONE` in Port 1
+only on HP49g+/HP50g, whose ROM provides that namespace; HP48gII keeps its
+Port 0 fixture and checks unavailable Port 1 reads.
+
 The classic object-mutation flow now exercises Port 0 across three independent
 launches from saved Stock state: create an integer backup, read and replace it
 with a string, then read and remove that string. Each invocation also exercises

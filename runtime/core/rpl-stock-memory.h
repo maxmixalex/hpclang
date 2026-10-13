@@ -5,6 +5,13 @@
 #include "rpl-mutation.h"
 
 #define HPCLANG_RPL_MAIN_PAGES 128u
+#define HPCLANG_RPL_PORT1_NIBBLES 0x40000u
+
+/* HP49/50 ERAM is a packed RAM-port chain independent of the active Saturn
+ * bank. Read-only capture does not claim ownership of its free tail. */
+int hpclang_rpl_stock_port1_capture(struct hpclang_rpl_reader *reader,
+                                    const volatile uint8_t *bytes, uint32_t ram_section);
+int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader);
 
 /* Invocation-local copy of the Stock main-RAM mapping. No Stock calls or
  * interrupt re-enabling may occur between preparation and mutation return. */

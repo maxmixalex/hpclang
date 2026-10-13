@@ -605,7 +605,7 @@ independent `hpclang_object` snapshots released with `hpclang_object_release`.
 Backup names are exact calculator bytes, while library metadata includes its
 numeric identifier. `hpclang_port_library_get` copies a complete library by
 number without installing, attaching or executing it. The current backend
-reads classic Stock Port 0 only.
+reads classic Stock Port 0 and HP49g+/HP50g Stock Port 1.
 Other valid port indices and unavailable runtime contexts return `ENOSYS`,
 which describes this implementation rather than hardware absence. Invalid
 indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
@@ -659,6 +659,15 @@ injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
 provide public library installation or attachment. Port 1/2 services and full
 library mutation remain M8.0 requirements.
+
+Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
+checking its live identity mapping. They do not switch Saturn banks or claim
+the free tail as writable storage. Host tests cover packed-nibble bounds,
+invalid mappings, backup/library snapshots and damaged records. HP49g+ and
+HP50g Stock tests create `PORTONE` through native RPL before launching, then
+enumerate it and verify integer 456 on all three lifecycle invocations while
+Port 0 and HOME mutations run. Port 1 writes still require a launcher-owned
+allocation boundary so native records cannot overwrite active ARM pages.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
