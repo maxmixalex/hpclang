@@ -177,8 +177,13 @@ pixels, and LCD state. Drawing state survives successful replacement, while
 new pages start white. `hpg_cleanup()` restores the original host LCD only
 when HPG acquired ownership and is registered for normal application exit.
 An already-owned clean display session causes initial HPG acquisition to
-fail with `EBUSY`; it is not released by HPG cleanup. Target-side acceptance
-and the historical indicator adapter remain open.
+fail with `EBUSY`; it is not released by HPG cleanup. `hpg_set_indicator()`
+uses the six historical segment constants and follows PAINT/XOR and page
+exchange. Its first call without an HPG-owned session acquires a single page
+and preserves the visible Stock pixels and other status segments. Printed
+icons differ by calculator; setting a segment does not change keyboard flags.
+All 59 historical HPG function names are implemented; target-side and
+representative historical-application acceptance remain open.
 
 The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean

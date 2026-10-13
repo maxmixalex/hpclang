@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <hpclang/font-package.h>
+#include "display-surface.h"
 
 /* Distinct font providers let this test observe adapter selection and HP-byte
  * translation independently of the clean font renderer's own raster tests. */
@@ -137,8 +138,10 @@ static int configure(unsigned levels, unsigned count)
     }
     for (unsigned i = 0; i < 2; ++i) {
         hpclang_surface_destroy(pages[i]);
-        pages[i] = i < count ? hpclang_surface_create(8, 6, levels) : NULL;
+        pages[i] = i < count ? hpclang_surface_create(9, 6, levels) : NULL;
         assert(i >= count || pages[i]);
+        if (pages[i])
+            pages[i]->width = 8;
     }
     page_count = count;
     back = count - 1;
@@ -161,6 +164,14 @@ int hpclang_display_publish(void)
 {
     assert(page_count);
     ++published;
+    return 0;
+}
+int hpclang_display_indicator_set(unsigned segment, uint8_t color)
+{
+    assert(segment < 6 && page_count);
+    struct hpclang_surface view = *pages[back];
+    ++view.width;
+    hpclang_surface_set_pixel(&view, 8, (int)segment, color);
     return 0;
 }
 int hpclang_display_present(uint32_t timeout)
@@ -222,6 +233,40 @@ static void modes(void)
     hpg_cleanup();
     assert(ended == 1 && page_count == 2); /* Other owner's session survives. */
     hpclang_display_end();
+}
+
+static void indicators(void)
+{
+    struct hpclang_surface original = *display;
+    ++original.width;
+    hpclang_surface_set_pixel(&original, 8, HPG_INDICATOR_WAIT, 255);
+    unsigned previous = published;
+    hpg_set_indicator(HPG_INDICATOR_ALPHA, 255);
+    assert(page_count == 1 && published == previous + 1);
+    assert(hpg_get_pixel(NULL, 1, 1) == 255);
+    struct hpclang_surface status = *pages[back];
+    ++status.width;
+    assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_ALPHA) == 255);
+    assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_WAIT) == 255);
+    assert(hpclang_surface_get_pixel(&original, 8, HPG_INDICATOR_ALPHA) == 0);
+    hpg_set_mode(NULL, HPG_MODE_XOR);
+    hpg_set_indicator(HPG_INDICATOR_ALPHA, 255);
+    assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_ALPHA) == 0);
+    hpg_set_mode_gray4(1);
+    previous = published;
+    hpg_set_indicator(HPG_INDICATOR_BATTERY, 255);
+    assert(published == previous);
+    status = *pages[back];
+    ++status.width;
+    assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_BATTERY) == 255);
+    hpg_flip();
+    status = *pages[back];
+    ++status.width;
+    assert(hpclang_surface_get_pixel(&status, 8, HPG_INDICATOR_BATTERY) == 0);
+    hpg_set_indicator(6, 255);
+    assert(errno == EINVAL && published == previous);
+    hpg_cleanup();
+    assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
 }
 
 static void copies(void)
@@ -403,8 +448,9 @@ int main(void)
     assert(!hpg_alloc_pattern(pattern, 0, 0) && errno == EINVAL);
     assert(!hpg_alloc_mono_image(0, 1) && errno == EINVAL);
     hpg_free_image(g);
-    display = hpclang_surface_create_mono(8, 6);
+    display = hpclang_surface_create_mono(9, 6);
     assert(display);
+    display->width = 8;
     hpg_set_color(NULL, 255);
     hpg_draw_pixel(1, 1);
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
@@ -413,6 +459,7 @@ int main(void)
     hpg_cleanup();
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
     modes();
+    indicators();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

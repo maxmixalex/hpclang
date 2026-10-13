@@ -20,7 +20,8 @@ hpclang_unit(hpg_context test_hpg_context.c
     "${HPCLANG_ROOT}/runtime/core/hpg-font.c"
     "${HPCLANG_ROOT}/runtime/core/hpg-xpm.c"
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
-target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include")
+target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
 
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c

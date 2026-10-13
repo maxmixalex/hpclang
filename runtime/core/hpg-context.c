@@ -1,5 +1,6 @@
 #include "hpg-internal.h"
 #include "display-internal.h"
+#include "display-surface.h"
 #include <errno.h>
 #include <stdlib.h>
 
@@ -81,6 +82,55 @@ void hpg_flip(void)
     hpg_init();
     if (owns_display && double_buffered)
         (void)hpclang_display_present(100000);
+}
+static int status_view(struct hpclang_surface *view)
+{
+    struct hpclang_surface *surface = hpclang_display_surface();
+    if (!surface) {
+        errno = ENODEV;
+        return 0;
+    }
+    *view = *surface;
+    unsigned bits = view->levels == 2 ? 1 : view->levels == 4 ? 2 : 4;
+    if (view->stride * 8u / bits <= view->width || view->height < 6) {
+        errno = ENOTSUP;
+        return 0;
+    }
+    ++view->width;
+    return 1;
+}
+void hpg_set_indicator(unsigned char indicator, unsigned char color)
+{
+    if (indicator >= 6) {
+        errno = EINVAL;
+        return;
+    }
+    hpg_init();
+    if (!initialized)
+        return;
+    struct hpclang_surface view;
+    if (!status_view(&view))
+        return;
+    if (!owns_display) {
+        /* The Stock page remains valid during acquisition. Copy its visible
+         * pixels and six status segments before changing the selected icon. */
+        if (hpclang_display_begin_pages(view.levels, 1))
+            return;
+        owns_display = 1;
+        double_buffered = 0;
+        screen.surface = hpclang_display_surface();
+        hpclang_surface_blit(screen.surface, 0, 0, &view, 0, 0, (int)screen.width,
+                             (int)screen.height);
+        for (unsigned i = 0; i < 6; ++i)
+            (void)hpclang_display_indicator_set(
+                i, hpclang_surface_get_pixel(&view, (int)view.width - 1, (int)i));
+        if (!status_view(&view))
+            return;
+    }
+    if (screen.mode == HPG_MODE_XOR)
+        color ^= hpclang_surface_get_pixel(&view, (int)view.width - 1, indicator);
+    if (!hpclang_display_indicator_set(indicator, color))
+        hpclang_hpg_finish(&screen);
 }
 hpg_t *hpclang_hpg_resolve(hpg_t *g)
 {

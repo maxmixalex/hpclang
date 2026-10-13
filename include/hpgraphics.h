@@ -15,6 +15,12 @@ extern "C"
 
 #define HPG_MODE_PAINT 0
 #define HPG_MODE_XOR 1
+#define HPG_INDICATOR_REMOTE 0
+#define HPG_INDICATOR_LSHIFT 1
+#define HPG_INDICATOR_RSHIFT 2
+#define HPG_INDICATOR_ALPHA 3
+#define HPG_INDICATOR_BATTERY 4
+#define HPG_INDICATOR_WAIT 5
 #define HPG_COLOR_WHITE 0x00
 #define HPG_COLOR_BLACK 0xff
 #define HPG_COLOR_GRAY_1 0x11
@@ -44,6 +50,9 @@ extern "C"
     void hpg_set_mode_gray4(int dbuf);
     void hpg_set_mode_gray16(int dbuf);
     void hpg_flip(void);
+    /* Status segments belong to the drawn page and follow its PAINT/XOR mode.
+     * Printed icons vary by model; this does not change OS keyboard flags. */
+    void hpg_set_indicator(unsigned char indicator, unsigned char color);
     int hpg_get_width(hpg_t *g);
     int hpg_get_height(hpg_t *g);
     hpg_t *hpg_alloc_mono_image(int width, int height);
