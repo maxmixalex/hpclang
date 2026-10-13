@@ -130,6 +130,43 @@ cleanup applies to normal returns; `exit()` does not unwind local C++ objects.
 Release such resources before calling it. Global-object destruction follows
 the runtime's ordinary exit handling.
 
+## Migrate HPGCC source
+
+Compatibility is provided by installed headers **and runtime implementations**.
+For supported calls, keep the historical include spelling and function calls;
+build the source with the hpclang toolchain and CMake package described above.
+Do not add an old HPGCC include directory ahead of the SDK headers or link its
+precompiled runtime libraries. This is source compatibility, not compatibility
+with the old library binaries, startup code or internal structure layouts.
+
+The SDK currently installs `hpgraphics.h`, `hpkeyb49.h`, `hpstdio.h`, `hpsys.h`,
+`hptime.h`, `saturn.h`, `satdir.h` and `fsystem.h`. Each exposes its implemented
+subset; the presence of a header does not promise every function from every
+HPGCC version. An umbrella `hpgcc49.h` is not provided. Replace that include
+with the individual headers needed by the application, then resolve remaining
+calls against the supported declarations rather than supplying old headers.
+
+Start with a small application and check these migration boundaries:
+
+- Remove application definitions of `int errno`; use `<errno.h>` and the
+  SDK runtime's error state.
+- Review direct hardware access, inline assembly and assumptions about raw
+  calculator addresses separately. Recompilation does not make them portable
+  across the six calculator models.
+- Check service availability and operation errors in the intended launch
+  context. A successful build does not make native RPL or SD services available
+  on a model that lacks them.
+- HPG default fonts preserve the legacy character cell and byte input, but
+  their glyphs need not be pixel-identical. The adapter uses live native fonts
+  where supported and packaged newRPL fallbacks elsewhere.
+- Rebuild and package the application using the SDK launcher helpers, then
+  validate its input, display, persistence and return to the calculator OS.
+
+`examples/hpgcc-timer` is a complete installed-package starting point for
+legacy timing and calendar calls. Its rendering uses the clean hpclang API;
+it demonstrates mixing compatible calls with new services rather than proving
+that an arbitrary historical application compiles unchanged.
+
 ## Package an HP39 Aplet
 
 HP39g+, HP39gs and HP40gs share the historical HPGCC39 Aplet format, with a

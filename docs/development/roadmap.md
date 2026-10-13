@@ -664,7 +664,7 @@ Deliver and review this core in the following slices, using the retained
   focus and navigation, controlled text/filter events and model-driven views.
   Define what happens when filtering removes the focused item and when the
   application accepts, transforms or rejects an edit.
-- [ ] **M8.2c — Effects, canvas and incremental frames:** explicit asynchronous
+- [x] **M8.2c — Effects, canvas and incremental frames:** explicit asynchronous
   states, loading/error/retry, cancellation, revision-driven custom painting
   and damaged-region updates. Accept the original sketch's six application
   patterns as one stateful example, with a deterministic asynchronous provider
@@ -682,7 +682,7 @@ Deliver and review this core in the following slices, using the retained
 - [x] Define controlled-input edits and selection, explicit effect start/cancel
   ownership, stale-result rejection after removal, and cleanup at application
   exit. Integrate with the cooperative application loop.
-- [ ] Track damaged regions and bounded canvas revisions; exercise identity,
+- [x] Track damaged regions and bounded canvas revisions; exercise identity,
   layout, focus and effect lifecycle in host tests, then validate an interactive
   stateful example on calculator targets.
 
