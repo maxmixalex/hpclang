@@ -4,7 +4,8 @@ The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
-loading/error/retry application are undergoing calculator acceptance.
+loading/error/retry application pass local six-model Direct and Stock acceptance;
+remote CI acceptance remains pending.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -23,8 +24,8 @@ continues keyboard-driven scan/cancel actions with the replacement renderer.
 An additional checkpoint switches to the native default font when accessible,
 or keeps the packaged fallback otherwise. Its verifier checks the waveform's
 new position after font-dependent measurement; Stock must expose its native
-eight-row font. These font/theme checks pass locally on all six Direct models
-and on HP48gII Stock; the remaining Stock combinations are being validated.
+eight-row font. These font/theme checks pass locally on all six Direct and all
+six Stock models, followed by further keyboard actions and normal system return.
 The installed SDK builds its ARM image and all six model launchers. The complete
 application flow also passes local Direct execution on all six models with
 electrical key injection, six display checkpoints and normal return. HP39g+
@@ -308,8 +309,8 @@ when switching back to a previously used renderer or after exposure. Destroy
 the renderer after callbacks finish; it does not own the UI or display session.
 Host pixel tests cover all three level counts, canvas confinement, partial
 updates, failed-frame retry, complete-page copying, input selection and an
-inverted theme. Six-model execution, low-memory acceptance and timing budgets
-remain required before closing the renderer milestone.
+inverted theme. Six-model local execution and low-memory acceptance now pass;
+remote CI acceptance remains required before closing the renderer milestone.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
 task for its complete eight-device view (46 live nodes). Its ARM declaration pool
@@ -324,7 +325,7 @@ allocation disabled. Full Stock flows now pass on HP39g+ and HP39gs with this
 pool, physical keyboard handoff and normal return. One HP39g+ emulator run
 reports 36,864 total read/write bytes, 46 peak nodes and 9,585 microseconds for
 the initial paint. This is a single emulator observation, not a hardware timing
-guarantee. The extended font/theme Stock matrix remains in progress.
+guarantee. The extended font/theme matrix also passes on all six Stock models.
 
 ## Vertical scrolling
 

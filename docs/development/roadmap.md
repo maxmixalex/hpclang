@@ -488,58 +488,26 @@ in their subsequent stages.
 
 #### M8.2 — Declarative UI core
 
-The local declaration slice provides caller-owned fixed storage, transactional
-frames, parent/key/kind identity, owned text and interruption-safe C scopes.
-Host tests, sanitizers and ARM compilation cover the initial contract; see the
-[working C sketch](../sdk/declarative-ui.md). Concrete rendering and target
-acceptance are still pending. This is not M8.2
-closure or a frozen public API. A subsequent local slice adds measured row/column
-layout, transparent components, weighted spare-space allocation, clipped bounds,
-button actions and stable focus traversal/fallback. Host/sanitizer tests, ARM
-compilation and Clang analysis pass. Controlled UTF-8 edits now emit owned
-proposals, with tested acceptance/rejection/transformation, selection and
-failed-frame recovery. Physical events now share native Alpha/Shift decoding
-and paired insertion with the existing editor; six-model host event sequences
-and all 76 host targets pass. GPIO/display integration remains in progress.
-The subsequent local paint slice adds revision-driven canvas callbacks, bounded
-damage, focus/cursor invalidation and failure/retry cleanup. A host pixel backend
-checks idle/partial frames, move/delete erasure and clipping; UI tests, sanitizers,
-ARM compilation and Clang analysis pass. Bounded effects now provide fair polling,
-copied completion/error events, owner-lifetime cancellation and exactly-once
-cleanup, including ordinary process exit. Host tests cover provider failures,
-pool exhaustion and removal/reappearance without stale results. Concrete
-grayscale rendering now has a local surface/font backend with explicit style
-inputs, UTF-8 measurement, bounded canvas leases, selection/cursor drawing and
-transactional raster pages. Host pixel tests cover 2/4/16 levels, failed-frame
-preservation/retry, complete-page copying and an inverted theme. Vertical scroll
-scopes now retain offsets, clamp after content shrink and reveal keyboard focus
-through nested viewports. Host tests cover geometry, pixels, manual scrolling
-and overflow rollback. Interactive loading/error/retry, target memory and
-six-model acceptance remain pending. The installed `examples/declarative-ui`
-device manager now assembles the original application patterns with a deterministic
-simulated provider. Its host flow covers failure/retry/cancel, all eight devices,
-stable insertion/reversal, controlled filtering and waveform changes; the installed
-SDK builds the ARM image and all six launchers. Local Direct execution now passes
-the complete flow on all six models, with electrical key injection, six LCD
-checkpoints and normal Stock return. HP39g+ Stock USB installation, initial
-render/idle and return pass in the smaller first-screen probe; the complete Stock
-flow and resource-budget acceptance remain open. The formal `build-e2e.sh ui`
-entry passes locally; Runtime's shared suite matrix now includes UI and watches
-its example sources. Its verifier checks six distinct monochrome states and all
-32 model-derived waveform vertices on the actual LCD captures. Remote CI has
-not yet been triggered for this batch.
+The implementation provides bounded transactional declarations, scoped stable
+identity, row/column layout, controlled text and boolean proposals, native-key
+input, nested focus-revealing scroll, revision-driven canvas damage and bounded
+asynchronous effects with owner cancellation and exit cleanup. The surface/font
+renderer has explicit themes, clipping leases and transactional raster pages.
+The installed device-manager example combines the original application patterns,
+including failure/retry/cancel, eight-device insertion/reversal and waveform updates.
+Public names remain provisional pending milestone acceptance.
 
-Controlled boolean selection now shares the model-driven proposal/commit contract.
-The toggle-enabled application passes six local Direct targets and independent
-LCD waveform checks. Full Stock flows pass on HP48gII, HP49g+ and HP50g; the
-HP39 family exposed real heap exhaustion in the full application. Independent
-task capacity and directly keyed device rows reduce the ARM declaration pool to
-16,764 bytes while retaining all eight devices; small-heap Stock revalidation is
-in progress. All 80 host targets and UI sanitizer tests pass. The example now
-supports an alternate palette and native-font preference with a packaged fallback.
-Renderer replacement retains focused identity, with host flows at 2/4/16 levels;
-HP39g+ Direct and HP50g Stock additionally pass independent alternate-theme LCD
-checks. Native/fallback font target acceptance and final resource gates remain open.
+Local acceptance now passes all six Direct and all six Stock targets, including
+physical-key events, alternate-theme replacement, native-font or explicit fallback
+layout, and normal system return. Independent LCD checks verify application states,
+32 model-derived waveform vertices, theme inversion and font-dependent geometry.
+All 80 host targets, UI sanitizers, host/ARM Clang analysis and strict docs pass;
+an installed SDK builds the alternate-palette/native-font example and six launchers.
+The full view has 46 nodes; its 48-node/512-byte/one-task ARM pool uses 16,764 bytes.
+HP39g+ and HP39gs complete the flow within the observed 36 KiB read/write window.
+Host flow/pixel tests cover both palettes at 2/4/16 levels; emulator timings are
+not physical-device performance guarantees. The shared Runtime matrix includes
+the UI suite. Remote CI acceptance remains open; no M8.2/M8.3 closure is claimed.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys

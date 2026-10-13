@@ -50,5 +50,7 @@ The application owns a fixed 48-node/512-byte/one-task declaration configuration
 creates its renderer once. Its display session is explicitly acquired and
 released. It retries display timeouts from the accepted image, reborrowing the
 LCD back page each time. Startup/allocation failures return an error to the
-launcher. Calculator memory use and six-model execution are still being
-validated; host flow tests do not establish target acceptance.
+launcher. The full example flow passes local Direct and Stock tests on all six
+models, with normal return, alternate-theme and native/fallback-font checkpoints.
+The ARM declaration pool uses 16,764 bytes; renderer and LCD pages are additional.
+Remote CI acceptance remains pending.
