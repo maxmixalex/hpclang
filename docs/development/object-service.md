@@ -618,17 +618,17 @@ tests pass with ASan/UBSan, and Clang static analysis passes for the public back
 The object-mutation suite now prepares `PORTZERO` through its versioned
 `stock-setup.json`, enumerates it and checks its exact integer value. It also
 reads installed libraries (including ARMToolbox on HP48gII). The same harness
-and application pass locally on all three classic models. Port writes and
-Flash transactions remain required; remote acceptance is still pending.
+and application pass locally on all three classic models. These initial reads
+and create-only writes are integrated into main at `f36d1d80`. The further
+mutation and persistence work below remains a local M8.0 extension.
 
 `hpclang_port_backup_create` prepares a complete owned backup encoding before
 changing native storage. Port 0 creation opens space at the HOME/port boundary
 using the existing validated USEROB relocation machinery, writes the record,
 then publishes the new port start. Existing port objects and libraries remain
 at their original addresses. Exact duplicate names return `EEXIST`; native
-space exhaustion returns `ENOSPC`. This first write operation does not replace
-or remove an existing backup, install a library or implement Port 1/2 writes.
-Those operations remain M8.0 requirements. As with HOME mutation, the captured
+space exhaustion returns `ENOSPC`. It never replaces an existing backup.
+As with HOME mutation, the captured
 RAM mapping must remain stable during commit; preflight does not promise
 rollback for an artificial backend that fails writes midway through commit.
 The three classic Stock models locally pass creation/readback of integer 987,
@@ -638,7 +638,27 @@ objects. Independent local relaunch probes on all three classic models use
 Stock Kermit commands to recall both backups through native RPL and store the
 results in a native directory; the recorded values are 987 and 123. Resumed
 USB enumeration requires restoring the saved interrupt-enable masks into the
-protocol backend. The reusable CI relaunch gate remains to be integrated.
+protocol backend. A reusable native-RPL recall gate remains required; the
+three-launch public-API gate below is a separate persistence witness.
+
+`hpclang_port_backup_replace` and `hpclang_port_backup_remove` now support
+existing exact names in Port 0. Missing names return `ENOENT`; replacement does
+not implicitly create a missing record. Replacement can grow or shrink a backup.
+References to its previous complete record, including interior value pointers,
+are preserved in TEMP before mutation. The classic library-address table joins
+the existing stack, environment and system reference scan; banked references
+are distinguished from numerically equal main-RAM addresses. Operations requiring
+relocation of a preceding library still return `ENOTSUP` while library code
+alignment and active execution safety are being completed.
+
+All three classic models locally pass grow/shrink/read/remove plus HOME mutation
+and settled return. They also pass three independent Stock launches: create an
+integer backup, read and replace it with a string after relaunch, then read and
+remove the string after another relaunch. No reinstallation, reset or fixture
+injection occurs between launches. Internal library-record creation preserves
+existing record addresses and rejects duplicate library IDs; it does not yet
+provide public library installation or attachment. Port 1/2 services and full
+library mutation remain M8.0 requirements.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
