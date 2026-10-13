@@ -17,6 +17,23 @@ int main(void)
 {
     static uint8_t port1[HPCLANG_RPL_PORT1_NIBBLES / 2u];
     struct hpclang_rpl_reader port_reader = {0};
+    assert(!hpclang_rpl_stock_port2_reader(0, &port_reader));
+    assert(!hpclang_rpl_stock_port2_capture(&port_reader, port1, 0x00000c02u));
+    assert(!hpclang_rpl_stock_port2_capture(&port_reader, port1, 0x00100402u));
+    assert(!hpclang_rpl_stock_port2_capture(&port_reader, port1, 0x00100c01u));
+    assert(port_reader.read_nibble == NULL);
+    assert(hpclang_rpl_stock_port2_capture(&port_reader, port1, 0x00100802u));
+    port1[0] = 0x71;
+    port1[sizeof(port1) - 1] = 0xab;
+    uint8_t flash_nibble;
+    assert(port_reader.read_nibble(port_reader.context, 1, &flash_nibble) && flash_nibble == 7);
+    assert(port_reader.read_nibble(port_reader.context, HPCLANG_RPL_FLASH_BANK_NIBBLES - 1,
+                                   &flash_nibble) &&
+           flash_nibble == 10);
+    assert(!port_reader.read_nibble(port_reader.context, HPCLANG_RPL_FLASH_BANK_NIBBLES,
+                                    &flash_nibble));
+    assert(!port_reader.read_nibble(port_reader.context, 0, NULL));
+    port_reader = (struct hpclang_rpl_reader){0};
     assert(!hpclang_rpl_stock_port1_reader(&port_reader));
     assert(!hpclang_rpl_stock_port1_capture(NULL, port1, 0x08000c1au));
     assert(!hpclang_rpl_stock_port1_capture(&port_reader, NULL, 0x08000c1au));

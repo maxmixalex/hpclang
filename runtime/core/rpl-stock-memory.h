@@ -6,6 +6,14 @@
 
 #define HPCLANG_RPL_MAIN_PAGES 128u
 #define HPCLANG_RPL_PORT1_NIBBLES 0x40000u
+#define HPCLANG_RPL_PORT2_BANKS 6u
+#define HPCLANG_RPL_FLASH_BANK_NIBBLES 0x40000u
+
+/* HP49g+/50g user Flash banks 8..13 occupy physical 0x140000..0x1fffff.
+ * Capture verifies their enclosing identity section permits user reads. */
+int hpclang_rpl_stock_port2_capture(struct hpclang_rpl_reader *reader,
+                                    const volatile uint8_t *bank_bytes, uint32_t flash_section);
+int hpclang_rpl_stock_port2_reader(uint32_t bank, struct hpclang_rpl_reader *reader);
 
 /* HP49/50 ERAM is a packed RAM-port chain independent of the active Saturn
  * bank. Read-only capture does not claim ownership of its free tail. */

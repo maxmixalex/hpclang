@@ -86,12 +86,46 @@ uint32_t hpclang_e2e_port_reads(void)
         hpclang_port_iterator_close(port1_entries);
         if (next != 0 || seen != 1)
             return 0xb6;
+        struct hpclang_object *port2 = hpclang_port_backup_get(2, (const uint8_t *)"PORTTWO", 7);
+        valid = port2 && hpclang_object_integer_i64(port2, &number) == 0 && number == 987;
+        hpclang_object_release(port2);
+        if (!valid)
+            return 0xba;
+        port2 = hpclang_port_library_get(2, 275);
+        valid = port2 && hpclang_object_kind(port2) == HPCLANG_OBJECT_LIBRARY;
+        hpclang_object_release(port2);
+        if (!valid)
+            return 0xbb;
+        port2 = hpclang_port_backup_get(2, (const uint8_t *)"PORTOLD", 7);
+        valid = !port2 && errno == ENOENT;
+        hpclang_object_release(port2);
+        if (!valid)
+            return 0xbc;
+        struct hpclang_port_iterator *port2_entries = hpclang_port_iterator_open(2);
+        if (!port2_entries)
+            return 0xbd;
+        int backups = 0, libraries = 0;
+        while ((next = hpclang_port_iterator_read(port2_entries, &port1_entry)) > 0) {
+            if (port1_entry.kind == HPCLANG_PORT_BACKUP && port1_entry.name_length == 7 &&
+                !memcmp(port1_entry.name, "PORTTWO", 7))
+                ++backups;
+            if (port1_entry.kind == HPCLANG_PORT_LIBRARY && port1_entry.library_number == 275)
+                ++libraries;
+        }
+        hpclang_port_iterator_close(port2_entries);
+        if (next || backups != 1 || libraries != 1)
+            return 0xbe;
     } else {
         struct hpclang_port_iterator *unavailable = hpclang_port_iterator_open(1);
         int rejected = !unavailable && errno == ENOSYS;
         hpclang_port_iterator_close(unavailable);
         if (!rejected)
             return 0xb7;
+        unavailable = hpclang_port_iterator_open(2);
+        rejected = !unavailable && errno == ENOSYS;
+        hpclang_port_iterator_close(unavailable);
+        if (!rejected)
+            return 0xbf;
     }
     struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(0);
     if (!iterator)

@@ -567,7 +567,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 | --- | --- | --- |
 | Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup creation pass local Stock, including relaunch and native RPL recall. Replacement/removal and library writes still require bank/reference handling. |
-| Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
+| Port 2 | Flash, containing library/backup objects | Owned backup/library reads and enumeration pass HP49g+/HP50g Stock across three launches; native erase/write transactions and power-loss behavior remain open. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
 areas explicitly. None has HOME-style subdirectories. Acceptance of these
@@ -596,8 +596,9 @@ includes the CRC, so adding four extra nibbles crosses into the next object.
 The corrected parser agrees with the 2404-byte L275_48 transfer file (eight-byte
 header plus 4792 object nibbles) and the native next-object address. All 74 host
 tests and the three affected parser tests under ASan/UBSan pass locally.
-Flash allocation records still require their own traversal and transaction
-implementation; the RAM iterator must not be applied to raw Flash records.
+Flash allocation records use the separate slot traversal described below;
+their write transactions remain open. The RAM iterator must not be applied
+to raw Flash records.
 
 The initial `<hpclang/port.h>` API provides `hpclang_port_iterator_open/read/close`
 and `hpclang_port_backup_get`. Iterators own their metadata; returned values are
@@ -605,7 +606,7 @@ independent `hpclang_object` snapshots released with `hpclang_object_release`.
 Backup names are exact calculator bytes, while library metadata includes its
 numeric identifier. `hpclang_port_library_get` copies a complete library by
 number without installing, attaching or executing it. The current backend
-reads classic Stock Port 0 and HP49g+/HP50g Stock Port 1.
+reads classic Stock Port 0 and HP49g+/HP50g Stock Port 1/2.
 Other valid port indices and unavailable runtime contexts return `ENOSYS`,
 which describes this implementation rather than hardware absence. Invalid
 indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
@@ -657,7 +658,7 @@ integer backup, read and replace it with a string after relaunch, then read and
 remove the string after another relaunch. No reinstallation, reset or fixture
 injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
-provide public library installation or attachment. Port 1 replacement/removal, Port 2 and full
+provide public library installation or attachment. Port 1 replacement/removal, Port 2 writes and full
 library mutation remain M8.0 requirements.
 
 Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
@@ -704,6 +705,12 @@ The iterator validates live objects and CRCs within their slot boundaries;
 unknown states, malformed extents and read failures leave the caller's cursor
 and result unchanged. Host/sanitizer checks and captured native HP50g Flash
 verify four existing libraries plus a newly stored integer 987, then the same
-four libraries after native deletion. Public Port 2 mapping, discovery and
-owned reads are still pending; erase/write and power-loss behavior remain
-separate M8.0 requirements.
+four libraries after native deletion. The public read backend checks the
+physical Flash identity mapping and each user bank's type/number, then scans
+all six banks. Metadata and objects are copied before returning; no borrowed
+Flash pointers escape. Host tests cover later-bank objects, deleted entries,
+missing mappings, corrupt bank headers and snapshot survival after mapping
+loss. HP49g+ and HP50g local Stock acceptance passes all three lifecycle
+invocations, reading native integer 987, enumerating its backup and library 275,
+copying that library and rejecting a natively purged backup. Typed port discovery, erase/write and
+power-loss behavior remain separate M8.0 requirements.

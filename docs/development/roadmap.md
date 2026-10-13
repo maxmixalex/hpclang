@@ -453,7 +453,7 @@ Local implementation now includes Port 0 backup create, variable-size replace
 and remove, with owned reads and preservation of live references to old records.
 The native library table participates in reference scanning. Library record
 creation is internal and does not register or attach a library. Existing-library
-relocation, public library mutation, Port 1 replacement/removal and Port 2 remain unfinished. The 83 host
+relocation, public library mutation, Port 1 replacement/removal and Port 2 writes remain unfinished. The 85 host
 tests and focused mutation/port sanitizer tests pass. The public grow/shrink/
 read/remove flow passes Stock on HP48gII, HP49g+ and HP50g. All three also pass
 a three-launch lifecycle: create an integer, return/relaunch and replace it
@@ -465,6 +465,15 @@ models across the three-launch Port 0 lifecycle. Port 1 backup creation now
 respects a launcher-derived physical-page fence, passes both models across
 relaunches and is independently recalled by native RPL. Reference-preserving
 replacement/removal and active-library safety remain open.
+
+Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g
+Stock across all three lifecycle launches. The backend validates the live
+Flash mapping and bank identities, and uses a separate slot iterator that skips
+native deletion markers. Host tests cover cross-bank reads and snapshot
+ownership. Port 2 writes, library mutation and typed discovery remain open.
+The HP48gII three-launch regression also passes, preserving `ENOSYS` for its
+unavailable Port 1/2 services. All 85 host tests, focused sanitizers, Clang
+analysis and strict documentation checks pass for this read-service batch.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

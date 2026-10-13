@@ -43,10 +43,18 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
     }
     const struct hpclang_device_info *device = hpclang_device_info();
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (port == 2 || !device || !boot || !boot->saturn_state ||
+    if (!device || !boot || !boot->saturn_state ||
         (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950)) {
         errno = ENOSYS;
         return -1;
+    }
+    if (port == 2) {
+        if (device->family != HPCLANG_FAMILY_HP4950 || !hpclang_rpl_stock_port2_reader(0, reader)) {
+            errno = ENOSYS;
+            return -1;
+        }
+        *cursor = (struct hpclang_rpl_port_cursor){0x20au, HPCLANG_RPL_FLASH_BANK_NIBBLES, 0};
+        return 0;
     }
     if (port == 1) {
         if (device->family != HPCLANG_FAMILY_HP4950 || !hpclang_rpl_stock_port1_reader(reader)) {
@@ -73,17 +81,48 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
     return 0;
 }
 
+static int next_entry(uint32_t port, uint32_t *bank, struct hpclang_rpl_reader *reader,
+                      struct hpclang_rpl_port_cursor *cursor, struct hpclang_rpl_port_entry *entry)
+{
+    if (port != 2)
+        return hpclang_rpl_port_next(reader, cursor, entry);
+    for (;;) {
+        if (*bank >= HPCLANG_RPL_PORT2_BANKS)
+            return 0;
+        /* Check the native bank identity before interpreting any slots. */
+        uint32_t header = 0;
+        for (uint32_t i = 0; i < 4; ++i) {
+            uint8_t nibble;
+            if (!reader->read_nibble(reader->context, 0x200u + i, &nibble))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (nibble > 15u)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            header |= (uint32_t)nibble << (4u * i);
+        }
+        if (header != (0xf0u | ((*bank + 8u) << 8u)))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        int result = hpclang_rpl_flash_next(reader, cursor, entry);
+        if (result)
+            return result;
+        if (++*bank == HPCLANG_RPL_PORT2_BANKS)
+            return 0;
+        if (!hpclang_rpl_stock_port2_reader(*bank, reader))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        *cursor = (struct hpclang_rpl_port_cursor){0x20au, HPCLANG_RPL_FLASH_BANK_NIBBLES, 0};
+    }
+}
+
 struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port)
 {
-    struct hpclang_rpl_port_cursor initial;
+    struct hpclang_rpl_port_cursor cursor;
     struct hpclang_rpl_reader reader;
-    if (open_cursor(port, &reader, &initial))
+    if (open_cursor(port, &reader, &cursor))
         return NULL;
-    struct hpclang_rpl_port_cursor cursor = initial;
     struct hpclang_rpl_port_entry native;
     size_t count = 0;
+    uint32_t bank = 0;
     int result;
-    while ((result = hpclang_rpl_port_next(&reader, &cursor, &native)) > 0)
+    while ((result = next_entry(port, &bank, &reader, &cursor, &native)) > 0)
         ++count;
     if (result < 0) {
         port_error(result);
@@ -100,12 +139,15 @@ struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port)
         errno = ENOMEM;
         return NULL;
     }
-    /* Every entry consumes at least 29 nibbles in the 20-bit address space. */
     iterator->count = (uint32_t)count;
     iterator->index = 0;
-    cursor = initial;
+    bank = 0;
+    if (open_cursor(port, &reader, &cursor)) {
+        free(iterator);
+        return NULL;
+    }
     uint32_t index = 0;
-    while ((result = hpclang_rpl_port_next(&reader, &cursor, &native)) > 0) {
+    while ((result = next_entry(port, &bank, &reader, &cursor, &native)) > 0) {
         if (index == count)
             break;
         struct hpclang_port_entry *entry = &iterator->entries[index++];
@@ -162,7 +204,8 @@ struct hpclang_object *hpclang_port_backup_get(uint32_t port, const uint8_t *nam
         return NULL;
     struct hpclang_rpl_port_entry entry;
     int result;
-    while ((result = hpclang_rpl_port_next(&reader, &cursor, &entry)) > 0) {
+    uint32_t bank = 0;
+    while ((result = next_entry(port, &bank, &reader, &cursor, &entry)) > 0) {
         if (entry.prologue != 0x02b62 || entry.name_length != name_length ||
             (name_length && memcmp(entry.name, name, name_length)))
             continue;
@@ -190,7 +233,8 @@ struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_
         return NULL;
     struct hpclang_rpl_port_entry entry;
     int result;
-    while ((result = hpclang_rpl_port_next(&reader, &cursor, &entry)) > 0) {
+    uint32_t bank = 0;
+    while ((result = next_entry(port, &bank, &reader, &cursor, &entry)) > 0) {
         if (entry.prologue != 0x02b40 || entry.library_number != library_number)
             continue;
         struct hpclang_object *object = NULL;

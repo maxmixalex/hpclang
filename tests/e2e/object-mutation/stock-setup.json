@@ -2,6 +2,11 @@
   "version": 2,
   "families": {
     "hp48": ["123 :0:PORTZERO STO"],
-    "hp4950": ["123 :0:PORTZERO STO", "456 :1:PORTONE STO"]
+    "hp4950": [
+      "123 :0:PORTZERO STO",
+      "456 :1:PORTONE STO",
+      "987 :2:PORTTWO STO",
+      "111 :2:PORTOLD STO :2:PORTOLD PURGE"
+    ]
   }
 }

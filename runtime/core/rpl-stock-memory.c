@@ -15,6 +15,35 @@ static int port1_read(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
+static int flash_read(void *context, uint32_t address, uint8_t *value)
+{
+    if (!context || !value || address >= HPCLANG_RPL_FLASH_BANK_NIBBLES)
+        return 0;
+    const volatile uint8_t *bytes = context;
+    *value = (bytes[address / 2u] >> (4u * (address & 1u))) & 15u;
+    return 1;
+}
+
+int hpclang_rpl_stock_port2_capture(struct hpclang_rpl_reader *reader,
+                                    const volatile uint8_t *bank_bytes, uint32_t flash_section)
+{
+    if (!reader || !bank_bytes || (flash_section & UINT32_C(0xfff00803)) != UINT32_C(0x00100802))
+        return 0;
+    *reader = (struct hpclang_rpl_reader){flash_read, (void *)(uintptr_t)bank_bytes};
+    return 1;
+}
+
+int hpclang_rpl_stock_port2_reader(uint32_t bank, struct hpclang_rpl_reader *reader)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (!reader || bank >= HPCLANG_RPL_PORT2_BANKS || !boot || !boot->saturn_state ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G))
+        return 0;
+    volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
+    return hpclang_rpl_stock_port2_capture(
+        reader, (const void *)(uintptr_t)(0x00140000u + bank * 0x20000u), l1[1]);
+}
+
 int hpclang_rpl_stock_port1_capture(struct hpclang_rpl_reader *reader,
                                     const volatile uint8_t *bytes, uint32_t ram_section)
 {
