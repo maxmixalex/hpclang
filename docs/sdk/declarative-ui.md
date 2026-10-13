@@ -20,6 +20,11 @@ font with an explicit packaged fallback. Host flow tests run both palettes at
 The calculator test adds a second-theme LCD checkpoint, independently checks
 the surrounding UI's inverse pixels and the unchanged custom canvas, then
 continues keyboard-driven scan/cancel actions with the replacement renderer.
+An additional checkpoint switches to the native default font when accessible,
+or keeps the packaged fallback otherwise. Its verifier checks the waveform's
+new position after font-dependent measurement; Stock must expose its native
+eight-row font. These font/theme checks pass locally on all six Direct models
+and on HP48gII Stock; the remaining Stock combinations are being validated.
 The installed SDK builds its ARM image and all six model launchers. The complete
 application flow also passes local Direct execution on all six models with
 electrical key injection, six display checkpoints and normal return. HP39g+
@@ -315,8 +320,11 @@ unnecessary. Independent task sizing avoids one task slot per visual node.
 Host allocation
 fault injection covers every renderer-construction allocation, checks cleanup
 and recovery, and proves declaration/layout/render/copy still work with further
-allocation disabled. Stock memory and keyboard-handoff acceptance remain in
-progress; host recovery alone does not establish target suitability.
+allocation disabled. Full Stock flows now pass on HP39g+ and HP39gs with this
+pool, physical keyboard handoff and normal return. One HP39g+ emulator run
+reports 36,864 total read/write bytes, 46 peak nodes and 9,585 microseconds for
+the initial paint. This is a single emulator observation, not a hardware timing
+guarantee. The extended font/theme Stock matrix remains in progress.
 
 ## Vertical scrolling
 

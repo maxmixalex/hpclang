@@ -196,6 +196,17 @@ static unsigned checks(void)
     r = demo_renderer(device->display_width, device->display_height, 2, &demo_font, 1);
     if (!r || capture(&app, r, 7) || hpclang_ui_focused(ui) != focused)
         goto done;
+    failure = 0x1702;
+    const struct hpclang_font *font = hpclang_font_default();
+    if (!hpclang_font_available(font))
+        font = &demo_font;
+    hpclang_ui_surface_destroy(r);
+    r = demo_renderer(device->display_width, device->display_height, 2, font, 1);
+    /* The checkpoint identifies the selected font's line height. The host
+     * independently checks the resulting canvas geometry and waveform. */
+    if (!r || capture(&app, r, 100 + hpclang_font_height(font)) ||
+        hpclang_ui_focused(ui) != focused)
+        goto done;
     failure = 18;
     if (activate(&app, r, &mode, DEMO_SCAN) || demo_poll(&app) < 0 ||
         activate(&app, r, &mode, DEMO_CANCEL) || app.model.scan != DEMO_IDLE || app.cleanups != 3)

@@ -529,6 +529,18 @@ its example sources. Its verifier checks six distinct monochrome states and all
 32 model-derived waveform vertices on the actual LCD captures. Remote CI has
 not yet been triggered for this batch.
 
+Controlled boolean selection now shares the model-driven proposal/commit contract.
+The toggle-enabled application passes six local Direct targets and independent
+LCD waveform checks. Full Stock flows pass on HP48gII, HP49g+ and HP50g; the
+HP39 family exposed real heap exhaustion in the full application. Independent
+task capacity and directly keyed device rows reduce the ARM declaration pool to
+16,764 bytes while retaining all eight devices; small-heap Stock revalidation is
+in progress. All 80 host targets and UI sanitizer tests pass. The example now
+supports an alternate palette and native-font preference with a packaged fallback.
+Renderer replacement retains focused identity, with host flows at 2/4/16 levels;
+HP39g+ Direct and HP50g Stock additionally pass independent alternate-theme LCD
+checks. Native/fallback font target acceptance and final resource gates remain open.
+
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
 preserve node identity when that view is declared again. C functions suffice
