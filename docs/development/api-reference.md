@@ -738,7 +738,7 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
-| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` now adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay; six Direct models and HP50g Stock pass locally. `sys_waitRTCTicks` remains pending. |
+| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` now adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay; six Direct models and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally. `sys_waitRTCTicks` remains pending. |
 | RTC wall clock | `sys_RTC_seconds`, `sys_delta_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; `hpsys.h` now adapts seconds-of-day and midnight-wrapped differences. `sys_tm_RTC` remains pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | 🧪 Typed HOST/ECONOMY policy preserves PLL/bus setup and restores borrowed clocks; local validation in progress. Historical raw register interfaces remain backend details. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |

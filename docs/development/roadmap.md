@@ -599,8 +599,8 @@ The system adapter now includes five `hpsys.h` entry points for millisecond dela
 750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
 midnight-wrapped differences.
 All 87 host tests after integration with the accepted C++ ownership work, six
-Direct targets and HP50g Stock pass, including independent
-pixel checks. Remaining Stock contexts and formal CI are pending.
+Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass, including independent
+pixel checks. HP39gs/HP40gs Stock and formal CI are pending.
 The relocated SDK build passes C/C++, all six launchers and all three HP39
 Aplet package families with the system adapter included.
 The remaining historical system, timer and console interfaces remain open.

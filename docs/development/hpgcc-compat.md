@@ -698,9 +698,9 @@ Timer setup/restore, clock changes and raw hardware helpers are not yet supplied
 Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
 RTC errors; the System Services E2E also exercises both delay spellings and RTC
 access, with both lower and upper delay bounds to catch unit mismatches.
-All six Direct targets and HP50g Stock pass locally with the corrected
+All six Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally with the corrected
 milliseconds conversion and stopwatch checks, including independent System
-Services pixel verification. Remaining Stock contexts and formal CI are pending.
+Services pixel verification. HP39gs/HP40gs Stock and formal CI are pending.
 The relocated installed SDK also builds its C/C++ examples, all six native
 launchers and three HP39 Aplet families with this adapter included. Historical
 integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
