@@ -548,6 +548,11 @@ and some roots point inside those blocks. Bounded parsing accounts for 43 typed
 objects across the 40 allocations with no leftover nibbles in this saved state.
 The trailing programs must enter reference traversal too; their Flash/ROM calls
 still need resolution before execution-reference safety is established.
+The combined HOME/TEMP experiment reaches 174 objects and reveals another Flash
+pointer. In this HP50g snapshot, native catalog entries for ROM calls 161/10,
+161/6 and 167/1 resolve to programs that match the three TEMP copies byte for
+byte. This establishes their origin, not complete executable-reference coverage
+or a portable ROM mapping for all models.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
