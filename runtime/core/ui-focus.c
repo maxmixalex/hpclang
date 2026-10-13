@@ -3,7 +3,7 @@
 
 static int eligible(const struct hpclang_ui_node *node)
 {
-    return node->kind == HPCLANG_UI_BUTTON && node->enabled;
+    return (node->kind == HPCLANG_UI_BUTTON || node->kind == HPCLANG_UI_INPUT) && node->enabled;
 }
 
 static uint32_t find(const struct frame *frame, uint32_t id)
@@ -99,6 +99,9 @@ int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event)
     if (index == UI_ROOT)
         return 0;
     const struct hpclang_ui_node *node = &frame->nodes[index].view;
-    *event = (struct hpclang_ui_event){node->id, node->action};
+    if (node->kind == HPCLANG_UI_INPUT)
+        return hpclang_ui_edit(ui, HPCLANG_INPUT_ACCEPT, 0, event);
+    *event = (struct hpclang_ui_event){
+        .source = node->id, .action = node->action, .kind = HPCLANG_UI_ACTIVATE};
     return 1;
 }

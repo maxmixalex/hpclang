@@ -31,9 +31,14 @@ struct hpclang_ui
     uint32_t parent, epoch, last_id, pending_id, focused;
     unsigned current;
     int building, error, measuring, arranged, focus_cleared;
+    char *edit_text;
+    uint32_t edit_pending;
+    size_t edit_cursor, edit_anchor;
 };
 
 int hpclang_ui_fail(struct hpclang_ui *ui, int error);
 void hpclang_ui_reconcile_focus(struct hpclang_ui *ui);
+int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, uint16_t style,
+                   const char *text);
 
 #endif

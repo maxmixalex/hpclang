@@ -496,8 +496,9 @@ canvas, rendering and target acceptance are still pending. This is not M8.2
 closure or a frozen public API. A subsequent local slice adds measured row/column
 layout, transparent components, weighted spare-space allocation, clipped bounds,
 button actions and stable focus traversal/fallback. Host/sanitizer tests, ARM
-compilation and Clang analysis pass; controlled text input and physical event
-routing remain in progress.
+compilation and Clang analysis pass. Controlled UTF-8 edits now emit owned
+proposals, with tested acceptance/rejection/transformation, selection and
+failed-frame recovery. Physical event routing remains in progress.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys

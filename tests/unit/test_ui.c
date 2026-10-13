@@ -239,6 +239,63 @@ static void focus(struct hpclang_ui *ui)
     assert(hpclang_ui_commit(ui) == -1 && hpclang_ui_focused(ui) == c);
 }
 
+static void input_view(struct hpclang_ui *ui, const char *text)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_text_input(ui, 77, 0, text, 16, (struct hpclang_ui_action){9, 17}, 1) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+}
+
+static void controlled_input(struct hpclang_ui *ui)
+{
+    input_view(ui, "A\xc3\xa9Z");
+    assert(hpclang_ui_select(ui, 1, 3) == 0);
+    struct hpclang_ui_event event = {0};
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 'B', &event) == 1);
+    assert(event.kind == HPCLANG_UI_CHANGE && !strcmp(event.text, "ABZ"));
+    assert(event.action.type == 9 && event.action.arg == 17 && event.cursor == 2);
+    assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "A\xc3\xa9Z"));
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 'Q', &event) == -1 && errno == EBUSY);
+    input_view(ui, event.text);
+    assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "ABZ"));
+    assert(hpclang_ui_node_at(ui, 0)->cursor == 2);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 'Q', &event) == 1);
+    assert(!strcmp(event.text, "ABQZ"));
+    input_view(ui, "ABZ"); /* Rejection preserves the previous cursor. */
+    assert(hpclang_ui_node_at(ui, 0)->cursor == 2);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 'Q', &event) == 1);
+    input_view(ui, "A\xe7\x95\x8c"); /* Transformation clamps to a scalar boundary. */
+    assert(hpclang_ui_node_at(ui, 0)->cursor == 1);
+    assert(hpclang_ui_select(ui, 2, 2) == -1 && errno == EINVAL);
+    assert(hpclang_ui_select(ui, 0, 4) == 0);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_BACKSPACE, 0, &event) == 1);
+    assert(event.text[0] == 0 && event.cursor == 0);
+    assert(hpclang_ui_begin(ui) == 0);
+    hpclang_ui_abort(ui);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_RIGHT, 0, &event) == -1 && errno == EBUSY);
+    input_view(ui, "");
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 0x1f600, &event) == 1);
+    assert(strlen(event.text) == 4 && event.cursor == 4);
+    input_view(ui, event.text);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_LEFT, 0, &event) == 1);
+    assert(event.kind == HPCLANG_UI_SELECTION && event.cursor == 0);
+    assert(hpclang_ui_activate(ui, &event) == 1 && event.kind == HPCLANG_UI_ACCEPT);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_CANCEL, 0, &event) == 1);
+    assert(event.kind == HPCLANG_UI_CANCEL);
+    const char *invalid[] = {"\xc0\x80", "\xed\xa0\x80", "\xf4\x90\x80\x80", "\xc3", "a\nb"};
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        assert(hpclang_ui_begin(ui) == 0);
+        assert(hpclang_ui_text_input(ui, 77, 0, invalid[i], 16, (struct hpclang_ui_action){0}, 1) ==
+               -1);
+        assert(hpclang_ui_commit(ui) == -1);
+        assert(strlen(hpclang_ui_node_at(ui, 0)->text) == 4);
+    }
+    input_view(ui, "123456789012345");
+    assert(hpclang_ui_select(ui, 15, 15) == 0);
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_INSERT, 'X', &event) == -1 && errno == ENOSPC);
+    assert(hpclang_ui_node_at(ui, 0)->cursor == 15);
+}
+
 static void capacity(void)
 {
     struct hpclang_ui_config config = {2, 8};
@@ -285,6 +342,7 @@ int main(void)
     failures_and_scopes(ui);
     layout(ui);
     focus(ui);
+    controlled_input(ui);
     free(storage);
     capacity();
     return 0;

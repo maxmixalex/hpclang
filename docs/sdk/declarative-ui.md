@@ -1,8 +1,8 @@
 # Declarative UI: declaration core
 
 The current M8.2 slice provides bounded declaration storage, node identity,
-row/column layout, button actions and focus traversal. Controlled text input,
-physical-key routing, effects and rendering are still being implemented.
+row/column layout, button actions, focus traversal and controlled text edits.
+Physical-key routing, effects and rendering are still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -45,7 +45,8 @@ that many bytes with `max_align_t` alignment, for example from `malloc`, to
 A zero text budget is valid for a tree with no text declarations.
 
 There is no allocation during declaration. Two fixed node/text arenas hold
-the accepted tree and the candidate tree. `hpclang_ui_begin` starts a candidate;
+the accepted tree and the candidate tree; an additional text-budget-sized buffer
+holds an edit proposal. `hpclang_ui_begin` starts a candidate;
 `hpclang_ui_commit` accepts it, or rejects the whole candidate on the first
 declaration error. `hpclang_ui_abort` discards it explicitly. A rejected frame
 leaves previously committed metadata and text intact.
@@ -118,3 +119,37 @@ until the application selects a node or requests traversal. Focus/activation
 operations are rejected while a candidate is being declared. Traversal currently
 includes clipped controls; scroll-to-focus and physical keyboard routing remain
 part of the subsequent interaction work.
+
+## Controlled text edits
+
+`hpclang_ui_text_input` declares a single-line UTF-8 model value, its capacity
+including the trailing NUL, a change action and enabled state. Capacity must
+fit the context's text budget. Malformed UTF-8, overlong encodings, surrogates
+and control characters reject the candidate. Initial selection is collapsed
+at the end of the value. `hpclang_ui_select` changes the focused input's anchor
+and cursor using byte offsets at Unicode scalar boundaries.
+
+`hpclang_ui_edit` takes an existing `hpclang_input_action`. It reuses the bounded
+text editor, including whole-scalar cursor/deletion behavior. Inserting over a
+selection replaces it; Backspace/Delete remove the selected range once. A value
+change emits `HPCLANG_UI_CHANGE` with the declared action, source lifetime ID,
+proposed text and selection. The displayed value and application model remain
+unchanged. The event text belongs to the UI context until the next edit call or
+reinitialization; copy it if the application needs a longer lifetime.
+
+Declare and successfully commit the application's response before issuing
+another edit. An identical value rejects the proposal and preserves the old
+selection. An accepted or transformed value uses the proposed selection,
+clamped to scalar boundaries in the new text. Removal retires the input's
+lifetime. A failed or aborted declaration leaves the proposal outstanding so
+the application can retry without silently acknowledging it.
+
+Cursor-only navigation emits `HPCLANG_UI_SELECTION` and changes no model value.
+Enter/accept and cancel emit distinct `HPCLANG_UI_ACCEPT`/`HPCLANG_UI_CANCEL`
+events. Activating a focused input emits accept; activating a button emits
+`HPCLANG_UI_ACTIVATE`. Inspect the event kind before applying a model update.
+No-op edits return zero without replacing the event. Capacity/argument errors
+preserve the displayed value and selection.
+
+The direct edit API does not consume physical keys or implement Alpha rules.
+Integration with the existing model-aware text-mode service remains pending.

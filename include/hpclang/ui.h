@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <hpclang/input.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -29,7 +30,8 @@ extern "C"
         HPCLANG_UI_COLUMN,
         HPCLANG_UI_ROW,
         HPCLANG_UI_TEXT,
-        HPCLANG_UI_BUTTON
+        HPCLANG_UI_BUTTON,
+        HPCLANG_UI_INPUT
     };
 
     struct hpclang_ui_config
@@ -43,10 +45,22 @@ extern "C"
         uint32_t type, arg;
     };
 
+    enum hpclang_ui_event_kind
+    {
+        HPCLANG_UI_ACTIVATE = 1,
+        HPCLANG_UI_CHANGE,
+        HPCLANG_UI_SELECTION,
+        HPCLANG_UI_ACCEPT,
+        HPCLANG_UI_CANCEL
+    };
+
     struct hpclang_ui_event
     {
         uint32_t source;
         struct hpclang_ui_action action;
+        enum hpclang_ui_event_kind kind;
+        const char *text;
+        size_t cursor, anchor;
     };
 
     /* Committed metadata; text is owned by the context. Pointers returned by
@@ -62,11 +76,13 @@ extern "C"
         struct hpclang_ui_rect bounds, clip;
         struct hpclang_ui_action action;
         int enabled;
+        size_t capacity, cursor, anchor;
     };
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
-     * frames never allocate. Size includes two fixed node/text arenas so a failed
-     * declaration cannot damage the last committed tree. Zero means invalid size.
+     * frames never allocate. Size includes two fixed node/text arenas plus one
+     * text-budget-sized edit buffer. Failed declarations preserve the committed
+     * tree. Zero means invalid size.
      * Storage must have max_align_t alignment and live as long as the context. */
     size_t hpclang_ui_storage_size(struct hpclang_ui_config config);
     struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes,
@@ -90,6 +106,19 @@ extern "C"
     int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text);
     int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
                           struct hpclang_ui_action action, int enabled);
+    /* Single-line controlled UTF-8 input. capacity includes NUL and must fit the
+     * context's text budget. Selection offsets are UTF-8 byte boundaries.
+     * Edit emits a proposal without changing displayed/model text. Commit a new
+     * declaration to accept, transform or reject it before requesting another
+     * edit. Failed/aborted declarations leave that proposal outstanding. Event
+     * text belongs to ui and lasts until the next edit call or reinitialization.
+     * Cursor-only navigation emits SELECTION; it changes no application value. */
+    int hpclang_ui_text_input(struct hpclang_ui *ui, uint32_t key, uint16_t style,
+                              const char *value, size_t capacity, struct hpclang_ui_action action,
+                              int enabled);
+    int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor);
+    int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uint32_t codepoint,
+                        struct hpclang_ui_event *event);
     /* Focus follows stable lifetime tokens across reordering. Removed/disabled
      * focus falls to the next surviving old neighbor, then the previous one,
      * then the first eligible new node. Step traverses declaration order and

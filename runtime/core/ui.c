@@ -22,11 +22,11 @@ size_t hpclang_ui_storage_size(struct hpclang_ui_config config)
         return 0;
     }
     size_t size = sizeof(struct hpclang_ui) + (size_t)config.nodes * 2 * sizeof(struct node);
-    if (config.text_bytes > (SIZE_MAX - size) / 2) {
+    if (config.text_bytes > (SIZE_MAX - size) / 3) {
         errno = EOVERFLOW;
         return 0;
     }
-    return size + 2 * config.text_bytes;
+    return size + 3 * config.text_bytes;
 }
 
 struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_ui_config config)
@@ -45,6 +45,7 @@ struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_u
     ui->frames[1].nodes = ui->frames[0].nodes + config.nodes;
     ui->frames[0].text = (char *)(ui->frames[1].nodes + config.nodes);
     ui->frames[1].text = ui->frames[0].text + config.text_bytes;
+    ui->edit_text = ui->frames[1].text + config.text_bytes;
     return ui;
 }
 
@@ -92,6 +93,7 @@ int hpclang_ui_commit(struct hpclang_ui *ui)
     hpclang_ui_reconcile_focus(ui);
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
+    ui->edit_pending = 0;
     return 0;
 }
 
@@ -109,8 +111,8 @@ const struct hpclang_ui_node *hpclang_ui_node_at(const struct hpclang_ui *ui, si
     return &ui->frames[ui->current].nodes[index].view;
 }
 
-static int add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, uint16_t style,
-               const char *text)
+int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, uint16_t style,
+                   const char *text)
 {
     if (!ui || !ui->building)
         return hpclang_ui_fail(NULL, EINVAL);
@@ -166,7 +168,7 @@ struct hpclang_ui_scope hpclang_ui_scope_begin(struct hpclang_ui *ui, uint32_t k
         hpclang_ui_fail(ui, EINVAL);
         return result;
     }
-    if (add(ui, key, kind, style, NULL))
+    if (hpclang_ui_add(ui, key, kind, style, NULL))
         return result;
     ui->parent = ui->frames[ui->current ^ 1u].count - 1;
     return (struct hpclang_ui_scope){ui, ui->epoch, ui->parent, 1};
@@ -191,7 +193,7 @@ int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const c
 {
     if (!text)
         return hpclang_ui_fail(ui, EINVAL);
-    return add(ui, key, HPCLANG_UI_TEXT, style, text);
+    return hpclang_ui_add(ui, key, HPCLANG_UI_TEXT, style, text);
 }
 
 int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
@@ -199,7 +201,7 @@ int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const
 {
     if (!text || (enabled != 0 && enabled != 1))
         return hpclang_ui_fail(ui, EINVAL);
-    if (add(ui, key, HPCLANG_UI_BUTTON, style, text))
+    if (hpclang_ui_add(ui, key, HPCLANG_UI_BUTTON, style, text))
         return -1;
     struct frame *next = &ui->frames[ui->current ^ 1u];
     next->nodes[next->count - 1].view.action = action;
