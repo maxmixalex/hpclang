@@ -61,3 +61,31 @@ int sys_delta_seconds(int start, int end)
     }
     return (end + 86400 - start) % 86400;
 }
+
+void sys_tm_RTC(struct tm *value)
+{
+    if (!value) {
+        errno = EINVAL;
+        return;
+    }
+    struct hpclang_datetime now;
+    if (hpclang_datetime_read(&now))
+        return;
+    unsigned weekday;
+    int64_t seconds, first;
+    const struct hpclang_datetime year_start = {now.year, 1, 1, 0, 0, 0};
+    if (hpclang_datetime_weekday(&now, &weekday) || hpclang_datetime_to_seconds(&now, &seconds) ||
+        hpclang_datetime_to_seconds(&year_start, &first))
+        return;
+    struct tm result = {0};
+    result.tm_year = (int)now.year - 1900;
+    result.tm_mon = (int)now.month - 1;
+    result.tm_mday = (int)now.day;
+    result.tm_hour = (int)now.hour;
+    result.tm_min = (int)now.minute;
+    result.tm_sec = (int)now.second;
+    result.tm_wday = (int)weekday;
+    result.tm_yday = (int)((seconds - first) / 86400);
+    result.tm_isdst = -1;
+    *value = result;
+}

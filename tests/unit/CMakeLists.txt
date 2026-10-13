@@ -15,7 +15,8 @@ function(hpclang_unit name)
 endfunction()
 
 hpclang_unit(hpgcc_system test_hpgcc_system.c
-    "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c")
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c"
+    "${HPCLANG_ROOT}/runtime/core/datetime.c")
 target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 
 hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c

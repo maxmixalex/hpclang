@@ -1,6 +1,8 @@
 #ifndef HPCLANG_HPGCC_HPSYS_H
 #define HPCLANG_HPGCC_HPSYS_H
 
+#include <time.h>
+
 #ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
 #define HPCLANG_HPGCC_LONG_TYPES_DEFINED
 typedef unsigned long long ULONGLONG;
@@ -19,8 +21,14 @@ typedef struct
     unsigned inited : 1;
 } sys_timer_t;
 
-#define SYS_TIMER_INITIALIZER {0, 0, 0, 0}
-#define SYS_TIMER_INITIALIZER_NUM(n) {0, 0, (n), 0}
+#define SYS_TIMER_INITIALIZER                                                                      \
+    {                                                                                              \
+        0, 0, 0, 0                                                                                 \
+    }
+#define SYS_TIMER_INITIALIZER_NUM(n)                                                               \
+    {                                                                                              \
+        0, 0, (n), 0                                                                               \
+    }
 
 #ifdef __cplusplus
 extern "C"
@@ -43,6 +51,11 @@ extern "C"
 
     /* Civil seconds since midnight, or -1 with the clean RTC service's errno. */
     int sys_RTC_seconds(void);
+
+    /* Read civil RTC into standard struct tm. Weekday/year-day are computed;
+     * tm_isdst is -1 (no timezone policy). On error leave output unchanged and
+     * set errno; NULL reports EINVAL. Does not copy the old broken weekday. */
+    void sys_tm_RTC(struct tm *value);
 
     /* Forward difference within one civil day, including midnight wrap.
      * Inputs must be 0..86399; invalid input returns -1/EINVAL. */

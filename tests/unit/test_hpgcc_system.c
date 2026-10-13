@@ -80,6 +80,26 @@ int hpclang_datetime_read(struct hpclang_datetime *value)
 
 int main(void)
 {
+    struct tm date;
+    civil = (struct hpclang_datetime){2000, 2, 29, 23, 59, 58};
+    sys_tm_RTC(&date);
+    assert(date.tm_year == 100 && date.tm_mon == 1 && date.tm_mday == 29);
+    assert(date.tm_wday == 2 && date.tm_yday == 59 && date.tm_isdst == -1);
+    assert(date.tm_hour == 23 && date.tm_min == 59 && date.tm_sec == 58);
+    civil = (struct hpclang_datetime){2100, 3, 1, 0, 0, 0};
+    sys_tm_RTC(&date);
+    assert(date.tm_year == 200 && date.tm_yday == 59 && date.tm_wday == 1);
+    struct tm saved = date;
+    rtc_error = EIO;
+    sys_tm_RTC(&date);
+    assert(errno == EIO && memcmp(&saved, &date, sizeof(date)) == 0);
+    rtc_error = 0;
+    civil.day = 32;
+    sys_tm_RTC(&date);
+    assert(errno == EINVAL && memcmp(&saved, &date, sizeof(date)) == 0);
+    sys_tm_RTC(NULL);
+    assert(errno == EINVAL);
+    civil = (struct hpclang_datetime){2026, 10, 14, 23, 59, 58};
     timers();
     sys_sleep(0);
     assert(delay == 0);
