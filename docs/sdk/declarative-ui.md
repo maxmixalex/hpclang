@@ -15,6 +15,14 @@ for toggles. These fields share storage rather than reserving every component's
 state in every node. Rebuild applications and custom renderers together with
 the SDK when upgrading this evolving UI interface.
 
+The full device-manager pool (48 nodes, 512 text bytes and one effect) now
+uses 13,692 bytes on ARM, down from 16,764. Layout phases reuse temporary
+fields and derive transparent-scope ancestry from the declaration chain.
+The complete C++/C UI fixture passes a local Direct experiment with its writable
+arena limited to 32 KiB, including both display pages, theme/native-font changes,
+physical input and independent pixel checks. This experiment does not replace
+Stock acceptance; the updated six-model Stock run is pending.
+
 The installed `examples/declarative-ui` application combines these interfaces
 into the original device-manager patterns. It uses two status-card instances,
 conditional connection controls, a controlled filter, keyed insertion/reversal,
