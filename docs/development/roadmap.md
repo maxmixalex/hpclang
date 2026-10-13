@@ -507,7 +507,16 @@ The full view has 46 nodes; its 48-node/512-byte/one-task ARM pool uses 16,764 b
 HP39g+ and HP39gs complete the flow within the observed 36 KiB read/write window.
 Host flow/pixel tests cover both palettes at 2/4/16 levels; emulator timings are
 not physical-device performance guarantees. The shared Runtime matrix includes
-the UI suite. Remote CI acceptance remains open; no M8.2/M8.3 closure is claimed.
+the UI suite. CI acceptance of the implementation is complete at `a18302a3`:
+[Core](https://github.com/maxmixalex/hpclang/actions/runs/38410381090),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38410381128),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38410381038),
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38410381089) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38419383490) pass.
+[Gallery](https://github.com/maxmixalex/hpclang/actions/runs/38406483751) passed
+on the preceding implementation; the text-node enum/scanner correction did not
+change Gallery inputs. The remaining milestone checklist below is retained;
+integration alone does not close M8.2/M8.3.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
