@@ -82,6 +82,48 @@ LLVM linker and binary tools and shares its bootstrap builder with repository
 E2E. Changing the payload or bootstrap sources, or removing an output file,
 causes CMake to regenerate the launchers.
 
+## Own calculator objects in C++
+
+`<hpclang/object.hpp>` provides the C++17 `hpclang::owned_object` for independent
+calculator-object snapshots. It has no allocation of its own, exceptions or
+RTTI. The underlying C operation can allocate and reports errors through its
+return value and `errno`.
+
+```cpp
+#include <hpclang/object.hpp>
+#include <cstdint>
+
+hpclang::owned_object value;
+if (value.receive([](auto **out) {
+        return hpclang_object_create_integer_i64(42, out);
+    }) != 0) {
+    return 1;
+}
+std::int64_t answer = 0;
+if (hpclang_object_integer_i64(value.get(), &answer) != 0)
+    return 2;
+```
+
+The owner automatically releases its snapshot on normal scope exit. Move it to
+transfer ownership; copying is disabled. `get()` borrows the snapshot, `reset()`
+releases it, and `release()` transfers responsibility back to a C caller.
+An explicit raw-pointer constructor adopts an already-owned C result. Never
+adopt a borrowed pointer or put one snapshot in two owners.
+
+`receive()` passes an initially null output pointer to a nonthrowing producer.
+On failure, the old snapshot and the producer's `errno` are preserved. On
+success, it replaces the old snapshot. The producer must return a new owned
+snapshot, not the owner's existing pointer. This works with constructors,
+object-store reads, Port reads and composite extraction without duplicating
+their C APIs. The producer may read the old snapshot while building the new one.
+Native-service availability and numeric/encoding rules remain those of the C
+API; owning a snapshot does not grant access to a native RPL stack on HP39.
+
+See `examples/object-cpp` for a complete C++17 application. Automatic local
+cleanup applies to normal returns; `exit()` does not unwind local C++ objects.
+Release such resources before calling it. Global-object destruction follows
+the runtime's ordinary exit handling.
+
 ## Package an HP39 Aplet
 
 HP39g+, HP39gs and HP40gs share the historical HPGCC39 Aplet format, with a

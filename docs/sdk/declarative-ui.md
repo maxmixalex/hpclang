@@ -6,7 +6,7 @@ model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
 loading/error/retry application passed six-model Direct and Stock acceptance,
 and its C implementation is integrated into main at `a7692b4b`. The C++ helpers
-and compact-storage changes below have local acceptance and await formal CI.
+and compact-storage changes below also pass formal CI and are integrated at `e6f04dbd`.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -450,7 +450,7 @@ perform shutdown; the existing context/provider lifetime rules still apply.
 Host tests exercise early return, two component instances, stable identity
 after reordering, duplicate frame acquisition and fixed-pool failure, with
 exceptions and RTTI disabled. This is the first M8.5 helper slice; complete
-broader owned-resource wrappers and full target-side C++ acceptance remain open.
+broader owned-resource wrappers and integrated release acceptance remain open.
 
 The installed `examples/declarative-ui-cpp` counter demonstrates these guards
 with keyboard navigation and the ordinary surface renderer. The SDK relocation
@@ -460,7 +460,7 @@ are supplied. It complements the larger C device-manager example.
 The UI E2E also links the counter's actual view and checks guard rollback,
 stable focus across model updates and owned-image moves before executing the
 full device-manager flow. All six Direct and all six Stock models pass locally;
-formal CI acceptance of this C++ extension is still pending. The integrated
+all six CI workflows also pass at `e6f04dbd`, merged into main. The integrated
 branch passes 84 host targets and the installed SDK relocation/HP39 packaging
 gate. Broader owned-resource wrappers and migration requirements remain open.
 
