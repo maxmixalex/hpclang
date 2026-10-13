@@ -15,6 +15,24 @@ const struct hpclang_boot_info *hpclang_boot_info(void)
 
 int main(void)
 {
+    static uint8_t port1[HPCLANG_RPL_PORT1_NIBBLES / 2u];
+    struct hpclang_rpl_reader port_reader = {0};
+    assert(!hpclang_rpl_stock_port1_reader(&port_reader));
+    assert(!hpclang_rpl_stock_port1_capture(NULL, port1, 0x08000c1au));
+    assert(!hpclang_rpl_stock_port1_capture(&port_reader, NULL, 0x08000c1au));
+    assert(!hpclang_rpl_stock_port1_capture(&port_reader, port1, 0x00000c1au));
+    assert(!hpclang_rpl_stock_port1_capture(&port_reader, port1, 0x0800081au));
+    assert(port_reader.read_nibble == NULL);
+    assert(hpclang_rpl_stock_port1_capture(&port_reader, port1, 0x08000c1au));
+    port1[0] = 0xa3;
+    port1[sizeof(port1) - 1] = 0xb4;
+    uint8_t nibble;
+    assert(port_reader.read_nibble(port_reader.context, 0, &nibble) && nibble == 3);
+    assert(port_reader.read_nibble(port_reader.context, 1, &nibble) && nibble == 10);
+    assert(port_reader.read_nibble(port_reader.context, HPCLANG_RPL_PORT1_NIBBLES - 1, &nibble) &&
+           nibble == 11);
+    assert(!port_reader.read_nibble(port_reader.context, HPCLANG_RPL_PORT1_NIBBLES, &nibble));
+    assert(!port_reader.read_nibble(port_reader.context, 0, NULL));
     uint32_t map[256] = {0};
     struct hpclang_rpl_stock_memory memory;
     for (uint32_t i = 0u; i < 128u; ++i)

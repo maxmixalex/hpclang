@@ -37,6 +37,9 @@ extern "C"
         uint32_t stack_reserve_nibbles;
         uint32_t **native_roots;
         uint32_t native_root_count;
+        /* Optional classic ROM-part table: 3-nibble count, 16-nibble records.
+         * Zero disables this model-specific source of native references. */
+        uint32_t library_table;
     };
 
     enum hpclang_rpl_mutation_result
@@ -149,6 +152,23 @@ extern "C"
      * This does not create, encode, replace, or remove a named variable by itself;
      * higher-level store code owns the bytes placed into/opened from the gap.
      */
+    /* Port-only geometry backend. Caller must validate the complete port chain,
+     * record boundaries and library relocation safety before invoking this.
+     * Live references into a contraction still return BUSY. */
+    int hpclang_rpl_mutation_port0_shift_before(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, int32_t delta);
+
+    /* Same caller validation as above; preserve an entire removed record when
+     * Stock retains references to it or any of its enclosed values. */
+    int hpclang_rpl_mutation_port0_remove_record(const struct hpclang_rpl_mutation_io *io,
+                                                 uint32_t address, uint32_t span);
+
+    /* Caller validates both encodings and library movement. Packed bytes must
+     * be owned ARM storage and remain stable throughout the transaction. */
+    int hpclang_rpl_mutation_port0_replace_record(const struct hpclang_rpl_mutation_io *io,
+                                                  uint32_t address, uint32_t old_span,
+                                                  const uint8_t *packed, uint32_t new_span);
+
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 

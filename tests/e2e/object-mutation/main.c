@@ -10,6 +10,7 @@
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_classic_mutation(void);
 uint32_t hpclang_e2e_port_reads(void);
+uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase);
 uint32_t hpclang_e2e_hp39_mutation(void);
 
 static void hold_success(void)
@@ -65,7 +66,15 @@ int main(void)
                 HPCLANG_CAPABILITY_SUPPORTED)
             return finish(0xe2u);
         uint32_t port_failure = hpclang_e2e_port_reads();
-        return finish(port_failure ? port_failure : hpclang_e2e_classic_mutation());
+        uint32_t failure = port_failure ? port_failure : hpclang_e2e_classic_mutation();
+        uint32_t phase = 0;
+        if (!failure)
+            failure = hpclang_e2e_port_lifecycle(&phase);
+        if (!failure) {
+            hpclang_e2e_result = UINT32_C(0x4f530400) | phase;
+            hold_success();
+        }
+        return finish(failure);
     }
 #endif
     return finish(0xe0u);

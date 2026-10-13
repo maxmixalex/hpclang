@@ -85,7 +85,8 @@ extern "C"
  * the live Read[] map and publishes this short-lived structure through the
  * opaque platform_cookie. Applications must never inspect it.
  */
-#define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x324c5052) /* "RPL2" */
+#define HPCLANG_RPL_BOUNDS_MAGIC_V2 UINT32_C(0x324c5052) /* "RPL2" prefix */
+#define HPCLANG_RPL_BOUNDS_MAGIC UINT32_C(0x334c5052)    /* "RPL3" adds ERAM fence */
 #define HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG ((uintptr_t)1u)
 
     struct hpclang_rpl_memory_bounds
@@ -96,6 +97,7 @@ extern "C"
         uint32_t stack_reserve_nibbles; /* launcher-private cells below user D1 */
         uint32_t **native_roots;        /* private ARM-held Saturn addresses */
         uint32_t native_root_count;
+        uint32_t port1_limit; /* exclusive nibble offset before ARM-owned ERAM */
     };
 
 /*

@@ -12,6 +12,8 @@
 static uint8_t memory[0x100000];
 static int unavailable;
 static int writable = 1;
+static int port1_available;
+static uint32_t port1_limit = 0x2000u;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -42,6 +44,24 @@ static int mapped_write(void *context, uint32_t address, uint8_t value)
     if (address >= sizeof(memory))
         return 0;
     memory[address] = value;
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
+{
+    if (!port1_available)
+        return 0;
+    *reader = (struct hpclang_rpl_reader){mapped_read, NULL};
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit)
+{
+    if (!port1_available || !writable)
+        return 0;
+    *io =
+        (struct hpclang_rpl_mutation_io){.read_nibble = mapped_read, .write_nibble = mapped_write};
+    *limit = port1_limit;
     return 1;
 }
 
@@ -97,6 +117,22 @@ int main(void)
     assert(!hpclang_port_iterator_open(0) && errno == EIO);
     unavailable = 0;
     fixture();
+    port1_available = 1;
+    memcpy(memory, memory + 0xfffc0, 54);
+    iterator = hpclang_port_iterator_open(1);
+    assert(iterator && hpclang_port_iterator_read(iterator, &entry) == 1);
+    assert(entry.kind == HPCLANG_PORT_BACKUP && entry.name_length == 8);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 0);
+    hpclang_port_iterator_close(iterator);
+    object = hpclang_port_backup_get(1, (const uint8_t *)"PORTZERO", 8);
+    assert(object && hpclang_object_integer_i64(object, &value) == 0 && value == 123);
+    memory[53] ^= 1;
+    assert(!hpclang_port_iterator_open(1) && errno == EILSEQ);
+    /* A Port 1 snapshot is independent of both native mapping and bank state. */
+    port1_available = 0;
+    memset(memory, 0, 54);
+    assert(hpclang_object_integer_i64(object, &value) == 0 && value == 123);
+    hpclang_object_release(object);
     assert(!hpclang_port_backup_get(0, (const uint8_t *)"portzero", 8) && errno == ENOENT);
     assert(!hpclang_port_backup_get(0, NULL, 1) && errno == EINVAL);
     assert(!hpclang_port_iterator_open(3) && errno == EINVAL);
@@ -138,8 +174,17 @@ int main(void)
     memset(memory + 0xfffc0 + 43, 0, 5);
     object = hpclang_port_library_get(0, 123);
     assert(object);
+    memcpy(memory, memory + 0xfffc0, 48);
+    port1_available = 1;
+    device.family = HPCLANG_FAMILY_HP4950;
+    struct hpclang_object *port1_library = hpclang_port_library_get(1, 123);
+    assert(port1_library && hpclang_object_kind(port1_library) == HPCLANG_OBJECT_LIBRARY);
+    port1_available = 0;
+    device.family = HPCLANG_FAMILY_HP48;
     memset(memory, 0, sizeof(memory));
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
+    assert(hpclang_object_kind(port1_library) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(port1_library);
     hpclang_object_release(object);
     fixture();
     object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);
@@ -160,10 +205,48 @@ int main(void)
     struct hpclang_object *copy = hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3);
     assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
     hpclang_object_release(copy);
+    struct hpclang_object *replacement = NULL;
+    assert(hpclang_object_create_string((const uint8_t *)"replacement", 11, &replacement) == 0);
+    assert(hpclang_port_backup_replace(0, (const uint8_t *)"NEW", 3, replacement) == 0);
+    copy = hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3);
+    assert(copy && hpclang_object_kind(copy) == HPCLANG_OBJECT_STRING);
+    hpclang_object_release(copy);
+    assert(hpclang_port_backup_replace(0, (const uint8_t *)"NEW", 3, object) == 0);
+    copy = hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    hpclang_object_release(replacement);
+    assert(hpclang_port_backup_remove(0, (const uint8_t *)"NEW", 3) == 0);
+    assert(!hpclang_port_backup_get(0, (const uint8_t *)"NEW", 3) && errno == ENOENT);
+    assert(hpclang_port_backup_remove(0, (const uint8_t *)"NEW", 3) == -1 && errno == ENOENT);
+    assert(hpclang_port_backup_replace(0, (const uint8_t *)"NEW", 3, object) == -1 &&
+           errno == ENOENT);
+    assert(hpclang_port_backup_remove(0, NULL, 1) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_remove(3, NULL, 0) == -1 && errno == EINVAL);
+    assert(hpclang_port_backup_remove(1, NULL, 0) == -1 && errno == ENOSYS);
+    assert(hpclang_port_backup_replace(2, NULL, 0, object) == -1 && errno == ENOSYS);
+    boot.saturn_state = 0;
+    assert(hpclang_port_backup_remove(0, NULL, 0) == -1 && errno == ENOSYS);
+    boot.saturn_state = 1;
     assert(hpclang_port_backup_create(0, NULL, 1, object) == -1 && errno == EINVAL);
     assert(hpclang_port_backup_create(3, NULL, 0, object) == -1 && errno == EINVAL);
     assert(hpclang_port_backup_create(1, NULL, 0, object) == -1 && errno == ENOSYS);
     assert(hpclang_port_backup_create(0, NULL, 0, NULL) == -1 && errno == EINVAL);
+    device.family = HPCLANG_FAMILY_HP4950;
+    port1_available = 1;
+    memory[port1_limit] = 11;
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"ERAM", 4, object) == 0);
+    copy = hpclang_port_backup_get(1, (const uint8_t *)"ERAM", 4);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    assert(memory[port1_limit] == 11);
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"ERAM", 4, object) == -1 &&
+           errno == EEXIST);
+    assert(hpclang_port_backup_replace(1, (const uint8_t *)"ERAM", 4, object) == -1 &&
+           errno == ENOSYS);
+    port1_limit = 0;
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"OTHER", 5, object) == -1 &&
+           errno == ENOSPC);
     writable = 0;
     assert(hpclang_port_backup_create(0, NULL, 0, object) == -1 && errno == ENOSYS);
     hpclang_object_release(object);

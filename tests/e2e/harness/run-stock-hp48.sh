@@ -12,6 +12,8 @@ APP_DIR="$(realpath "$2")"
 ASSETS_DIR="$(realpath "$3")"
 export TARGET
 
+source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"
+
 NOR="$ROOT/build/$TARGET-nor.bin"
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
@@ -153,3 +155,6 @@ done
 
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/stock-hp48.json"
+if [[ -f "$LIFECYCLE" ]]; then
+    python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE"
+fi

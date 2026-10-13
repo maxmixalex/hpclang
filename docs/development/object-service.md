@@ -565,8 +565,8 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | Metadata enumeration, owned backup/library reads and backup creation have local Stock coverage; replacement, removal and library mutation remain in M8.0. |
-| Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
+| Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
+| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup creation pass local Stock, including relaunch and native RPL recall. Replacement/removal and library writes still require bank/reference handling. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
@@ -605,7 +605,7 @@ independent `hpclang_object` snapshots released with `hpclang_object_release`.
 Backup names are exact calculator bytes, while library metadata includes its
 numeric identifier. `hpclang_port_library_get` copies a complete library by
 number without installing, attaching or executing it. The current backend
-reads classic Stock Port 0 only.
+reads classic Stock Port 0 and HP49g+/HP50g Stock Port 1.
 Other valid port indices and unavailable runtime contexts return `ENOSYS`,
 which describes this implementation rather than hardware absence. Invalid
 indices return `EINVAL`, missing names `ENOENT`, damaged encodings `EILSEQ`,
@@ -618,17 +618,17 @@ tests pass with ASan/UBSan, and Clang static analysis passes for the public back
 The object-mutation suite now prepares `PORTZERO` through its versioned
 `stock-setup.json`, enumerates it and checks its exact integer value. It also
 reads installed libraries (including ARMToolbox on HP48gII). The same harness
-and application pass locally on all three classic models. Port writes and
-Flash transactions remain required; remote acceptance is still pending.
+and application pass locally on all three classic models. These initial reads
+and create-only writes are integrated into main at `f36d1d80`. The further
+mutation and persistence work below remains a local M8.0 extension.
 
 `hpclang_port_backup_create` prepares a complete owned backup encoding before
 changing native storage. Port 0 creation opens space at the HOME/port boundary
 using the existing validated USEROB relocation machinery, writes the record,
 then publishes the new port start. Existing port objects and libraries remain
 at their original addresses. Exact duplicate names return `EEXIST`; native
-space exhaustion returns `ENOSPC`. This first write operation does not replace
-or remove an existing backup, install a library or implement Port 1/2 writes.
-Those operations remain M8.0 requirements. As with HOME mutation, the captured
+space exhaustion returns `ENOSPC`. It never replaces an existing backup.
+As with HOME mutation, the captured
 RAM mapping must remain stable during commit; preflight does not promise
 rollback for an artificial backend that fails writes midway through commit.
 The three classic Stock models locally pass creation/readback of integer 987,
@@ -638,7 +638,45 @@ objects. Independent local relaunch probes on all three classic models use
 Stock Kermit commands to recall both backups through native RPL and store the
 results in a native directory; the recorded values are 987 and 123. Resumed
 USB enumeration requires restoring the saved interrupt-enable masks into the
-protocol backend. The reusable CI relaunch gate remains to be integrated.
+protocol backend. A reusable native-RPL recall gate remains required; the
+three-launch public-API gate below is a separate persistence witness.
+
+`hpclang_port_backup_replace` and `hpclang_port_backup_remove` now support
+existing exact names in Port 0. Missing names return `ENOENT`; replacement does
+not implicitly create a missing record. Replacement can grow or shrink a backup.
+References to its previous complete record, including interior value pointers,
+are preserved in TEMP before mutation. The classic library-address table joins
+the existing stack, environment and system reference scan; banked references
+are distinguished from numerically equal main-RAM addresses. Operations requiring
+relocation of a preceding library still return `ENOTSUP` while library code
+alignment and active execution safety are being completed.
+
+All three classic models locally pass grow/shrink/read/remove plus HOME mutation
+and settled return. They also pass three independent Stock launches: create an
+integer backup, read and replace it with a string after relaunch, then read and
+remove the string after another relaunch. No reinstallation, reset or fixture
+injection occurs between launches. Internal library-record creation preserves
+existing record addresses and rejects duplicate library IDs; it does not yet
+provide public library installation or attachment. Port 1 replacement/removal, Port 2 and full
+library mutation remain M8.0 requirements.
+
+Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
+checking its live identity mapping. They do not switch Saturn banks or claim
+the free tail as writable storage. Host tests cover packed-nibble bounds,
+invalid mappings, backup/library snapshots and damaged records. HP49g+ and
+HP50g Stock tests create `PORTONE` through native RPL before launching, then
+enumerate it and verify integer 456 on all three lifecycle invocations while
+Port 0 and HOME mutations run.
+
+`hpclang_port_backup_create(1, ...)` now appends a validated record before the
+launcher-provided ERAM ownership fence. Existing records and library addresses
+do not move. The body, CRC and next terminator are prepared before publishing
+the prologue. Insufficient unowned space returns `ENOSPC`; no native space is
+borrowed from the application heap. Older launchers without the fence return
+`ENOSYS`. HP49g+ and HP50g Stock create integer 789 and read it across subsequent
+launches. Independent native-RPL probes then recall both that record and the
+original 456 through Stock Kermit. Port 1 replacement/removal and library
+mutation still require their own reference-preservation and relocation paths.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must

@@ -1,0 +1,8 @@
+# Resume the saved native system. Recall HPCLANG from HOME and invoke PrRUN
+# through the already installed ARMToolbox; do not transfer or reinstall it.
+0 monitor 90000
+2000 tap var
+4000 tap f1
+6000 chord rshift two
+8500 tap f1
+11000 tap f1

@@ -1,4 +1,7 @@
 {
-  "version": 1,
-  "commands": ["123 :0:PORTZERO STO"]
+  "version": 2,
+  "families": {
+    "hp48": ["123 :0:PORTZERO STO"],
+    "hp4950": ["123 :0:PORTZERO STO", "456 :1:PORTONE STO"]
+  }
 }

@@ -20,13 +20,24 @@ hpclang_launch_rpl_bounds(const struct hpclang_boot_info *boot)
     if (raw == 0u || raw % _Alignof(struct hpclang_rpl_memory_bounds) != 0u)
         return NULL;
     const struct hpclang_rpl_memory_bounds *bounds = (const void *)raw;
-    if (bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC || bounds->temp_limit <= 0x80000u ||
-        bounds->temp_limit > 0x100000u || bounds->user_limit < 0x80000u ||
-        bounds->user_limit >= 0x100000u ||
+    if ((bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC &&
+         bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC_V2) ||
+        bounds->temp_limit <= 0x80000u || bounds->temp_limit > 0x100000u ||
+        bounds->user_limit < 0x80000u || bounds->user_limit >= 0x100000u ||
         bounds->stack_reserve_nibbles > 0x100000u - bounds->user_limit ||
         bounds->stack_reserve_nibbles % 5u != 0u)
         return NULL;
     return bounds;
+}
+
+static inline uint32_t hpclang_launch_port1_limit(const struct hpclang_boot_info *boot)
+{
+    const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
+    if (!bounds || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+        (boot->model != HPCLANG_MODEL_HP49GPLUS && boot->model != HPCLANG_MODEL_HP50G) ||
+        bounds->port1_limit > 0x40000u)
+        return 0;
+    return bounds->port1_limit;
 }
 
 static inline const struct hpclang_hp39_platform_context *

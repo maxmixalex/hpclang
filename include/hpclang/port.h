@@ -32,8 +32,9 @@ extern "C"
 
     /* Snapshot port metadata. Names/titles are raw calculator bytes, not UTF-8.
      * Libraries are identified by number, backups by exact name. No native
-     * addresses are retained by the iterator. Currently Port 0 on classic Stock
-     * is implemented; other valid ports/contexts return ENOSYS. This does not
+     * addresses are retained by the iterator. Currently classic Stock Port 0
+     * and HP49g+/HP50g Stock Port 1 reads are implemented; other valid
+     * ports/contexts return ENOSYS. This does not
      * imply that the calculator lacks those ports. Indices above 2 return EINVAL.
      */
     struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port);
@@ -54,9 +55,19 @@ extern "C"
 
     /* Create a new named backup from an owned snapshot. An existing exact name
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port
-     * objects remain at their original addresses. Currently Port 0 only. */
+     * objects remain at their original addresses. Supports classic Stock Port 0
+     * and HP49g+/HP50g Stock Port 1. Port 1 requires a launcher-provided ERAM
+     * ownership boundary; older launchers without it return ENOSYS. */
     int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
                                    const struct hpclang_object *value);
+
+    /* Replace/remove an existing backup; missing names return ENOENT. Live
+     * calculator references retain the old value. Currently Port 0 only;
+     * operations requiring relocation of a preceding library return ENOTSUP.
+     * Replacement never implicitly creates a missing backup. */
+    int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
+                                    const struct hpclang_object *value);
+    int hpclang_port_backup_remove(uint32_t port, const uint8_t *name, uint32_t name_length);
 
 #ifdef __cplusplus
 }

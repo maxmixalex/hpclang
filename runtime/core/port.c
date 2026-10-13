@@ -10,6 +10,7 @@
 
 #include "object-snapshot.h"
 #include "rpl-port.h"
+#include "rpl-stock-memory.h"
 #include "saturn-view.h"
 
 struct hpclang_port_iterator
@@ -25,8 +26,6 @@ static int read_nibble(void *context, uint32_t address, uint8_t *value)
     return hpclang_saturn_read_nibble(hpclang_saturn_address_make(address), value);
 }
 
-static const struct hpclang_rpl_reader reader = {read_nibble, NULL};
-
 static int port_error(int result)
 {
     errno = result == HPCLANG_RPL_SPAN_UNAVAILABLE   ? EIO
@@ -35,7 +34,8 @@ static int port_error(int result)
     return -1;
 }
 
-static int open_cursor(uint32_t port, struct hpclang_rpl_port_cursor *cursor)
+static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
+                       struct hpclang_rpl_port_cursor *cursor)
 {
     if (port > 2) {
         errno = EINVAL;
@@ -43,11 +43,20 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_port_cursor *cursor)
     }
     const struct hpclang_device_info *device = hpclang_device_info();
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (port != 0 || !device || !boot || !boot->saturn_state ||
+    if (port == 2 || !device || !boot || !boot->saturn_state ||
         (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950)) {
         errno = ENOSYS;
         return -1;
     }
+    if (port == 1) {
+        if (device->family != HPCLANG_FAMILY_HP4950 || !hpclang_rpl_stock_port1_reader(reader)) {
+            errno = ENOSYS;
+            return -1;
+        }
+        *cursor = (struct hpclang_rpl_port_cursor){0, HPCLANG_RPL_PORT1_NIBBLES, 0};
+        return 0;
+    }
+    *reader = (struct hpclang_rpl_reader){read_nibble, NULL};
     uint32_t start = 0;
     for (uint32_t i = 0; i < 5; ++i) {
         uint8_t nibble;
@@ -67,7 +76,8 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_port_cursor *cursor)
 struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port)
 {
     struct hpclang_rpl_port_cursor initial;
-    if (open_cursor(port, &initial))
+    struct hpclang_rpl_reader reader;
+    if (open_cursor(port, &reader, &initial))
         return NULL;
     struct hpclang_rpl_port_cursor cursor = initial;
     struct hpclang_rpl_port_entry native;
@@ -147,7 +157,8 @@ struct hpclang_object *hpclang_port_backup_get(uint32_t port, const uint8_t *nam
         return NULL;
     }
     struct hpclang_rpl_port_cursor cursor;
-    if (open_cursor(port, &cursor))
+    struct hpclang_rpl_reader reader;
+    if (open_cursor(port, &reader, &cursor))
         return NULL;
     struct hpclang_rpl_port_entry entry;
     int result;
@@ -174,7 +185,8 @@ struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_
         return NULL;
     }
     struct hpclang_rpl_port_cursor cursor;
-    if (open_cursor(port, &cursor))
+    struct hpclang_rpl_reader reader;
+    if (open_cursor(port, &reader, &cursor))
         return NULL;
     struct hpclang_rpl_port_entry entry;
     int result;

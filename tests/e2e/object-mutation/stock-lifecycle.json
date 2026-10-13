@@ -1,21 +1,92 @@
 {
-  "version": 1,
-  "family": "hp39",
-  "initial_phase": "0x4f530300",
-  "relaunches": [
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530301"},
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530301"},
-    {"sequence": "hp39-stock-copy-aplet.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530301"},
-    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530301"},
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-cancel-reset.seq", "phase": "0x4f530301"},
-    {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-reset-aplet.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-reset-aplet.seq", "phase": "0x4f530300"},
-    {"sequence": "hp39-stock-next-aplet.seq", "phase": "0x4f530301"}
-  ]
+  "version": 2,
+  "families": {
+    "hp39": {
+      "initial_phase": "0x4f530300",
+      "relaunches": [
+        {
+          "sequence": "hp39-stock-relaunch.seq",
+          "phase": "0x4f530301"
+        },
+        {
+          "sequence": "hp39-stock-relaunch.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-relaunch.seq",
+          "phase": "0x4f530301"
+        },
+        {
+          "sequence": "hp39-stock-copy-aplet.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-next-aplet.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-next-aplet.seq",
+          "phase": "0x4f530301"
+        },
+        {
+          "sequence": "hp39-stock-next-aplet.seq",
+          "phase": "0x4f530301"
+        },
+        {
+          "sequence": "hp39-stock-relaunch.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-cancel-reset.seq",
+          "phase": "0x4f530301"
+        },
+        {
+          "sequence": "hp39-stock-relaunch.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-reset-aplet.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-next-aplet.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-reset-aplet.seq",
+          "phase": "0x4f530300"
+        },
+        {
+          "sequence": "hp39-stock-next-aplet.seq",
+          "phase": "0x4f530301"
+        }
+      ]
+    },
+    "hp48": {
+      "initial_phase": "0x4f530400",
+      "relaunches": [
+        {
+          "sequence": "classic-stock-relaunch.seq",
+          "phase": "0x4f530401"
+        },
+        {
+          "sequence": "classic-stock-relaunch.seq",
+          "phase": "0x4f530402"
+        }
+      ]
+    },
+    "hp4950": {
+      "initial_phase": "0x4f530400",
+      "relaunches": [
+        {
+          "sequence": "classic-stock-relaunch.seq",
+          "phase": "0x4f530401"
+        },
+        {
+          "sequence": "classic-stock-relaunch.seq",
+          "phase": "0x4f530402"
+        }
+      ]
+    }
+  }
 }
