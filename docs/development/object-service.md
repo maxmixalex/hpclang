@@ -714,3 +714,9 @@ loss. HP49g+ and HP50g local Stock acceptance passes all three lifecycle
 invocations, reading native integer 987, enumerating its backup and library 275,
 copying that library and rejecting a natively purged backup. Typed port discovery, erase/write and
 power-loss behavior remain separate M8.0 requirements.
+
+`hpclang_port_query()` exposes native medium, implemented operations and
+launch-available operations without touching port contents. This separates
+absent model ports from unavailable launch contexts and from unfinished write
+services. It does not replace data/mapping checks in the actual service calls.
+See the API reference for the operation masks and descriptor version contract.

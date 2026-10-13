@@ -12,6 +12,50 @@
 #include "rpl-port.h"
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
+#include "launch-services.h"
+
+int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
+{
+    if (port > 2 || !info || info->size < sizeof(*info) ||
+        info->version != HPCLANG_PORT_INFO_VERSION) {
+        errno = EINVAL;
+        return -1;
+    }
+    const struct hpclang_device_info *device = hpclang_device_info();
+    if (!device || device->model < HPCLANG_MODEL_HP39GPLUS || device->model > HPCLANG_MODEL_HP50G) {
+        errno = ENOSYS;
+        return -1;
+    }
+    struct hpclang_port_info result = {
+        .size = info->size, .version = HPCLANG_PORT_INFO_VERSION, .port = port};
+    if (device->model >= HPCLANG_MODEL_HP48GII &&
+        (port == 0 || device->model != HPCLANG_MODEL_HP48GII)) {
+        result.medium = port == 0   ? HPCLANG_PORT_MAIN_RAM
+                        : port == 1 ? HPCLANG_PORT_EXTENDED_RAM
+                                    : HPCLANG_PORT_FLASH;
+        uint32_t reads =
+            HPCLANG_PORT_ENUMERATE | HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_READ_LIBRARY;
+        result.implemented = reads;
+        if (port == 0)
+            result.implemented |= HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP |
+                                  HPCLANG_PORT_REMOVE_BACKUP;
+        else if (port == 1)
+            result.implemented |= HPCLANG_PORT_CREATE_BACKUP;
+        const struct hpclang_boot_info *boot = hpclang_boot_info();
+        if (boot && boot->model == device->model && boot->saturn_state) {
+            result.available = reads;
+            const struct hpclang_rpl_memory_bounds *bounds =
+                port < 2 ? hpclang_launch_rpl_bounds(boot) : NULL;
+            if (port == 0 && bounds)
+                result.available = result.implemented;
+            else if (port == 1 && bounds && bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC &&
+                     bounds->port1_limit <= HPCLANG_RPL_PORT1_NIBBLES)
+                result.available |= HPCLANG_PORT_CREATE_BACKUP;
+        }
+    }
+    *info = result;
+    return 0;
+}
 
 struct hpclang_port_iterator
 {

@@ -470,10 +470,17 @@ Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g
 Stock across all three lifecycle launches. The backend validates the live
 Flash mapping and bank identities, and uses a separate slot iterator that skips
 native deletion markers. Host tests cover cross-bank reads and snapshot
-ownership. Port 2 writes, library mutation and typed discovery remain open.
+ownership. Port 2 writes and library mutation remain open.
 The HP48gII three-launch regression also passes, preserving `ENOSYS` for its
 unavailable Port 1/2 services. All 85 host tests, focused sanitizers, Clang
 analysis and strict documentation checks pass for this read-service batch.
+
+Local typed discovery now reports native medium, SDK operation masks and
+launch-available operation masks through `hpclang_port_query()`. Six-model
+host checks distinguish absent ports, Direct/Stock contexts, legacy launch
+bounds and supported-but-full ERAM, including the exact legacy descriptor size
+under ASan/UBSan. HP50g passes three Stock lifecycle launches; HP39g+ target
+discovery acceptance is still in progress. All 85 host tests pass.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

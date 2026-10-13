@@ -79,6 +79,28 @@ the requested operation still checks its arguments, mapping, resources and data.
 Unknown IDs return `-1` with `EINVAL`. Native Port 0/1/2 services are not covered
 by the HOME object-store capabilities.
 
+Use `hpclang_port_query(port, &info)` for native ports. Initialize `info.size`
+and `info.version = HPCLANG_PORT_INFO_VERSION`. Its `medium` distinguishes
+absent ports, main RAM, extended RAM and Flash; `implemented` is the SDK's
+operation mask and `available` additionally checks this launch's context and
+ownership bounds. Known absent ports return success with zero masks. Direct
+launches retain the model's medium/implemented information but report no
+available operations. Unknown models return `ENOSYS`; invalid indices or
+descriptor headers return `EINVAL`. Errors leave output unchanged; successful
+queries preserve `errno` and do not read hardware or allocate resources.
+
+| Native port | Models with this port | Implemented operations |
+| --- | --- | --- |
+| 0, main RAM | HP48gII, HP49g+, HP50g | Enumerate, read backups/libraries, create/replace/remove backups |
+| 1, extended RAM | HP49g+, HP50g | Enumerate, read backups/libraries, create backups |
+| 2, Flash | HP49g+, HP50g | Enumerate, read backups/libraries |
+
+Port 0 mutations require valid launcher bounds; Port 1 creation requires the
+newer ERAM ownership extension. A zero free prefix still permits the operation
+to be queried as available: the eventual allocation reports `ENOSPC`. Queries
+do not guarantee valid live mappings, intact data or safe library relocation.
+HP39 Aplet storage is a separate service, not a native Port 0/1/2 namespace.
+
 Host regression tests cover all six models, absent contexts, invalid portal
 prefixes and invalid mutation bounds. System-service E2E checks discovery under
 Direct and Stock; object-mutation E2E checks support before exercising writes.
