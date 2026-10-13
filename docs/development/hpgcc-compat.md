@@ -185,6 +185,16 @@ icons differ by calculator; setting a segment does not change keyboard flags.
 All 59 historical HPG function names are implemented; target-side and
 representative historical-application acceptance remain open.
 
+The original HPGCC 1.1 `testtext`, `testbigtext`, `testimage`, `testshapes`,
+and `testdoublebuf` examples compile and link against this adapter locally.
+Their HPG drawing calls remain unchanged. Required migration edits are:
+replace `hpkeyb49.h` with a bridge polling the clean physical keyboard service
+for `keyb_isON`/`keyb_waitKeyPressed`; replace the unused `hpsys.h` include with
+`errno.h`; and remove application definitions of `int errno`. This is a
+graphics-source build check, not yet a claim that the historical keyboard
+subsystem is installed or that these original applications passed target-side
+execution. The integrated Display E2E is a separately authored adapter witness.
+
 The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean
 Unicode font API. Default-font integration is in progress: prefer live native
