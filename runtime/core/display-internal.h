@@ -15,6 +15,8 @@ void hpclang_display_reclock_saved(uint32_t control);
  * publish flushes CPU writes without waiting, changing pages or touching LCD
  * registers; the single-page adapter calls it after each drawing operation. */
 int hpclang_display_begin_pages(uint32_t levels, unsigned page_count);
+/* Replace an owned mode atomically; failure keeps its pages and LCD state. */
+int hpclang_display_replace_pages(uint32_t levels, unsigned page_count);
 int hpclang_display_publish(void);
 
 #endif
