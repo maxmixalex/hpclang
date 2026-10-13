@@ -506,6 +506,15 @@ analysis pass. Native banked-reference discovery and public Port 1 replacement/
 removal remain unfinished; an imported ACPTR experiment demonstrates that native
 PURGE can leave a stale ERAM pointer, so native PURGE alone is not a safety proof.
 
+A bounded internal library-reference visitor now validates the library CRC,
+relative table bounds and link-table shape, then visits hash/message/link/config
+objects and function targets. It handles backward relative links and propagates
+visitor/read errors without writing native memory. All 85 host tests, focused
+ASan/UBSan and Clang analysis pass; the same C implementation enumerates 16
+references from library 275 in a saved HP50g native state. This supplies one
+structural traversal component; complete live-root and executable-reference
+coverage, and public Port 1 replacement/removal, remain open.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.

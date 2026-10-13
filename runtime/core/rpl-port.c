@@ -61,6 +61,89 @@ static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
     return 0;
 }
 
+static int library_target(const struct hpclang_rpl_reader *reader, uint32_t field, uint32_t first,
+                          uint32_t end, uint32_t *target)
+{
+    uint32_t relative;
+    int result = word(reader, field, 5, &relative);
+    if (result)
+        return result;
+    if (!relative) {
+        *target = 0;
+        return 0;
+    }
+    uint32_t resolved = (field + relative) & 0xfffffu;
+    if (resolved < first || resolved >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *target = resolved;
+    return 0;
+}
+
+int hpclang_rpl_library_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, hpclang_rpl_library_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 5)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t prologue;
+    int result = word(reader, address, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x2b40u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_port_entry entry = {.address = address};
+    uint32_t name;
+    result = library(reader, limit, &entry, &name);
+    if (result)
+        return result;
+    uint32_t fields = name + entry.name_length * 2 + 5;
+    uint32_t first = fields + 20, end = address + entry.span - 4;
+    uint32_t targets[4];
+    for (unsigned i = 0; i < 4; ++i) {
+        result = library_target(reader, fields + i * 5, first, end, &targets[i]);
+        if (result)
+            return result;
+    }
+    uint32_t links_end = 0;
+    if (targets[2]) {
+        uint32_t type, span;
+        if (end - targets[2] < 10)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = word(reader, targets[2], 5, &type);
+        if (result)
+            return result;
+        if (type != 0x2a4eu)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        result = hpclang_rpl_object_span(reader, targets[2], end - targets[2], &span);
+        if (result)
+            return result;
+        if ((span - 10) % 5)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        links_end = targets[2] + span;
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        if (targets[i]) {
+            result = visit(context, (enum hpclang_rpl_library_reference_kind)i, fields + i * 5,
+                           targets[i], end - targets[i]);
+            if (result)
+                return result;
+        }
+    }
+    for (uint32_t field = targets[2] ? targets[2] + 10 : 0; field < links_end; field += 5) {
+        uint32_t target;
+        result = library_target(reader, field, first, end, &target);
+        if (result)
+            return result;
+        if (target) {
+            result = visit(context, HPCLANG_RPL_LIBRARY_FUNCTION, field, target, end - target);
+            if (result)
+                return result;
+        }
+    }
+    return 0;
+}
+
 int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
                           struct hpclang_rpl_port_cursor *cursor,
                           struct hpclang_rpl_port_entry *entry)

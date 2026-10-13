@@ -31,6 +31,25 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
                           struct hpclang_rpl_port_cursor *cursor,
                           struct hpclang_rpl_port_entry *entry);
 
+enum hpclang_rpl_library_reference_kind
+{
+    HPCLANG_RPL_LIBRARY_HASH,
+    HPCLANG_RPL_LIBRARY_MESSAGES,
+    HPCLANG_RPL_LIBRARY_LINKS,
+    HPCLANG_RPL_LIBRARY_CONFIG,
+    HPCLANG_RPL_LIBRARY_FUNCTION
+};
+
+/* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
+ * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
+ * discard partial traversal on error. This enumerates structural references;
+ * it does not prove that referenced code has no further live references. */
+typedef int (*hpclang_rpl_library_visit_fn)(void *context,
+                                            enum hpclang_rpl_library_reference_kind kind,
+                                            uint32_t field, uint32_t target, uint32_t limit);
+int hpclang_rpl_library_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, hpclang_rpl_library_visit_fn visit, void *context);
+
 /* Traverse allocated slots within one Flash bank, starting after its bank
  * header. Each slot has a status byte, a five-nibble relative extent and one
  * metadata nibble before the object. The caller supplies bank mapping/bounds.
