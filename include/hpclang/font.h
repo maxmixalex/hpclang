@@ -63,6 +63,13 @@ extern "C"
     uint32_t hpclang_font_advance(const struct hpclang_font *font);
     uint32_t hpclang_font_codepoint_advance(const struct hpclang_font *font, uint32_t codepoint);
 
+    /* Measure bounded UTF-8 with the same fallback/newline policy as drawing.
+     * Width is the largest line's advance, not its ink bounds; height includes
+     * one line for empty text. Returns 0, or -1/EINVAL or EOVERFLOW, preserving
+     * outputs on failure. A NUL ends text before byte_count. */
+    int hpclang_font_measure_text_n(const struct hpclang_font *font, const char *text,
+                                    size_t byte_count, uint32_t *width, uint32_t *height);
+
     /* Draw one Unicode code point. Native calculator fonts fall back to '?' for
      * code points outside their byte-oriented repertoire. */
     void hpclang_surface_draw_codepoint(struct hpclang_surface *surface,

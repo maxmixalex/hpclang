@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
@@ -616,6 +617,34 @@ static uint32_t utf8_next(const char **cursor, const char *end)
 
     *cursor = (const char *)(p + continuation);
     return value;
+}
+
+int hpclang_font_measure_text_n(const struct hpclang_font *font, const char *text,
+                                size_t byte_count, uint32_t *width, uint32_t *height)
+{
+    if (!font || !text || !width || !height || !hpclang_font_available(font)) {
+        errno = EINVAL;
+        return -1;
+    }
+    const char *end = text + byte_count;
+    uint64_t line = 0, widest = 0, total = hpclang_font_height(font);
+    while (text < end && *text) {
+        uint32_t cp = utf8_next(&text, end);
+        if (cp == '\n') {
+            if (line > widest)
+                widest = line;
+            line = 0;
+            total += hpclang_font_height(font);
+        } else
+            line += hpclang_font_codepoint_advance(font, cp);
+        if (line > UINT32_MAX || total > UINT32_MAX) {
+            errno = EOVERFLOW;
+            return -1;
+        }
+    }
+    *width = (uint32_t)(line > widest ? line : widest);
+    *height = (uint32_t)total;
+    return 0;
 }
 
 static void draw_text(struct hpclang_surface *surface, const struct hpclang_font *font, int32_t x,

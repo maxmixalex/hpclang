@@ -185,7 +185,12 @@ icons differ by calculator; setting a segment does not change keyboard flags.
 All 59 historical HPG function names are implemented. The integrated Display
 suite passes all six models in Direct and Stock locally, including independent
 pixel checks for single/double buffering, fonts, XPM and status segments.
-Formal CI acceptance remains pending.
+Formal CI acceptance is complete at `1e46aa3d`:
+[Core](https://github.com/maxmixalex/hpclang/actions/runs/38419627444),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38419627345),
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38419627334),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38419627393) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38419627414) pass.
 
 The original HPGCC 1.1 `testtext`, `testbigtext`, `testimage`, `testshapes`,
 and `testdoublebuf` examples compile and link against this adapter locally.
@@ -613,7 +618,7 @@ review; a declaration count proves none of those.
 | Header / comparison | Unique functions in each version | Identical common declarations | Finding |
 | --- | --- | --- | --- |
 | `hpgraphics.h`, 1.0.3 → 1.1 | 55 → 59 | 55 | Existing count confirmed; four metric/geometry helpers added |
-| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | All 59 installed adapter functions implemented; six-model Direct/Stock local checks pass, formal CI pending |
+| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | All 59 installed adapter functions implemented; six-model Direct/Stock local checks and formal CI pass at `1e46aa3d` |
 | `hpkeyb49.h`, 1.0.3 → 1.1 | 12 → 17 | 11 | `keyb_getkey` changes return type; five names added |
 | `hpkeyb49.h`, 1.1 → 2.0 | 17 → 17 | 17 | Existing count confirmed |
 | `hpscreen.h`, 1.0.3 → 1.1 | 12 → 9 | 9 | Three old minifont helpers removed; 9 is the retained subset |

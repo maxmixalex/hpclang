@@ -488,6 +488,36 @@ in their subsequent stages.
 
 #### M8.2 — Declarative UI core
 
+The implementation provides bounded transactional declarations, scoped stable
+identity, row/column layout, controlled text and boolean proposals, native-key
+input, nested focus-revealing scroll, revision-driven canvas damage and bounded
+asynchronous effects with owner cancellation and exit cleanup. The surface/font
+renderer has explicit themes, clipping leases and transactional raster pages.
+The installed device-manager example combines the original application patterns,
+including failure/retry/cancel, eight-device insertion/reversal and waveform updates.
+Public names remain provisional pending milestone acceptance.
+
+Local acceptance now passes all six Direct and all six Stock targets, including
+physical-key events, alternate-theme replacement, native-font or explicit fallback
+layout, and normal system return. Independent LCD checks verify application states,
+32 model-derived waveform vertices, theme inversion and font-dependent geometry.
+All 80 host targets, UI sanitizers, host/ARM Clang analysis and strict docs pass;
+an installed SDK builds the alternate-palette/native-font example and six launchers.
+The full view has 46 nodes; its 48-node/512-byte/one-task ARM pool uses 16,764 bytes.
+HP39g+ and HP39gs complete the flow within the observed 36 KiB read/write window.
+Host flow/pixel tests cover both palettes at 2/4/16 levels; emulator timings are
+not physical-device performance guarantees. The shared Runtime matrix includes
+the UI suite. CI acceptance of the implementation is complete at `a18302a3`:
+[Core](https://github.com/maxmixalex/hpclang/actions/runs/38410381090),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38410381128),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38410381038),
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38410381089) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38419383490) pass.
+[Gallery](https://github.com/maxmixalex/hpclang/actions/runs/38406483751) passed
+on the preceding implementation; the text-node enum/scanner correction did not
+change Gallery inputs. The remaining milestone checklist below is retained;
+integration alone does not close M8.2/M8.3.
+
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
 preserve node identity when that view is declared again. C functions suffice
@@ -553,8 +583,11 @@ checks match all four historical headers (55 functions in 1.0; 59 thereafter).
 The integrated Display suite passes all six models in Direct and Stock,
 including independent single/double-buffer, font, XPM and indicator checks.
 Five original HPGCC 1.1 graphics examples compile and their drawing bodies
-pass HP50g Direct execution with test-controlled screenshot waits. Formal
-CI acceptance remains pending; the other adapter groups below are retained.
+pass HP50g Direct execution with test-controlled screenshot waits. CI acceptance
+of the HPG implementation is complete at `1e46aa3d`: Core, Quality, Runtime,
+Objects and Storage pass. Integration with the accepted UI implementation
+passes all 81 host targets and the ARM Display build. The other adapter groups
+below are retained.
 
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused

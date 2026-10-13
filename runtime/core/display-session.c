@@ -55,8 +55,11 @@ static int configure(uint32_t levels, unsigned count, int replacing)
             goto fail;
         if (hpclang_lcd_buffer_validate(next_pages[i].physical, next_pages[i].bytes))
             goto fail;
-        next_surfaces[i] = (struct hpclang_surface){next_pages[i].pixels, device->display_width,
-                                                    device->display_height, stride, levels};
+        next_surfaces[i] = (struct hpclang_surface){.pixels = next_pages[i].pixels,
+                                                    .width = device->display_width,
+                                                    .height = device->display_height,
+                                                    .stride = stride,
+                                                    .levels = levels};
         hpclang_cache_clean(next_pages[i].pixels, next_pages[i].bytes);
     }
     struct hpclang_lcd_layout layout;
