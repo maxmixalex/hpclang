@@ -77,9 +77,10 @@ int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, ui
 }
 
 static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, const uint8_t *name,
-                      uint32_t name_length, const uint8_t *packed, uint32_t span)
+                      uint32_t name_length, const uint8_t *packed, uint32_t span,
+                      const struct hpclang_rpl_port1_guard *guard)
 {
-    if (!io || !io->read_nibble || !io->write_nibble)
+    if (!io || !io->read_nibble || !io->write_nibble || !guard || !guard->check)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
     if (limit > 0x40000u || span > 0xfffffu || (!name && name_length) || name_length > 255)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -129,6 +130,11 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
     }
     uint32_t from = target.address + target.span;
     uint32_t to = target.address + span;
+    /* Same-size replacement invalidates references to the old record only;
+     * a size change also moves every following record, up to the terminator. */
+    result = guard->check(guard->context, target.address, to == from ? from : old_end);
+    if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
     uint32_t tail = old_end - from + 6u;
     if (to != from) {
         for (uint32_t n = 0; n < tail; ++n) {
@@ -148,17 +154,19 @@ static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, 
 }
 
 int hpclang_rpl_port1_replace_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
-                                     const uint8_t *packed, uint32_t span)
+                                     const uint8_t *packed, uint32_t span,
+                                     const struct hpclang_rpl_port1_guard *guard)
 {
     if (!packed)
         return HPCLANG_RPL_MUTATION_MALFORMED;
-    return port1_edit(io, limit, NULL, 0, packed, span);
+    return port1_edit(io, limit, NULL, 0, packed, span, guard);
 }
 
 int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
-                                    const uint8_t *name, uint32_t name_length)
+                                    const uint8_t *name, uint32_t name_length,
+                                    const struct hpclang_rpl_port1_guard *guard)
 {
-    return port1_edit(io, limit, name, name_length, NULL, 0);
+    return port1_edit(io, limit, name, name_length, NULL, 0, guard);
 }
 
 static int port_start(const struct hpclang_rpl_mutation_io *io, uint32_t *start)

@@ -1347,8 +1347,25 @@ static void test_port1_append_respects_native_pool(void)
     }
 }
 
+struct port1_guard_fixture
+{
+    uint32_t start, end, calls;
+    int result;
+};
+
+static int check_port1_fixture(void *context, uint32_t start, uint32_t end)
+{
+    struct port1_guard_fixture *fixture = context;
+    fixture->start = start;
+    fixture->end = end;
+    ++fixture->calls;
+    return fixture->result;
+}
+
 static void test_port1_edit_owned_suffix(void)
 {
+    struct port1_guard_fixture fixture = {0};
+    const struct hpclang_rpl_port1_guard guard = {check_port1_fixture, &fixture};
     struct hpclang_rpl_mutation_io io = setup(1);
     const struct hpclang_rpl_reader reader = {read_nibble, NULL};
     put_word(0x82000, 5, 0x029bf);
@@ -1373,15 +1390,37 @@ static void test_port1_edit_owned_suffix(void)
     assert(hpclang_rpl_port1_create_backup(&io, limit, tail, tail_span) == 0);
     memory[limit] = 11;
     uint32_t before = writes;
-    assert(hpclang_rpl_port1_replace_backup(&io, limit - 1, large, large_span) ==
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, NULL) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    const struct hpclang_rpl_port1_guard missing = {0};
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &missing) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(fixture.start == 0 && fixture.end == small_span + tail_span && fixture.calls == 1);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    fixture.result = HPCLANG_RPL_MUTATION_IO;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, same, same_span, &guard) ==
+           HPCLANG_RPL_MUTATION_IO);
+    assert(fixture.start == 0 && fixture.end == small_span && fixture.calls == 3);
+    assert(writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, tail, tail_span, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(fixture.start == small_span && fixture.end == small_span + tail_span);
+    assert(writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_OK;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit - 1, large, large_span, &guard) ==
            HPCLANG_RPL_MUTATION_NOSPACE);
     assert(writes == before);
     rejected_read = limit - 1;
-    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span) ==
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) ==
            HPCLANG_RPL_MUTATION_IO);
     assert(writes == before);
     rejected_read = UINT32_MAX;
-    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span) == 0);
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) == 0);
     assert(memory[limit] == 11);
     struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
     struct hpclang_rpl_port_entry entry;
@@ -1389,7 +1428,7 @@ static void test_port1_edit_owned_suffix(void)
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == large_span);
     assert(!memcmp(entry.name, "TAIL", 4));
     assert_char_at(entry.value_address, 'T');
-    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span) == 0);
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span, &guard) == 0);
     cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
     assert_char_at(entry.value_address, 'A');
@@ -1397,19 +1436,19 @@ static void test_port1_edit_owned_suffix(void)
     assert_char_at(entry.value_address, 'T');
     before = writes;
     small[0] ^= 1;
-    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span) ==
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span, &guard) ==
            HPCLANG_RPL_MUTATION_MALFORMED);
     small[0] ^= 1;
     assert(writes == before);
-    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"MISS", 4) ==
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"MISS", 4, &guard) ==
            HPCLANG_RPL_MUTATION_NOT_FOUND);
     assert(writes == before);
-    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4) == 0);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &guard) == 0);
     cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 0);
     assert_char_at(entry.value_address, 'T');
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
-    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"TAIL", 4) == 0);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"TAIL", 4, &guard) == 0);
     assert(get_word(0, 5) == 0 && memory[limit] == 11);
 
     // A following library must not move; same-size replacement may leave it fixed.
@@ -1419,12 +1458,13 @@ static void test_port1_edit_owned_suffix(void)
     for (uint32_t i = 0; i < 43; ++i)
         memory[small_span + i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
     before = writes;
-    assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4) ==
+    assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard) ==
            HPCLANG_RPL_MUTATION_UNSUPPORTED);
-    assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span) ==
+    assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard) ==
            HPCLANG_RPL_MUTATION_UNSUPPORTED);
     assert(writes == before);
-    assert(hpclang_rpl_port1_replace_backup(&io, 256, same, same_span) == 0);
+    assert(hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard) == 0);
+    assert(fixture.start == 0 && fixture.end == small_span);
     cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
     assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
     assert_char_at(entry.value_address, 'B');

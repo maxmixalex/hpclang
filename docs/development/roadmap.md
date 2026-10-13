@@ -489,8 +489,15 @@ The subsequent HP39gs/HP40gs CI run exposed smaller heaps on later Aplet
 launches. HP39 discovery checks now run in the catalog suite (Direct and Stock),
 while classic discovery stays beside port mutation. The common probe preserves
 the same medium/operation assertions. All three HP39 Direct catalog targets and
-all 15 HP40gs Stock mutation launches pass locally; HP39gs mutation and the
-Stock catalog check are being verified before the follow-up push.
+all 15 HP39gs and all 15 HP40gs Stock mutation launches pass locally; the
+Stock catalog check is being verified before the follow-up push.
+
+Internal Port 1 replacement/removal now requires an explicit read-only reference
+guard before any write. Missing guards, live-reference rejection and guard read
+errors preserve the port bytes. All 85 host tests, focused sanitizers and static
+analysis pass. Native banked-reference discovery and public Port 1 replacement/
+removal remain unfinished; an imported ACPTR experiment demonstrates that native
+PURGE can leave a stale ERAM pointer, so native PURGE alone is not a safety proof.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

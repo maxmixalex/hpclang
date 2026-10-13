@@ -8,14 +8,25 @@
 int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *packed, uint32_t span);
 
-/* Internal ERAM edits. Caller must prove that no live banked reference points
- * into the replaced record or moved suffix; these routines do not relocate
- * banked references. Libraries after the target cannot move. The same launcher
- * ownership fence and stable-mapping commit contract as append apply. */
+/* Read-only reference preflight. The callback must prove no live banked
+ * reference targets [start,end), expressed as ERAM-relative nibble offsets.
+ * Return a mutation result (OK, BUSY or a read/validation error). The inspected
+ * native state and mappings must remain stable through the subsequent commit. */
+struct hpclang_rpl_port1_guard
+{
+    int (*check)(void *context, uint32_t start, uint32_t end);
+    void *context;
+};
+
+/* Internal ERAM edits require the reference guard; absence is UNAVAILABLE.
+ * These routines do not relocate banked references. Libraries after the target
+ * cannot move. The launcher ownership fence and append commit contract apply. */
 int hpclang_rpl_port1_replace_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
-                                     const uint8_t *packed, uint32_t span);
+                                     const uint8_t *packed, uint32_t span,
+                                     const struct hpclang_rpl_port1_guard *guard);
 int hpclang_rpl_port1_remove_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
-                                    const uint8_t *name, uint32_t name_length);
+                                    const uint8_t *name, uint32_t name_length,
+                                    const struct hpclang_rpl_port1_guard *guard);
 
 /* Store a library record without registering or attaching it to the OS.
  * Existing record addresses remain stable; duplicate library IDs are rejected.
