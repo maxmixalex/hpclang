@@ -485,6 +485,13 @@ including copied Aplets. The fixture reuses bounded scratch buffers so its
 large-string checks fit the copied Aplet's smaller ARM heap, with unchanged
 payload lengths and persistence/rejection assertions. All 85 host tests pass.
 
+The subsequent HP39gs/HP40gs CI run exposed smaller heaps on later Aplet
+launches. HP39 discovery checks now run in the catalog suite (Direct and Stock),
+while classic discovery stays beside port mutation. The common probe preserves
+the same medium/operation assertions. All three HP39 Direct catalog targets and
+all 15 HP40gs Stock mutation launches pass locally; HP39gs mutation and the
+Stock catalog check are being verified before the follow-up push.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.
