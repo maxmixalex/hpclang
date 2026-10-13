@@ -192,8 +192,14 @@ replace `hpkeyb49.h` with a bridge polling the clean physical keyboard service
 for `keyb_isON`/`keyb_waitKeyPressed`; replace the unused `hpsys.h` include with
 `errno.h`; and remove application definitions of `int errno`. This is a
 graphics-source build check, not yet a claim that the historical keyboard
-subsystem is installed or that these original applications passed target-side
-execution. The integrated Display E2E is a separately authored adapter witness.
+subsystem is installed. The five original drawing bodies also pass HP50g
+Direct execution: the test driver renames their entry points and replaces
+blocking key waits with screenshot handshakes. Pixel anchors cover numbered
+text, three image circles, the shape scene and the final animation line;
+the 210-character big-font grid is captured and visually checked. This does
+not test the original keyboard waits or assert pixel identity with HPGCC's
+bundled fonts. The integrated Display E2E is a separately authored adapter
+witness covering the wider model/launch matrix.
 
 The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean

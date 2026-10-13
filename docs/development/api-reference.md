@@ -669,8 +669,10 @@ HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1,
 These entries now refer to installed `hpgraphics.h` implementations, with host
 state/ownership tests and packaged-font pixel checks. Display E2E exercises
 the adapters directly alongside the earlier clean-API witnesses. All six
-Direct targets and HP50g Stock pass locally, including independent LCD checks;
-remaining Stock and representative original-application acceptance stay open.
+Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally, including
+independent LCD checks. Five original HPGCC 1.1 graphics examples also run on
+HP50g Direct with explicit test-entry/input-wait adaptations. HP39gs/HP40gs
+Stock and broader historical input/application acceptance remain open.
 
 ## Keyboard: detailed progress
 
