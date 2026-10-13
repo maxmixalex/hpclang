@@ -565,8 +565,8 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
-| Port 0 | Main RAM, containing library/backup objects | Metadata enumeration, owned backup/library reads and backup creation have local Stock coverage; replacement, removal and library mutation remain in M8.0. |
-| Port 1 | Extended/banked RAM, containing library/backup objects | No public port read/write service; account for bank mapping and ARM allocator ownership. |
+| Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
+| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads are implemented; native backup enumeration/readback passes local Stock. Writes require bank/reference handling and ARM allocator ownership. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
@@ -657,7 +657,7 @@ integer backup, read and replace it with a string after relaunch, then read and
 remove the string after another relaunch. No reinstallation, reset or fixture
 injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
-provide public library installation or attachment. Port 1/2 services and full
+provide public library installation or attachment. Port 1 writes, Port 2 and full
 library mutation remain M8.0 requirements.
 
 Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
