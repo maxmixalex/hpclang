@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "families": {
+    "hp39": {
+      "initial_phase": "0x4f53b000",
+      "relaunches": [
+        {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f53b001"},
+        {"sequence": "hp39-stock-relaunch.seq", "phase": "0x4f53b002"}
+      ]
+    },
+    "hp48": {
+      "initial_phase": "0x4f53b000",
+      "relaunches": [
+        {"sequence": "classic-stock-relaunch.seq", "phase": "0x4f53b001"},
+        {"sequence": "classic-stock-relaunch.seq", "phase": "0x4f53b002"}
+      ]
+    },
+    "hp4950": {
+      "initial_phase": "0x4f53b000",
+      "relaunches": [
+        {"sequence": "classic-stock-relaunch.seq", "phase": "0x4f53b001"},
+        {"sequence": "classic-stock-relaunch.seq", "phase": "0x4f53b002"}
+      ]
+    }
+  }
+}
