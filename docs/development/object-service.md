@@ -690,3 +690,20 @@ The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports
 on every model. HP39 Aplet/catalog namespaces remain separate.
+
+Port 2 has a separate internal Flash-slot iterator. On the examined HP50g
+Stock image, user banks have a `0xf0` bank type and slots begin at bank-relative
+nibble `0x20a`. A slot contains a status byte, a five-nibble extent relative to
+that extent field, and one metadata nibble before the ordinary backup/library
+object. The metadata nibble must not be included in the extent. Live slots use
+`0x53`; an erased `0xff` status ends traversal. Native `PURGE` changes only the
+status byte to `0x00`, preserving the extent and stale payload. Deleted slots
+are skipped without interpreting that payload.
+
+The iterator validates live objects and CRCs within their slot boundaries;
+unknown states, malformed extents and read failures leave the caller's cursor
+and result unchanged. Host/sanitizer checks and captured native HP50g Flash
+verify four existing libraries plus a newly stored integer 987, then the same
+four libraries after native deletion. Public Port 2 mapping, discovery and
+owned reads are still pending; erase/write and power-loss behavior remain
+separate M8.0 requirements.

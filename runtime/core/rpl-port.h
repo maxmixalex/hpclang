@@ -31,4 +31,14 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
                           struct hpclang_rpl_port_cursor *cursor,
                           struct hpclang_rpl_port_entry *entry);
 
+/* Traverse allocated slots within one Flash bank, starting after its bank
+ * header. Each slot has a status byte, a five-nibble relative extent and one
+ * metadata nibble before the object. The caller supplies bank mapping/bounds.
+ * Deleted slots retain their extent and are skipped without reading payloads.
+ * Unknown slot states are rejected until their native lifecycle is supported.
+ * Cursor/output remain unchanged on error, as for RAM traversal. */
+int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
+                           struct hpclang_rpl_port_cursor *cursor,
+                           struct hpclang_rpl_port_entry *entry);
+
 #endif

@@ -111,3 +111,58 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
     *entry = next;
     return 1;
 }
+
+int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
+                           struct hpclang_rpl_port_cursor *cursor,
+                           struct hpclang_rpl_port_entry *entry)
+{
+    if (!reader || !reader->read_nibble || !cursor || !entry)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (cursor->end > 0x100000u || cursor->address > cursor->end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (cursor->finished)
+        return 0;
+    struct hpclang_rpl_port_cursor scan = *cursor;
+    for (;;) {
+        uint32_t available = scan.end - scan.address;
+        if (available < 2u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t status;
+        int result = word(reader, scan.address, 2u, &status);
+        if (result)
+            return result;
+        if (status == 0xffu) {
+            scan.finished = 1;
+            *cursor = scan;
+            return 0;
+        }
+        if (status != 0x53u && status != 0u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (available < 8u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t extent;
+        result = word(reader, scan.address + 2u, 5u, &extent);
+        if (result)
+            return result;
+        /* Extent is relative to its own field, not the slot or object prologue.
+         * The final metadata nibble is not part of this size. */
+        if (extent < 11u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (extent > available - 2u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (status == 0u) {
+            /* Native PURGE changes the status byte; payload is no longer live. */
+            scan.address += 2u + extent;
+            continue;
+        }
+        struct hpclang_rpl_port_cursor object = {scan.address + 8u, scan.address + 2u + extent, 0};
+        struct hpclang_rpl_port_entry next;
+        result = hpclang_rpl_port_next(reader, &object, &next);
+        if (result != 1)
+            return result < 0 ? result : HPCLANG_RPL_SPAN_MALFORMED;
+        scan.address += 2u + extent;
+        *cursor = scan;
+        *entry = next;
+        return 1;
+    }
+}
