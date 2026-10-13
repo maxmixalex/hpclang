@@ -1,4 +1,5 @@
 #include "ui-internal.h"
+#include "input-event-plan.h"
 #include <errno.h>
 #include <string.h>
 
@@ -122,9 +123,10 @@ int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor)
     return 0;
 }
 
-int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uint32_t codepoint,
-                    struct hpclang_ui_event *event)
+static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
+                struct hpclang_ui_event *event)
 {
+    enum hpclang_input_action action = plan->action;
     if (!ui || !event || action < HPCLANG_INPUT_INSERT || action > HPCLANG_INPUT_CANCEL)
         return hpclang_ui_fail(NULL, EINVAL);
     if (ui->building || ui->edit_pending)
@@ -150,7 +152,7 @@ int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uin
             skip = 1;
         }
     }
-    int result = skip ? HPCLANG_INPUT_EDITING : hpclang_text_input_edit(&input, action, codepoint);
+    int result = skip ? HPCLANG_INPUT_EDITING : hpclang_input_plan_apply(&input, plan);
     if (result < 0)
         return -1;
     enum hpclang_ui_event_kind kind;
@@ -177,4 +179,37 @@ int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uin
         .anchor =
             (kind == HPCLANG_UI_ACCEPT || kind == HPCLANG_UI_CANCEL) ? node->anchor : input.cursor};
     return 1;
+}
+
+int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uint32_t codepoint,
+                    struct hpclang_ui_event *event)
+{
+    const struct hpclang_input_plan plan = {action, codepoint, 0};
+    return edit(ui, &plan, event);
+}
+
+int hpclang_ui_key(struct hpclang_ui *ui, struct hpclang_text_mode *mode,
+                   const struct hpclang_keyboard_event *key, struct hpclang_ui_event *event)
+{
+    if (!ui || !event)
+        return hpclang_ui_fail(NULL, EINVAL);
+    if (ui->building || ui->edit_pending)
+        return hpclang_ui_fail(NULL, EBUSY);
+    struct hpclang_input_plan plan;
+    int result = hpclang_input_plan_event(mode, key, &plan);
+    if (result < 0)
+        return -1;
+    if (key->type == HPCLANG_KEYBOARD_EVENT_UP)
+        return 0;
+    if (key->key == HPCLANG_KEY_UP || key->key == HPCLANG_KEY_DOWN)
+        return hpclang_ui_focus_step(ui, key->key == HPCLANG_KEY_UP ? -1 : 1);
+    if (!result)
+        return 0;
+    if (focused_input(ui))
+        return edit(ui, &plan, event);
+    if (plan.action == HPCLANG_INPUT_ACCEPT)
+        return hpclang_ui_activate(ui, event);
+    if (plan.action == HPCLANG_INPUT_LEFT || plan.action == HPCLANG_INPUT_RIGHT)
+        return hpclang_ui_focus_step(ui, plan.action == HPCLANG_INPUT_LEFT ? -1 : 1);
+    return 0;
 }

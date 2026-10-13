@@ -296,6 +296,59 @@ static void controlled_input(struct hpclang_ui *ui)
     assert(hpclang_ui_node_at(ui, 0)->cursor == 15);
 }
 
+static int physical(struct hpclang_ui *ui, struct hpclang_text_mode *mode, uint16_t key,
+                    struct hpclang_ui_event *event)
+{
+    struct hpclang_keyboard_event input = {.key = key, .type = HPCLANG_KEYBOARD_EVENT_DOWN};
+    int result = hpclang_ui_key(ui, mode, &input, event);
+    if (result == 1 && event->kind == HPCLANG_UI_CHANGE)
+        input_view(ui, event->text);
+    input.type = HPCLANG_KEYBOARD_EVENT_UP;
+    assert(hpclang_ui_key(ui, mode, &input, event) == 0);
+    return result;
+}
+
+static void physical_input(struct hpclang_ui *ui)
+{
+    struct hpclang_ui_event event;
+    struct hpclang_text_mode mode;
+    for (uint32_t model = HPCLANG_MODEL_HP39GPLUS; model <= HPCLANG_MODEL_HP50G; ++model) {
+        input_view(ui, "");
+        assert(hpclang_text_mode_init(&mode, model) == 0);
+        assert(physical(ui, &mode, HPCLANG_KEY_ALPHA, &event) == 0);
+        uint16_t a = model <= HPCLANG_MODEL_HP40GS ? HPCLANG_KEY_HP39_VARS : HPCLANG_KEY_F1;
+        struct hpclang_keyboard_event input = {.key = a, .type = HPCLANG_KEYBOARD_EVENT_DOWN};
+        assert(hpclang_ui_key(ui, &mode, &input, &event) == 1);
+        assert(!strcmp(event.text, "A"));
+        struct hpclang_text_mode saved = mode;
+        input.type = HPCLANG_KEYBOARD_EVENT_UP;
+        assert(hpclang_ui_key(ui, &mode, &input, &event) == -1 && errno == EBUSY);
+        assert(!memcmp(&saved, &mode, sizeof(mode)));
+        input_view(ui, event.text);
+        assert(hpclang_ui_key(ui, &mode, &input, &event) == 0);
+        assert(physical(ui, &mode, HPCLANG_KEY_2, &event) == 1);
+        assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "A2"));
+        assert(physical(ui, &mode, HPCLANG_KEY_ENTER, &event) == 1);
+        assert(event.kind == HPCLANG_UI_ACCEPT);
+    }
+    input_view(ui, "123456789012345");
+    assert(hpclang_ui_select(ui, 0, 15) == 0);
+    assert(hpclang_text_mode_init(&mode, HPCLANG_MODEL_HP50G) == 0);
+    assert(physical(ui, &mode, HPCLANG_KEY_LEFT_SHIFT, &event) == 0);
+    assert(physical(ui, &mode, HPCLANG_KEY_MULTIPLY, &event) == 1);
+    assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "[]"));
+    assert(hpclang_ui_node_at(ui, 0)->cursor == 1);
+    assert(physical(ui, &mode, HPCLANG_KEY_2, &event) == 1);
+    assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "[2]"));
+    input_view(ui, "123456789012345");
+    assert(hpclang_ui_select(ui, 15, 15) == 0);
+    assert(physical(ui, &mode, HPCLANG_KEY_LEFT_SHIFT, &event) == 0);
+    assert(physical(ui, &mode, HPCLANG_KEY_MULTIPLY, &event) == -1);
+    assert(!strcmp(hpclang_ui_node_at(ui, 0)->text, "123456789012345"));
+    struct hpclang_text_mode_status status;
+    assert(hpclang_text_mode_get(&mode, &status) == 0 && status.plane == HPCLANG_TEXT_PLAIN);
+}
+
 static void capacity(void)
 {
     struct hpclang_ui_config config = {2, 8};
@@ -343,6 +396,7 @@ int main(void)
     layout(ui);
     focus(ui);
     controlled_input(ui);
+    physical_input(ui);
     free(storage);
     capacity();
     return 0;

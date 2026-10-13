@@ -18,7 +18,11 @@ hpclang_unit(ui test_ui.c "${HPCLANG_ROOT}/runtime/core/ui.c"
     "${HPCLANG_ROOT}/runtime/core/ui-layout.c")
 target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-focus.c")
 target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-input.c"
-    "${HPCLANG_ROOT}/runtime/core/input.c")
+    "${HPCLANG_ROOT}/runtime/core/input.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/input-mode.c"
+    "${HPCLANG_ROOT}/runtime/core/input-alpha.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keymap.c")
 target_include_directories(test_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)

@@ -1,8 +1,8 @@
 # Declarative UI: declaration core
 
 The current M8.2 slice provides bounded declaration storage, node identity,
-row/column layout, button actions, focus traversal and controlled text edits.
-Physical-key routing, effects and rendering are still being implemented.
+row/column layout, button actions, focus traversal, controlled text edits and
+model-aware physical-key routing. Effects and rendering are still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -117,8 +117,8 @@ the first eligible node. `hpclang_ui_focus_step` traverses declaration order in
 either direction and wraps. Explicitly clearing focus persists across commits
 until the application selects a node or requests traversal. Focus/activation
 operations are rejected while a candidate is being declared. Traversal currently
-includes clipped controls; scroll-to-focus and physical keyboard routing remain
-part of the subsequent interaction work.
+includes clipped controls; scroll-to-focus remains part of the subsequent
+interaction work.
 
 ## Controlled text edits
 
@@ -152,4 +152,20 @@ No-op edits return zero without replacing the event. Capacity/argument errors
 preserve the displayed value and selection.
 
 The direct edit API does not consume physical keys or implement Alpha rules.
-Integration with the existing model-aware text-mode service remains pending.
+For keyboard operation, initialize a caller-owned `hpclang_text_mode` for the
+active model and feed every ordered event, including releases, to
+`hpclang_ui_key`. It shares native mode/key decoding and atomic delimiter-pair
+insertion with the existing line editor. Selection replacement occurs before
+capacity checking, so a pair can replace a full selected field without leaving
+half a delimiter behind.
+
+Up/down traverse controls. On a button, left/right traverse and Enter activates;
+on an input, left/right move/collapse selection, Enter accepts and ON cancels.
+Zero means no application action, not necessarily no UI change: focus or modifier
+state may have advanced. If an edit proposal is outstanding, `EBUSY` consumes
+no physical state; commit its response and retry the same event. An `ENOSPC`
+edit still consumes native one-shot modifier state, matching the line editor.
+
+Host tests feed all six model layouts, including one-shot Alpha, release events,
+delimiter pairs and capacity recovery. Actual GPIO/display integration remains
+part of the interactive calculator example's acceptance.

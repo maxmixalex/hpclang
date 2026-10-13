@@ -119,6 +119,13 @@ extern "C"
     int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor);
     int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uint32_t codepoint,
                         struct hpclang_ui_event *event);
+    /* Feed all physical events to the existing model-aware text mode. Up/down
+     * traverse controls; input left/right edit selection, button left/right
+     * traverse. Modifier state advances on ENOSPC. EBUSY for an outstanding
+     * proposal consumes nothing: commit its response and retry that event.
+     * Returns 1/application event, 0/consumed/no action, or -1/errno. */
+    int hpclang_ui_key(struct hpclang_ui *ui, struct hpclang_text_mode *mode,
+                       const struct hpclang_keyboard_event *key, struct hpclang_ui_event *event);
     /* Focus follows stable lifetime tokens across reordering. Removed/disabled
      * focus falls to the next surviving old neighbor, then the previous one,
      * then the first eligible new node. Step traverses declaration order and

@@ -491,14 +491,16 @@ in their subsequent stages.
 The local declaration slice provides caller-owned fixed storage, transactional
 frames, parent/key/kind identity, owned text and interruption-safe C scopes.
 Host tests, sanitizers and ARM compilation cover the initial contract; see the
-[working C sketch](../sdk/declarative-ui.md). Layout, controlled inputs, effects,
-canvas, rendering and target acceptance are still pending. This is not M8.2
+[working C sketch](../sdk/declarative-ui.md). Effects, canvas, rendering and target
+acceptance are still pending. This is not M8.2
 closure or a frozen public API. A subsequent local slice adds measured row/column
 layout, transparent components, weighted spare-space allocation, clipped bounds,
 button actions and stable focus traversal/fallback. Host/sanitizer tests, ARM
 compilation and Clang analysis pass. Controlled UTF-8 edits now emit owned
 proposals, with tested acceptance/rejection/transformation, selection and
-failed-frame recovery. Physical event routing remains in progress.
+failed-frame recovery. Physical events now share native Alpha/Shift decoding
+and paired insertion with the existing editor; six-model host event sequences
+and all 76 host targets pass. GPIO/display integration remains in progress.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
