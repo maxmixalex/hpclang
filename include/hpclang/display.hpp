@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <span>
+#include <utility>
 
 #include <hpclang/display.h>
 
@@ -98,6 +99,59 @@ class surface_ref {
 
   private:
     hpclang_surface *surface_;
+};
+
+/* Owns an offscreen image. LCD pages remain borrowed surface_ref objects.
+ * Construction failure is an empty owner, following the C constructor contract.
+ * Views and get() borrow the image until reset/destruction/move-assignment. */
+class owned_surface {
+  public:
+    owned_surface() noexcept = default;
+    owned_surface(std::uint32_t width, std::uint32_t height, std::uint32_t levels = 2) noexcept
+        : surface_(::hpclang_surface_create(width, height, levels))
+    {
+    }
+    owned_surface(const owned_surface &) = delete;
+    owned_surface &operator=(const owned_surface &) = delete;
+    owned_surface(owned_surface &&other) noexcept : surface_(std::exchange(other.surface_, nullptr))
+    {
+    }
+    owned_surface &operator=(owned_surface &&other) noexcept
+    {
+        if (this != &other) {
+            reset();
+            surface_ = std::exchange(other.surface_, nullptr);
+        }
+        return *this;
+    }
+    ~owned_surface()
+    {
+        reset();
+    }
+    explicit operator bool() const noexcept
+    {
+        return surface_ != nullptr;
+    }
+    [[nodiscard]] hpclang_surface *get() const noexcept
+    {
+        return surface_;
+    }
+    [[nodiscard]] surface_ref view() const noexcept
+    {
+        return surface_ref{surface_};
+    }
+    void reset() noexcept
+    {
+        ::hpclang_surface_destroy(std::exchange(surface_, nullptr));
+    }
+    /* Transfer destruction responsibility to a C owner. */
+    [[nodiscard]] hpclang_surface *release() noexcept
+    {
+        return std::exchange(surface_, nullptr);
+    }
+
+  private:
+    hpclang_surface *surface_ = nullptr;
 };
 
 [[nodiscard]] inline surface_ref display_surface() noexcept

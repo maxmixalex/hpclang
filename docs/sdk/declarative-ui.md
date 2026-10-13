@@ -435,3 +435,12 @@ Host tests exercise early return, two component instances, stable identity
 after reordering, duplicate frame acquisition and fixed-pool failure, with
 exceptions and RTTI disabled. This is the first M8.5 helper slice; complete
 owned-resource wrappers and target-side C++ application acceptance remain open.
+
+For offscreen drawing, `<hpclang/display.hpp>` also provides a C++20
+`hpclang::owned_surface{width, height, levels}`. Check its Boolean conversion
+before obtaining a borrowed `view()` or `get()`. The owner releases pixels
+on destruction, supports move construction/assignment, and cannot be copied.
+`reset()` releases the image; `release()` transfers destruction responsibility
+to a C caller. Views must not outlive the image. Calculator display pages
+remain borrowed and cannot be adopted by this owner. Allocation failure follows
+the C constructor's empty-result contract and does not throw.

@@ -92,11 +92,15 @@ extern "C" int hpclang_e2e_cpp_test(void)
     surface.draw_rect(-10, -10, 2, 2, 255u);
     surface.fill_rect(-10, -10, 2, 2, 255u);
 
-    hpclang_surface *owned_raw = hpclang_surface_create_mono(24u, 16u);
-    if (owned_raw == nullptr)
+    hpclang::owned_surface image{24u, 16u};
+    if (!image)
         return 4;
 
-    hpclang::surface_ref owned{owned_raw};
+    hpclang::owned_surface owner{std::move(image)};
+    if (image || !owner)
+        return 5;
+    auto *owned_raw = owner.get();
+    auto owned = owner.view();
 
     /*
      * This font is produced by hpclang_target_font(STATIC_AUTO) from the
@@ -108,7 +112,6 @@ extern "C" int hpclang_e2e_cpp_test(void)
     if (hpclang_font_height(&hpclang_e2e_ui_font) == 0u ||
         hpclang_font_codepoint_advance(&hpclang_e2e_ui_font, 'H') == 0u ||
         hpclang_font_codepoint_advance(&hpclang_e2e_ui_font, 'p') == 0u) {
-        hpclang_surface_destroy(owned_raw);
         return 9;
     }
 
@@ -124,27 +127,23 @@ extern "C" int hpclang_e2e_cpp_test(void)
         }
     }
     if (!generated_font_ink) {
-        hpclang_surface_destroy(owned_raw);
         return 9;
     }
 
     owned.clear(0u);
     owned.draw_line(0, 0, 1, 1, 255u);
     if (owned.get_pixel(0, 0) != 255u || owned.get_pixel(1, 1) != 255u) {
-        hpclang_surface_destroy(owned_raw);
         return 5;
     }
 
     owned.blit_from(owned, 1, 0, 0, 0, 1, 1);
     if (owned.get_pixel(1, 0) != 255u) {
-        hpclang_surface_destroy(owned_raw);
         return 5;
     }
 
     owned.clear(0u);
     owned.draw_circle(5, 5, 3, 255u);
     if (owned.get_pixel(5, 2) != 255u || owned.get_pixel(5, 5) != 0u) {
-        hpclang_surface_destroy(owned_raw);
         return 7;
     }
 
@@ -156,25 +155,22 @@ extern "C" int hpclang_e2e_cpp_test(void)
     owned.clear(0u);
     owned.fill_polygon(triangle, 255u);
     if (owned.get_pixel(5, 4) != 255u || owned.get_pixel(0, 10) != 0u) {
-        hpclang_surface_destroy(owned_raw);
         return 7;
     }
-    hpclang_surface_destroy(owned_raw);
+    owner.reset();
 
-    hpclang_surface *gray_raw = hpclang_surface_create(4u, 1u, 4u);
-    if (gray_raw == nullptr)
+    hpclang::owned_surface gray_image{4u, 1u, 4u};
+    if (!gray_image)
         return 8;
-    hpclang::surface_ref gray{gray_raw};
+    auto gray = gray_image.view();
     gray.set_pixel(0, 0, 0u);
     gray.set_pixel(1, 0, 64u);
     gray.set_pixel(2, 0, 128u);
     gray.set_pixel(3, 0, 255u);
     if (gray.levels() != 4u || gray.get_pixel(0, 0) != 0u || gray.get_pixel(1, 0) != 85u ||
         gray.get_pixel(2, 0) != 170u || gray.get_pixel(3, 0) != 255u) {
-        hpclang_surface_destroy(gray_raw);
         return 8;
     }
-    hpclang_surface_destroy(gray_raw);
 
     return 0;
 }
