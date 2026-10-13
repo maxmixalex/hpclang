@@ -4,8 +4,9 @@ The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
-loading/error/retry application pass local six-model Direct and Stock acceptance;
-remote CI acceptance remains pending.
+loading/error/retry application passed six-model Direct and Stock acceptance,
+and its C implementation is integrated into main at `a7692b4b`. The C++ helpers
+and compact-storage changes below have local acceptance and await formal CI.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -21,7 +22,8 @@ fields and derive transparent-scope ancestry from the declaration chain.
 The complete C++/C UI fixture passes a local Direct experiment with its writable
 arena limited to 32 KiB, including both display pages, theme/native-font changes,
 physical input and independent pixel checks. This experiment does not replace
-Stock acceptance; the updated six-model Stock run is pending.
+Stock acceptance. The production build now also passes all six Direct and all
+six Stock targets with independent state, waveform, theme and font checks.
 
 The installed `examples/declarative-ui` application combines these interfaces
 into the original device-manager patterns. It uses two status-card instances,
@@ -457,8 +459,10 @@ six launchers, and packages all three HP39 Aplets when the packaging dependencie
 are supplied. It complements the larger C device-manager example.
 The UI E2E also links the counter's actual view and checks guard rollback,
 stable focus across model updates and owned-image moves before executing the
-full device-manager flow. All six Direct models pass locally; Stock acceptance
-of this C++ extension is still pending.
+full device-manager flow. All six Direct and all six Stock models pass locally;
+formal CI acceptance of this C++ extension is still pending. The integrated
+branch passes 84 host targets and the installed SDK relocation/HP39 packaging
+gate. Broader owned-resource wrappers and migration requirements remain open.
 
 For offscreen drawing, `<hpclang/display.hpp>` also provides a C++20
 `hpclang::owned_surface{width, height, levels}`. Check its Boolean conversion
