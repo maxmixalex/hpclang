@@ -230,7 +230,7 @@ int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const c
 {
     if (!text)
         return hpclang_ui_fail(ui, EINVAL);
-    return hpclang_ui_add(ui, key, HPCLANG_UI_TEXT, style, text);
+    return hpclang_ui_add(ui, key, HPCLANG_UI_LABEL, style, text);
 }
 
 int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,

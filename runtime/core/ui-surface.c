@@ -176,7 +176,7 @@ static int node(void *context, const struct hpclang_ui_node *n, struct hpclang_u
         return 0;
     if (x < INT32_MIN || height > INT32_MAX)
         return fail(EOVERFLOW);
-    uint8_t ink = n->kind == HPCLANG_UI_TEXT || n->enabled ? s->foreground : s->disabled;
+    uint8_t ink = n->kind == HPCLANG_UI_LABEL || n->enabled ? s->foreground : s->disabled;
     if (n->kind == HPCLANG_UI_TOGGLE) {
         uint32_t prefix;
         if (toggle_width(s->font, &prefix))

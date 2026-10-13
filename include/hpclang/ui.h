@@ -33,7 +33,7 @@ extern "C"
         HPCLANG_UI_KEY,
         HPCLANG_UI_COLUMN,
         HPCLANG_UI_ROW,
-        HPCLANG_UI_TEXT,
+        HPCLANG_UI_LABEL,
         HPCLANG_UI_BUTTON,
         HPCLANG_UI_INPUT,
         HPCLANG_UI_CANVAS,
