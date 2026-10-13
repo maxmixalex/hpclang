@@ -672,9 +672,8 @@ Zero HPG source-compatibility wrappers are claimed merely because the clean prim
 
 HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented helpers and reaches 17; all 17 remain signature-identical in 2.0. HPGCC3 reorganizes keyboard handling around raw state plus an asynchronous message queue.
 
-The installed `hpkeyb49.h` adapter currently implements thirteen functions:
-the eleven physical queries and press/release wait functions, plus
-`keyb_getmatrix` and `keyb_isKeyPrM`. The historical matrix uses byte columns
+The installed `hpkeyb49.h` adapter implements all seventeen HPGCC 1.1/2.0
+function names locally. The historical matrix uses byte columns
 and retains physical GPF4/5/6 at bits 60/61/62 and ON at bit 63; these fixed
 positions do not imply classic-model key labels on HP39. Named queries follow the model's
 physical keys: HP39's single Shift answers `keyb_isLS`, while `keyb_isRS`
@@ -686,7 +685,26 @@ false (or return immediately from the wait) with `ENOSYS`.
 Local unit tests cover all 56 matrix coordinates and dedicated keys on six
 models, plus simultaneous-key release and already-held-key waits. Sanitizer
 and ARM compilation checks pass; adapter-specific target acceptance remains
-pending. The remaining four shift/code-return functions are not yet installed.
+pending. Function-name coverage alone does not establish application acceptance.
+
+The numeric namespace deliberately retains historical inconsistencies:
+`SHFT_LS` is `0x40000000`, while `KB_LSHIFT` is bit 61, so its raw high-word
+mask equals `SHFT_RS`. Use named physical queries for model-aware semantics.
+`keyb_isShiftKeyPrM` tests the key plus any requested modifier, not exact
+modifier equality; a request with no modifier bits returns false.
+`keyb_getnextkey` iterates ordinary snapshot bits below 60 without reading
+hardware; inspect modifier/ON bits separately. `keyb_getkeyM` preserves the
+raw shift plane and allows modifiers to remain held after a blocking read.
+
+`keyb_getkey` uses the implementation's `row * 16 + column` numbering,
+not the contradictory `column * 15 + row` formula in historical comments.
+Its nonblocking path returns a pressed key or -1; this fixes the historical
+1.1/2.0 implementation's unconditional -1 result. Blocking reads first wait
+for an already-held ordinary key to be released, then capture a fresh key
+and model-aware modifiers in bits 8..11, and wait for all ordinary matrix
+keys to be released. They do not alter the RTC or add historical RTC-tick
+debounce delays. This adapter supplies instantaneous physical
+state; applications needing repeat/debounce policy should use clean events.
 
 | Historical behavior | HPGCC calls | hpclang status |
 | --- | --- | --- |
@@ -695,7 +713,7 @@ pending. The remaining four shift/code-return functions are not yet installed.
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
 | arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
 | blocking wait | `keyb_waitKeyPressed` | ◐ Installed physical press/all-release adapter; local tests pass, target acceptance pending. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Physical events, model-native text planes and bounded editing are implemented; historical return-code adapters remain M8. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Installed return-code adapters with the explicit differences above; local tests pass, target acceptance pending. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 
 ## Time, system and machine control

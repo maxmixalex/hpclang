@@ -90,5 +90,70 @@ int main(void)
     samples[1] = 0;
     keyb_waitKeyPressed();
     assert(index == 1 && delays == 4 && reads == before + 6);
+    count = 1;
+    index = 0;
+    samples[0] = (UINT64_C(1) << 35) | (UINT64_C(1) << 58);
+    assert(keyb_isShiftKeyPrM(KB_A | SHFT_RS));
+    assert(!keyb_isShiftKeyPrM(KB_A | SHFT_LS));
+    assert(keyb_isShiftKeyPrM(KB_A | SHFT_ANY));
+    assert(!keyb_isShiftKeyPrM(KB_A));
+    assert(!keyb_isShiftKeyPrM(255) && errno == EINVAL);
+    assert(keyb_getkeyM(0) == (int)(KB_A | SHFT_RS));
+    samples[0] = UINT64_C(1) << 58;
+    assert(keyb_getkeyM(0) == KB_LSHIFT);
+    samples[0] = 0;
+    assert(!keyb_getkeyM(0));
+    keymatrix matrix = {.full = KB_MASK64(KB_BKS) | KB_MASK64(KB_A) | KB_MASK64(KB_ON)};
+    before = reads;
+    assert(keyb_getnextkey(&matrix, -1) == KB_BKS);
+    assert(keyb_getnextkey(&matrix, KB_BKS) == KB_A);
+    assert(!keyb_getnextkey(&matrix, KB_A));
+    assert(!keyb_getnextkey(&matrix, 63));
+    assert(!keyb_getnextkey(&matrix, 64) && errno == EINVAL);
+    assert(!keyb_getnextkey(&matrix, -2) && errno == EINVAL);
+    assert(!keyb_getnextkey(NULL, -1) && errno == EINVAL && reads == before);
+    count = 4;
+    samples[0] = UINT64_C(1) << 58;
+    samples[1] = samples[0] | (UINT64_C(1) << 35);
+    samples[2] = samples[1] | (UINT64_C(1) << 36);
+    samples[3] = samples[0];
+    assert(keyb_getkeyM(1) == (int)(KB_A | SHFT_RS));
+    assert(index == 3);
+    index = 0;
+    count = 2;
+    samples[0] = (UINT64_C(1) << 58) | (UINT64_C(1) << 56);
+    samples[1] = UINT64_C(1) << 58;
+    assert(keyb_getkeyM(1) == KB_ON && index == 1);
+    count = 1;
+    index = 0;
+    for (unsigned col = 0; col < 8; ++col)
+        for (unsigned row = 0; row < 7; ++row) {
+            samples[0] = UINT64_C(1) << (col * 7 + row);
+            assert(keyb_getkey(0) == (int)(row * 16 + col));
+        }
+    samples[0] = UINT64_C(1) << 58;
+    assert(keyb_getkey(0) == -1);
+    for (boot.model = 1; boot.model <= 6; ++boot.model) {
+        index = 0;
+        count = 4;
+        uint64_t shift = UINT64_C(1) << (boot.model <= 3 ? 59 : 58);
+        samples[0] = shift;
+        samples[1] = shift | (UINT64_C(1) << 35);
+        samples[2] = shift | (UINT64_C(1) << 36);
+        samples[3] = shift;
+        assert(keyb_getkey(1) == (5 | (1 << 10)) && index == 3);
+    }
+    boot.model = HPCLANG_MODEL_HP50G;
+    index = 0;
+    count = 4;
+    samples[0] = UINT64_C(1) << 36;
+    samples[1] = 0;
+    samples[2] = UINT64_C(1) << 35;
+    samples[3] = 0;
+    assert(keyb_getkey(1) == 5 && index == 3);
+    boot.model = 0;
+    before = reads;
+    assert(!keyb_getkeyM(1) && errno == ENOSYS && reads == before);
+    assert(keyb_getkey(1) == -1 && errno == ENOSYS && reads == before);
     return 0;
 }

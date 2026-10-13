@@ -63,6 +63,94 @@ int keyb_isKeyPrM(int keycode)
     keyb_getmatrix(&matrix);
     return (int)((matrix.full >> keycode) & UINT64_C(1));
 }
+int keyb_isShiftKeyPrM(int shiftcode)
+{
+    unsigned key = KEYCODE((uint32_t)shiftcode);
+    if (key > 63) {
+        errno = EINVAL;
+        return 0;
+    }
+    keymatrix matrix;
+    keyb_getmatrix(&matrix);
+    return (matrix.full & KB_MASK64(key)) != 0 &&
+           (matrix.hiword & SHFTPLANE((uint32_t)shiftcode)) != 0;
+}
+int keyb_getnextkey(keymatrix *ptr, int previous)
+{
+    if (!ptr || previous < -1 || previous > 63) {
+        errno = EINVAL;
+        return 0;
+    }
+    for (int key = previous < 1 ? 1 : previous + 1; key < 60; ++key)
+        if (ptr->full & KB_MASK64(key))
+            return key;
+    return 0;
+}
+int keyb_getkeyM(int wait)
+{
+    if (!model())
+        return 0;
+    const uint64_t ordinary = UINT64_C(0x8fffffffffffffff);
+    keymatrix matrix;
+    keyb_getmatrix(&matrix);
+    while (wait && !(matrix.full & ordinary)) {
+        hpclang_delay_us(1000);
+        keyb_getmatrix(&matrix);
+    }
+    unsigned key = 0;
+    while (key < 64 && !(matrix.full & KB_MASK64(key)))
+        ++key;
+    uint32_t plane = SHFTPLANE(matrix.hiword);
+    while (wait && (matrix.full & ordinary)) {
+        hpclang_delay_us(1000);
+        keyb_getmatrix(&matrix);
+    }
+    if (wait && key >= 60)
+        return KB_ON;
+    if (key < 60)
+        return (int)(key | plane);
+    return key < 64 ? (int)key : 0;
+}
+int keyb_getkey(int wait)
+{
+    unsigned id = model();
+    if (!id)
+        return -1;
+    const uint64_t ordinary = (UINT64_C(1) << 56) - 1;
+    struct hpclang_keyboard_state state;
+    hpclang_keyboard_read(&state);
+    while (wait && (state.bits & ordinary)) {
+        hpclang_delay_us(1000);
+        hpclang_keyboard_read(&state);
+    }
+    while (!(state.bits & ordinary)) {
+        if (!wait)
+            return -1;
+        hpclang_delay_us(1000);
+        hpclang_keyboard_read(&state);
+    }
+    unsigned scan = 0;
+    while (!(state.bits & (UINT64_C(1) << scan)))
+        ++scan;
+    int code = (int)((scan % 7) * 16 + scan / 7);
+    if (wait) {
+        uint32_t modifiers = hpclang_keyboard_modifiers_from_bits(id, state.bits);
+        if (modifiers & HPCLANG_KEYBOARD_MOD_ON)
+            code |= 1 << 8;
+        if (modifiers & HPCLANG_KEYBOARD_MOD_RIGHT_SHIFT)
+            code |= 1 << 9;
+        if ((modifiers & HPCLANG_KEYBOARD_MOD_LEFT_SHIFT) ||
+            (id <= HPCLANG_MODEL_HP40GS && (modifiers & HPCLANG_KEYBOARD_MOD_SHIFT)))
+            code |= 1 << 10;
+        if (modifiers & HPCLANG_KEYBOARD_MOD_ALPHA)
+            code |= 1 << 11;
+        do {
+            hpclang_delay_us(1000);
+            hpclang_keyboard_read(&state);
+        } while (state.bits & ordinary);
+    }
+    return code;
+}
 static int named(unsigned key)
 {
     unsigned id = model();
