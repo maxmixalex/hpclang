@@ -46,7 +46,7 @@ static void settle(struct demo_app *app)
 }
 int main(void)
 {
-    struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES};
+    struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES, DEMO_UI_EFFECTS};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);

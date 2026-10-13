@@ -86,7 +86,7 @@ static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned 
 static unsigned checks(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES};
+    struct hpclang_ui_config config = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES, DEMO_UI_EFFECTS};
     size_t bytes = hpclang_ui_storage_size(config);
     hpclang_ui_witness[0] = (uint32_t)bytes;
     hpclang_ui_witness[1] = hpclang_boot_info()->rw_bytes;

@@ -53,7 +53,9 @@ font, color or widget appearance.
 
 ## Storage and frame boundaries
 
-Choose a `hpclang_ui_config` with a nonzero node capacity and a text byte budget.
+Choose a `hpclang_ui_config` with a nonzero node capacity, a text byte budget
+and an independent `effects` capacity. Zero effects disables asynchronous tasks
+without reserving task slots for ordinary labels or layout containers.
 `hpclang_ui_storage_size(config)` reports the complete allocation size. Supply
 that many bytes with `max_align_t` alignment, for example from `malloc`, to
 `hpclang_ui_init`. Keep the storage alive until the context is no longer used.
@@ -297,10 +299,13 @@ updates, failed-frame retry, complete-page copying, input selection and an
 inverted theme. Six-model execution, low-memory acceptance and timing budgets
 remain required before closing the renderer milestone.
 
-The device-manager example budgets 56 nodes and 512 text bytes for its complete
-eight-device view (54 live nodes). Its ARM declaration pool is 21,240 bytes;
+The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
+task for its complete eight-device view (46 live nodes). Its ARM declaration pool
+is 16,764 bytes;
 renderer pages, LCD DMA pages, application state and the stack are additional.
-This replaces unused capacity in the earlier 25,560-byte pool. Host allocation
+Each device row directly carries its stable key; a separate identity wrapper is
+unnecessary. Independent task sizing avoids one task slot per visual node.
+Host allocation
 fault injection covers every renderer-construction allocation, checks cleanup
 and recovery, and proves declaration/layout/render/copy still work with further
 allocation disabled. Stock memory and keyboard-handoff acceptance remain in
@@ -336,7 +341,7 @@ wraparound, content shrink, manual offsets, clipping and overflow rollback.
 
 Queue work with `hpclang_ui_effect_start` outside declaration. The UI copies the
 provider's `begin`, `poll` and `end` callbacks; its context remains borrowed until
-`end`. Each context has `config.nodes` task slots. Queue exhaustion returns
+`end`. Each context has `config.effects` task slots. Queue exhaustion returns
 `ENOSPC` without starting work or changing the output token. Successful requests
 receive monotonically increasing tokens; tokens are never recycled within a
 context's lifetime.

@@ -2,10 +2,11 @@
 #define HPCLANG_UI_DEMO_APP_H
 #include <hpclang/ui-surface.h>
 
-/* The full eight-device view has 54 nodes. Keep bounded headroom and owned
+/* The full eight-device view has 46 nodes. Keep bounded headroom and owned
  * text for that view, without reserving unused capacity on small Stock heaps. */
-#define DEMO_UI_NODES 56u
+#define DEMO_UI_NODES 48u
 #define DEMO_UI_TEXT_BYTES 512u
+#define DEMO_UI_EFFECTS 1u
 
 enum demo_action
 {

@@ -9,7 +9,7 @@ extern const struct hpclang_font demo_font;
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    const struct hpclang_ui_config capacity = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES};
+    const struct hpclang_ui_config capacity = {DEMO_UI_NODES, DEMO_UI_TEXT_BYTES, DEMO_UI_EFFECTS};
     size_t bytes = hpclang_ui_storage_size(capacity);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : NULL;

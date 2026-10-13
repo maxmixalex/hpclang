@@ -67,7 +67,7 @@ static void run(uint32_t levels)
                                              .padding_y = 1};
     struct hpclang_ui_surface *r = hpclang_ui_surface_create(16, 16, levels, &style, 1, 0);
     assert(r);
-    struct hpclang_ui_config config = {8, 64};
+    struct hpclang_ui_config config = {8, 64, 0};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);

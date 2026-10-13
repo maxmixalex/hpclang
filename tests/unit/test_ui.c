@@ -596,7 +596,7 @@ static void effects(struct hpclang_ui *ui)
                                    &second) == -1);
     assert(errno == ENOENT && second == 999);
 
-    struct hpclang_ui_config config = {1, 1};
+    struct hpclang_ui_config config = {1, 1, 1};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     assert(storage);
@@ -615,13 +615,23 @@ static void effects(struct hpclang_ui *ui)
 
 static void capacity(void)
 {
-    struct hpclang_ui_config config = {2, 8};
+    struct hpclang_ui_config config = {2, 8, 0};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     assert(storage);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
     assert(ui);
     char text[] = "owned";
+    uint32_t token = 123;
+    struct effect_test task = {.ui = ui};
+    assert(hpclang_ui_effect_start(ui, 0, (struct hpclang_ui_action){0}, &effect_ops, &task,
+                                   &token) == -1 &&
+           errno == ENOSPC && token == 123);
+    struct hpclang_ui_event completion;
+    assert(hpclang_ui_effect_poll(ui, &completion) == 0 && !task.begins && !task.ends);
+    struct hpclang_ui_config larger = config;
+    larger.effects = 3; /* Task capacity is independent of the two node slots. */
+    assert(hpclang_ui_storage_size(larger) > bytes);
     assert(hpclang_ui_begin(ui) == 0);
     assert(hpclang_ui_text(ui, 1, 0, text) == 0);
     text[0] = 'X';
@@ -640,8 +650,8 @@ static void capacity(void)
     assert(hpclang_ui_begin(ui) == -1 && errno == EBUSY);
     hpclang_ui_abort(ui);
     assert(hpclang_ui_node_count(ui) == 1);
-    assert(!hpclang_ui_storage_size((struct hpclang_ui_config){0, 10}));
-    assert(!hpclang_ui_storage_size((struct hpclang_ui_config){1, SIZE_MAX}));
+    assert(!hpclang_ui_storage_size((struct hpclang_ui_config){0, 10, 0}));
+    assert(!hpclang_ui_storage_size((struct hpclang_ui_config){1, SIZE_MAX, 0}));
     assert(!hpclang_ui_init(storage, bytes - 1, config));
     assert(!strcmp(saved->text, "owned"));
     free(storage);
@@ -772,7 +782,7 @@ static void toggles(struct hpclang_ui *ui)
 
 int main(void)
 {
-    struct hpclang_ui_config config = {32, 256};
+    struct hpclang_ui_config config = {32, 256, 4};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     assert(storage);

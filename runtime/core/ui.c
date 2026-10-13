@@ -17,12 +17,17 @@ size_t hpclang_ui_storage_size(struct hpclang_ui_config config)
         errno = EINVAL;
         return 0;
     }
-    size_t per_node = 2 * sizeof(struct node) + sizeof(struct ui_effect);
+    size_t per_node = 2 * sizeof(struct node);
     if ((SIZE_MAX - sizeof(struct hpclang_ui)) / config.nodes < per_node) {
         errno = EOVERFLOW;
         return 0;
     }
     size_t size = sizeof(struct hpclang_ui) + (size_t)config.nodes * per_node;
+    if (config.effects > (SIZE_MAX - size) / sizeof(struct ui_effect)) {
+        errno = EOVERFLOW;
+        return 0;
+    }
+    size += (size_t)config.effects * sizeof(struct ui_effect);
     if (config.text_bytes > (SIZE_MAX - size) / 3) {
         errno = EOVERFLOW;
         return 0;
@@ -45,7 +50,7 @@ struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_u
     ui->frames[0].nodes = (struct node *)(ui + 1);
     ui->frames[1].nodes = ui->frames[0].nodes + config.nodes;
     ui->effects = (struct ui_effect *)(ui->frames[1].nodes + config.nodes);
-    ui->frames[0].text = (char *)(ui->effects + config.nodes);
+    ui->frames[0].text = (char *)(ui->effects + config.effects);
     ui->frames[1].text = ui->frames[0].text + config.text_bytes;
     ui->edit_text = ui->frames[1].text + config.text_bytes;
     return ui;

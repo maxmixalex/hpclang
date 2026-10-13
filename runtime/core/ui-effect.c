@@ -37,7 +37,7 @@ static void unlink_context(struct hpclang_ui *ui)
 
 static void unlink_idle(struct hpclang_ui *ui)
 {
-    for (uint32_t i = 0; i < ui->capacity.nodes; ++i)
+    for (uint32_t i = 0; i < ui->capacity.effects; ++i)
         if (ui->effects[i].state)
             return;
     unlink_context(ui);
@@ -57,7 +57,7 @@ static void close_context(struct hpclang_ui *ui)
     unlink_context(ui);
     ui->building = 0;
     ui->dispatching = 1;
-    for (uint32_t i = 0; i < ui->capacity.nodes; ++i)
+    for (uint32_t i = 0; i < ui->capacity.effects; ++i)
         if (ui->effects[i].state)
             finish(&ui->effects[i], 1);
     ui->dispatching = 0;
@@ -94,7 +94,7 @@ int hpclang_ui_effect_start(struct hpclang_ui *ui, uint32_t owner, struct hpclan
     if (ui->effect_serial == UINT32_MAX)
         return hpclang_ui_fail(NULL, EOVERFLOW);
     struct ui_effect *slot = NULL;
-    for (uint32_t i = 0; i < ui->capacity.nodes; ++i)
+    for (uint32_t i = 0; i < ui->capacity.effects; ++i)
         if (!ui->effects[i].state) {
             slot = &ui->effects[i];
             break;
@@ -127,7 +127,7 @@ int hpclang_ui_effect_cancel(struct hpclang_ui *ui, uint32_t token)
 {
     if (ready(ui))
         return -1;
-    for (uint32_t i = 0; i < ui->capacity.nodes; ++i)
+    for (uint32_t i = 0; i < ui->capacity.effects; ++i)
         if (ui->effects[i].state && ui->effects[i].token == token) {
             ui->effects[i].state = CANCELLED;
             return 0;
@@ -137,7 +137,7 @@ int hpclang_ui_effect_cancel(struct hpclang_ui *ui, uint32_t token)
 
 void hpclang_ui_effect_reconcile(struct hpclang_ui *ui)
 {
-    for (uint32_t i = 0; i < ui->capacity.nodes; ++i)
+    for (uint32_t i = 0; i < ui->capacity.effects; ++i)
         if (ui->effects[i].state && !owner_exists(ui, ui->effects[i].owner))
             ui->effects[i].state = CANCELLED;
 }
@@ -155,9 +155,10 @@ int hpclang_ui_effect_poll(struct hpclang_ui *ui, struct hpclang_ui_event *event
         return hpclang_ui_fail(NULL, EINVAL);
     int saved_errno = errno;
     ui->dispatching = 1;
-    for (uint32_t visited = 0; visited < ui->capacity.nodes; ++visited) {
+    for (uint32_t visited = 0; visited < ui->capacity.effects; ++visited) {
         struct ui_effect *effect = &ui->effects[ui->effect_cursor];
-        ui->effect_cursor = ui->effect_cursor + 1 == ui->capacity.nodes ? 0 : ui->effect_cursor + 1;
+        ui->effect_cursor =
+            ui->effect_cursor + 1 == ui->capacity.effects ? 0 : ui->effect_cursor + 1;
         if (!effect->state)
             continue;
         if (effect->state == CANCELLED) {

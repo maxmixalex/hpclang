@@ -65,7 +65,7 @@ int main(void)
     struct hpclang_ui_surface_style style = {.font = &font, .foreground = 255};
     struct hpclang_ui_surface *healthy = hpclang_ui_surface_create(8, 8, 2, &style, 1, 0);
     struct hpclang_surface *target = hpclang_surface_create(8, 8, 2);
-    struct hpclang_ui_config config = {2, 16};
+    struct hpclang_ui_config config = {2, 16, 0};
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);

@@ -39,14 +39,11 @@ static void button(struct hpclang_ui *ui, uint32_t key, const char *title, enum 
 
 static void device_row(struct hpclang_ui *ui, const struct demo_device *device)
 {
-    HPCLANG_UI_WITH(ui, device->id, HPCLANG_UI_KEY, 0)
+    HPCLANG_UI_WITH(ui, device->id, HPCLANG_UI_ROW, 0)
     {
-        HPCLANG_UI_WITH(ui, 1, HPCLANG_UI_ROW, 0)
-        {
-            hpclang_ui_text(ui, 1, 0, device->name);
-            hpclang_ui_toggle(ui, 2, 1, "Enabled", device->enabled,
-                              (struct hpclang_ui_action){DEMO_TOGGLE, device->id}, 1);
-        }
+        hpclang_ui_text(ui, 1, 0, device->name);
+        hpclang_ui_toggle(ui, 2, 1, "Enabled", device->enabled,
+                          (struct hpclang_ui_action){DEMO_TOGGLE, device->id}, 1);
     }
 }
 

@@ -38,7 +38,7 @@ int main(void)
     /* Register observation first so it runs after the UI's actual atexit hook. */
     assert(atexit(verify) == 0);
     const struct hpclang_ui_effect_ops ops = {begin, poll, end};
-    const struct hpclang_ui_config config = {1, 1};
+    const struct hpclang_ui_config config = {1, 1, 1};
     for (unsigned i = 0; i < 2; ++i) {
         size_t bytes = hpclang_ui_storage_size(config);
         storage[i] = malloc(bytes);

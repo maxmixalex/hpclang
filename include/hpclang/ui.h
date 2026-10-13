@@ -45,6 +45,7 @@ extern "C"
     {
         uint32_t nodes;
         size_t text_bytes;
+        uint32_t effects;
     };
 
     struct hpclang_ui_action
@@ -101,7 +102,8 @@ extern "C"
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
      * frames never allocate. Size includes two fixed node/text arenas plus one
-     * text-budget-sized edit buffer and config.nodes effect slots. Failed declarations preserve the
+     * text-budget-sized edit buffer and config.effects effect slots (zero disables tasks).
+     * Failed declarations preserve the
      * committed tree. Zero means invalid size. Storage must have max_align_t alignment and live as
      * long as the context. */
     size_t hpclang_ui_storage_size(struct hpclang_ui_config config);
@@ -228,7 +230,7 @@ extern "C"
         void (*end)(void *context, int cancelled);
     };
     /* Queue outside declaration; begin/poll/end run only during effect_poll or
-     * shutdown. There are config.nodes effect slots. owner=0 is app lifetime;
+     * shutdown. There are config.effects effect slots. owner=0 is app lifetime;
      * other owners must be live node IDs. Removal cancels without delivering a
      * stale result. Callback descriptor is copied, context is borrowed until end.
      * Successful requests get non-reused tokens. Completion events copy token,
