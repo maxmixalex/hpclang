@@ -2,6 +2,7 @@
 #include <hpclang/aplet.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
+#include <hpclang/port.h>
 #include <errno.h>
 #include <string.h>
 
@@ -51,11 +52,25 @@ struct destination
 {
     struct hpclang_object_store *home;
     int aplet;
+    int port;
+    uint32_t available;
 };
 
-static int open_destination(struct destination *destination, int write)
+static int open_destination(struct destination *destination, int write, int port)
 {
-    *destination = (struct destination){0};
+    *destination = (struct destination){.port = port};
+    if (port >= 0) {
+        struct hpclang_port_info info = {.size = sizeof(info),
+                                         .version = HPCLANG_PORT_INFO_VERSION};
+        if (hpclang_port_query((unsigned)port, &info))
+            return -1;
+        if (!(info.available & HPCLANG_PORT_READ_BACKUP)) {
+            errno = ENOSYS;
+            return -1;
+        }
+        destination->available = info.available;
+        return 0;
+    }
     if (hpclang_device_capability(HPCLANG_CAPABILITY_APLET_DATA) == HPCLANG_CAPABILITY_SUPPORTED) {
         destination->aplet = 1;
         return 0;
@@ -73,7 +88,12 @@ static int open_destination(struct destination *destination, int write)
 static int read_note(const struct destination *destination, char *text)
 {
     struct hpclang_object *object = NULL;
-    int result = destination->aplet
+    int result;
+    if (destination->port >= 0) {
+        object = hpclang_port_backup_get((unsigned)destination->port, name, sizeof(name) - 1);
+        result = object ? 0 : -1;
+    } else
+        result = destination->aplet
                      ? hpclang_aplet_data_get(&object)
                      : hpclang_object_store_get(destination->home, name, sizeof(name) - 1, &object);
     if (result)
@@ -115,14 +135,14 @@ static int read_note(const struct destination *destination, char *text)
     return result;
 }
 
-int notebook_load(char text[NOTEBOOK_CAPACITY])
+static int load_note(int port, char text[NOTEBOOK_CAPACITY])
 {
     if (!text) {
         errno = EINVAL;
         return -1;
     }
     struct destination destination;
-    if (open_destination(&destination, 0))
+    if (open_destination(&destination, 0, port))
         return -1;
     int result = read_note(&destination, text);
     int error = errno;
@@ -132,7 +152,7 @@ int notebook_load(char text[NOTEBOOK_CAPACITY])
     return result;
 }
 
-int notebook_save(const char *text)
+static int save_note(int port, const char *text)
 {
     if (!text) {
         errno = EINVAL;
@@ -150,18 +170,27 @@ int notebook_save(const char *text)
         return -1;
     }
     struct destination destination;
-    if (open_destination(&destination, 1))
+    if (open_destination(&destination, 1, port))
         return -1;
     int result = read_note(&destination, NULL);
     int exists = result == 0;
     struct hpclang_object *object = NULL;
     if (exists || errno == ENOENT) {
+        uint32_t operation = exists ? HPCLANG_PORT_REPLACE_BACKUP : HPCLANG_PORT_CREATE_BACKUP;
+        if (port >= 0 && !(destination.available & operation)) {
+            errno = ENOSYS;
+            return -1;
+        }
         char bytes[sizeof(signature) - 1 + NOTEBOOK_CAPACITY];
         memcpy(bytes, signature, sizeof(signature) - 1);
         memcpy(bytes + sizeof(signature) - 1, text, length);
         result = hpclang_object_create_string((const uint8_t *)bytes,
                                               sizeof(signature) - 1 + length, &object);
-        if (!result)
+        if (!result && port >= 0)
+            result =
+                exists ? hpclang_port_backup_replace((unsigned)port, name, sizeof(name) - 1, object)
+                       : hpclang_port_backup_create((unsigned)port, name, sizeof(name) - 1, object);
+        else if (!result)
             result =
                 destination.aplet
                     ? hpclang_aplet_data_set(object)
@@ -175,4 +204,32 @@ int notebook_save(const char *text)
         hpclang_object_store_close(destination.home);
     errno = error;
     return result;
+}
+
+int notebook_load(char text[NOTEBOOK_CAPACITY])
+{
+    return load_note(-1, text);
+}
+
+int notebook_save(const char *text)
+{
+    return save_note(-1, text);
+}
+
+int notebook_backup_load(unsigned port, char text[NOTEBOOK_CAPACITY])
+{
+    if (port > 2) {
+        errno = EINVAL;
+        return -1;
+    }
+    return load_note((int)port, text);
+}
+
+int notebook_backup_save(unsigned port, const char *text)
+{
+    if (port > 2) {
+        errno = EINVAL;
+        return -1;
+    }
+    return save_note((int)port, text);
 }

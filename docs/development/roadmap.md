@@ -788,8 +788,10 @@ explicit and reject foreign destination data. Host tests cover both paths,
 bounded records, failure preservation and owned-resource cleanup. ARM syntax
 and static analysis pass. The relocated installed SDK builds the application,
 all six launchers and all three HP39 Aplet packages. Multi-session device
-acceptance is still pending. File export and Port backup integration remain
-part of this application track, not completed features.
+acceptance is still pending. The application now offers Port backup/restore
+according to queried read/create/replace capabilities, with validated records
+and no delete/recreate fallback. Host tests cover all three indices; device
+Port acceptance and file export remain part of this application track.
 
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each

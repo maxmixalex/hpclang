@@ -10,5 +10,7 @@
  * EILSEQ means existing data does not belong to this example. */
 int notebook_load(char text[NOTEBOOK_CAPACITY]);
 int notebook_save(const char *text);
+int notebook_backup_load(unsigned port, char text[NOTEBOOK_CAPACITY]);
+int notebook_backup_save(unsigned port, const char *text);
 
 #endif

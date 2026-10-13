@@ -1,6 +1,7 @@
 #include "store.h"
 #include <hpclang/datetime.h>
 #include <hpclang/device.h>
+#include <hpclang/port.h>
 #include <hpclang/time.h>
 #include <hpclang/ui-surface.h>
 #include <errno.h>
@@ -16,7 +17,9 @@ enum action
     SAVE,
     LOAD,
     CLOCK,
-    EXIT
+    EXIT,
+    BACKUP,
+    RESTORE
 };
 struct notebook
 {
@@ -64,6 +67,20 @@ static int view(struct hpclang_ui *ui, struct hpclang_ui_surface *renderer,
         hpclang_ui_button(ui, 6, 0, "Save", (struct hpclang_ui_action){SAVE, 0}, 1);
         hpclang_ui_button(ui, 7, 0, "Reload saved note", (struct hpclang_ui_action){LOAD, 0}, 1);
         hpclang_ui_button(ui, 8, 0, "Refresh clock", (struct hpclang_ui_action){CLOCK, 0}, 1);
+        for (unsigned port = 0; port < 3; ++port) {
+            struct hpclang_port_info info = {.size = sizeof(info),
+                                             .version = HPCLANG_PORT_INFO_VERSION};
+            if (hpclang_port_query(port, &info) || !(info.available & HPCLANG_PORT_READ_BACKUP))
+                continue;
+            char label[24];
+            snprintf(label, sizeof(label), "Port %u backup", port);
+            hpclang_ui_button(
+                ui, 10 + port * 2, 0, label, (struct hpclang_ui_action){BACKUP, port},
+                !!(info.available & (HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP)));
+            snprintf(label, sizeof(label), "Port %u restore", port);
+            hpclang_ui_button(ui, 11 + port * 2, 0, label,
+                              (struct hpclang_ui_action){RESTORE, port}, 1);
+        }
         hpclang_ui_button(ui, 9, 0, "Exit (unsaved edits lost)",
                           (struct hpclang_ui_action){EXIT, 0}, 1);
     }
@@ -78,7 +95,7 @@ static int view(struct hpclang_ui *ui, struct hpclang_ui_surface *renderer,
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    const struct hpclang_ui_config capacity = {16, 512, 0};
+    const struct hpclang_ui_config capacity = {24, 768, 0};
     size_t bytes = hpclang_ui_storage_size(capacity);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : NULL;
@@ -145,6 +162,18 @@ int main(void)
                     break;
                 case CLOCK:
                     clock_read(&note);
+                    break;
+                case BACKUP:
+                    if (notebook_backup_save(event.action.arg, note.text))
+                        snprintf(note.status, sizeof(note.status), "Backup error %d", errno);
+                    else
+                        strcpy(note.status, "Backup saved");
+                    break;
+                case RESTORE:
+                    if (notebook_backup_load(event.action.arg, note.text))
+                        snprintf(note.status, sizeof(note.status), "Restore error %d", errno);
+                    else
+                        strcpy(note.status, "Restored; Save to keep here");
                     break;
                 case EXIT:
                     quit = 1;

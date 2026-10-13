@@ -2,6 +2,7 @@
 #include <hpclang/aplet.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
+#include <hpclang/port.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -22,6 +23,16 @@ static struct hpclang_object_store home;
 static int aplet, supported = 1, present, fault, create_fault, write_fault, copy_fault;
 static int writes, owners, handles;
 static enum hpclang_object_store_put_mode last_mode;
+static uint32_t port_operations;
+static unsigned selected_port;
+
+int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
+{
+    assert(port == selected_port && info->size == sizeof(*info) &&
+           info->version == HPCLANG_PORT_INFO_VERSION);
+    info->available = port_operations;
+    return 0;
+}
 
 int hpclang_device_capability(enum hpclang_capability capability)
 {
@@ -131,6 +142,58 @@ void hpclang_object_release(struct hpclang_object *object)
     errno = EBADF;
 }
 
+struct hpclang_object *hpclang_port_backup_get(uint32_t port, const uint8_t *name, uint32_t length)
+{
+    assert(port == selected_port && length == 7 && !memcmp(name, "HPCNOTE", length));
+    struct hpclang_object *object = NULL;
+    return hpclang_aplet_data_get(&object) ? NULL : object;
+}
+int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t length,
+                               const struct hpclang_object *object)
+{
+    assert(port == selected_port && length == 7 && !memcmp(name, "HPCNOTE", length));
+    assert(!present && (port_operations & HPCLANG_PORT_CREATE_BACKUP));
+    return hpclang_aplet_data_set(object);
+}
+int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t length,
+                                const struct hpclang_object *object)
+{
+    assert(port == selected_port && length == 7 && !memcmp(name, "HPCNOTE", length));
+    assert(present && (port_operations & HPCLANG_PORT_REPLACE_BACKUP));
+    return hpclang_aplet_data_set(object);
+}
+
+static void ports(void)
+{
+    aplet = 0;
+    for (selected_port = 0; selected_port < 3; ++selected_port) {
+        present = writes = 0;
+        port_operations = HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_CREATE_BACKUP;
+        char text[NOTEBOOK_CAPACITY] = "retained";
+        assert(notebook_backup_load(selected_port, text) == -1 && errno == ENOENT);
+        assert(!strcmp(text, "retained"));
+        assert(notebook_backup_save(selected_port, "backup") == 0 && writes == 1);
+        assert(notebook_backup_load(selected_port, text) == 0 && !strcmp(text, "backup"));
+        assert(notebook_backup_save(selected_port, "new") == -1 && errno == ENOSYS && writes == 1);
+        port_operations |= HPCLANG_PORT_REPLACE_BACKUP;
+        assert(notebook_backup_save(selected_port, "new") == 0 && writes == 2);
+        assert(notebook_backup_load(selected_port, text) == 0 && !strcmp(text, "new"));
+        saved.bytes[0] = '!';
+        assert(notebook_backup_save(selected_port, "no") == -1 && errno == EILSEQ && writes == 2);
+        assert(notebook_backup_load(selected_port, text) == -1 && errno == EILSEQ &&
+               !strcmp(text, "new"));
+        port_operations = HPCLANG_PORT_CREATE_BACKUP;
+        assert(notebook_backup_save(selected_port, "no") == -1 && errno == ENOSYS && writes == 2);
+        port_operations = HPCLANG_PORT_READ_BACKUP;
+        present = 0;
+        assert(notebook_backup_save(selected_port, "no") == -1 && errno == ENOSYS && writes == 2);
+        assert(owners == 0 && handles == 0);
+    }
+    assert(notebook_backup_save(3, "no") == -1 && errno == EINVAL);
+    char text[NOTEBOOK_CAPACITY];
+    assert(notebook_backup_load(~0u, text) == -1 && errno == EINVAL);
+}
+
 static void run(int use_aplet)
 {
     aplet = use_aplet;
@@ -223,5 +286,6 @@ int main(void)
 {
     run(0);
     run(1);
+    ports();
     return 0;
 }

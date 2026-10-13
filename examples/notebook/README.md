@@ -24,6 +24,24 @@ The bounded note holds at most 191 bytes. Invalid UTF-8 and control characters
 are rejected on both load and save without changing the note. UTF-8 bytes are preserved inside the
 native string; this does not translate them to the Stock character encoding.
 This example's small ASCII font shows its fallback glyph for other characters.
-Files, Port backups and multi-session device persistence tests remain follow-up
-work for the integrated application; this initial example does not establish
+
+## Native Port backups
+
+For ports whose capability query reports backup reads, the view offers a
+Restore button. Backup is enabled when creation or replacement is available.
+The backup name is `HPCNOTE` and its value uses the same validated record as
+the primary store. Restore changes only the edit buffer; Save explicitly
+copies it into the primary Aplet/HOME destination. A failed restore retains
+the edit buffer. Backup does not automatically save the primary destination.
+
+Backup checks whether the name exists before choosing creation or replacement.
+An existing foreign record is rejected. A port with creation but no replacement
+can accept a new backup but cannot overwrite an existing one. There is no
+delete-and-recreate fallback. These controls follow the public Port capability
+mask; they do not add missing native write support (currently Port 1 replacement
+and Port 2 writes remain unavailable).
+
+Host tests cover operation selection and rejected writes for all three port
+indices using simulated service capabilities. Device backup/persistence tests
+and file export remain follow-up work; this example does not establish
 completion of M8.6.
