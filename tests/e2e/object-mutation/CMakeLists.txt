@@ -26,7 +26,8 @@ if(HPCLANG_E2E_FAMILY MATCHES "^(all|hp39)$")
     target_compile_definitions(hpclang_object_mutation_e2e PRIVATE HPCLANG_E2E_HP39=1)
 endif()
 if(NOT HPCLANG_E2E_FAMILY STREQUAL "hp39")
-    target_sources(hpclang_object_mutation_e2e PRIVATE classic.c nested.c ports.c)
+    target_sources(hpclang_object_mutation_e2e PRIVATE classic.c nested.c ports.c
+        "${CMAKE_CURRENT_LIST_DIR}/../object-common/port-discovery.c")
     target_compile_definitions(hpclang_object_mutation_e2e PRIVATE HPCLANG_E2E_CLASSIC=1)
 endif()
 

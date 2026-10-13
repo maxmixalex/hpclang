@@ -5,11 +5,12 @@
 #include <hpclang/device.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
-#include <hpclang/port.h>
+
 #include <hpclang/target.h>
 
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_classic_mutation(void);
+uint32_t hpclang_e2e_port_discovery(void);
 uint32_t hpclang_e2e_port_reads(void);
 uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase);
 uint32_t hpclang_e2e_hp39_mutation(void);
@@ -49,27 +50,6 @@ int main(void)
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (boot == NULL)
         return finish(0xe0u);
-    const uint32_t reads =
-        HPCLANG_PORT_ENUMERATE | HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_READ_LIBRARY;
-    const uint32_t writes =
-        HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP;
-    for (uint32_t port = 0; port < 3; ++port) {
-        struct hpclang_port_info info = {.size = sizeof(info),
-                                         .version = HPCLANG_PORT_INFO_VERSION};
-        if (hpclang_port_query(port, &info))
-            return finish(0xe3u);
-        uint32_t expected = 0, medium = HPCLANG_PORT_ABSENT;
-        if (boot->model >= HPCLANG_MODEL_HP48GII && port == 0) {
-            expected = reads | writes;
-            medium = HPCLANG_PORT_MAIN_RAM;
-        } else if (boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G) {
-            expected = reads | (port == 1 ? HPCLANG_PORT_CREATE_BACKUP : 0);
-            medium = port == 1 ? HPCLANG_PORT_EXTENDED_RAM : HPCLANG_PORT_FLASH;
-        }
-        if (info.port != port || info.medium != medium || info.implemented != expected ||
-            info.available != expected)
-            return finish(0xe4u);
-    }
 #if HPCLANG_E2E_HP39
     if (boot->model == HPCLANG_MODEL_HP39GPLUS || boot->model == HPCLANG_MODEL_HP39GS ||
         boot->model == HPCLANG_MODEL_HP40GS) {
@@ -87,7 +67,9 @@ int main(void)
             hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE_MUTATION) !=
                 HPCLANG_CAPABILITY_SUPPORTED)
             return finish(0xe2u);
-        uint32_t port_failure = hpclang_e2e_port_reads();
+        uint32_t port_failure = hpclang_e2e_port_discovery();
+        if (!port_failure)
+            port_failure = hpclang_e2e_port_reads();
         uint32_t failure = port_failure ? port_failure : hpclang_e2e_classic_mutation();
         uint32_t phase = 0;
         if (!failure)

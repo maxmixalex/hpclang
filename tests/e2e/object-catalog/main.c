@@ -8,13 +8,18 @@
 volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_catalog(void);
 uint32_t hpclang_e2e_catalog_variables(void);
+uint32_t hpclang_e2e_port_discovery(void);
 extern const struct hpclang_font hpclang_catalog_ui_font;
 static const char pass_label[] = HPCLANG_UI_TEXT("CATALOG PASS");
 static const char fail_label[] = HPCLANG_UI_TEXT("CATALOG FAIL");
 
 int main(void)
 {
-    uint32_t failure = hpclang_e2e_catalog_variables();
+    /* Capability discovery belongs with metadata on HP39. Keep the separate
+     * mutation/lifecycle payload's scarce ARM arena for its large snapshots. */
+    uint32_t failure = hpclang_e2e_port_discovery();
+    if (!failure)
+        failure = hpclang_e2e_catalog_variables();
     if (failure == 0u && hpclang_boot_info()->saturn_state != 0u) {
         if (hpclang_power_set_profile(HPCLANG_POWER_ECONOMY))
             failure = 0x3e1u;
