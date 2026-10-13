@@ -23,13 +23,17 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
     if (seconds < 0 || seconds >= 86400 || sys_delta_seconds(86399, 1) != 2 ||
         hpclang_time_read_us(&delay_start))
         return 4;
-    sys_sleep(1);
-    if (hpclang_time_read_us(&delay_end) || delay_end - delay_start < 1000000u)
+    sys_sleep(10);
+    /* Wide headroom for clock resolution, but reject seconds/microseconds
+     * confusion in either direction. */
+    if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
+        delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
         return 5;
     if (hpclang_time_read_us(&delay_start))
         return 6;
     sys_waitTicks(7500);
-    if (hpclang_time_read_us(&delay_end) || delay_end - delay_start < 10000u)
+    if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
+        delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
         return 7;
     enum
     {

@@ -30,9 +30,11 @@ int main(void)
     sys_sleep(0);
     assert(delay == 0);
     sys_sleep(1);
+    assert(delay == 1000);
+    sys_sleep(1000);
     assert(delay == 1000000);
     sys_sleep(UINT_MAX);
-    assert(delay == (uint64_t)UINT_MAX * 1000000);
+    assert(delay == (uint64_t)UINT_MAX * 1000);
     sys_waitTicks(0);
     assert(delay == 0);
     sys_waitTicks(1);

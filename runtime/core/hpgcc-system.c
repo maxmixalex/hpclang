@@ -4,9 +4,9 @@
 #include <hpclang/datetime.h>
 #include <hpclang/time.h>
 
-void sys_sleep(unsigned int seconds)
+void sys_sleep(unsigned int millis)
 {
-    hpclang_delay_us((uint64_t)seconds * UINT64_C(1000000));
+    hpclang_delay_us((uint64_t)millis * UINT64_C(1000));
 }
 
 void sys_waitTicks(unsigned int ticks)

@@ -6,9 +6,8 @@ extern "C"
 {
 #endif
 
-    /* HPGCC 1.1/2.0 implementations use seconds despite the old header's
-     * parameter name "millis". Busy-waits; does not suspend the CPU. */
-    void sys_sleep(unsigned int seconds);
+    /* HPGCC 1.1/2.0 milliseconds delay. Busy-waits; does not suspend the CPU. */
+    void sys_sleep(unsigned int millis);
 
     /* Intended historical 750 kHz tick duration, rounded up to microseconds.
      * Does not require slow mode or reconfigure PWM/interrupt registers. */

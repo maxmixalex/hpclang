@@ -672,14 +672,17 @@ ENVID bit. The clean equivalent is `hpclang_display_set_enabled` within an owned
 display session: bounded frame waiting, retained pages, and host-state restoration
 on exit. It does not change the application clock or put the CPU to sleep.
 
-HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based seconds delay in the reviewed
+HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based milliseconds delay in the reviewed
 implementation. Its ordinary behavior maps to the clean monotonic delay service;
 the historical name is not evidence of a missing low-power CPU suspend service.
+The implementation multiplies duration by 1,000,000 because `sys_updateTimer`
+accumulates **nanoseconds**, not microseconds: its 12 MHz base-clock conversion
+uses 250/3 nanoseconds per tick. This confirms the original `millis` declaration.
 
 The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`,
-`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves the reviewed
-implementation's seconds unit, despite the old declaration's `millis` parameter
-name. `sys_waitTicks` implements the documented 750 kHz duration, rounded up to
+`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves milliseconds
+without the historical 32-bit intermediate multiplication overflow.
+`sys_waitTicks` implements the documented 750 kHz duration, rounded up to
 microseconds, without requiring slow mode or changing interrupt/PWM registers.
 Both delays inherit the clean service's early return if the clock is unavailable.
 RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
@@ -688,8 +691,9 @@ inputs as `-1/EINVAL`. This is a partial system adapter: legacy timer structures
 timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
 Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
 RTC errors; the System Services E2E also exercises both delay spellings and RTC
-access. HP39g+ Direct execution and the independent System Services pixel
-checks pass locally. Other device contexts and formal CI remain pending.
+access, with both lower and upper delay bounds to catch unit mismatches.
+Device acceptance of the corrected milliseconds conversion and formal CI remain
+pending.
 
 ### SD media discovery and replacement
 
