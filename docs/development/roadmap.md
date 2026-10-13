@@ -543,9 +543,11 @@ roots and covering banked library entries remain necessary before enabling write
 The C visitor enumerates 422 cells (51 distinct values) in the saved HP50g state
 without writes. A separate TEMP allocation visitor validates the complete footer
 chain before reporting payload bounds and reproduces all 40 saved allocations.
-Three allocations contain data beyond the first typed object's span, and some
-roots point inside those blocks; these execution payloads still need semantic
-interpretation rather than being discarded as ordinary object padding.
+Three allocations contain a ROM-pointer object followed by a complete program,
+and some roots point inside those blocks. Bounded parsing accounts for 43 typed
+objects across the 40 allocations with no leftover nibbles in this saved state.
+The trailing programs must enter reference traversal too; their Flash/ROM calls
+still need resolution before execution-reference safety is established.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
