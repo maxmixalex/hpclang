@@ -22,6 +22,8 @@ fi
     exit 2
 }
 
+source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"
+
 case "$STORAGE_WITNESS" in
     0|1) ;;
     *)
@@ -110,3 +112,6 @@ done
 
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/stock-hp4950.json"
+if [[ -f "$LIFECYCLE" ]]; then
+    python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE"
+fi

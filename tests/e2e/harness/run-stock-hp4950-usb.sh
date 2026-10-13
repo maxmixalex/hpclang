@@ -12,6 +12,8 @@ APP_DIR="$(realpath "$2")"
 ASSETS_DIR="$(realpath "$3")"
 export TARGET
 
+source "$ROOT/tests/e2e/harness/stock-lifecycle-env.sh"
+
 STATE="$ROOT/build/$TARGET-state"
 SEND="$ROOT/build/$TARGET-send"
 HOST_GATE="$ROOT/build/$TARGET-kermit-complete"
@@ -137,3 +139,6 @@ done
 
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/stock-hp4950-usb.json"
+if [[ -f "$LIFECYCLE" ]]; then
+    python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE"
+fi

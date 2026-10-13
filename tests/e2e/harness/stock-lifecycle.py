@@ -11,6 +11,18 @@ import subprocess
 
 def load_contract(path: Path, sequences: Path) -> dict:
     contract = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        isinstance(contract, dict)
+        and type(contract.get("version")) is int
+        and contract["version"] == 2
+    ):
+        if set(contract) != {"version", "families"} or not isinstance(contract["families"], dict):
+            raise ValueError("invalid Stock lifecycle family fields")
+        if not contract["families"]:
+            raise ValueError("Stock lifecycle requires at least one family")
+        for family, profile in contract["families"].items():
+            validate_profile(family, profile, sequences)
+        return contract["families"]
     if not isinstance(contract, dict) or set(contract) != {
         "version",
         "family",
@@ -20,8 +32,16 @@ def load_contract(path: Path, sequences: Path) -> dict:
         raise ValueError("invalid Stock lifecycle fields")
     if type(contract["version"]) is not int or contract["version"] != 1:
         raise ValueError("unsupported Stock lifecycle version")
-    if contract["family"] != "hp39":
-        raise ValueError("Stock lifecycle currently supports the HP39 Aplet return path")
+    profile = {key: contract[key] for key in ("initial_phase", "relaunches")}
+    validate_profile(contract["family"], profile, sequences)
+    return {contract["family"]: profile}
+
+
+def validate_profile(family: str, contract: dict, sequences: Path) -> None:
+    if family not in ("hp39", "hp48", "hp4950"):
+        raise ValueError("unsupported Stock lifecycle family")
+    if not isinstance(contract, dict) or set(contract) != {"initial_phase", "relaunches"}:
+        raise ValueError("invalid Stock lifecycle profile fields")
 
     def phase(value):
         if not isinstance(value, str) or not re.fullmatch(r"0x4f53[0-9a-f]{4}", value):
@@ -40,7 +60,6 @@ def load_contract(path: Path, sequences: Path) -> dict:
             raise ValueError("invalid lifecycle sequence name")
         if not (sequences / name).is_file():
             raise ValueError(f"missing lifecycle sequence: {name}")
-    return contract
 
 
 def verify_result(path: Path, expected: str) -> None:
@@ -59,14 +78,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("contract", type=Path)
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--has-family", choices=("hp39", "hp48", "hp4950"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[3]
     sequences = root / "tests/e2e/sequences"
-    contract = load_contract(args.contract, sequences)
+    contracts = load_contract(args.contract, sequences)
+    if args.has_family:
+        print(int(args.has_family in contracts))
+        return
     if args.validate_only:
         return
-    if os.environ["HPCLANG_E2E_FAMILY"] != contract["family"]:
-        raise ValueError("lifecycle family differs from the current Stock target")
+    family = os.environ["HPCLANG_E2E_FAMILY"]
+    if family not in contracts:
+        raise ValueError("lifecycle does not define the current Stock family")
+    contract = contracts[family]
     target = os.environ["TARGET"]
     state = root / "build" / f"{target}-state"
     verify_result(Path(os.environ["HPCLANG_X50NG_E2E_JSON"]), contract["initial_phase"])
@@ -95,7 +120,7 @@ def main() -> None:
             str(root / "build/x50ng/dist/x50ng"),
             f"--datadir={state}",
             "--overwrite-config",
-            f"--style={root / 'build/x50ng/dist/style-40g.css'}",
+            f"--style={root / 'build/x50ng/dist' / ('style-50g.css' if family == 'hp4950' else 'style-40g.css')}",
         ]
         with Path(f"{prefix}.log").open("w", encoding="utf-8") as log:
             subprocess.run(

@@ -202,8 +202,7 @@ if [[ "$MODE" == object-mutation ]]; then
     cp "$ROOT/tests/e2e/object-mutation/stock-setup.json" "$OUT/e2e.stock-setup.json"
 fi
 
-if [[ ( "$FAMILY" == all || "$FAMILY" == hp39 ) &&
-      -f "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" ]]; then
+if [[ -f "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" ]]; then
     cp "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" "$OUT/e2e.stock-lifecycle.json"
 fi
 

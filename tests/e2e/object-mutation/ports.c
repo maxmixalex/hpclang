@@ -5,6 +5,43 @@
 #include <hpclang/port.h>
 #include <hpclang/target.h>
 
+uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
+{
+    static const uint8_t name[] = "PORTKEEP";
+    static const uint8_t text[] = "Survives native return and relaunch";
+    struct hpclang_object *previous = hpclang_port_backup_get(0, name, sizeof(name) - 1);
+    struct hpclang_object *next = NULL;
+    int result;
+    if (!previous) {
+        if (errno != ENOENT || hpclang_object_create_integer_i64(321, &next))
+            return 0xb0;
+        *phase = 0;
+        result = hpclang_port_backup_create(0, name, sizeof(name) - 1, next);
+    } else if (hpclang_object_kind(previous) == HPCLANG_OBJECT_STRING) {
+        uint8_t bytes[sizeof(text)] = {0};
+        size_t length;
+        int valid = hpclang_object_string_size(previous, &length) == 0 &&
+                    length == sizeof(text) - 1 &&
+                    hpclang_object_string_copy(previous, bytes, sizeof(bytes)) == 0 &&
+                    !memcmp(bytes, text, length);
+        hpclang_object_release(previous);
+        if (!valid)
+            return 0xb1;
+        *phase = 2;
+        result = hpclang_port_backup_remove(0, name, sizeof(name) - 1);
+    } else {
+        int64_t integer;
+        int valid = hpclang_object_integer_i64(previous, &integer) == 0 && integer == 321;
+        hpclang_object_release(previous);
+        if (!valid || hpclang_object_create_string(text, sizeof(text) - 1, &next))
+            return 0xb2;
+        *phase = 1;
+        result = hpclang_port_backup_replace(0, name, sizeof(name) - 1, next);
+    }
+    hpclang_object_release(next);
+    return result ? 0xb3 : 0;
+}
+
 uint32_t hpclang_e2e_port_reads(void)
 {
     const struct hpclang_boot_info *boot = hpclang_boot_info();

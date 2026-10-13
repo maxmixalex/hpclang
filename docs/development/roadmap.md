@@ -454,8 +454,11 @@ and remove, with owned reads and preservation of live references to old records.
 The native library table participates in reference scanning. Library record
 creation is internal and does not register or attach a library. Existing-library
 relocation, public library mutation and Port 1/2 remain unfinished. The 81 host
-tests and focused mutation/port sanitizer tests pass; Stock acceptance of the
-new public replace/remove flow is pending. These results do not close M8.0.
+tests and focused mutation/port sanitizer tests pass. The public grow/shrink/
+read/remove flow passes Stock on HP48gII, HP49g+ and HP50g. All three also pass
+a three-launch lifecycle: create an integer, return/relaunch and replace it
+with a string, then return/relaunch and verify/remove the string. No reinstall
+or calculator reset occurs between launches. These results do not close M8.0.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
