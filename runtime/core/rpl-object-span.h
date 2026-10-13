@@ -46,7 +46,9 @@ extern "C"
      * declared type; no synthetic prefix is written into native memory. A
      * nonzero read-only callback result aborts and is returned unchanged.
      * Discard partial traversal on error and keep the reader mapping stable.
-     * Linked arrays have a different layout and are not accepted here. */
+     * Linked arrays visit every link, including aliases, and require each body
+     * to lie after the link table within the declared array. Unreferenced bytes
+     * are not visited. Directory bodies and out-of-array links are rejected. */
     typedef int (*hpclang_rpl_array_visit_fn)(void *context, uint32_t index, uint32_t prologue,
                                               uint32_t body, uint32_t nibbles);
     int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t address,

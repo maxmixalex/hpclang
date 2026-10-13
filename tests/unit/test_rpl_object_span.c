@@ -514,7 +514,7 @@ static void test_array_bodies(void)
     state = (struct array_visit_state){0, 0x02baa, 25, {10}, 0};
     assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) == 0);
     assert(state.count == 1);
-    /* Missing header reads, unknown types and linked layouts fail closed. */
+    /* Missing header reads and unsupported element types fail closed. */
     for (uint32_t used = 0; used < 25; ++used) {
         image.used = used;
         state.count = 0;
@@ -528,9 +528,6 @@ static void test_array_bodies(void)
     put_nibbles(&image, 10, 0x02a96, 5);
     assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
-    put_nibbles(&image, 0, 0x02a0a, 5);
-    assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
     /* Empty arrays still require an exact declared extent. */
     put_nibbles(&image, 0, 0x029e8, 5);
     put_nibbles(&image, 5, 20, 5);
@@ -541,8 +538,66 @@ static void test_array_bodies(void)
     assert(state.count == 0);
 }
 
+struct linked_visit_state
+{
+    uint32_t count;
+    uint32_t addresses[3];
+};
+
+static int linked_visit(void *context, uint32_t index, uint32_t type, uint32_t body,
+                        uint32_t nibbles)
+{
+    struct linked_visit_state *state = context;
+    assert(index == state->count && index < 3);
+    assert(type == 0x02a2c && nibbles == 7);
+    assert(body == state->addresses[index]);
+    ++state->count;
+    return 0;
+}
+
+static void test_linked_array_bodies(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    put_nibbles(&image, 0, 0x02a0a, 5);
+    put_nibbles(&image, 5, 49, 5);
+    put_nibbles(&image, 10, 0x02a2c, 5);
+    put_nibbles(&image, 15, 1, 5);
+    put_nibbles(&image, 20, 3, 5);
+    /* Elements may share bodies and need not follow physical storage order. */
+    put_nibbles(&image, 25, 22, 5);
+    put_nibbles(&image, 30, 10, 5);
+    put_nibbles(&image, 35, 12, 5);
+    put_nibbles(&image, 40, 7, 5);
+    put_nibbles(&image, 45, 0x41, 2);
+    put_nibbles(&image, 47, 7, 5);
+    put_nibbles(&image, 52, 0x42, 2);
+    struct image original = image;
+    struct linked_visit_state state = {0, {47, 40, 47}};
+    assert(hpclang_rpl_array_visit(&reader, 0, 54, linked_visit, &state) == 0);
+    assert(state.count == 3);
+    assert(memcmp(&image, &original, sizeof(image)) == 0);
+    const uint32_t invalid[] = {0, 14, 29, 30, 0xfffff};
+    for (uint32_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        image = original;
+        put_nibbles(&image, 25, invalid[i], 5);
+        state.count = 0;
+        assert(hpclang_rpl_array_visit(&reader, 0, 54, linked_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    image = original;
+    put_nibbles(&image, 47, 8, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 54, linked_visit, &state) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    image = original;
+    put_nibbles(&image, 20, 7, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 54, linked_visit, &state) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+}
+
 int main(void)
 {
+    test_linked_array_bodies();
     test_array_bodies();
     test_address_overflow_is_bounded();
     test_fixed_objects();

@@ -520,8 +520,11 @@ bounded body without writing a synthetic prologue into native memory. Tests
 cover strings, multidimensional numbers, banked-pointer bodies, empty arrays,
 truncation, overflow and callback cancellation. The same C implementation reads
 all 13 strings in library 275's native HP50g message array with an exact ending
-boundary. Linked arrays and address-dependent directory bodies are not yet
-accepted; this component does not by itself certify reference safety.
+boundary. Linked-array traversal also handles shared and reordered bodies using
+bounded relative links; synthetic fixtures cover links into the header/table,
+past the array end and truncated bodies. A native linked-array instance has not
+yet been validated. Address-dependent directory bodies and out-of-array links
+are rejected; this component does not by itself certify reference safety.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

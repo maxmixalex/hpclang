@@ -572,7 +572,7 @@ int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t ad
     int result = read_nibbles(reader, address, 5, limit, &type);
     if (result)
         return result;
-    if (type != RPL_DOARRY)
+    if (type != RPL_DOARRY && type != RPL_DOLNKARRY)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     result = length_prefixed_span(reader, address, limit, &span);
     if (result)
@@ -607,19 +607,39 @@ int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t ad
     uint32_t offset = 20 + dimensions * 5;
     if (count > span - offset)
         return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t bodies = offset;
+    if (type == RPL_DOLNKARRY) {
+        if (count > (span - offset) / 5)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        bodies += count * 5;
+    }
     for (uint32_t index = 0; index < count; ++index) {
-        struct array_body_reader body = {reader, address + offset - 5, element};
+        uint32_t current = offset;
+        if (type == RPL_DOLNKARRY) {
+            uint32_t relative;
+            result = read_nibbles(reader, address + offset, 5, span - offset, &relative);
+            if (result)
+                return result;
+            /* Link cells address compact bodies relative to the cell itself.
+             * Only bodies contained in this array are certified here. */
+            if (relative > span - offset)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            current += relative;
+            if (current < bodies || current >= span)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+        }
+        struct array_body_reader body = {reader, address + current - 5, element};
         struct hpclang_rpl_reader synthetic = {array_body_read, &body};
         uint32_t length;
-        result = parse_object(&synthetic, body.prefix, span - offset + 5, 0, &length);
+        result = parse_object(&synthetic, body.prefix, span - current + 5, 0, &length);
         if (result)
             return result;
         if (length <= 5)
             return HPCLANG_RPL_SPAN_MALFORMED;
-        result = visit(context, index, element, address + offset, length - 5);
+        result = visit(context, index, element, address + current, length - 5);
         if (result)
             return result;
-        offset += length - 5;
+        offset += type == RPL_DOLNKARRY ? 5 : length - 5;
     }
-    return offset == span ? 0 : HPCLANG_RPL_SPAN_MALFORMED;
+    return type == RPL_DOLNKARRY || offset == span ? 0 : HPCLANG_RPL_SPAN_MALFORMED;
 }
