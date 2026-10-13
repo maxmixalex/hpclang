@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.20)
+project(hpclang_declarative_ui_cpp LANGUAGES C CXX ASM)
+find_package(hpclang CONFIG REQUIRED)
+hpclang_add_application(declarative_ui_cpp main.cpp)
+target_compile_features(declarative_ui_cpp PRIVATE cxx_std_20)
+hpclang_target_launchers(declarative_ui_cpp)
+set(ascii)
+foreach(codepoint RANGE 32 126)
+    list(APPEND ascii ${codepoint})
+endforeach()
+hpclang_target_font(declarative_ui_cpp NAME counter_font FONT @mini
+    MODE STATIC_EXPLICIT CODEPOINTS ${ascii} FALLBACK 63)
