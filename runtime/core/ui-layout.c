@@ -7,6 +7,17 @@ static int transparent(const struct node *node)
     return node->view.kind == HPCLANG_UI_COMPONENT || node->view.kind == HPCLANG_UI_KEY;
 }
 
+/* Identity scopes contribute ancestry but no layout box. Derive their nearest
+ * box from the retained declaration chain instead of storing a second parent
+ * index in both frame arenas. Parents always precede their descendants. */
+static uint32_t layout_parent(const struct frame *frame, const struct node *node)
+{
+    uint32_t parent = node->parent_index;
+    while (parent != UI_ROOT && transparent(&frame->nodes[parent]))
+        parent = frame->nodes[parent].parent_index;
+    return parent;
+}
+
 static int valid_rect(struct hpclang_ui_rect rect)
 {
     return rect.width >= 0 && rect.height >= 0 && (int64_t)rect.x + rect.width <= INT32_MAX &&
@@ -86,10 +97,6 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
     struct node root = {.view = {.kind = HPCLANG_UI_COLUMN, .bounds = viewport, .clip = viewport}};
     for (uint32_t i = 0; i < frame->count; ++i) {
         struct node *node = &frame->nodes[i];
-        uint32_t parent = node->parent_index;
-        if (parent != UI_ROOT && transparent(&frame->nodes[parent]))
-            parent = frame->nodes[parent].layout_parent;
-        node->layout_parent = parent;
         node->content_width = node->content_height = 0;
         node->children = node->weights = 0;
         node->metrics = (struct hpclang_ui_metrics){0};
@@ -130,8 +137,8 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
             if (node->view.kind != HPCLANG_UI_SCROLL)
                 node->metrics.height = maximum(node->metrics.height, (int32_t)height);
         }
-        struct node *parent =
-            node->layout_parent == UI_ROOT ? &root : &frame->nodes[node->layout_parent];
+        uint32_t parent_index = layout_parent(frame, node);
+        struct node *parent = parent_index == UI_ROOT ? &root : &frame->nodes[parent_index];
         if (accumulate(parent, node))
             return hpclang_ui_fail(ui, EOVERFLOW);
     }
@@ -142,8 +149,8 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
             node->view.bounds = node->view.clip = (struct hpclang_ui_rect){0};
             continue;
         }
-        struct node *parent =
-            node->layout_parent == UI_ROOT ? &root : &frame->nodes[node->layout_parent];
+        uint32_t parent_index = layout_parent(frame, node);
+        struct node *parent = parent_index == UI_ROOT ? &root : &frame->nodes[parent_index];
         struct hpclang_ui_rect box = content(parent);
         int row = parent->view.kind == HPCLANG_UI_ROW;
         int32_t extra =
@@ -188,7 +195,8 @@ static int64_t shifted_y(const struct frame *frame, uint32_t index)
 {
     const struct node *node = &frame->nodes[index];
     int64_t y = node->base_y;
-    for (uint32_t p = node->layout_parent; p != UI_ROOT; p = frame->nodes[p].layout_parent)
+    for (uint32_t p = layout_parent(frame, node); p != UI_ROOT;
+         p = layout_parent(frame, &frame->nodes[p]))
         y -= frame->nodes[p].next_scroll;
     return y;
 }
@@ -211,7 +219,8 @@ static int scroll_update(struct hpclang_ui *ui, struct frame *frame, uint32_t fo
     if (selected != UI_ROOT) {
         const struct node *node = &frame->nodes[selected];
         int64_t top = node->base_y, bottom = top + node->view.bounds.height;
-        for (uint32_t p = node->layout_parent; p != UI_ROOT; p = frame->nodes[p].layout_parent) {
+        for (uint32_t p = layout_parent(frame, node); p != UI_ROOT;
+             p = layout_parent(frame, &frame->nodes[p])) {
             struct node *parent = &frame->nodes[p];
             if (parent->view.kind != HPCLANG_UI_SCROLL)
                 continue;
@@ -250,8 +259,9 @@ static int scroll_update(struct hpclang_ui *ui, struct frame *frame, uint32_t fo
         node->view.bounds.y = (int32_t)shifted_y(frame, i);
         node->view.scroll_y = node->next_scroll;
         struct hpclang_ui_rect parent_clip = frame->viewport;
-        if (node->layout_parent != UI_ROOT) {
-            const struct node *parent = &frame->nodes[node->layout_parent];
+        uint32_t parent_index = layout_parent(frame, node);
+        if (parent_index != UI_ROOT) {
+            const struct node *parent = &frame->nodes[parent_index];
             parent_clip = intersect(parent->view.clip, content(parent));
         }
         node->view.clip = intersect(node->view.bounds, parent_clip);

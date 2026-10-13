@@ -9,7 +9,6 @@ struct node
 {
     struct hpclang_ui_node view;
     uint32_t parent_index;
-    uint32_t layout_parent;
     /* Preferred sizes are consumed before this node distributes space to its
      * children. Padding/gap/grow remain live in the trailing metrics fields. */
     union
