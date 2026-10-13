@@ -534,6 +534,13 @@ objects in a saved HP50g HOME graph and identifies the imported ERAM ACPTR.
 Flash-pointer resolution, executable references and complete live-root coverage
 remain open; this experiment is not authorization to move referenced Port 1 data.
 
+A read-only root visitor now reuses the native relocation scanner for launcher
+roots, data/return stacks and its supported system tables. It reports raw values
+without assuming they are object beginnings; tests verify callback cancellation,
+read failures and byte-for-byte preservation. The saved HP50g return stack also
+contains execution addresses outside the HOME object graph, so interpreting these
+roots and covering banked library entries remain necessary before enabling writes.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.

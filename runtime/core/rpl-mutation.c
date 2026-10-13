@@ -204,7 +204,8 @@ enum pointer_scan_mode
 {
     POINTER_SCAN_REJECT = 0,
     POINTER_SCAN_VALIDATE_SHIFT = 1,
-    POINTER_SCAN_APPLY_SHIFT = 2
+    POINTER_SCAN_APPLY_SHIFT = 2,
+    POINTER_SCAN_VISIT = 3
 };
 
 struct pointer_scan_request
@@ -217,6 +218,8 @@ struct pointer_scan_request
     enum pointer_scan_mode mode;
     int port_boundary; /* Port 0 boundary is committed separately. */
     int *busy_found;   /* validation accumulates BUSY without hiding later errors */
+    hpclang_rpl_root_visit_fn visit;
+    void *visit_context;
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
@@ -225,6 +228,9 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
 {
     if (request == NULL)
         return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    if (request->mode == POINTER_SCAN_VISIT)
+        return request->visit(request->visit_context, slot, value);
 
     if (request->mode == POINTER_SCAN_REJECT) {
         if (!pointer_hits_range(value, request->move_start, request->move_end))
@@ -541,6 +547,19 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
     return scan_library_references(io, request);
+}
+
+int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
+                                     hpclang_rpl_root_visit_fn visit, void *context)
+{
+    if (!io_ready(io) || !visit)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct pointer_scan_request request = {
+        .mode = POINTER_SCAN_VISIT,
+        .visit = visit,
+        .visit_context = context,
+    };
+    return scan_all_references(io, &request);
 }
 
 static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,

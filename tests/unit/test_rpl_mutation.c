@@ -1618,8 +1618,57 @@ static void test_port0_create_preserves_home_and_library(void)
     }
 }
 
+struct root_visit_state
+{
+    uint32_t count;
+    unsigned found;
+    int stop;
+};
+
+static int visit_root(void *context, uint32_t slot, uint32_t value)
+{
+    struct root_visit_state *state = context;
+    ++state->count;
+    if (slot == 0 && value == 0x82345)
+        state->found |= 1;
+    if (slot == 0x90000 && value == 0x82000)
+        state->found |= 2;
+    if (slot == 0x84ffb && value == 0x1d91b)
+        state->found |= 4;
+    return state->stop;
+}
+
+static void test_read_only_root_visit(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    uint32_t native = 0x82345;
+    uint32_t *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    put_word(0x84ffb, 5, 0x1d91b);
+    put_word(0x84ff6, 5, 0);
+    uint8_t *before = malloc(sizeof(memory));
+    assert(before);
+    memcpy(before, memory, sizeof(memory));
+    struct root_visit_state state = {0};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) == 0);
+    assert(state.found == 7);
+    assert(writes == 0 && native == 0x82345);
+    assert(memcmp(before, memory, sizeof(memory)) == 0);
+    state = (struct root_visit_state){.stop = 79};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) == 79);
+    assert(state.count == 1 && writes == 0);
+    rejected_read = DSKTOP;
+    state = (struct root_visit_state){0};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) != 0);
+    assert(writes == 0 && memcmp(before, memory, sizeof(memory)) == 0);
+    assert(hpclang_rpl_mutation_visit_roots(&io, NULL, &state) == HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    free(before);
+}
+
 int main(void)
 {
+    test_read_only_root_visit();
     test_port1_append_respects_native_pool();
     test_port1_edit_owned_suffix();
     test_port0_create_library();

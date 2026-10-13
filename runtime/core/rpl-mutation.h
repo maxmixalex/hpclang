@@ -60,6 +60,16 @@ extern "C"
         HPCLANG_RPL_MUTATION_NOMEM = -13
     };
 
+    /* Read-only enumeration of the pointer cells already covered by native
+     * relocation: launcher roots, stacks and supported Stock pointer tables.
+     * slot is zero for an ARM-side launcher root. Values may be sentinels,
+     * execution positions or metadata, not necessarily object beginnings.
+     * Banked library entries and pointers inside object bodies need separate
+     * traversal. Keep mappings stable and discard partial results on error. */
+    typedef int (*hpclang_rpl_root_visit_fn)(void *context, uint32_t slot, uint32_t value);
+    int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
+                                         hpclang_rpl_root_visit_fn visit, void *context);
+
     /* Bootstrap-only: turn the native page interval into a rooted opaque
      * TEMPOB block. Pin
      * the compact pre-existing TEMP prefix as well, so Stock
