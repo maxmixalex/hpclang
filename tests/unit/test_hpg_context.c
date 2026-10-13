@@ -89,6 +89,41 @@ static void defaults(void)
     hpg_free_image(g);
 }
 
+static void pixmaps(void)
+{
+    char *source[] = {
+        "4 2 5 2",   "aa c #000000",           "bb c #ffffff", "cc c #ff0000 g #00ff00 g4 #0000ff",
+        "dd c None", "ee s ignored c #808080", "aabbccdd",     "ee??aabb"};
+    hpg_t *g = hpg_load_xpm_gray16(source);
+    assert(g && hpg_get_width(g) == 4 && hpg_get_height(g) == 2);
+    assert(hpg_get_pixel(g, 0, 0) == 255 && hpg_get_pixel(g, 1, 0) == 0);
+    assert(hpg_get_pixel(g, 2, 0) == 238 && hpg_get_pixel(g, 3, 0) == 0);
+    assert(hpg_get_pixel(g, 0, 1) == 119 && hpg_get_pixel(g, 1, 1) == 0);
+    assert(hpg_get_color(g) == 0);
+    hpg_free_image(g);
+    g = hpg_load_xpm_gray4(source);
+    assert(g && hpg_get_pixel(g, 0, 1) == 85);
+    hpg_free_image(g);
+    g = hpg_load_xpm_mono(source);
+    assert(g && hpg_get_pixel(g, 0, 1) == 0 && hpg_get_pixel(g, 2, 0) == 255);
+    hpg_free_image(g);
+    char *space_key[] = {"2\t1 2 1 0 0", "  c #000000", ". g4 invalid c #FFFFFF", " ."};
+    g = hpg_load_xpm_mono(space_key);
+    assert(g && hpg_get_pixel(g, 0, 0) == 255 && hpg_get_pixel(g, 1, 0) == 0);
+    hpg_free_image(g);
+    char *short_row[] = {"2 1 1 2", "aa c #000000", "aa"};
+    assert(!hpg_load_xpm_gray16(short_row) && errno == EINVAL);
+    char *duplicate[] = {"1 1 2 1", "a c #000000", "a c #ffffff", "a"};
+    assert(!hpg_load_xpm_mono(duplicate) && errno == EINVAL);
+    char *bad_header[] = {"9999999999999999999999 1 1 1"};
+    assert(!hpg_load_xpm_mono(bad_header) && errno == EINVAL);
+    bad_header[0] = "0 1 1 1";
+    assert(!hpg_load_xpm_mono(bad_header) && errno == EINVAL);
+    bad_header[0] = "1x 1 1 1";
+    assert(!hpg_load_xpm_mono(bad_header) && errno == EINVAL);
+    assert(!hpg_load_xpm_mono(NULL) && errno == EINVAL);
+}
+
 static struct hpclang_surface *display;
 static unsigned borrowed;
 struct hpclang_surface *hpclang_display_surface(void)
@@ -291,5 +326,6 @@ int main(void)
     copies();
     text();
     defaults();
+    pixmaps();
     return 0;
 }

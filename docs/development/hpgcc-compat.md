@@ -186,6 +186,16 @@ without native mappings and compares the pixels with the packaged source.
 Target-side adapter acceptance remains open; default-font pixel identity is
 not an adapter guarantee.
 
+The installed HPG adapter loads compiled XPM arrays into owned mono/4/16-level
+images. Palette keys may use multiple characters; `#RRGGBB` entries prefer
+`g4` over `g` over `c`, with historical HPG luminance conversion. Unsupported
+names, `None`, and unknown pixel keys produce opaque white, as in historical
+HPG; these images do not carry an alpha plane. The caller supplies the
+header-declared palette and rows as terminated strings. Invalid headers,
+duplicate keys, and short rows fail with `EINVAL` and release partial storage.
+This adapter is distinct from the earlier transparent-drawing feasibility
+probe described below.
+
 M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
 synchronization and six status segments through the clean display service.
 The runtime owns contiguous DMA allocations, cache publication and LCD restoration.

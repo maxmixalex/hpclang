@@ -39,6 +39,14 @@ extern "C"
     int hpg_get_width(hpg_t *g);
     int hpg_get_height(hpg_t *g);
     hpg_t *hpg_alloc_mono_image(int width, int height);
+    /* Compiled XPM arrays with header-declared palette/rows, each a terminated
+     * string. Supports arbitrary positive characters-per-pixel and #RRGGBB,
+     * preferring g4, then g, then c. Like historical HPG, unknown color names,
+     * None and unknown pixel keys become opaque white (there is no alpha plane).
+     * Malformed headers, short rows and duplicate palette keys return EINVAL. */
+    hpg_t *hpg_load_xpm_mono(char *xpm[]);
+    hpg_t *hpg_load_xpm_gray4(char *xpm[]);
+    hpg_t *hpg_load_xpm_gray16(char *xpm[]);
     hpg_t *hpg_alloc_gray4_image(int width, int height);
     hpg_t *hpg_alloc_gray16_image(int width, int height);
     void hpg_free_image(hpg_t *image);

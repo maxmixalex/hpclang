@@ -54,6 +54,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-context.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-draw.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-font.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-xpm.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/fonts/generated/newrpl_font6_menus.S"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/fonts/generated/newrpl_font8_styleb.S"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-saturn.c"
