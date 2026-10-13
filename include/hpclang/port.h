@@ -55,7 +55,9 @@ extern "C"
 
     /* Create a new named backup from an owned snapshot. An existing exact name
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port
-     * objects remain at their original addresses. Currently Port 0 only. */
+     * objects remain at their original addresses. Supports classic Stock Port 0
+     * and HP49g+/HP50g Stock Port 1. Port 1 requires a launcher-provided ERAM
+     * ownership boundary; older launchers without it return ENOSYS. */
     int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
                                    const struct hpclang_object *value);
 

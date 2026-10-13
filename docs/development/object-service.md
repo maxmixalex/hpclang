@@ -566,7 +566,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
 | Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
-| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads are implemented; native backup enumeration/readback passes local Stock. Writes require bank/reference handling and ARM allocator ownership. |
+| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup creation pass local Stock, including relaunch and native RPL recall. Replacement/removal and library writes still require bank/reference handling. |
 | Port 2 | Flash, containing library/backup objects | No public port read/write service; implement native erase/write transactions and persistence. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
@@ -657,7 +657,7 @@ integer backup, read and replace it with a string after relaunch, then read and
 remove the string after another relaunch. No reinstallation, reset or fixture
 injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
-provide public library installation or attachment. Port 1 writes, Port 2 and full
+provide public library installation or attachment. Port 1 replacement/removal, Port 2 and full
 library mutation remain M8.0 requirements.
 
 Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after
@@ -666,8 +666,17 @@ the free tail as writable storage. Host tests cover packed-nibble bounds,
 invalid mappings, backup/library snapshots and damaged records. HP49g+ and
 HP50g Stock tests create `PORTONE` through native RPL before launching, then
 enumerate it and verify integer 456 on all three lifecycle invocations while
-Port 0 and HOME mutations run. Port 1 writes still require a launcher-owned
-allocation boundary so native records cannot overwrite active ARM pages.
+Port 0 and HOME mutations run.
+
+`hpclang_port_backup_create(1, ...)` now appends a validated record before the
+launcher-provided ERAM ownership fence. Existing records and library addresses
+do not move. The body, CRC and next terminator are prepared before publishing
+the prologue. Insufficient unowned space returns `ENOSPC`; no native space is
+borrowed from the application heap. Older launchers without the fence return
+`ENOSYS`. HP49g+ and HP50g Stock create integer 789 and read it across subsequent
+launches. Independent native-RPL probes then recall both that record and the
+original 456 through Stock Kermit. Port 1 replacement/removal and library
+mutation still require their own reference-preservation and relocation paths.
 
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must

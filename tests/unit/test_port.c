@@ -13,6 +13,7 @@ static uint8_t memory[0x100000];
 static int unavailable;
 static int writable = 1;
 static int port1_available;
+static uint32_t port1_limit = 0x2000u;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 const struct hpclang_boot_info *hpclang_boot_info(void)
@@ -51,6 +52,16 @@ int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
     if (!port1_available)
         return 0;
     *reader = (struct hpclang_rpl_reader){mapped_read, NULL};
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit)
+{
+    if (!port1_available || !writable)
+        return 0;
+    *io =
+        (struct hpclang_rpl_mutation_io){.read_nibble = mapped_read, .write_nibble = mapped_write};
+    *limit = port1_limit;
     return 1;
 }
 
@@ -221,6 +232,21 @@ int main(void)
     assert(hpclang_port_backup_create(3, NULL, 0, object) == -1 && errno == EINVAL);
     assert(hpclang_port_backup_create(1, NULL, 0, object) == -1 && errno == ENOSYS);
     assert(hpclang_port_backup_create(0, NULL, 0, NULL) == -1 && errno == EINVAL);
+    device.family = HPCLANG_FAMILY_HP4950;
+    port1_available = 1;
+    memory[port1_limit] = 11;
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"ERAM", 4, object) == 0);
+    copy = hpclang_port_backup_get(1, (const uint8_t *)"ERAM", 4);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    assert(memory[port1_limit] == 11);
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"ERAM", 4, object) == -1 &&
+           errno == EEXIST);
+    assert(hpclang_port_backup_replace(1, (const uint8_t *)"ERAM", 4, object) == -1 &&
+           errno == ENOSYS);
+    port1_limit = 0;
+    assert(hpclang_port_backup_create(1, (const uint8_t *)"OTHER", 5, object) == -1 &&
+           errno == ENOSPC);
     writable = 0;
     assert(hpclang_port_backup_create(0, NULL, 0, object) == -1 && errno == ENOSYS);
     hpclang_object_release(object);

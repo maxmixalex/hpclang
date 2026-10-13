@@ -39,7 +39,28 @@ uint32_t hpclang_e2e_port_lifecycle(uint32_t *phase)
         result = hpclang_port_backup_replace(0, name, sizeof(name) - 1, next);
     }
     hpclang_object_release(next);
-    return result ? 0xb3 : 0;
+    if (result)
+        return 0xb3;
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    if (boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G) {
+        static const uint8_t made[] = "PORTMADE";
+        if (*phase == 0) {
+            next = NULL;
+            if (hpclang_object_create_integer_i64(789, &next))
+                return 0xb8;
+            result = hpclang_port_backup_create(1, made, sizeof(made) - 1, next);
+            hpclang_object_release(next);
+            if (result)
+                return 0xb8;
+        }
+        next = hpclang_port_backup_get(1, made, sizeof(made) - 1);
+        int64_t integer;
+        int valid = next && hpclang_object_integer_i64(next, &integer) == 0 && integer == 789;
+        hpclang_object_release(next);
+        if (!valid)
+            return 0xb9;
+    }
+    return 0;
 }
 
 uint32_t hpclang_e2e_port_reads(void)

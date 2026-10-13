@@ -1300,6 +1300,53 @@ static void test_overwrite_port_value_preserves_references(void)
     free(value);
 }
 
+static void test_port1_append_respects_native_pool(void)
+{
+    const char *backup = "26b20130008005f42545a55425f48041620900003210119200f9e3";
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    uint8_t packed[27] = {0};
+    for (uint32_t i = 0; i < 54; ++i) {
+        uint8_t n = backup[i] <= '9' ? backup[i] - '0' : backup[i] - 'a' + 10;
+        packed[i / 2] |= n << (4 * (i & 1));
+    }
+    for (int failure = 0; failure < 5; ++failure) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        for (uint32_t i = 0; i < 43; ++i)
+            memory[i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+        uint8_t saved[43];
+        memcpy(saved, memory, sizeof(saved));
+        uint32_t limit = 103;
+        memory[limit] = 11; /* First nibble of ARM-owned storage. */
+        if (failure == 1)
+            limit = 102;
+        else if (failure == 2)
+            limit = 0;
+        else if (failure == 3)
+            memory[42] ^= 1;
+        else if (failure == 4)
+            rejected_read = 100;
+        int result = hpclang_rpl_port1_create_backup(&io, limit, packed, 54);
+        if (failure) {
+            assert(result != HPCLANG_RPL_MUTATION_OK && writes == 0);
+            assert(memory[103] == 11);
+            continue;
+        }
+        assert(result == HPCLANG_RPL_MUTATION_OK);
+        assert(!memcmp(saved, memory, sizeof(saved)) && memory[103] == 11);
+        const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
+        struct hpclang_rpl_port_entry entry;
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.library_number == 123);
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 43);
+        assert(entry.name_length == 8 && !memcmp(entry.name, "PORTZERO", 8));
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+        uint32_t before = writes;
+        assert(hpclang_rpl_port1_create_backup(&io, limit, packed, 54) ==
+               HPCLANG_RPL_MUTATION_EXISTS);
+        assert(writes == before);
+    }
+}
+
 static void test_port0_create_library(void)
 {
     const char *library = "04b2062000108510b7000000000000000000000d5c2";
@@ -1445,6 +1492,7 @@ static void test_port0_create_preserves_home_and_library(void)
 
 int main(void)
 {
+    test_port1_append_respects_native_pool();
     test_port0_create_library();
     test_library_table_reference_preservation();
     test_port_remove_preserves_backup_references();

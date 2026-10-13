@@ -3,6 +3,11 @@
 
 #include "rpl-mutation.h"
 
+/* Append to the ERAM chain without moving any existing record. limit is the
+ * launcher-proven exclusive nibble boundary before its physical page pool. */
+int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                    const uint8_t *packed, uint32_t span);
+
 /* Store a library record without registering or attaching it to the OS.
  * Existing record addresses remain stable; duplicate library IDs are rejected.
  * The caller owns stable packed input, as for backup creation below. */

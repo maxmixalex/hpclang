@@ -26,6 +26,56 @@ static int parse_error(int result)
                                                     : HPCLANG_RPL_MUTATION_MALFORMED;
 }
 
+int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                    const uint8_t *packed, uint32_t span)
+{
+    if (!io || !io->read_nibble || !io->write_nibble)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (!packed || span > 0xfffffu || limit > 0x40000u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    struct packed_source source = {packed, span};
+    const struct hpclang_rpl_reader input = {read_packed, &source};
+    struct hpclang_rpl_port_cursor input_cursor = {.end = span};
+    struct hpclang_rpl_port_entry added;
+    int result = hpclang_rpl_port_next(&input, &input_cursor, &added);
+    if (result != 1 || added.prologue != 0x02b62u || added.span != span)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
+    struct hpclang_rpl_port_entry existing;
+    while ((result = hpclang_rpl_port_next(&reader, &cursor, &existing)) > 0) {
+        if (existing.prologue == added.prologue && existing.name_length == added.name_length &&
+            !memcmp(existing.name, added.name, added.name_length))
+            return HPCLANG_RPL_MUTATION_EXISTS;
+    }
+    if (result < 0)
+        return parse_error(result);
+    uint32_t start = cursor.address;
+    /* Keep the six-nibble terminator/padding expected by the native allocator. */
+    if (start > limit || limit - start < span + 6u)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    for (uint32_t i = 0; i < span + 6u; ++i) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, start + i, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    /* Prepare the body and next terminator while the current terminator still
+     * hides the append. The stable-mapping commit contract matches Port 0. */
+    for (uint32_t i = 5; i < span + 6u; ++i) {
+        uint8_t nibble = i < span ? (packed[i / 2u] >> (4u * (i & 1u))) & 15u : 0;
+        if (!io->write_nibble(io->context, start + i, nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+    }
+    for (uint32_t i = 0; i < 5; ++i) {
+        uint8_t nibble = (packed[i / 2u] >> (4u * (i & 1u))) & 15u;
+        if (!io->write_nibble(io->context, start + i, nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int port_start(const struct hpclang_rpl_mutation_io *io, uint32_t *start)
 {
     *start = 0;

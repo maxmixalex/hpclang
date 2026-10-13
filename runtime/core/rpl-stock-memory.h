@@ -12,6 +12,7 @@
 int hpclang_rpl_stock_port1_capture(struct hpclang_rpl_reader *reader,
                                     const volatile uint8_t *bytes, uint32_t ram_section);
 int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader);
+int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit);
 
 /* Invocation-local copy of the Stock main-RAM mapping. No Stock calls or
  * interrupt re-enabling may occur between preparation and mutation return. */

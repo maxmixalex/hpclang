@@ -68,8 +68,15 @@ protected unused upper half of the L2 workspace and validates its Stock identity
 that protected copy, including the final removal of the temporary stage alias.
 The hidden launcher object and saved post-ARMSYS Saturn PC are explicit private
 relocation roots. They move with USEROB/TEMPOB references rather than retaining
-addresses into relocated data. The private bounds record uses the `RPL2` magic
-so an older record cannot be mistaken for one containing native roots.
+addresses into relocated data. The private `RPL2` bounds prefix identifies
+records containing these native roots. `RPL3` appends the Port 1 write fence:
+the exclusive nibble offset before the earliest ERAM page in the entire
+ARMToolbox allocation pool, including stage code, page tables, code, stack and
+heap. Runtime never infers Port 1 capacity from currently unused heap bytes.
+Invalid pool descriptors do not publish this extension. The current runtime
+continues to accept `RPL2` for main-RAM services but requires `RPL3` for Port 1
+creation. These records remain launcher-private; rebuild applications and
+their packaged launcher together when updating the SDK.
 
 ## Platform families and model profiles
 

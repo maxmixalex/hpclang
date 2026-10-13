@@ -9,6 +9,7 @@
 #include "hp39-portal-stack.h"
 
 #include "stage-layout.h"
+#include "port-memory.h"
 
 #define STAGE_WINDOW_BASE HPCLANG_STAGE_WINDOW_BASE
 #define STAGE_CODE_OFFSET 0x00000400u
@@ -1407,7 +1408,8 @@ static int stage_phys_page_saturn_start(const uint32_t *read_map, uint32_t phys_
 }
 
 static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint32_t *pool_l2,
-                                   uint32_t pool_pages, struct hpclang_rpl_memory_bounds *bounds)
+                                   uint32_t pool_pages, struct hpclang_rpl_memory_bounds *bounds,
+                                   uint32_t model)
 {
     if (saturn_state == NULL || pool_l2 == NULL || bounds == NULL)
         return 0;
@@ -1459,6 +1461,9 @@ static int stage_rpl_memory_bounds(const void *saturn_state, volatile const uint
     bounds->stack_reserve_nibbles = 0u;
     bounds->native_roots = NULL;
     bounds->native_root_count = 0u;
+    bounds->port1_limit = 0u;
+    if (!hpclang_stage_port1_limit(model, pool_l2, pool_pages, &bounds->port1_limit))
+        bounds->magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;
     return 1;
 }
 
@@ -1667,7 +1672,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     } else if (launch.saturn_state != 0u &&
                (model == HPCLANG_MODEL_HP48GII || model == HPCLANG_MODEL_HP49GPLUS ||
                 model == HPCLANG_MODEL_HP50G) &&
-               stage_rpl_memory_bounds(saturn_state, old_l2, total_pages, &rpl_bounds)) {
+               stage_rpl_memory_bounds(saturn_state, old_l2, total_pages, &rpl_bounds, model)) {
         /*
          * A hidden HPGCC-1.1-style Launcher-V3 pointer needs one physical
          * stack cell when stage1 restores it after HPC1 returns. init/exit do

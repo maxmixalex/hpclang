@@ -34,6 +34,30 @@ int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
     return hpclang_rpl_stock_port1_capture(reader, (const void *)(uintptr_t)0x08020000u, l1[0x80]);
 }
 
+static int port1_write(void *context, uint32_t address, uint8_t value)
+{
+    if (!context || address >= HPCLANG_RPL_PORT1_NIBBLES || value > 15u)
+        return 0;
+    volatile uint8_t *bytes = context;
+    uint8_t packed = bytes[address / 2u];
+    bytes[address / 2u] = address & 1u ? (packed & 15u) | (value << 4u) : (packed & 0xf0u) | value;
+    return 1;
+}
+
+int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit)
+{
+    const struct hpclang_boot_info *boot = hpclang_boot_info();
+    const struct hpclang_rpl_memory_bounds *bounds = hpclang_launch_rpl_bounds(boot);
+    struct hpclang_rpl_reader reader;
+    if (!io || !limit || !bounds || bounds->magic != HPCLANG_RPL_BOUNDS_MAGIC ||
+        bounds->port1_limit > HPCLANG_RPL_PORT1_NIBBLES || !hpclang_rpl_stock_port1_reader(&reader))
+        return 0;
+    *limit = hpclang_launch_port1_limit(boot);
+    *io = (struct hpclang_rpl_mutation_io){
+        .read_nibble = reader.read_nibble, .write_nibble = port1_write, .context = reader.context};
+    return 1;
+}
+
 int hpclang_rpl_stock_memory_capture(struct hpclang_rpl_stock_memory *memory,
                                      const uint32_t *read_map, uint32_t ram_section)
 {

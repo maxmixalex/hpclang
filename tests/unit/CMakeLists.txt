@@ -459,6 +459,10 @@ hpclang_unit(rpl_stock_memory test_rpl_stock_memory.c
     "${HPCLANG_ROOT}/runtime/core/rpl-stock-memory.c")
 target_include_directories(test_rpl_stock_memory PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(port_memory test_port_memory.c)
+target_include_directories(test_port_memory PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core" "${HPCLANG_ROOT}/platform/armtoolbox")
+
 hpclang_unit(hp39_portal_stack test_hp39_portal_stack.c)
 target_include_directories(test_hp39_portal_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
 
