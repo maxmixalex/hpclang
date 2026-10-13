@@ -88,11 +88,21 @@ extern "C"
         struct hpclang_ui_rect bounds, clip;
         struct hpclang_ui_action action;
         int enabled;
-        size_t capacity, cursor, anchor;
-        hpclang_ui_canvas_paint_fn paint;
-        const void *canvas_state;
+        /* Kind-specific metadata shares storage. Read input fields only for
+         * INPUT, canvas fields only for CANVAS, and value only for TOGGLE. */
         union
         {
+            size_t capacity;          /* INPUT */
+            const void *canvas_state; /* CANVAS */
+        };
+        union
+        {
+            size_t cursor;                    /* INPUT */
+            hpclang_ui_canvas_paint_fn paint; /* CANVAS */
+        };
+        union
+        {
+            size_t anchor;     /* INPUT */
             uint32_t revision; /* CANVAS */
             uint32_t value;    /* TOGGLE: zero or one */
         };

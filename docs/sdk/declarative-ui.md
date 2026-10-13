@@ -4,10 +4,26 @@ The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
 tracking and bounded asynchronous effects. A surface/font renderer and integrated
-loading/error/retry application pass local six-model Direct and Stock acceptance;
-remote CI acceptance remains pending.
+loading/error/retry application passed six-model Direct and Stock acceptance,
+and its C implementation is integrated into main at `a7692b4b`. The C++ helpers
+and compact-storage changes below have local acceptance and await formal CI.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
+
+Node metadata is selected by `kind`: read `capacity`, `cursor` and `anchor`
+for inputs; `paint`, `canvas_state` and `revision` for canvases; and `value`
+for toggles. These fields share storage rather than reserving every component's
+state in every node. Rebuild applications and custom renderers together with
+the SDK when upgrading this evolving UI interface.
+
+The full device-manager pool (48 nodes, 512 text bytes and one effect) now
+uses 13,692 bytes on ARM, down from 16,764. Layout phases reuse temporary
+fields and derive transparent-scope ancestry from the declaration chain.
+The complete C++/C UI fixture passes a local Direct experiment with its writable
+arena limited to 32 KiB, including both display pages, theme/native-font changes,
+physical input and independent pixel checks. This experiment does not replace
+Stock acceptance. The production build now also passes all six Direct and all
+six Stock targets with independent state, waveform, theme and font checks.
 
 The installed `examples/declarative-ui` application combines these interfaces
 into the original device-manager patterns. It uses two status-card instances,
@@ -393,4 +409,66 @@ one process-wide C-library exit handler.
 
 Host tests cover fair progress, failed begin/poll, explicit cancellation,
 owner removal/reappearance, exhausted pools, shutdown and actual process-exit
-cleanup. Interactive loading, failure and retry remain target acceptance work.
+cleanup. The integrated device-manager E2E also validates interactive loading,
+failure and retry on all six Direct and Stock targets; implementation acceptance
+is recorded in the roadmap.
+
+## C++ declaration guards
+
+`<hpclang/ui.hpp>` adds C++17 lexical guards over the same C context. They do
+not allocate, throw, commit implicitly or introduce a second state model.
+Check construction before declaring children and explicitly commit only after
+all container guards have left scope:
+
+```cpp
+#include <hpclang/ui.hpp>
+
+int declare_status(hpclang_ui *ui, const char *status)
+{
+    hpclang::ui::declaration frame{ui};
+    if (!frame)
+        return -1;
+    {
+        hpclang::ui::scope column{ui, 1, HPCLANG_UI_COLUMN};
+        if (!column || hpclang_ui_text(ui, 1, 0, status))
+            return -1;
+    }
+    // Apply hpclang_ui_layout here when using the surface renderer.
+    return frame.commit();
+}
+```
+
+Early return closes nested scopes and aborts the candidate, preserving the
+previous committed view. A failed nested declaration guard does not abort
+another guard's active frame. Guards cannot be copied or moved, so lexical
+nesting and cleanup ownership remain explicit. They borrow the C context;
+its storage must outlive them. Do not call C begin/abort/commit directly on
+the guarded declaration. Existing C leaf declarations, layout, input and
+effects remain usable unchanged. These guards do not own UI storage or
+perform shutdown; the existing context/provider lifetime rules still apply.
+
+Host tests exercise early return, two component instances, stable identity
+after reordering, duplicate frame acquisition and fixed-pool failure, with
+exceptions and RTTI disabled. This is the first M8.5 helper slice; complete
+broader owned-resource wrappers and full target-side C++ acceptance remain open.
+
+The installed `examples/declarative-ui-cpp` counter demonstrates these guards
+with keyboard navigation and the ordinary surface renderer. The SDK relocation
+gate builds it outside the installed tree, checks its ARM/HPC1 output and all
+six launchers, and packages all three HP39 Aplets when the packaging dependencies
+are supplied. It complements the larger C device-manager example.
+The UI E2E also links the counter's actual view and checks guard rollback,
+stable focus across model updates and owned-image moves before executing the
+full device-manager flow. All six Direct and all six Stock models pass locally;
+formal CI acceptance of this C++ extension is still pending. The integrated
+branch passes 84 host targets and the installed SDK relocation/HP39 packaging
+gate. Broader owned-resource wrappers and migration requirements remain open.
+
+For offscreen drawing, `<hpclang/display.hpp>` also provides a C++20
+`hpclang::owned_surface{width, height, levels}`. Check its Boolean conversion
+before obtaining a borrowed `view()` or `get()`. The owner releases pixels
+on destruction, supports move construction/assignment, and cannot be copied.
+`reset()` releases the image; `release()` transfers destruction responsibility
+to a C caller. Views must not outlive the image. Calculator display pages
+remain borrowed and cannot be adopted by this owner. Allocation failure follows
+the C constructor's empty-result contract and does not throw.

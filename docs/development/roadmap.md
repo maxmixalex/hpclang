@@ -617,6 +617,17 @@ below are retained.
 
 #### M8.5 — Modern C++ and migration
 
+Local implementation adds allocation-free C++ declaration/scope guards and
+movable ownership for offscreen surfaces. A shipped C++ counter uses the same
+C UI core; its actual view is also exercised by the UI E2E before the complete
+device-manager flow. All six Direct and all six Stock targets and independent
+UI pixel checks pass, as do 84 host targets, wrapper sanitizers and ARM compilation. The SDK
+relocation gate includes the counter and has passed all six launchers and
+three HP39 Aplet packages. Compact node storage reduces the full ARM declaration
+pool by 3,072 bytes without reducing the eight-device scenario. Formal CI,
+broader owned wrappers and
+the remaining migration/release requirements below stay open.
+
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
   first-class and exercise destruction/exit behavior.

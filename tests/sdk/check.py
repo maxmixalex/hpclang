@@ -35,6 +35,9 @@ def main():
         package = sdk / "share/hpclang"
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
+        shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
+        with (application / "CMakeLists.txt").open("a") as source:
+            source.write("\nadd_subdirectory(counter)\n")
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
@@ -43,6 +46,13 @@ foreach(application IN ITEMS hello_c hello_cpp)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
     endforeach()
+endforeach()
+""")
+            with (application / "counter/CMakeLists.txt").open("a") as source:
+                source.write("""
+foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
+    hpclang_target_aplet(declarative_ui_cpp MODEL ${model} NAME "SDK example"
+        AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
 endforeach()
 """)
         build = work / "build"
@@ -73,15 +83,19 @@ endforeach()
             for forbidden in (str(root), str(prefix)):
                 if forbidden in serialized:
                     raise AssertionError(f"Nonrelocatable build dependency: {forbidden}")
-        for name in ("hello_c", "hello_cpp"):
-            elf = (build / f"{name}.elf").read_bytes()
-            hpc = (build / f"{name}.hpc").read_bytes()
+        for name, output in (
+            ("hello_c", build),
+            ("hello_cpp", build),
+            ("declarative_ui_cpp", build / "counter"),
+        ):
+            elf = (output / f"{name}.elf").read_bytes()
+            hpc = (output / f"{name}.hpc").read_bytes()
             if elf[:4] != b"\x7fELF" or int.from_bytes(elf[18:20], "little") != 40:
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
             for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
-                launcher = build / f"{name}-launchers" / model
+                launcher = output / f"{name}-launchers" / model
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
                 if hpc not in binary or binary not in wrapped or wrapped[:8] != b"HPHP49-C":
@@ -89,7 +103,7 @@ endforeach()
                         f"{name}/{model}: application missing from native launcher"
                     )
                 if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
-                    bundle = build / f"{name}-aplet" / model
+                    bundle = output / f"{name}-aplet" / model
                     aplet = (bundle / "HPGCC000.000").read_bytes()
                     if not aplet.startswith(b"HP39BinB\x0bSDK example") or hpc not in aplet:
                         raise AssertionError(f"{name}/{model}: invalid installable Aplet")

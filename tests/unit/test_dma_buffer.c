@@ -9,6 +9,8 @@ struct memory
     _Alignas(4096) uint8_t bytes[32768];
     uint32_t pages[8];
     size_t offset, reserved;
+    size_t allocation_limit;
+    size_t relocated_offset;
     unsigned allocations, releases;
     int owned, exhausted, map_error;
 };
@@ -18,7 +20,7 @@ static void *allocate(void *context, size_t bytes)
     struct memory *memory = context;
     assert(!memory->owned);
     ++memory->allocations;
-    if (memory->exhausted)
+    if (memory->exhausted || (memory->allocation_limit && bytes > memory->allocation_limit))
         return NULL;
     assert(bytes <= sizeof(memory->bytes) - memory->offset);
     memory->owned = 1;
@@ -32,6 +34,8 @@ static void release(void *context, void *allocation)
     assert(memory->owned && allocation == memory->bytes + memory->offset);
     memory->owned = 0;
     ++memory->releases;
+    if (memory->relocated_offset)
+        memory->offset = memory->relocated_offset;
 }
 
 static int translate(void *context, const void *pixels, uint32_t bytes, uint32_t *physical)
@@ -88,10 +92,27 @@ int main(void)
     for (unsigned page = 0; page < 8; ++page)
         memory.pages[page] = 0x08000ffe + page * 8192;
     assert(hpclang_dma_buffer_acquire(&allocator, 6000, 4, &buffer) == -1 && errno == ENOTSUP);
-    assert(memory.allocations == 7 && memory.releases == 6 && !memory.owned);
+    assert(memory.allocations == 8 && memory.releases == 7 && !memory.owned);
     assert(!buffer.allocation && !buffer.pixels);
     assert(hpclang_dma_buffer_acquire(&allocator, UINT32_MAX, 4, &buffer) == -1 && errno == EINVAL);
     assert(hpclang_dma_buffer_acquire(&allocator, 4, 3, &buffer) == -1 && errno == EINVAL);
-    assert(memory.allocations == 7);
+    assert(memory.allocations == 8);
+
+    /* A short buffer straddles unrelated physical pages. Only the observed
+     * prefix fits this heap; reserving a whole page of padding would fail. */
+    memory.offset = 4000;
+    memory.allocation_limit = 256;
+    assert(hpclang_dma_buffer_acquire(&allocator, 128, 4, &buffer) == 0);
+    assert(memory.reserved == 224 && buffer.pixels == memory.bytes + 4096);
+    assert(buffer.bytes == 128 && buffer.physical == 0x08002000);
+    hpclang_dma_buffer_release(&buffer);
+    memory.allocation_limit = 0;
+    memory.offset = 4000;
+    memory.relocated_offset = 3900;
+    unsigned before = memory.allocations;
+    assert(hpclang_dma_buffer_acquire(&allocator, 256, 4, &buffer) == 0);
+    assert(memory.allocations == before + 3);
+    assert(buffer.pixels == memory.bytes + 4096 && buffer.physical == 0x08002000);
+    hpclang_dma_buffer_release(&buffer);
     return 0;
 }

@@ -94,11 +94,20 @@ static unsigned checks(void)
     if (!storage)
         return 1;
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
+    if (!ui) {
+        hpclang_ui_witness[2] = (uint32_t)(uintptr_t)storage;
+        hpclang_ui_witness[3] = (uint32_t)errno;
+        hpclang_ui_witness[4] = (uint32_t)_Alignof(max_align_t);
+        free(storage);
+        return 0x0201;
+    }
     struct hpclang_ui_surface *r =
         demo_renderer(device->display_width, device->display_height, 2, &demo_font, 0);
-    unsigned failure = 2;
-    if (!ui || !r)
+    unsigned failure = 0x0202;
+    if (!r) {
+        hpclang_ui_witness[3] = (uint32_t)errno;
         goto done;
+    }
     struct demo_app app;
     demo_init(&app, ui);
     failure = 3;
@@ -223,7 +232,10 @@ done:
 }
 int main(void)
 {
-    unsigned failure = checks();
+    extern unsigned hpclang_cpp_ui_test(void);
+    unsigned failure = hpclang_cpp_ui_test();
+    if (!failure)
+        failure = checks();
     struct hpclang_surface *screen = hpclang_display_surface();
     hpclang_surface_clear(screen, 0);
     char line[48];

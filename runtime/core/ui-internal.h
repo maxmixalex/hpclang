@@ -9,12 +9,28 @@ struct node
 {
     struct hpclang_ui_node view;
     uint32_t parent_index;
-    uint32_t layout_parent;
-    struct hpclang_ui_metrics metrics;
-    int32_t content_width, content_height;
-    uint32_t children, weights;
-    int32_t offset, extra;
-    int32_t base_y, next_scroll;
+    /* Preferred sizes are consumed before this node distributes space to its
+     * children. Padding/gap/grow remain live in the trailing metrics fields. */
+    union
+    {
+        struct hpclang_ui_metrics metrics;
+        struct
+        {
+            int32_t extra, offset;
+        };
+    };
+    union
+    {
+        int32_t content_width;
+        int32_t base_y;
+    };
+    int32_t content_height;
+    union
+    {
+        uint32_t children;
+        int32_t next_scroll;
+    };
+    uint32_t weights;
 };
 
 struct frame

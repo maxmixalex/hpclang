@@ -4,7 +4,8 @@
 #include "dma-buffer.h"
 
 static int acquire(const struct hpclang_dma_allocator *allocator, uint32_t bytes,
-                   uint32_t alignment, uint32_t slack, struct hpclang_dma_buffer *buffer)
+                   uint32_t alignment, uint32_t slack, struct hpclang_dma_buffer *buffer,
+                   uint32_t *next_slack)
 {
     size_t reserved = (size_t)bytes + slack;
     void *allocation = allocator->allocate(allocator->context, reserved);
@@ -40,6 +41,8 @@ static int acquire(const struct hpclang_dma_allocator *allocator, uint32_t bytes
             if (end == UINTPTR_MAX)
                 break;
             candidate = end + 1u;
+            if (next_slack && candidate - base < HPCLANG_PAGE_SIZE)
+                *next_slack = (uint32_t)(candidate - base);
         }
     }
     allocator->release(allocator->context, allocation);
@@ -60,11 +63,21 @@ int hpclang_dma_buffer_acquire(const struct hpclang_dma_allocator *allocator, ui
         errno = EBUSY;
         return -1;
     }
-    if (acquire(allocator, bytes, alignment, alignment - 1u, buffer) == 0)
+    uint32_t slack = HPCLANG_PAGE_SIZE - 1u;
+    if (acquire(allocator, bytes, alignment, alignment - 1u, buffer, &slack) == 0)
         return 0;
     if (errno != ENOTSUP || alignment == HPCLANG_PAGE_SIZE)
         return -1;
-    return acquire(allocator, bytes, alignment, HPCLANG_PAGE_SIZE - 1u, buffer);
+    /* Reuse the observed distance to the next page before reserving worst-case
+     * padding. A different allocation address is allowed: every candidate is
+     * translated again, and a failed compact retry falls back once. */
+    if (slack < HPCLANG_PAGE_SIZE - 1u) {
+        if (acquire(allocator, bytes, alignment, slack, buffer, NULL) == 0)
+            return 0;
+        if (errno != ENOTSUP)
+            return -1;
+    }
+    return acquire(allocator, bytes, alignment, HPCLANG_PAGE_SIZE - 1u, buffer, NULL);
 }
 
 void hpclang_dma_buffer_release(struct hpclang_dma_buffer *buffer)

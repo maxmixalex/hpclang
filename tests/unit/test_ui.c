@@ -161,6 +161,9 @@ static void layout(struct hpclang_ui *ui)
         }
         assert(hpclang_ui_text(ui, 20, 0, "B") == 0);
     }
+    /* A candidate can be measured again before commit. Scratch-field reuse
+     * must not destroy declaration ancestry or retain prior distribution. */
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 160, 80}, measure, NULL) == 0);
     assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){10, 20, 100, 40}, measure, NULL) == 0);
     assert(hpclang_ui_commit(ui) == 0);
     rectangle(hpclang_ui_node_at(ui, 0)->bounds, 10, 20, 100, 40);
