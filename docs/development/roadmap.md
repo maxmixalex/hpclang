@@ -480,7 +480,10 @@ launch-available operation masks through `hpclang_port_query()`. Six-model
 host checks distinguish absent ports, Direct/Stock contexts, legacy launch
 bounds and supported-but-full ERAM, including the exact legacy descriptor size
 under ASan/UBSan. HP50g passes three Stock lifecycle launches; HP39g+ target
-discovery acceptance is still in progress. All 85 host tests pass.
+discovery acceptance now passes all 15 HP39g+ Stock lifecycle invocations,
+including copied Aplets. The fixture reuses bounded scratch buffers so its
+large-string checks fit the copied Aplet's smaller ARM heap, with unchanged
+payload lengths and persistence/rejection assertions. All 85 host tests pass.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
