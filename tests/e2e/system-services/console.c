@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <hpkeyb49.h>
 #include <hpclang/abi.h>
 #include <hpclang/console.h>
 #include <hpclang/device.h>
@@ -112,6 +113,65 @@ static int physical_symbols(uint32_t model)
     struct hpclang_keyboard_state keys;
     hpclang_keyboard_read(&keys);
     return strcmp(text, expected) || hpclang_keyboard_any_is_down(&keys) ? -1 : 0;
+}
+
+static int historical_keyboard_adapter(uint32_t model)
+{
+    unsigned alpha = model <= HPCLANG_MODEL_HP40GS ? 58 : 57;
+    unsigned left_shift = model <= HPCLANG_MODEL_HP40GS ? 59 : 58;
+    for (unsigned scan = 0; scan < 60; ++scan) {
+        struct hpclang_keyboard_event event;
+        if (physical_event(scan, 1, &event))
+            return -1;
+        keymatrix matrix;
+        keyb_getmatrix(&matrix);
+        unsigned bit = scan < 56 ? (scan / 7) * 8 + scan % 7 + 1 : (scan == 56 ? 63 : scan + 3);
+        if (matrix.full != (UINT64_C(1) << bit) || !keyb_isKeyPrM((int)bit) ||
+            !keyb_isAnyKeyPressed() || keyb_isON() != (scan == 56) ||
+            keyb_isAlpha() != (scan == alpha) || keyb_isLS() != (scan == left_shift) ||
+            keyb_isRS() != (model > HPCLANG_MODEL_HP40GS && scan == 59) ||
+            keyb_isUp() != (scan == 42) || keyb_isLeft() != (scan == 43) ||
+            keyb_isDown() != (scan == 44) || keyb_isRight() != (scan == 45))
+            return -1;
+        if (scan < 56 && (!keyb_isKeyPressed(scan / 7, scan % 7) ||
+                          keyb_getkey(0) != (int)((scan % 7) * 16 + scan / 7)))
+            return -1;
+        if (keyb_getkeyM(0) != (int)bit ||
+            keyb_getnextkey(&matrix, -1) != (bit < 60 ? (int)bit : 0))
+            return -1;
+        if (physical_event(scan, 0, &event) || keyb_isAnyKeyPressed() || keyb_getkey(0) != -1 ||
+            keyb_getkeyM(0))
+            return -1;
+    }
+    struct hpclang_keyboard_event event;
+    if (physical_event(left_shift, 1, &event) || physical_event(35, 1, &event))
+        return -1;
+    uint32_t plane = model <= HPCLANG_MODEL_HP40GS ? UINT32_C(0x40000000) : UINT32_C(0x20000000);
+    if (keyb_getkeyM(0) != (int)(41 | plane) || !keyb_isShiftKeyPrM((int)(41 | plane)) ||
+        !keyb_isShiftKeyPrM(KB_A | SHFT_ANY) || keyb_isShiftKeyPrM(KB_A) ||
+        keyb_isShiftKeyPrM(KB_B | SHFT_ANY))
+        return -1;
+    if (physical_event(35, 0, &event) || physical_event(left_shift, 0, &event))
+        return -1;
+    volatile const uint8_t *rtc_tick = (volatile const uint8_t *)(uintptr_t)0x07b00044u;
+    uint8_t saved_tick = *rtc_tick;
+    uint64_t start = hpclang_time_monotonic_us();
+    if (mailbox(0x4b500123u, 0x4b510123u))
+        return -1; /* delayed physical F1 press/release */
+    keyb_waitKeyPressed();
+    if (keyb_isAnyKeyPressed() || hpclang_time_monotonic_us() - start < 100000u ||
+        *rtc_tick != saved_tick)
+        return -1;
+    if (mailbox(0x4b500123u, 0x4b510123u) || keyb_getkey(1) != 5 || keyb_isAnyKeyPressed() ||
+        *rtc_tick != saved_tick)
+        return -1;
+    /* Keep Shift held while the ordinary key is pressed and released. */
+    if (physical_event(left_shift, 1, &event) || mailbox(0x4b500123u, 0x4b510123u) ||
+        keyb_getkeyM(1) != (int)(41 | plane) || !keyb_isLS() || *rtc_tick != saved_tick)
+        return -1;
+    if (physical_event(left_shift, 0, &event))
+        return -1;
+    return 0;
 }
 
 /* HPGCC 1.0.3 examples/libtests/keyboard.c application flow: scan the physical
@@ -528,6 +588,9 @@ unsigned hpclang_e2e_console_test(void)
         goto done;
     result = 15;
     if (historical_keyboard(model))
+        goto done;
+    result = 17;
+    if (historical_keyboard_adapter(model))
         goto done;
     result = 16;
     if (hpclang_historical_system(mailbox))

@@ -69,6 +69,7 @@ struct state
     int payload_started;
     int payload_keyboard_scheduled;
     uint64_t input_held;
+    struct input_sequence input_sequence;
     unsigned media_phase;
     size_t payload_keyboard_sent;
     size_t payload_keyboard_captured;
@@ -725,7 +726,8 @@ static void monitor(void *arg)
         }
         if (media > 0)
             s->payload_started = 1;
-        int input = input_checkpoint(s->hdw, s->result_addr, value, &s->input_held);
+        int input =
+            input_checkpoint(s->hdw, s->result_addr, value, &s->input_held, &s->input_sequence);
         if (input < 0) {
             fail(s, "input-checkpoint");
             return;
@@ -761,7 +763,7 @@ static void monitor(void *arg)
          */
         if (!s->saw_pass && value == PASS_WORD &&
             (!s->require_object_phase || s->object_store_phase != 0u)) {
-            if (s->input_held) {
+            if (s->input_held || s->input_sequence.remaining) {
                 fail(s, "input-held-at-pass");
                 return;
             }

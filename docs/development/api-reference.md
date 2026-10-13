@@ -684,7 +684,11 @@ Invalid coordinates return false with `EINVAL`; unsupported models return
 false (or return immediately from the wait) with `ENOSYS`.
 Local unit tests cover all 56 matrix coordinates and dedicated keys on six
 models, plus simultaneous-key release and already-held-key waits. Sanitizer
-and ARM compilation checks pass; adapter-specific target acceptance remains
+and ARM compilation checks pass. The System Services E2E exercises all 60
+physical inputs, classic/HP39 modifier mappings and held combinations, then
+uses delayed electrical transitions to exercise all three blocking APIs while
+checking that the RTC tick configuration is preserved. HP50g Direct passes
+this full flow locally; the remaining model/launch checks and formal CI are
 pending. Function-name coverage alone does not establish application acceptance.
 
 The numeric namespace deliberately retains historical inconsistencies:

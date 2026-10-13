@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+#ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
+#define HPCLANG_HPGCC_LONG_TYPES_DEFINED
+typedef unsigned long long ULONGLONG;
+typedef long long LONGLONG;
+#endif
+
 /* Historical numeric namespace, not Unicode or model-neutral key labels. */
 #define KB_A 41
 #define KB_B 42
