@@ -155,6 +155,11 @@ extern "C"
     int hpclang_rpl_mutation_port0_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                 uint32_t position, int32_t delta);
 
+    /* Same caller validation as above; preserve an entire removed record when
+     * Stock retains references to it or any of its enclosed values. */
+    int hpclang_rpl_mutation_port0_remove_record(const struct hpclang_rpl_mutation_io *io,
+                                                 uint32_t address, uint32_t span);
+
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 

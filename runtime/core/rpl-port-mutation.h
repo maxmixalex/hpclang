@@ -21,4 +21,9 @@ int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
 int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, uint32_t position,
                                     int32_t delta);
 
+/* Preserve the removed backup and enclosed values for live references.
+ * Preceding libraries still require the separate library relocation path. */
+int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *name,
+                                    uint32_t name_length);
+
 #endif

@@ -509,8 +509,8 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     return scan_system_references(io, request);
 }
 
-static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint32_t start,
-                                  uint32_t end)
+static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t start, uint32_t end, int port_boundary)
 {
     if (start >= end || end > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
@@ -523,10 +523,17 @@ static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint
         .remove_end = 0u,
         .offset = 0,
         .mode = POINTER_SCAN_REJECT,
+        .port_boundary = port_boundary,
         .busy_found = &busy,
     };
     int result = scan_all_references(io, &request);
     return result == HPCLANG_RPL_MUTATION_OK && busy ? HPCLANG_RPL_MUTATION_BUSY : result;
+}
+
+static int object_reference_state(const struct hpclang_rpl_mutation_io *io, uint32_t start,
+                                  uint32_t end)
+{
+    return object_reference_state_with_boundary(io, start, end, 0);
 }
 
 struct userob_shift_geometry;
@@ -1056,6 +1063,25 @@ int hpclang_rpl_mutation_port0_shift_before(const struct hpclang_rpl_mutation_io
     int result = plan_userob_shift(io, position, delta, &geometry, &directory_plan, NULL, 1);
     if (result)
         return result;
+    return commit_userob_shift(io, &geometry, &directory_plan);
+}
+
+int hpclang_rpl_mutation_port0_remove_record(const struct hpclang_rpl_mutation_io *io,
+                                             uint32_t address, uint32_t span)
+{
+    if (!span || span > RPL_MAIN_END || address > RPL_MAIN_END - span)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    const int32_t delta = -(int32_t)span;
+    struct userob_shift_geometry geometry;
+    struct directory_patch_plan directory_plan;
+    int result = plan_userob_shift(io, address + span, delta, &geometry, &directory_plan, NULL, 1);
+    if (result != HPCLANG_RPL_MUTATION_OK && result != HPCLANG_RPL_MUTATION_BUSY)
+        return result;
+    if (result == HPCLANG_RPL_MUTATION_BUSY) {
+        result = preserve_userob_references_to_temp(io, address, address + span, delta, &geometry);
+        if (result)
+            return result;
+    }
     return commit_userob_shift(io, &geometry, &directory_plan);
 }
 
@@ -1723,7 +1749,8 @@ static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_
     if (!io_ready(io) || start >= end || end > RPL_MAIN_END)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    int result = object_reference_state(io, start, end);
+    const int port_boundary = future_geometry && future_geometry->port_boundary;
+    int result = object_reference_state_with_boundary(io, start, end, port_boundary);
     if (result == HPCLANG_RPL_MUTATION_OK)
         return HPCLANG_RPL_MUTATION_OK;
     if (result != HPCLANG_RPL_MUTATION_BUSY)
@@ -1776,6 +1803,7 @@ static int preserve_userob_references_to_temp(const struct hpclang_rpl_mutation_
         .remove_end = 0u,
         .offset = (int32_t)offset_wide,
         .mode = POINTER_SCAN_VALIDATE_SHIFT,
+        .port_boundary = port_boundary,
     };
     result = scan_all_references(io, &pointer_request);
     if (result != HPCLANG_RPL_MUTATION_OK)
