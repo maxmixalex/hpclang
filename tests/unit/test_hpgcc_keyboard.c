@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <stddef.h>
 #include <hpkeyb49.h>
 #include <hpclang/abi.h>
 #include <hpclang/keyboard.h>
@@ -37,7 +38,17 @@ int main(void)
                 assert(keyb_isAnyKeyPressed());
                 assert(keyb_isKeyPressed(col, row));
                 assert(!keyb_isKeyPressed(col, (row + 1) % 7));
+                keymatrix matrix;
+                keyb_getmatrix(&matrix);
+                assert(matrix.full == (UINT64_C(1) << (col * 8 + row + 1)));
+                assert(keyb_isKeyPrM((int)(col * 8 + row + 1)));
             }
+        for (unsigned scan = 56; scan < 60; ++scan) {
+            samples[0] = UINT64_C(1) << scan;
+            keymatrix matrix;
+            keyb_getmatrix(&matrix);
+            assert(matrix.full == (UINT64_C(1) << (scan == 56 ? 63 : scan + 3)));
+        }
         samples[0] = UINT64_C(1) << 42;
         assert(keyb_isUp() && !keyb_isDown());
         samples[0] = UINT64_C(1) << 43;
@@ -61,6 +72,10 @@ int main(void)
     unsigned before = reads;
     assert(!keyb_isKeyPressed(8, 0) && errno == EINVAL);
     assert(!keyb_isKeyPressed(0, 7) && errno == EINVAL && reads == before);
+    assert(!keyb_isKeyPrM(-1) && errno == EINVAL);
+    assert(!keyb_isKeyPrM(64) && errno == EINVAL && reads == before);
+    keyb_getmatrix(NULL);
+    assert(errno == EINVAL && reads == before);
     count = 4;
     index = 0;
     samples[0] = 0;

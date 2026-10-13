@@ -672,8 +672,11 @@ Zero HPG source-compatibility wrappers are claimed merely because the clean prim
 
 HPGCC 1.0.3 has 12 public keyboard functions. HPGCC 1.1 adds matrix-oriented helpers and reaches 17; all 17 remain signature-identical in 2.0. HPGCC3 reorganizes keyboard handling around raw state plus an asynchronous message queue.
 
-The installed `hpkeyb49.h` adapter currently implements the eleven physical
-queries and press/release wait functions. Named queries follow the model's
+The installed `hpkeyb49.h` adapter currently implements thirteen functions:
+the eleven physical queries and press/release wait functions, plus
+`keyb_getmatrix` and `keyb_isKeyPrM`. The historical matrix uses byte columns
+and retains physical GPF4/5/6 at bits 60/61/62 and ON at bit 63; these fixed
+positions do not imply classic-model key labels on HP39. Named queries follow the model's
 physical keys: HP39's single Shift answers `keyb_isLS`, while `keyb_isRS`
 returns false. Coordinates use zero-based hardware columns and rows.
 `keyb_waitKeyPressed` accepts an already-held key and returns only after all
@@ -683,7 +686,7 @@ false (or return immediately from the wait) with `ENOSYS`.
 Local unit tests cover all 56 matrix coordinates and dedicated keys on six
 models, plus simultaneous-key release and already-held-key waits. Sanitizer
 and ARM compilation checks pass; adapter-specific target acceptance remains
-pending. The remaining six matrix/code-return functions are not yet installed.
+pending. The remaining four shift/code-return functions are not yet installed.
 
 | Historical behavior | HPGCC calls | hpclang status |
 | --- | --- | --- |

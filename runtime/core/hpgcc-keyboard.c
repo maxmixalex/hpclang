@@ -37,6 +37,32 @@ int keyb_isAnyKeyPressed(void)
     hpclang_keyboard_read(&state);
     return state.bits != 0;
 }
+void keyb_getmatrix(keymatrix *ptr)
+{
+    if (!ptr) {
+        errno = EINVAL;
+        return;
+    }
+    ptr->full = 0;
+    if (!model())
+        return;
+    struct hpclang_keyboard_state state;
+    hpclang_keyboard_read(&state);
+    for (unsigned col = 0; col < HPCLANG_KEYBOARD_COLUMNS; ++col)
+        ptr->full |= ((state.bits >> (col * 7)) & UINT64_C(0x7f)) << (col * 8 + 1);
+    ptr->full |= ((state.bits >> HPCLANG_KEYBOARD_GPF4) & UINT64_C(7)) << 60;
+    ptr->full |= ((state.bits >> HPCLANG_KEYBOARD_ON) & UINT64_C(1)) << 63;
+}
+int keyb_isKeyPrM(int keycode)
+{
+    if (keycode < 0 || keycode > 63) {
+        errno = EINVAL;
+        return 0;
+    }
+    keymatrix matrix;
+    keyb_getmatrix(&matrix);
+    return (int)((matrix.full >> keycode) & UINT64_C(1));
+}
 static int named(unsigned key)
 {
     unsigned id = model();

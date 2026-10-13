@@ -1,10 +1,26 @@
 #ifndef HPCLANG_HPKEYB49_H
 #define HPCLANG_HPKEYB49_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+    /* Historical byte-column snapshot, distinct from hpclang's packed raw
+     * state. Bits 60..62 retain physical GPF4/5/6, and bit 63 is ON. These
+     * positions do not acquire classic-model labels on an HP39 keyboard. */
+    typedef union
+    {
+        uint64_t full;
+        struct
+        {
+            unsigned int loword, hiword;
+        };
+        unsigned char bytes[8];
+    } keymatrix;
+    void keyb_getmatrix(keymatrix *ptr);
+    int keyb_isKeyPrM(int keycode);
     /* Historical physical-state queries. Matrix coordinates are zero-based
      * hardware column/row, not character positions. Named queries follow the
      * current model: HP39's single Shift is LS; RS is absent. No shift/alpha latch
