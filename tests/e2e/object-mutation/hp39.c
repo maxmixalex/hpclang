@@ -77,7 +77,16 @@ static uint32_t aplet_data_roundtrip(void)
 {
     struct hpclang_object *original = NULL, *value = NULL, *readback = NULL;
     uint32_t failure = 0x280u;
-    uint8_t text[1536], actual[1536];
+    union
+    {
+        struct
+        {
+            uint8_t text[1536], actual[1536];
+        } roundtrip;
+        uint8_t oversize[3496];
+    } scratch;
+    uint8_t *text = scratch.roundtrip.text;
+    uint8_t *actual = scratch.roundtrip.actual;
     hpclang_e2e_result = 0x4f530280u;
     if (hpclang_aplet_data_get(NULL) != -1 || errno != EINVAL ||
         hpclang_aplet_data_set(NULL) != -1 || errno != EINVAL)
@@ -120,12 +129,14 @@ static uint32_t aplet_data_roundtrip(void)
         goto done;
     /* The rejected write must leave the current value and older snapshot intact. */
     failure = 0x285u;
-    uint8_t *oversize = calloc(3496u, 1u);
-    if (oversize == NULL)
+    /* Roundtrip scratch is no longer live. Reuse it so preparing the rejected
+     * value does not require two simultaneous 3496-byte heap allocations. */
+    memset(scratch.oversize, 0, sizeof(scratch.oversize));
+    failure = 0x286u;
+    if (hpclang_object_create_string(scratch.oversize, sizeof(scratch.oversize), &value) != 0)
         goto done;
-    int created = hpclang_object_create_string(oversize, 3496u, &value);
-    free(oversize);
-    if (created != 0 || hpclang_aplet_data_set(value) != -1 || errno != E2BIG ||
+    failure = 0x285u;
+    if (hpclang_aplet_data_set(value) != -1 || errno != E2BIG ||
         hpclang_object_kind(readback) != HPCLANG_OBJECT_LIST)
         goto done;
     hpclang_object_release(readback);
