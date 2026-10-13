@@ -73,7 +73,7 @@ done:
     return failure;
 }
 
-static uint32_t aplet_data_roundtrip(void)
+static __attribute__((noinline)) uint32_t aplet_data_roundtrip(void)
 {
     struct hpclang_object *original = NULL, *value = NULL, *readback = NULL;
     uint32_t failure = 0x280u;
@@ -128,7 +128,6 @@ static uint32_t aplet_data_roundtrip(void)
         hpclang_object_kind(readback) != HPCLANG_OBJECT_LIST)
         goto done;
     /* The rejected write must leave the current value and older snapshot intact. */
-    failure = 0x285u;
     /* Roundtrip scratch is no longer live. Reuse it so preparing the rejected
      * value does not require two simultaneous 3496-byte heap allocations. */
     memset(scratch.oversize, 0, sizeof(scratch.oversize));
@@ -189,13 +188,11 @@ done:
     return failure;
 }
 
-uint32_t hpclang_e2e_hp39_mutation(void)
+static __attribute__((noinline)) uint32_t variable_roundtrip(void)
 {
-    uint32_t aplet_failure = aplet_data_roundtrip();
-    if (aplet_failure != 0u)
-        return aplet_failure;
     struct hpclang_object *original = NULL, *value = NULL, *readback = NULL;
-    uint8_t *text = malloc(3500u), *actual = malloc(3500u);
+    uint8_t scratch[3500];
+    uint8_t *original_text = NULL;
     uint32_t failure = 0x120u;
     /* In this fixture all mutated values are restored to their original extent.
      * The four original context bindings must therefore still identify the same
@@ -204,10 +201,8 @@ uint32_t hpclang_e2e_hp39_mutation(void)
     uint32_t context_before[4];
     for (size_t i = 0u; i < 4u; ++i)
         context_before[i] = stock_word(bindings[i]);
-    if (text == NULL || actual == NULL || get(&original) != 0)
+    if (get(&original) != 0)
         goto done;
-    for (size_t i = 0; i < 3500u; ++i)
-        text[i] = (uint8_t)('A' + i % 26u);
     const size_t lengths[] = {31u, 3450u, 1u, 0u};
     uint32_t last_temp = stock_word(0x806eeu);
     int saw_collection = 0;
@@ -215,9 +210,11 @@ uint32_t hpclang_e2e_hp39_mutation(void)
      * forces Stock GC while the ARM arena and old snapshots remain live. */
     for (size_t step = 0; step < 64u; ++step) {
         size_t length = lengths[step % 4u];
+        for (size_t i = 0; i < length; ++i)
+            scratch[i] = (uint8_t)('A' + i % 26u);
         failure = 0x121u + (uint32_t)step * 4u;
         hpclang_e2e_result = 0x4f530000u | failure;
-        if (hpclang_object_create_string(text, length, &value) != 0)
+        if (hpclang_object_create_string(scratch, length, &value) != 0)
             goto done;
         ++failure;
         if (set(value) != 0)
@@ -230,9 +227,11 @@ uint32_t hpclang_e2e_hp39_mutation(void)
         size_t size = 0;
         ++failure;
         if (hpclang_object_string_size(readback, &size) != 0 || size != length ||
-            hpclang_object_string_copy(readback, actual, size) != 0 ||
-            memcmp(actual, text, size) != 0)
+            hpclang_object_string_copy(readback, scratch, size) != 0)
             goto done;
+        for (size_t i = 0; i < size; ++i)
+            if (scratch[i] != (uint8_t)('A' + i % 26u))
+                goto done;
         hpclang_object_release(readback);
         readback = NULL;
         uint32_t temp = stock_word(0x806eeu);
@@ -260,9 +259,13 @@ uint32_t hpclang_e2e_hp39_mutation(void)
     hpclang_object_release(readback);
     readback = NULL;
     ++failure;
-    if (hpclang_object_create_string(text, 3500u, &value) != 0 || set(value) != -1 ||
+    for (size_t i = 0; i < sizeof(scratch); ++i)
+        scratch[i] = (uint8_t)('A' + i % 26u);
+    if (hpclang_object_create_string(scratch, sizeof(scratch), &value) != 0 || set(value) != -1 ||
         errno != E2BIG)
         goto done;
+    hpclang_object_release(value);
+    value = NULL;
     ++failure;
     if (hpclang_variable_set(category, sizeof(category) - 1u, (const uint8_t *)"MissingM7", 9u,
                              original) != -1 ||
@@ -274,10 +277,15 @@ uint32_t hpclang_e2e_hp39_mutation(void)
         goto done;
     size_t original_size = 0;
     if (hpclang_object_string_size(original, &original_size) != 0 || original_size > 3500u ||
-        hpclang_object_string_size(readback, &size) != 0 || size != original_size ||
-        hpclang_object_string_copy(original, text, size) != 0 ||
-        hpclang_object_string_copy(readback, actual, size) != 0 || memcmp(actual, text, size) != 0)
+        hpclang_object_string_size(readback, &size) != 0 || size != original_size)
         goto done;
+    original_text = malloc(size ? size : 1u);
+    if (original_text == NULL || hpclang_object_string_copy(original, original_text, size) != 0 ||
+        hpclang_object_string_copy(readback, scratch, size) != 0 ||
+        memcmp(scratch, original_text, size) != 0)
+        goto done;
+    free(original_text);
+    original_text = NULL;
     failure = page_number_roundtrip();
     if (failure != 0u)
         goto done;
@@ -287,10 +295,16 @@ uint32_t hpclang_e2e_hp39_mutation(void)
             goto done;
     failure = aplet_data_lifecycle();
 done:
-    free(actual);
-    free(text);
+    free(original_text);
     hpclang_object_release(readback);
     hpclang_object_release(value);
     hpclang_object_release(original);
     return failure;
+}
+
+uint32_t hpclang_e2e_hp39_mutation(void)
+{
+    /* Keep the two phases' large scratch arrays in separate stack frames. */
+    uint32_t failure = aplet_data_roundtrip();
+    return failure != 0u ? failure : variable_roundtrip();
 }
