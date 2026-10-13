@@ -526,6 +526,14 @@ past the array end and truncated bodies. A native linked-array instance has not
 yet been validated. Address-dependent directory bodies and out-of-array links
 are rejected; this component does not by itself certify reference safety.
 
+The internal sequence visitor distinguishes inline children from five-nibble
+reference cells in lists, programs, symbolic objects and matrices. It validates
+the enclosing sequence before invoking callbacks and leaves reference targets
+unread. The combined directory/library/array/sequence experiment reaches 126
+objects in a saved HP50g HOME graph and identifies the imported ERAM ACPTR.
+Flash-pointer resolution, executable references and complete live-root coverage
+remain open; this experiment is not authorization to move referenced Port 1 data.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.

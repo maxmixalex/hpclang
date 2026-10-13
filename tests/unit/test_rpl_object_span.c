@@ -595,8 +595,67 @@ static void test_linked_array_bodies(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+struct sequence_state
+{
+    uint32_t count;
+    int stop;
+};
+
+static int sequence_visit(void *context, uint32_t field, uint32_t target, uint32_t span)
+{
+    struct sequence_state *state = context;
+    const uint32_t fields[] = {5, 10, 17};
+    const uint32_t targets[] = {0x81234, 10, 17};
+    const uint32_t spans[] = {0, 7, 15};
+    assert(state->count < 3);
+    assert(field == fields[state->count]);
+    assert(target == targets[state->count]);
+    assert(span == spans[state->count]);
+    ++state->count;
+    return state->stop;
+}
+
+static void test_sequence_children(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    put_nibbles(&image, 0, 0x02a74, 5);
+    put_nibbles(&image, 5, 0x81234, 5);
+    put_nibbles(&image, 10, 0x029bf, 5);
+    put_nibbles(&image, 15, 0x41, 2);
+    put_nibbles(&image, 17, 0x02d9d, 5);
+    put_nibbles(&image, 22, 0x82345, 5);
+    put_nibbles(&image, 27, 0x0312b, 5);
+    put_nibbles(&image, 32, 0x0312b, 5);
+    struct image original = image;
+    struct sequence_state state = {0};
+    assert(hpclang_rpl_sequence_visit(&reader, 0, 37, sequence_visit, &state) == 0);
+    assert(state.count == 3);
+    assert(memcmp(&image, &original, sizeof(image)) == 0);
+    for (uint32_t size = 0; size < 37; ++size) {
+        state.count = 0;
+        assert(hpclang_rpl_sequence_visit(&reader, 0, size, sequence_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    state = (struct sequence_state){0, 73};
+    assert(hpclang_rpl_sequence_visit(&reader, 0, 37, sequence_visit, &state) == 73);
+    assert(state.count == 1);
+    state = (struct sequence_state){0};
+    put_nibbles(&image, 22, 0x026d5, 5);
+    assert(hpclang_rpl_sequence_visit(&reader, 0, 37, sequence_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(state.count == 0);
+    image = original;
+    put_nibbles(&image, 5, 0x0312b, 5);
+    assert(hpclang_rpl_sequence_visit(&reader, 0, 37, sequence_visit, &state) == 0);
+    assert(state.count == 0);
+    assert(hpclang_rpl_sequence_visit(&reader, 0, 37, NULL, &state) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    test_sequence_children();
     test_linked_array_bodies();
     test_array_bodies();
     test_address_overflow_is_bounded();

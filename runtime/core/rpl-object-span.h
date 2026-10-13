@@ -54,6 +54,17 @@ extern "C"
     int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
                                 uint32_t limit, hpclang_rpl_array_visit_fn visit, void *context);
 
+    /* Visit immediate children of lists, programs, symbolic objects and matrices.
+     * Inline children report their address and full span. Reference cells report
+     * the stored target and span zero; targets are not dereferenced or certified.
+     * The terminator is not visited. The reader must remain stable; callbacks
+     * must be read-only. Discard partial results on any nonzero return. */
+    typedef int (*hpclang_rpl_sequence_visit_fn)(void *context, uint32_t field, uint32_t target,
+                                                 uint32_t span);
+    int hpclang_rpl_sequence_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                   uint32_t limit, hpclang_rpl_sequence_visit_fn visit,
+                                   void *context);
+
 #ifdef __cplusplus
 }
 #endif
