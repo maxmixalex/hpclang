@@ -10,6 +10,7 @@
 
 #include <hpclang/display.hpp>
 #include <hpclang/font.h>
+#include <hpclang/object.hpp>
 #include <hpclang/time.hpp>
 
 extern "C" const struct hpclang_font hpclang_e2e_ui_font;
@@ -52,6 +53,22 @@ extern "C" int hpclang_e2e_cpp_test(void)
     static_assert(__cplusplus > 202002L);
     static_assert(hpclang_compile_time_answer() == 42);
     static_assert(hpclang_add(20, 22) == 42);
+
+    hpclang::owned_object snapshot;
+    if (snapshot.receive([](auto **out) {
+            return hpclang_object_create_integer_i64(INT64_C(-123456789), out);
+        }) != 0)
+        return 9;
+    hpclang::owned_object moved{std::move(snapshot)};
+    std::int64_t decoded = 0;
+    if (snapshot || hpclang_object_integer_i64(moved.get(), &decoded) != 0 || decoded != -123456789)
+        return 9;
+    if (moved.receive([](auto **out) { return hpclang_object_create_string(nullptr, 1, out); }) !=
+            -1 ||
+        errno != EFAULT || hpclang_object_integer_i64(moved.get(), &decoded) != 0 ||
+        decoded != -123456789)
+        return 9;
+    moved.reset();
 
     constexpr std::array<int, 4> expected{10, 20, 30, 40};
     std::span<const int> view(expected);

@@ -607,9 +607,16 @@ device-manager flow. All six Direct and all six Stock targets and independent
 UI pixel checks pass, as do 84 host targets, wrapper sanitizers and ARM compilation. The SDK
 relocation gate includes the counter and has passed all six launchers and
 three HP39 Aplet packages. Compact node storage reduces the full ARM declaration
-pool by 3,072 bytes without reducing the eight-device scenario. Formal CI,
-broader owned wrappers and
+pool by 3,072 bytes without reducing the eight-device scenario. All six CI
+workflows pass at `e6f04dbd`, now merged into main. Broader owned wrappers and
 the remaining migration/release requirements below stay open.
+
+The next local ownership slice adds C++17 `owned_object`, with move-only
+snapshot ownership and failure-preserving C producer calls. Host and sanitizer
+checks cover transfer, replacement, failure cleanup and destruction. HP39g+ and
+HP50g Direct Runtime tests pass, as does the installed SDK relocation gate with
+the new object example, all six launchers and three HP39 Aplet packages. This
+slice still requires formal CI; broader migration and release goals remain.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications
