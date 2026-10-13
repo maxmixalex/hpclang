@@ -598,8 +598,8 @@ Deliver and review this core in the following slices, using the retained
 The system adapter now includes five `hpsys.h` entry points for millisecond delays,
 750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
 midnight-wrapped differences.
-Host boundary/error tests pass; device acceptance of the corrected millisecond
-conversion and formal CI are pending.
+All 86 host tests, six Direct targets and HP50g Stock pass, including independent
+pixel checks. Remaining Stock contexts and formal CI are pending.
 The remaining historical system, timer and console interfaces remain open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration

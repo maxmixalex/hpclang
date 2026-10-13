@@ -698,8 +698,9 @@ Timer setup/restore, clock changes and raw hardware helpers are not yet supplied
 Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
 RTC errors; the System Services E2E also exercises both delay spellings and RTC
 access, with both lower and upper delay bounds to catch unit mismatches.
-Device acceptance of the corrected milliseconds conversion and formal CI remain
-pending.
+All six Direct targets and HP50g Stock pass locally with the corrected
+milliseconds conversion and stopwatch checks, including independent System
+Services pixel verification. Remaining Stock contexts and formal CI are pending.
 
 ### SD media discovery and replacement
 
