@@ -694,8 +694,8 @@ and ARM compilation checks pass. The System Services E2E exercises all 60
 physical inputs, classic/HP39 modifier mappings and held combinations, then
 uses delayed electrical transitions to exercise all three blocking APIs while
 checking that the RTC tick configuration is preserved. All six Direct models
-and HP50g Stock pass this full flow locally, as do all 76 host targets; the
-remaining Stock checks and formal CI are pending. ARM declaration checks match
+and all six Stock models pass this full flow locally before integration with main;
+after integration, all 82 host targets and the ARM fixture build pass. Integrated target checks and formal CI are pending. ARM declaration checks match
 all seventeen declarations from 1.1 and 2.0, and eleven from 1.0.3; the latter's
 `char keyb_getkey` becomes `int` in the selected 1.1/2.0 contract. Mixed inclusion
 with `saturn.h` also compiles as C++17. Function-name coverage alone does not
