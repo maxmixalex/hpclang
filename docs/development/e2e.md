@@ -170,6 +170,21 @@ library ordering moves the last-used Aplet to the first row, so each switch
 selects the second row. Every invocation must match its data phase and reach a
 settled Stock return.
 
+Stock lifecycle contracts can select different flows by calculator family.
+Version 2 uses a `families` map keyed by `hp39`, `hp48` or `hp4950`; each value
+contains `initial_phase` and `relaunches`. Version 1's single-family contract
+remains supported. The shared transport setup validates the complete contract
+and enables only the current family's flow. Invalid contracts fail the run;
+an absent family does not implicitly reuse another model's sequence.
+
+The classic object-mutation flow now exercises Port 0 across three independent
+launches from saved Stock state: create an integer backup, read and replace it
+with a string, then read and remove that string. Each invocation also exercises
+temporary backup growth/shrinkage and HOME mutation. The native VAR/library
+keys recall the existing application through ARMToolbox; there is no reinstall,
+fresh calculator state or data injection between invocations. HP39 retains its
+existing instance-isolation and Reset sequence.
+
 Lifecycle runs require a newly observed object phase before accepting PASS.
 Saved emulator RAM can retain the previous invocation's PASS while the new
 bootstrap has installed the data mapping but has not yet cleared BSS. Accepting
