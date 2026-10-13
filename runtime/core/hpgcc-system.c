@@ -1,8 +1,39 @@
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <hpsys.h>
 #include <hpclang/datetime.h>
 #include <hpclang/time.h>
+
+ULONGLONG sys_updateTimer(sys_timer_t *timer)
+{
+    if (timer == NULL || timer->timer > 4u) {
+        errno = EINVAL;
+        return 0;
+    }
+    uint64_t now;
+    if (hpclang_time_read_us(&now) != 0)
+        return 0;
+    if (!timer->inited) {
+        timer->last_val = now;
+        timer->current = 0;
+        timer->inited = 1;
+        return 0;
+    }
+    if (now < timer->last_val) {
+        errno = EIO;
+        return 0;
+    }
+    uint64_t elapsed = now - timer->last_val;
+    if (elapsed > (UINT64_MAX - timer->current) / 1000u) {
+        errno = ERANGE;
+        return 0;
+    }
+    elapsed *= 1000u;
+    timer->current += elapsed;
+    timer->last_val = now;
+    return elapsed;
+}
 
 void sys_sleep(unsigned int millis)
 {

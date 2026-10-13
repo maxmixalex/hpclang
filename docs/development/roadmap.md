@@ -595,8 +595,9 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.4 — Historical source compatibility
 
-The system adapter now includes four `hpsys.h` entry points for millisecond delays,
-750 kHz tick delays, civil seconds-of-day and midnight-wrapped differences.
+The system adapter now includes five `hpsys.h` entry points for millisecond delays,
+750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
+midnight-wrapped differences.
 Host boundary/error tests pass; device acceptance of the corrected millisecond
 conversion and formal CI are pending.
 The remaining historical system, timer and console interfaces remain open.

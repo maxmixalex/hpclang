@@ -679,7 +679,7 @@ The implementation multiplies duration by 1,000,000 because `sys_updateTimer`
 accumulates **nanoseconds**, not microseconds: its 12 MHz base-clock conversion
 uses 250/3 nanoseconds per tick. This confirms the original `millis` declaration.
 
-The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`,
+The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`, `sys_updateTimer`,
 `sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves milliseconds
 without the historical 32-bit intermediate multiplication overflow.
 `sys_waitTicks` implements the documented 750 kHz duration, rounded up to
@@ -687,8 +687,14 @@ microseconds, without requiring slow mode or changing interrupt/PWM registers.
 Both delays inherit the clean service's early return if the clock is unavailable.
 RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
 The one-day difference helper accepts seconds in 0..86399 and reports invalid
-inputs as `-1/EINVAL`. This is a partial system adapter: legacy timer structures,
-timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
+inputs as `-1/EINVAL`. `sys_timer_t`, its two initializer macros and
+`sys_updateTimer` preserve elapsed/accumulated nanoseconds and restart through
+`inited = 0`. Timer indices 0..4 are logical stopwatches sharing the clean
+monotonic source; they do not select or reconfigure hardware PWM channels.
+The private `last_val` field is widened for a monotonic sample, so the structure
+is source-compatible for ordinary stopwatch use, not binary-compatible or a raw
+PWM-counter view. Failed samples, regression and overflow leave state unchanged.
+Timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
 Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
 RTC errors; the System Services E2E also exercises both delay spellings and RTC
 access, with both lower and upper delay bounds to catch unit mismatches.

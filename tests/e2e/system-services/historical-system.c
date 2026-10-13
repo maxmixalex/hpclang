@@ -19,6 +19,9 @@ extern const struct hpclang_font hpclang_benchmark_font;
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
     uint64_t delay_start, delay_end;
+    sys_timer_t legacy_timer = SYS_TIMER_INITIALIZER;
+    if (sys_updateTimer(&legacy_timer) != 0 || !legacy_timer.inited)
+        return 8;
     int seconds = sys_RTC_seconds();
     if (seconds < 0 || seconds >= 86400 || sys_delta_seconds(86399, 1) != 2 ||
         hpclang_time_read_us(&delay_start))
@@ -29,12 +32,20 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
     if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
         delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
         return 5;
+    ULONGLONG first_elapsed = sys_updateTimer(&legacy_timer);
+    if (first_elapsed < 10000000u || first_elapsed > 300000000u ||
+        legacy_timer.current != first_elapsed)
+        return 9;
     if (hpclang_time_read_us(&delay_start))
         return 6;
     sys_waitTicks(7500);
     if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
         delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
         return 7;
+    ULONGLONG second_elapsed = sys_updateTimer(&legacy_timer);
+    if (second_elapsed < 10000000u || second_elapsed > 300000000u ||
+        legacy_timer.current != first_elapsed + second_elapsed)
+        return 10;
     enum
     {
         LIMIT = 1000,

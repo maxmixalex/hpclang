@@ -2,17 +2,70 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
+#include <string.h>
 #include <hpsys.h>
 #include <hpclang/datetime.h>
 #include <hpclang/time.h>
 
 static uint64_t delay;
 static int rtc_error;
+static uint64_t monotonic;
+static int clock_error;
 static struct hpclang_datetime civil = {2026, 10, 14, 23, 59, 58};
 
 void hpclang_delay_us(uint64_t microseconds)
 {
     delay = microseconds;
+}
+
+int hpclang_time_read_us(uint64_t *value)
+{
+    if (clock_error) {
+        errno = clock_error;
+        return -1;
+    }
+    *value = monotonic;
+    return 0;
+}
+
+static void timers(void)
+{
+    assert(sys_updateTimer(NULL) == 0 && errno == EINVAL);
+    for (unsigned index = 0; index < 5; ++index) {
+        sys_timer_t timer = SYS_TIMER_INITIALIZER_NUM(index);
+        monotonic = 123;
+        errno = EDOM;
+        assert(sys_updateTimer(&timer) == 0 && timer.inited && timer.current == 0);
+        assert(errno == EDOM);
+        monotonic += 17;
+        assert(sys_updateTimer(&timer) == 17000 && timer.current == 17000);
+        assert(sys_updateTimer(&timer) == 0 && timer.current == 17000);
+        monotonic += 100000000;
+        assert(sys_updateTimer(&timer) == UINT64_C(100000000000));
+        assert(timer.current == UINT64_C(100000017000));
+        sys_timer_t saved = timer;
+        clock_error = EIO;
+        assert(sys_updateTimer(&timer) == 0 && errno == EIO);
+        assert(memcmp(&saved, &timer, sizeof(timer)) == 0);
+        clock_error = 0;
+        --monotonic;
+        assert(sys_updateTimer(&timer) == 0 && errno == EIO);
+        assert(memcmp(&saved, &timer, sizeof(timer)) == 0);
+        timer.inited = 0;
+        assert(sys_updateTimer(&timer) == 0 && timer.current == 0);
+        timer.current = UINT64_MAX - 999;
+        saved = timer;
+        ++monotonic;
+        assert(sys_updateTimer(&timer) == 0 && errno == ERANGE);
+        assert(memcmp(&saved, &timer, sizeof(timer)) == 0);
+    }
+    sys_timer_t invalid = SYS_TIMER_INITIALIZER_NUM(5);
+    assert(sys_updateTimer(&invalid) == 0 && errno == EINVAL && !invalid.inited);
+    sys_timer_t large = SYS_TIMER_INITIALIZER;
+    monotonic = 0;
+    assert(sys_updateTimer(&large) == 0);
+    monotonic = UINT64_MAX;
+    assert(sys_updateTimer(&large) == 0 && errno == ERANGE && large.current == 0);
 }
 
 int hpclang_datetime_read(struct hpclang_datetime *value)
@@ -27,6 +80,7 @@ int hpclang_datetime_read(struct hpclang_datetime *value)
 
 int main(void)
 {
+    timers();
     sys_sleep(0);
     assert(delay == 0);
     sys_sleep(1);
