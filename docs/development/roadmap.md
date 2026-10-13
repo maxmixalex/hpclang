@@ -495,8 +495,9 @@ attempts received an Aplet missing one byte from a doubled backslash, despite
 successful Kermit completion. Quoting backslashes in the transfer copy makes
 the same payload pass Stock. The server now applies that quoting without
 changing source packages; PTY tests cover byte preservation and cleanup.
-Formal-server Stock checks and an explicit retained byte witness are in local
-verification before submission.
+The production server passes HP40gs Stock Catalog with the originally failing
+payload. The explicit retained byte witness also passes HP39g+ Stock Catalog,
+including its normal return. Formal CI for this follow-up remains pending.
 
 Internal Port 1 replacement/removal now requires an explicit read-only reference
 guard before any write. Missing guards, live-reference rejection and guard read
