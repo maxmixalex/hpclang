@@ -60,6 +60,57 @@ static void copies(void)
     hpg_free_image(g);
 }
 
+static void text(void)
+{
+    char bits[256 * 3] = {0};
+    bits[65 * 3] = 1;
+    bits[65 * 3 + 1] = 2;
+    bits[65 * 3 + 2] = 4;
+    bits[255 * 3] = 4;
+    bits[255 * 3 + 1] = 2;
+    bits[255 * 3 + 2] = 1;
+    hpg_font_t *font = hpg_alloc_font(bits, 256, 3, 4);
+    hpg_t *g = hpg_alloc_mono_image(16, 10);
+    char zero = 0;
+    hpg_pattern_t *pattern = hpg_alloc_pattern(&zero, 1, 1);
+    assert(font && g && pattern);
+    hpg_set_font(g, font);
+    hpg_set_pattern(g, pattern);
+    char message[] = "A\n\xff";
+    hpg_draw_text_on(g, message, 1, 1);
+    assert(hpg_get_pixel(g, 1, 1) == 255 && hpg_get_pixel(g, 2, 2) == 255);
+    assert(hpg_get_pixel(g, 3, 4) == 255 && hpg_get_pixel(g, 1, 6) == 255);
+    assert(hpg_get_pixel(g, 5, 4) == 0);
+    assert(hpg_get_pattern(g) == pattern && hpg_get_font(g) == font);
+    hpg_set_mode(g, HPG_MODE_XOR);
+    hpg_draw_text_on(g, message, 1, 1);
+    for (int y = 0; y < 10; ++y)
+        for (int x = 0; x < 16; ++x)
+            assert(hpg_get_pixel(g, x, y) == 0);
+    hpg_draw_letter_on(g, 'A', -1, -1);
+    assert(hpg_get_pixel(g, 0, 0) == 255 && hpg_get_pixel(g, 1, 1) == 255);
+    hpg_draw_text_on(g, message, INT_MAX, INT_MAX);
+    bits[0] = 1;
+    hpg_draw_letter_on(g, 0, 5, 0);
+    assert(hpg_get_pixel(g, 5, 0) == 255); /* Borrowed data, including direct NUL. */
+    hpg_set_font(g, NULL);
+    hpg_free_font(font);
+    char small_bits[] = {1, 1};
+    font = hpg_alloc_font(small_bits, 2, 1, 12);
+    assert(font);
+    hpg_set_font(g, font);
+    hpg_clear_on(g);
+    char outside[] = {3, 1, 0};
+    hpg_draw_text_on(g, outside, 1, 2);
+    assert(hpg_get_pixel(g, 1, 2) == 255 && hpg_get_pixel(g, 9, 2) == 255);
+    assert(hpg_get_pixel(g, 13, 2) == 0); /* Out-of-font byte did not advance. */
+    hpg_set_font(g, NULL);
+    hpg_set_pattern(g, NULL);
+    hpg_free_font(font);
+    hpg_free_pattern(pattern);
+    hpg_free_image(g);
+}
+
 int main(void)
 {
     hpg_t *g = hpg_alloc_gray4_image(8, 6);
@@ -154,5 +205,6 @@ int main(void)
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);
     copies();
+    text();
     return 0;
 }

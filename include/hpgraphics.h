@@ -82,6 +82,12 @@ extern "C"
     void hpg_set_font(hpg_t *g, hpg_font_t *font);
     int hpg_font_get_height(hpg_font_t *font);
     int hpg_font_get_advance(hpg_font_t *font);
+    /* Byte-indexed text, not UTF-8. Newline restores the starting x and advances
+     * one font height; bytes outside the selected custom font do not advance. */
+    void hpg_draw_letter_on(hpg_t *g, char letter, int x, int y);
+    void hpg_draw_letter(char letter, int x, int y);
+    void hpg_draw_text_on(hpg_t *g, char *text, int x, int y);
+    void hpg_draw_text(char *text, int x, int y);
 
 #ifdef __cplusplus
 }

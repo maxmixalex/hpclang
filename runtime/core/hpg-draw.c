@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <limits.h>
 
 static int ink(const hpg_pattern_t *pattern, int x, int y, int64_t origin_x, int64_t origin_y)
 {
@@ -249,4 +250,71 @@ void hpg_blit(hpg_t *src, int sx, int sy, int width, int height, hpg_t *dst, int
             hpclang_surface_set_pixel(to, (int)(dx + x), (int)(dy + y), color);
         }
     }
+}
+
+static void letter(hpg_t *g, unsigned char code, int64_t x, int64_t y)
+{
+    const hpg_font_t *font = g->font;
+    if (code >= font->count)
+        return;
+    int64_t left = x > g->left ? x : g->left, top = y > g->top ? y : g->top;
+    int64_t right = x + font->advance, bottom = y + font->height;
+    if (right > g->right)
+        right = g->right;
+    if (bottom > g->bottom)
+        bottom = g->bottom;
+    struct hpclang_surface *surface = hpclang_hpg_surface(g);
+    for (int64_t row = top; row < bottom; ++row) {
+        unsigned char bits = font->buffer[(size_t)code * font->height + (size_t)(row - y)];
+        for (int64_t col = left; col < right; ++col)
+            if (bits & (1u << ((col - x) % 8)))
+                pixel(g, surface, (int)col, (int)row);
+    }
+}
+void hpg_draw_letter_on(hpg_t *g, char code, int x, int y)
+{
+    g = hpclang_hpg_resolve(g);
+    if (!g)
+        return;
+    /* Built-in font selection is added separately; explicit legacy descriptors
+     * already have complete byte/row semantics without borrowing ROM glyphs. */
+    if (!g->font) {
+        errno = ENOSYS;
+        return;
+    }
+    letter(g, (unsigned char)code, x, y);
+}
+void hpg_draw_letter(char code, int x, int y)
+{
+    hpg_draw_letter_on(NULL, code, x, y);
+}
+void hpg_draw_text_on(hpg_t *g, char *text, int x, int y)
+{
+    if (!text) {
+        errno = EINVAL;
+        return;
+    }
+    g = hpclang_hpg_resolve(g);
+    if (!g)
+        return;
+    if (!g->font) {
+        errno = ENOSYS;
+        return;
+    }
+    int64_t cursor_x = x, cursor_y = y;
+    for (const unsigned char *p = (const unsigned char *)text; *p; ++p) {
+        if (*p == '\n') {
+            cursor_x = x;
+            if (cursor_y <= INT_MAX)
+                cursor_y += g->font->height;
+        } else if (*p < g->font->count) {
+            letter(g, *p, cursor_x, cursor_y);
+            if (cursor_x <= INT_MAX)
+                cursor_x += g->font->advance;
+        }
+    }
+}
+void hpg_draw_text(char *text, int x, int y)
+{
+    hpg_draw_text_on(NULL, text, x, y);
 }

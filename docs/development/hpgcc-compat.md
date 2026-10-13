@@ -168,6 +168,18 @@ Compatibility decision:
 The hpclang core already provides opaque physical/software surfaces, clipped pixel/line/rectangle/circle/polygon operations, cross-level blit, native/generated fonts, and UTF-8/codepoint text drawing. That is enough clean machinery for many HPG wrappers without reproducing `hpg_t` as the core state model.
 
 Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter.
+
+The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
+newline handling, and borrowed bitmap storage. This differs from the clean
+Unicode font API. Default-font integration is in progress: prefer live native
+mini/big fonts on HP48gII/49g+/50g and the native main font on HP39-family models.
+HP39 small text needs a packaged face; newRPL's `Font6_menus` is the closest
+reviewed small-face candidate, fitting the legacy 4-by-6 ASCII cell. Keep the
+legacy advance independently of a packaged face's proportional advance.
+Native tables are read from the running calculator, not embedded in the SDK.
+Packaged fallback coverage and HP-byte-to-Unicode mapping still require
+acceptance; default-font pixel identity is not yet an adapter guarantee.
+
 M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
 synchronization and six status segments through the clean display service.
 The runtime owns contiguous DMA allocations, cache publication and LCD restoration.
