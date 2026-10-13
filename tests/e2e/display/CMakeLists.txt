@@ -15,6 +15,7 @@ add_executable(hpclang_display_e2e
     ${HPCLANG_LIBC}
     main.c
     hpg-prototype.c
+    hpg-adapter.c
     historical-clients.c)
 
 target_include_directories(

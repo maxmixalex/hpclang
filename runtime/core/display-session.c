@@ -9,6 +9,7 @@ static struct hpclang_lcd_state saved;
 static struct hpclang_dma_buffer pages[2];
 static struct hpclang_surface surfaces[2];
 static unsigned back;
+static unsigned page_count;
 
 void hpclang_display_reclock_saved(uint32_t control)
 {
@@ -23,12 +24,17 @@ struct hpclang_surface *hpclang_display_back(void)
 
 int hpclang_display_begin(uint32_t levels)
 {
-    if (levels != 2 && levels != 4 && levels != 16) {
+    return hpclang_display_begin_pages(levels, 2);
+}
+
+static int configure(uint32_t levels, unsigned count, int replacing)
+{
+    if ((levels != 2 && levels != 4 && levels != 16) || (count != 1 && count != 2)) {
         errno = EINVAL;
         return -1;
     }
-    if (saved.owned) {
-        errno = EBUSY;
+    if (!!saved.owned != replacing) {
+        errno = replacing ? EPERM : EBUSY;
         return -1;
     }
     const struct hpclang_device_info *device = hpclang_device_info();
@@ -41,34 +47,55 @@ int hpclang_display_begin(uint32_t levels)
     uint32_t scan_width = (((bus->read(bus->context, LCD_CONTROL3) >> 8) & 2047u) + 1u) * 4u;
     uint32_t bits = levels == 2 ? 1u : levels == 4 ? 2u : 4u;
     uint32_t stride = (scan_width * bits + 7u) / 8u;
-    for (unsigned i = 0; i < 2; ++i) {
-        if (hpclang_dma_buffer_acquire(&hpclang_display_allocator, rows * stride, 4, &pages[i]))
+    struct hpclang_dma_buffer next_pages[2] = {0};
+    struct hpclang_surface next_surfaces[2] = {0};
+    for (unsigned i = 0; i < count; ++i) {
+        if (hpclang_dma_buffer_acquire(&hpclang_display_allocator, rows * stride, 4,
+                                       &next_pages[i]))
             goto fail;
-        if (hpclang_lcd_buffer_validate(pages[i].physical, pages[i].bytes))
+        if (hpclang_lcd_buffer_validate(next_pages[i].physical, next_pages[i].bytes))
             goto fail;
-        surfaces[i] = (struct hpclang_surface){.pixels = pages[i].pixels,
-                                               .width = device->display_width,
-                                               .height = device->display_height,
-                                               .stride = stride,
-                                               .levels = levels};
-        hpclang_cache_clean(pages[i].pixels, pages[i].bytes);
+        next_surfaces[i] = (struct hpclang_surface){.pixels = next_pages[i].pixels,
+                                                    .width = device->display_width,
+                                                    .height = device->display_height,
+                                                    .stride = stride,
+                                                    .levels = levels};
+        hpclang_cache_clean(next_pages[i].pixels, next_pages[i].bytes);
     }
     struct hpclang_lcd_layout layout;
+    struct hpclang_lcd_state previous = {0};
     uint32_t irq = hpclang_irq_save_disable();
-    int result = hpclang_lcd_acquire(bus, &saved, device->display_width, device->display_height,
-                                     levels, pages[0].physical, pages[0].bytes, &layout);
+    int result = hpclang_lcd_acquire(bus, &previous, device->display_width, device->display_height,
+                                     levels, next_pages[0].physical, next_pages[0].bytes, &layout);
     hpclang_irq_restore(irq);
     if (result)
         goto fail;
-    back = 1;
+    if (!replacing)
+        saved = previous;
+    for (unsigned i = 0; i < 2; ++i) {
+        hpclang_dma_buffer_release(&pages[i]);
+        pages[i] = next_pages[i];
+        surfaces[i] = next_surfaces[i];
+    }
+    page_count = count;
+    back = count - 1;
     return 0;
 fail: {
     int error = errno;
-    hpclang_dma_buffer_release(&pages[1]);
-    hpclang_dma_buffer_release(&pages[0]);
+    hpclang_dma_buffer_release(&next_pages[1]);
+    hpclang_dma_buffer_release(&next_pages[0]);
     errno = error;
     return -1;
 }
+}
+
+int hpclang_display_begin_pages(uint32_t levels, unsigned count)
+{
+    return configure(levels, count, 0);
+}
+int hpclang_display_replace_pages(uint32_t levels, unsigned count)
+{
+    return configure(levels, count, 1);
 }
 
 int hpclang_display_wait_frame(uint32_t timeout_us)
@@ -89,6 +116,8 @@ int hpclang_display_present(uint32_t timeout_us)
     hpclang_cache_clean(pages[back].pixels, pages[back].bytes);
     if (hpclang_display_wait_frame(timeout_us))
         return -1;
+    if (page_count == 1)
+        return 0;
     /* Stop DMA rather than updating live addresses with stale FIFO contents.
      * Serialize the entire register transaction, not the potentially long wait. */
     struct hpclang_lcd_state previous = {0};
@@ -102,6 +131,16 @@ int hpclang_display_present(uint32_t timeout_us)
     if (!result)
         back ^= 1u;
     return result;
+}
+
+int hpclang_display_publish(void)
+{
+    if (!saved.owned) {
+        errno = EPERM;
+        return -1;
+    }
+    hpclang_cache_clean(pages[back].pixels, pages[back].bytes);
+    return 0;
 }
 
 int hpclang_display_set_enabled(int enabled, uint32_t timeout_us)
@@ -159,4 +198,5 @@ void hpclang_display_end(void)
     hpclang_dma_buffer_release(&pages[1]);
     hpclang_dma_buffer_release(&pages[0]);
     surfaces[0] = surfaces[1] = (struct hpclang_surface){0};
+    page_count = 0;
 }

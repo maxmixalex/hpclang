@@ -14,6 +14,14 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpg-context.c"
+    "${HPCLANG_ROOT}/runtime/core/hpg-draw.c"
+    "${HPCLANG_ROOT}/runtime/core/hpg-font.c"
+    "${HPCLANG_ROOT}/runtime/core/hpg-xpm.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c")
+target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
 set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
     "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
     "${HPCLANG_ROOT}/runtime/core/ui-focus.c"

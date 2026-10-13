@@ -578,6 +578,17 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.4 — Historical source compatibility
 
+Local HPG implementation now covers all 59 public functions. ARM declaration
+checks match all four historical headers (55 functions in 1.0; 59 thereafter).
+The integrated Display suite passes all six models in Direct and Stock,
+including independent single/double-buffer, font, XPM and indicator checks.
+Five original HPGCC 1.1 graphics examples compile and their drawing bodies
+pass HP50g Direct execution with test-controlled screenshot waits. CI acceptance
+of the HPG implementation is complete at `1e46aa3d`: Core, Quality, Runtime,
+Objects and Storage pass. Integration with the accepted UI implementation
+passes all 81 host targets and the ARM Display build. The other adapter groups
+below are retained.
+
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
   groups. Expand the four-generation declaration/implementation/evidence ledger.

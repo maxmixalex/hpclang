@@ -13,7 +13,7 @@ static unsigned live, allocations, fail_allocation, clean_count, irq_depth;
 static int invalid_second;
 static unsigned tick, frozen, disabled, clock_error, frozen_line;
 static uint64_t now;
-static void *owned[2];
+static void *owned[4];
 
 int hpclang_display_contrast_restore(void)
 {
@@ -74,8 +74,8 @@ static void *allocate(void *context, size_t bytes)
     if (++allocations == fail_allocation)
         return NULL;
     void *p = malloc(bytes);
-    assert(p && live < 2);
-    for (unsigned i = 0; i < 2; ++i)
+    assert(p && live < 4);
+    for (unsigned i = 0; i < 4; ++i)
         if (!owned[i]) {
             owned[i] = p;
             break;
@@ -87,9 +87,9 @@ static void release(void *context, void *p)
 {
     (void)context;
     /* No page can be freed while the LCD still uses it. */
-    assert(registers[5] == original[5]);
-    for (unsigned i = 0; i < 2; ++i)
+    for (unsigned i = 0; i < 4; ++i)
         if (owned[i] == p) {
+            assert(registers[5] != (0x08004000u + i * 0x4000u) / 2);
             owned[i] = NULL;
             --live;
             free(p);
@@ -101,7 +101,11 @@ static int translate(void *context, const void *p, uint32_t bytes, uint32_t *phy
 {
     (void)context;
     assert(bytes && p);
-    *physical = live == 1 ? 0x08004000 : 0x08008000;
+    unsigned index = 0;
+    while (index < 4 && owned[index] != p)
+        ++index;
+    assert(index < 4);
+    *physical = 0x08004000u + index * 0x4000u;
     if (live == 2 && invalid_second)
         *physical = 0x083ffffcu;
     return 0;
@@ -177,6 +181,47 @@ int main(void)
             break;
     }
     assert(clean_count >= 6);
+    assert(hpclang_display_begin_pages(2, 0) == -1 && errno == EINVAL);
+    assert(hpclang_display_begin_pages(2, 3) == -1 && errno == EINVAL);
+    assert(hpclang_display_publish() == -1 && errno == EPERM);
+    assert(hpclang_display_replace_pages(2, 1) == -1 && errno == EPERM);
+    for (unsigned levels = 2; levels <= 16; levels = levels == 2 ? 4 : 16) {
+        fail_allocation = allocations + 1;
+        assert(hpclang_display_begin_pages(levels, 1) == -1 && errno == ENOMEM && !live);
+        assert(memcmp(registers, original, sizeof original) == 0);
+        fail_allocation = 0;
+        assert(hpclang_display_begin_pages(levels, 1) == 0 && live == 1);
+        struct hpclang_surface *front = hpclang_display_back();
+        assert(front && front->levels == levels);
+        uint32_t address = registers[5];
+        unsigned cleaned = clean_count;
+        hpclang_surface_set_pixel(front, 1, 1, 255);
+        assert(hpclang_display_publish() == 0 && clean_count == cleaned + 1);
+        assert(registers[5] == address && hpclang_display_back() == front);
+        assert(hpclang_display_present(100000) == 0);
+        assert(registers[5] == address && hpclang_display_back() == front);
+        assert(hpclang_surface_get_pixel(front, 1, 1) == 255);
+        assert(hpclang_display_indicator_set(3, 255) == 0);
+        assert(hpclang_display_publish() == 0);
+        uint32_t before[25];
+        memcpy(before, registers, sizeof before);
+        fail_allocation = allocations + 2;
+        assert(hpclang_display_replace_pages(16, 2) == -1 && errno == ENOMEM);
+        assert(live == 1 && hpclang_display_back() == front);
+        assert(hpclang_surface_get_pixel(front, 1, 1) == 255);
+        assert(memcmp(before, registers, sizeof before) == 0);
+        fail_allocation = 0;
+        assert(hpclang_display_replace_pages(16, 2) == 0 && live == 2);
+        assert(hpclang_display_back()->levels == 16);
+        assert(hpclang_display_present(100000) == 0);
+        assert(hpclang_display_replace_pages(2, 1) == 0 && live == 1);
+        assert(hpclang_display_back()->levels == 2);
+        hpclang_display_end();
+        assert(!live && !hpclang_display_back());
+        assert(memcmp(registers, original, sizeof original) == 0);
+        if (levels == 16)
+            break;
+    }
     clock_error = 1;
     assert(hpclang_display_wait_frame(1000) == -1 && errno == EIO);
     clock_error = 0;

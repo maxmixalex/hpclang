@@ -168,6 +168,72 @@ Compatibility decision:
 The hpclang core already provides opaque physical/software surfaces, clipped pixel/line/rectangle/circle/polygon operations, cross-level blit, native/generated fonts, and UTF-8/codepoint text drawing. That is enough clean machinery for many HPG wrappers without reproducing `hpg_t` as the core state model.
 
 Historical mutable color/font/pattern/clip/PAINT-XOR state belongs in the HPG adapter.
+
+`hpg_set_mode_mono/gray4/gray16` now acquire one scanout page when `dbuf` is
+zero, or two pages otherwise. Single-page drawing publishes CPU writes at the
+end of each adapter operation; double-page drawing stays hidden until
+`hpg_flip()` exchanges pages. A failed mode replacement keeps the old pages,
+pixels, and LCD state. Drawing state survives successful replacement, while
+new pages start white. `hpg_cleanup()` restores the original host LCD only
+when HPG acquired ownership and is registered for normal application exit.
+An already-owned clean display session causes initial HPG acquisition to
+fail with `EBUSY`; it is not released by HPG cleanup. `hpg_set_indicator()`
+uses the six historical segment constants and follows PAINT/XOR and page
+exchange. Its first call without an HPG-owned session acquires a single page
+and preserves the visible Stock pixels and other status segments. Printed
+icons differ by calculator; setting a segment does not change keyboard flags.
+All 59 historical HPG function names are implemented. The integrated Display
+suite passes all six models in Direct and Stock locally, including independent
+pixel checks for single/double buffering, fonts, XPM and status segments.
+Formal CI acceptance is complete at `1e46aa3d`:
+[Core](https://github.com/maxmixalex/hpclang/actions/runs/38419627444),
+[Quality](https://github.com/maxmixalex/hpclang/actions/runs/38419627345),
+[Runtime](https://github.com/maxmixalex/hpclang/actions/runs/38419627334),
+[Objects](https://github.com/maxmixalex/hpclang/actions/runs/38419627393) and
+[Storage](https://github.com/maxmixalex/hpclang/actions/runs/38419627414) pass.
+
+The original HPGCC 1.1 `testtext`, `testbigtext`, `testimage`, `testshapes`,
+and `testdoublebuf` examples compile and link against this adapter locally.
+Their HPG drawing calls remain unchanged. Required migration edits are:
+replace `hpkeyb49.h` with a bridge polling the clean physical keyboard service
+for `keyb_isON`/`keyb_waitKeyPressed`; replace the unused `hpsys.h` include with
+`errno.h`; and remove application definitions of `int errno`. This is a
+graphics-source build check, not yet a claim that the historical keyboard
+subsystem is installed. The five original drawing bodies also pass HP50g
+Direct execution: the test driver renames their entry points and replaces
+blocking key waits with screenshot handshakes. Pixel anchors cover numbered
+text, three image circles, the shape scene and the final animation line;
+the 210-character big-font grid is captured and visually checked. This does
+not test the original keyboard waits or assert pixel identity with HPGCC's
+bundled fonts. The integrated Display E2E is a separately authored adapter
+witness covering the wider model/launch matrix.
+
+The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
+newline handling, and borrowed bitmap storage. This differs from the clean
+Unicode font API. Default-font integration prefers live native
+mini/big fonts on HP48gII/49g+/50g and the native main font on HP39-family models.
+HP39 small text uses newRPL's `Font6_menus`, the closest reviewed small-face
+candidate fitting the legacy 4-by-6 ASCII cell. When native big text is
+unavailable, `Font8_StyleB` supplies a 6-by-8 fallback whose ASCII glyphs fit
+without cropping. The adapter keeps legacy advance independently of a
+packaged face's proportional advance. HP symbol bytes are mapped to Unicode
+for packaged fonts; angle is constructed from two rays, x-bar adds an overbar,
+and oversized symbols are compressed into the cell while retaining source ink.
+Native tables are read from the running calculator, not embedded in the SDK.
+The portable asset test renders all 256 bytes in both fonts for six models
+without native mappings and compares the pixels with the packaged source.
+Default-font pixel identity is not an adapter guarantee.
+
+The installed HPG adapter loads compiled XPM arrays into owned mono/4/16-level
+images. Palette keys may use multiple characters; `#RRGGBB` entries prefer
+`g4` over `g` over `c`, with historical HPG luminance conversion. Unsupported
+names, `None`, and unknown pixel keys produce opaque white, as in historical
+HPG; these images do not carry an alpha plane. The caller supplies the
+header-declared palette and rows as terminated strings. Invalid headers,
+duplicate keys, and short rows fail with `EINVAL` and release partial storage.
+This adapter is distinct from the earlier transparent-drawing feasibility
+probe described below.
+
 M7.5 now provides physical 2/4/16-level sessions, double buffering, bounded frame
 synchronization and six status segments through the clean display service.
 The runtime owns contiguous DMA allocations, cache publication and LCD restoration.
@@ -552,7 +618,7 @@ review; a declaration count proves none of those.
 | Header / comparison | Unique functions in each version | Identical common declarations | Finding |
 | --- | --- | --- | --- |
 | `hpgraphics.h`, 1.0.3 → 1.1 | 55 → 59 | 55 | Existing count confirmed; four metric/geometry helpers added |
-| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | Existing count confirmed; wrappers still not implemented by hpclang |
+| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | All 59 installed adapter functions implemented; six-model Direct/Stock local checks and formal CI pass at `1e46aa3d` |
 | `hpkeyb49.h`, 1.0.3 → 1.1 | 12 → 17 | 11 | `keyb_getkey` changes return type; five names added |
 | `hpkeyb49.h`, 1.1 → 2.0 | 17 → 17 | 17 | Existing count confirmed |
 | `hpscreen.h`, 1.0.3 → 1.1 | 12 → 9 | 9 | Three old minifont helpers removed; 9 is the retained subset |
