@@ -46,8 +46,11 @@ int hpclang_display_begin(uint32_t levels)
             goto fail;
         if (hpclang_lcd_buffer_validate(pages[i].physical, pages[i].bytes))
             goto fail;
-        surfaces[i] = (struct hpclang_surface){pages[i].pixels, device->display_width,
-                                               device->display_height, stride, levels};
+        surfaces[i] = (struct hpclang_surface){.pixels = pages[i].pixels,
+                                               .width = device->display_width,
+                                               .height = device->display_height,
+                                               .stride = stride,
+                                               .levels = levels};
         hpclang_cache_clean(pages[i].pixels, pages[i].bytes);
     }
     struct hpclang_lcd_layout layout;

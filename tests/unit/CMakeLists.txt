@@ -14,7 +14,38 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-paint.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-effect.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-input.c"
+    "${HPCLANG_ROOT}/runtime/core/input.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keyboard.c"
+    "${HPCLANG_ROOT}/runtime/core/input-mode.c"
+    "${HPCLANG_ROOT}/runtime/core/input-alpha.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keymap.c")
+hpclang_unit(ui test_ui.c ${HPCLANG_UI_TEST_SOURCES})
+hpclang_unit(ui_effect_exit test_ui_effect_exit.c ${HPCLANG_UI_TEST_SOURCES})
+foreach(name ui ui_effect_exit)
+    target_include_directories(test_${name} PRIVATE "${HPCLANG_ROOT}/include")
+endforeach()
+
+set(HPCLANG_UI_SURFACE_TEST_SOURCES ${HPCLANG_UI_TEST_SOURCES}
+    "${HPCLANG_ROOT}/runtime/core/ui-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/display-surface.c"
+    "${HPCLANG_ROOT}/runtime/core/font.c"
+    "${HPCLANG_ROOT}/runtime/core/saturn-view.c")
+hpclang_unit(ui_surface test_ui_surface.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
+target_include_directories(test_ui_surface PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(ui_demo test_ui_demo.c ${HPCLANG_UI_SURFACE_TEST_SOURCES}
+    "${HPCLANG_ROOT}/examples/declarative-ui/app.c")
+target_include_directories(test_ui_demo PRIVATE "${HPCLANG_ROOT}/include")
+
 if(UNIX)
+    hpclang_unit(ui_surface_alloc test_ui_surface_alloc.c ${HPCLANG_UI_SURFACE_TEST_SOURCES})
+    target_include_directories(test_ui_surface_alloc PRIVATE "${HPCLANG_ROOT}/include")
+    target_link_options(test_ui_surface_alloc PRIVATE "LINKER:--wrap=malloc,--wrap=calloc,--wrap=free")
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c
         "${HPCLANG_ROOT}/runtime/core/exit-hooks.c"
         "${HPCLANG_ROOT}/runtime/libc/stdio-lifetime.c")

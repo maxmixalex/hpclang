@@ -7,6 +7,16 @@ endif()
 
 include("${HPCLANG_ROOT}/cmake/fonts.cmake")
 
+# Runtime sources share the application target in the execution profile and
+# must therefore also be valid STATIC_AUTO scanner input. UI node names must
+# not collide with the public string marker.
+hpclang_collect_ui_text_codepoints(runtime_codepoints
+    "${HPCLANG_ROOT}/runtime/core/ui.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-surface.c")
+if(runtime_codepoints)
+    message(FATAL_ERROR "UI runtime unexpectedly contributes application text")
+endif()
+
 add_executable(font_mode_probe EXCLUDE_FROM_ALL auto.c)
 target_include_directories(font_mode_probe PRIVATE "${HPCLANG_ROOT}/include")
 
