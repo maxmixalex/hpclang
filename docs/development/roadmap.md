@@ -453,7 +453,7 @@ Local implementation now includes Port 0 backup create, variable-size replace
 and remove, with owned reads and preservation of live references to old records.
 The native library table participates in reference scanning. Library record
 creation is internal and does not register or attach a library. Existing-library
-relocation, public library mutation, Port 1 replacement/removal and Port 2 remain unfinished. The 83 host
+relocation, public library mutation, Port 1 replacement/removal and Port 2 writes remain unfinished. The 85 host
 tests and focused mutation/port sanitizer tests pass. The public grow/shrink/
 read/remove flow passes Stock on HP48gII, HP49g+ and HP50g. All three also pass
 a three-launch lifecycle: create an integer, return/relaunch and replace it
@@ -465,6 +465,118 @@ models across the three-launch Port 0 lifecycle. Port 1 backup creation now
 respects a launcher-derived physical-page fence, passes both models across
 relaunches and is independently recalled by native RPL. Reference-preserving
 replacement/removal and active-library safety remain open.
+
+Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g
+Stock across all three lifecycle launches. The backend validates the live
+Flash mapping and bank identities, and uses a separate slot iterator that skips
+native deletion markers. Host tests cover cross-bank reads and snapshot
+ownership. Port 2 writes and library mutation remain open.
+The HP48gII three-launch regression also passes, preserving `ENOSYS` for its
+unavailable Port 1/2 services. All 85 host tests, focused sanitizers, Clang
+analysis and strict documentation checks pass for this read-service batch.
+
+Local typed discovery now reports native medium, SDK operation masks and
+launch-available operation masks through `hpclang_port_query()`. Six-model
+host checks distinguish absent ports, Direct/Stock contexts, legacy launch
+bounds and supported-but-full ERAM, including the exact legacy descriptor size
+under ASan/UBSan. HP50g passes three Stock lifecycle launches; HP39g+ target
+discovery acceptance now passes all 15 HP39g+ Stock lifecycle invocations,
+including copied Aplets. The fixture reuses bounded scratch buffers so its
+large-string checks fit the copied Aplet's smaller ARM heap, with unchanged
+payload lengths and persistence/rejection assertions. All 85 host tests pass.
+
+The subsequent HP39gs/HP40gs CI run exposed smaller heaps on later Aplet
+launches. HP39 discovery checks now run in the catalog suite (Direct and Stock),
+while classic discovery stays beside port mutation. The common probe preserves
+the same medium/operation assertions. All three HP39 Direct catalog targets and
+all 15 HP39gs and all 15 HP40gs Stock mutation launches pass locally; the
+Stock catalog check is being verified before the follow-up push. Two HP40gs
+attempts received an Aplet missing one byte from a doubled backslash, despite
+successful Kermit completion. Quoting backslashes in the transfer copy makes
+the same payload pass Stock. The server now applies that quoting without
+changing source packages; PTY tests cover byte preservation and cleanup.
+The production server passes HP40gs Stock Catalog with the originally failing
+payload. The explicit retained byte witness also passes HP39g+ Stock Catalog,
+including its normal return. Formal CI for this follow-up remains pending.
+
+Internal Port 1 replacement/removal now requires an explicit read-only reference
+guard before any write. Missing guards, live-reference rejection and guard read
+errors preserve the port bytes. All 85 host tests, focused sanitizers and static
+analysis pass. Native banked-reference discovery and public Port 1 replacement/
+removal remain unfinished; an imported ACPTR experiment demonstrates that native
+PURGE can leave a stale ERAM pointer, so native PURGE alone is not a safety proof.
+
+A bounded internal library-reference visitor now validates the library CRC,
+relative table bounds and link-table shape, then visits hash/message/link/config
+objects and function targets. It handles backward relative links and propagates
+visitor/read errors without writing native memory. All 85 host tests, focused
+ASan/UBSan and Clang analysis pass; the same C implementation enumerates 16
+references from library 275 in a saved HP50g native state. This supplies one
+structural traversal component; complete live-root and executable-reference
+coverage, and public Port 1 replacement/removal, remain open.
+
+The internal compact-array visitor supplies each element's shared type and
+bounded body without writing a synthetic prologue into native memory. Tests
+cover strings, multidimensional numbers, banked-pointer bodies, empty arrays,
+truncation, overflow and callback cancellation. The same C implementation reads
+all 13 strings in library 275's native HP50g message array with an exact ending
+boundary. Linked-array traversal also handles shared and reordered bodies using
+bounded relative links; synthetic fixtures cover links into the header/table,
+past the array end and truncated bodies. A native linked-array instance has not
+yet been validated. Address-dependent directory bodies and out-of-array links
+are rejected; this component does not by itself certify reference safety.
+
+The internal sequence visitor distinguishes inline children from five-nibble
+reference cells in lists, programs, symbolic objects and matrices. It validates
+the enclosing sequence before invoking callbacks and leaves reference targets
+unread. The combined directory/library/array/sequence experiment reaches 126
+objects in a saved HP50g HOME graph and identifies the imported ERAM ACPTR.
+Flash-pointer resolution, executable references and complete live-root coverage
+remain open; this experiment is not authorization to move referenced Port 1 data.
+
+A read-only root visitor now reuses the native relocation scanner for launcher
+roots, data/return stacks and its supported system tables. It reports raw values
+without assuming they are object beginnings; tests verify callback cancellation,
+read failures and byte-for-byte preservation. The saved HP50g return stack also
+contains execution addresses outside the HOME object graph, so interpreting these
+roots and covering banked library entries remain necessary before enabling writes.
+The C visitor enumerates 422 cells (51 distinct values) in the saved HP50g state
+without writes. A separate TEMP allocation visitor validates the complete footer
+chain before reporting payload bounds and reproduces all 40 saved allocations.
+Three allocations contain a ROM-pointer object followed by a complete program,
+and some roots point inside those blocks. Bounded parsing accounts for 43 typed
+objects across the 40 allocations with no leftover nibbles in this saved state.
+The trailing programs must enter reference traversal too; their Flash/ROM calls
+still need resolution before execution-reference safety is established.
+The combined HOME/TEMP experiment reaches 174 objects and reveals another Flash
+pointer. In this HP50g snapshot, native catalog entries for ROM calls 161/10,
+161/6 and 167/1 resolve to programs that match the three TEMP copies byte for
+byte. This establishes their origin, not complete executable-reference coverage
+or a portable ROM mapping for all models.
+The bounded internal library-catalog lookup preserves the native bank-switch
+identity and leaves its output unchanged on missing IDs, duplicate matching IDs
+or read/bounds errors. Its C implementation matches all 62 records in the saved
+HP50g catalog. This supplies binding metadata; bank resolution and executable
+target traversal remain separate unfinished steps.
+A bounded command resolver now validates the selected bank's library-ID header
+and relative binary link table, preserves backward links and rejects table/target
+addresses outside the caller's mapping. The actual C implementation resolves
+161/10, 161/6 and 167/1 to the three independently matched HP50g ROM programs.
+Selecting and validating mappings across models and following executable targets
+remain unfinished; successful address resolution is not a mutation safety proof.
+The internal bank lookup reads switch entries from caller-validated ROM tables,
+rejects ambiguous matches and preserves output on error. Actual C lookup matches
+all 16 Flash entries and the ERAM entry in saved HP48gII, HP49g+ and HP50g ROMs;
+HP48gII's switch routine addresses differ from the other two models. This verifies
+table interpretation, not physical bank availability or runtime mapping ownership.
+
+The Port development branch now integrates the standalone historical-system client
+and system adapters. Both integrated HP40gs Stock clients pass normal return and
+independent pixel checks, replacing the old combined fixture that failed with
+`0x464100c0`. All 87 host tests, focused sanitizers/static analysis, formatting and
+strict documentation checks pass. Public Port 1 replacement/removal remains open:
+bank-qualified traversal reaches ROM machine-code entries and user-library code
+whose execution references still require classification.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
@@ -594,6 +706,23 @@ Deliver and review this core in the following slices, using the retained
   Stock return. Record frame/update and memory budgets.
 
 #### M8.4 — Historical source compatibility
+
+The system adapter now includes five `hpsys.h` entry points for millisecond delays,
+750 kHz tick delays, nanosecond stopwatches, civil seconds-of-day and
+midnight-wrapped differences.
+All 87 host tests after integration with the accepted C++ ownership work, six
+Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass, including independent
+pixel checks for the combined payload. HP39gs then exposed insufficient heap
+for its clock/display check. The timed-sieve client now has a separate
+`hpgcc-system` payload and pixel verifier in the shared Runtime suite manifest;
+both split payloads pass all six Direct and all six Stock targets, including
+their independent pixel checks. All 87 host tests, formatting, static analysis,
+focused sanitizers and strict documentation checks pass. Formal CI is pending.
+The relocated SDK build passes C/C++, all six launchers and all three HP39
+Aplet package families with the system adapter included. The installed
+`examples/hpgcc-timer` migration client passes that same relocation/packaging
+gate; it demonstrates the five historical calls and documents their units.
+The remaining historical system, timer and console interfaces remain open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
@@ -904,7 +1033,7 @@ Final source-confirmed application capabilities and retained follow-ups:
     object coexistence pass. Formal CI is accepted on `2988e1de`.
 - [x] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
-  - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
+  - `hpgcc-system/historical-system.c` ports the HPGCC 1.1/2.0 sieve
     example with bounded allocation/work, independently checked prime results
     and a visible elapsed-time report. Direct and Stock pass on all six models;
     formal CI is accepted on `2988e1de` for this additional client.

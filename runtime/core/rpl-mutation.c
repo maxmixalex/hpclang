@@ -7,6 +7,7 @@
 
 enum
 {
+    RPL_TEMPBOTTOM = 0x000806e9u,
     RPL_TEMPTOP = 0x000806eeu,
     RPL_RSKTOP = 0x000806f3u,
     RPL_DSKTOP = 0x000806f8u,
@@ -204,7 +205,8 @@ enum pointer_scan_mode
 {
     POINTER_SCAN_REJECT = 0,
     POINTER_SCAN_VALIDATE_SHIFT = 1,
-    POINTER_SCAN_APPLY_SHIFT = 2
+    POINTER_SCAN_APPLY_SHIFT = 2,
+    POINTER_SCAN_VISIT = 3
 };
 
 struct pointer_scan_request
@@ -217,6 +219,8 @@ struct pointer_scan_request
     enum pointer_scan_mode mode;
     int port_boundary; /* Port 0 boundary is committed separately. */
     int *busy_found;   /* validation accumulates BUSY without hiding later errors */
+    hpclang_rpl_root_visit_fn visit;
+    void *visit_context;
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
@@ -225,6 +229,9 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
 {
     if (request == NULL)
         return HPCLANG_RPL_MUTATION_MALFORMED;
+
+    if (request->mode == POINTER_SCAN_VISIT)
+        return request->visit(request->visit_context, slot, value);
 
     if (request->mode == POINTER_SCAN_REJECT) {
         if (!pointer_hits_range(value, request->move_start, request->move_end))
@@ -541,6 +548,64 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
     return scan_library_references(io, request);
+}
+
+int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
+                                    hpclang_rpl_temp_visit_fn visit, void *context)
+{
+    if (!io_ready(io) || !visit)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    uint32_t bottom, top, sentinel;
+    int result = read_word(io, RPL_TEMPBOTTOM, 5, &bottom);
+    if (result)
+        return result;
+    result = read_word(io, RPL_TEMPTOP, 5, &top);
+    if (result)
+        return result;
+    if (bottom < RPL_MAIN_FIRST || bottom > RPL_MAIN_END - 5 || top < bottom + 5 ||
+        top > RPL_MAIN_END)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, bottom, 5, &sentinel);
+    if (result)
+        return result;
+    if (sentinel)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    bottom += 5;
+    /* First validate every allocation; a malformed old footer must not leave
+     * callers believing that a newer partial prefix is the entire TEMP arena. */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        uint32_t cursor = top;
+        while (cursor > bottom) {
+            if (cursor - bottom < 11)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            uint32_t extent;
+            result = read_word(io, cursor - 5, 5, &extent);
+            if (result)
+                return result;
+            if (extent < 11 || extent > cursor - bottom)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+            if (pass) {
+                result = visit(context, cursor - extent + 1, extent - 6);
+                if (result)
+                    return result;
+            }
+            cursor -= extent;
+        }
+    }
+    return 0;
+}
+
+int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
+                                     hpclang_rpl_root_visit_fn visit, void *context)
+{
+    if (!io_ready(io) || !visit)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct pointer_scan_request request = {
+        .mode = POINTER_SCAN_VISIT,
+        .visit = visit,
+        .visit_context = context,
+    };
+    return scan_all_references(io, &request);
 }
 
 static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,

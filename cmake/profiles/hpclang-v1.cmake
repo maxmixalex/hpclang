@@ -69,6 +69,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-keyboard.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-system.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input-session.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/input-alpha.c"

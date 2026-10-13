@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <hpclang/abi.h>
+#include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/port.h>
 #include <hpclang/target.h>
@@ -13,6 +15,9 @@ static uint8_t memory[0x100000];
 static int unavailable;
 static int writable = 1;
 static int port1_available;
+static int port2_available;
+static uint8_t flash[HPCLANG_RPL_PORT2_BANKS][HPCLANG_RPL_FLASH_BANK_NIBBLES];
+static uint32_t missing_flash_bank = UINT32_MAX;
 static uint32_t port1_limit = 0x2000u;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
@@ -55,6 +60,22 @@ int hpclang_rpl_stock_port1_reader(struct hpclang_rpl_reader *reader)
     return 1;
 }
 
+static int flash_read(void *context, uint32_t address, uint8_t *value)
+{
+    if (!port2_available || address >= HPCLANG_RPL_FLASH_BANK_NIBBLES)
+        return 0;
+    *value = ((const uint8_t *)context)[address];
+    return 1;
+}
+
+int hpclang_rpl_stock_port2_reader(uint32_t bank, struct hpclang_rpl_reader *reader)
+{
+    if (!port2_available || bank >= HPCLANG_RPL_PORT2_BANKS || bank == missing_flash_bank)
+        return 0;
+    *reader = (struct hpclang_rpl_reader){flash_read, flash[bank]};
+    return 1;
+}
+
 int hpclang_rpl_stock_port1_mutation_io(struct hpclang_rpl_mutation_io *io, uint32_t *limit)
 {
     if (!port1_available || !writable)
@@ -92,8 +113,129 @@ static void fixture(void)
         memory[0xfffc0 + i] = (uint8_t)(hex[i] <= '9' ? hex[i] - '0' : hex[i] - 'a' + 10);
 }
 
+static void test_discovery(void)
+{
+    struct hpclang_boot_info saved_boot = boot;
+    struct hpclang_device_info saved_device = device;
+    struct hpclang_port_info info = {.size = sizeof(info), .version = HPCLANG_PORT_INFO_VERSION};
+    struct hpclang_rpl_memory_bounds bounds = {.magic = HPCLANG_RPL_BOUNDS_MAGIC,
+                                               .temp_limit = 0xa0000u,
+                                               .user_limit = 0xb0000u,
+                                               .port1_limit = 0};
+    uint32_t reads = HPCLANG_PORT_ENUMERATE | HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_READ_LIBRARY;
+    for (uint32_t model = HPCLANG_MODEL_HP39GPLUS; model <= HPCLANG_MODEL_HP50G; ++model) {
+        device.model = boot.model = model;
+        boot.platform_cookie = (uintptr_t)&bounds | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+        for (uint32_t port = 0; port < 3; ++port) {
+            int present =
+                model >= HPCLANG_MODEL_HP48GII && (port == 0 || model != HPCLANG_MODEL_HP48GII);
+            boot.saturn_state = 0;
+            errno = EDOM;
+            assert(hpclang_port_query(port, &info) == 0 && errno == EDOM);
+            assert(info.port == port && info.available == 0);
+            assert((info.medium != HPCLANG_PORT_ABSENT) == present);
+            assert((info.implemented & reads) == (present ? reads : 0));
+            if (present)
+                assert(info.medium == port + HPCLANG_PORT_MAIN_RAM);
+            boot.saturn_state = 1;
+            assert(hpclang_port_query(port, &info) == 0);
+            assert(info.available == info.implemented);
+            if (present && port == 2)
+                assert(info.available == reads);
+        }
+    }
+    // Zero writable headroom means supported-but-full, not an unavailable API.
+    assert(hpclang_port_query(1, &info) == 0 && (info.available & HPCLANG_PORT_CREATE_BACKUP));
+    bounds.port1_limit = HPCLANG_RPL_PORT1_NIBBLES + 1;
+    assert(hpclang_port_query(1, &info) == 0 && info.available == reads);
+    bounds.port1_limit = 0;
+    bounds.magic = HPCLANG_RPL_BOUNDS_MAGIC_V2;
+    assert(hpclang_port_query(1, &info) == 0 && info.available == reads);
+    assert(hpclang_port_query(0, &info) == 0 && info.available == info.implemented);
+    size_t legacy_size = offsetof(struct hpclang_rpl_memory_bounds, port1_limit);
+    void *legacy = malloc(legacy_size);
+    assert(legacy);
+    memcpy(legacy, &bounds, legacy_size);
+    boot.platform_cookie = (uintptr_t)legacy | HPCLANG_PLATFORM_COOKIE_RPL_BOUNDS_TAG;
+    assert(hpclang_port_query(1, &info) == 0 && info.available == reads);
+    assert(hpclang_port_query(0, &info) == 0 && info.available == info.implemented);
+    free(legacy);
+    boot.platform_cookie = 0;
+    assert(hpclang_port_query(0, &info) == 0 && info.available == reads);
+    boot.model = HPCLANG_MODEL_HP39GPLUS;
+    assert(hpclang_port_query(0, &info) == 0 && info.available == 0);
+    info.size += 16;
+    assert(hpclang_port_query(0, &info) == 0 && info.size == sizeof(info) + 16);
+    struct hpclang_port_info previous = info;
+    assert(hpclang_port_query(3, &info) == -1 && errno == EINVAL);
+    assert(memcmp(&info, &previous, sizeof(info)) == 0);
+    device.model = HPCLANG_MODEL_UNKNOWN;
+    assert(hpclang_port_query(0, &info) == -1 && errno == ENOSYS);
+    assert(memcmp(&info, &previous, sizeof(info)) == 0);
+    info.version = 0;
+    assert(hpclang_port_query(0, &info) == -1 && errno == EINVAL);
+    assert(hpclang_port_query(0, NULL) == -1 && errno == EINVAL);
+    info.version = HPCLANG_PORT_INFO_VERSION;
+    info.size = sizeof(info) - 1;
+    assert(hpclang_port_query(0, &info) == -1 && errno == EINVAL);
+    boot = saved_boot;
+    device = saved_device;
+}
+
+static void test_flash(void)
+{
+    memset(flash, 15, sizeof(flash));
+    for (uint32_t bank = 0; bank < HPCLANG_RPL_PORT2_BANKS; ++bank) {
+        uint32_t header = 0xf0u | ((bank + 8u) << 8u);
+        for (uint32_t i = 0; i < 4; ++i)
+            flash[bank][0x200 + i] = (header >> (4u * i)) & 15u;
+    }
+    const char *records[] = {"35e3000104b2062000108510b7000000000000000000000d5c2",
+                             "35e3000026b20130008005f42545a55425f48041620900003210119200f9e3"};
+    const uint32_t banks[] = {1, 5};
+    for (uint32_t j = 0; j < 2; ++j)
+        for (uint32_t i = 0; records[j][i]; ++i)
+            flash[banks[j]][0x20a + i] =
+                records[j][i] <= '9' ? records[j][i] - '0' : records[j][i] - 'a' + 10;
+    port2_available = 1;
+    device.family = HPCLANG_FAMILY_HP48;
+    assert(!hpclang_port_iterator_open(2) && errno == ENOSYS);
+    device.family = HPCLANG_FAMILY_HP4950;
+    boot.saturn_state = 0;
+    assert(!hpclang_port_iterator_open(2) && errno == ENOSYS);
+    boot.saturn_state = 1;
+    struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(2);
+    assert(iterator);
+    struct hpclang_object *value = hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8);
+    struct hpclang_object *library = hpclang_port_library_get(2, 123);
+    assert(value && library && hpclang_object_kind(library) == HPCLANG_OBJECT_LIBRARY);
+    assert(!hpclang_port_backup_get(2, (const uint8_t *)"missing", 7) && errno == ENOENT);
+    missing_flash_bank = 3;
+    assert(!hpclang_port_iterator_open(2) && errno == EIO);
+    missing_flash_bank = UINT32_MAX;
+    flash[5][0x202] ^= 1;
+    assert(!hpclang_port_iterator_open(2) && errno == EILSEQ);
+    flash[5][0x202] ^= 1;
+    flash[5][0x20a] = flash[5][0x20b] = 0;
+    assert(!hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8) && errno == ENOENT);
+    port2_available = 0;
+    memset(flash, 0, sizeof(flash));
+    int64_t integer;
+    assert(hpclang_object_integer_i64(value, &integer) == 0 && integer == 123);
+    struct hpclang_port_entry entry = {.size = sizeof(entry),
+                                       .version = HPCLANG_PORT_ENTRY_VERSION};
+    assert(hpclang_port_iterator_read(iterator, &entry) == 1 && entry.library_number == 123);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 1 && entry.kind == HPCLANG_PORT_BACKUP);
+    assert(hpclang_port_iterator_read(iterator, &entry) == 0);
+    hpclang_port_iterator_close(iterator);
+    hpclang_object_release(value);
+    hpclang_object_release(library);
+}
+
 int main(void)
 {
+    test_discovery();
+    test_flash();
     fixture();
     struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(0);
     assert(iterator);

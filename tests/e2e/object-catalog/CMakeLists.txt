@@ -19,7 +19,7 @@ add_executable(hpclang_object_catalog_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     "${HPCLANG_ROOT}/runtime/core/hp39-catalog.c"
-    main.c catalog.c variables.c)
+    main.c catalog.c variables.c "${CMAKE_CURRENT_LIST_DIR}/../object-common/port-discovery.c")
 target_include_directories(hpclang_object_catalog_e2e PRIVATE
     "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
 target_compile_features(hpclang_object_catalog_e2e PRIVATE c_std_11)

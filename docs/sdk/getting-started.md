@@ -59,6 +59,12 @@ historical host tool and assets described below. The small examples
 draw a greeting and return immediately; they are build examples, not interactive
 applications or calculator execution acceptance tests.
 
+The installed `examples/hpgcc-timer` directory demonstrates the supported
+historical `hpsys.h` timing calls with an ordinary external CMake application.
+It measures a short delay, draws the duration and returns. Its README explains
+the units and the boundary between historical timer calls and hpclang rendering;
+it does not imply complete HPGCC compatibility.
+
 An application CMake file uses:
 
 ```cmake

@@ -42,7 +42,7 @@ The application-facing surface currently includes:
 - `<hpclang/storage.h>` for HP49g+/HP50g byte-stream metadata/media queries
 - `<hpclang/object.h>` for owned calculator-object snapshots and stack exchange
 - `<hpclang/object-store.h>` for HP48gII/HP49g+/HP50g named RPL stores
-- `<hpclang/port.h>` for owned classic Port 0 metadata, backup values and libraries
+- `<hpclang/port.h>` for owned native port metadata, backup values and libraries
 - `<hpclang/variable.h>` for HP39 native schema-defined variable values
 
 Bounded HPGCC source-compatibility headers also now exist as `<satdir.h>` and `<saturn.h>`. They are **adapters above the canonical object/stack API**, not alternate core object models. In particular they do not expose raw Saturn memory access, real Saturn-address descriptors, or borrowed Stock-memory lifetimes.
@@ -78,6 +78,28 @@ known capability. They do not validate every live object or promise free space:
 the requested operation still checks its arguments, mapping, resources and data.
 Unknown IDs return `-1` with `EINVAL`. Native Port 0/1/2 services are not covered
 by the HOME object-store capabilities.
+
+Use `hpclang_port_query(port, &info)` for native ports. Initialize `info.size`
+and `info.version = HPCLANG_PORT_INFO_VERSION`. Its `medium` distinguishes
+absent ports, main RAM, extended RAM and Flash; `implemented` is the SDK's
+operation mask and `available` additionally checks this launch's context and
+ownership bounds. Known absent ports return success with zero masks. Direct
+launches retain the model's medium/implemented information but report no
+available operations. Unknown models return `ENOSYS`; invalid indices or
+descriptor headers return `EINVAL`. Errors leave output unchanged; successful
+queries preserve `errno` and do not read hardware or allocate resources.
+
+| Native port | Models with this port | Implemented operations |
+| --- | --- | --- |
+| 0, main RAM | HP48gII, HP49g+, HP50g | Enumerate, read backups/libraries, create/replace/remove backups |
+| 1, extended RAM | HP49g+, HP50g | Enumerate, read backups/libraries, create backups |
+| 2, Flash | HP49g+, HP50g | Enumerate, read backups/libraries |
+
+Port 0 mutations require valid launcher bounds; Port 1 creation requires the
+newer ERAM ownership extension. A zero free prefix still permits the operation
+to be queried as available: the eventual allocation reports `ENOSPC`. Queries
+do not guarantee valid live mappings, intact data or safe library relocation.
+HP39 Aplet storage is a separate service, not a native Port 0/1/2 namespace.
 
 Host regression tests cover all six models, absent contexts, invalid portal
 prefixes and invalid mutation bounds. System-service E2E checks discovery under
@@ -728,8 +750,8 @@ state; applications needing repeat/debounce policy should use clean events.
 | any key | `keyb_isAnyKeyPressed` | ✅ |
 | dedicated modifiers | `keyb_isAlpha`, `keyb_isLS`, `keyb_isRS`, `keyb_isON` | ✅ Physical held-state queries. |
 | arrows | `keyb_isLeft/Right/Up/Down` | ✅ Arrow identities are part of the measured `hpclang_key` set. |
-| blocking wait | `keyb_waitKeyPressed` | ◐ Installed physical press/all-release adapter; local tests pass, target acceptance pending. |
-| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ◐ Installed return-code adapters with the explicit differences above; local tests pass, target acceptance pending. |
+| blocking wait | `keyb_waitKeyPressed` | ✅ Installed physical press/all-release adapter; accepted at `267dd953`. |
+| logical key return | `keyb_getkey`, `keyb_getkeyM`, `keyb_getnextkey` | ✅ Installed return-code adapters with the explicit differences above; accepted at `267dd953`. |
 | HPGCC3 async queue | KEYDN/PRESS/KEYUP machinery | ◐ Core event semantics exist; global IRQ-owned queue policy is intentionally not copied. |
 
 ## Time, system and machine control
@@ -738,8 +760,8 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
-| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Monotonic microseconds + explicit delay; source adapter absent. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; historical source adapters remain pending. |
+| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` now adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay; six Direct models and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally. `sys_waitRTCTicks` remains pending. |
+| RTC wall clock | `sys_RTC_seconds`, `sys_delta_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; `hpsys.h` now adapts seconds-of-day and midnight-wrapped differences. `sys_tm_RTC` remains pending. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | 🧪 Typed HOST/ECONOMY policy preserves PLL/bus setup and restores borrowed clocks; local validation in progress. Historical raw register interfaces remain backend details. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
@@ -782,7 +804,7 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | --- | --- | --- |
 | `struct hpclang_object` | ✅ opaque owned snapshot | ARM-side immutable copy of a proven-bounded native object; no Saturn pointer escapes the runtime |
 | `hpclang_catalog_list/get/put/remove()` | M7.3j accepted (`6a7f9a28`) | HP39 Stock Program/Note text catalogs; owned names and body snapshots, create/replace/upsert modes, native compilation/editor record maintenance. Names are 1–19 calculator bytes; Program `Editline` is protected. These are distinct from Aplet Variables and HOME directories. |
-| Port 0 / Port 1 / Port 2 | 🧪 M8.0 in progress | Port 0 metadata enumeration and owned backup/library reads have local Stock coverage on the three classic models. `hpclang_port_iterator_open/read/close`, `hpclang_port_backup_get` and `hpclang_port_library_get` expose no native addresses. `hpclang_port_backup_create/replace/remove` provide exact-name backup mutation; the grow/shrink/read/remove flow passes local Stock tests on HP48gII, HP49g+ and HP50g. Live references retain the old record; operations requiring relocation of a preceding library return `ENOTSUP`. A three-launch backup lifecycle also passes locally on all three classic models. HP49g+/HP50g Stock also passes Port 1 enumeration and backup readback across all three launches; owned library reads have host coverage. Port 1 backup creation also passes both models across relaunches and independent native RPL recall, using launcher-owned memory bounds. Public library mutation, Port 1 replacement/removal and Port 2 remain pending. HOME CRUD does not imply port support. |
+| Port 0 / Port 1 / Port 2 | 🧪 M8.0 in progress | Port 0 metadata enumeration and owned backup/library reads have local Stock coverage on the three classic models. `hpclang_port_iterator_open/read/close`, `hpclang_port_backup_get` and `hpclang_port_library_get` expose no native addresses. `hpclang_port_backup_create/replace/remove` provide exact-name backup mutation; the grow/shrink/read/remove flow passes local Stock tests on HP48gII, HP49g+ and HP50g. Live references retain the old record; operations requiring relocation of a preceding library return `ENOTSUP`. A three-launch backup lifecycle also passes locally on all three classic models. HP49g+/HP50g Stock also passes Port 1 enumeration and backup readback across all three launches; owned library reads have host coverage. Port 1 backup creation also passes both models across relaunches and independent native RPL recall, using launcher-owned memory bounds. Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g Stock across all three launches, including absence of natively purged backups. Public library mutation, Port 1 replacement/removal and Port 2 writes remain pending. HOME CRUD does not imply port support. |
 | `hpclang_object_kind()` / `release()` | ✅ | Stable coarse semantic class and explicit ARM-side lifetime |
 | `hpclang_object_create_character()` | ✅ | Construct an owned calculator CHARACTER object without exposing its native prologue |
 | `hpclang_object_create_string()` | ✅ | Construct an owned classic calculator DOCSTR from explicit-length raw calculator bytes; embedded zero bytes are preserved and no UTF-8 transcoding occurs |

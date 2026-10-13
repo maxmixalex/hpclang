@@ -21,7 +21,13 @@ class StockSetupTests(unittest.TestCase):
         path = ROOT / "tests/e2e/object-mutation/stock-setup.json"
         self.assertEqual(setup.load_commands(path, "hp48"), ["123 :0:PORTZERO STO"])
         self.assertEqual(
-            setup.load_commands(path, "hp4950"), ["123 :0:PORTZERO STO", "456 :1:PORTONE STO"]
+            setup.load_commands(path, "hp4950"),
+            [
+                "123 :0:PORTZERO STO",
+                "456 :1:PORTONE STO",
+                "987 :2:PORTTWO STO",
+                "111 :2:PORTOLD STO :2:PORTOLD PURGE",
+            ],
         )
         for family in (None, "hp39", "unknown"):
             with self.assertRaises(ValueError):

@@ -40,8 +40,13 @@ text with independently rendered literals for single/held and locked Alpha.
 The same protocol runs under Direct and Stock, with the ordinary strict return
 checks retained.
 
-System Services also runs the source-anchored timed-sieve client and exercises
-HOST/ECONOMY clock policy, monotonic continuity and clock/display ownership in
+The separate `hpgcc-system` payload runs the source-anchored timed-sieve client,
+including historical delay/stopwatch APIs, prime-count/checksum assertions and
+the independent frame-204 report verifier. It is included in the Runtime suite
+manifest for all Direct and Stock targets. Keeping it separate bounds the code
+and heap demand of each application on HP39 Stock's shared launch arena.
+
+System Services exercises HOST/ECONOMY clock policy, monotonic continuity and clock/display ownership in
 both release orders. Its final action calls ordinary `exit` from a sound
 cancellation callback while economy mode is active. Direct checks clock, timer
 and LCD configuration before the harness restores its saved host state; Stock
@@ -56,8 +61,10 @@ invariants; the LCD return gate catches unintended ROM wake/clock changes.
 HP39 serial-disk transfer applies CRLF-to-LF conversion inside received files,
 including binary Aplets. The Kermit server therefore sends transparent eight-bit
 text with LF line endings in manual mode: its LF-to-CRLF expansion is the inverse
-of Stock's conversion. Input files remain unchanged. The PTY regression models
-Stock decoding, covers all byte values and adjacent CR/LF runs, and rejects the
+of Stock's conversion. Stock also contracts doubled backslashes. The server
+quotes each backslash in a private transfer copy before starting Kermit and
+removes that copy when the server exits. Input files remain unchanged. The PTY regression models
+Stock decoding, covers all byte values, adjacent CR/LF runs and backslash runs, and rejects the
 previous binary-mode configuration. System Services embeds a retained byte
 witness with CRLF in both possible Aplet nibble alignments. A successful Kermit
 EOF alone is insufficient evidence that Stock can load the resulting object.

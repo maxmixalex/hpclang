@@ -6,8 +6,8 @@
  * compatibility claim. The original interactive pause becomes a capture. */
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <hpsys.h>
 #include <hpclang/console.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
@@ -17,16 +17,46 @@ extern const struct hpclang_font hpclang_benchmark_font;
 
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
+    uint64_t delay_start, delay_end;
+    sys_timer_t legacy_timer = SYS_TIMER_INITIALIZER;
+    if (sys_updateTimer(&legacy_timer) != 0 || !legacy_timer.inited)
+        return 8;
+    int seconds = sys_RTC_seconds();
+    if (seconds < 0 || seconds >= 86400 || sys_delta_seconds(86399, 1) != 2 ||
+        hpclang_time_read_us(&delay_start))
+        return 4;
+    sys_sleep(10);
+    /* Wide headroom for clock resolution, but reject seconds/microseconds
+     * confusion in either direction. */
+    if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
+        delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
+        return 5;
+    ULONGLONG first_elapsed = sys_updateTimer(&legacy_timer);
+    if (first_elapsed < 10000000u || first_elapsed > 300000000u ||
+        legacy_timer.current != first_elapsed)
+        return 9;
+    if (hpclang_time_read_us(&delay_start))
+        return 6;
+    sys_waitTicks(7500);
+    if (hpclang_time_read_us(&delay_end) || delay_end < delay_start ||
+        delay_end - delay_start < 10000u || delay_end - delay_start > 250000u)
+        return 7;
+    ULONGLONG second_elapsed = sys_updateTimer(&legacy_timer);
+    if (second_elapsed < 10000000u || second_elapsed > 300000000u ||
+        legacy_timer.current != first_elapsed + second_elapsed)
+        return 10;
     enum
     {
         LIMIT = 1000,
         ITERATIONS = 16
     };
-    uint32_t *primes = calloc(LIMIT, sizeof *primes);
+    /* Keep the bounded scratch list in the reserved application stack;
+     * the report consoles have their own heap allocations. */
+    uint32_t primes[LIMIT];
     struct hpclang_console *console = hpclang_console_create(32, 4, &hpclang_benchmark_font);
     struct hpclang_console *reference = hpclang_console_create(32, 2, &hpclang_benchmark_font);
     unsigned result = 1;
-    if (!primes || !console || !reference)
+    if (!console || !reference)
         goto done;
     uint64_t before, after;
     if (hpclang_time_read_us(&before))
@@ -72,6 +102,5 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 done:
     hpclang_console_destroy(reference);
     hpclang_console_destroy(console);
-    free(primes);
     return result;
 }

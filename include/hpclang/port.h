@@ -11,6 +11,46 @@ extern "C"
 
 #define HPCLANG_PORT_ENTRY_VERSION 1u
 #define HPCLANG_PORT_NAME_CAPACITY 256u
+#define HPCLANG_PORT_INFO_VERSION 1u
+
+    enum hpclang_port_medium
+    {
+        HPCLANG_PORT_ABSENT = 0,
+        HPCLANG_PORT_MAIN_RAM = 1,
+        HPCLANG_PORT_EXTENDED_RAM = 2,
+        HPCLANG_PORT_FLASH = 3
+    };
+
+    enum hpclang_port_operation
+    {
+        HPCLANG_PORT_ENUMERATE = 1u << 0,
+        HPCLANG_PORT_READ_BACKUP = 1u << 1,
+        HPCLANG_PORT_READ_LIBRARY = 1u << 2,
+        HPCLANG_PORT_CREATE_BACKUP = 1u << 3,
+        HPCLANG_PORT_REPLACE_BACKUP = 1u << 4,
+        HPCLANG_PORT_REMOVE_BACKUP = 1u << 5
+    };
+
+    struct hpclang_port_info
+    {
+        uint32_t size;
+        uint32_t version;
+        uint32_t port;
+        uint32_t medium;
+        uint32_t implemented;
+        uint32_t available;
+    };
+
+    /* Set size/version before querying. medium describes the native model;
+     * implemented lists SDK operations, available additionally checks launch
+     * context and required ownership bounds. No hardware access/allocation.
+     * Availability does not promise a valid live mapping, free space or safe
+     * relocation of every object. Each operation still reports its own errors.
+     * A known absent port succeeds with ABSENT and zero operation masks.
+     * Unknown models return ENOSYS; invalid index/descriptor returns EINVAL.
+     * Failure preserves output; success preserves errno and the caller's size.
+     */
+    int hpclang_port_query(uint32_t port, struct hpclang_port_info *info);
 
     enum hpclang_port_entry_kind
     {
@@ -33,7 +73,7 @@ extern "C"
     /* Snapshot port metadata. Names/titles are raw calculator bytes, not UTF-8.
      * Libraries are identified by number, backups by exact name. No native
      * addresses are retained by the iterator. Currently classic Stock Port 0
-     * and HP49g+/HP50g Stock Port 1 reads are implemented; other valid
+     * and HP49g+/HP50g Stock Port 1/2 reads are implemented; other valid
      * ports/contexts return ENOSYS. This does not
      * imply that the calculator lacks those ports. Indices above 2 return EINVAL.
      */

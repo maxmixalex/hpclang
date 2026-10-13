@@ -16,8 +16,7 @@ add_executable(hpclang_system_services_e2e
     main.c
     checks.c
     power.c
-    console.c
-    historical-system.c)
+    console.c)
 
 target_include_directories(
     hpclang_system_services_e2e PRIVATE "${HPCLANG_ROOT}/include" "${HPCLANG_ROOT}/runtime/core")
@@ -33,14 +32,3 @@ set_target_properties(
 
 hpclang_target_font(hpclang_system_services_e2e
     NAME hpclang_system_font FONT @mini MODE STATIC_AUTO FALLBACK NONE)
-
-# Benchmark output contains arbitrary decimal values and fixed ASCII labels.
-# Declare that repertoire explicitly instead of packaging the full Unicode font
-# into the HP39 application's limited shared code/heap arena.
-set(benchmark_ascii)
-foreach(codepoint RANGE 32 126)
-    list(APPEND benchmark_ascii ${codepoint})
-endforeach()
-hpclang_target_font(hpclang_system_services_e2e
-    NAME hpclang_benchmark_font FONT @mini MODE STATIC_EXPLICIT
-    CODEPOINTS ${benchmark_ascii} FALLBACK NONE)

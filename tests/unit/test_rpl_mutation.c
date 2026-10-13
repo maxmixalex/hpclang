@@ -1347,6 +1347,134 @@ static void test_port1_append_respects_native_pool(void)
     }
 }
 
+struct port1_guard_fixture
+{
+    uint32_t start, end, calls;
+    int result;
+};
+
+static int check_port1_fixture(void *context, uint32_t start, uint32_t end)
+{
+    struct port1_guard_fixture *fixture = context;
+    fixture->start = start;
+    fixture->end = end;
+    ++fixture->calls;
+    return fixture->result;
+}
+
+static void test_port1_edit_owned_suffix(void)
+{
+    struct port1_guard_fixture fixture = {0};
+    const struct hpclang_rpl_port1_guard guard = {check_port1_fixture, &fixture};
+    struct hpclang_rpl_mutation_io io = setup(1);
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    put_word(0x82000, 5, 0x029bf);
+    put_word(0x82005, 2, 'A');
+    uint8_t *small = NULL, *same = NULL, *tail = NULL, *large = NULL;
+    uint32_t small_span, same_span, tail_span, large_span;
+    assert(hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4, &small,
+                                     &small_span) == 0);
+    put_word(0x82005, 2, 'B');
+    assert(hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"DATA", 4, &same,
+                                     &same_span) == 0);
+    assert(same_span == small_span);
+    put_word(0x82005, 2, 'T');
+    assert(hpclang_rpl_backup_encode(&reader, 0x82000, 7, (const uint8_t *)"TAIL", 4, &tail,
+                                     &tail_span) == 0);
+    put_word(0x82000, 5, 0x02a2c);
+    put_word(0x82005, 5, 5);
+    assert(hpclang_rpl_backup_encode(&reader, 0x82000, 10, (const uint8_t *)"DATA", 4, &large,
+                                     &large_span) == 0);
+    uint32_t limit = large_span + tail_span + 6;
+    assert(hpclang_rpl_port1_create_backup(&io, limit, small, small_span) == 0);
+    assert(hpclang_rpl_port1_create_backup(&io, limit, tail, tail_span) == 0);
+    memory[limit] = 11;
+    uint32_t before = writes;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, NULL) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    const struct hpclang_rpl_port1_guard missing = {0};
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &missing) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(fixture.start == 0 && fixture.end == small_span + tail_span && fixture.calls == 1);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    fixture.result = HPCLANG_RPL_MUTATION_IO;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, same, same_span, &guard) ==
+           HPCLANG_RPL_MUTATION_IO);
+    assert(fixture.start == 0 && fixture.end == small_span && fixture.calls == 3);
+    assert(writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_BUSY;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, tail, tail_span, &guard) ==
+           HPCLANG_RPL_MUTATION_BUSY);
+    assert(fixture.start == small_span && fixture.end == small_span + tail_span);
+    assert(writes == before);
+    fixture.result = HPCLANG_RPL_MUTATION_OK;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit - 1, large, large_span, &guard) ==
+           HPCLANG_RPL_MUTATION_NOSPACE);
+    assert(writes == before);
+    rejected_read = limit - 1;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) ==
+           HPCLANG_RPL_MUTATION_IO);
+    assert(writes == before);
+    rejected_read = UINT32_MAX;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, large, large_span, &guard) == 0);
+    assert(memory[limit] == 11);
+    struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
+    struct hpclang_rpl_port_entry entry;
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.value_span == 10);
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == large_span);
+    assert(!memcmp(entry.name, "TAIL", 4));
+    assert_char_at(entry.value_address, 'T');
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span, &guard) == 0);
+    cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+    assert_char_at(entry.value_address, 'A');
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == small_span);
+    assert_char_at(entry.value_address, 'T');
+    before = writes;
+    small[0] ^= 1;
+    assert(hpclang_rpl_port1_replace_backup(&io, limit, small, small_span, &guard) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    small[0] ^= 1;
+    assert(writes == before);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"MISS", 4, &guard) ==
+           HPCLANG_RPL_MUTATION_NOT_FOUND);
+    assert(writes == before);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"DATA", 4, &guard) == 0);
+    cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 0);
+    assert_char_at(entry.value_address, 'T');
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+    assert(hpclang_rpl_port1_remove_backup(&io, limit, (const uint8_t *)"TAIL", 4, &guard) == 0);
+    assert(get_word(0, 5) == 0 && memory[limit] == 11);
+
+    // A following library must not move; same-size replacement may leave it fixed.
+    io = setup(1);
+    assert(hpclang_rpl_port1_create_backup(&io, 256, small, small_span) == 0);
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    for (uint32_t i = 0; i < 43; ++i)
+        memory[small_span + i] = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+    before = writes;
+    assert(hpclang_rpl_port1_remove_backup(&io, 256, (const uint8_t *)"DATA", 4, &guard) ==
+           HPCLANG_RPL_MUTATION_UNSUPPORTED);
+    assert(hpclang_rpl_port1_replace_backup(&io, 256, large, large_span, &guard) ==
+           HPCLANG_RPL_MUTATION_UNSUPPORTED);
+    assert(writes == before);
+    assert(hpclang_rpl_port1_replace_backup(&io, 256, same, same_span, &guard) == 0);
+    assert(fixture.start == 0 && fixture.end == small_span);
+    cursor = (struct hpclang_rpl_port_cursor){0, 0x40000u, 0};
+    assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+    assert_char_at(entry.value_address, 'B');
+    assert(get_word(small_span, 5) == 0x02b40);
+    free(small);
+    free(same);
+    free(tail);
+    free(large);
+}
+
 static void test_port0_create_library(void)
 {
     const char *library = "04b2062000108510b7000000000000000000000d5c2";
@@ -1490,9 +1618,111 @@ static void test_port0_create_preserves_home_and_library(void)
     }
 }
 
+struct root_visit_state
+{
+    uint32_t count;
+    unsigned found;
+    int stop;
+};
+
+static int visit_root(void *context, uint32_t slot, uint32_t value)
+{
+    struct root_visit_state *state = context;
+    ++state->count;
+    if (slot == 0 && value == 0x82345)
+        state->found |= 1;
+    if (slot == 0x90000 && value == 0x82000)
+        state->found |= 2;
+    if (slot == 0x84ffb && value == 0x1d91b)
+        state->found |= 4;
+    return state->stop;
+}
+
+static void test_read_only_root_visit(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    uint32_t native = 0x82345;
+    uint32_t *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    put_word(0x84ffb, 5, 0x1d91b);
+    put_word(0x84ff6, 5, 0);
+    uint8_t *before = malloc(sizeof(memory));
+    assert(before);
+    memcpy(before, memory, sizeof(memory));
+    struct root_visit_state state = {0};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) == 0);
+    assert(state.found == 7);
+    assert(writes == 0 && native == 0x82345);
+    assert(memcmp(before, memory, sizeof(memory)) == 0);
+    state = (struct root_visit_state){.stop = 79};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) == 79);
+    assert(state.count == 1 && writes == 0);
+    rejected_read = DSKTOP;
+    state = (struct root_visit_state){0};
+    assert(hpclang_rpl_mutation_visit_roots(&io, visit_root, &state) != 0);
+    assert(writes == 0 && memcmp(before, memory, sizeof(memory)) == 0);
+    assert(hpclang_rpl_mutation_visit_roots(&io, NULL, &state) == HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    free(before);
+}
+
+struct temp_visit_state
+{
+    uint32_t count;
+    int stop;
+};
+
+static int visit_temp(void *context, uint32_t first, uint32_t nibbles)
+{
+    struct temp_visit_state *state = context;
+    assert(state->count < 2);
+    assert(first == (state->count ? 0x83006u : 0x83013u));
+    assert(nibbles == (state->count ? 7u : 11u));
+    ++state->count;
+    return state->stop;
+}
+
+static void test_temp_allocation_visit(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(0);
+    put_word(TEMPTOP - 5, 5, 0x83000);
+    put_word(0x83000, 5, 0);
+    put_word(TEMPTOP, 5, 0x83023);
+    put_word(0x8300d, 5, 13);
+    put_word(0x8301e, 5, 17);
+    struct temp_visit_state state = {0};
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
+    assert(state.count == 2 && writes == 0);
+    state = (struct temp_visit_state){.stop = 81};
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 81);
+    assert(state.count == 1 && writes == 0);
+    const uint32_t bad[] = {0, 10, 14, 0xfffff};
+    for (uint32_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        put_word(0x8300d, 5, bad[i]);
+        state = (struct temp_visit_state){0};
+        assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(state.count == 0 && writes == 0);
+    }
+    put_word(0x8300d, 5, 13);
+    rejected_read = 0x8300d;
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) != 0);
+    assert(state.count == 0 && writes == 0);
+    rejected_read = UINT32_MAX;
+    put_word(TEMPTOP, 5, 0x83005);
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) == 0);
+    assert(state.count == 0);
+    put_word(0x83000, 5, 1);
+    assert(hpclang_rpl_mutation_visit_temp(&io, visit_temp, &state) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+}
+
 int main(void)
 {
+    test_temp_allocation_visit();
+    test_read_only_root_visit();
     test_port1_append_respects_native_pool();
+    test_port1_edit_owned_suffix();
     test_port0_create_library();
     test_library_table_reference_preservation();
     test_port_remove_preserves_backup_references();

@@ -48,7 +48,7 @@ ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
 | Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | `FSVolumeInserted` currently reports presence/volume errors, not the full historical `FS_CHANGED` distinction | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
 | Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
 | Persistent HP39 Aplet and native catalogs | HP39-enabled 1.1 Aplet template, checked against native ROM behavior | Aplet data/Reset and Program/Note catalogs; HP39 Stock with portal validation | Aplet packaging/template integration; no invented HOME namespace | Accepted on `6a7f9a28`: 15-invocation Reset and eight-invocation composite lifecycles, independent instances, SAVE and GC boundaries |
-| Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | M8.0 in progress: classic Port 0 owned reads and backup mutation; HP49g+/HP50g Port 1 owned reads | No historical adapter claims | Port 0 three-launch backup persistence passes locally on all classic models; Port 1 native backup readback passes locally on HP49g+/HP50g. Port 1 backup creation and native RPL recall also pass locally on both models. Complete library mutation, Port 1 replacement/removal and Port 2 remain required |
+| Native Port 0/1/2 storage | Historical backup/library object semantics, distinct from FAT and HOME directories | M8.0 in progress: classic Port 0 owned reads and backup mutation; HP49g+/HP50g Port 1/2 owned reads | No historical adapter claims | Port 0 three-launch backup persistence passes locally on all classic models; Port 1 native backup readback passes locally on HP49g+/HP50g. Port 1 backup creation and native RPL recall also pass locally on both models. Port 2 owned enumeration and backup/library reads also pass both models across three launches. Complete library mutation, Port 1 replacement/removal and Port 2 writes remain required |
 | Ordinary application termination | HPGCC3 `hplib/sys/exit.c` distinguishes normal saved-stack return from reset/warm recovery; picolibc supplies standard exit callbacks | `main` return / `exit` execute callbacks, close registered streams and return through the launcher; `_Exit` skips callbacks/buffer flushing but releases SDK-owned hardware | Standard libc names | 72 host tests, sanitizer checks and six-model Direct/Stock termination evidence pass. HP49g+/HP50g Direct/Stock additionally verify buffered exit-time writes after native return. Formal CI is accepted on `2988e1de` |
 | Whole-calculator reset and hardware serial number | `kos_Reset` is reset/panic recovery; all four releases warn that `kos_getSerialNumber` may return garbage / Kinpo copyright data | Not implemented; no reliable serial-number claim | No adapter claims | Retained research goals, explicitly approved as nonblocking for M7 on 2026-10-12; ordinary `exit` remains required in M7 |
 
@@ -66,8 +66,11 @@ Stock native-object coexistence passes on all six models, and SD file
 coexistence passes on both supported models in Direct/Stock. Formal CI is accepted on `2988e1de`. Historical
 raw speed-register and overclocking interfaces are not exposed by this policy.
 The HPGCC 1.1/2.0 sieve client is now ported in
-`system-services/historical-system.c`, with prime-count/checksum and visible
-report checks. It passes Direct and Stock on all six models; its additional formal CI is accepted on `2988e1de`.
+`hpgcc-system/historical-system.c`, with prime-count/checksum and visible
+report checks. The earlier clean-service version passed Direct and Stock on
+all six models and formal CI on `2988e1de`. The M8 version adds historical
+timer/delay calls and runs as a separate Runtime-suite payload; its acceptance
+is tracked in M8.4 rather than inherited from that earlier result.
 
 ## Public API stability
 
@@ -672,9 +675,39 @@ ENVID bit. The clean equivalent is `hpclang_display_set_enabled` within an owned
 display session: bounded frame waiting, retained pages, and host-state restoration
 on exit. It does not change the application clock or put the CPU to sleep.
 
-HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based seconds delay in the reviewed
+HPGCC 1.1/2.0 `sys_sleep(duration)` is a timer-based milliseconds delay in the reviewed
 implementation. Its ordinary behavior maps to the clean monotonic delay service;
 the historical name is not evidence of a missing low-power CPU suspend service.
+The implementation multiplies duration by 1,000,000 because `sys_updateTimer`
+accumulates **nanoseconds**, not microseconds: its 12 MHz base-clock conversion
+uses 250/3 nanoseconds per tick. This confirms the original `millis` declaration.
+
+The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`, `sys_updateTimer`,
+`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves milliseconds
+without the historical 32-bit intermediate multiplication overflow.
+`sys_waitTicks` implements the documented 750 kHz duration, rounded up to
+microseconds, without requiring slow mode or changing interrupt/PWM registers.
+Both delays inherit the clean service's early return if the clock is unavailable.
+RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
+The one-day difference helper accepts seconds in 0..86399 and reports invalid
+inputs as `-1/EINVAL`. `sys_timer_t`, its two initializer macros and
+`sys_updateTimer` preserve elapsed/accumulated nanoseconds and restart through
+`inited = 0`. Timer indices 0..4 are logical stopwatches sharing the clean
+monotonic source; they do not select or reconfigure hardware PWM channels.
+The private `last_val` field is widened for a monotonic sample, so the structure
+is source-compatible for ordinary stopwatch use, not binary-compatible or a raw
+PWM-counter view. Failed samples, regression and overflow leave state unchanged.
+Timer setup/restore, clock changes and raw hardware helpers are not yet supplied.
+Host tests cover unit conversion, maximum unsigned durations, midnight wrap and
+RTC errors; the standalone HPGCC System E2E also exercises both delay spellings and RTC
+access, with both lower and upper delay bounds to catch unit mismatches.
+All six Direct and all six Stock targets pass locally with the corrected
+milliseconds conversion and stopwatch checks, including independent report
+pixel verification. The separate System Services payload also passes that
+full matrix. Formal CI is pending.
+The relocated installed SDK also builds its C/C++ examples, all six native
+launchers and three HP39 Aplet families, including `examples/hpgcc-timer`. Historical
+integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
 
 ### SD media discovery and replacement
 

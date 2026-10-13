@@ -31,4 +31,78 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
                           struct hpclang_rpl_port_cursor *cursor,
                           struct hpclang_rpl_port_entry *entry);
 
+enum hpclang_rpl_library_reference_kind
+{
+    HPCLANG_RPL_LIBRARY_HASH,
+    HPCLANG_RPL_LIBRARY_MESSAGES,
+    HPCLANG_RPL_LIBRARY_LINKS,
+    HPCLANG_RPL_LIBRARY_CONFIG,
+    HPCLANG_RPL_LIBRARY_FUNCTION
+};
+
+struct hpclang_rpl_library_binding
+{
+    uint32_t address;
+    uint32_t bank_switch;
+    uint32_t flags;
+};
+
+/* Resolve a library ID in a bounded classic Stock catalog (3-nibble count,
+ * 16-nibble records). Preserve the bank-switch identity: address alone is not
+ * a dereferenceable object pointer. Mapping the catalog and resolving the bank
+ * are caller responsibilities. Returns 1 found, 0 absent or a negative span
+ * result. Duplicate matching IDs are malformed; output is unchanged on failure
+ * or absence. The reader must remain stable throughout the call. */
+int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
+                               uint32_t limit, uint32_t number,
+                               struct hpclang_rpl_library_binding *binding);
+
+/* Resolve one command through a native library ID header's relative link table.
+ * The caller supplies the already selected, stable bank mapping and its half-open
+ * bounds. This does not switch banks, execute code or prove target safety.
+ * Returns 1 for a target, 0 for a missing table/entry/index, negative on malformed
+ * or unreadable metadata. Output remains unchanged except on success. */
+int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                uint32_t end, uint32_t header, uint32_t number, uint32_t command,
+                                uint32_t *target);
+
+/* Match a switch address against a caller-validated ROM table containing
+ * 16 seven-nibble Flash entries and a separate ERAM entry. Addresses are read,
+ * never inferred from an arithmetic sequence of implementation routines.
+ * Returns 1 found, 0 unknown or a negative span result; output is unchanged on
+ * absence/error. A returned index still requires physical mapping validation. */
+enum hpclang_rpl_bank_kind
+{
+    HPCLANG_RPL_BANK_FLASH,
+    HPCLANG_RPL_BANK_ERAM
+};
+struct hpclang_rpl_bank_binding
+{
+    enum hpclang_rpl_bank_kind kind;
+    uint32_t index;
+};
+int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                            uint32_t eram_entry, uint32_t bank_switch,
+                            struct hpclang_rpl_bank_binding *binding);
+
+/* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
+ * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
+ * discard partial traversal on error. This enumerates structural references;
+ * it does not prove that referenced code has no further live references. */
+typedef int (*hpclang_rpl_library_visit_fn)(void *context,
+                                            enum hpclang_rpl_library_reference_kind kind,
+                                            uint32_t field, uint32_t target, uint32_t limit);
+int hpclang_rpl_library_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, hpclang_rpl_library_visit_fn visit, void *context);
+
+/* Traverse allocated slots within one Flash bank, starting after its bank
+ * header. Each slot has a status byte, a five-nibble relative extent and one
+ * metadata nibble before the object. The caller supplies bank mapping/bounds.
+ * Deleted slots retain their extent and are skipped without reading payloads.
+ * Unknown slot states are rejected until their native lifecycle is supported.
+ * Cursor/output remain unchanged on error, as for RAM traversal. */
+int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
+                           struct hpclang_rpl_port_cursor *cursor,
+                           struct hpclang_rpl_port_entry *entry);
+
 #endif

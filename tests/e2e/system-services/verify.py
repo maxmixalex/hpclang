@@ -37,17 +37,7 @@ def verify(prefix: Path, height: int) -> None:
     assert all(48 <= i // 132 < 54 and 16 <= i % 132 < 20 for i in differences), (
         f"{prefix}: non-ON text changed between otherwise identical snapshots"
     )
-    data = Path(f"{prefix}-204.pgm").read_bytes()
-    assert data.startswith(header) and len(data) == len(header) + 132 * height
-    pixels = data[len(header) :]
-    # x=131 is DMA padding outside the 131-pixel physical display.
-    actual = bytes(pixels[y * 132 + x] for y in range(12) for x in range(131))
-    expected = bytes(pixels[y * 132 + x] for y in range(32, 44) for x in range(131))
-    assert actual == expected and 0 in expected, f"{prefix}: historical sieve report"
-    assert any(pixels[y * 132 + x] == 0 for y in range(12, 18) for x in range(131)), (
-        f"{prefix}: missing elapsed time"
-    )
-    print(f"PASS: {prefix}: physical input and historical keyboard/timed-sieve clients")
+    print(f"PASS: {prefix}: physical input and historical keyboard clients")
 
 
 def main() -> None:

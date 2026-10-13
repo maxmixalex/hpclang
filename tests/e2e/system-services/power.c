@@ -50,11 +50,16 @@ unsigned hpclang_e2e_power_test(void)
     if (hpclang_time_read_us(&end) || end < start + 20000 || end - start > 250000 ||
         hpclang_timer_poll(&deadline, &expirations) || expirations != 0)
         goto done;
-    failure = 5;
     /* A display acquired at low speed must later restore the host divider,
      * even if speed is restored before the display session ends. */
-    if (hpclang_display_begin(4) || hpclang_display_present(200000) ||
-        hpclang_power_set_profile(HPCLANG_POWER_HOST))
+    failure = 0x51;
+    if (hpclang_display_begin(4))
+        goto done;
+    failure = 0x52;
+    if (hpclang_display_present(200000))
+        goto done;
+    failure = 0x53;
+    if (hpclang_power_set_profile(HPCLANG_POWER_HOST))
         goto done;
     hpclang_display_end();
     /* Keep this combined service client's heap bounded. Two gray16 pages do
