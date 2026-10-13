@@ -13,11 +13,20 @@ extern const struct hpclang_font hpclang_catalog_ui_font;
 static const char pass_label[] = HPCLANG_UI_TEXT("CATALOG PASS");
 static const char fail_label[] = HPCLANG_UI_TEXT("CATALOG FAIL");
 
+/* Retain adjacent backslashes in both Aplet nibble alignments. Stock's file
+ * import must preserve these bytes independently of incidental machine code. */
+static const volatile uint8_t transfer_octets[] = {0x5c, 0x5c, 0, 0xc0, 0xc5, 0x05, 0x0d, 0x0a};
+
 int main(void)
 {
     /* Capability discovery belongs with metadata on HP39. Keep the separate
      * mutation/lifecycle payload's scarce ARM arena for its large snapshots. */
     uint32_t failure = hpclang_e2e_port_discovery();
+    if (!failure &&
+        (transfer_octets[0] != 0x5c || transfer_octets[1] != 0x5c || transfer_octets[2] != 0 ||
+         transfer_octets[3] != 0xc0 || transfer_octets[4] != 0xc5 || transfer_octets[5] != 0x05 ||
+         transfer_octets[6] != 0x0d || transfer_octets[7] != 0x0a))
+        failure = 0x3e4u;
     if (!failure)
         failure = hpclang_e2e_catalog_variables();
     if (failure == 0u && hpclang_boot_info()->saturn_state != 0u) {

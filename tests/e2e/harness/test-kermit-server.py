@@ -155,6 +155,9 @@ def verify(tools: Path) -> None:
     environment = dict(os.environ, PATH=f"{tools.resolve()}{os.pathsep}{os.environ['PATH']}")
     with tempfile.TemporaryDirectory(prefix="hpclang-kermit-test-") as directory:
         root = Path(directory)
+        staging = root / "staging"
+        staging.mkdir()
+        environment["TMPDIR"] = str(staging)
         # The byte census alone lacks CRLF adjacency. These runs reproduce the
         # deterministic one-byte loss that made a valid Aplet unloadable while
         # the old binary-mode server reported successful delivery.
@@ -231,6 +234,10 @@ def verify(tools: Path) -> None:
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait(timeout=5)
+                if list(staging.iterdir()):
+                    raise AssertionError("server left private transfer copies after termination")
+                if (root / "FIRST.BIN").read_bytes() != payload:
+                    raise AssertionError("server modified the original transfer file")
         finally:
             os.close(master)
             os.close(slave)
