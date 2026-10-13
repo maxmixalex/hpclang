@@ -393,4 +393,45 @@ one process-wide C-library exit handler.
 
 Host tests cover fair progress, failed begin/poll, explicit cancellation,
 owner removal/reappearance, exhausted pools, shutdown and actual process-exit
-cleanup. Interactive loading, failure and retry remain target acceptance work.
+cleanup. The integrated device-manager E2E also validates interactive loading,
+failure and retry on all six Direct and Stock targets; implementation acceptance
+is recorded in the roadmap.
+
+## C++ declaration guards
+
+`<hpclang/ui.hpp>` adds C++17 lexical guards over the same C context. They do
+not allocate, throw, commit implicitly or introduce a second state model.
+Check construction before declaring children and explicitly commit only after
+all container guards have left scope:
+
+```cpp
+#include <hpclang/ui.hpp>
+
+int declare_status(hpclang_ui *ui, const char *status)
+{
+    hpclang::ui::declaration frame{ui};
+    if (!frame)
+        return -1;
+    {
+        hpclang::ui::scope column{ui, 1, HPCLANG_UI_COLUMN};
+        if (!column || hpclang_ui_text(ui, 1, 0, status))
+            return -1;
+    }
+    // Apply hpclang_ui_layout here when using the surface renderer.
+    return frame.commit();
+}
+```
+
+Early return closes nested scopes and aborts the candidate, preserving the
+previous committed view. A failed nested declaration guard does not abort
+another guard's active frame. Guards cannot be copied or moved, so lexical
+nesting and cleanup ownership remain explicit. They borrow the C context;
+its storage must outlive them. Do not call C begin/abort/commit directly on
+the guarded declaration. Existing C leaf declarations, layout, input and
+effects remain usable unchanged. These guards do not own UI storage or
+perform shutdown; the existing context/provider lifetime rules still apply.
+
+Host tests exercise early return, two component instances, stable identity
+after reordering, duplicate frame acquisition and fixed-pool failure, with
+exceptions and RTTI disabled. This is the first M8.5 helper slice; complete
+owned-resource wrappers and target-side C++ application acceptance remain open.
