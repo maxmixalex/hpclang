@@ -14,7 +14,9 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
-hpclang_unit(ui test_ui.c "${HPCLANG_ROOT}/runtime/core/ui.c")
+hpclang_unit(ui test_ui.c "${HPCLANG_ROOT}/runtime/core/ui.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-layout.c")
+target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-focus.c")
 target_include_directories(test_ui PRIVATE "${HPCLANG_ROOT}/include")
 
 if(UNIX)

@@ -1,34 +1,9 @@
-#include <hpclang/ui.h>
+#include "ui-internal.h"
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
-#define UI_ROOT UINT32_MAX
-
-struct node
-{
-    struct hpclang_ui_node view;
-    uint32_t parent_index;
-};
-
-struct frame
-{
-    struct node *nodes;
-    char *text;
-    uint32_t count;
-    size_t text_used;
-};
-
-struct hpclang_ui
-{
-    struct hpclang_ui_config capacity;
-    struct frame frames[2];
-    uint32_t parent, epoch, last_id, pending_id;
-    unsigned current;
-    int building, error;
-};
-
-static int fail(struct hpclang_ui *ui, int error)
+int hpclang_ui_fail(struct hpclang_ui *ui, int error)
 {
     if (ui && ui->building && !ui->error)
         ui->error = error;
@@ -76,11 +51,11 @@ struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_u
 int hpclang_ui_begin(struct hpclang_ui *ui)
 {
     if (!ui)
-        return fail(NULL, EINVAL);
+        return hpclang_ui_fail(NULL, EINVAL);
     if (ui->building)
-        return fail(NULL, EBUSY);
+        return hpclang_ui_fail(NULL, EBUSY);
     if (ui->epoch == UINT32_MAX)
-        return fail(NULL, EOVERFLOW);
+        return hpclang_ui_fail(NULL, EOVERFLOW);
     ++ui->epoch;
     struct frame *next = &ui->frames[ui->current ^ 1u];
     next->count = 0;
@@ -89,24 +64,32 @@ int hpclang_ui_begin(struct hpclang_ui *ui)
     ui->parent = UI_ROOT;
     ui->error = 0;
     ui->building = 1;
+    ui->arranged = 0;
     return 0;
 }
 
 void hpclang_ui_abort(struct hpclang_ui *ui)
 {
+    if (ui && ui->measuring) {
+        hpclang_ui_fail(ui, EBUSY);
+        return;
+    }
     if (ui)
         ui->building = 0;
 }
 
 int hpclang_ui_commit(struct hpclang_ui *ui)
 {
+    if (ui && ui->measuring)
+        return hpclang_ui_fail(ui, EBUSY);
     if (!ui || !ui->building)
-        return fail(NULL, EINVAL);
+        return hpclang_ui_fail(NULL, EINVAL);
     if (ui->parent != UI_ROOT && !ui->error)
         ui->error = EINVAL;
     ui->building = 0;
     if (ui->error)
-        return fail(NULL, ui->error);
+        return hpclang_ui_fail(NULL, ui->error);
+    hpclang_ui_reconcile_focus(ui);
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
     return 0;
@@ -130,17 +113,19 @@ static int add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, u
                const char *text)
 {
     if (!ui || !ui->building)
-        return fail(NULL, EINVAL);
+        return hpclang_ui_fail(NULL, EINVAL);
     if (ui->error)
-        return fail(ui, ui->error);
+        return hpclang_ui_fail(ui, ui->error);
+    if (ui->measuring || ui->arranged)
+        return hpclang_ui_fail(ui, EBUSY);
     struct frame *next = &ui->frames[ui->current ^ 1u];
     const struct frame *old = &ui->frames[ui->current];
     if (next->count == ui->capacity.nodes)
-        return fail(ui, ENOSPC);
+        return hpclang_ui_fail(ui, ENOSPC);
     uint32_t parent = ui->parent == UI_ROOT ? 0 : next->nodes[ui->parent].view.id;
     for (uint32_t i = 0; i < next->count; ++i)
         if (next->nodes[i].view.parent == parent && next->nodes[i].view.key == key)
-            return fail(ui, EEXIST);
+            return hpclang_ui_fail(ui, EEXIST);
     uint32_t id = 0;
     for (uint32_t i = 0; i < old->count; ++i) {
         const struct hpclang_ui_node *candidate = &old->nodes[i].view;
@@ -150,7 +135,7 @@ static int add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, u
         }
     }
     if (!id && ui->pending_id == UINT32_MAX)
-        return fail(ui, EOVERFLOW);
+        return hpclang_ui_fail(ui, EOVERFLOW);
     const char *owned = NULL;
     if (text) {
         size_t available = ui->capacity.text_bytes - next->text_used;
@@ -158,7 +143,7 @@ static int add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, u
         while (length < available && text[length])
             ++length;
         if (length == available)
-            return fail(ui, ENOSPC);
+            return hpclang_ui_fail(ui, ENOSPC);
         char *destination = next->text + next->text_used;
         memcpy(destination, text, length + 1);
         next->text_used += length + 1;
@@ -166,8 +151,10 @@ static int add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, u
     }
     if (!id)
         id = ++ui->pending_id;
-    next->nodes[next->count++] =
-        (struct node){.view = {id, parent, key, kind, style, owned}, .parent_index = ui->parent};
+    next->nodes[next->count++] = (struct node){
+        .view =
+            {.id = id, .parent = parent, .key = key, .kind = kind, .style = style, .text = owned},
+        .parent_index = ui->parent};
     return 0;
 }
 
@@ -176,7 +163,7 @@ struct hpclang_ui_scope hpclang_ui_scope_begin(struct hpclang_ui *ui, uint32_t k
 {
     struct hpclang_ui_scope result = {0};
     if (kind < HPCLANG_UI_COMPONENT || kind > HPCLANG_UI_ROW) {
-        fail(ui, EINVAL);
+        hpclang_ui_fail(ui, EINVAL);
         return result;
     }
     if (add(ui, key, kind, style, NULL))
@@ -194,7 +181,7 @@ void hpclang_ui_scope_close(struct hpclang_ui_scope *scope)
     if (!ui || !ui->building || ui->epoch != scope->epoch)
         return;
     if (ui->parent != scope->node) {
-        fail(ui, EINVAL);
+        hpclang_ui_fail(ui, EINVAL);
         return;
     }
     ui->parent = ui->frames[ui->current ^ 1u].nodes[scope->node].parent_index;
@@ -203,6 +190,19 @@ void hpclang_ui_scope_close(struct hpclang_ui_scope *scope)
 int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text)
 {
     if (!text)
-        return fail(ui, EINVAL);
+        return hpclang_ui_fail(ui, EINVAL);
     return add(ui, key, HPCLANG_UI_TEXT, style, text);
+}
+
+int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
+                      struct hpclang_ui_action action, int enabled)
+{
+    if (!text || (enabled != 0 && enabled != 1))
+        return hpclang_ui_fail(ui, EINVAL);
+    if (add(ui, key, HPCLANG_UI_BUTTON, style, text))
+        return -1;
+    struct frame *next = &ui->frames[ui->current ^ 1u];
+    next->nodes[next->count - 1].view.action = action;
+    next->nodes[next->count - 1].view.enabled = enabled;
+    return 0;
 }

@@ -1,7 +1,8 @@
 # Declarative UI: declaration core
 
-The first M8.2 slice provides bounded declaration storage and node identity.
-Layout, interactive controls, effects and rendering are still being implemented.
+The current M8.2 slice provides bounded declaration storage, node identity,
+row/column layout, button actions and focus traversal. Controlled text input,
+physical-key routing, effects and rendering are still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -82,3 +83,38 @@ belonging to a newer frame.
 Host tests exercise independent components, insertion/reversal, removal,
 kind changes, duplicate keys, interruption, storage exhaustion and recovery.
 This establishes declaration behavior, not calculator UI/rendering acceptance.
+
+## Layout and button actions
+
+Call `hpclang_ui_layout` after declaring and closing all scopes, before commit.
+Pass a viewport and a measurement callback that returns preferred leaf sizes,
+container padding/gaps and optional growth weights. Components and keyed scopes
+are transparent: they add identity without inserting gaps or layout boxes.
+Root children form a column.
+
+Children stretch across the parent's cross axis. Positive growth weights share
+spare main-axis space in declaration order using integer division; the last
+weighted child receives the remaining pixels. Preferred content is not shrunk
+when it overflows. Each visible node exposes its uncut bounds and an ancestor-
+clipped rectangle; rendering must honor that clip. Transparent identity nodes
+have empty bounds. Padding cannot produce negative content dimensions.
+
+Measurement callbacks may inspect the node but must not mutate/reenter the
+context. Invalid metrics, callback failure and coordinate overflow reject the
+candidate. After layout, additional declarations are rejected; begin a new
+candidate to change the tree. Layout itself performs no drawing.
+
+`hpclang_ui_button` declares a caption, action `{type, arg}` and enabled state.
+`hpclang_ui_activate` returns the focused button's action and stable source ID;
+the application performs its update and declares the resulting model again.
+Disabled buttons retain identity but cannot receive focus or activation.
+
+Focus survives reordering by lifetime ID. If its node disappears or becomes
+disabled, the next surviving eligible node in the old order is preferred,
+then the previous one, then the first eligible new node. Initial focus chooses
+the first eligible node. `hpclang_ui_focus_step` traverses declaration order in
+either direction and wraps. Explicitly clearing focus persists across commits
+until the application selects a node or requests traversal. Focus/activation
+operations are rejected while a candidate is being declared. Traversal currently
+includes clipped controls; scroll-to-focus and physical keyboard routing remain
+part of the subsequent interaction work.

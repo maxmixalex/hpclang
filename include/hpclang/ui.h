@@ -11,19 +11,42 @@ extern "C"
 
     struct hpclang_ui;
 
+    struct hpclang_ui_rect
+    {
+        int32_t x, y, width, height;
+    };
+
+    struct hpclang_ui_metrics
+    {
+        int32_t width, height;
+        uint16_t padding_x, padding_y, gap, grow;
+    };
+
     enum hpclang_ui_kind
     {
         HPCLANG_UI_COMPONENT = 1,
         HPCLANG_UI_KEY,
         HPCLANG_UI_COLUMN,
         HPCLANG_UI_ROW,
-        HPCLANG_UI_TEXT
+        HPCLANG_UI_TEXT,
+        HPCLANG_UI_BUTTON
     };
 
     struct hpclang_ui_config
     {
         uint32_t nodes;
         size_t text_bytes;
+    };
+
+    struct hpclang_ui_action
+    {
+        uint32_t type, arg;
+    };
+
+    struct hpclang_ui_event
+    {
+        uint32_t source;
+        struct hpclang_ui_action action;
     };
 
     /* Committed metadata; text is owned by the context. Pointers returned by
@@ -36,6 +59,9 @@ extern "C"
         enum hpclang_ui_kind kind;
         uint16_t style;
         const char *text;
+        struct hpclang_ui_rect bounds, clip;
+        struct hpclang_ui_action action;
+        int enabled;
     };
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
@@ -62,6 +88,31 @@ extern "C"
                                                    enum hpclang_ui_kind kind, uint16_t style);
     void hpclang_ui_scope_close(struct hpclang_ui_scope *scope);
     int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text);
+    int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
+                          struct hpclang_ui_action action, int enabled);
+    /* Focus follows stable lifetime tokens across reordering. Removed/disabled
+     * focus falls to the next surviving old neighbor, then the previous one,
+     * then the first eligible new node. Step traverses declaration order and
+     * wraps; direction must be -1 or +1. id=0 explicitly clears focus. Calls
+     * that change focus or dispatch an action require no active declaration.
+     * Activation returns 1/event, 0/no eligible focus, -1/errno. No model update
+     * or callback occurs; the application decides how to handle the action. */
+    uint32_t hpclang_ui_focused(const struct hpclang_ui *ui);
+    int hpclang_ui_focus(struct hpclang_ui *ui, uint32_t id);
+    int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction);
+    int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event);
+
+    /* Arrange a balanced candidate before commit. The callback supplies leaf
+     * preferred sizes and container padding/gaps; grow distributes spare space
+     * on the parent's main axis. Children stretch on the cross axis. Oversized
+     * content keeps its preferred size and is clipped, never silently shrunk.
+     * COMPONENT/KEY are transparent. Root children form a column. The callback
+     * must not reenter or mutate ui. Return 0, or -1 with errno. Invalid metrics
+     * or coordinate overflow reject the frame, retaining the accepted tree. */
+    typedef int (*hpclang_ui_measure_fn)(void *context, const struct hpclang_ui_node *node,
+                                         struct hpclang_ui_metrics *metrics);
+    int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
+                          hpclang_ui_measure_fn measure, void *context);
 
 #ifdef __cplusplus
 }

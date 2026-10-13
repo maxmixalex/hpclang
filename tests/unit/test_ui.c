@@ -119,6 +119,126 @@ static void failures_and_scopes(struct hpclang_ui *ui)
     assert(hpclang_ui_commit(ui) == 0);
 }
 
+static int measure(void *context, const struct hpclang_ui_node *node,
+                   struct hpclang_ui_metrics *metrics)
+{
+    (void)context;
+    if (node->kind == HPCLANG_UI_ROW)
+        *metrics = (struct hpclang_ui_metrics){.padding_x = 2, .padding_y = 1, .gap = 3, .grow = 1};
+    else if (node->kind == HPCLANG_UI_COLUMN)
+        *metrics = (struct hpclang_ui_metrics){.gap = 2};
+    else if (node->key == 10)
+        *metrics = (struct hpclang_ui_metrics){.width = 20, .height = 12, .grow = 1};
+    else
+        *metrics = (struct hpclang_ui_metrics){.width = 30, .height = 30, .grow = 2};
+    return 0;
+}
+
+static void rectangle(struct hpclang_ui_rect rect, int x, int y, int width, int height)
+{
+    assert(rect.x == x && rect.y == y && rect.width == width && rect.height == height);
+}
+
+static int bad_measure(void *context, const struct hpclang_ui_node *node,
+                       struct hpclang_ui_metrics *metrics)
+{
+    (void)node;
+    if (context)
+        hpclang_ui_abort(context);
+    else
+        metrics->height = -1;
+    return 0;
+}
+
+static void layout(struct hpclang_ui *ui)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    HPCLANG_UI_WITH(ui, 1, HPCLANG_UI_ROW, 0)
+    {
+        HPCLANG_UI_WITH(ui, 2, HPCLANG_UI_COMPONENT, 0)
+        {
+            assert(hpclang_ui_text(ui, 10, 0, "A") == 0);
+        }
+        assert(hpclang_ui_text(ui, 20, 0, "B") == 0);
+    }
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){10, 20, 100, 40}, measure, NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    rectangle(hpclang_ui_node_at(ui, 0)->bounds, 10, 20, 100, 40);
+    rectangle(hpclang_ui_node_at(ui, 2)->bounds, 12, 21, 34, 38);
+    rectangle(hpclang_ui_node_at(ui, 3)->bounds, 49, 21, 59, 38);
+    rectangle(hpclang_ui_node_at(ui, 3)->clip, 49, 21, 59, 38);
+
+    assert(hpclang_ui_begin(ui) == 0);
+    HPCLANG_UI_WITH(ui, 1, HPCLANG_UI_COLUMN, 0)
+    {
+        assert(hpclang_ui_text(ui, 20, 0, "first") == 0);
+        assert(hpclang_ui_text(ui, 30, 0, "second") == 0);
+    }
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 80, 20}, measure, NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    rectangle(hpclang_ui_node_at(ui, 0)->bounds, 0, 0, 80, 62);
+    rectangle(hpclang_ui_node_at(ui, 1)->clip, 0, 0, 80, 20);
+    rectangle(hpclang_ui_node_at(ui, 2)->bounds, 0, 32, 80, 30);
+    rectangle(hpclang_ui_node_at(ui, 2)->clip, 0, 32, 80, 0);
+
+    for (int reenter = 0; reenter < 2; ++reenter) {
+        assert(hpclang_ui_begin(ui) == 0);
+        assert(hpclang_ui_text(ui, 1, 0, "invalid") == 0);
+        assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 80, 20}, bad_measure,
+                                 reenter ? ui : NULL) == -1);
+        assert(errno == (reenter ? EBUSY : EINVAL));
+        assert(hpclang_ui_commit(ui) == -1);
+        rectangle(hpclang_ui_node_at(ui, 0)->bounds, 0, 0, 80, 62);
+    }
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_text(ui, 1, 0, "overflow") == 0);
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){INT32_MAX, 0, 1, 20}, measure, NULL) ==
+           -1);
+    assert(hpclang_ui_commit(ui) == -1);
+    assert(hpclang_ui_node_count(ui) == 3);
+}
+
+static void buttons(struct hpclang_ui *ui, const uint32_t *keys, size_t count, uint32_t disabled)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    for (size_t i = 0; i < count; ++i)
+        assert(hpclang_ui_button(ui, keys[i], 0, "action", (struct hpclang_ui_action){7, keys[i]},
+                                 keys[i] != disabled) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+}
+
+static void focus(struct hpclang_ui *ui)
+{
+    const uint32_t initial[] = {10, 20, 30};
+    buttons(ui, initial, 3, 0);
+    uint32_t a = token(ui, 0, 10), b = token(ui, 0, 20), c = token(ui, 0, 30);
+    assert(hpclang_ui_focused(ui) == a);
+    assert(hpclang_ui_focus_step(ui, 1) == 0 && hpclang_ui_focused(ui) == b);
+    struct hpclang_ui_event event;
+    assert(hpclang_ui_activate(ui, &event) == 1);
+    assert(event.source == b && event.action.type == 7 && event.action.arg == 20);
+    const uint32_t reversed[] = {30, 20, 10};
+    buttons(ui, reversed, 3, 0);
+    assert(hpclang_ui_focused(ui) == b);
+    const uint32_t filtered[] = {30, 10};
+    buttons(ui, filtered, 2, 0);
+    assert(hpclang_ui_focused(ui) == a); /* Next survivor in the old reversed view. */
+    buttons(ui, filtered, 2, 10);
+    assert(hpclang_ui_focused(ui) == c);
+    assert(hpclang_ui_focus(ui, a) == -1 && errno == ENOENT);
+    assert(hpclang_ui_focus_step(ui, -1) == 0 && hpclang_ui_focused(ui) == c);
+    assert(hpclang_ui_focus(ui, 0) == 0);
+    buttons(ui, initial, 3, 0);
+    assert(hpclang_ui_focused(ui) == 0);
+    event.source = 123;
+    assert(hpclang_ui_activate(ui, &event) == 0 && event.source == 123);
+    assert(hpclang_ui_focus_step(ui, -1) == 0 && hpclang_ui_focused(ui) == c);
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_activate(ui, &event) == -1 && errno == EBUSY);
+    assert(hpclang_ui_button(ui, 1, 0, "bad", (struct hpclang_ui_action){0}, 2) == -1);
+    assert(hpclang_ui_commit(ui) == -1 && hpclang_ui_focused(ui) == c);
+}
+
 static void capacity(void)
 {
     struct hpclang_ui_config config = {2, 8};
@@ -163,6 +283,8 @@ int main(void)
     assert(ui);
     identity(ui);
     failures_and_scopes(ui);
+    layout(ui);
+    focus(ui);
     free(storage);
     capacity();
     return 0;
