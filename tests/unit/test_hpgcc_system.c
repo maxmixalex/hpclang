@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <hpsys.h>
+#include <hptime.h>
 #include <hpclang/datetime.h>
 #include <hpclang/time.h>
 

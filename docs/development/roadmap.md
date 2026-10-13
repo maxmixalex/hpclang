@@ -722,6 +722,12 @@ The relocated SDK build passes C/C++, all six launchers and all three HP39
 Aplet package families with the system adapter included. The installed
 `examples/hpgcc-timer` migration client passes that same relocation/packaging
 gate; it demonstrates the five historical calls and documents their units.
+The follow-up calendar adapter adds `sys_tm_RTC`, the `hptime.h` include spelling
+and date output in the installed timer example. Calendar conversion/failure
+tests and all six Direct targets pass; Stock and updated SDK acceptance are
+in progress. The original void signature is retained with errno and unchanged
+output on failure; weekday/year-day are computed rather than copied from the
+historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration

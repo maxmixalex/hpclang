@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <hpsys.h>
+#include <hptime.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 
@@ -38,5 +39,15 @@ int main(void)
         return 1;
     hpclang_surface_clear(screen, 0);
     hpclang_surface_draw_text_n(screen, &report_font, 0, 0, report, (size_t)length, 255);
+    struct tm date;
+    errno = 0;
+    sys_tm_RTC(&date);
+    if (errno)
+        return 1;
+    length = snprintf(report, sizeof report, "%04d-%02d-%02d %02d:%02d:%02d", date.tm_year + 1900,
+                      date.tm_mon + 1, date.tm_mday, date.tm_hour, date.tm_min, date.tm_sec);
+    if (length < 0 || (size_t)length >= sizeof report)
+        return 1;
+    hpclang_surface_draw_text_n(screen, &report_font, 0, 12, report, (size_t)length, 255);
     return 0;
 }

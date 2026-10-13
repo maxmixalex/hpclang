@@ -21,14 +21,8 @@ typedef struct
     unsigned inited : 1;
 } sys_timer_t;
 
-#define SYS_TIMER_INITIALIZER                                                                      \
-    {                                                                                              \
-        0, 0, 0, 0                                                                                 \
-    }
-#define SYS_TIMER_INITIALIZER_NUM(n)                                                               \
-    {                                                                                              \
-        0, 0, (n), 0                                                                               \
-    }
+#define SYS_TIMER_INITIALIZER {0, 0, 0, 0}
+#define SYS_TIMER_INITIALIZER_NUM(n) {0, 0, (n), 0}
 
 #ifdef __cplusplus
 extern "C"

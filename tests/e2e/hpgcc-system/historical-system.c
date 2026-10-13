@@ -4,19 +4,54 @@
  * consuming all free calculator memory; timings use monotonic microseconds.
  * CPU speed selection remains a separate power-policy capability, not a no-op
  * compatibility claim. The original interactive pause becomes a capture. */
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <hpsys.h>
+#include <hptime.h>
 #include <hpclang/console.h>
+#include <hpclang/datetime.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
 #include <hpclang/time.h>
 
 extern const struct hpclang_font hpclang_benchmark_font;
 
+static int calendar(void)
+{
+    struct hpclang_datetime before, after;
+    struct tm legacy;
+    if (hpclang_datetime_read(&before))
+        return -1;
+    errno = 0;
+    sys_tm_RTC(&legacy);
+    if (errno || hpclang_datetime_read(&after))
+        return -1;
+    if (legacy.tm_year < 100 || legacy.tm_year > 199 || legacy.tm_mon < 0 || legacy.tm_mon > 11 ||
+        legacy.tm_isdst != -1)
+        return -1;
+    const struct hpclang_datetime sampled = {
+        (uint32_t)(legacy.tm_year + 1900), (uint32_t)(legacy.tm_mon + 1), (uint32_t)legacy.tm_mday,
+        (uint32_t)legacy.tm_hour,          (uint32_t)legacy.tm_min,       (uint32_t)legacy.tm_sec};
+    const struct hpclang_datetime year_start = {sampled.year, 1, 1, 0, 0, 0};
+    int64_t low, high, value, first;
+    unsigned weekday;
+    if (hpclang_datetime_to_seconds(&before, &low) || hpclang_datetime_to_seconds(&after, &high) ||
+        hpclang_datetime_to_seconds(&sampled, &value) ||
+        hpclang_datetime_to_seconds(&year_start, &first) ||
+        hpclang_datetime_weekday(&sampled, &weekday))
+        return -1;
+    return value < low || value > high || legacy.tm_wday != (int)weekday ||
+                   legacy.tm_yday != (int)((value - first) / 86400)
+               ? -1
+               : 0;
+}
+
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
+    if (calendar())
+        return 11;
     uint64_t delay_start, delay_end;
     sys_timer_t legacy_timer = SYS_TIMER_INITIALIZER;
     if (sys_updateTimer(&legacy_timer) != 0 || !legacy_timer.inited)

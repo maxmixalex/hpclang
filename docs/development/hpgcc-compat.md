@@ -683,12 +683,12 @@ accumulates **nanoseconds**, not microseconds: its 12 MHz base-clock conversion
 uses 250/3 nanoseconds per tick. This confirms the original `millis` declaration.
 
 The `hpsys.h` adapter now provides `sys_sleep`, `sys_waitTicks`, `sys_updateTimer`,
-`sys_RTC_seconds` and `sys_delta_seconds`. `sys_sleep` preserves milliseconds
+`sys_RTC_seconds`, `sys_delta_seconds` and `sys_tm_RTC`. `sys_sleep` preserves milliseconds
 without the historical 32-bit intermediate multiplication overflow.
 `sys_waitTicks` implements the documented 750 kHz duration, rounded up to
 microseconds, without requiring slow mode or changing interrupt/PWM registers.
 Both delays inherit the clean service's early return if the clock is unavailable.
-RTC reads use a coherent civil snapshot and report failure as `-1` with errno.
+`sys_RTC_seconds` uses a coherent civil snapshot and reports failure as `-1` with errno.
 The one-day difference helper accepts seconds in 0..86399 and reports invalid
 inputs as `-1/EINVAL`. `sys_timer_t`, its two initializer macros and
 `sys_updateTimer` preserve elapsed/accumulated nanoseconds and restart through
@@ -708,6 +708,15 @@ full matrix. Formal CI is pending.
 The relocated installed SDK also builds its C/C++ examples, all six native
 launchers and three HP39 Aplet families, including `examples/hpgcc-timer`. Historical
 integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
+
+The additional `sys_tm_RTC(struct tm *)` adapter uses the same civil RTC service,
+computes weekday and year-day, and reports unknown DST through `tm_isdst = -1`.
+Its historical void signature is retained: failure sets errno and leaves the
+output unchanged. `hptime.h` forwards standard SDK libc time types and this
+adapter; it does not promise the historical time library's binary ABI. Host
+tests cover leap/century dates and failure preservation. The calendar check
+passes all six Direct targets with independent report pixel verification;
+its Stock matrix is still running.
 
 ### SD media discovery and replacement
 
