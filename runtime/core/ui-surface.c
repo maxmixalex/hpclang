@@ -87,7 +87,8 @@ int hpclang_ui_surface_measure(void *context, const struct hpclang_ui_node *node
     if (node->text &&
         hpclang_font_measure_text_n(s->font, node->text, strlen(node->text), &width, &height))
         return -1;
-    int container = node->kind == HPCLANG_UI_ROW || node->kind == HPCLANG_UI_COLUMN;
+    int container = node->kind == HPCLANG_UI_ROW || node->kind == HPCLANG_UI_COLUMN ||
+                    node->kind == HPCLANG_UI_SCROLL;
     int64_t w = width, h = height;
     if (!container) {
         w += 2u * s->padding_x;

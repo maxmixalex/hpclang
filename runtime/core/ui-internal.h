@@ -14,6 +14,7 @@ struct node
     int32_t content_width, content_height;
     uint32_t children, weights;
     int32_t offset, extra;
+    int32_t base_y, next_scroll;
 };
 
 struct frame
@@ -61,5 +62,7 @@ void hpclang_ui_damage(struct hpclang_ui *ui, struct hpclang_ui_rect rect);
 void hpclang_ui_damage_commit(struct hpclang_ui *ui, uint32_t old_focus);
 void hpclang_ui_damage_focus(struct hpclang_ui *ui, uint32_t old_focus);
 void hpclang_ui_effect_reconcile(struct hpclang_ui *ui);
+int hpclang_ui_scroll_reveal(struct hpclang_ui *ui, struct frame *frame, uint32_t focus,
+                             int damage);
 
 #endif

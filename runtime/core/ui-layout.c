@@ -111,6 +111,8 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
             return hpclang_ui_fail(ui, EINVAL);
         if (node->view.kind == HPCLANG_UI_CANVAS)
             node->metrics.height = maximum(node->metrics.height, node->view.preferred_height);
+        if (node->view.kind == HPCLANG_UI_SCROLL)
+            node->metrics.height = node->view.preferred_height;
     }
     /* Reverse traversal completes nested container sizes before their parents.
      * Transparent identity scopes do not introduce layout boxes or extra gaps. */
@@ -118,13 +120,15 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
         struct node *node = &frame->nodes[i - 1];
         if (transparent(node))
             continue;
-        if (node->view.kind == HPCLANG_UI_ROW || node->view.kind == HPCLANG_UI_COLUMN) {
+        if (node->view.kind == HPCLANG_UI_ROW || node->view.kind == HPCLANG_UI_COLUMN ||
+            node->view.kind == HPCLANG_UI_SCROLL) {
             int64_t width = (int64_t)node->content_width + 2 * node->metrics.padding_x;
             int64_t height = (int64_t)node->content_height + 2 * node->metrics.padding_y;
             if (width > INT32_MAX || height > INT32_MAX)
                 return hpclang_ui_fail(ui, EOVERFLOW);
             node->metrics.width = maximum(node->metrics.width, (int32_t)width);
-            node->metrics.height = maximum(node->metrics.height, (int32_t)height);
+            if (node->view.kind != HPCLANG_UI_SCROLL)
+                node->metrics.height = maximum(node->metrics.height, (int32_t)height);
         }
         struct node *parent =
             node->layout_parent == UI_ROOT ? &root : &frame->nodes[node->layout_parent];
@@ -157,6 +161,7 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
             row ? (struct hpclang_ui_rect){(int32_t)origin, box.y, (int32_t)size, box.height}
                 : (struct hpclang_ui_rect){box.x, (int32_t)origin, box.width, (int32_t)size};
         node->view.clip = intersect(node->view.bounds, intersect(parent->view.clip, box));
+        node->base_y = node->view.bounds.y;
         parent->offset = (int32_t)(offset + size);
         ++parent->children;
         prepare_children(node);
@@ -165,4 +170,116 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
     frame->viewport = viewport;
     frame->laid_out = 1;
     return 0;
+}
+
+static int32_t clamp_scroll(int64_t value, const struct node *node)
+{
+    struct hpclang_ui_rect box = content(node);
+    int64_t limit = (int64_t)node->content_height - box.height;
+    if (limit < 0)
+        limit = 0;
+    if (value > limit)
+        value = limit;
+    return value < 0 ? 0 : (int32_t)value;
+}
+
+static int64_t shifted_y(const struct frame *frame, uint32_t index)
+{
+    const struct node *node = &frame->nodes[index];
+    int64_t y = node->base_y;
+    for (uint32_t p = node->layout_parent; p != UI_ROOT; p = frame->nodes[p].layout_parent)
+        y -= frame->nodes[p].next_scroll;
+    return y;
+}
+
+static int scroll_update(struct hpclang_ui *ui, struct frame *frame, uint32_t focus, int damage,
+                         uint32_t request, int32_t offset)
+{
+    if (!frame->laid_out)
+        return 0;
+    uint32_t selected = UI_ROOT;
+    for (uint32_t i = 0; i < frame->count; ++i) {
+        struct node *node = &frame->nodes[i];
+        node->next_scroll =
+            node->view.kind == HPCLANG_UI_SCROLL
+                ? clamp_scroll(node->view.id == request ? offset : node->view.scroll_y, node)
+                : 0;
+        if (node->view.id == focus)
+            selected = i;
+    }
+    if (selected != UI_ROOT) {
+        const struct node *node = &frame->nodes[selected];
+        int64_t top = node->base_y, bottom = top + node->view.bounds.height;
+        for (uint32_t p = node->layout_parent; p != UI_ROOT; p = frame->nodes[p].layout_parent) {
+            struct node *parent = &frame->nodes[p];
+            if (parent->view.kind != HPCLANG_UI_SCROLL)
+                continue;
+            struct hpclang_ui_rect box = content(parent);
+            int64_t start = (int64_t)parent->base_y +
+                            minimum(parent->view.bounds.height, parent->metrics.padding_y);
+            int64_t end = start + box.height;
+            int64_t offset = parent->next_scroll;
+            if (top - offset < start || bottom - top > box.height)
+                offset = top - start;
+            else if (bottom - offset > end)
+                offset = bottom - end;
+            parent->next_scroll = clamp_scroll(offset, parent);
+            top -= parent->next_scroll;
+            bottom -= parent->next_scroll;
+            if (top < start)
+                top = start;
+            if (bottom > end)
+                bottom = end;
+        }
+    }
+    /* Validate every projected position before changing any accepted geometry. */
+    for (uint32_t i = 0; i < frame->count; ++i) {
+        if (transparent(&frame->nodes[i]))
+            continue;
+        int64_t y = shifted_y(frame, i);
+        if (y < INT32_MIN || y + frame->nodes[i].view.bounds.height > INT32_MAX)
+            return hpclang_ui_fail(NULL, EOVERFLOW);
+    }
+    for (uint32_t i = 0; i < frame->count; ++i) {
+        struct node *node = &frame->nodes[i];
+        if (transparent(node))
+            continue;
+        struct hpclang_ui_rect previous = node->view.clip;
+        int32_t previous_y = node->view.bounds.y;
+        node->view.bounds.y = (int32_t)shifted_y(frame, i);
+        node->view.scroll_y = node->next_scroll;
+        struct hpclang_ui_rect parent_clip = frame->viewport;
+        if (node->layout_parent != UI_ROOT) {
+            const struct node *parent = &frame->nodes[node->layout_parent];
+            parent_clip = intersect(parent->view.clip, content(parent));
+        }
+        node->view.clip = intersect(node->view.bounds, parent_clip);
+        if (damage && (previous_y != node->view.bounds.y || previous.x != node->view.clip.x ||
+                       previous.y != node->view.clip.y || previous.width != node->view.clip.width ||
+                       previous.height != node->view.clip.height)) {
+            hpclang_ui_damage(ui, previous);
+            hpclang_ui_damage(ui, node->view.clip);
+        }
+    }
+    return 0;
+}
+
+int hpclang_ui_scroll_reveal(struct hpclang_ui *ui, struct frame *frame, uint32_t focus, int damage)
+{
+    return scroll_update(ui, frame, focus, damage, 0, 0);
+}
+
+int hpclang_ui_scroll_to(struct hpclang_ui *ui, uint32_t id, int32_t offset)
+{
+    if (!ui || ui->closed || offset < 0)
+        return hpclang_ui_fail(NULL, EINVAL);
+    if (ui->building || ui->painting || ui->dispatching)
+        return hpclang_ui_fail(NULL, EBUSY);
+    struct frame *frame = &ui->frames[ui->current];
+    if (!frame->laid_out)
+        return hpclang_ui_fail(NULL, EINVAL);
+    for (uint32_t i = 0; i < frame->count; ++i)
+        if (frame->nodes[i].view.id == id && frame->nodes[i].view.kind == HPCLANG_UI_SCROLL)
+            return scroll_update(ui, frame, 0, 1, id, offset);
+    return hpclang_ui_fail(NULL, ENOENT);
 }

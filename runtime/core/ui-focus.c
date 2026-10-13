@@ -60,6 +60,8 @@ int hpclang_ui_focus(struct hpclang_ui *ui, uint32_t id)
         return hpclang_ui_fail(NULL, EBUSY);
     if (id && find(&ui->frames[ui->current], id) == UI_ROOT)
         return hpclang_ui_fail(NULL, ENOENT);
+    if (hpclang_ui_scroll_reveal(ui, &ui->frames[ui->current], id, 1))
+        return -1;
     uint32_t old_focus = ui->focused;
     ui->focused = id;
     ui->focus_cleared = id == 0;
@@ -76,19 +78,17 @@ int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction)
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);
     uint32_t old_focus = ui->focused;
-    ui->focus_cleared = 0;
     for (uint32_t visited = 0; visited < frame->count; ++visited) {
         if (direction > 0)
             index = index == UI_ROOT || index + 1 == frame->count ? 0 : index + 1;
         else
             index = index == UI_ROOT || !index ? frame->count - 1 : index - 1;
         if (eligible(&frame->nodes[index].view)) {
-            ui->focused = frame->nodes[index].view.id;
-            hpclang_ui_damage_focus(ui, old_focus);
-            return 0;
+            return hpclang_ui_focus(ui, frame->nodes[index].view.id);
         }
     }
     ui->focused = 0;
+    ui->focus_cleared = 0;
     hpclang_ui_damage_focus(ui, old_focus);
     return 0;
 }

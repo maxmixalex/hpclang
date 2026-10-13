@@ -647,6 +647,95 @@ static void capacity(void)
     free(storage);
 }
 
+static int scroll_measure(void *context, const struct hpclang_ui_node *node,
+                          struct hpclang_ui_metrics *metrics)
+{
+    (void)context;
+    *metrics = (struct hpclang_ui_metrics){.width = 20,
+                                           .height = node->kind == HPCLANG_UI_SCROLL ? 0 : 10};
+    return 0;
+}
+
+static void scroll_view(struct hpclang_ui *ui, unsigned count, int nested)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, 1, 0, 20))
+    {
+        if (nested) {
+            assert(hpclang_ui_text(ui, 99, 0, "heading") == 0);
+            HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, 2, 0, 20))
+            {
+                for (unsigned i = 0; i < count; ++i)
+                    assert(hpclang_ui_button(ui, 10 + i, 0, "item",
+                                             (struct hpclang_ui_action){1, i}, 1) == 0);
+            }
+        } else {
+            for (unsigned i = 0; i < count; ++i)
+                assert(hpclang_ui_button(ui, 10 + i, 0, "item", (struct hpclang_ui_action){1, i},
+                                         1) == 0);
+        }
+    }
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 20, 20}, scroll_measure, NULL) ==
+           0);
+    assert(hpclang_ui_commit(ui) == 0);
+}
+
+static void scrolling(struct hpclang_ui *ui)
+{
+    scroll_view(ui, 5, 0);
+    uint32_t last = hpclang_ui_node_at(ui, 5)->id;
+    assert(hpclang_ui_focus(ui, last) == 0);
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 30);
+    rectangle(hpclang_ui_node_at(ui, 5)->bounds, 0, 10, 20, 10);
+    rectangle(hpclang_ui_node_at(ui, 5)->clip, 0, 10, 20, 10);
+    assert(hpclang_ui_node_at(ui, 1)->clip.height == 0);
+    scroll_view(ui, 5, 0);
+    assert(hpclang_ui_focused(ui) == last && hpclang_ui_node_at(ui, 0)->scroll_y == 30);
+    assert(hpclang_ui_focus_step(ui, 1) == 0); /* Wrap to first item and reveal it. */
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 0);
+    assert(hpclang_ui_focus(ui, last) == 0);
+    scroll_view(ui, 2, 0); /* Removed focus falls back, scroll shrinks to content. */
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 0);
+    assert(hpclang_ui_focused(ui) == hpclang_ui_node_at(ui, 2)->id);
+    scroll_view(ui, 5, 1);
+    last = hpclang_ui_node_at(ui, 7)->id;
+    assert(hpclang_ui_focus(ui, last) == 0);
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 10);
+    assert(hpclang_ui_node_at(ui, 2)->scroll_y == 30);
+    rectangle(hpclang_ui_node_at(ui, 7)->bounds, 0, 10, 20, 10);
+    rectangle(hpclang_ui_node_at(ui, 7)->clip, 0, 10, 20, 10);
+    scroll_view(ui, 5, 1);
+    rectangle(hpclang_ui_node_at(ui, 7)->clip, 0, 10, 20, 10);
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(!hpclang_ui_scroll_begin(ui, 1, 0, 0).open);
+    assert(hpclang_ui_commit(ui) == -1 && errno == EINVAL);
+    assert(hpclang_ui_focused(ui) == last);
+    uint32_t outer = hpclang_ui_node_at(ui, 0)->id;
+    assert(hpclang_ui_focus(ui, 0) == 0);
+    assert(hpclang_ui_scroll_to(ui, outer, INT32_MAX) == 0);
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 10);
+    assert(hpclang_ui_scroll_to(ui, outer, 0) == 0);
+    scroll_view(ui, 5, 1);
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 0 && hpclang_ui_focused(ui) == 0);
+    assert(hpclang_ui_scroll_to(ui, outer, -1) == -1 && errno == EINVAL);
+    assert(hpclang_ui_scroll_to(ui, last, 0) == -1 && errno == ENOENT);
+    assert(hpclang_ui_begin(ui) == 0);
+    HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, 80, 0, 20))
+    {
+        for (unsigned i = 0; i < 4; ++i)
+            assert(hpclang_ui_button(ui, i, 0, "x", (struct hpclang_ui_action){0}, 1) == 0);
+    }
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, INT32_MIN, 20, 20}, scroll_measure,
+                             NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    outer = hpclang_ui_node_at(ui, 0)->id;
+    last = hpclang_ui_node_at(ui, 4)->id;
+    assert(hpclang_ui_focus(ui, last) == -1 && errno == EOVERFLOW);
+    assert(hpclang_ui_focused(ui) == 0 && hpclang_ui_node_at(ui, 0)->scroll_y == 0);
+    assert(hpclang_ui_node_at(ui, 1)->bounds.y == INT32_MIN);
+    assert(hpclang_ui_scroll_to(ui, outer, 20) == -1 && errno == EOVERFLOW);
+}
+
 int main(void)
 {
     struct hpclang_ui_config config = {32, 256};
@@ -663,6 +752,7 @@ int main(void)
     physical_input(ui);
     painting(ui);
     effects(ui);
+    scrolling(ui);
     free(storage);
     capacity();
     return 0;

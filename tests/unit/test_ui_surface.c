@@ -117,6 +117,21 @@ static void run(uint32_t levels)
     assert(hpclang_surface_get_pixel(target, 0, 0) == 0);
     assert(hpclang_surface_get_pixel(target, 1, 1) == 255);
     hpclang_ui_surface_destroy(other);
+    assert(hpclang_ui_begin(ui) == 0);
+    HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, 20, 0, 12))
+    {
+        for (unsigned i = 0; i < 3; ++i)
+            assert(hpclang_ui_button(ui, i, 0, "A", (struct hpclang_ui_action){1, i}, 1) == 0);
+    }
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 16, 16}, hpclang_ui_surface_measure,
+                             r) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    assert(hpclang_ui_focus(ui, hpclang_ui_node_at(ui, 3)->id) == 0);
+    assert(hpclang_ui_node_at(ui, 0)->scroll_y == 8);
+    assert(hpclang_ui_surface_render(r, ui) == 1);
+    assert(hpclang_ui_surface_copy(r, target) == 0);
+    assert(hpclang_surface_get_pixel(target, 1, 5) == 255); /* Revealed focus border. */
+    assert(hpclang_surface_get_pixel(target, 1, 12) == 0);  /* Viewport confines children. */
     assert(hpclang_ui_shutdown(ui) == 0);
     hpclang_ui_surface_destroy(r);
     hpclang_surface_destroy(target);

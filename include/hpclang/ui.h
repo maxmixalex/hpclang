@@ -36,7 +36,8 @@ extern "C"
         HPCLANG_UI_TEXT,
         HPCLANG_UI_BUTTON,
         HPCLANG_UI_INPUT,
-        HPCLANG_UI_CANVAS
+        HPCLANG_UI_CANVAS,
+        HPCLANG_UI_SCROLL
     };
 
     struct hpclang_ui_config
@@ -90,6 +91,7 @@ extern "C"
         const void *canvas_state;
         uint32_t revision;
         int32_t preferred_height;
+        int32_t scroll_y;
     };
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
@@ -116,6 +118,16 @@ extern "C"
     struct hpclang_ui_scope hpclang_ui_scope_begin(struct hpclang_ui *ui, uint32_t key,
                                                    enum hpclang_ui_kind kind, uint16_t style);
     void hpclang_ui_scope_close(struct hpclang_ui_scope *scope);
+    /* Vertical viewport containing a column. Height is the preferred outer
+     * height; grow can add space. Offset survives stable identity and is
+     * clamped after content changes. Focus reveals itself through nested
+     * viewports without changing the model. Use with HPCLANG_UI_SCOPE. */
+    struct hpclang_ui_scope hpclang_ui_scroll_begin(struct hpclang_ui *ui, uint32_t key,
+                                                    uint16_t style, int32_t height);
+    /* Scroll a committed viewport to a nonnegative pixel offset, clamped to
+     * content. Does not change focus; subsequent focus navigation/commit reveals
+     * focus again. Clear focus explicitly for independently browsed text. */
+    int hpclang_ui_scroll_to(struct hpclang_ui *ui, uint32_t id, int32_t offset);
     int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text);
     int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
                           struct hpclang_ui_action action, int enabled);

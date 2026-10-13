@@ -36,7 +36,7 @@ Call `ItemList(ui, 10, ...)` and `ItemList(ui, 20, ...)` to create independent
 instances. Use persistent item IDs, not their current positions. Inserting or
 reversing the list preserves surviving node IDs. A same-key kind change creates
 a new lifetime, as does removal followed by reappearance in a later frame.
-Styles are opaque numeric inputs for a future renderer; this core assigns no
+Styles are opaque numeric inputs for the selected renderer; this core assigns no
 font, color or widget appearance.
 
 ## Storage and frame boundaries
@@ -227,8 +227,8 @@ context. Font measurement uses the same UTF-8 decoder, fallback and newline
 rules as drawing, including proportional advances. Text is top-left aligned;
 buttons and inputs have outlines, focus uses the accent color, and disabled
 controls use the disabled color. Focused inputs invert selected text and scroll
-horizontally to retain the cursor. Container/list scrolling is separate pending
-work. Changing font/geometry themes requires layout again.
+horizontally to retain the cursor. Vertical scroll scopes provide container/list
+scrolling as described below. Changing font/geometry themes requires layout again.
 
 `hpclang_ui_surface_render(renderer, ui)` returns one after an update, zero
 when clean, or minus one with errno. The renderer owns two raster pages: each
@@ -274,6 +274,32 @@ Host pixel tests cover all three level counts, canvas confinement, partial
 updates, failed-frame retry, complete-page copying, input selection and an
 inverted theme. Six-model execution, low-memory acceptance and timing budgets
 remain required before closing the renderer milestone.
+
+## Vertical scrolling
+
+Use `HPCLANG_UI_SCOPE(hpclang_ui_scroll_begin(ui, key, style, height))` to declare
+a vertical viewport whose children form a column. Height is its preferred outer
+height, including padding; the style's grow weight can add space. Content keeps
+its measured height and is clipped to the viewport. Scroll scopes can nest and
+can contain transparent component/key scopes.
+
+The accepted node's `scroll_y` reports its pixel offset. Stable scope identity
+retains the offset across declarations; shortened content clamps it. Focus
+navigation and committed focus fallback reveal the selected control from the
+innermost viewport outward. An oversized control aligns its top edge. Scrolling
+updates geometry and damage without modifying application data or node IDs.
+Failed declarations and coordinate overflow preserve accepted geometry/focus.
+
+`hpclang_ui_scroll_to(ui, id, offset)` supports explicit browsing, including
+text-only content. The nonnegative requested offset is clamped to the available
+range. It does not change focus. A subsequent commit or focus operation reveals
+focus again; explicitly clear focus for independently browsed text. Negative
+offsets and non-scroll node IDs are errors. Calls require a laid-out committed
+frame outside painting, declaration and effect callbacks.
+
+This implementation retains every declared node in the bounded pool; it does
+not virtualize large lists. Host geometry and pixel tests cover nested reveal,
+wraparound, content shrink, manual offsets, clipping and overflow rollback.
 
 ## Asynchronous effects and cleanup
 

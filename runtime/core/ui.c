@@ -96,6 +96,10 @@ int hpclang_ui_commit(struct hpclang_ui *ui)
         return hpclang_ui_fail(NULL, ui->error);
     uint32_t old_focus = ui->focused;
     hpclang_ui_reconcile_focus(ui);
+    if (hpclang_ui_scroll_reveal(ui, &ui->frames[ui->current ^ 1u], ui->focused, 0)) {
+        ui->focused = old_focus;
+        return -1;
+    }
     hpclang_ui_damage_commit(ui, old_focus);
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
@@ -136,10 +140,12 @@ int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kin
         if (next->nodes[i].view.parent == parent && next->nodes[i].view.key == key)
             return hpclang_ui_fail(ui, EEXIST);
     uint32_t id = 0;
+    int32_t scroll_y = 0;
     for (uint32_t i = 0; i < old->count; ++i) {
         const struct hpclang_ui_node *candidate = &old->nodes[i].view;
         if (candidate->parent == parent && candidate->key == key && candidate->kind == kind) {
             id = candidate->id;
+            scroll_y = candidate->scroll_y;
             break;
         }
     }
@@ -160,10 +166,14 @@ int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kin
     }
     if (!id)
         id = ++ui->pending_id;
-    next->nodes[next->count++] = (struct node){
-        .view =
-            {.id = id, .parent = parent, .key = key, .kind = kind, .style = style, .text = owned},
-        .parent_index = ui->parent};
+    next->nodes[next->count++] = (struct node){.view = {.id = id,
+                                                        .parent = parent,
+                                                        .key = key,
+                                                        .kind = kind,
+                                                        .style = style,
+                                                        .text = owned,
+                                                        .scroll_y = scroll_y},
+                                               .parent_index = ui->parent};
     return 0;
 }
 
@@ -178,6 +188,21 @@ struct hpclang_ui_scope hpclang_ui_scope_begin(struct hpclang_ui *ui, uint32_t k
     if (hpclang_ui_add(ui, key, kind, style, NULL))
         return result;
     ui->parent = ui->frames[ui->current ^ 1u].count - 1;
+    return (struct hpclang_ui_scope){ui, ui->epoch, ui->parent, 1};
+}
+
+struct hpclang_ui_scope hpclang_ui_scroll_begin(struct hpclang_ui *ui, uint32_t key, uint16_t style,
+                                                int32_t height)
+{
+    if (height <= 0) {
+        hpclang_ui_fail(ui, EINVAL);
+        return (struct hpclang_ui_scope){0};
+    }
+    if (hpclang_ui_add(ui, key, HPCLANG_UI_SCROLL, style, NULL))
+        return (struct hpclang_ui_scope){0};
+    struct frame *frame = &ui->frames[ui->current ^ 1u];
+    ui->parent = frame->count - 1;
+    frame->nodes[ui->parent].view.preferred_height = height;
     return (struct hpclang_ui_scope){ui, ui->epoch, ui->parent, 1};
 }
 
