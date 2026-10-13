@@ -1,8 +1,11 @@
 #ifndef HPCLANG_HPGCC_HPSYS_H
 #define HPCLANG_HPGCC_HPSYS_H
 
+#ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
+#define HPCLANG_HPGCC_LONG_TYPES_DEFINED
 typedef unsigned long long ULONGLONG;
 typedef long long LONGLONG;
+#endif
 
 /* Source-compatible elapsed-time state; not the historical binary layout.
  * current is nanoseconds. last_val is private monotonic sampling state,
