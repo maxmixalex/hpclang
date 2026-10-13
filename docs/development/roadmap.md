@@ -553,6 +553,11 @@ pointer. In this HP50g snapshot, native catalog entries for ROM calls 161/10,
 161/6 and 167/1 resolve to programs that match the three TEMP copies byte for
 byte. This establishes their origin, not complete executable-reference coverage
 or a portable ROM mapping for all models.
+The bounded internal library-catalog lookup preserves the native bank-switch
+identity and leaves its output unchanged on missing IDs, duplicate matching IDs
+or read/bounds errors. Its C implementation matches all 62 records in the saved
+HP50g catalog. This supplies binding metadata; bank resolution and executable
+target traversal remain separate unfinished steps.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a

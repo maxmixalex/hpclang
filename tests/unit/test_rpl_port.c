@@ -198,8 +198,49 @@ static void test_flash(void)
     assert(memcmp(&entry, &saved, sizeof(entry)) == 0);
 }
 
+static void test_library_catalog_lookup(void)
+{
+    struct image image = {.count = 35, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 0, 2, 3);
+    put_word(&image, 3, 161, 3);
+    put_word(&image, 6, 0x4dee9, 5);
+    put_word(&image, 11, 0x22f2e, 5);
+    put_word(&image, 16, 0x123, 3);
+    put_word(&image, 19, 275, 3);
+    put_word(&image, 22, 0xdd56a, 5);
+    put_word(&image, 27, 0, 5);
+    struct hpclang_rpl_library_binding binding = {1, 2, 3};
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 161, &binding) == 1);
+    assert(binding.address == 0x4dee9 && binding.bank_switch == 0x22f2e && binding.flags == 0x123);
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 275, &binding) == 1);
+    assert(binding.address == 0xdd56a && binding.bank_switch == 0);
+    struct hpclang_rpl_library_binding before = binding;
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 900, &binding) == 0);
+    assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    for (uint32_t limit = 0; limit < 35; ++limit) {
+        assert(hpclang_rpl_library_lookup(&reader, 0, limit, 161, &binding) < 0);
+        assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    }
+    for (uint32_t failed = 0; failed < 22; ++failed) {
+        image.fail_at = failed;
+        assert(hpclang_rpl_library_lookup(&reader, 0, 35, 161, &binding) < 0);
+        assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    }
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 19, 161, 3);
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 161, &binding) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    assert(hpclang_rpl_library_lookup(&reader, 0xfffff, 35, 161, &binding) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 0x1000, &binding) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_library_lookup(&reader, 0, 35, 161, NULL) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    test_library_catalog_lookup();
     test_library_references();
     test_flash();
     /* Owned synthetic library 123, title X, empty table offsets. The backup is

@@ -40,6 +40,23 @@ enum hpclang_rpl_library_reference_kind
     HPCLANG_RPL_LIBRARY_FUNCTION
 };
 
+struct hpclang_rpl_library_binding
+{
+    uint32_t address;
+    uint32_t bank_switch;
+    uint32_t flags;
+};
+
+/* Resolve a library ID in a bounded classic Stock catalog (3-nibble count,
+ * 16-nibble records). Preserve the bank-switch identity: address alone is not
+ * a dereferenceable object pointer. Mapping the catalog and resolving the bank
+ * are caller responsibilities. Returns 1 found, 0 absent or a negative span
+ * result. Duplicate matching IDs are malformed; output is unchanged on failure
+ * or absence. The reader must remain stable throughout the call. */
+int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
+                               uint32_t limit, uint32_t number,
+                               struct hpclang_rpl_library_binding *binding);
+
 /* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
  * discard partial traversal on error. This enumerates structural references;

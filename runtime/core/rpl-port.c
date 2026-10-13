@@ -18,6 +18,49 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, uint32_t c
     return 0;
 }
 
+int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
+                               uint32_t limit, uint32_t number,
+                               struct hpclang_rpl_library_binding *binding)
+{
+    if (!reader || !reader->read_nibble || !binding)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t count;
+    int result = word(reader, address, 3, &count);
+    if (result)
+        return result;
+    if (count > (limit - 3) / 16)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int found = 0;
+    struct hpclang_rpl_library_binding next = {0};
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = address + 3 + 16 * i, id;
+        result = word(reader, record, 3, &id);
+        if (result)
+            return result;
+        if (id != number)
+            continue;
+        if (found)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        result = word(reader, record + 3, 5, &next.address);
+        if (result)
+            return result;
+        result = word(reader, record + 8, 5, &next.bank_switch);
+        if (result)
+            return result;
+        result = word(reader, record + 13, 3, &next.flags);
+        if (result)
+            return result;
+        found = 1;
+    }
+    if (found)
+        *binding = next;
+    return found;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {
