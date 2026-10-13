@@ -50,6 +50,29 @@ int main(void)
     assert(hpg_get_pixel(g, 4, 1) == 255 && hpg_get_pixel(g, 2, 1) == 0);
     hpg_set_pattern(g, NULL);
     hpg_free_pattern(p);
+    hpg_clear_on(g);
+    hpg_set_mode(g, HPG_MODE_XOR);
+    hpg_draw_rect_on(g, 1, 1, 6, 4);
+    assert(hpg_get_pixel(g, 1, 1) == 255 && hpg_get_pixel(g, 6, 4) == 255);
+    assert(hpg_get_pixel(g, 3, 2) == 0);
+    hpg_draw_rect_on(g, 6, 4, 1, 1);
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 8; ++x)
+            assert(hpg_get_pixel(g, x, y) == 0);
+    hpg_clip(g, 2, 1, 6, 5);
+    hpg_draw_line_on(g, INT_MIN, 3, INT_MAX, 3);
+    for (int x = 0; x < 8; ++x)
+        assert(hpg_get_pixel(g, x, 3) == (x >= 2 && x < 6 ? 255 : 0));
+    hpg_clip_reset(g);
+    hpg_clear_on(g);
+    hpg_fill_circle_on(g, 3, 3, 2);
+    assert(hpg_get_pixel(g, 3, 3) == 255 && hpg_get_pixel(g, 1, 3) == 255);
+    assert(hpg_get_pixel(g, 0, 0) == 0);
+    hpg_fill_circle_on(g, 3, 3, 2);
+    assert(hpg_get_pixel(g, 3, 3) == 0 && hpg_get_pixel(g, 1, 3) == 0);
+    hpg_draw_circle_on(g, 3, 3, 2);
+    assert(hpg_get_pixel(g, 3, 3) == 0 && hpg_get_pixel(g, 1, 3) == 255);
+    hpg_draw_circle_on(g, INT_MAX, INT_MAX, INT_MAX);
     char font_bits[] = {1, 2, 4, 1, 2, 4};
     hpg_font_t *f = hpg_alloc_font(font_bits, 2, 3, 4);
     assert(f && hpg_font_get_height(f) == 3 && hpg_font_get_advance(f) == 4);

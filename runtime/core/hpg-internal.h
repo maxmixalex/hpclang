@@ -19,6 +19,7 @@ struct hpg_pattern
 struct hpg_graphics
 {
     struct hpclang_surface *surface;
+    struct hpclang_surface *mask;
     int width, height, left, top, right, bottom;
     unsigned char color, mode;
     struct hpg_pattern *pattern;

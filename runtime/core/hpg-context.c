@@ -29,6 +29,7 @@ void hpg_init(void)
 }
 void hpg_cleanup(void)
 {
+    hpclang_surface_destroy(screen.mask);
     screen = (hpg_t){0};
     hpg_stdscreen = &screen;
     initialized = 0;
@@ -88,6 +89,7 @@ void hpg_free_image(hpg_t *g)
         return;
     }
     hpclang_surface_destroy(g->surface);
+    hpclang_surface_destroy(g->mask);
     free(g);
 }
 int hpg_get_width(hpg_t *g)

@@ -46,6 +46,14 @@ extern "C"
     void hpg_clear(void);
     void hpg_draw_pixel_on(hpg_t *g, int x, int y);
     void hpg_draw_pixel(int x, int y);
+    void hpg_draw_line_on(hpg_t *g, int x1, int y1, int x2, int y2);
+    void hpg_draw_line(int x1, int y1, int x2, int y2);
+    void hpg_draw_rect_on(hpg_t *g, int x1, int y1, int x2, int y2);
+    void hpg_draw_rect(int x1, int y1, int x2, int y2);
+    void hpg_draw_circle_on(hpg_t *g, int cx, int cy, int radius);
+    void hpg_draw_circle(int cx, int cy, int radius);
+    void hpg_fill_circle_on(hpg_t *g, int cx, int cy, int radius);
+    void hpg_fill_circle(int cx, int cy, int radius);
     void hpg_fill_rect_on(hpg_t *g, int x1, int y1, int x2, int y2);
     void hpg_fill_rect(int x1, int y1, int x2, int y2);
     unsigned char hpg_get_pixel(hpg_t *g, int x, int y);
