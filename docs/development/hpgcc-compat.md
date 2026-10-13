@@ -182,8 +182,10 @@ uses the six historical segment constants and follows PAINT/XOR and page
 exchange. Its first call without an HPG-owned session acquires a single page
 and preserves the visible Stock pixels and other status segments. Printed
 icons differ by calculator; setting a segment does not change keyboard flags.
-All 59 historical HPG function names are implemented; target-side and
-representative historical-application acceptance remain open.
+All 59 historical HPG function names are implemented. The integrated Display
+suite passes all six models in Direct and Stock locally, including independent
+pixel checks for single/double buffering, fonts, XPM and status segments.
+Formal CI acceptance remains pending.
 
 The original HPGCC 1.1 `testtext`, `testbigtext`, `testimage`, `testshapes`,
 and `testdoublebuf` examples compile and link against this adapter locally.
@@ -203,7 +205,7 @@ witness covering the wider model/launch matrix.
 
 The adapter retains HPG's byte-indexed custom fonts, fixed character advance,
 newline handling, and borrowed bitmap storage. This differs from the clean
-Unicode font API. Default-font integration is in progress: prefer live native
+Unicode font API. Default-font integration prefers live native
 mini/big fonts on HP48gII/49g+/50g and the native main font on HP39-family models.
 HP39 small text uses newRPL's `Font6_menus`, the closest reviewed small-face
 candidate fitting the legacy 4-by-6 ASCII cell. When native big text is
@@ -215,8 +217,7 @@ and oversized symbols are compressed into the cell while retaining source ink.
 Native tables are read from the running calculator, not embedded in the SDK.
 The portable asset test renders all 256 bytes in both fonts for six models
 without native mappings and compares the pixels with the packaged source.
-Target-side adapter acceptance remains open; default-font pixel identity is
-not an adapter guarantee.
+Default-font pixel identity is not an adapter guarantee.
 
 The installed HPG adapter loads compiled XPM arrays into owned mono/4/16-level
 images. Palette keys may use multiple characters; `#RRGGBB` entries prefer
@@ -612,7 +613,7 @@ review; a declaration count proves none of those.
 | Header / comparison | Unique functions in each version | Identical common declarations | Finding |
 | --- | --- | --- | --- |
 | `hpgraphics.h`, 1.0.3 → 1.1 | 55 → 59 | 55 | Existing count confirmed; four metric/geometry helpers added |
-| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | Existing count confirmed; wrappers still not implemented by hpclang |
+| `hpgraphics.h`, 1.1 → 2.0 → 3 | 59 → 59 → 59 | 59 at each transition | All 59 installed adapter functions implemented; six-model Direct/Stock local checks pass, formal CI pending |
 | `hpkeyb49.h`, 1.0.3 → 1.1 | 12 → 17 | 11 | `keyb_getkey` changes return type; five names added |
 | `hpkeyb49.h`, 1.1 → 2.0 | 17 → 17 | 17 | Existing count confirmed |
 | `hpscreen.h`, 1.0.3 → 1.1 | 12 → 9 | 9 | Three old minifont helpers removed; 9 is the retained subset |

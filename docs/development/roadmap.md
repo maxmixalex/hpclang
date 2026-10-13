@@ -550,10 +550,11 @@ Deliver and review this core in the following slices, using the retained
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
-The integrated Display suite passes all six Direct models and HP50g Stock,
+The integrated Display suite passes all six models in Direct and Stock,
 including independent single/double-buffer, font, XPM and indicator checks.
-Remaining Stock acceptance and original-source applications are still open;
-the other adapter groups below are retained.
+Five original HPGCC 1.1 graphics examples compile and their drawing bodies
+pass HP50g Direct execution with test-controlled screenshot waits. Formal
+CI acceptance remains pending; the other adapter groups below are retained.
 
 - [ ] Deliver the common 59-function HPG graphics surface and maintained
   keyboard, console/text, system, filesystem and object adapters in focused
