@@ -600,7 +600,11 @@ The system adapter now includes five `hpsys.h` entry points for millisecond dela
 midnight-wrapped differences.
 All 87 host tests after integration with the accepted C++ ownership work, six
 Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass, including independent
-pixel checks. HP39gs/HP40gs Stock and formal CI are pending.
+pixel checks for the combined payload. HP39gs then exposed insufficient heap
+for its clock/display check. The timed-sieve client now has a separate
+`hpgcc-system` payload and pixel verifier in the shared Runtime suite manifest;
+its HP39gs Direct run and independent report check pass. Validation of the
+split payloads on the remaining Direct/Stock targets and formal CI are pending.
 The relocated SDK build passes C/C++, all six launchers and all three HP39
 Aplet package families with the system adapter included.
 The remaining historical system, timer and console interfaces remain open.
@@ -914,7 +918,7 @@ Final source-confirmed application capabilities and retained follow-ups:
     object coexistence pass. Formal CI is accepted on `2988e1de`.
 - [x] Add a genuine source-anchored historical time/system client alongside
   the accepted focused RTC, timer and sound tests.
-  - `system-services/historical-system.c` ports the HPGCC 1.1/2.0 sieve
+  - `hpgcc-system/historical-system.c` ports the HPGCC 1.1/2.0 sieve
     example with bounded allocation/work, independently checked prime results
     and a visible elapsed-time report. Direct and Stock pass on all six models;
     formal CI is accepted on `2988e1de` for this additional client.

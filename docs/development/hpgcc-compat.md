@@ -66,8 +66,11 @@ Stock native-object coexistence passes on all six models, and SD file
 coexistence passes on both supported models in Direct/Stock. Formal CI is accepted on `2988e1de`. Historical
 raw speed-register and overclocking interfaces are not exposed by this policy.
 The HPGCC 1.1/2.0 sieve client is now ported in
-`system-services/historical-system.c`, with prime-count/checksum and visible
-report checks. It passes Direct and Stock on all six models; its additional formal CI is accepted on `2988e1de`.
+`hpgcc-system/historical-system.c`, with prime-count/checksum and visible
+report checks. The earlier clean-service version passed Direct and Stock on
+all six models and formal CI on `2988e1de`. The M8 version adds historical
+timer/delay calls and runs as a separate Runtime-suite payload; its acceptance
+is tracked in M8.4 rather than inherited from that earlier result.
 
 ## Public API stability
 

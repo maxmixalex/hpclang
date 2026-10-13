@@ -50,9 +50,8 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
         LIMIT = 1000,
         ITERATIONS = 16
     };
-    /* This fixed workload needs a bounded scratch list, not a 4 KiB heap
-     * allocation alongside three live consoles. Small Stock launch arenas
-     * can have less heap than that even with enough reserved stack space. */
+    /* Keep the bounded scratch list in the reserved application stack;
+     * the report consoles have their own heap allocations. */
     uint32_t primes[LIMIT];
     struct hpclang_console *console = hpclang_console_create(32, 4, &hpclang_benchmark_font);
     struct hpclang_console *reference = hpclang_console_create(32, 2, &hpclang_benchmark_font);
