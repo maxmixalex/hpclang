@@ -214,6 +214,12 @@ The generated application does not include or replace the calculator OS.
 
 ## Choose services at runtime
 
+The installed `examples/notebook` combines the declarative C UI, calculator
+clock and native object persistence. It uses Aplet-owned data on HP39 Stock
+and a dedicated HOME object on classic Stock, with explicit Save/Reload
+actions and rejection of foreign data. Its README describes the storage and
+encoding contract; device persistence acceptance is still pending.
+
 Include `<hpclang/device.h>` and read `hpclang_device_info()` for model and
 visible display dimensions. Use `hpclang_device_capability()` to decide whether
 to offer an optional service in the current launch context:

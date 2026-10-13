@@ -14,6 +14,10 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(notebook_store test_notebook_store.c
+    "${HPCLANG_ROOT}/examples/notebook/store.c")
+target_include_directories(test_notebook_store PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_system test_hpgcc_system.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-system.c"
     "${HPCLANG_ROOT}/runtime/core/datetime.c")

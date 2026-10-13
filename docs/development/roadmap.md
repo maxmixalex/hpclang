@@ -782,6 +782,14 @@ slice still requires formal CI; broader migration and release goals remain.
 
 #### M8.6 — Application and release acceptance
 
+The initial `examples/notebook` application connects the C UI and civil clock
+to native string persistence: HP39 Aplet-owned data or classic HOME. Saves are
+explicit and reject foreign destination data. Host tests cover both paths,
+bounded records, failure preservation and owned-resource cleanup. ARM syntax
+and static analysis pass; installed-package builds and multi-session device
+acceptance are in progress. File export and Port backup integration remain
+part of this application track, not completed features.
+
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.
