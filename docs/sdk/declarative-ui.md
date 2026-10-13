@@ -16,8 +16,10 @@ waveform. Its host flow test exercises the actual application update/view code.
 The installed SDK builds its ARM image and all six model launchers. The complete
 application flow also passes local Direct execution on all six models with
 electrical key injection, six display checkpoints and normal return. HP39g+
-Stock first-screen execution passes; complete Stock interaction, formal CI
-integration and resource budgets are still pending.
+Stock first-screen execution passes; complete Stock interaction and resource
+budgets are still pending. UI is included in the shared Runtime E2E suite matrix;
+its independent verifier checks captured states and waveform sample coordinates.
+The current batch has local evidence but has not yet been pushed to CI.
 
 An application owns its model and describes the current view with ordinary C
 functions, loops and conditions. Separate component instances scope their keys:

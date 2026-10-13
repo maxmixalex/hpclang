@@ -523,7 +523,11 @@ SDK builds the ARM image and all six launchers. Local Direct execution now passe
 the complete flow on all six models, with electrical key injection, six LCD
 checkpoints and normal Stock return. HP39g+ Stock USB installation, initial
 render/idle and return pass in the smaller first-screen probe; the complete Stock
-flow, formal CI integration and resource-budget acceptance remain open.
+flow and resource-budget acceptance remain open. The formal `build-e2e.sh ui`
+entry passes locally; Runtime's shared suite matrix now includes UI and watches
+its example sources. Its verifier checks six distinct monochrome states and all
+32 model-derived waveform vertices on the actual LCD captures. Remote CI has
+not yet been triggered for this batch.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys

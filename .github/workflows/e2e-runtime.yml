@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - "examples/declarative-ui/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
@@ -50,6 +51,7 @@ on:
       - ".github/workflows/e2e-runtime.yml"
   pull_request:
     paths:
+      - "examples/declarative-ui/**"
       - "runtime/core/**"
       - "runtime/libc/**"
       - "runtime/bootstrap/**"
