@@ -31,34 +31,12 @@ case "$TARGET" in
 esac
 
 SDK="${HP39_APLET_HOME:-$ROOT/.cache/hp39-aplet/sdk}"
-BUILD="$ROOT/build/hp39-aplet"
-
-rm -rf "$BUILD" "$OUT"
-mkdir -p "$BUILD" "$OUT"
-
-cc -O2 "$SDK/src/hp2aplet.c" -o "$BUILD/hp2aplet"
-
-# The historical splash centers the author using 66 - 2 * length and does
-# not clip a negative coordinate on HP39g+. Keep this field a short credit;
-# a long test description can overwrite unrelated Stock objects while drawing.
-cat > "$BUILD/hp39prj.dat" <<'EOF'
-HP39 Aplet Project
-HPCLANG HPC1 TEST
-hpclang
-N
-EOF
-
-(
-    cd "$BUILD"
-    HPGCC="$SDK/data" ./hp2aplet "$INPUT"
-)
-
-# Preserve the stock HPGCC39 transfer names. Conn3x/HPGComm and real HP39gs
-# hardware have decades of evidence for these names; semantic renaming adds no
-# value at the calculator boundary.
-mv "$BUILD/HPGCC000.000" "$OUT/HPGCC000.000"
-cp "$SDK/data/LIB275L.L39" "$OUT/LIB275L.000"
-cp "$SDK/data/HPCRESET.000" "$OUT/HPCRESET.000"
+BUILD="$(mktemp -d)"
+trap 'rm -rf "$BUILD"' EXIT
+"${CC:-cc}" -O2 "$SDK/src/hp2aplet.c" -o "$BUILD/hp2aplet"
+python3 "$ROOT/tools/package-aplet.py" "$INPUT" "$OUT" \
+    --tool "$BUILD/hp2aplet" --assets "$SDK/data" \
+    --name "HPCLANG HPC1 TEST" --author hpclang
 
 python3 - "$OUT" "$TARGET_LABEL" "$MODEL_ID" <<'PY'
 from pathlib import Path
@@ -67,22 +45,6 @@ import sys
 root = Path(sys.argv[1])
 target = sys.argv[2]
 model = sys.argv[3]
-
-def entry(kind: str, name: str, title: str) -> str:
-    return f"{kind} {len(name)} {name}{len(title)} {title}"
-
-directory = (
-    "HP39AscA "
-    + entry("B", "HPGCC000.000", "HPCLANG HPC1 TEST")
-    + " "
-    + entry("H", "LIB275L.000", "LIB275L")
-    + " "
-    + entry("D", "HPCRESET.000", ".HPCRESET")
-    + " "
-)
-
-(root / "HP39DIR.000").write_bytes(directory.encode("ascii"))
-(root / "HP39DIR.CUR").write_bytes(b"HP39AscA A 11 HP39DIR.0004 Root")
 
 (root / "TESTING.txt").write_text(
     f"hpclang {target} canonical runtime validation\n"

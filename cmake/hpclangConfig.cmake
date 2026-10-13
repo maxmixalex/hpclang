@@ -5,6 +5,7 @@ endif()
 get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 include("${CMAKE_CURRENT_LIST_DIR}/profiles/hpclang-v1.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/fonts.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/launchers.cmake")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # Compile once per downstream build, using exactly its selected toolchain.
