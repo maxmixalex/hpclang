@@ -515,7 +515,11 @@ preservation/retry, complete-page copying and an inverted theme. Vertical scroll
 scopes now retain offsets, clamp after content shrink and reveal keyboard focus
 through nested viewports. Host tests cover geometry, pixels, manual scrolling
 and overflow rollback. Interactive loading/error/retry, target memory and
-six-model acceptance remain pending.
+six-model acceptance remain pending. The installed `examples/declarative-ui`
+device manager now assembles the original application patterns with a deterministic
+simulated provider. Its host flow covers failure/retry/cancel, all eight devices,
+stable insertion/reversal, controlled filtering and waveform changes; the installed
+SDK builds the ARM image and all six launchers. Target execution remains open.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys

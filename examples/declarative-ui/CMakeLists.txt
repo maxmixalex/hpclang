@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+project(hpclang_declarative_ui LANGUAGES C ASM)
+find_package(hpclang CONFIG REQUIRED)
+hpclang_add_application(declarative_ui main.c app.c)
+hpclang_target_launchers(declarative_ui)
+set(ui_ascii)
+foreach(codepoint RANGE 32 126)
+    list(APPEND ui_ascii ${codepoint})
+endforeach()
+hpclang_target_font(declarative_ui NAME demo_font FONT @mini MODE STATIC_EXPLICIT
+    CODEPOINTS ${ui_ascii} FALLBACK 63)

@@ -9,6 +9,14 @@ is still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
+The installed `examples/declarative-ui` application combines these interfaces
+into the original device-manager patterns. It uses two status-card instances,
+conditional connection controls, a controlled filter, keyed insertion/reversal,
+a simulated asynchronous scan with failure/retry/cancel, and a revision-driven
+waveform. Its host flow test exercises the actual application update/view code.
+The installed SDK builds its ARM image and all six model launchers. Calculator
+execution and memory/interaction evidence are still pending.
+
 An application owns its model and describes the current view with ordinary C
 functions, loops and conditions. Separate component instances scope their keys:
 
