@@ -66,6 +66,25 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t end, uint32_t header, uint32_t number, uint32_t command,
                                 uint32_t *target);
 
+/* Match a switch address against a caller-validated ROM table containing
+ * 16 seven-nibble Flash entries and a separate ERAM entry. Addresses are read,
+ * never inferred from an arithmetic sequence of implementation routines.
+ * Returns 1 found, 0 unknown or a negative span result; output is unchanged on
+ * absence/error. A returned index still requires physical mapping validation. */
+enum hpclang_rpl_bank_kind
+{
+    HPCLANG_RPL_BANK_FLASH,
+    HPCLANG_RPL_BANK_ERAM
+};
+struct hpclang_rpl_bank_binding
+{
+    enum hpclang_rpl_bank_kind kind;
+    uint32_t index;
+};
+int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                            uint32_t eram_entry, uint32_t bank_switch,
+                            struct hpclang_rpl_bank_binding *binding);
+
 /* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
  * discard partial traversal on error. This enumerates structural references;

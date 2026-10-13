@@ -109,6 +109,36 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
     return 1;
 }
 
+int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
+                            uint32_t eram_entry, uint32_t bank_switch,
+                            struct hpclang_rpl_bank_binding *binding)
+{
+    if (!reader || !reader->read_nibble || !binding)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (flash_table > 0x100000u - 112 || eram_entry > 0x100000u - 5 || bank_switch >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int found = 0;
+    struct hpclang_rpl_bank_binding next = {0};
+    for (uint32_t i = 0; i < 17; ++i) {
+        uint32_t value;
+        int result = word(reader, i < 16 ? flash_table + 7 * i : eram_entry, 5, &value);
+        if (result)
+            return result;
+        if (!value)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (value == bank_switch) {
+            if (found)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            next.kind = i < 16 ? HPCLANG_RPL_BANK_FLASH : HPCLANG_RPL_BANK_ERAM;
+            next.index = i < 16 ? i : 0;
+            found = 1;
+        }
+    }
+    if (found)
+        *binding = next;
+    return found;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {

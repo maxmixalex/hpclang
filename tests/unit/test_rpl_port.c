@@ -283,8 +283,41 @@ static void test_library_command_resolution(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+static void test_bank_lookup(void)
+{
+    struct image image = {.count = 125, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (uint32_t i = 0; i < 16; ++i)
+        put_word(&image, 7 * i, 0x12345 + i * i, 5);
+    put_word(&image, 120, 0x45678, 5);
+    struct hpclang_rpl_bank_binding binding = {HPCLANG_RPL_BANK_ERAM, 91};
+    for (uint32_t i = 0; i < 16; ++i) {
+        assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x12345 + i * i, &binding) == 1);
+        assert(binding.kind == HPCLANG_RPL_BANK_FLASH && binding.index == i);
+    }
+    assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x45678, &binding) == 1);
+    assert(binding.kind == HPCLANG_RPL_BANK_ERAM && binding.index == 0);
+    struct hpclang_rpl_bank_binding before = binding;
+    assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x99999, &binding) == 0);
+    assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    image.fail_at = 120;
+    assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x12345, &binding) < 0);
+    assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 120, 0x12345, 5);
+    assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x12345, &binding) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(memcmp(&before, &binding, sizeof(binding)) == 0);
+    put_word(&image, 120, 0, 5);
+    assert(hpclang_rpl_bank_lookup(&reader, 0, 120, 0x12345, &binding) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_bank_lookup(&reader, 0xfffff, 120, 0x12345, &binding) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+}
+
 int main(void)
 {
+    test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();
     test_library_references();

@@ -564,6 +564,11 @@ addresses outside the caller's mapping. The actual C implementation resolves
 161/10, 161/6 and 167/1 to the three independently matched HP50g ROM programs.
 Selecting and validating mappings across models and following executable targets
 remain unfinished; successful address resolution is not a mutation safety proof.
+The internal bank lookup reads switch entries from caller-validated ROM tables,
+rejects ambiguous matches and preserves output on error. Actual C lookup matches
+all 16 Flash entries and the ERAM entry in saved HP48gII, HP49g+ and HP50g ROMs;
+HP48gII's switch routine addresses differ from the other two models. This verifies
+table interpretation, not physical bank availability or runtime mapping ownership.
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
