@@ -56,12 +56,14 @@ int hpclang_ui_focus(struct hpclang_ui *ui, uint32_t id)
 {
     if (!ui)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building)
+    if (ui->building || ui->painting)
         return hpclang_ui_fail(NULL, EBUSY);
     if (id && find(&ui->frames[ui->current], id) == UI_ROOT)
         return hpclang_ui_fail(NULL, ENOENT);
+    uint32_t old_focus = ui->focused;
     ui->focused = id;
     ui->focus_cleared = id == 0;
+    hpclang_ui_damage_focus(ui, old_focus);
     return 0;
 }
 
@@ -69,10 +71,11 @@ int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction)
 {
     if (!ui || (direction != -1 && direction != 1))
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building)
+    if (ui->building || ui->painting)
         return hpclang_ui_fail(NULL, EBUSY);
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);
+    uint32_t old_focus = ui->focused;
     ui->focus_cleared = 0;
     for (uint32_t visited = 0; visited < frame->count; ++visited) {
         if (direction > 0)
@@ -81,10 +84,12 @@ int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction)
             index = index == UI_ROOT || !index ? frame->count - 1 : index - 1;
         if (eligible(&frame->nodes[index].view)) {
             ui->focused = frame->nodes[index].view.id;
+            hpclang_ui_damage_focus(ui, old_focus);
             return 0;
         }
     }
     ui->focused = 0;
+    hpclang_ui_damage_focus(ui, old_focus);
     return 0;
 }
 
@@ -92,7 +97,7 @@ int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event)
 {
     if (!ui || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building)
+    if (ui->building || ui->painting)
         return hpclang_ui_fail(NULL, EBUSY);
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);

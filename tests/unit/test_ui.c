@@ -349,6 +349,156 @@ static void physical_input(struct hpclang_ui *ui)
     assert(hpclang_text_mode_get(&mode, &status) == 0 && status.plane == HPCLANG_TEXT_PLAIN);
 }
 
+struct painter_test
+{
+    struct hpclang_ui *ui;
+    unsigned char front[64], back[64];
+    unsigned begins, canvases, ends, failed;
+    int fail_canvas;
+    struct hpclang_ui_rect damage;
+};
+
+static void pixels(struct painter_test *test, struct hpclang_ui_rect clip, unsigned char value)
+{
+    assert(clip.x >= 0 && clip.y >= 0 && clip.x + clip.width <= 8 && clip.y + clip.height <= 8);
+    for (int y = clip.y; y < clip.y + clip.height; ++y)
+        for (int x = clip.x; x < clip.x + clip.width; ++x)
+            test->back[y * 8 + x] = value;
+}
+
+static int paint_begin(void *context, struct hpclang_ui_rect damage)
+{
+    struct painter_test *test = context;
+    ++test->begins;
+    test->damage = damage;
+    assert(hpclang_ui_begin(test->ui) == -1 && errno == EBUSY);
+    memcpy(test->back, test->front, sizeof(test->back));
+    pixels(test, damage, 0);
+    return 0;
+}
+
+static int paint_node(void *context, const struct hpclang_ui_node *node,
+                      struct hpclang_ui_rect clip, int focused)
+{
+    (void)focused;
+    pixels(context, clip, (unsigned char)(node->text ? node->text[0] : 1));
+    return 0;
+}
+
+static int paint_canvas(void *context, const void *state, struct hpclang_ui_rect bounds,
+                        struct hpclang_ui_rect clip)
+{
+    struct painter_test *test = context;
+    ++test->canvases;
+    assert(bounds.width == 8 && bounds.height == 3);
+    if (test->fail_canvas) {
+        errno = EIO;
+        return -1;
+    }
+    pixels(test, clip, *(const unsigned char *)state);
+    return 0;
+}
+
+static int paint_end(void *context, int completed)
+{
+    struct painter_test *test = context;
+    ++test->ends;
+    if (completed)
+        memcpy(test->front, test->back, sizeof(test->front));
+    else
+        ++test->failed;
+    return 0;
+}
+
+static int paint_measure(void *context, const struct hpclang_ui_node *node,
+                         struct hpclang_ui_metrics *metrics)
+{
+    (void)context;
+    metrics->height = node->kind == HPCLANG_UI_CANVAS ? 0 : 2;
+    return 0;
+}
+
+static void canvas_view(struct hpclang_ui *ui, const char *title, const unsigned char *state,
+                        uint32_t revision)
+{
+    assert(hpclang_ui_begin(ui) == 0);
+    if (title)
+        assert(hpclang_ui_text(ui, 1, 0, title) == 0);
+    if (state)
+        assert(hpclang_ui_canvas(ui, 2, 0, paint_canvas, state, revision, 3) == 0);
+    assert(hpclang_ui_layout(ui, (struct hpclang_ui_rect){0, 0, 8, 8}, paint_measure, NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+}
+
+static void painting(struct hpclang_ui *ui)
+{
+    struct painter_test test = {.ui = ui};
+    struct hpclang_ui_painter painter = {paint_begin, paint_node, paint_end, &test, &test};
+    struct hpclang_ui_rect surface = {0, 0, 8, 8};
+    unsigned char state = 7;
+    canvas_view(ui, "A", &state, 1);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    assert(test.front[0] == 'A' && test.front[16] == 7 && test.front[40] == 0);
+    assert(test.canvases == 1 && test.begins == 1 && test.ends == 1);
+    canvas_view(ui, "A", &state, 1);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 0 && test.canvases == 1);
+    canvas_view(ui, "B", &state, 1);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1 && test.canvases == 1);
+    rectangle(test.damage, 0, 0, 8, 2);
+    assert(test.front[0] == 'B' && test.front[16] == 7);
+    state = 9;
+    canvas_view(ui, "B", &state, 2);
+    test.fail_canvas = 1;
+    assert(hpclang_ui_paint(ui, surface, &painter) == -1 && errno == EIO);
+    assert(test.failed == 1 && test.front[16] == 7);
+    test.fail_canvas = 0;
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1 && test.front[16] == 9);
+    rectangle(test.damage, 0, 2, 8, 3);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 0);
+    canvas_view(ui, NULL, &state, 2);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    assert(test.front[0] == 9 && test.front[16] == 9 && test.front[24] == 0);
+    assert(hpclang_ui_invalidate(ui, (struct hpclang_ui_rect){2, 1, 2, 1}) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    rectangle(test.damage, 2, 1, 2, 1);
+    canvas_view(ui, NULL, NULL, 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    for (size_t i = 0; i < sizeof(test.front); ++i)
+        assert(test.front[i] == 0);
+    assert(hpclang_ui_invalidate(ui, (struct hpclang_ui_rect){INT32_MIN, 0, 1, 1}) == 0);
+    assert(hpclang_ui_invalidate(ui, (struct hpclang_ui_rect){INT32_MAX - 1, 0, 1, 1}) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    rectangle(test.damage, 0, 0, 8, 1);
+
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_button(ui, 10, 0, "A", (struct hpclang_ui_action){0}, 1) == 0);
+    assert(hpclang_ui_button(ui, 20, 0, "B", (struct hpclang_ui_action){0}, 1) == 0);
+    assert(hpclang_ui_layout(ui, surface, paint_measure, NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    assert(hpclang_ui_focus_step(ui, 1) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    rectangle(test.damage, 0, 0, 8, 4);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 0);
+
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_text_input(ui, 77, 0, "abc", 16, (struct hpclang_ui_action){0}, 1) == 0);
+    assert(hpclang_ui_layout(ui, surface, paint_measure, NULL) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    assert(hpclang_ui_select(ui, 0, 0) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    rectangle(test.damage, 0, 0, 8, 2);
+    struct hpclang_ui_event event;
+    assert(hpclang_ui_edit(ui, HPCLANG_INPUT_RIGHT, 0, &event) == 1);
+    assert(hpclang_ui_paint(ui, surface, &painter) == 1);
+    rectangle(test.damage, 0, 0, 8, 2);
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_text(ui, 3, 0, "not laid out") == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    assert(hpclang_ui_paint(ui, surface, &painter) == -1 && errno == EINVAL);
+}
+
 static void capacity(void)
 {
     struct hpclang_ui_config config = {2, 8};
@@ -397,6 +547,7 @@ int main(void)
     focus(ui);
     controlled_input(ui);
     physical_input(ui);
+    painting(ui);
     free(storage);
     capacity();
     return 0;

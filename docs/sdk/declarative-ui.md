@@ -2,7 +2,8 @@
 
 The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
-model-aware physical-key routing. Effects and rendering are still being implemented.
+model-aware physical-key routing, revision-driven canvas callbacks and damage
+tracking. Effects and concrete calculator renderers are still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -169,3 +170,40 @@ edit still consumes native one-shot modifier state, matching the line editor.
 Host tests feed all six model layouts, including one-shot Alpha, release events,
 delimiter pairs and capacity recovery. Actual GPIO/display integration remains
 part of the interactive calculator example's acceptance.
+
+## Canvas and damaged regions
+
+`hpclang_ui_canvas` declares a paint callback, borrowed application state, a
+revision and preferred height. The callback descriptor is copied into the node;
+keep its state alive through painting or removal. Increment the revision when
+mutating the state in place. The layout engine supplies bounds and a clipped
+paint region. Canvas callbacks must obey that clip; a concrete renderer owns
+the drawing context and its display/surface access.
+
+After successful declaration/layout/commit, `hpclang_ui_paint` invokes the
+selected painter only when there is damage. Nonempty declarations without
+layout are rejected. Changes to visible text, style, enabled state, selection,
+focus, geometry or canvas revision add old and new affected regions. Removal
+therefore clears the old pixels. Exposure and theme/backend changes use
+`hpclang_ui_invalidate`. Identical idle declarations produce no drawing calls.
+
+Damage is stored as one bounded union, using wide coordinates internally and
+clipping to the complete target surface before callbacks. This is conservative:
+separate changes can also redraw the space between them. It does not allocate
+a growing rectangle list. Canvas callbacks run when their revision changes or
+their region intersects damage, including movement, resize or exposure.
+
+A painter supplies `begin`, `node` and `end`, plus a context passed to canvas
+callbacks. `begin` prepares/clears the damaged region. Ordinary nodes are painted
+in declaration order; transparent identity scopes are skipped. After successful
+`begin`, `end` always runs. It receives `completed=0` after drawing failure so
+the backend can release resources without publishing an incomplete frame.
+All damage remains pending after any failure and is retried on the next call.
+Callbacks cannot mutate/reenter the UI. Successful drawing preserves errno.
+
+This interface does not acquire a display mode, expose framebuffer addresses
+or publish an LCD page. The concrete renderer must enforce clipping and manage
+its own surface ownership, page contents and presentation. A host pixel backend
+currently verifies idle behavior, partial updates, move/delete cleanup,
+failure/retry, focus/cursor invalidation and clipping. The standard grayscale
+renderer and calculator execution tests remain pending.

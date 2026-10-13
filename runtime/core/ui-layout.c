@@ -109,6 +109,8 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
                                    result == -1 ? (callback_error ? callback_error : EIO) : EINVAL);
         if (node->metrics.width < 0 || node->metrics.height < 0)
             return hpclang_ui_fail(ui, EINVAL);
+        if (node->view.kind == HPCLANG_UI_CANVAS)
+            node->metrics.height = maximum(node->metrics.height, node->view.preferred_height);
     }
     /* Reverse traversal completes nested container sizes before their parents.
      * Transparent identity scopes do not introduce layout boxes or extra gaps. */
@@ -160,5 +162,7 @@ int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
         prepare_children(node);
     }
     ui->arranged = 1;
+    frame->viewport = viewport;
+    frame->laid_out = 1;
     return 0;
 }

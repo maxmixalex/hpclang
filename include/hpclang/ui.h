@@ -23,6 +23,10 @@ extern "C"
         uint16_t padding_x, padding_y, gap, grow;
     };
 
+    typedef int (*hpclang_ui_canvas_paint_fn)(void *paint_context, const void *state,
+                                              struct hpclang_ui_rect bounds,
+                                              struct hpclang_ui_rect clip);
+
     enum hpclang_ui_kind
     {
         HPCLANG_UI_COMPONENT = 1,
@@ -31,7 +35,8 @@ extern "C"
         HPCLANG_UI_ROW,
         HPCLANG_UI_TEXT,
         HPCLANG_UI_BUTTON,
-        HPCLANG_UI_INPUT
+        HPCLANG_UI_INPUT,
+        HPCLANG_UI_CANVAS
     };
 
     struct hpclang_ui_config
@@ -77,6 +82,10 @@ extern "C"
         struct hpclang_ui_action action;
         int enabled;
         size_t capacity, cursor, anchor;
+        hpclang_ui_canvas_paint_fn paint;
+        const void *canvas_state;
+        uint32_t revision;
+        int32_t preferred_height;
     };
 
     /* Allocate once, or supply suitably aligned static storage. Initialization and
@@ -106,6 +115,12 @@ extern "C"
     int hpclang_ui_text(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text);
     int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *text,
                           struct hpclang_ui_action action, int enabled);
+    /* State is borrowed through painting/removal; update revision when mutable
+     * state changes. Callback/state addresses are not dereferenced during
+     * declaration. Bounds are layout-owned; painting must honor clip. */
+    int hpclang_ui_canvas(struct hpclang_ui *ui, uint32_t key, uint16_t style,
+                          hpclang_ui_canvas_paint_fn paint, const void *state, uint32_t revision,
+                          int32_t preferred_height);
     /* Single-line controlled UTF-8 input. capacity includes NUL and must fit the
      * context's text budget. Selection offsets are UTF-8 byte boundaries.
      * Edit emits a proposal without changing displayed/model text. Commit a new
@@ -149,6 +164,28 @@ extern "C"
                                          struct hpclang_ui_metrics *metrics);
     int hpclang_ui_layout(struct hpclang_ui *ui, struct hpclang_ui_rect viewport,
                           hpclang_ui_measure_fn measure, void *context);
+
+    struct hpclang_ui_painter
+    {
+        /* begin clears/prepares the damaged region. node paints ordinary nodes
+         * in declaration order. Canvas callbacks receive canvas_context.
+         * After a successful begin, end is always called, even on draw failure;
+         * completed=0 means release resources without claiming a good frame. */
+        int (*begin)(void *context, struct hpclang_ui_rect damage);
+        int (*node)(void *context, const struct hpclang_ui_node *node, struct hpclang_ui_rect clip,
+                    int focused);
+        int (*end)(void *context, int completed);
+        void *context;
+        void *canvas_context;
+    };
+    /* Commit, focus and selection changes accumulate bounded damage. Explicit
+     * invalidation covers exposure/theme changes. Paint clips to the complete
+     * target surface, retries all damage after failure, and does nothing when
+     * clean. Returns 1/painted, 0/clean or off-surface, -1/errno. Callbacks must
+     * not mutate/reenter ui. No display acquisition or publication is implicit. */
+    int hpclang_ui_invalidate(struct hpclang_ui *ui, struct hpclang_ui_rect rect);
+    int hpclang_ui_paint(struct hpclang_ui *ui, struct hpclang_ui_rect surface,
+                         const struct hpclang_ui_painter *painter);
 
 #ifdef __cplusplus
 }

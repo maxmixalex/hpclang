@@ -22,6 +22,8 @@ struct frame
     char *text;
     uint32_t count;
     size_t text_used;
+    struct hpclang_ui_rect viewport;
+    int laid_out;
 };
 
 struct hpclang_ui
@@ -34,11 +36,16 @@ struct hpclang_ui
     char *edit_text;
     uint32_t edit_pending;
     size_t edit_cursor, edit_anchor;
+    int painting, dirty;
+    int64_t damage_left, damage_top, damage_right, damage_bottom;
 };
 
 int hpclang_ui_fail(struct hpclang_ui *ui, int error);
 void hpclang_ui_reconcile_focus(struct hpclang_ui *ui);
 int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kind, uint16_t style,
                    const char *text);
+void hpclang_ui_damage(struct hpclang_ui *ui, struct hpclang_ui_rect rect);
+void hpclang_ui_damage_commit(struct hpclang_ui *ui, uint32_t old_focus);
+void hpclang_ui_damage_focus(struct hpclang_ui *ui, uint32_t old_focus);
 
 #endif

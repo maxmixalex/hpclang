@@ -53,7 +53,7 @@ int hpclang_ui_begin(struct hpclang_ui *ui)
 {
     if (!ui)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building)
+    if (ui->building || ui->painting)
         return hpclang_ui_fail(NULL, EBUSY);
     if (ui->epoch == UINT32_MAX)
         return hpclang_ui_fail(NULL, EOVERFLOW);
@@ -61,6 +61,8 @@ int hpclang_ui_begin(struct hpclang_ui *ui)
     struct frame *next = &ui->frames[ui->current ^ 1u];
     next->count = 0;
     next->text_used = 0;
+    next->viewport = (struct hpclang_ui_rect){0};
+    next->laid_out = 0;
     ui->pending_id = ui->last_id;
     ui->parent = UI_ROOT;
     ui->error = 0;
@@ -71,7 +73,7 @@ int hpclang_ui_begin(struct hpclang_ui *ui)
 
 void hpclang_ui_abort(struct hpclang_ui *ui)
 {
-    if (ui && ui->measuring) {
+    if (ui && (ui->measuring || ui->painting)) {
         hpclang_ui_fail(ui, EBUSY);
         return;
     }
@@ -81,7 +83,7 @@ void hpclang_ui_abort(struct hpclang_ui *ui)
 
 int hpclang_ui_commit(struct hpclang_ui *ui)
 {
-    if (ui && ui->measuring)
+    if (ui && (ui->measuring || ui->painting))
         return hpclang_ui_fail(ui, EBUSY);
     if (!ui || !ui->building)
         return hpclang_ui_fail(NULL, EINVAL);
@@ -90,7 +92,9 @@ int hpclang_ui_commit(struct hpclang_ui *ui)
     ui->building = 0;
     if (ui->error)
         return hpclang_ui_fail(NULL, ui->error);
+    uint32_t old_focus = ui->focused;
     hpclang_ui_reconcile_focus(ui);
+    hpclang_ui_damage_commit(ui, old_focus);
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
     ui->edit_pending = 0;
@@ -206,5 +210,22 @@ int hpclang_ui_button(struct hpclang_ui *ui, uint32_t key, uint16_t style, const
     struct frame *next = &ui->frames[ui->current ^ 1u];
     next->nodes[next->count - 1].view.action = action;
     next->nodes[next->count - 1].view.enabled = enabled;
+    return 0;
+}
+
+int hpclang_ui_canvas(struct hpclang_ui *ui, uint32_t key, uint16_t style,
+                      hpclang_ui_canvas_paint_fn paint, const void *state, uint32_t revision,
+                      int32_t preferred_height)
+{
+    if (!paint || preferred_height < 0)
+        return hpclang_ui_fail(ui, EINVAL);
+    if (hpclang_ui_add(ui, key, HPCLANG_UI_CANVAS, style, NULL))
+        return -1;
+    struct frame *next = &ui->frames[ui->current ^ 1u];
+    struct hpclang_ui_node *node = &next->nodes[next->count - 1].view;
+    node->paint = paint;
+    node->canvas_state = state;
+    node->revision = revision;
+    node->preferred_height = preferred_height;
     return 0;
 }

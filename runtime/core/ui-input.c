@@ -109,7 +109,7 @@ int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor)
 {
     if (!ui)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->edit_pending)
+    if (ui->building || ui->painting || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -118,6 +118,8 @@ int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor)
     if (cursor > length || anchor > length || clamp(node->text, length, cursor) != cursor ||
         clamp(node->text, length, anchor) != anchor)
         return hpclang_ui_fail(NULL, EINVAL);
+    if (node->cursor != cursor || node->anchor != anchor)
+        hpclang_ui_damage(ui, node->clip);
     node->cursor = cursor;
     node->anchor = anchor;
     return 0;
@@ -129,7 +131,7 @@ static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
     enum hpclang_input_action action = plan->action;
     if (!ui || !event || action < HPCLANG_INPUT_INSERT || action > HPCLANG_INPUT_CANCEL)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->edit_pending)
+    if (ui->building || ui->painting || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -168,6 +170,7 @@ static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
         if (input.cursor == node->cursor && node->anchor == input.cursor)
             return 0;
         kind = HPCLANG_UI_SELECTION;
+        hpclang_ui_damage(ui, node->clip);
         node->cursor = node->anchor = input.cursor;
     }
     *event = (struct hpclang_ui_event){
@@ -193,7 +196,7 @@ int hpclang_ui_key(struct hpclang_ui *ui, struct hpclang_text_mode *mode,
 {
     if (!ui || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->edit_pending)
+    if (ui->building || ui->painting || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_input_plan plan;
     int result = hpclang_input_plan_event(mode, key, &plan);
