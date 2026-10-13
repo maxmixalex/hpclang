@@ -54,5 +54,37 @@ uint32_t hpclang_e2e_port_reads(void)
     int duplicate = hpclang_port_backup_create(0, (const uint8_t *)"PORTNEW", 7, value);
     int rejected = duplicate == -1 && errno == EEXIST;
     hpclang_object_release(value);
-    return correct && rejected ? 0 : 0xd8;
+    if (!correct || !rejected)
+        return 0xd8;
+    static const uint8_t text[] = "Port backup grows before shrinking";
+    if (hpclang_object_create_string(text, sizeof(text) - 1, &created))
+        return 0xd9;
+    written = hpclang_port_backup_replace(0, (const uint8_t *)"PORTNEW", 7, created);
+    hpclang_object_release(created);
+    if (written)
+        return 0xda;
+    value = hpclang_port_backup_get(0, (const uint8_t *)"PORTNEW", 7);
+    uint8_t copied[sizeof(text)] = {0};
+    size_t length = 0;
+    correct = value && hpclang_object_string_size(value, &length) == 0 &&
+              hpclang_object_string_copy(value, copied, sizeof(copied)) == 0 &&
+              length == sizeof(text) - 1 && !memcmp(text, copied, length);
+    hpclang_object_release(value);
+    if (!correct)
+        return 0xdb;
+    if (hpclang_object_create_integer_i64(654, &created))
+        return 0xdc;
+    written = hpclang_port_backup_replace(0, (const uint8_t *)"PORTNEW", 7, created);
+    hpclang_object_release(created);
+    if (written)
+        return 0xdd;
+    value = hpclang_port_backup_get(0, (const uint8_t *)"PORTNEW", 7);
+    correct = value && hpclang_object_integer_i64(value, &integer) == 0 && integer == 654;
+    hpclang_object_release(value);
+    if (!correct || hpclang_port_backup_remove(0, (const uint8_t *)"PORTNEW", 7))
+        return 0xde;
+    value = hpclang_port_backup_get(0, (const uint8_t *)"PORTNEW", 7);
+    correct = !value && errno == ENOENT;
+    hpclang_object_release(value);
+    return correct ? 0 : 0xdf;
 }

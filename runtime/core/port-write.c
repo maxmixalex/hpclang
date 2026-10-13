@@ -15,10 +15,11 @@ static int snapshot_read(void *context, uint32_t offset, uint8_t *value)
     return hpclang_object_snapshot_read_nibble(*object, offset, value);
 }
 
-int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
-                               const struct hpclang_object *value)
+static int mutation_result(int result);
+
+static int writable_port(uint32_t port)
 {
-    if (port > 2 || (!name && name_length) || name_length > 255 || !value) {
+    if (port > 2) {
         errno = EINVAL;
         return -1;
     }
@@ -29,6 +30,18 @@ int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name
         errno = ENOSYS;
         return -1;
     }
+    return 0;
+}
+
+static int write_backup(uint32_t port, const uint8_t *name, uint32_t name_length,
+                        const struct hpclang_object *value, int replace)
+{
+    if ((!name && name_length) || name_length > 255 || !value) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (writable_port(port))
+        return -1;
     const struct hpclang_rpl_reader source = {snapshot_read, &value};
     uint8_t *packed = NULL;
     uint32_t span;
@@ -45,13 +58,51 @@ int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name
         errno = ENOSYS;
         return -1;
     }
-    result = hpclang_rpl_port0_create_backup(&io, packed, span);
+    result = replace ? hpclang_rpl_port0_replace_backup(&io, packed, span)
+                     : hpclang_rpl_port0_create_backup(&io, packed, span);
     free(packed);
+    return mutation_result(result);
+}
+
+int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
+                               const struct hpclang_object *value)
+{
+    return write_backup(port, name, name_length, value, 0);
+}
+
+int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
+                                const struct hpclang_object *value)
+{
+    return write_backup(port, name, name_length, value, 1);
+}
+
+int hpclang_port_backup_remove(uint32_t port, const uint8_t *name, uint32_t name_length)
+{
+    if ((!name && name_length) || name_length > 255) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (writable_port(port))
+        return -1;
+    struct hpclang_rpl_stock_memory memory;
+    struct hpclang_rpl_mutation_io io;
+    if (!hpclang_rpl_stock_mutation_io(&io, &memory)) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return mutation_result(hpclang_rpl_port0_remove_backup(&io, name, name_length));
+}
+
+static int mutation_result(int result)
+{
     switch (result) {
     case HPCLANG_RPL_MUTATION_OK:
         return 0;
     case HPCLANG_RPL_MUTATION_EXISTS:
         errno = EEXIST;
+        break;
+    case HPCLANG_RPL_MUTATION_NOT_FOUND:
+        errno = ENOENT;
         break;
     case HPCLANG_RPL_MUTATION_NOSPACE:
         errno = ENOSPC;

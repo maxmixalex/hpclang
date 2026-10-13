@@ -112,8 +112,8 @@ int hpclang_rpl_port0_remove_backup(const struct hpclang_rpl_mutation_io *io, co
     return hpclang_rpl_mutation_port0_remove_record(io, target.address, target.span);
 }
 
-int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
-                                    uint32_t span)
+static int prepend_record(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
+                          uint32_t span, uint32_t prologue)
 {
     if (!io || !io->read_nibble || !io->write_nibble)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -124,7 +124,7 @@ int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, co
     struct hpclang_rpl_port_cursor input_cursor = {.end = span};
     struct hpclang_rpl_port_entry added;
     int result = hpclang_rpl_port_next(&input, &input_cursor, &added);
-    if (result != 1 || added.prologue != 0x02b62u || added.span != span)
+    if (result != 1 || added.prologue != prologue || added.span != span)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     uint32_t start;
     result = port_start(io, &start);
@@ -134,8 +134,10 @@ int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, co
     struct hpclang_rpl_port_cursor cursor = {start, 0x100000u, 0};
     struct hpclang_rpl_port_entry existing;
     while ((result = hpclang_rpl_port_next(&reader, &cursor, &existing)) > 0) {
-        if (existing.prologue == added.prologue && existing.name_length == added.name_length &&
-            !memcmp(existing.name, added.name, added.name_length))
+        if (existing.prologue == added.prologue &&
+            (prologue == 0x02b40u ? existing.library_number == added.library_number
+                                  : existing.name_length == added.name_length &&
+                                        !memcmp(existing.name, added.name, added.name_length)))
             return HPCLANG_RPL_MUTATION_EXISTS;
     }
     if (result < 0)
@@ -164,13 +166,25 @@ int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, co
         if (!io->write_nibble(io->context, destination + i, nibble))
             return HPCLANG_RPL_MUTATION_IO;
     }
-    /* Publish only after the complete backup is present. Existing port objects
+    /* Publish only after the complete record is present. Existing port objects
      * and installed library addresses have not moved. */
     for (uint32_t i = 0; i < 5; ++i)
         if (!io->write_nibble(io->context, 0x80716u + i,
                               (uint8_t)((destination >> (4u * i)) & 15u)))
             return HPCLANG_RPL_MUTATION_IO;
     return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
+                                    uint32_t span)
+{
+    return prepend_record(io, packed, span, 0x02b62u);
+}
+
+int hpclang_rpl_port0_create_library(const struct hpclang_rpl_mutation_io *io,
+                                     const uint8_t *packed, uint32_t span)
+{
+    return prepend_record(io, packed, span, 0x02b40u);
 }
 
 int hpclang_rpl_port0_replace_backup(const struct hpclang_rpl_mutation_io *io,

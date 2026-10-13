@@ -449,6 +449,14 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 
 #### M8.0 — Native port services
 
+Local implementation now includes Port 0 backup create, variable-size replace
+and remove, with owned reads and preservation of live references to old records.
+The native library table participates in reference scanning. Library record
+creation is internal and does not register or attach a library. Existing-library
+relocation, public library mutation and Port 1/2 remain unfinished. The 81 host
+tests and focused mutation/port sanitizer tests pass; Stock acceptance of the
+new public replace/remove flow is pending. These results do not close M8.0.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.

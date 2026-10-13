@@ -1300,6 +1300,70 @@ static void test_overwrite_port_value_preserves_references(void)
     free(value);
 }
 
+static void test_port0_create_library(void)
+{
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    for (int failure_case = 0; failure_case < 5; ++failure_case) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        uint32_t object = prepare_named_char('A');
+        uint32_t port = object + 7;
+        put_word(0x80716, 5, port);
+        uint8_t packed[22] = {0};
+        for (uint32_t i = 0; i < 43; ++i) {
+            uint8_t nibble = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+            packed[i / 2] |= nibble << (4 * (i & 1));
+        }
+        uint32_t root = object;
+        uint32_t *roots[] = {&root};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        uint32_t dstk = get_word(DSKTOP, 5);
+        put_word(dstk, 5, object);
+        if (failure_case == 1)
+            packed[21] ^= 1; /* Invalid CRC. */
+        else if (failure_case == 2)
+            io.user_limit = dstk;
+        else if (failure_case == 3)
+            rejected_read = port - 1;
+        else if (failure_case == 4)
+            packed[0] = 0x62; /* Backup prologue cannot enter the library path. */
+        int result = hpclang_rpl_port0_create_library(&io, packed, 43);
+        if (failure_case) {
+            assert(result != HPCLANG_RPL_MUTATION_OK && writes == 0);
+            assert(root == object && get_word(DSKTOP, 5) == dstk);
+            assert(get_word(0x80716, 5) == port);
+            continue;
+        }
+        assert(result == HPCLANG_RPL_MUTATION_OK);
+        assert(root == object - 43 && get_word(dstk - 43, 5) == root);
+        assert_char_at(root, 'A');
+        const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        struct hpclang_rpl_port_cursor cursor = {port - 43, NIBBLES, 0};
+        struct hpclang_rpl_port_entry entry;
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1);
+        assert(entry.prologue == 0x02b40 && entry.library_number == 123);
+        assert(entry.name_length == 1 && entry.name[0] == 'X');
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+        uint32_t before = writes;
+        assert(hpclang_rpl_port0_create_library(&io, packed, 43) == HPCLANG_RPL_MUTATION_EXISTS);
+        assert(writes == before);
+        /* A different title does not make the same library ID unique. */
+        packed[6] = 'Y';
+        uint32_t crc = 0;
+        for (uint32_t i = 5; i < 39; ++i) {
+            uint8_t nibble = (packed[i / 2] >> (4 * (i & 1))) & 15;
+            crc = (crc >> 4) ^ (((crc ^ nibble) & 15) * 0x1081);
+        }
+        for (uint32_t i = 0; i < 4; ++i) {
+            uint32_t shift = 4 * ((39 + i) & 1);
+            packed[(39 + i) / 2] =
+                (packed[(39 + i) / 2] & ~(15u << shift)) | (((crc >> (4 * i)) & 15) << shift);
+        }
+        assert(hpclang_rpl_port0_create_library(&io, packed, 43) == HPCLANG_RPL_MUTATION_EXISTS);
+        assert(writes == before);
+    }
+}
+
 static void test_port0_create_preserves_home_and_library(void)
 {
     const char *backup = "26b20130008005f42545a55425f48041620900003210119200f9e3";
@@ -1381,6 +1445,7 @@ static void test_port0_create_preserves_home_and_library(void)
 
 int main(void)
 {
+    test_port0_create_library();
     test_library_table_reference_preservation();
     test_port_remove_preserves_backup_references();
     test_backup_overwrite_preserves_old_value_and_crc();

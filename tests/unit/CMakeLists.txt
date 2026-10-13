@@ -321,6 +321,7 @@ target_include_directories(test_object_store PRIVATE
 
 hpclang_unit(port
     test_port.c
+    "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     "${HPCLANG_ROOT}/runtime/core/port-write.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-mutation.c"

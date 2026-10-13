@@ -58,6 +58,14 @@ extern "C"
     int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
                                    const struct hpclang_object *value);
 
+    /* Replace/remove an existing backup; missing names return ENOENT. Live
+     * calculator references retain the old value. Currently Port 0 only;
+     * operations requiring relocation of a preceding library return ENOTSUP.
+     * Replacement never implicitly creates a missing backup. */
+    int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
+                                    const struct hpclang_object *value);
+    int hpclang_port_backup_remove(uint32_t port, const uint8_t *name, uint32_t name_length);
+
 #ifdef __cplusplus
 }
 #endif
