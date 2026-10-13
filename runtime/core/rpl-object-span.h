@@ -42,6 +42,16 @@ extern "C"
     int hpclang_rpl_object_span(const struct hpclang_rpl_reader *reader, uint32_t address,
                                 uint32_t limit, uint32_t *span);
 
+    /* DOARRY bodies omit the shared prologue. Visit each bounded body with its
+     * declared type; no synthetic prefix is written into native memory. A
+     * nonzero read-only callback result aborts and is returned unchanged.
+     * Discard partial traversal on error and keep the reader mapping stable.
+     * Linked arrays have a different layout and are not accepted here. */
+    typedef int (*hpclang_rpl_array_visit_fn)(void *context, uint32_t index, uint32_t prologue,
+                                              uint32_t body, uint32_t nibbles);
+    int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                uint32_t limit, hpclang_rpl_array_visit_fn visit, void *context);
+
 #ifdef __cplusplus
 }
 #endif

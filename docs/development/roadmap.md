@@ -515,6 +515,14 @@ references from library 275 in a saved HP50g native state. This supplies one
 structural traversal component; complete live-root and executable-reference
 coverage, and public Port 1 replacement/removal, remain open.
 
+The internal compact-array visitor supplies each element's shared type and
+bounded body without writing a synthetic prologue into native memory. Tests
+cover strings, multidimensional numbers, banked-pointer bodies, empty arrays,
+truncation, overflow and callback cancellation. The same C implementation reads
+all 13 strings in library 275's native HP50g message array with an exact ending
+boundary. Linked arrays and address-dependent directory bodies are not yet
+accepted; this component does not by itself certify reference safety.
+
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
   single model's mapping to all six calculators.

@@ -425,8 +425,125 @@ static void test_unknown_and_unfrozen_objects(void)
     assert(hpclang_rpl_object_span(&reader, 0u, image.used, &span) == HPCLANG_RPL_SPAN_UNSUPPORTED);
 }
 
+struct array_visit_state
+{
+    uint32_t count;
+    uint32_t type;
+    uint32_t next;
+    uint32_t sizes[3];
+    int stop;
+};
+
+static int array_visit(void *context, uint32_t index, uint32_t type, uint32_t body,
+                       uint32_t nibbles)
+{
+    struct array_visit_state *state = context;
+    assert(index == state->count);
+    assert(type == state->type);
+    assert(body == state->next);
+    assert(index < 3 && nibbles == state->sizes[index]);
+    state->next += nibbles;
+    ++state->count;
+    return state->stop;
+}
+
+static void test_array_bodies(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    /* Two compact strings: their size words include themselves, not a prologue. */
+    put_nibbles(&image, 0, 0x029e8, 5);
+    put_nibbles(&image, 5, 34, 5);
+    put_nibbles(&image, 10, 0x02a2c, 5);
+    put_nibbles(&image, 15, 1, 5);
+    put_nibbles(&image, 20, 2, 5);
+    put_nibbles(&image, 25, 5, 5);
+    put_nibbles(&image, 30, 9, 5);
+    put_nibbles(&image, 35, 0x4241, 4);
+    struct image original = image;
+    struct array_visit_state state = {0, 0x02a2c, 25, {5, 9}, 0};
+    assert(hpclang_rpl_array_visit(&reader, 0, 39, array_visit, &state) == 0);
+    assert(state.count == 2 && state.next == 39);
+    assert(memcmp(&image, &original, sizeof(image)) == 0);
+    for (uint32_t limit = 0; limit < 39; ++limit) {
+        state = (struct array_visit_state){0, 0x02a2c, 25, {5, 9}, 0};
+        assert(hpclang_rpl_array_visit(&reader, 0, limit, array_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    state = (struct array_visit_state){0, 0x02a2c, 25, {5, 9}, 71};
+    assert(hpclang_rpl_array_visit(&reader, 0, 39, array_visit, &state) == 71);
+    assert(state.count == 1);
+    /* A valid first body does not make a truncated second body safe. */
+    put_nibbles(&image, 30, 10, 5);
+    state = (struct array_visit_state){0, 0x02a2c, 25, {5, 9}, 0};
+    assert(hpclang_rpl_array_visit(&reader, 0, 39, array_visit, &state) != 0);
+    assert(state.count == 1);
+    image = original;
+    put_nibbles(&image, 20, 1, 5);
+    state = (struct array_visit_state){0, 0x02a2c, 25, {5}, 0};
+    assert(hpclang_rpl_array_visit(&reader, 0, 39, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    /* A two-dimensional numeric array has fixed-size bodies. */
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0, 0x029e8, 5);
+    put_nibbles(&image, 5, 57, 5);
+    put_nibbles(&image, 10, 0x02933, 5);
+    put_nibbles(&image, 15, 2, 5);
+    put_nibbles(&image, 20, 1, 5);
+    put_nibbles(&image, 25, 2, 5);
+    image.used = 62;
+    state = (struct array_visit_state){0, 0x02933, 30, {16, 16}, 0};
+    assert(hpclang_rpl_array_visit(&reader, 0, 62, array_visit, &state) == 0);
+    assert(state.count == 2);
+    put_nibbles(&image, 20, 0xfffff, 5);
+    put_nibbles(&image, 25, 0xfffff, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 62, array_visit, &state) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_array_visit(NULL, 0, 62, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_array_visit(&reader, UINT32_MAX - 10, 62, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    /* Banked-pointer bodies must remain visible to the reference walker. */
+    memset(&image, 0, sizeof(image));
+    put_nibbles(&image, 0, 0x029e8, 5);
+    put_nibbles(&image, 5, 30, 5);
+    put_nibbles(&image, 10, 0x02baa, 5);
+    put_nibbles(&image, 15, 1, 5);
+    put_nibbles(&image, 20, 1, 5);
+    put_nibbles(&image, 25, 0x4001c, 5);
+    put_nibbles(&image, 30, 0x23c21, 5);
+    state = (struct array_visit_state){0, 0x02baa, 25, {10}, 0};
+    assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) == 0);
+    assert(state.count == 1);
+    /* Missing header reads, unknown types and linked layouts fail closed. */
+    for (uint32_t used = 0; used < 25; ++used) {
+        image.used = used;
+        state.count = 0;
+        assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    image.used = 35;
+    put_nibbles(&image, 10, 0x54321, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put_nibbles(&image, 10, 0x02a96, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put_nibbles(&image, 0, 0x02a0a, 5);
+    assert(hpclang_rpl_array_visit(&reader, 0, 35, array_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    /* Empty arrays still require an exact declared extent. */
+    put_nibbles(&image, 0, 0x029e8, 5);
+    put_nibbles(&image, 5, 20, 5);
+    put_nibbles(&image, 10, 0x02933, 5);
+    put_nibbles(&image, 20, 0, 5);
+    state.count = 0;
+    assert(hpclang_rpl_array_visit(&reader, 0, 25, array_visit, &state) == 0);
+    assert(state.count == 0);
+}
+
 int main(void)
 {
+    test_array_bodies();
     test_address_overflow_is_bounded();
     test_fixed_objects();
     test_length_prefixed();

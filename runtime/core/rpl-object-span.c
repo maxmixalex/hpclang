@@ -543,3 +543,83 @@ int hpclang_rpl_object_span(const struct hpclang_rpl_reader *reader, uint32_t ad
     *span = 0u;
     return parse_object(reader, address, limit, 0u, span);
 }
+
+struct array_body_reader
+{
+    const struct hpclang_rpl_reader *source;
+    uint32_t prefix;
+    uint32_t prologue;
+};
+
+static int array_body_read(void *context, uint32_t address, uint8_t *value)
+{
+    const struct array_body_reader *body = context;
+    if (address >= body->prefix && address - body->prefix < 5) {
+        *value = (uint8_t)((body->prologue >> (4 * (address - body->prefix))) & 15);
+        return 1;
+    }
+    return body->source->read_nibble(body->source->context, address, value);
+}
+
+int hpclang_rpl_array_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                            uint32_t limit, hpclang_rpl_array_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address > UINT32_MAX - limit || limit < 20)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t type, span;
+    int result = read_nibbles(reader, address, 5, limit, &type);
+    if (result)
+        return result;
+    if (type != RPL_DOARRY)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    result = length_prefixed_span(reader, address, limit, &span);
+    if (result)
+        return result;
+    if (span < 20)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t element, dimensions;
+    result = read_nibbles(reader, address + 10, 5, span - 10, &element);
+    if (result)
+        return result;
+    result = read_nibbles(reader, address + 15, 5, span - 15, &dimensions);
+    if (result)
+        return result;
+    if (!dimensions || dimensions > (span - 20) / 5)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (!hpclang_rpl_object_prologue_known(element))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    /* Directory layout depends on its real address and USEROB. A virtual
+     * prologue cannot establish that identity for a compact array body. */
+    if (element == RPL_DORRP)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t count = 1;
+    for (uint32_t axis = 0; axis < dimensions; ++axis) {
+        uint32_t size;
+        result = read_nibbles(reader, address + 20 + axis * 5, 5, span - 20 - axis * 5, &size);
+        if (result)
+            return result;
+        if (size && count > UINT32_MAX / size)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        count *= size;
+    }
+    uint32_t offset = 20 + dimensions * 5;
+    if (count > span - offset)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (uint32_t index = 0; index < count; ++index) {
+        struct array_body_reader body = {reader, address + offset - 5, element};
+        struct hpclang_rpl_reader synthetic = {array_body_read, &body};
+        uint32_t length;
+        result = parse_object(&synthetic, body.prefix, span - offset + 5, 0, &length);
+        if (result)
+            return result;
+        if (length <= 5)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        result = visit(context, index, element, address + offset, length - 5);
+        if (result)
+            return result;
+        offset += length - 5;
+    }
+    return offset == span ? 0 : HPCLANG_RPL_SPAN_MALFORMED;
+}
