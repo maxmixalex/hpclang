@@ -468,15 +468,21 @@ The first source-SDK slice provides installation, relocation, an external C/C++
 build API, generated font selection and HPC1 packaging. Local relocation/build,
 format/lint, ARM example analysis and strict docs pass. Core CI now exercises
 the installed package. The first slice is accepted by Core, Quality, Runtime,
-Objects and Storage CI on `9faa4882` and integrated into main. Complete Stock
-launcher bundles and full M8.1 delivery remain pending; see
-[SDK getting started](../sdk/getting-started.md).
+Objects and Storage CI on `9faa4882` and integrated into main. The complete
+packaging slice adds six-model raw/wrapped launchers and HP39 Aplet envelopes
+through builders shared with E2E. Relocated external C/C++ builds, missing-output
+regeneration and all three HP39 Aplet packages pass with declared historical
+dependencies and a Clang-built host packager. Core, Quality, Runtime, Objects,
+Storage and Gallery CI accept `5eea74c9`; M8.1 is complete. See
+[SDK getting started](../sdk/getting-started.md). This accepts the source SDK
+and its build/package contract; UI and integrated release acceptance remain
+in their subsequent stages.
 
-- [ ] Package the public headers, libraries, fonts/assets, target configuration
+- [x] Package the public headers, libraries, fonts/assets, target configuration
   and launcher/packaging tools with an explicit supported toolchain contract.
-- [ ] Build and package external C and C++ examples using only the installed
+- [x] Build and package external C and C++ examples using only the installed
   SDK and declared dependencies in a fresh LLVM-only environment.
-- [ ] Start application-facing installation, build and capability documentation
+- [x] Start application-facing installation, build and capability documentation
   separately from the internal Development reference. Keep examples usable
   without depending on repository research or test infrastructure.
 

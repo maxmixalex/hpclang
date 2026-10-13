@@ -1,10 +1,10 @@
 # Build an application with the installed SDK
 
 The initial M8 SDK is a relocatable source package. It includes public headers,
-runtime sources, generated fonts, CMake integration and the HPC1 packer. The
+runtime sources, generated fonts, CMake integration and launcher packaging tools. The
 runtime library is compiled once in each application build with the selected
-toolchain. Prebuilt runtime archives and complete Stock installation bundles
-are not yet part of this package.
+toolchain. Calculator packaging uses explicit external ARMToolbox dependencies;
+the SDK does not redistribute those historical libraries or firmware.
 
 ## Requirements
 
@@ -47,10 +47,15 @@ cmake -S hello -B build/hello \
 cmake --build build/hello
 ```
 
-This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`.
+This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`,
+plus `hello_c-launchers/` and `hello_cpp-launchers/` with all six model launchers.
 The HPC1 payload is model-independent; it is not a calculator transfer file.
-Model-specific Stock wrapping, the HP39 Aplet installer and external packaging
-dependencies remain part of the next SDK delivery slice. The small examples
+Each launcher directory contains raw `.bin` images and wrapped `.hp` objects.
+HP48gII/HP49g+/HP50g use the wrapped object with the corresponding installed
+ARMToolbox library. HP39g+/HP39gs/HP40gs need an additional Aplet envelope;
+the `.hp` file is an intermediate input, not a directly installable Aplet.
+`hpclang_target_aplet` creates that envelope when supplied with the prepared
+historical host tool and assets described below. The small examples
 draw a greeting and return immediately; they are build examples, not interactive
 applications or calculator execution acceptance tests.
 
@@ -62,6 +67,7 @@ project(my_application LANGUAGES C CXX ASM)
 find_package(hpclang CONFIG REQUIRED)
 hpclang_add_application(my_application main.cpp)
 target_compile_features(my_application PRIVATE cxx_std_23)
+hpclang_target_launchers(my_application MODELS hp49gplus hp50g)
 ```
 
 `hpclang_add_application` supplies the startup, runtime library, linker script
@@ -70,8 +76,88 @@ the installed examples demonstrate `STATIC_AUTO` with `HPCLANG_UI_TEXT`.
 The C++ profile has no exceptions or RTTI. Declare external dependencies in the
 application rather than referring back to an hpclang checkout.
 
+`hpclang_target_launchers` is optional. Omitting `MODELS` builds all six models;
+an explicit list limits the output. It uses the selected compiler's matching
+LLVM linker and binary tools and shares its bootstrap builder with repository
+E2E. Changing the payload or bootstrap sources, or removing an output file,
+causes CMake to regenerate the launchers.
+
+## Package an HP39 Aplet
+
+HP39g+, HP39gs and HP40gs share the historical HPGCC39 Aplet format, with a
+different model launcher inside each package. Supply an extracted HPGCC 1.1
+kit with HP39 support. Prepare its host tool and resources using the installed
+helper and a **host** Clang compiler:
+
+```sh
+python /path/to/sdk/share/hpclang/tools/prepare-hp39-aplet.py \
+  /path/to/extracted-hpgcc39 /path/to/prepared-hpgcc39
+clang -O2 /path/to/prepared-hpgcc39/src/hp2aplet.c \
+  -o /path/to/prepared-hpgcc39/hp2aplet
+```
+
+The host tool runs on the development computer, so do not give this compile
+command the calculator's ARM target flags. Its original source and binary
+assets remain external dependencies; preparing them does not change their
+redistribution terms. The SDK helper adds the native Aplet Start/Reset views
+and the companion Reset program.
+
+After declaring the application and enabling its launcher, add:
+
+```cmake
+hpclang_target_launchers(my_application MODELS hp39gs)
+hpclang_target_aplet(my_application
+    MODEL hp39gs NAME "My application" AUTHOR "My name"
+    TOOL "${HP39_APLET_TOOL}" ASSETS "${HP39_APLET_ASSETS}")
+```
+
+Configure the project with `-DHP39_APLET_TOOL=/path/to/prepared-hpgcc39/hp2aplet`
+and `-DHP39_APLET_ASSETS=/path/to/prepared-hpgcc39/data`. `NAME` accepts 1–48
+printable ASCII characters; `AUTHOR` defaults to `hpclang` and accepts 1–33.
+The author bound prevents the historical splash renderer from drawing before
+the screen's left edge.
+
+The resulting `my_application-aplet/hp39gs/` contains `HPGCC000.000`,
+`HPCRESET.000`, `LIB275L.000` and the Connectivity Kit directory files.
+Transfer the Aplet and Reset program using Conn3x/HPGComm; install the library
+once. Build separate packages with `MODEL hp39gplus` or `MODEL hp40gs` for
+those calculators. Reset clears only the selected Aplet's custom data.
+
+For HP48gII, install ARMToolbox48 library 275 and transfer its model's `.hp`
+object. HP49g+/HP50g use their corresponding ARMToolbox launcher support.
+The generated application does not include or replace the calculator OS.
+
+## Choose services at runtime
+
+Include `<hpclang/device.h>` and read `hpclang_device_info()` for model and
+visible display dimensions. Use `hpclang_device_capability()` to decide whether
+to offer an optional service in the current launch context:
+
+```c
+int state = hpclang_device_capability(HPCLANG_CAPABILITY_RPL_OBJECT_STORE);
+if (state == HPCLANG_CAPABILITY_SUPPORTED) {
+    /* Offer the calculator object-store action. */
+}
+```
+
+Compare with `HPCLANG_CAPABILITY_SUPPORTED` explicitly. A nonzero value can
+also mean `HPCLANG_CAPABILITY_CONTEXT_UNAVAILABLE`: the model can provide the
+service, but this launch lacks its required native context. `UNSUPPORTED`
+means that service is not provided for this model; `-1` reports an invalid
+capability ID through `errno`.
+
+Read and mutation capabilities are separate. Availability does not reserve
+memory, insert an SD card, validate objects or acquire a display session.
+Check each operation's result and follow its documented ownership/cleanup
+contract. Model geometry does not expose framebuffer addresses or pixel packing.
+
+## SDK validation
+
 The Core CI gate installs to a temporary prefix, relocates it, copies out the
 examples and builds both languages from the installed package, including fonts
-and HPC1 output. It rejects compile commands referring to the source checkout
+and HPC1/launcher output. It rejects compile commands referring to the source checkout
 or the old install prefix. This establishes build/relocation acceptance;
 calculator launch and return have separate E2E gates.
+Core's installed-SDK gate also builds the historical host tool with Clang
+and verifies both external examples' installable Aplets for all three
+HP39 models. The SDK and E2E share both launcher and Aplet packaging tools.
