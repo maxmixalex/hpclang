@@ -38,6 +38,19 @@ struct hpclang_ui
     size_t edit_cursor, edit_anchor;
     int painting, dirty;
     int64_t damage_left, damage_top, damage_right, damage_bottom;
+    struct ui_effect *effects;
+    uint32_t effect_serial, effect_cursor;
+    int dispatching, closed, registered;
+    struct hpclang_ui *exit_next;
+};
+
+struct ui_effect
+{
+    struct hpclang_ui_effect_ops ops;
+    void *context;
+    struct hpclang_ui_action action;
+    uint32_t token, owner;
+    int state;
 };
 
 int hpclang_ui_fail(struct hpclang_ui *ui, int error);
@@ -47,5 +60,6 @@ int hpclang_ui_add(struct hpclang_ui *ui, uint32_t key, enum hpclang_ui_kind kin
 void hpclang_ui_damage(struct hpclang_ui *ui, struct hpclang_ui_rect rect);
 void hpclang_ui_damage_commit(struct hpclang_ui *ui, uint32_t old_focus);
 void hpclang_ui_damage_focus(struct hpclang_ui *ui, uint32_t old_focus);
+void hpclang_ui_effect_reconcile(struct hpclang_ui *ui);
 
 #endif

@@ -98,9 +98,9 @@ void hpclang_ui_damage_commit(struct hpclang_ui *ui, uint32_t old_focus)
 
 int hpclang_ui_invalidate(struct hpclang_ui *ui, struct hpclang_ui_rect rect)
 {
-    if (!ui || !valid(rect))
+    if (!ui || ui->closed || !valid(rect))
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     hpclang_ui_damage(ui, rect);
     return 0;
@@ -114,9 +114,10 @@ static int callback_error(int result, int error)
 int hpclang_ui_paint(struct hpclang_ui *ui, struct hpclang_ui_rect surface,
                      const struct hpclang_ui_painter *painter)
 {
-    if (!ui || !painter || !painter->begin || !painter->node || !painter->end || !valid(surface))
+    if (!ui || ui->closed || !painter || !painter->begin || !painter->node || !painter->end ||
+        !valid(surface))
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     if (ui->frames[ui->current].count && !ui->frames[ui->current].laid_out)
         return hpclang_ui_fail(NULL, EINVAL);

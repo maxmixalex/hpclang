@@ -17,11 +17,12 @@ size_t hpclang_ui_storage_size(struct hpclang_ui_config config)
         errno = EINVAL;
         return 0;
     }
-    if ((SIZE_MAX - sizeof(struct hpclang_ui)) / config.nodes < 2 * sizeof(struct node)) {
+    size_t per_node = 2 * sizeof(struct node) + sizeof(struct ui_effect);
+    if ((SIZE_MAX - sizeof(struct hpclang_ui)) / config.nodes < per_node) {
         errno = EOVERFLOW;
         return 0;
     }
-    size_t size = sizeof(struct hpclang_ui) + (size_t)config.nodes * 2 * sizeof(struct node);
+    size_t size = sizeof(struct hpclang_ui) + (size_t)config.nodes * per_node;
     if (config.text_bytes > (SIZE_MAX - size) / 3) {
         errno = EOVERFLOW;
         return 0;
@@ -43,7 +44,8 @@ struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_u
     ui->capacity = config;
     ui->frames[0].nodes = (struct node *)(ui + 1);
     ui->frames[1].nodes = ui->frames[0].nodes + config.nodes;
-    ui->frames[0].text = (char *)(ui->frames[1].nodes + config.nodes);
+    ui->effects = (struct ui_effect *)(ui->frames[1].nodes + config.nodes);
+    ui->frames[0].text = (char *)(ui->effects + config.nodes);
     ui->frames[1].text = ui->frames[0].text + config.text_bytes;
     ui->edit_text = ui->frames[1].text + config.text_bytes;
     return ui;
@@ -51,9 +53,9 @@ struct hpclang_ui *hpclang_ui_init(void *storage, size_t bytes, struct hpclang_u
 
 int hpclang_ui_begin(struct hpclang_ui *ui)
 {
-    if (!ui)
+    if (!ui || ui->closed)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     if (ui->epoch == UINT32_MAX)
         return hpclang_ui_fail(NULL, EOVERFLOW);
@@ -73,7 +75,7 @@ int hpclang_ui_begin(struct hpclang_ui *ui)
 
 void hpclang_ui_abort(struct hpclang_ui *ui)
 {
-    if (ui && (ui->measuring || ui->painting)) {
+    if (ui && (ui->measuring || ui->painting || ui->dispatching)) {
         hpclang_ui_fail(ui, EBUSY);
         return;
     }
@@ -83,7 +85,7 @@ void hpclang_ui_abort(struct hpclang_ui *ui)
 
 int hpclang_ui_commit(struct hpclang_ui *ui)
 {
-    if (ui && (ui->measuring || ui->painting))
+    if (ui && (ui->measuring || ui->painting || ui->dispatching))
         return hpclang_ui_fail(ui, EBUSY);
     if (!ui || !ui->building)
         return hpclang_ui_fail(NULL, EINVAL);
@@ -98,6 +100,7 @@ int hpclang_ui_commit(struct hpclang_ui *ui)
     ui->current ^= 1u;
     ui->last_id = ui->pending_id;
     ui->edit_pending = 0;
+    hpclang_ui_effect_reconcile(ui);
     return 0;
 }
 

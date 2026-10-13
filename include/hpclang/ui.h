@@ -56,7 +56,9 @@ extern "C"
         HPCLANG_UI_CHANGE,
         HPCLANG_UI_SELECTION,
         HPCLANG_UI_ACCEPT,
-        HPCLANG_UI_CANCEL
+        HPCLANG_UI_CANCEL,
+        HPCLANG_UI_EFFECT_READY,
+        HPCLANG_UI_EFFECT_ERROR
     };
 
     struct hpclang_ui_event
@@ -66,6 +68,8 @@ extern "C"
         enum hpclang_ui_event_kind kind;
         const char *text;
         size_t cursor, anchor;
+        uint32_t effect, value;
+        int error;
     };
 
     /* Committed metadata; text is owned by the context. Pointers returned by
@@ -186,6 +190,33 @@ extern "C"
     int hpclang_ui_invalidate(struct hpclang_ui *ui, struct hpclang_ui_rect rect);
     int hpclang_ui_paint(struct hpclang_ui *ui, struct hpclang_ui_rect surface,
                          const struct hpclang_ui_painter *painter);
+
+    struct hpclang_ui_effect_ops
+    {
+        int (*begin)(void *context, uint32_t token);
+        /* 0/pending, 1/ready with copied scalar result, -1/errno. */
+        int (*poll)(void *context, uint32_t *value);
+        /* Exactly once after completion/failure/cancellation, including a
+         * queued request cancelled before begin. Must finish resource cleanup
+         * before returning; callbacks are nonblocking and cannot reenter ui. */
+        void (*end)(void *context, int cancelled);
+    };
+    /* Queue outside declaration; begin/poll/end run only during effect_poll or
+     * shutdown. There are config.nodes effect slots. owner=0 is app lifetime;
+     * other owners must be live node IDs. Removal cancels without delivering a
+     * stale result. Callback descriptor is copied, context is borrowed until end.
+     * Successful requests get non-reused tokens. Completion events copy token,
+     * owner, action and scalar value/error; no provider pointer escapes.
+     * Keep UI storage alive while tasks are pending; call shutdown before
+     * freeing/reinitializing it. Ordinary exit() also cancels registered tasks;
+     * _Exit deliberately skips language cleanup. */
+    int hpclang_ui_effect_start(struct hpclang_ui *ui, uint32_t owner,
+                                struct hpclang_ui_action action,
+                                const struct hpclang_ui_effect_ops *ops, void *context,
+                                uint32_t *token);
+    int hpclang_ui_effect_cancel(struct hpclang_ui *ui, uint32_t token);
+    int hpclang_ui_effect_poll(struct hpclang_ui *ui, struct hpclang_ui_event *event);
+    int hpclang_ui_shutdown(struct hpclang_ui *ui);
 
 #ifdef __cplusplus
 }

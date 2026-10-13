@@ -14,17 +14,22 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
-hpclang_unit(ui test_ui.c "${HPCLANG_ROOT}/runtime/core/ui.c"
-    "${HPCLANG_ROOT}/runtime/core/ui-layout.c")
-target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-focus.c")
-target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-paint.c")
-target_sources(test_ui PRIVATE "${HPCLANG_ROOT}/runtime/core/ui-input.c"
+set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-focus.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-paint.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-effect.c"
+    "${HPCLANG_ROOT}/runtime/core/ui-input.c"
     "${HPCLANG_ROOT}/runtime/core/input.c"
     "${HPCLANG_ROOT}/runtime/core/input-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/input-mode.c"
     "${HPCLANG_ROOT}/runtime/core/input-alpha.c"
     "${HPCLANG_ROOT}/runtime/core/input-keymap.c")
-target_include_directories(test_ui PRIVATE "${HPCLANG_ROOT}/include")
+hpclang_unit(ui test_ui.c ${HPCLANG_UI_TEST_SOURCES})
+hpclang_unit(ui_effect_exit test_ui_effect_exit.c ${HPCLANG_UI_TEST_SOURCES})
+foreach(name ui ui_effect_exit)
+    target_include_directories(test_${name} PRIVATE "${HPCLANG_ROOT}/include")
+endforeach()
 
 if(UNIX)
     hpclang_unit(stdio_lifetime test_stdio_lifetime.c

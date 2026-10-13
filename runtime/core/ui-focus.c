@@ -54,9 +54,9 @@ uint32_t hpclang_ui_focused(const struct hpclang_ui *ui)
 
 int hpclang_ui_focus(struct hpclang_ui *ui, uint32_t id)
 {
-    if (!ui)
+    if (!ui || ui->closed)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     if (id && find(&ui->frames[ui->current], id) == UI_ROOT)
         return hpclang_ui_fail(NULL, ENOENT);
@@ -69,9 +69,9 @@ int hpclang_ui_focus(struct hpclang_ui *ui, uint32_t id)
 
 int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction)
 {
-    if (!ui || (direction != -1 && direction != 1))
+    if (!ui || ui->closed || (direction != -1 && direction != 1))
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);
@@ -95,9 +95,9 @@ int hpclang_ui_focus_step(struct hpclang_ui *ui, int direction)
 
 int hpclang_ui_activate(struct hpclang_ui *ui, struct hpclang_ui_event *event)
 {
-    if (!ui || !event)
+    if (!ui || ui->closed || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting)
+    if (ui->building || ui->painting || ui->dispatching)
         return hpclang_ui_fail(NULL, EBUSY);
     const struct frame *frame = &ui->frames[ui->current];
     uint32_t index = find(frame, ui->focused);

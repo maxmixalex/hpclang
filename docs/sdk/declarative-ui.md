@@ -3,7 +3,8 @@
 The current M8.2 slice provides bounded declaration storage, node identity,
 row/column layout, button actions, focus traversal, controlled text edits and
 model-aware physical-key routing, revision-driven canvas callbacks and damage
-tracking. Effects and concrete calculator renderers are still being implemented.
+tracking and bounded asynchronous effects. Concrete calculator renderers and
+the integrated loading/error/retry application are still being implemented.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
@@ -207,3 +208,45 @@ its own surface ownership, page contents and presentation. A host pixel backend
 currently verifies idle behavior, partial updates, move/delete cleanup,
 failure/retry, focus/cursor invalidation and clipping. The standard grayscale
 renderer and calculator execution tests remain pending.
+
+## Asynchronous effects and cleanup
+
+Queue work with `hpclang_ui_effect_start` outside declaration. The UI copies the
+provider's `begin`, `poll` and `end` callbacks; its context remains borrowed until
+`end`. Each context has `config.nodes` task slots. Queue exhaustion returns
+`ENOSPC` without starting work or changing the output token. Successful requests
+receive monotonically increasing tokens; tokens are never recycled within a
+context's lifetime.
+
+An owner is a committed node lifetime ID, or zero for application-wide work.
+Removing an owner marks its work cancelled at commit. Reintroducing the same
+key creates a new lifetime and cannot receive the retired task's result.
+Explicit cancellation uses `hpclang_ui_effect_cancel`. Cancellation is drained
+by the next poll or shutdown; retain provider resources until `end` runs.
+
+Call `hpclang_ui_effect_poll` from the event loop. A round-robin scan visits at
+most the fixed slot count and emits at most one completion per call. Providers
+must perform bounded, nonblocking work: this scheduler does not turn blocking
+I/O into a background thread. `poll` returning zero keeps work pending; one
+produces `HPCLANG_UI_EFFECT_READY`; minus one with errno produces
+`HPCLANG_UI_EFFECT_ERROR`. The UI event copies the owner, action, request token
+and scalar result/error. Provider errors are events, not failures of the UI
+poll call. The application updates its own loading/error/ready state and queues
+a new request to retry.
+
+`end` runs exactly once, including begin failure and cancellation before begin.
+Cancelled tasks produce no completion event. All callbacks prohibit mutation
+or reentry into the same UI. Call `hpclang_ui_shutdown` before freeing or
+reinitializing UI storage; it discards any candidate frame, immediately cancels
+remaining tasks and is idempotent. A closed context cannot accept more work.
+
+Ordinary `exit()` also cancels registered tasks through an exit handler; `_Exit`
+skips this language cleanup. Both UI storage and provider contexts must still
+exist when the handler runs. Stack storage going out of scope requires explicit
+shutdown; automatic exit cleanup is not a replacement for object lifetime
+management. The scheduler uses fixed task storage; first use also registers
+one process-wide C-library exit handler.
+
+Host tests cover fair progress, failed begin/poll, explicit cancellation,
+owner removal/reappearance, exhausted pools, shutdown and actual process-exit
+cleanup. Interactive loading, failure and retry remain target acceptance work.

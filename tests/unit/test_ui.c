@@ -499,6 +499,116 @@ static void painting(struct hpclang_ui *ui)
     assert(hpclang_ui_paint(ui, surface, &painter) == -1 && errno == EINVAL);
 }
 
+struct effect_test
+{
+    struct hpclang_ui *ui;
+    unsigned begins, polls, ends, cancelled, complete_after;
+    int begin_error, poll_error;
+};
+
+static int effect_begin(void *context, uint32_t token)
+{
+    struct effect_test *test = context;
+    assert(token);
+    ++test->begins;
+    assert(hpclang_ui_begin(test->ui) == -1 && errno == EBUSY);
+    errno = test->begin_error;
+    return test->begin_error ? -1 : 0;
+}
+
+static int effect_poll(void *context, uint32_t *value)
+{
+    struct effect_test *test = context;
+    ++test->polls;
+    if (test->poll_error) {
+        errno = test->poll_error;
+        return -1;
+    }
+    if (test->polls < test->complete_after)
+        return 0;
+    *value = 42;
+    return 1;
+}
+
+static void effect_end(void *context, int cancelled)
+{
+    struct effect_test *test = context;
+    ++test->ends;
+    test->cancelled += (unsigned)cancelled;
+    assert(hpclang_ui_shutdown(test->ui) == -1 && errno == EBUSY);
+}
+
+static const struct hpclang_ui_effect_ops effect_ops = {effect_begin, effect_poll, effect_end};
+
+static void effects(struct hpclang_ui *ui)
+{
+    input_view(ui, "owner");
+    uint32_t owner = hpclang_ui_node_at(ui, 0)->id, first, second;
+    struct effect_test a = {.ui = ui, .complete_after = 2}, b = {.ui = ui, .complete_after = 2};
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){8, 9}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){8, 10}, &effect_ops, &b,
+                                   &second) == 0);
+    assert(first != second && !a.begins && !b.begins);
+    struct hpclang_ui_event event = {.source = 999};
+    errno = EDOM;
+    assert(hpclang_ui_effect_poll(ui, &event) == 0 && event.source == 999 && errno == EDOM);
+    assert(a.begins == 1 && b.begins == 1 && a.polls == 1 && b.polls == 1);
+    assert(hpclang_ui_effect_poll(ui, &event) == 1);
+    assert(event.kind == HPCLANG_UI_EFFECT_READY && event.effect == first && event.value == 42);
+    assert(event.source == owner && event.action.arg == 9 && a.ends == 1 && !a.cancelled);
+    assert(hpclang_ui_effect_poll(ui, &event) == 1 && event.effect == second && b.ends == 1);
+    assert(hpclang_ui_effect_cancel(ui, first) == -1 && errno == ENOENT);
+
+    a = (struct effect_test){.ui = ui, .begin_error = ERANGE};
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_poll(ui, &event) == 1 && event.kind == HPCLANG_UI_EFFECT_ERROR);
+    assert(event.error == ERANGE && !a.polls && a.ends == 1 && !a.cancelled);
+    a = (struct effect_test){.ui = ui, .poll_error = EIO};
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_poll(ui, &event) == 1 && event.error == EIO && a.ends == 1);
+
+    a = (struct effect_test){.ui = ui, .complete_after = 100};
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_cancel(ui, first) == 0);
+    assert(hpclang_ui_effect_poll(ui, &event) == 0 && !a.begins && a.ends == 1 && a.cancelled == 1);
+    a = (struct effect_test){.ui = ui, .complete_after = 100};
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_poll(ui, &event) == 0 && a.begins == 1);
+    assert(hpclang_ui_begin(ui) == 0);
+    assert(hpclang_ui_commit(ui) == 0);
+    assert(!a.ends); /* Commit only marks cancellation, never runs user work. */
+    input_view(ui, "new owner");
+    assert(hpclang_ui_node_at(ui, 0)->id != owner);
+    a.complete_after = 1; /* A late ready result must not be delivered. */
+    assert(hpclang_ui_effect_poll(ui, &event) == 0 && a.ends == 1 && a.cancelled == 1);
+    assert(a.polls == 1);
+    second = 999;
+    assert(hpclang_ui_effect_start(ui, owner, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &second) == -1);
+    assert(errno == ENOENT && second == 999);
+
+    struct hpclang_ui_config config = {1, 1};
+    size_t bytes = hpclang_ui_storage_size(config);
+    void *storage = malloc(bytes);
+    assert(storage);
+    struct hpclang_ui *small = hpclang_ui_init(storage, bytes, config);
+    a = (struct effect_test){.ui = small};
+    assert(hpclang_ui_effect_start(small, 0, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &first) == 0);
+    assert(hpclang_ui_effect_start(small, 0, (struct hpclang_ui_action){0}, &effect_ops, &a,
+                                   &second) == -1);
+    assert(errno == ENOSPC && second == 999);
+    assert(hpclang_ui_shutdown(small) == 0 && a.ends == 1 && a.cancelled == 1 && !a.begins);
+    assert(hpclang_ui_shutdown(small) == 0 && a.ends == 1);
+    assert(hpclang_ui_begin(small) == -1 && errno == EINVAL);
+    free(storage);
+}
+
 static void capacity(void)
 {
     struct hpclang_ui_config config = {2, 8};
@@ -548,6 +658,7 @@ int main(void)
     controlled_input(ui);
     physical_input(ui);
     painting(ui);
+    effects(ui);
     free(storage);
     capacity();
     return 0;

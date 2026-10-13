@@ -60,7 +60,7 @@ static size_t clamp(const char *text, size_t length, size_t offset)
 int hpclang_ui_text_input(struct hpclang_ui *ui, uint32_t key, uint16_t style, const char *value,
                           size_t capacity, struct hpclang_ui_action action, int enabled)
 {
-    if (!ui || !ui->building)
+    if (!ui || ui->closed || !ui->building)
         return hpclang_ui_fail(NULL, EINVAL);
     if (capacity > ui->capacity.text_bytes)
         return hpclang_ui_fail(ui, ENOSPC);
@@ -107,9 +107,9 @@ static struct hpclang_ui_node *focused_input(struct hpclang_ui *ui)
 
 int hpclang_ui_select(struct hpclang_ui *ui, size_t anchor, size_t cursor)
 {
-    if (!ui)
+    if (!ui || ui->closed)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -129,9 +129,10 @@ static int edit(struct hpclang_ui *ui, const struct hpclang_input_plan *plan,
                 struct hpclang_ui_event *event)
 {
     enum hpclang_input_action action = plan->action;
-    if (!ui || !event || action < HPCLANG_INPUT_INSERT || action > HPCLANG_INPUT_CANCEL)
+    if (!ui || ui->closed || !event || action < HPCLANG_INPUT_INSERT ||
+        action > HPCLANG_INPUT_CANCEL)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_ui_node *node = focused_input(ui);
     if (!node)
@@ -194,9 +195,9 @@ int hpclang_ui_edit(struct hpclang_ui *ui, enum hpclang_input_action action, uin
 int hpclang_ui_key(struct hpclang_ui *ui, struct hpclang_text_mode *mode,
                    const struct hpclang_keyboard_event *key, struct hpclang_ui_event *event)
 {
-    if (!ui || !event)
+    if (!ui || ui->closed || !event)
         return hpclang_ui_fail(NULL, EINVAL);
-    if (ui->building || ui->painting || ui->edit_pending)
+    if (ui->building || ui->painting || ui->dispatching || ui->edit_pending)
         return hpclang_ui_fail(NULL, EBUSY);
     struct hpclang_input_plan plan;
     int result = hpclang_input_plan_event(mode, key, &plan);

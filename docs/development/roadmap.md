@@ -491,7 +491,7 @@ in their subsequent stages.
 The local declaration slice provides caller-owned fixed storage, transactional
 frames, parent/key/kind identity, owned text and interruption-safe C scopes.
 Host tests, sanitizers and ARM compilation cover the initial contract; see the
-[working C sketch](../sdk/declarative-ui.md). Effects, concrete rendering and target
+[working C sketch](../sdk/declarative-ui.md). Concrete rendering and target
 acceptance are still pending. This is not M8.2
 closure or a frozen public API. A subsequent local slice adds measured row/column
 layout, transparent components, weighted spare-space allocation, clipped bounds,
@@ -504,8 +504,11 @@ and all 76 host targets pass. GPIO/display integration remains in progress.
 The subsequent local paint slice adds revision-driven canvas callbacks, bounded
 damage, focus/cursor invalidation and failure/retry cleanup. A host pixel backend
 checks idle/partial frames, move/delete erasure and clipping; UI tests, sanitizers,
-ARM compilation and Clang analysis pass. Concrete grayscale rendering, effects
-and interactive target acceptance remain pending.
+ARM compilation and Clang analysis pass. Bounded effects now provide fair polling,
+copied completion/error events, owner-lifetime cancellation and exactly-once
+cleanup, including ordinary process exit. Host tests cover provider failures,
+pool exhaustion and removal/reappearance without stale results. Concrete
+grayscale rendering and interactive loading/error/retry acceptance remain pending.
 
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
