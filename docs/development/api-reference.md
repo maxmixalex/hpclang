@@ -669,10 +669,10 @@ HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1,
 These entries now refer to installed `hpgraphics.h` implementations, with host
 state/ownership tests and packaged-font pixel checks. Display E2E exercises
 the adapters directly alongside the earlier clean-API witnesses. All six
-Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally, including
+Direct and Stock targets pass locally, including
 independent LCD checks. Five original HPGCC 1.1 graphics examples also run on
-HP50g Direct with explicit test-entry/input-wait adaptations. HP39gs/HP40gs
-Stock and broader historical input/application acceptance remain open.
+HP50g Direct with explicit test-entry/input-wait adaptations. Broader historical
+input/application acceptance remains open.
 
 ## Keyboard: detailed progress
 
@@ -695,7 +695,9 @@ physical inputs, classic/HP39 modifier mappings and held combinations, then
 uses delayed electrical transitions to exercise all three blocking APIs while
 checking that the RTC tick configuration is preserved. All six Direct models
 and all six Stock models pass this full flow locally before integration with main;
-after integration, all 82 host targets and the ARM fixture build pass. Integrated target checks and formal CI are pending. ARM declaration checks match
+after integration, all 82 host targets, the ARM fixture build and HP39g+ Direct
+with its independent physical-input oracle pass. Formal CI is pending.
+ARM declaration checks match
 all seventeen declarations from 1.1 and 2.0, and eleven from 1.0.3; the latter's
 `char keyb_getkey` becomes `int` in the selected 1.1/2.0 contract. Mixed inclusion
 with `saturn.h` also compiles as C++17. Function-name coverage alone does not
