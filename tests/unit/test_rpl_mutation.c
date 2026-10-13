@@ -1217,6 +1217,29 @@ static void test_port0_create_preserves_home_and_library(void)
         uint32_t saved_writes = writes;
         assert(hpclang_rpl_port0_create_backup(&io, packed, 54) == HPCLANG_RPL_MUTATION_EXISTS);
         assert(writes == saved_writes);
+
+        /* HOME mutation keeps its old fence. Port contraction must update the
+         * structural port boundary without treating it as a live value root. */
+        assert(hpclang_rpl_mutation_userob_shift_before(&io, port, -54) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_port0_shift_backups(&io, port - 1, -53) ==
+               HPCLANG_RPL_MUTATION_MALFORMED);
+        assert(hpclang_rpl_port0_shift_backups(&io, port + 43, -97) ==
+               HPCLANG_RPL_MUTATION_UNSUPPORTED);
+        assert(writes == saved_writes);
+        uint32_t backup_root = port - 54;
+        uint32_t *live_roots[] = {&root, &backup_root};
+        io.native_roots = live_roots;
+        io.native_root_count = 2;
+        assert(hpclang_rpl_port0_shift_backups(&io, port, -54) == HPCLANG_RPL_MUTATION_BUSY);
+        assert(writes == saved_writes);
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        assert(hpclang_rpl_port0_shift_backups(&io, port, -54) == HPCLANG_RPL_MUTATION_OK);
+        assert(get_word(0x80716, 5) == port && get_word(DSKTOP, 5) == dstk);
+        assert(root == object && get_word(dstk, 5) == object);
+        assert_char_at(root, 'A');
+        assert(memcmp(saved_library, memory + port, sizeof(saved_library)) == 0);
     }
 }
 

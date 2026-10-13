@@ -14,4 +14,11 @@ int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, co
 int hpclang_rpl_port0_overwrite_backup(const struct hpclang_rpl_mutation_io *io,
                                        const uint8_t *packed, uint32_t span);
 
+/* Internal backup-chain geometry. Validate the complete chain and whole-record
+ * boundaries before moving a prefix. Libraries must remain at their original
+ * addresses; a caller needing to move one requires the library-aware path.
+ * Contraction returns BUSY for live references into removed records. */
+int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, uint32_t position,
+                                    int32_t delta);
+
 #endif

@@ -149,6 +149,12 @@ extern "C"
      * This does not create, encode, replace, or remove a named variable by itself;
      * higher-level store code owns the bytes placed into/opened from the gap.
      */
+    /* Port-only geometry backend. Caller must validate the complete port chain,
+     * record boundaries and library relocation safety before invoking this.
+     * Live references into a contraction still return BUSY. */
+    int hpclang_rpl_mutation_port0_shift_before(const struct hpclang_rpl_mutation_io *io,
+                                                uint32_t position, int32_t delta);
+
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 

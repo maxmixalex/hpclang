@@ -44,6 +44,42 @@ static int port_start(const struct hpclang_rpl_mutation_io *io, uint32_t *start)
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+int hpclang_rpl_port0_shift_backups(const struct hpclang_rpl_mutation_io *io, uint32_t position,
+                                    int32_t delta)
+{
+    if (!io || !io->read_nibble || !io->write_nibble)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    uint32_t start;
+    int result = port_start(io, &start);
+    if (result)
+        return result;
+    if (!delta || position < start || position > 0xffffbu)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t removed = delta < 0 ? (uint32_t)(-(int64_t)delta) : 0;
+    if (removed > position - start)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t move_end = position - removed;
+    const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
+    struct hpclang_rpl_port_cursor cursor = {start, 0x100000u, 0};
+    struct hpclang_rpl_port_entry entry;
+    int position_found = position == start;
+    int move_end_found = move_end == start;
+    int library_affected = 0;
+    while ((result = hpclang_rpl_port_next(&reader, &cursor, &entry)) > 0) {
+        position_found |= entry.address + entry.span == position;
+        move_end_found |= entry.address + entry.span == move_end;
+        if (entry.prologue == 0x02b40u && entry.address < position)
+            library_affected = 1;
+    }
+    if (result < 0)
+        return parse_error(result);
+    if (!position_found || !move_end_found)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    if (library_affected)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    return hpclang_rpl_mutation_port0_shift_before(io, position, delta);
+}
+
 int hpclang_rpl_port0_create_backup(const struct hpclang_rpl_mutation_io *io, const uint8_t *packed,
                                     uint32_t span)
 {
