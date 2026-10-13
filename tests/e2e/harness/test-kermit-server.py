@@ -113,7 +113,7 @@ class Peer:
         # Stock's serial-disk receiver contracts decoded CRLF to LF even for
         # binary HP39BinB objects. Include the wire expansion in the bound, then
         # apply the receiver conversion across packet boundaries below.
-        wire_length = len(expected) + expected.count(b"\n")
+        wire_length = len(expected) + expected.count(b"\n") + expected.count(b"\\")
         while len(received) < wire_length:
             data = self.expect(b"D", 3, sequence)
             if lose_data_ack:
@@ -140,7 +140,7 @@ class Peer:
             self.acknowledged_data = packet(b"D", data, sequence, 3)
             self.send(packet(b"Y", sequence=sequence, check=3))
             sequence = (sequence + 1) % 64
-        if bytes(received).replace(b"\r\n", b"\n") != expected:
+        if bytes(received).replace(b"\r\n", b"\n").replace(b"\\\\", b"\\") != expected:
             raise AssertionError("binary payload differs from the served file")
         self.expect(b"Z", 3, sequence)
         self.send(packet(b"Y", sequence=sequence, check=3))
@@ -158,7 +158,12 @@ def verify(tools: Path) -> None:
         # The byte census alone lacks CRLF adjacency. These runs reproduce the
         # deterministic one-byte loss that made a valid Aplet unloadable while
         # the old binary-mode server reported successful delivery.
-        payload = bytes(range(256)) * 2 + b"\r\n\r\r\n\n\r\r\r\r\n\n" * 16
+        payload = (
+            bytes(range(256)) * 2
+            + b"\r\n\r\r\n\n\r\r\r\r\n\n" * 16
+            + b"\\\\\x00\\123\\\r\n" * 16
+            + b"".join(b"x" + b"\\" * count + b"y" for count in range(1, 65))
+        )
         (root / "FIRST.BIN").write_bytes(payload)
         (root / "NEXT.BIN").write_bytes(b"next transaction\x00\xff")
         master, slave = pty.openpty()
