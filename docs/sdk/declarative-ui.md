@@ -9,6 +9,12 @@ remote CI acceptance remains pending.
 The interface below is a working application sketch; its names are not yet a
 frozen UI API.
 
+Node metadata is selected by `kind`: read `capacity`, `cursor` and `anchor`
+for inputs; `paint`, `canvas_state` and `revision` for canvases; and `value`
+for toggles. These fields share storage rather than reserving every component's
+state in every node. Rebuild applications and custom renderers together with
+the SDK when upgrading this evolving UI interface.
+
 The installed `examples/declarative-ui` application combines these interfaces
 into the original device-manager patterns. It uses two status-card instances,
 conditional connection controls, a controlled filter, keyed insertion/reversal,
