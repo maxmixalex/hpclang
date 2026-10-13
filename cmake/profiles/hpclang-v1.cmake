@@ -14,6 +14,13 @@ add_compile_options(
 set(HPCLANG_RUNTIME_START
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/start.S")
 set(HPCLANG_RUNTIME
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-layout.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-focus.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-input.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-paint.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-effect.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/ui-surface.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/runtime.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/exit-hooks.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/device.c"
@@ -51,6 +58,12 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-store.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/object-catalog.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-satdir.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-context.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-draw.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-font.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-xpm.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/fonts/generated/newrpl_font6_menus.S"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/fonts/generated/newrpl_font8_styleb.S"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-saturn.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-mutation.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-stock-memory.c"

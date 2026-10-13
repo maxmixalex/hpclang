@@ -629,7 +629,7 @@ Formal `E2E / Font Gallery` run **35298949457 / #112** is fully green across Bui
 
 | Historical surface | 1.0.3 | 1.1 39G | 2.0 SP2 | HPGCC3 | hpclang today |
 | --- | ---: | ---: | ---: | ---: | --- |
-| HPG `hpgraphics.h` | 55 | 59 | 59 | 59 | clean core geometry/surface/text exists; no HPG adapter yet |
+| HPG `hpgraphics.h` | 55 | 59 | 59 | 59 | all 59 adapter entries implemented; broad target/application acceptance in progress |
 | keyboard `hpkeyb49.h` | 12 | 17 | 17 | — | raw + event core implemented |
 | HPGCC3 `keyb.h` | — | — | — | 8 functions plus queue/macros | event core implemented; queue policy not copied |
 | legacy `hpscreen.h` | 12 | 9 | 9 | — | migrate to opaque surface |
@@ -654,19 +654,25 @@ HPG is unusually stable: all 55 HPG 1.0.3 declarations survive exactly into 1.1,
 
 | HPG group | Historical calls | hpclang status |
 | --- | --- | --- |
-| lifecycle | `hpg_init`, `hpg_cleanup` | ↪ Core surface access needs no matching global lifecycle; adapter can supply legacy setup semantics. |
-| display mode | mono/gray4/gray16, `hpg_flip` | 🧪 Clean owned display sessions and bounded page presentation; historical spelling remains an adapter. |
-| geometry | width/height, pixel, line, rect, circle, polygon | ✅ Canonical primitives implemented; legacy context/coordinate wrappers absent. |
-| indicators | `hpg_set_indicator` | 🧪 Six scan-order status segments through the owned display service; printed icons are model-specific. |
-| clipping state | `hpg_clip_*` | ◐ Intersecting mutable clips demonstrated over public primitives; installed HPG adapter remains M8. |
-| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, metrics, allocation/free | ◐ Native and generated hpclang font systems are implemented; HPG's exact bundled-font/custom-descriptor source semantics still need an adapter. |
-| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | ✅ Canonical explicit-surface UTF-8/codepoint drawing exists; mutable HPG context wrapper absent. |
-| mutable style / PAINT/XOR / patterns | HPG context state | ◐ Executable prototype covers PAINT/XOR and transparent anchored/relative ink patterns; mutable state stays in the adapter. |
-| owned images | mono/gray images | ◐ Generic 2/4/16-level software surfaces cover the clean ownership model. |
-| blit | `hpg_blit` | ◐ Canonical blit implemented; HPG argument/context adapter pending. |
-| XPM | mono/gray loaders | ◐ Transparent one-character RGB XPM prototype over public pixels; broad historical importer remains M8. |
+| lifecycle | `hpg_init`, `hpg_cleanup` | Implemented: lazy context, adapter-owned display restoration and normal-exit cleanup. |
+| display mode | mono/gray4/gray16, `hpg_flip` | Implemented: true single/double buffering, bounded presentation and failure-preserving mode replacement. |
+| geometry | width/height, pixel, line, rect, circle, polygon | Implemented: mutable context over clean clipped primitives; XOR applies once per covered pixel. |
+| indicators | `hpg_set_indicator` | Implemented: six page-local segments, PAINT/XOR, first-acquisition screen preservation; printed icons are model-specific. |
+| clipping state | `hpg_clip_*` | Implemented: intersecting mutable clips and the historical setter's exclusive last-edge behavior. |
+| fonts | `hpg_get_minifont`, `hpg_get_bigfont`, metrics, allocation/free | Implemented: fixed HPG metrics, borrowed custom buffers, native default fonts and reviewed packaged fallbacks. Bundled historical bitmap identity is not promised. |
+| text | `hpg_draw_letter[_on]`, `hpg_draw_text[_on]` | Implemented: byte-indexed characters, newline, clipping and XOR; separate from the clean UTF-8 API. |
+| mutable style / PAINT/XOR / patterns | HPG context state | Implemented: borrowed fixed/relative patterns and per-context color/mode/font state. |
+| owned images | mono/gray images | Implemented: owned 2/4/16-level surfaces and explicit destruction. |
+| blit | `hpg_blit` | Implemented: destination clipping, PAINT/XOR and overlap-safe copying. |
+| XPM | mono/gray loaders | Implemented: multi-character pixel keys and RGB/g/g4 preference; unsupported colors and `None` become opaque white as in historical HPG. |
 
-Zero HPG source-compatibility wrappers are claimed merely because the clean primitives exist.
+These entries now refer to installed `hpgraphics.h` implementations, with host
+state/ownership tests and packaged-font pixel checks. Display E2E exercises
+the adapters directly alongside the earlier clean-API witnesses. All six
+Direct targets and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally, including
+independent LCD checks. Five original HPGCC 1.1 graphics examples also run on
+HP50g Direct with explicit test-entry/input-wait adaptations. HP39gs/HP40gs
+Stock and broader historical input/application acceptance remain open.
 
 ## Keyboard: detailed progress
 

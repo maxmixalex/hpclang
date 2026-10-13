@@ -15,4 +15,5 @@ install(FILES tools/hpclang-pack.py tools/build-launchers.py tools/armtoolbox-wr
 install(FILES LICENSE DESTINATION "${sdk_root}")
 install(DIRECTORY examples DESTINATION "${sdk_root}")
 install(FILES docs/sdk/getting-started.md DESTINATION "${sdk_root}/docs")
+install(FILES docs/sdk/declarative-ui.md DESTINATION "${sdk_root}/docs")
 install(FILES docs/development/licensing.md DESTINATION "${sdk_root}/docs")

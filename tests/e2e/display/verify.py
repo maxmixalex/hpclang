@@ -73,7 +73,37 @@ def verify(prefix: Path, height: int) -> None:
                 assert any(
                     pixels[y * 132 + x] == 0 for y in range(top, bottom) for x in range(45)
                 ), f"{prefix}: missing historical font band {top}"
-    print(f"PASS: {prefix}: gray/DMA checks and historical animation/font/shape clients")
+    adapter_frames = {}
+    for frame in range(110, 115):
+        data = Path(f"{prefix}-{frame}.pgm").read_bytes()
+        header = f"P5\n132 {height}\n255\n".encode()
+        assert data.startswith(header) and len(data) == len(header) + 132 * height
+        pixels = data[len(header) :]
+        adapter_frames[frame] = pixels
+        if frame == 110:
+            assert pixels[5 * 132 + 55] == 119
+            assert pixels[15 * 132 + 70] == 0
+            assert pixels[5 * 132 + 80 : 5 * 132 + 83] == bytes((0, 255, 136))
+            assert pixels[6 * 132 + 80 : 6 * 132 + 83] == bytes((136, 255, 0))
+            assert pixels[3 * 132 + 131] == 0
+            for top, bottom in ((0, 6), (10, 18), (20, 28)):
+                assert any(pixels[y * 132 + x] == 0 for y in range(top, bottom) for x in range(32))
+        else:
+            for y in range(height):
+                for x in range(132):
+                    if frame == 114:
+                        expected = 136 if 1 <= x <= 10 and 1 <= y <= 10 else 255
+                    else:
+                        left = 20 if frame == 112 else 2
+                        segment = 2 if frame == 112 else 1
+                        expected = (
+                            0
+                            if (left <= x <= left + 6 and 2 <= y <= 8 or x == 131 and y == segment)
+                            else 255
+                        )
+                    assert pixels[y * 132 + x] == expected, (frame, x, y)
+    assert adapter_frames[111] == adapter_frames[113], "HPG lost the previous front page"
+    print(f"PASS: {prefix}: gray/DMA checks, historical clients and installed HPG adapter")
 
 
 def main() -> None:

@@ -2,5 +2,6 @@
   {"mode": "runtime", "keyboard": true},
   {"mode": "object-basics", "keyboard": false},
   {"mode": "system-services", "keyboard": false, "verifier": "tests/e2e/system-services/verify.py"},
-  {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"}
+  {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"},
+  {"mode": "ui", "keyboard": false, "verifier": "tests/e2e/ui/verify.py"}
 ]
