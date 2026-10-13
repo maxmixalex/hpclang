@@ -678,6 +678,13 @@ launches. Independent native-RPL probes then recall both that record and the
 original 456 through Stock Kermit. Port 1 replacement/removal and library
 mutation still require their own reference-preservation and relocation paths.
 
+Native HP50g `RCL` probes distinguish stored records from recalled values:
+both an integer and the nested list `{ 123 456 { 789 321 } }` become complete
+main-RAM objects on the data stack. Native `PURGE` removes the list's Port 1
+record while leaving the recalled list intact. This establishes copy semantics
+for those ordinary values, not for attached libraries, executing programs or
+extended bank pointers; those cases still need independent relocation checks.
+
 The local HP48gII fixture accepts Port 0 storage but reports native error `#A`
 (Port Not Available) for `1 PVARS` and `2 PVARS`. Capability discovery must
 preserve this difference from HP49g+/HP50g rather than fabricating three ports
