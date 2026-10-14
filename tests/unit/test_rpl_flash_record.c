@@ -36,8 +36,59 @@ static void put_word(uint8_t *data, uint32_t at, uint32_t value)
     }
 }
 
+static void test_tail(void)
+{
+    uint8_t bank[128];
+    memset(bank, 0xff, sizeof bank);
+    struct image source = {bank, sizeof bank * 2u, 0x20a, 0, UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    const uint32_t end = source.base + source.nibbles;
+    struct hpclang_rpl_flash_space space;
+    assert(hpclang_rpl_flash_tail(&reader, source.base, end, &space) == 0);
+    assert(space.address == source.base && space.nibbles == 252);
+    memcpy(bank, native_record, sizeof native_record);
+    memcpy(bank + sizeof native_record, native_record, sizeof native_record);
+    bank[sizeof native_record] = 0;
+    /* Deleted payloads are not interpreted, but still occupy their slots. */
+    bank[sizeof native_record + 8] ^= 0xff;
+    source.reads = 0;
+    assert(hpclang_rpl_flash_tail(&reader, source.base, end, &space) == 0);
+    assert(space.address == source.base + 128u && space.nibbles == 124u);
+    uint32_t reads = source.reads;
+    for (uint32_t cut = 0; cut < reads; ++cut) {
+        source.reads = 0;
+        source.fail_after = cut;
+        space = (struct hpclang_rpl_flash_space){123, 456};
+        assert(hpclang_rpl_flash_tail(&reader, source.base, end, &space) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(space.address == 123 && space.nibbles == 456);
+    }
+    source.fail_after = UINT32_MAX;
+    /* An interrupted append can leave any byte behind an erased status. */
+    for (uint32_t at = 65; at < sizeof bank; ++at) {
+        bank[at] = 0xfe;
+        assert(hpclang_rpl_flash_tail(&reader, source.base, end, &space) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(space.address == 123 && space.nibbles == 456);
+        bank[at] = 0xff;
+    }
+    bank[30] ^= 1;
+    assert(hpclang_rpl_flash_tail(&reader, source.base, end, &space) == HPCLANG_RPL_SPAN_MALFORMED);
+    bank[30] ^= 1;
+    assert(hpclang_rpl_flash_tail(&reader, source.base, source.base + 128u, &space) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flash_tail(&reader, end, source.base, &space) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flash_tail(&reader, source.base, 0x100002u, &space) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flash_tail(NULL, source.base, end, &space) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(space.address == 123 && space.nibbles == 456);
+    assert(hpclang_rpl_flash_tail(&reader, source.base, source.base + 130u, &space) == 0);
+    assert(space.address == source.base + 128u && space.nibbles == 0);
+}
+
 int main(void)
 {
+    test_tail();
     struct image source = {native_record + 4, 54, 0x100, 0, UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &source};
     uint8_t *record = NULL;

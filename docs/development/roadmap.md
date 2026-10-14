@@ -478,7 +478,10 @@ passes local HP49g+/HP50g Stock and normal return, with byte-for-byte unchanged
 Flash images afterward; all 93 host targets pass. A RAM-backed block writer checks the entire range
 before programming under one mapping lease. Its bounds, late-conflict refusal,
 identical rewrite and neighboring-byte checks pass both Stock models, with
-byte-for-byte restored Flash after erasure. Native backup record encoding
+byte-for-byte restored Flash after erasure. The tail scan preserves deleted allocations, validates live
+records and checks every remaining nibble before treating an erased end marker
+as writable space. It rejects interrupted-write remnants; recovery remains open.
+Native backup record encoding
 also matches Stock bytes and passes local HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,
 full-media behavior and failure/recovery acceptance remain unfinished. The

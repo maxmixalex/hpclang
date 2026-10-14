@@ -107,7 +107,9 @@ focused payloads through the shared Direct/Stock family harness:
 - `port-flash`: Stock-only SST identification, mapping restoration, bounded
   physical word/block programming and sector erasure on HP49g+/HP50g. Block
   checks cover complete-range preflight, bounds, identical rewrites and untouched
-  neighbors. It requires
+  neighbors. The native tail scan validates existing records, refuses data left
+  behind an erased end marker, and recognizes free space again after erasure.
+  It requires
   an unused bank in the disposable emulator image, restores its erased bytes,
   and checks the complete Flash fingerprint before returning to Stock. This
   tests internal physical primitives, not native Port object mutation or

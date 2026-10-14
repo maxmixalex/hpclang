@@ -13,4 +13,20 @@
 int hpclang_rpl_flash_backup_record(const struct hpclang_rpl_reader *reader, uint32_t address,
                                     uint32_t span, uint8_t **record, uint32_t *bytes);
 
+struct hpclang_rpl_flash_space
+{
+    uint32_t address;
+    uint32_t nibbles;
+};
+
+/* Find the erased tail after validated live/deleted records. first/end are
+ * nibble coordinates after a caller-validated bank header. nibbles excludes
+ * the final erased status byte and is rounded down to a whole halfword.
+ * Check the entire tail: an FF status followed by partially programmed data
+ * is not free space. Such interrupted writes require recovery, not overwrite.
+ * No mutation or reservation occurs; mapping/data must remain stable through
+ * the eventual commit. Output is unchanged on failure. */
+int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                           struct hpclang_rpl_flash_space *space);
+
 #endif

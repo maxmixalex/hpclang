@@ -1,4 +1,6 @@
 #include "stock-flash.h"
+#include "rpl-flash-record.h"
+#include "rpl-stock-memory.h"
 #include <stdint.h>
 
 volatile uint32_t hpclang_e2e_result;
@@ -20,8 +22,17 @@ static uint32_t unused_sector(void)
     /* Only the disposable Stock test image is eligible: require a completely
      * unused bank tail, not merely an all-FF sector inside a live object. */
     for (uint32_t bank = 0x140000u; bank < 0x200000u; bank += 0x20000u) {
-        if ((hpclang_flash_read16(0, bank + 0x100u) & 0xffu) != 0xf0u ||
-            (hpclang_flash_read16(0, bank + 0x104u) & 0xff00u) != 0xff00u)
+        uint32_t index = (bank - 0x140000u) / 0x20000u;
+        if (hpclang_flash_read16(0, bank + 0x100u) != (0xf0u | ((index + 8u) << 8u)))
+            return 0;
+        struct hpclang_rpl_reader reader;
+        struct hpclang_rpl_flash_space space;
+        if (!hpclang_rpl_stock_port2_reader(index, &reader) ||
+            hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space))
+            return 0;
+        if (space.address != 0x20au)
+            continue;
+        if ((hpclang_flash_read16(0, bank + 0x104u) & 0xff00u) != 0xff00u)
             continue;
         uint32_t address;
         for (address = bank + 0x106u; address < bank + 0x20000u; address += 2u)
@@ -69,6 +80,12 @@ int main(void)
         hpclang_flash_read16(0, scratch) != UINT16_MAX)
         goto done;
     failure = 8;
+    struct hpclang_rpl_reader reader;
+    struct hpclang_rpl_flash_space space = {123, 456};
+    if (!hpclang_rpl_stock_port2_reader((scratch - 0x140000u) / 0x20000u, &reader) ||
+        hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space) != HPCLANG_RPL_SPAN_MALFORMED ||
+        space.address != 123 || space.nibbles != 456)
+        goto done;
     if (hpclang_stock_flash_program_word(scratch + 2u, UINT16_MAX) != HPCLANG_SST_NEEDS_ERASE ||
         hpclang_flash_read16(0, scratch + 2u) != 0x1234u ||
         hpclang_stock_flash_program_word(scratch + 4094u, 0x5678u) != HPCLANG_SST_OK ||
@@ -108,6 +125,10 @@ int main(void)
     failure = 13;
     if (hpclang_stock_flash_erase_sector(scratch) != HPCLANG_SST_OK || fingerprint() != before ||
         l1[0] != original[0] || l1[1] != original[1])
+        goto done;
+    failure = 14;
+    if (hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space) || space.address != 0x20au ||
+        space.nibbles != 0x3fdf4u)
         goto done;
     failure = 0;
 done:
