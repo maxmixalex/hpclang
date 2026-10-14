@@ -801,6 +801,10 @@ The integrated application exposed a Stock startup RAM limit on HP39g+ and
 HP48gII. Launcher compression and smaller C/C++ code generation are being
 validated against the complete application; host decoder bounds and relocated
 SDK packaging pass, but small-model execution acceptance is still pending.
+The compact bootstrap now passes six-model Direct runtime/divmod/keyboard
+acceptance. HP48gII and HP50g also pass the complete notebook Stock
+save/relaunch/replace/relaunch/cleanup flow and independent LCD checks locally.
+HP39 notebook execution, the other Stock targets and formal CI remain open.
 
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each

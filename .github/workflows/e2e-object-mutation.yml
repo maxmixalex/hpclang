@@ -9,6 +9,7 @@ on:
     paths:
       - "runtime/**"
       - "platform/armtoolbox/**"
+      - "runtime/core/armv4t-eabi-div.S"
       - "third_party/tinf/**"
       - "include/**"
       - "cmake/**"
@@ -42,6 +43,7 @@ on:
     paths:
       - "runtime/**"
       - "platform/armtoolbox/**"
+      - "runtime/core/armv4t-eabi-div.S"
       - "third_party/tinf/**"
       - "include/**"
       - "cmake/**"

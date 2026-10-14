@@ -51,6 +51,14 @@ Host tests cover operation selection and rejected writes for all three port
 indices using simulated service capabilities. Device backup/persistence tests
 remain follow-up work; this example does not establish completion of M8.6.
 
+## Build resources
+
+The application selects picolibc's integer-only formatter because it displays
+integer dates, port indices and error codes. Remove that target's
+`vfprintf=__i_vfprintf` link option if adding floating-point format conversions.
+Its UI arena holds the complete 17-node view, including all three Port pairs,
+with 512 bytes per text buffer.
+
 ## File export
 
 When stream storage is available, Export creates `/HPCNOTE.TXT` in the active

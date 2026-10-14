@@ -23,6 +23,7 @@ function(hpclang_target_launchers target)
     get_filename_component(tool_bin "${CMAKE_C_COMPILER}" DIRECTORY)
     file(GLOB bootstrap_sources CONFIGURE_DEPENDS
         "${HPCLANG_ROOT}/runtime/bootstrap/*"
+        "${HPCLANG_ROOT}/runtime/core/armv4t-eabi-div.S"
         "${HPCLANG_ROOT}/platform/armtoolbox/*"
         "${HPCLANG_ROOT}/third_party/tinf/*"
         "${HPCLANG_ROOT}/include/hpclang/*.h")

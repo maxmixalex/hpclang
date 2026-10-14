@@ -59,7 +59,8 @@ def build(
 
     def compile_source(source: Path, name: str, *extra: str) -> Path:
         obj = scratch / (name + ".o")
-        run(cc, *flags, *extra, "-c", source, "-o", obj)
+        language = ["-mthumb", "-Oz"] if source.suffix == ".c" else []
+        run(cc, *flags, *language, *extra, "-c", source, "-o", obj)
         return obj
 
     objects = [
@@ -82,10 +83,14 @@ def build(
         )
     ] + objects
     objects.append(compile_source(root / "third_party/tinf/tinflate.c", "tinflate"))
+    objects.append(compile_source(root / "runtime/core/armv4t-eabi-div.S", "stage-div"))
     script = scratch / "stage1.ld"
     run(cc, "-E", "-P", "-x", "c", platform / "stage1.ld", "-o", script)
     stage1_elf = scratch / "stage1.elf"
-    run(ld, "-m", "armelf", "-T", script, *objects, "-o", stage1_elf)
+    builtins = run(
+        cc, "--target=arm-none-eabi", "-march=armv4t", "--print-libgcc-file-name"
+    ).strip()
+    run(ld, "-m", "armelf", "--gc-sections", "-T", script, *objects, builtins, "-o", stage1_elf)
     if run(nm, "-u", stage1_elf).strip():
         raise ValueError("unresolved stage1 symbols")
     sizes = [
