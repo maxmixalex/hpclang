@@ -29,4 +29,21 @@ struct hpclang_rpl_flash_space
 int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
                            struct hpclang_rpl_flash_space *space);
 
+struct hpclang_rpl_flash_discard
+{
+    uint32_t address;
+    uint32_t extent;
+};
+
+/* Plan rollback of data behind an FF end marker into a deleted allocation.
+ * The extent covers every programmed nibble without requiring any 0-to-1 bit
+ * transition in its five-nibble field. The caller must program/verify that
+ * field before clearing the status byte to 00, preserving neighboring bytes.
+ * Returns 1 with a plan, 0 for an already clean tail, or a negative span result.
+ * Output changes only on 1. This neither writes nor reclaims space, and does
+ * not handle interrupted status writes, unknown slot states or sector erase.
+ * The bank must remain stable from planning through commit. */
+int hpclang_rpl_flash_discard_plan(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                   uint32_t end, struct hpclang_rpl_flash_discard *plan);
+
 #endif

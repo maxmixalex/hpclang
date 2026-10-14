@@ -475,14 +475,22 @@ The internal SST command engine now identifies documented chip/CFI geometry,
 excludes firmware addresses from programming/erasure, and owns uncached Flash
 mappings until the chip is ready. Its isolated physical write/erase fixture
 passes local HP49g+/HP50g Stock and normal return, with byte-for-byte unchanged
-Flash images afterward; all 93 host targets pass. A RAM-backed block writer checks the entire range
-before programming under one mapping lease. Its bounds, late-conflict refusal,
+Flash images afterward; all 93 host targets pass. A RAM-backed block writer
+checks the entire range before programming under one mapping lease. Its bounds, late-conflict refusal,
 identical rewrite and neighboring-byte checks pass both Stock models, with
-byte-for-byte restored Flash after erasure. The tail scan preserves deleted allocations, validates live
-records and checks every remaining nibble before treating an erased end marker
-as writable space. It rejects interrupted-write remnants; recovery remains open.
-Native backup record encoding
-also matches Stock bytes and passes local HP49g+/HP50g native RCL/PURGE/STO
+byte-for-byte restored Flash after erasure. The tail scan preserves deleted
+allocations, validates live records and checks every remaining nibble before
+treating an erased end marker as writable space. An internal rollback planner
+can cover uncommitted body bytes with a deleted allocation using only 1-to-0
+header transitions. Host fault injection covers interrupted body/header writes
+and unreadable input. Status-write interruption, space reclamation and complete
+transaction recovery remain open.
+Local HP49g+/HP50g experiments confirm why rollback is necessary: native STO
+overwrites an FF-marked dirty tail and produces an invalid object. Converting
+the uncommitted record into a deleted slot permits subsequent native STO/RCL
+to succeed, with unrelated Flash bytes unchanged.
+Native backup record encoding also matches Stock bytes and passes local
+HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,
 full-media behavior and failure/recovery acceptance remain unfinished. The
 fixture does not establish real-hardware cache or NOR timing behavior.

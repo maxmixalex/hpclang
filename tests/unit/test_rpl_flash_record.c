@@ -86,9 +86,88 @@ static void test_tail(void)
     assert(space.address == source.base + 128u && space.nibbles == 0);
 }
 
+static void test_discard(void)
+{
+    uint8_t bank[128], before[128];
+    struct image source = {bank, sizeof bank * 2u, 0x20a, 0, UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    const uint32_t first = source.base, end = first + source.nibbles;
+    struct hpclang_rpl_flash_discard plan;
+    /* Interrupt every bit in the append body, leaving status erased. */
+    for (unsigned cut = 0; cut <= (sizeof native_record - 1u) * 8u; ++cut) {
+        memset(bank, 0xff, sizeof bank);
+        memcpy(bank, native_record, sizeof native_record);
+        for (unsigned bit = 0; bit < cut; ++bit)
+            bank[33u + bit / 8u] &= (uint8_t)(native_record[1u + bit / 8u] | ~(1u << (bit % 8u)));
+        memcpy(before, bank, sizeof bank);
+        plan = (struct hpclang_rpl_flash_discard){123, 456};
+        int result = hpclang_rpl_flash_discard_plan(&reader, first, end, &plan);
+        /* Determine cleanliness independently of the native parser. */
+        unsigned at = 32;
+        while (at < sizeof bank && bank[at] == 255)
+            ++at;
+        if (at == sizeof bank) {
+            assert(result == 0 && plan.address == 123 && plan.extent == 456);
+            continue;
+        }
+        assert(result == 1 && plan.address == first + 64u);
+        assert(plan.extent >= 11u && (plan.extent + 2u) % 4u == 0);
+        put_word(bank + 32, 2, plan.extent);
+        for (unsigned i = 0; i < sizeof bank; ++i)
+            assert((before[i] & bank[i]) == bank[i]);
+        uint8_t complete[sizeof bank];
+        memcpy(complete, bank, sizeof bank);
+        for (unsigned header_cut = 0; header_cut <= 20; ++header_cut) {
+            memcpy(bank, before, sizeof bank);
+            for (unsigned bit = 0; bit < header_cut; ++bit)
+                bank[33u + bit / 8u] &= (uint8_t)(complete[33u + bit / 8u] | ~(1u << (bit % 8u)));
+            struct hpclang_rpl_flash_discard partial;
+            assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &partial) == 1);
+            assert(partial.address == plan.address && partial.extent <= plan.extent);
+        }
+        memcpy(bank, complete, sizeof bank);
+        /* A second interruption after updating the header remains recoverable. */
+        struct hpclang_rpl_flash_discard retry;
+        assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &retry) == 1);
+        assert(retry.address == plan.address && retry.extent <= plan.extent);
+        bank[32] = 0;
+        struct hpclang_rpl_flash_space space;
+        assert(hpclang_rpl_flash_tail(&reader, first, end, &space) == 0);
+        assert(space.address == first + 64u + plan.extent + 2u);
+        assert(!memcmp(bank, before, 32) && !memcmp(bank + 36, before + 36, sizeof bank - 36));
+    }
+    memset(bank, 0xff, sizeof bank);
+    memcpy(bank, native_record, sizeof native_record);
+    memcpy(bank + 33, native_record + 1, sizeof native_record - 1);
+    source.reads = 0;
+    assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &plan) == 1);
+    uint32_t reads = source.reads;
+    for (uint32_t cut = 0; cut < reads; ++cut) {
+        source.reads = 0;
+        source.fail_after = cut;
+        plan = (struct hpclang_rpl_flash_discard){123, 456};
+        assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &plan) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(plan.address == 123 && plan.extent == 456);
+    }
+    source.fail_after = UINT32_MAX;
+    put_word(bank + 32, 2, 0);
+    assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &plan) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    memset(bank + 33, 0xff, sizeof bank - 33);
+    bank[sizeof bank - 1] = 0;
+    assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &plan) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    bank[32] = 0x57;
+    assert(hpclang_rpl_flash_discard_plan(&reader, first, end, &plan) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(plan.address == 123 && plan.extent == 456);
+}
+
 int main(void)
 {
     test_tail();
+    test_discard();
     struct image source = {native_record + 4, 54, 0x100, 0, UINT32_MAX};
     const struct hpclang_rpl_reader reader = {read_nibble, &source};
     uint8_t *record = NULL;
