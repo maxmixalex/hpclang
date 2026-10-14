@@ -19,6 +19,25 @@ struct hpclang_rpl_flash_space
     uint32_t nibbles;
 };
 
+struct hpclang_rpl_flash_allocation
+{
+    uint32_t address;
+    uint32_t nibbles;
+    int deleted;
+};
+
+/* Locate the allocation containing target, including interior addresses,
+ * headers and padding. Deleted allocations remain candidates: native PURGE
+ * does not invalidate outstanding references. Validate the entire chain and
+ * erased tail before reporting a match. Deleted payloads are opaque and need
+ * not contain a valid object. Caller supplies one stable, validated bank
+ * mapping; all coordinates are nibbles in that mapping. Returns 1 found,
+ * 0 outside allocations, or a negative span result. Output changes only on 1.
+ * This establishes ownership bounds, not permission to reclaim or relocate. */
+int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t target,
+                                      struct hpclang_rpl_flash_allocation *allocation);
+
 /* Find the erased tail after validated live/deleted records. first/end are
  * nibble coordinates after a caller-validated bank header. nibbles excludes
  * the final erased status byte and is rounded down to a whole halfword.

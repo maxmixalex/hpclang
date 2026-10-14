@@ -835,3 +835,19 @@ reading a library, and discard partial traversal after an error. The actual C
 visitor matches all 62 entries, including 56 banked bindings, in the examined
 HP50g Stock catalog. This is catalog coverage, not complete execution-root or
 reclamation safety.
+
+## Port allocation ownership
+
+The internal `hpclang_rpl_port_find()` maps an interior RAM-port address to its
+enclosing backup or library, validating the complete chain and terminator before
+returning a match. `hpclang_rpl_flash_allocation_find()` also retains deleted
+Flash allocations and validates the entire chain and erased tail. Header and
+padding addresses belong to their allocation; a deleted payload need not remain
+a parseable object. Neither helper discards the bank identity supplied by its
+caller or treats a found allocation as permission to reclaim it.
+
+The C resolvers locate the same native 60-nibble Flash allocation from an ACPTR
+before and after Stock PURGE on HP49g+/HP50g, preserving its deleted status.
+The RAM resolver maps the examined HP50g ERAM ACPTR to the 52-nibble `PORTONE`
+backup. Complete root traversal and execution-reference qualification remain
+necessary before production relocation/reclamation can use these bounds.

@@ -36,6 +36,62 @@ static void put_word(uint8_t *data, uint32_t at, uint32_t value)
     }
 }
 
+static void test_allocation_find(void)
+{
+    uint8_t bank[96];
+    memset(bank, 0xff, sizeof bank);
+    memcpy(bank, native_record, sizeof native_record);
+    memcpy(bank + sizeof native_record, native_record, sizeof native_record);
+    bank[sizeof native_record] = 0;
+    /* A discarded failed append need not contain a parseable payload. */
+    memset(bank + sizeof native_record + 4, 0x9a, sizeof native_record - 4);
+    struct image source = {bank, sizeof bank * 2, 0x20a, 0, UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    uint32_t first = source.base, end = first + source.nibbles;
+    struct hpclang_rpl_flash_allocation allocation;
+    const struct hpclang_rpl_flash_allocation sentinel = {123, 456, 7};
+    for (uint32_t offset = 0; offset < 128; ++offset) {
+        allocation = sentinel;
+        assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + offset,
+                                                 &allocation) == 1);
+        assert(allocation.address == first + (offset / 64) * 64);
+        assert(allocation.nibbles == 64 && allocation.deleted == (offset >= 64));
+    }
+    const uint32_t misses[] = {0, 0x209, 0x28a, 0x28b, 0x2ca, 0xfffff};
+    for (unsigned i = 0; i < sizeof misses / sizeof misses[0]; ++i) {
+        allocation = sentinel;
+        assert(hpclang_rpl_flash_allocation_find(&reader, first, end, misses[i], &allocation) == 0);
+        assert(memcmp(&allocation, &sentinel, sizeof allocation) == 0);
+    }
+    source.reads = 0;
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + 100, &allocation) == 1);
+    uint32_t reads = source.reads;
+    for (uint32_t cut = 0; cut < reads; ++cut) {
+        source.reads = 0;
+        source.fail_after = cut;
+        allocation = sentinel;
+        assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + 100, &allocation) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(memcmp(&allocation, &sentinel, sizeof allocation) == 0);
+    }
+    source.fail_after = UINT32_MAX;
+    /* A match in the first slot cannot hide a broken later chain or dirty tail. */
+    bank[32] = 0x52;
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + 8, &allocation) < 0);
+    bank[32] = 0;
+    bank[95] = 0xfe;
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + 8, &allocation) < 0);
+    bank[95] = 0xff;
+    bank[30] ^= 1;
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first + 8, &allocation) < 0);
+    assert(memcmp(&allocation, &sentinel, sizeof allocation) == 0);
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, 0x100000, &allocation) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flash_allocation_find(&reader, end, first, first, &allocation) < 0);
+    assert(hpclang_rpl_flash_allocation_find(NULL, first, end, first, &allocation) < 0);
+    assert(hpclang_rpl_flash_allocation_find(&reader, first, end, first, NULL) < 0);
+}
+
 static void test_tail(void)
 {
     uint8_t bank[128];
@@ -166,6 +222,7 @@ static void test_discard(void)
 
 int main(void)
 {
+    test_allocation_find();
     test_tail();
     test_discard();
     struct image source = {native_record + 4, 54, 0x100, 0, UINT32_MAX};

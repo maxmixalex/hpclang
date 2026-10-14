@@ -132,6 +132,47 @@ static void test_library_references(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+static void test_port_containment(void)
+{
+    struct image image = {.fail_at = UINT32_MAX};
+    append(&image, "fffff");
+    append(&image, library);
+    append(&image, backup);
+    append(&image, "00000");
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_port_entry entry = {.address = 123, .span = 456};
+    struct hpclang_rpl_port_entry sentinel = entry;
+    for (uint32_t target = 5; target < 102; ++target) {
+        assert(hpclang_rpl_port_find(&reader, 5, image.count, target, &entry) == 1);
+        assert(entry.address == (target < 48 ? 5u : 48u));
+        assert(entry.span == (target < 48 ? 43u : 54u));
+    }
+    const uint32_t misses[] = {0, 4, 102, 106, 107, 0xfffff};
+    for (unsigned i = 0; i < sizeof misses / sizeof misses[0]; ++i) {
+        entry = sentinel;
+        assert(hpclang_rpl_port_find(&reader, 5, image.count, misses[i], &entry) == 0);
+        assert(memcmp(&entry, &sentinel, sizeof entry) == 0);
+    }
+    /* Validate later records and the terminator even when the first matches. */
+    for (uint32_t failed = 5; failed < image.count; ++failed) {
+        image.fail_at = failed;
+        assert(hpclang_rpl_port_find(&reader, 5, image.count, 10, &entry) < 0);
+        assert(memcmp(&entry, &sentinel, sizeof entry) == 0);
+    }
+    image.fail_at = UINT32_MAX;
+    image.data[100] ^= 1;
+    assert(hpclang_rpl_port_find(&reader, 5, image.count, 10, &entry) < 0);
+    image.data[100] ^= 1;
+    for (uint32_t end = 5; end < image.count; ++end) {
+        assert(hpclang_rpl_port_find(&reader, 5, end, 10, &entry) < 0);
+        assert(memcmp(&entry, &sentinel, sizeof entry) == 0);
+    }
+    assert(hpclang_rpl_port_find(&reader, 5, image.count, 0x100000, &entry) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_port_find(NULL, 5, image.count, 10, &entry) < 0);
+    assert(hpclang_rpl_port_find(&reader, 5, image.count, 10, NULL) < 0);
+}
+
 static void test_flash(void)
 {
     struct image image = {.fail_at = UINT32_MAX};
@@ -613,6 +654,7 @@ int main(void)
     test_library_command_resolution();
     test_library_catalog_lookup();
     test_catalog_traversal();
+    test_port_containment();
     test_library_references();
     test_flash();
     /* Owned synthetic library 123, title X, empty table offsets. The backup is

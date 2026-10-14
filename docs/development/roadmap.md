@@ -709,6 +709,15 @@ to also store the full sample in HOME returned `ENOSPC` in this native layout.
 These checks establish read-only enumeration during invocation, not complete
 bank-qualified execution-reference coverage or permission to reclaim objects.
 
+Internal RAM-port and Flash-allocation containment now map interior references
+to enclosing records only after validating the complete chain. Flash lookup
+also checks the erased tail and retains deleted allocations: native ACPTRs on
+HP49g+/HP50g resolve to the same 60-nibble record before and after PURGE. The
+HP50g ERAM ACPTR resolves to the 52-nibble `PORTONE` backup. Tests cover every
+interior position, boundaries, read failures and corruption after an apparent
+match. These ownership bounds still require complete bank-qualified root and
+execution-reference checks before movement or reclamation is enabled.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

@@ -31,6 +31,14 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
                           struct hpclang_rpl_port_cursor *cursor,
                           struct hpclang_rpl_port_entry *entry);
 
+/* Find the RAM-port record containing an interior target, including its header
+ * and CRC. Validate the complete chain through its zero terminator before
+ * publishing a match. The terminator and free tail are not objects. Mapping
+ * and bank identity belong to the caller and must remain stable. Returns 1
+ * found, 0 absent or a negative span result; output changes only on 1. */
+int hpclang_rpl_port_find(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                          uint32_t target, struct hpclang_rpl_port_entry *entry);
+
 enum hpclang_rpl_library_reference_kind
 {
     HPCLANG_RPL_LIBRARY_HASH,

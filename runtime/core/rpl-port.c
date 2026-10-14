@@ -487,6 +487,29 @@ int hpclang_rpl_port_next(const struct hpclang_rpl_reader *reader,
     return 1;
 }
 
+int hpclang_rpl_port_find(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t end,
+                          uint32_t target, struct hpclang_rpl_port_entry *entry)
+{
+    if (!entry)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (target >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_port_cursor cursor = {first, end, 0};
+    struct hpclang_rpl_port_entry current, match;
+    int result, found = 0;
+    while ((result = hpclang_rpl_port_next(reader, &cursor, &current)) > 0) {
+        if (target >= current.address && target - current.address < current.span) {
+            match = current;
+            found = 1;
+        }
+    }
+    if (result)
+        return result;
+    if (found)
+        *entry = match;
+    return found;
+}
+
 int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
                            struct hpclang_rpl_port_cursor *cursor,
                            struct hpclang_rpl_port_entry *entry)
@@ -526,7 +549,8 @@ int hpclang_rpl_flash_next(const struct hpclang_rpl_reader *reader,
         if (extent > available - 2u)
             return HPCLANG_RPL_SPAN_BOUNDS;
         if (status == 0u) {
-            /* Native PURGE changes the status byte; payload is no longer live. */
+            /* PURGE hides the entry from enumeration. Existing references can
+             * still target its retained payload; this is not a reclaim test. */
             scan.address += 2u + extent;
             continue;
         }

@@ -70,6 +70,45 @@ int hpclang_rpl_flash_tail(const struct hpclang_rpl_reader *reader, uint32_t fir
     return HPCLANG_RPL_SPAN_OK;
 }
 
+int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t target,
+                                      struct hpclang_rpl_flash_allocation *allocation)
+{
+    if (!allocation)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (target >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_flash_space tail;
+    int result = hpclang_rpl_flash_tail(reader, first, end, &tail);
+    if (result)
+        return result;
+    if (target < first || target >= tail.address)
+        return 0;
+    for (uint32_t at = first; at < tail.address;) {
+        uint32_t header = 0;
+        for (unsigned i = 0; i < 7; ++i) {
+            uint8_t nibble;
+            if (!reader->read_nibble(reader->context, at + i, &nibble))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (nibble > 15)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            header |= (uint32_t)nibble << (4 * i);
+        }
+        uint32_t status = header & 255, extent = header >> 8;
+        if ((status != 0 && status != 0x53) || extent < 11)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (tail.address - at < 2 || extent > tail.address - at - 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t nibbles = extent + 2;
+        if (target - at < nibbles) {
+            *allocation = (struct hpclang_rpl_flash_allocation){at, nibbles, status == 0};
+            return 1;
+        }
+        at += nibbles;
+    }
+    return 0;
+}
+
 int hpclang_rpl_flash_backup_record(const struct hpclang_rpl_reader *reader, uint32_t address,
                                     uint32_t span, uint8_t **record, uint32_t *bytes)
 {
