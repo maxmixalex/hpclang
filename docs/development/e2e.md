@@ -88,14 +88,29 @@ The emulator workflows are split by what they prove, not by which historical
 emulator happens to execute them.
 
 The Runtime workflow reads `tests/e2e/runtime-suites.json` to build and run
-four focused payloads through the same six-model Direct/Stock family harness:
+focused payloads through the shared Direct/Stock family harness:
 
 - `runtime`: core C/C++ runtime, drawing, physical keyboard progression and
   ordinary termination callbacks.
 - `object-basics`: stack operations, named-object views and HPGCC Saturn compatibility.
 - `system-services`: RTC read/set, deadline continuity, timers, sound, contrast,
-  USB detection, bounded input, historical timed client and owned power policy.
+  USB detection, bounded input and owned power policy.
+- `hpgcc-system`: historical timing/calendar adapters and the timed client.
 - `display`: display sessions, restoration and pixel verification described above.
+- `ui`: declarative input, layout, rendering and application interaction.
+- `notebook`: Stock-only primary persistence and pixels across three launches,
+  built separately for each model to fit the original HP39g+ memory budget.
+- `notebook-backup`: Stock-only Port 0 backup/restore/replacement/removal across
+  three launches on HP48gII/HP49g+/HP50g, without the UI renderer's allocation.
+
+`tools/e2e-runtime-plan.py` validates the registry before building. Each entry
+requires `mode` and boolean `keyboard`, with optional `verifier`, `contexts`
+(`direct`/`stock`), `families` and `build` (`universal`/`model`). Defaults preserve
+both execution contexts and all families. The generated matrices select only
+eligible profiles and pair every job with its own payload and Stock assets.
+Lifecycle JSON travels with the application artifact. The build helper accepts
+an optional fourth model argument, for example:
+`tools/build-e2e.sh notebook build/notebook-39 hp39 hp39gplus`.
 
 Only `runtime` requires the injected keyboard sequence. Separate payloads reduce
 each Stock upload and avoid exhausting HP48gII's heap with a monolithic binary.

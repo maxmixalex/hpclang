@@ -19,6 +19,7 @@ mkdir -p "$OUT/hp39gplus-stock-transfer" "$OUT/hp39gs-stock-transfer" "$OUT/hp40
 bash "$ROOT/tools/bootstrap-hp39-aplet.sh" >/dev/null
 
 for target in hp39gplus hp39gs hp40gs; do
+    [[ -f "$APP_DIR/launchers/$target.hp" ]] || continue
     bash "$ROOT/tools/package-hp39-aplet.sh" \
         "$APP_DIR/launchers/$target.hp" \
         "$OUT/$target-stock-transfer" \

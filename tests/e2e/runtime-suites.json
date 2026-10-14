@@ -4,5 +4,9 @@
   {"mode": "system-services", "keyboard": false, "verifier": "tests/e2e/system-services/verify.py"},
   {"mode": "hpgcc-system", "keyboard": false, "verifier": "tests/e2e/hpgcc-system/verify.py"},
   {"mode": "display", "keyboard": false, "verifier": "tests/e2e/display/verify.py"},
-  {"mode": "ui", "keyboard": false, "verifier": "tests/e2e/ui/verify.py"}
+  {"mode": "ui", "keyboard": false, "verifier": "tests/e2e/ui/verify.py"},
+  {"mode": "notebook", "keyboard": false, "verifier": "tests/e2e/notebook/verify.py",
+   "contexts": ["stock"], "build": "model"},
+  {"mode": "notebook-backup", "keyboard": false,
+   "contexts": ["stock"], "families": ["hp48", "hp4950"]}
 ]
