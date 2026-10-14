@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 3 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950]" >&2
+if [[ $# -lt 1 || $# -gt 4 ]]; then
+    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     exit 2
 fi
 
@@ -10,10 +10,18 @@ MODE="$1"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${2:-$ROOT/build/e2e-$MODE}"
 FAMILY="${3:-all}"
+BUILD_MODEL="${4:-universal}"
 case "$FAMILY" in
     all|hp39|hp48|hp4950) ;;
     *) echo "unsupported E2E family: $FAMILY" >&2; exit 2 ;;
 esac
+if [[ "$BUILD_MODEL" != universal ]]; then
+    target_args=(--target "$BUILD_MODEL")
+    if [[ "$FAMILY" != all ]]; then
+        target_args+=(--family "$FAMILY")
+    fi
+    python3 "$ROOT/tools/e2e-target-matrix.py" direct "${target_args[@]}" >/dev/null
+fi
 ATFE="${ATFE:?set ATFE to the extracted Arm Toolchain for Embedded root}"
 NM="$ATFE/bin/llvm-nm"
 
@@ -39,7 +47,7 @@ if [[ "$MODE" == font-gallery && -z "${HPCLANG_GALLERY_SHARD_INDEX+x}" ]]; then
         echo "=== Direct Gallery shard $shard_index/$GALLERY_BUNDLE_COUNT ==="
         HPCLANG_GALLERY_SHARD_INDEX="$shard_index" \
         HPCLANG_GALLERY_SHARD_COUNT="$GALLERY_BUNDLE_COUNT" \
-            "$0" font-gallery "$shard_out" "$FAMILY"
+            "$0" font-gallery "$shard_out" "$FAMILY" "$BUILD_MODEL"
 
         shard_result="$(cat "$shard_out/e2e.result-address")"
         if [[ -z "$expected_result" ]]; then
@@ -90,7 +98,7 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services|hpgcc-system|display|ui|notebook|object-basics|sd-media-manual)
+    system-services|hpgcc-system|display|ui|notebook|notebook-backup|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"
@@ -137,6 +145,7 @@ cmake_args=(
     -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/toolchains/hpclang-armv4t.cmake"
     -DHPCLANG_ROOT="$ROOT"
     -DCMAKE_BUILD_TYPE=MinSizeRel
+    -DHPCLANG_BUILD_MODEL="$BUILD_MODEL"
     "${E2E_CMAKE_ARGS[@]}"
 )
 
@@ -167,14 +176,16 @@ if [[ "$MODE" == runtime ]]; then
     LAUNCHER_ARGS+=(--hp39-armsys-probe)
 fi
 mapfile -t LAUNCHER_MODELS < <(
-    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" <<'PY'
+    python3 - "$ROOT/tests/e2e/targets" "$FAMILY" "$BUILD_MODEL" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 for path in sorted(Path(sys.argv[1]).glob("*.json")):
     data = json.loads(path.read_text(encoding="utf-8"))
-    if sys.argv[2] == "all" or data["family"] == sys.argv[2]:
+    if (sys.argv[2] == "all" or data["family"] == sys.argv[2]) and (
+        sys.argv[3] == "universal" or data["target"] == sys.argv[3]
+    ):
         print(data["target"])
 PY
 )

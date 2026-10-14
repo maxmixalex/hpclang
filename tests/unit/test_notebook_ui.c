@@ -11,19 +11,22 @@
 
 static char saved[NOTEBOOK_CAPACITY];
 static int load_error, save_error, clock_error;
+static unsigned port_mask;
+static int storage_available;
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return NULL;
 }
 int hpclang_device_capability(enum hpclang_capability capability)
 {
-    (void)capability;
-    return HPCLANG_CAPABILITY_SUPPORTED;
+    assert(capability == HPCLANG_CAPABILITY_STREAM_STORAGE);
+    return storage_available ? HPCLANG_CAPABILITY_SUPPORTED : HPCLANG_CAPABILITY_UNSUPPORTED;
 }
 int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
 {
     assert(port < 3);
-    info->available = HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_CREATE_BACKUP;
+    info->available =
+        port_mask & (1u << port) ? HPCLANG_PORT_READ_BACKUP | HPCLANG_PORT_CREATE_BACKUP : 0;
     return 0;
 }
 int hpclang_datetime_read(struct hpclang_datetime *out)
@@ -88,8 +91,10 @@ static int activate(struct notebook *note, struct hpclang_ui *ui, unsigned actio
     return notebook_update(note, &event);
 }
 
-static void run(unsigned height)
+static void run(unsigned height, unsigned ports, int files, unsigned expected_nodes)
 {
+    port_mask = ports;
+    storage_available = files;
     static const uint8_t bits[] = {0xe0, 0xa0, 0xe0};
     static const struct hpclang_bitmap_glyph glyph = {
         .codepoint = '?', .bitmap = bits, .width = 3, .height = 3, .advance = 4, .stride = 1};
@@ -104,7 +109,8 @@ static void run(unsigned height)
     struct hpclang_ui_surface_style style = {
         .font = &font, .foreground = 255, .accent = 255, .gap = 2};
     struct hpclang_ui_surface *renderer = hpclang_ui_surface_create(131, height, 2, &style, 1, 0);
-    const struct hpclang_ui_config config = NOTEBOOK_UI_CONFIG;
+    const struct hpclang_ui_config config = notebook_ui_config();
+    assert(config.nodes == expected_nodes);
     size_t bytes = hpclang_ui_storage_size(config);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = hpclang_ui_init(storage, bytes, config);
@@ -117,14 +123,16 @@ static void run(unsigned height)
     memset(note.text, 'x', sizeof(note.text) - 1);
     note.text[sizeof(note.text) - 1] = 0;
     assert(notebook_view(ui, renderer, &note, 131, (int)height) == 0);
+    assert(hpclang_ui_node_count(ui) == expected_nodes);
     assert(hpclang_ui_surface_render(renderer, ui) == 1);
     assert(!activate(&note, ui, SAVE) && !strcmp(saved, note.text));
-    assert(!activate(&note, ui, EXPORT) && !strcmp(note.status, "HPCNOTE.TXT already exists"));
+    if (files)
+        assert(!activate(&note, ui, EXPORT) && !strcmp(note.status, "HPCNOTE.TXT already exists"));
     load_error = EIO;
     assert(!activate(&note, ui, LOAD) && strlen(note.text) == NOTEBOOK_CAPACITY - 1);
     load_error = 0;
     strcpy(saved, "restored");
-    assert(!activate(&note, ui, RESTORE) && !strcmp(note.text, "restored"));
+    assert(!activate(&note, ui, ports ? RESTORE : LOAD) && !strcmp(note.text, "restored"));
     assert(notebook_view(ui, renderer, &note, 131, (int)height) == 0);
     assert(hpclang_ui_focus(ui, control(ui, EDIT)) == 0);
     struct hpclang_ui_event event;
@@ -144,7 +152,9 @@ static void run(unsigned height)
 }
 int main(void)
 {
-    run(64);
-    run(80);
+    run(64, 0, 0, 10);
+    run(64, 1, 0, 12);
+    run(64, 7, 1, 17);
+    run(80, 7, 1, 17);
     return 0;
 }

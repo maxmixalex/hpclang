@@ -12,8 +12,10 @@
      (width_),                                                                                     \
      (height_)}
 
+#ifndef HPCLANG_COMPILED_MODEL
 static const struct hpclang_device_info unknown =
     DEVICE(HPCLANG_MODEL_UNKNOWN, HPCLANG_FAMILY_UNKNOWN, 0u, 0u);
+#endif
 
 static const struct hpclang_device_info devices[] = {
     DEVICE(HPCLANG_MODEL_UNKNOWN, HPCLANG_FAMILY_UNKNOWN, 0u, 0u),
@@ -27,6 +29,9 @@ static const struct hpclang_device_info devices[] = {
 
 const struct hpclang_device_info *hpclang_device_info(void)
 {
+#ifdef HPCLANG_COMPILED_MODEL
+    return &devices[HPCLANG_COMPILED_MODEL];
+#else
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     uint32_t model = boot != 0 ? boot->model : HPCLANG_MODEL_UNKNOWN;
 
@@ -34,6 +39,7 @@ const struct hpclang_device_info *hpclang_device_info(void)
         return &unknown;
 
     return &devices[model];
+#endif
 }
 
 int hpclang_device_capability(enum hpclang_capability capability)

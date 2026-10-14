@@ -48,16 +48,22 @@ mask; they do not add missing native write support (currently Port 1 replacement
 and Port 2 writes remain unavailable).
 
 Host tests cover operation selection and rejected writes for all three port
-indices using simulated service capabilities. Device backup/persistence tests
-remain follow-up work; this example does not establish completion of M8.6.
+indices using simulated service capabilities. The separate `notebook-backup`
+Stock fixture verifies Port 0 create, restore without changing the primary save,
+replacement, and removal across three launches. Its first HP48gII ROM-emulator
+run passes. The UI fixture separately checks primary persistence and pixels;
+this example does not establish completion of M8.6.
 
 ## Build resources
 
 The application selects picolibc's integer-only formatter because it displays
 integer dates, port indices and error codes. Remove that target's
 `vfprintf=__i_vfprintf` link option if adding floating-point format conversions.
-Its UI arena holds the complete 17-node view, including all three Port pairs,
-with 512 bytes per text buffer.
+Its UI arena reserves the controls advertised by the current launch context:
+10 base nodes, two per readable Port, and one for file export (17 at most),
+with 512 bytes per text buffer. Card removal does not change this reservation.
+Use `-DHPCLANG_BUILD_MODEL=hp39gplus` when building for the original HP39g+;
+the model-specific SDK build removes services absent on that calculator.
 
 ## File export
 

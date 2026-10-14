@@ -2,9 +2,6 @@
 #define HPCLANG_NOTEBOOK_APP_H
 #include "store.h"
 #include <hpclang/ui-surface.h>
-/* Full view: 17 nodes, including all three Port pairs and file export.
- * 512 text bytes also cover the maximum note, clock and status buffers. */
-#define NOTEBOOK_UI_CONFIG {17, 512, 0}
 
 enum action
 {
@@ -25,6 +22,7 @@ struct notebook
 };
 
 void notebook_init(struct notebook *note);
+struct hpclang_ui_config notebook_ui_config(void);
 int notebook_update(struct notebook *note, const struct hpclang_ui_event *event);
 int notebook_view(struct hpclang_ui *ui, struct hpclang_ui_surface *renderer,
                   const struct notebook *note, int width, int height);

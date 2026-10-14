@@ -86,7 +86,13 @@ int main(void)
     static const char *const expected[] = {"STIMFCODPN", "STIMFCODPN", "STIMODPN", "STIFCODPN",
                                            "STIODPN"};
     const int statuses[] = {0, 1, -1, INT_MIN, INT_MAX};
-    const struct hpclang_boot_info boot = {0};
+    struct hpclang_boot_info boot = {0};
+#ifdef HPCLANG_COMPILED_MODEL
+    assert(hpclang_start(NULL) == -1);
+    assert(hpclang_start(&boot) == -1);
+    assert(used == 0);
+    boot.model = HPCLANG_COMPILED_MODEL;
+#endif
     for (scenario = 0; scenario < sizeof expected / sizeof expected[0]; ++scenario) {
         for (size_t i = 0; i < sizeof statuses / sizeof statuses[0]; ++i) {
             status = statuses[i];

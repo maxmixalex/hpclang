@@ -802,9 +802,20 @@ HP48gII. Launcher compression and smaller C/C++ code generation are being
 validated against the complete application; host decoder bounds and relocated
 SDK packaging pass, but small-model execution acceptance is still pending.
 The compact bootstrap now passes six-model Direct runtime/divmod/keyboard
-acceptance. HP48gII and HP50g also pass the complete notebook Stock
+acceptance. HP48gII, HP49g+ and HP50g also pass the complete notebook Stock
 save/relaunch/replace/relaunch/cleanup flow and independent LCD checks locally.
 HP39 notebook execution, the other Stock targets and formal CI remain open.
+
+The approved model-specific SDK build keeps the application source and APIs,
+uses a fixed model with whole-program optimization, and rejects another model
+before application startup. All six model-specific notebook builds and the
+default universal relocated SDK build pass locally. The HP39g+ application is
+44,424 code bytes with 1,048 static writable bytes; its Stock execution is still
+under validation. Host coverage is now 91 passing targets, including startup
+rejection before initialization. The independent `notebook-backup` fixture keeps
+Port 0 lifecycle checks out of the UI image: HP48gII passes its three-launch
+backup/restore/replace/remove flow and the separate UI/pixel lifecycle locally.
+These are original-ROM emulator results, not physical-device acceptance.
 
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each

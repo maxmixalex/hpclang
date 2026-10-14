@@ -2,6 +2,7 @@
 #include <hpclang/aplet.h>
 #include <hpclang/device.h>
 #include <hpclang/object-store.h>
+#include <hpclang/port.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +45,7 @@ static int cleanup(void)
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    const struct hpclang_ui_config config = NOTEBOOK_UI_CONFIG;
+    const struct hpclang_ui_config config = notebook_ui_config();
     size_t size = hpclang_ui_storage_size(config);
     void *storage = malloc(size);
     struct hpclang_ui *ui = storage ? hpclang_ui_init(storage, size, config) : NULL;

@@ -163,6 +163,63 @@ endforeach()
         for path in missing:
             if not path.is_file():
                 raise AssertionError(f"incremental build did not restore {path.name}")
+        # Exercise all model selectors from the relocated SDK. Each build keeps
+        # the same notebook source and packages only its matching launcher.
+        for model in ("hp39gplus", "hp39gs", "hp40gs", "hp48gii", "hp49gplus", "hp50g"):
+            selected = work / f"model-{model}"
+            run(
+                "cmake",
+                "-S",
+                str(package / "examples/notebook"),
+                "-B",
+                str(selected),
+                "-DCMAKE_BUILD_TYPE=MinSizeRel",
+                f"-DHPCLANG_BUILD_MODEL={model}",
+                f"-DCMAKE_PREFIX_PATH={sdk}",
+                f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                env=env,
+            )
+            run("cmake", "--build", str(selected), "--parallel", "2", env=env)
+            launchers = selected / "notebook-launchers"
+            if {p.stem for p in launchers.glob("*.hp")} != {model}:
+                raise AssertionError(f"{model}: model build packaged other calculators")
+            if (
+                model == "hp39gplus"
+                and (selected / "notebook.hpc").stat().st_size
+                >= (build / "notebook/notebook.hpc").stat().st_size
+            ):
+                raise AssertionError("HP39 specialization did not reduce notebook code size")
+        print("Installed SDK: all six model-specific notebook builds PASS")
+        rejected = work / "rejected model application"
+        shutil.copytree(package / "examples/notebook", rejected)
+        cmake_file = rejected / "CMakeLists.txt"
+        cmake_file.write_text(
+            cmake_file.read_text().replace(
+                "hpclang_target_launchers(notebook)",
+                "hpclang_target_launchers(notebook MODELS hp50g)",
+            )
+        )
+        for model, diagnostic in (
+            ("unknown", "Unsupported HPCLANG_BUILD_MODEL"),
+            ("hp39gplus", "does not match HPCLANG_BUILD_MODEL"),
+        ):
+            result = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(rejected),
+                    "-B",
+                    str(work / f"reject-{model}"),
+                    f"-DHPCLANG_BUILD_MODEL={model}",
+                    f"-DCMAKE_PREFIX_PATH={sdk}",
+                    f"-DCMAKE_TOOLCHAIN_FILE={package / 'cmake/toolchains/hpclang-armv4t.cmake'}",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0 or diagnostic not in result.stdout + result.stderr:
+                raise AssertionError(f"Model configuration did not reject {model}: {result}")
         print("Installed SDK: C/C++, fonts, HPC1, six-model launchers and relocation PASS")
         if args.aplet_tool:
             print("Installed SDK: HP39g+/HP39gs/HP40gs C/C++ Aplet packaging PASS")

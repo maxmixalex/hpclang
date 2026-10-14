@@ -9,7 +9,7 @@ extern const struct hpclang_font notebook_font;
 int main(void)
 {
     const struct hpclang_device_info *device = hpclang_device_info();
-    const struct hpclang_ui_config capacity = NOTEBOOK_UI_CONFIG;
+    const struct hpclang_ui_config capacity = notebook_ui_config();
     size_t bytes = hpclang_ui_storage_size(capacity);
     void *storage = malloc(bytes);
     struct hpclang_ui *ui = storage ? hpclang_ui_init(storage, bytes, capacity) : NULL;

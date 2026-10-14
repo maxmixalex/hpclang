@@ -21,6 +21,10 @@ int main(void);
 
 int hpclang_start(const struct hpclang_boot_info *boot)
 {
+#ifdef HPCLANG_COMPILED_MODEL
+    if (!boot || boot->model != HPCLANG_COMPILED_MODEL)
+        return -1;
+#endif
     boot_info = boot;
 
     _set_tls(__tls_base);

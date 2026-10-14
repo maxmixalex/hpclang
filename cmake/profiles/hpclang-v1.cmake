@@ -3,6 +3,21 @@
 # The application ABI is independent of the calculator family:
 # ARMv4T, AAPCS32, Thumb-1 C code, soft-float and fixed virtual addresses.
 
+set(HPCLANG_BUILD_MODEL "universal" CACHE STRING "Calculator model to optimize for, or universal")
+set(hpclang_build_models universal hp39gplus hp39gs hp40gs hp48gii hp49gplus hp50g)
+set_property(CACHE HPCLANG_BUILD_MODEL PROPERTY STRINGS ${hpclang_build_models})
+list(FIND hpclang_build_models "${HPCLANG_BUILD_MODEL}" hpclang_build_model_id)
+if(hpclang_build_model_id LESS 0)
+    message(FATAL_ERROR "Unsupported HPCLANG_BUILD_MODEL: ${HPCLANG_BUILD_MODEL}")
+endif()
+if(hpclang_build_model_id GREATER 0)
+    # Whole-program optimization removes services absent on the selected model.
+    # Runtime startup also checks the model before invoking application code.
+    add_compile_definitions(HPCLANG_COMPILED_MODEL=${hpclang_build_model_id})
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-flto>")
+    add_link_options(-flto)
+endif()
+
 add_compile_options(
     "$<$<COMPILE_LANGUAGE:C>:-mthumb>"
     "$<$<COMPILE_LANGUAGE:C>:-mabi=aapcs>"

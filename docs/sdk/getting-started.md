@@ -57,6 +57,16 @@ This reduces the memory occupied by the installed object while the app runs;
 the public `.hpc` file stays HPC1. `MinSizeRel` uses Clang's `-Oz` for C/C++.
 Compression does not remove the need for enough free calculator RAM for code,
 data, the application heap and stack.
+
+For a memory-constrained calculator, configure a separate build directory with
+`-DHPCLANG_BUILD_MODEL=hp39gplus` (or `hp39gs`, `hp40gs`, `hp48gii`, `hp49gplus`,
+`hp50g`). This enables whole-program optimization with a fixed device model,
+allowing the linker to remove unreachable services while keeping the same source
+and public APIs. The default is `universal`. Model-specific builds package only
+the selected model's launcher; requesting another launcher is a configuration
+error. Runtime startup rejects a mismatched calculator before constructors or
+application code run. Use separate build directories for different models.
+
 HP48gII/HP49g+/HP50g use the wrapped object with the corresponding installed
 ARMToolbox library. HP39g+/HP39gs/HP40gs need an additional Aplet envelope;
 the `.hp` file is an intermediate input, not a directly installable Aplet.

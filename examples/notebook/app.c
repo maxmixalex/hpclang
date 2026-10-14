@@ -6,6 +6,26 @@
 #include <stdio.h>
 #include <string.h>
 
+static unsigned port_operations(unsigned port)
+{
+    struct hpclang_port_info info = {.size = sizeof(info), .version = HPCLANG_PORT_INFO_VERSION};
+    return hpclang_port_query(port, &info) ? 0u : info.available;
+}
+
+struct hpclang_ui_config notebook_ui_config(void)
+{
+    /* These capabilities describe the launch context, not whether a card is
+       currently inserted. Reserve each control that the view can declare. */
+    struct hpclang_ui_config config = {10, 512, 0};
+    if (hpclang_device_capability(HPCLANG_CAPABILITY_STREAM_STORAGE) ==
+        HPCLANG_CAPABILITY_SUPPORTED)
+        ++config.nodes;
+    for (unsigned port = 0; port < 3; ++port)
+        if (port_operations(port) & HPCLANG_PORT_READ_BACKUP)
+            config.nodes += 2;
+    return config;
+}
+
 static void clock_read(struct notebook *note)
 {
     struct hpclang_datetime now;
@@ -50,15 +70,14 @@ int notebook_view(struct hpclang_ui *ui, struct hpclang_ui_surface *renderer,
             hpclang_ui_button(ui, 16, 0, "Export HPCNOTE.TXT",
                               (struct hpclang_ui_action){EXPORT, 0}, 1);
         for (unsigned port = 0; port < 3; ++port) {
-            struct hpclang_port_info info = {.size = sizeof(info),
-                                             .version = HPCLANG_PORT_INFO_VERSION};
-            if (hpclang_port_query(port, &info) || !(info.available & HPCLANG_PORT_READ_BACKUP))
+            unsigned operations = port_operations(port);
+            if (!(operations & HPCLANG_PORT_READ_BACKUP))
                 continue;
             char label[24];
             snprintf(label, sizeof(label), "Port %u backup", port);
             hpclang_ui_button(
                 ui, 10 + port * 2, 0, label, (struct hpclang_ui_action){BACKUP, port},
-                !!(info.available & (HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP)));
+                !!(operations & (HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP)));
             snprintf(label, sizeof(label), "Port %u restore", port);
             hpclang_ui_button(ui, 11 + port * 2, 0, label,
                               (struct hpclang_ui_action){RESTORE, port}, 1);
