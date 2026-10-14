@@ -71,8 +71,6 @@ _Static_assert(sizeof(hp39gplus_font_nor_pages) / sizeof(hp39gplus_font_nor_page
 
 void hpclang_cache_clean(const void *start, uint32_t size);
 void hpclang_mmu_sync(volatile uint32_t *l2_workspace, volatile uint32_t *l1);
-uint32_t hpclang_irq_save_disable(void);
-void hpclang_irq_restore(uint32_t cpsr);
 
 uintptr_t hpclang_stage0_resume_target __attribute__((section(".data.stage0.resume"))) = 0u;
 
@@ -1083,7 +1081,6 @@ int hpclang_hp39_portal_prepare_stock(void)
     l1[HPCLANG_L1_CODE_INDEX] = portal->stock_code_l1;
     hpclang_mmu_sync((volatile uint32_t *)portal->l2_workspace, l1);
 
-    hpclang_irq_restore(portal->stock_cpsr);
     return 0;
 }
 
@@ -1091,8 +1088,6 @@ int hpclang_hp39_portal_restore_hpc(void)
 {
     struct hpclang_hp39_portal_context *portal = &hpclang_hp39_portal_context;
     volatile uint32_t *l1 = (volatile uint32_t *)portal->l1;
-
-    portal->last_cpsr = hpclang_irq_save_disable();
 
     int result = 0;
     const uint32_t *read_map = (const uint32_t *)portal->saturn_state;

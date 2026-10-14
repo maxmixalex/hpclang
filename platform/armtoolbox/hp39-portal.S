@@ -36,10 +36,17 @@ hpclang_hp39_portal_enter:
     cmp     r0, #0
     bne     .Lportal_prepare_failed
 
+    /* Stock's IRQ return trampoline assumes ARM user code. Keep interrupts
+     * masked through the Thumb preparation epilogue, then restore the native
+     * user stack before enabling them here in ARM state. */
+    ldr     r12, =hpclang_hp39_portal_context
+    ldr     sp, [r12, #HP39P_STOCK_SP]
+    ldr     r0, [r12, #HP39P_STOCK_CPSR]
+    bl      hpclang_irq_restore
+
     ldr     r12, =hpclang_hp39_portal_context
     add     r1, r12, #HP39P_EMULATOR_REGS
     ldmia   r1, {r4-r11}
-    ldr     sp, [r12, #HP39P_STOCK_SP]
     ldr     r0, [r12, #HP39P_SATURN_ENTRY]
     ldr     r1, [r12, #HP39P_SATURN_STATE]
     ldr     r2, [r12, #HP39P_EMULATOR_LR]
@@ -76,6 +83,11 @@ hpclang_hp39_portal_resume:
     stmia   r2, {r4-r11}
 
     add     sp, r12, #HP39P_STACK_END
+    /* Native callbacks arrive in ARM state with Stock IRQs enabled. Mask them
+     * before the first Thumb instruction, not inside the C function. */
+    bl      hpclang_irq_save_disable
+    ldr     r12, =hpclang_hp39_portal_context
+    str     r0, [r12, #HP39P_LAST_CPSR]
     bl      hpclang_hp39_portal_restore_hpc
     mov     r3, r0
 

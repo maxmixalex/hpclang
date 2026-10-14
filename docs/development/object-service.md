@@ -321,6 +321,14 @@ Native setters keep their own domain rules; for example PageNum depends on the
 Aplet's existing sketch pages. There is no generic rollback promise for arbitrary
 custom-Aplet handler side effects.
 
+The HP39 portal changes interrupt ownership in ARM assembly. Preparation and
+restoration C code, including their Thumb entry/exit instructions, run with
+IRQ/FIQ masked. Before resuming Stock, the assembly boundary restores the native
+ARM stack and then the saved interrupt state; on return it masks interrupts
+before entering C. Stock's user-mode IRQ return trampoline assumes ARM code,
+so enabling interrupts inside a Thumb C epilogue can resume in the wrong
+instruction set even when every saved code byte is intact.
+
 The historical HPGCC39 launcher exposes free Saturn RAM as ARM pages without
 making those pages native TEMP objects. Before the first portal call, hpclang
 reserves that interval as an opaque rooted TEMP string and retains the existing
