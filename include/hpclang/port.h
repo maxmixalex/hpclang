@@ -107,9 +107,15 @@ extern "C"
                                    const struct hpclang_object *value);
 
     /* Replace an existing backup; missing names return ENOENT. Live
-     * calculator references retain the old value. Currently Port 0 only;
-     * operations requiring relocation of a preceding library return ENOTSUP.
-     * Replacement never implicitly creates a missing backup. */
+     * calculator references retain the old value. Supports Port 0 and
+     * HP49g+/HP50g Stock Port 2. Port 0 operations requiring relocation of a
+     * preceding library return ENOTSUP. Port 2 appends the complete new record
+     * before tombstoning the old one, preserving its payload and pointers.
+     * Insufficient erased tail space returns ENOSPC without deleting the old
+     * value. Failed appends are discarded; after commit, old-status cleanup
+     * completes under exclusive ownership before success is returned. Permanent
+     * hardware failure retains RAM execution as with creation. No reclamation
+     * or power-loss guarantee. Replacement never creates a missing backup. */
     int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_object *value);
     /* Remove an existing backup; missing names return ENOENT. Supports Port 0

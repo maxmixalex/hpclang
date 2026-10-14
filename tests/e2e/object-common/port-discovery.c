@@ -24,7 +24,7 @@ uint32_t hpclang_e2e_port_discovery(void)
         } else if (boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G) {
             expected = reads | HPCLANG_PORT_CREATE_BACKUP;
             if (port == 2)
-                expected |= HPCLANG_PORT_REMOVE_BACKUP;
+                expected |= HPCLANG_PORT_REMOVE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP;
             medium = port == 1 ? HPCLANG_PORT_EXTENDED_RAM : HPCLANG_PORT_FLASH;
         }
         if (info.port != port || info.medium != medium || info.implemented != expected ||

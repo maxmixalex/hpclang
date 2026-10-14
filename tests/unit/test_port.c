@@ -64,6 +64,15 @@ int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
                                             0x200000u};
     return hpclang_rpl_flash_remove_backup(&io, name, name_length, NULL);
 }
+int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes)
+{
+    if (!port2_available)
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    struct hpclang_rpl_flash_replacement transaction = {UINT32_MAX, UINT32_MAX, 0};
+    return hpclang_rpl_flash_replace_backup(&io, record, bytes, &transaction);
+}
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return &boot;
@@ -185,7 +194,8 @@ static void test_discovery(void)
             assert(info.available == info.implemented);
             if (present && port == 2)
                 assert(info.available ==
-                       (reads | HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP));
+                       (reads | HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP |
+                        HPCLANG_PORT_REPLACE_BACKUP));
         }
     }
     // Zero writable headroom means supported-but-full, not an unavailable API.
@@ -268,6 +278,17 @@ static void test_flash(void)
     assert(!hpclang_object_integer_i64(value, &number) && number == 123);
     assert(!hpclang_port_backup_create(2, (const uint8_t *)"NEWFLASH", 8, value));
     assert(!hpclang_port_backup_get(2, (const uint8_t *)"missing", 7) && errno == ENOENT);
+    assert(hpclang_port_backup_replace(2, (const uint8_t *)"missing", 7, value) == -1 &&
+           errno == ENOENT);
+    struct hpclang_object *replacement = NULL;
+    assert(!hpclang_object_create_string((const uint8_t *)"replacement", 11, &replacement));
+    assert(!hpclang_port_backup_replace(2, (const uint8_t *)"NEWFLASH", 8, replacement));
+    hpclang_object_release(replacement);
+    replacement = hpclang_port_backup_get(2, (const uint8_t *)"NEWFLASH", 8);
+    assert(replacement && hpclang_object_kind(replacement) == HPCLANG_OBJECT_STRING);
+    hpclang_object_release(replacement);
+    assert(!hpclang_port_backup_replace(2, (const uint8_t *)"NEWFLASH", 8, value));
+    assert(!hpclang_object_integer_i64(value, &number) && number == 123);
     missing_flash_bank = 3;
     assert(hpclang_port_backup_remove(2, (const uint8_t *)"NEWFLASH", 8) == -1 && errno == EIO);
     assert(hpclang_port_backup_create(2, (const uint8_t *)"FAIL", 4, value) == -1 && errno == EIO);

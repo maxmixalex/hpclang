@@ -223,6 +223,41 @@ int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint3
                                                   : HPCLANG_RPL_FLASH_DIRTY;
 }
 
+int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes,
+                                     struct hpclang_rpl_flash_replacement *transaction)
+{
+    if (!transaction || !valid_record(record, bytes))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct backup_selection selection;
+    int result = select_backup(io, wanted.name, wanted.name_length, bytes, &selection);
+    if (result)
+        return result;
+    if (!selection.matches)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (selection.matches != 1u)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    if (selection.free_slot == io->end)
+        return HPCLANG_RPL_FLASH_NOSPACE;
+    struct hpclang_rpl_flash_io reserved = *io;
+    uint32_t bank = io->first + ((selection.free_slot - io->first) / 0x20000u) * 0x20000u;
+    reserved.first = bank + 0x104u;
+    reserved.end = bank + 0x20000u;
+    *transaction =
+        (struct hpclang_rpl_flash_replacement){selection.match_slot, selection.free_slot, 0};
+    result = hpclang_rpl_flash_append(&reserved, transaction->new_slot, record, bytes);
+    if (result)
+        return result;
+    transaction->committed = 1;
+    return hpclang_rpl_flash_finish_remove(io, transaction->old_slot);
+}
+
 int hpclang_rpl_flash_remove_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
                                     uint32_t name_length, uint32_t *attempted_slot)
 {

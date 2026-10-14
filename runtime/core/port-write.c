@@ -52,7 +52,7 @@ static int packed_read(void *context, uint32_t offset, uint8_t *value)
     return 1;
 }
 
-static int create_flash_backup(const uint8_t *packed, uint32_t span)
+static int write_flash_backup(const uint8_t *packed, uint32_t span, int replace)
 {
     struct packed_backup source = {packed, span};
     const struct hpclang_rpl_reader reader = {packed_read, &source};
@@ -65,7 +65,8 @@ static int create_flash_backup(const uint8_t *packed, uint32_t span)
                                                     : EILSEQ;
         return -1;
     }
-    result = hpclang_stock_flash_create_backup(record, bytes);
+    result = replace ? hpclang_stock_flash_replace_backup(record, bytes)
+                     : hpclang_stock_flash_create_backup(record, bytes);
     free(record);
     return flash_result(result);
 }
@@ -104,7 +105,7 @@ static int write_backup(uint32_t port, const uint8_t *name, uint32_t name_length
         errno = EINVAL;
         return -1;
     }
-    if (writable_port(port, !replace))
+    if (writable_port(port, !replace || port == 2))
         return -1;
     const struct hpclang_rpl_reader source = {snapshot_read, &value};
     uint8_t *packed = NULL;
@@ -116,7 +117,7 @@ static int write_backup(uint32_t port, const uint8_t *name, uint32_t name_length
         return -1;
     }
     if (port == 2) {
-        result = create_flash_backup(packed, span);
+        result = write_flash_backup(packed, span, replace);
         free(packed);
         return result;
     }

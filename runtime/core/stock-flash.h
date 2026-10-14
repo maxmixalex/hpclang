@@ -42,5 +42,8 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes);
 /* Whole-port deletion with the same exclusive ownership/fault policy.
  * Only the selected backup's status is cleared; no space is reclaimed. */
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length);
+/* Keep the old value on failed append; after a verified new commit, finish
+ * deleting the old status before releasing exclusive mapping ownership. */
+int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes);
 
 #endif

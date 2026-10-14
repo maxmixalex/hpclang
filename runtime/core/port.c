@@ -42,7 +42,7 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
         else
             result.implemented |= HPCLANG_PORT_CREATE_BACKUP;
         if (port == 2)
-            result.implemented |= HPCLANG_PORT_REMOVE_BACKUP;
+            result.implemented |= HPCLANG_PORT_REMOVE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP;
         const struct hpclang_boot_info *boot = hpclang_boot_info();
         if (boot && boot->model == device->model && boot->saturn_state) {
             result.available = reads;

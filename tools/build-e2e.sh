@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 4 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     exit 2
 fi
 
@@ -98,7 +98,7 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|object-basics|sd-media-manual)
+    system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"

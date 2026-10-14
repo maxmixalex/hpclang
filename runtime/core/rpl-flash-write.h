@@ -84,6 +84,25 @@ int hpclang_rpl_flash_remove_backup(const struct hpclang_rpl_flash_io *io, const
  * DIRTY requires retaining ownership and retrying before native return. */
 int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint32_t address);
 
+struct hpclang_rpl_flash_replacement
+{
+    uint32_t old_slot, new_slot;
+    int committed;
+};
+
+/* Replace exactly one existing backup without relocating its payload. Validate
+ * all banks, append the complete replacement, then tombstone the old record.
+ * Hold exclusive ownership across the transient duplicate-name interval.
+ * Missing/ambiguous names and insufficient erased space do not change Flash.
+ * transaction is required and unchanged on preflight rejection. On DIRTY after
+ * mutation, committed==0 requires discard_record(new_slot, retained record);
+ * committed==1 requires finish_remove(old_slot). Do not return to Stock until
+ * that recovery succeeds. Initialize new_slot to UINT32_MAX to distinguish
+ * preflight DIRTY. No reclamation or power-loss/restart guarantee. */
+int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes,
+                                     struct hpclang_rpl_flash_replacement *transaction);
+
 /* Discard a caller-owned failed append using its retained expected record.
  * Verify its exact extent before clearing status; no payload or other record
  * is touched. Returns WRITTEN only after the deleted slot is verified.

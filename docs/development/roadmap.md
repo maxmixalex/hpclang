@@ -551,8 +551,18 @@ presence witness and remove again. Owned snapshots survive deletion. Saved
 images contain only the two expected deleted 30-byte records; unrelated Flash
 is unchanged. All 95 host targets, focused ASan/UBSan and ARM static analysis
 pass, including partial status writes and whole-port preflight failures.
-Restart integration, replacement and reclamation remain unfinished; these
-deletion results do not certify reference safety during later reclamation.
+Port 2 backup replacement now appends and verifies the complete new record
+before tombstoning the old one under exclusive ownership. Failed appends retain
+the old value; failed old-status writes finish before returning success. All
+95 host targets pass, including every programming failure position, cross-bank
+replacement, grow/shrink, duplicate refusal and full media without old-value
+deletion. Focused ASan/UBSan and ARM analysis pass. The independent
+`port-flash-replace` client passes three Stock launches on HP49g+/HP50g with
+native RPL witnesses for 987 to 12345678901234 to 5, retained snapshots and normal
+return/exit variants. Final images preserve all three old payloads and every
+unrelated Flash byte. HP39g+ model builds exclude the Flash mutation backend.
+Restart integration and reclamation remain unfinished; these mutation results
+do not certify reference safety during later reclamation.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,

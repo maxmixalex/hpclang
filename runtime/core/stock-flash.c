@@ -269,3 +269,34 @@ int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
     close_flash(&owner);
     return result;
 }
+
+int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes)
+{
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
+                                                 : HPCLANG_RPL_FLASH_FAILED;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
+                                            user_flash.end};
+    struct hpclang_rpl_flash_replacement transaction = {UINT32_MAX, UINT32_MAX, 0};
+    result = hpclang_rpl_flash_replace_backup(&io, record, bytes, &transaction);
+    if (result == HPCLANG_RPL_FLASH_DIRTY && transaction.new_slot != UINT32_MAX) {
+        /* Until the new record is complete, preserve the old record and
+         * discard only the attempted append. Afterwards finish the old
+         * tombstone before allowing Stock to see the new unique name. */
+        if (transaction.committed) {
+            while (hpclang_rpl_flash_finish_remove(&io, transaction.old_slot) !=
+                   HPCLANG_RPL_FLASH_WRITTEN) {
+            }
+            result = HPCLANG_RPL_FLASH_WRITTEN;
+        } else {
+            while (hpclang_rpl_flash_discard_record(&io, transaction.new_slot, record, bytes) !=
+                   HPCLANG_RPL_FLASH_WRITTEN) {
+            }
+            result = HPCLANG_RPL_FLASH_FAILED;
+        }
+    }
+    close_flash(&owner);
+    return result;
+}

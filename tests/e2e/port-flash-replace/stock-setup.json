@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "families": {
+    "hp4950": [
+      "HOME 0 'HPCSTEP' STO",
+      "HOME \\{171} :2:HPCFONE RCL 'HPCFWIT' STO \\{187} 'HPCA' STO",
+      "HOME { HPCLANG SETUP } ORDER"
+    ]
+  }
+}
