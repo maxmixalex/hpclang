@@ -79,7 +79,7 @@ and reports write or close errors. A failed export can leave a partial new
 file; it is not a transactional file replacement. The application leaves that
 file for inspection rather than deleting a path after a possible media change.
 The edit buffer and primary native object are unaffected. Host fault tests
-cover these cases. The `notebook-export` Stock fixture passes two HP50g
+cover these cases. The `notebook-export` Stock fixture passes two HP49g+/HP50g
 ROM-emulator launches with a raw FAT16 card: UTF-8 output survives relaunch,
 repeated export refuses replacement, and independent host reads verify the
 output and a retained sentinel. Physical-card acceptance remains separate.
