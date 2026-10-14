@@ -70,6 +70,31 @@ extern "C"
     int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                          hpclang_rpl_root_visit_fn visit, void *context);
 
+    enum hpclang_rpl_root_source
+    {
+        HPCLANG_RPL_ROOT_NATIVE,
+        HPCLANG_RPL_ROOT_DATA_STACK,
+        HPCLANG_RPL_ROOT_RETURN_STACK,
+        HPCLANG_RPL_ROOT_TEMPENV,
+        HPCLANG_RPL_ROOT_TOUCHTAB,
+        HPCLANG_RPL_ROOT_VGER,
+        HPCLANG_RPL_ROOT_SYSTEM,
+        HPCLANG_RPL_ROOT_LIBRARY
+    };
+
+    /* The same cells as visit_roots, with their source preserved. Source is
+     * provenance, not a type assertion: system/support tables may mix metadata
+     * and references, native roots may include saved execution positions, and
+     * return-stack values need not point at object prologues. Library cells
+     * here are main-RAM bindings only; enumerate banked catalogs separately.
+     * No source is automatically safe to skip. Same read-only/error contract. */
+    typedef int (*hpclang_rpl_root_source_visit_fn)(void *context,
+                                                    enum hpclang_rpl_root_source source,
+                                                    uint32_t slot, uint32_t value);
+    int hpclang_rpl_mutation_visit_root_sources(const struct hpclang_rpl_mutation_io *io,
+                                                hpclang_rpl_root_source_visit_fn visit,
+                                                void *context);
+
     /* Enumerate TEMP allocation payloads, newest first, after validating the
      * complete footer chain. Payloads can contain private execution data beyond
      * the first typed object's span; these are allocation bounds, not proof of

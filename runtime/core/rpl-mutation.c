@@ -220,6 +220,8 @@ struct pointer_scan_request
     int port_boundary; /* Port 0 boundary is committed separately. */
     int *busy_found;   /* validation accumulates BUSY without hiding later errors */
     hpclang_rpl_root_visit_fn visit;
+    hpclang_rpl_root_source_visit_fn source_visit;
+    enum hpclang_rpl_root_source source;
     void *visit_context;
 };
 
@@ -230,8 +232,11 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
     if (request == NULL)
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
-    if (request->mode == POINTER_SCAN_VISIT)
+    if (request->mode == POINTER_SCAN_VISIT) {
+        if (request->source_visit)
+            return request->source_visit(request->visit_context, request->source, slot, value);
         return request->visit(request->visit_context, slot, value);
+    }
 
     if (request->mode == POINTER_SCAN_REJECT) {
         if (!pointer_hits_range(value, request->move_start, request->move_end))
@@ -519,8 +524,11 @@ static int scan_library_references(const struct hpclang_rpl_mutation_io *io,
 }
 
 static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
-                               const struct pointer_scan_request *request)
+                               const struct pointer_scan_request *original)
 {
+    struct pointer_scan_request classified = *original;
+    struct pointer_scan_request *request = &classified;
+    request->source = HPCLANG_RPL_ROOT_NATIVE;
     for (uint32_t i = 0u; i < io->native_root_count; ++i) {
         uint32_t *root = io->native_roots[i];
         if (root == NULL)
@@ -529,24 +537,31 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
     }
+    request->source = HPCLANG_RPL_ROOT_DATA_STACK;
     int result = scan_data_stack_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_RETURN_STACK;
     result = scan_return_stack_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_TEMPENV;
     result = scan_tempenv_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_TOUCHTAB;
     result = scan_touchtab_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_VGER;
     result = scan_vger_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_SYSTEM;
     result = scan_system_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
+    request->source = HPCLANG_RPL_ROOT_LIBRARY;
     return scan_library_references(io, request);
 }
 
@@ -593,6 +608,19 @@ int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
         }
     }
     return 0;
+}
+
+int hpclang_rpl_mutation_visit_root_sources(const struct hpclang_rpl_mutation_io *io,
+                                            hpclang_rpl_root_source_visit_fn visit, void *context)
+{
+    if (!io_ready(io) || !visit)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    const struct pointer_scan_request request = {
+        .mode = POINTER_SCAN_VISIT,
+        .source_visit = visit,
+        .visit_context = context,
+    };
+    return scan_all_references(io, &request);
 }
 
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,

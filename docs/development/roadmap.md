@@ -718,6 +718,15 @@ interior position, boundaries, read failures and corruption after an apparent
 match. These ownership bounds still require complete bank-qualified root and
 execution-reference checks before movement or reclamation is enabled.
 
+Root enumeration now preserves source provenance without changing the existing
+flat scan or relocation semantics. Both HP49g+/HP50g active-invocation probes
+report 2 launcher roots, 2 data-stack cells, 10 return positions, 4 TEMPENV cells,
+14 TOUCHTAB cells, 396 system cells and 6 main-RAM library bindings. No VGER
+cells are active in these captures; unit fixtures cover that source as well.
+Both models pass all three Flash replacement/return lifecycles with this scan.
+Source labels do not assert object types or authorize skipping any category;
+execution-position interpretation and complete reference safety remain open.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

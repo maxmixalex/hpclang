@@ -851,3 +851,15 @@ before and after Stock PURGE on HP49g+/HP50g, preserving its deleted status.
 The RAM resolver maps the examined HP50g ERAM ACPTR to the 52-nibble `PORTONE`
 backup. Complete root traversal and execution-reference qualification remain
 necessary before production relocation/reclamation can use these bounds.
+
+## Root provenance
+
+`hpclang_rpl_mutation_visit_root_sources()` enumerates the same cells as the
+existing root visitor while preserving their origin: launcher, data stack,
+return stack, TEMPENV, TOUCHTAB, VGER, system table or main-RAM library catalog.
+This lets reference analysis distinguish execution positions from object-stack
+entries without guessing from numeric addresses. The origin does not certify
+the value's type: system/support tables can carry metadata, launcher roots can
+be return positions, and stack values can be sentinels. No category is
+automatically safe to skip. Banked library catalog entries still require the
+separate catalog visitor and mapping resolution.

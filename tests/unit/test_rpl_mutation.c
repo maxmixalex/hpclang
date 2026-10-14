@@ -1625,6 +1625,92 @@ struct root_visit_state
     int stop;
 };
 
+struct source_visit_state
+{
+    uint32_t slots[512], values[512], count, index;
+    unsigned counts[8];
+    int stop;
+};
+
+static int collect_flat_root(void *context, uint32_t slot, uint32_t value)
+{
+    struct source_visit_state *state = context;
+    assert(state->count < 512);
+    state->slots[state->count] = slot;
+    state->values[state->count++] = value;
+    return 0;
+}
+
+static int visit_source_root(void *context, enum hpclang_rpl_root_source source, uint32_t slot,
+                             uint32_t value)
+{
+    struct source_visit_state *state = context;
+    assert(state->index < state->count);
+    assert(slot == state->slots[state->index] && value == state->values[state->index]);
+    ++state->index;
+    enum hpclang_rpl_root_source expected;
+    if (!slot)
+        expected = HPCLANG_RPL_ROOT_NATIVE;
+    else if (slot >= 0x90000 && slot <= 0x90005)
+        expected = HPCLANG_RPL_ROOT_DATA_STACK;
+    else if (slot == 0x84ffb)
+        expected = HPCLANG_RPL_ROOT_RETURN_STACK;
+    else if (slot == 0x8440a || slot == 0x8440f)
+        expected = HPCLANG_RPL_ROOT_TEMPENV;
+    else if (slot == 0x84503 || slot == 0x84508)
+        expected = HPCLANG_RPL_ROOT_TOUCHTAB;
+    else if (slot == 0x84623 || slot == 0x8463c || slot == 0x84641)
+        expected = HPCLANG_RPL_ROOT_VGER;
+    else if (slot == 0x86123)
+        expected = HPCLANG_RPL_ROOT_LIBRARY;
+    else {
+        assert(slot >= 0x806da && slot < 0x806da + 396 * 5 && (slot - 0x806da) % 5 == 0);
+        expected = HPCLANG_RPL_ROOT_SYSTEM;
+    }
+    assert(source == expected);
+    ++state->counts[source];
+    return state->stop;
+}
+
+static void test_root_sources(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    struct named_pair pair = prepare_two_named_chars();
+    prepare_reference_tables(&pair);
+    uint32_t native = pair.object_b;
+    uint32_t *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    io.library_table = 0x8611d;
+    put_word(0x8611d, 3, 2);
+    put_word(0x86123, 5, 0x81234);
+    put_word(0x86128, 5, 0);
+    put_word(0x86133, 5, 0x41234);
+    put_word(0x86138, 5, 0x22f5a);
+    struct source_visit_state state = {0};
+    uint8_t *before = malloc(sizeof memory);
+    assert(before);
+    memcpy(before, memory, sizeof memory);
+    assert(hpclang_rpl_mutation_visit_roots(&io, collect_flat_root, &state) == 0);
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 0);
+    assert(state.index == state.count);
+    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1};
+    assert(memcmp(counts, state.counts, sizeof counts) == 0);
+    state.index = 0;
+    state.stop = 73;
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 73);
+    assert(state.index == 1);
+    state.index = 0;
+    state.stop = 0;
+    rejected_read = 0x86128;
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) ==
+           HPCLANG_RPL_MUTATION_IO);
+    assert(writes == 0 && native == pair.object_b && memcmp(before, memory, sizeof memory) == 0);
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, NULL, &state) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    free(before);
+}
+
 static int visit_root(void *context, uint32_t slot, uint32_t value)
 {
     struct root_visit_state *state = context;
@@ -1721,6 +1807,7 @@ int main(void)
 {
     test_temp_allocation_visit();
     test_read_only_root_visit();
+    test_root_sources();
     test_port1_append_respects_native_pool();
     test_port1_edit_owned_suffix();
     test_port0_create_library();
