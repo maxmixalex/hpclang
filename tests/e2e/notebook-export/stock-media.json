@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "initial_files": {"KEEP.TXT": "Retained card content\n"},
+  "expected_files": {"HPCNOTE.TXT": "Notebook αβ UTF-8\n"}
+}

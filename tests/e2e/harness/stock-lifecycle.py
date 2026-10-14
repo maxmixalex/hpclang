@@ -122,6 +122,8 @@ def main() -> None:
             "--overwrite-config",
             f"--style={root / 'build/x50ng/dist' / ('style-50g.css' if family == 'hp4950' else 'style-40g.css')}",
         ]
+        if env.get("HPCLANG_STOCK_MEDIA_IMAGE"):
+            command.append(f"--sd-dir={env['HPCLANG_STOCK_MEDIA_IMAGE']}")
         with Path(f"{prefix}.log").open("w", encoding="utf-8") as log:
             subprocess.run(
                 command, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=120, check=True

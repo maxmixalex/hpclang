@@ -102,6 +102,8 @@ focused payloads through the shared Direct/Stock family harness:
   built separately for each model to fit the original HP39g+ memory budget.
 - `notebook-backup`: Stock-only Port 0 backup/restore/replacement/removal across
   three launches on HP48gII/HP49g+/HP50g, without the UI renderer's allocation.
+- `notebook-export`: Stock-only native save and UTF-8 file export on HP49g+/HP50g,
+  with a second launch checking persistence and exclusive-create refusal.
 
 `tools/e2e-runtime-plan.py` validates the registry before building. Each entry
 requires `mode` and boolean `keyboard`, with optional `verifier`, `contexts`
@@ -111,6 +113,15 @@ eligible profiles and pair every job with its own payload and Stock assets.
 Lifecycle JSON travels with the application artifact. The build helper accepts
 an optional fourth model argument, for example:
 `tools/build-e2e.sh notebook build/notebook-39 hp39 hp39gplus`.
+
+Raw-card fixtures declare `stock-media.json` version 1 with `initial_files` and
+`expected_files`, mapping uppercase FAT 8.3 names to UTF-8 text (up to 4096 bytes
+per file). The USB Stock harness creates a 16 MiB FAT16 image, mounts the same
+image for every lifecycle launch, and verifies the expected output plus retained
+initial files with independent mtools reads after exit. This fixture format
+currently requires HP49g+/HP50g USB installation; unsupported contexts fail
+explicitly. CI installs dosfstools/mtools when a fixture requests media and
+retains the resulting raw image with its evidence.
 
 Only `runtime` requires the injected keyboard sequence. Separate payloads reduce
 each Stock upload and avoid exhausting HP48gII's heap with a monolithic binary.

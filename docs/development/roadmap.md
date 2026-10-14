@@ -820,6 +820,15 @@ backup/restore/replace/remove flow and the separate UI/pixel lifecycle locally;
 the independent backup fixture also passes on HP50g.
 These are original-ROM emulator results, not physical-device acceptance.
 
+The model-specific notebook also passes HP39gs and HP40gs Stock persistence and
+pixel checks. The separate Port 0 fixture now passes all three classic models.
+The file-export fixture passes HP50g with a raw FAT16 image shared across two
+launches: native HOME data and UTF-8 output persist, exclusive-create refuses
+replacement, and independent mtools reads verify the output and retained card
+content. HP49g+ export and the remaining model-specific UI executions are under
+local validation. The Runtime registry covers these separate Stock-only fixtures
+with per-model builds where needed; formal CI for this batch is not yet submitted.
+
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 4 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     exit 2
 fi
 
@@ -98,7 +98,7 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services|hpgcc-system|display|ui|notebook|notebook-backup|object-basics|sd-media-manual)
+    system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"
@@ -215,6 +215,9 @@ fi
 
 if [[ -f "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" ]]; then
     cp "$ROOT/tests/e2e/$MODE/stock-lifecycle.json" "$OUT/e2e.stock-lifecycle.json"
+fi
+if [[ -f "$ROOT/tests/e2e/$MODE/stock-media.json" ]]; then
+    cp "$ROOT/tests/e2e/$MODE/stock-media.json" "$OUT/e2e.stock-media.json"
 fi
 
 if (( WRAP_LAUNCHERS )); then

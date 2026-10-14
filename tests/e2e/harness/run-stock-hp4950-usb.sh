@@ -101,6 +101,13 @@ COMMON_ARGS=(
     --firmware="$ROOT/build/x50ng/dist/firmware/hp4950v215/2MB_FIX/2MB_215f.bin"
     --flash
 )
+unset HPCLANG_STOCK_MEDIA_IMAGE || true
+if [[ -f "$APP_DIR/e2e.stock-media.json" ]]; then
+    export HPCLANG_STOCK_MEDIA_IMAGE="$ROOT/build/$TARGET-stock-media.img"
+    python3 "$ROOT/tools/e2e-stock-media.py" prepare \
+        "$APP_DIR/e2e.stock-media.json" "$HPCLANG_STOCK_MEDIA_IMAGE"
+    COMMON_ARGS+=(--sd-dir="$HPCLANG_STOCK_MEDIA_IMAGE")
+fi
 
 timeout "${EMULATOR_TIMEOUT}s" "$ROOT/build/x50ng/dist/x50ng"     "${COMMON_ARGS[@]}" &
 X50_PID=$!
@@ -141,4 +148,8 @@ python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/runtime.json"
 python3 "$ROOT/tests/e2e/verify.py" "$ROOT/tests/e2e/specs/stock-hp4950-usb.json"
 if [[ -f "$LIFECYCLE" ]]; then
     python3 "$ROOT/tests/e2e/harness/stock-lifecycle.py" "$LIFECYCLE"
+fi
+if [[ -n "${HPCLANG_STOCK_MEDIA_IMAGE:-}" ]]; then
+    python3 "$ROOT/tools/e2e-stock-media.py" verify \
+        "$APP_DIR/e2e.stock-media.json" "$HPCLANG_STOCK_MEDIA_IMAGE"
 fi

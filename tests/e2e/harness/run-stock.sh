@@ -22,6 +22,11 @@ if [[ -n "${HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE:-}" ]]; then
     HPCLANG_E2E_STOCK_TRANSPORT="$HPCLANG_E2E_STOCK_TRANSPORT_OVERRIDE"
     export HPCLANG_E2E_STOCK_TRANSPORT
 fi
+if [[ -f "$2/e2e.stock-media.json" &&
+      ( "$HPCLANG_E2E_FAMILY" != hp4950 || "$HPCLANG_E2E_STOCK_TRANSPORT" != usb ) ]]; then
+    echo "Raw-card fixtures require HP49g+/HP50g Stock USB installation" >&2
+    exit 2
+fi
 
 export HPCLANG_X50NG_HARNESS=stock
 if [[ "$HPCLANG_E2E_FAMILY" == hp48 ]]; then
