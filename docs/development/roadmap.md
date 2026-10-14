@@ -789,13 +789,13 @@ to native string persistence: HP39 Aplet-owned data or classic HOME. Saves are
 explicit and reject foreign destination data. Host tests cover both paths,
 bounded records, failure preservation and owned-resource cleanup. ARM syntax
 and static analysis pass. The relocated installed SDK builds the application,
-all six launchers and all three HP39 Aplet packages. Multi-session device
-acceptance is still pending. The application now offers Port backup/restore
+all six launchers and all three HP39 Aplet packages. Local multi-session
+ROM-emulator acceptance now passes all six models. The application offers Port backup/restore
 according to queried read/create/replace capabilities, with validated records
 and no delete/recreate fallback. Exclusive file export handles short writes,
 interruption and write/close errors without overwriting an existing file.
-Host tests cover all three port indices and export failures; device Port and
-raw-media export acceptance remain part of this application track.
+Host tests cover all three port indices and export failures; the focused Stock
+fixtures below cover Port 0 and raw-media export acceptance.
 
 The integrated application exposed a Stock startup RAM limit on HP39g+ and
 HP48gII. Launcher compression and smaller C/C++ code generation are being
@@ -825,9 +825,12 @@ pixel checks. The separate Port 0 fixture now passes all three classic models.
 The file-export fixture passes HP49g+ and HP50g with a raw FAT16 image shared across two
 launches: native HOME data and UTF-8 output persist, exclusive-create refuses
 replacement, and independent mtools reads verify the output and retained card
-content. Model-specific UI execution also passes HP48gII; HP49g+/HP50g are still
-under local validation. The Runtime registry covers these separate Stock-only fixtures
-with per-model builds where needed; formal CI for this batch is not yet submitted.
+content. Model-specific UI execution and independent pixels pass all six models.
+The Runtime registry covers these separate Stock-only fixtures with per-model
+builds where needed. Local verification also passes all 91 host targets, SDK
+relocation and six-model builds, schema/negative-configuration checks, static
+analysis, shellcheck, actionlint, formatting and strict documentation. Formal CI
+acceptance for this integrated batch remains pending.
 
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
