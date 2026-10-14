@@ -535,7 +535,12 @@ retains RAM execution, matching the existing permanently-BUSY handling.
 All 95 host tests pass, including public snapshot encoding/readback, cross-bank
 duplicate rejection and recovery after repeated programming failures. Public
 creation/readback and `EEXIST` pass HP49g+/HP50g Stock with normal return and
-independently verified whole-Flash restoration; relaunch acceptance remains open.
+independently verified whole-Flash restoration. A separate persistence client
+passes three independent Stock launches on both models, including ordinary
+return, `exit()` and `_Exit()`. Native RPL recalls value 987 before both relaunches;
+the application checks and deletes each HOME witness so a stale value cannot
+pass the next run. Independent saved-image comparison finds exactly one new
+30-byte allocation, with every unrelated Flash byte unchanged.
 Restart integration, replacement/removal and reclamation remain unfinished.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO

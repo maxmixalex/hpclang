@@ -123,8 +123,18 @@ focused payloads through the shared Direct/Stock family harness:
   duplicate creation without any change. The selected sector is saved and
   restored, with the whole-image fingerprint checked again. This covers
   internal physical/append primitives and public backup creation;
-  Port replacement/deletion, relaunch persistence and power-loss recovery remain separate
+  Port replacement/deletion and power-loss recovery remain separate
   acceptance gates. The emulator does not model real cache or NOR timing.
+- `port-flash-backup`: a separate public-API persistence client on HP49g+/HP50g.
+  It creates one Flash backup, then validates it across two independent relaunches.
+  Before each relaunch, an installed native RPL program recalls the backup and
+  stores a HOME witness. The application validates and removes that witness,
+  requiring native recall again next time. The three launches cover ordinary
+  return, `exit()` and `_Exit()`, while repeated creation must report `EEXIST`.
+  Stock setup uses C-Kermit character escapes for the native program delimiters
+  and explicitly orders HPCLANG/SETUP for the existing installation sequence.
+  Remote HOST commands are grouped so RPL operators cannot become local output
+  redirection. This fixture retains its backup in the disposable test image.
 
 `tools/e2e-runtime-plan.py` validates the registry before building. Each entry
 requires `mode` and boolean `keyboard`, with optional `verifier`, `contexts`

@@ -82,7 +82,9 @@ for spec in "$@"; do
 done
 
 for command in "${remote_commands[@]}"; do
-    commands+=("remote host $command" "if failure exit 1")
+    # Preserve RPL's program delimiters: an ungrouped >> is C-Kermit's
+    # local output redirection and truncates the command sent to Stock.
+    commands+=("remote host {$command}" "if failure exit 1")
 done
 commands+=("finish" "if failure exit 1" "exit 0")
 command_list="$(IFS=,; echo "${commands[*]}")"

@@ -645,6 +645,11 @@ the mapping and expected RAM record. Persistent hardware failure retains RAM
 execution, as does a chip that never leaves BUSY; normal return and both exit
 paths cannot bypass this synchronous operation. This does not guarantee
 power-loss recovery, and replacement/removal and library writes remain open.
+The separate `port-flash-backup` client passes three independent launches on
+HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
+and the application consumes the witness then verifies duplicate refusal.
+Normal return, `exit()` and `_Exit()` preserve the backup. Independent image
+comparison confirms only the intended 30-byte allocation changed.
 As with HOME mutation, the captured
 RAM mapping must remain stable during commit; preflight does not promise
 rollback for an artificial backend that fails writes midway through commit.

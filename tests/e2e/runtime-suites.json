@@ -12,5 +12,7 @@
   {"mode": "notebook-export", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]},
   {"mode": "port-flash", "keyboard": false,
+   "contexts": ["stock"], "families": ["hp4950"]},
+  {"mode": "port-flash-backup", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]}
 ]
