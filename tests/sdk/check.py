@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +15,44 @@ def run(*args, env):
     result = subprocess.run(args, env=env, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{args!r}\n{result.stdout}\n{result.stderr}")
+
+
+def check_interworking(package, work, env):
+    """Check emitted ARMv4T returns, which newer CPU emulators may accept wrongly."""
+    sources = {
+        "runtime/bootstrap/sync.S": (
+            "hpclang_mmu_sync",
+            "hpclang_cache_clean",
+            "hpclang_irq_save_disable",
+            "hpclang_irq_restore",
+        ),
+        "runtime/bootstrap/enter.S": ("hpclang_enter",),
+        "runtime/libc/kos-call.S": ("hpclang_kos_swi3", "hpclang_kos_sync3"),
+    }
+    for index, (source, symbols) in enumerate(sources.items()):
+        obj = work / f"interworking-{index}.o"
+        run(
+            "clang",
+            "--target=arm-none-eabi",
+            "-march=armv4t",
+            "-c",
+            str(package / source),
+            "-o",
+            str(obj),
+            env=env,
+        )
+        listing = subprocess.check_output(
+            ["llvm-objdump", "-d", "--no-show-raw-insn", str(obj)], env=env, text=True
+        )
+        functions = re.split(r"^[0-9a-f]+ <([^>]+)>:\s*$", listing, flags=re.MULTILINE)
+        bodies = dict(zip(functions[1::2], functions[2::2]))
+        for symbol in symbols:
+            body = bodies[symbol]
+            if not re.search(r"\bbx\s+lr\b", body):
+                raise AssertionError(f"{symbol}: missing ARMv4T interworking return")
+            if re.search(r"\b(?:pop|ldm\w*)\s+[^\n]*\bpc\b|\b(?:ldr|mov)\s+pc\b", body):
+                raise AssertionError(f"{symbol}: non-interworking PC load")
+    print("Installed SDK: ARMv4T public assembly return checks PASS")
 
 
 def main():
@@ -41,6 +80,7 @@ def main():
         )
         prefix.rename(sdk)
         package = sdk / "share/hpclang"
+        check_interworking(package, work, env)
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")

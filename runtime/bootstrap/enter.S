@@ -23,5 +23,6 @@ hpclang_enter:
     bx      r0
 
     mov     sp, r4
-    ldmfd   sp!, {r4-r11, pc}
+    ldmfd   sp!, {r4-r11, lr}
+    bx      lr
 .size hpclang_enter, .-hpclang_enter

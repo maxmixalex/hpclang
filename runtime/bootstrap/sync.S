@@ -18,6 +18,8 @@
  * supervisor exception context, before exception-return can re-enable the
  * caller's IRQ/FIQ state. Restoring it in the caller after SWI return leaves a
  * race where a pending interrupt can observe the temporary handler.
+ * Ordinary returns must use BX: ARMv4T LDM-to-PC cannot return to Thumb C.
+ * The supervisor MOVS-to-PC returns instead restore CPSR from SPSR.
  */
 .global hpclang_mmu_sync
 .type hpclang_mmu_sync,%function
@@ -31,7 +33,8 @@ hpclang_mmu_sync:
     /* Preserve r0=L2 workspace and r1=L1 table across SWI entry. */
     swi     0
 
-    ldmfd   sp!, {r2-r5, pc}
+    ldmfd   sp!, {r2-r5, lr}
+    bx      lr
 
 .align 2
 .Lsupervisor:
@@ -90,7 +93,8 @@ hpclang_cache_clean:
     swp     r4, r1, [r2]
     swi     0
 
-    ldmfd   sp!, {r2-r5, pc}
+    ldmfd   sp!, {r2-r5, lr}
+    bx      lr
 
 .align 2
 .Lclean_supervisor:
@@ -132,7 +136,8 @@ hpclang_irq_save_disable:
     swp     r4, r3, [r2]
     swi     0
 
-    ldmfd   sp!, {r1-r5, pc}
+    ldmfd   sp!, {r1-r5, lr}
+    bx      lr
 
 .align 2
 .Lirq_disable_supervisor:
@@ -166,7 +171,8 @@ hpclang_irq_restore:
     mov     r0, r5
     swi     0
 
-    ldmfd   sp!, {r1-r5, pc}
+    ldmfd   sp!, {r1-r5, lr}
+    bx      lr
 
 .align 2
 .Lirq_restore_supervisor:

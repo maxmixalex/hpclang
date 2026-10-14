@@ -1023,6 +1023,14 @@ relocation and six-model builds, schema/negative-configuration checks, static
 analysis, shellcheck, actionlint, formatting and strict documentation. Formal CI
 acceptance for this integrated batch remains pending.
 
+The public ARM bootstrap and synchronous KOS wrappers now return through `BX`
+after restoring LR, as required when ARMv4T callers use Thumb. The relocated SDK
+gate inspects their emitted instructions; restoring the old LDM-to-PC sequence
+is rejected. Full SDK C/C++ builds, all six model-specific notebook builds and
+three HP39 Aplet variants pass locally. Object Basics also passes HP39g+ and
+HP50g Stock startup and normal return with the corrected wrappers. These checks
+do not replace physical-device validation or close the remaining release goals.
+
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.

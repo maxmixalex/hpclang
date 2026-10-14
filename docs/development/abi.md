@@ -16,6 +16,15 @@ Application code uses:
 
 ARM startup code may be used where useful. ARM/Thumb interworking is part of the normal ARMv4T build.
 
+Handwritten ARM functions called from C must restore saved registers and return
+with `BX`, including bootstrap and KOS service wrappers. Loading a saved return
+address directly into PC with `LDM` does not switch to Thumb on ARMv4T; later
+architectures may hide this mistake. Supervisor exception returns use `MOVS pc,lr`
+to restore CPSR from SPSR and are a separate operation. See the
+[Arm AAPCS32 interworking rules](https://github.com/ARM-software/abi-aa/blob/main/aapcs32/aapcs32.rst#66interworking).
+The installed-SDK gate checks emitted public wrapper instructions as well as
+building downstream applications and launchers.
+
 Applications use fixed virtual addresses and ordinary non-PIC code. There is no application-visible historical r9/r10 static-base contract.
 
 ## Virtual layout

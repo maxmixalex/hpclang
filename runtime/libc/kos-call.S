@@ -72,5 +72,6 @@ hpclang_kos_sync3:
     bl hpclang_kos_swi3
     str r6, [r4, #4]
     str r5, [r4, #8]
-    ldmfd sp!, {r4-r6, pc}
+    ldmfd sp!, {r4-r6, lr}
+    bx      lr
 .size hpclang_kos_sync3, .-hpclang_kos_sync3
