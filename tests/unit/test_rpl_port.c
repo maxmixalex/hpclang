@@ -198,6 +198,77 @@ static void test_flash(void)
     assert(memcmp(&entry, &saved, sizeof(entry)) == 0);
 }
 
+struct catalog_state
+{
+    unsigned count;
+    int stop;
+};
+
+static int visit_catalog(void *context, uint32_t record, uint32_t number,
+                         const struct hpclang_rpl_library_binding *binding)
+{
+    struct catalog_state *state = context;
+    assert(state->count < 2);
+    assert(record == 8 + 16 * state->count);
+    assert(number == 161);
+    assert(binding->address == (state->count ? 0xdd56a : 0x4dee9));
+    assert(binding->bank_switch == (state->count ? 0 : 0x22f2e));
+    assert(binding->flags == (state->count ? 0x456 : 0x123));
+    ++state->count;
+    return state->stop;
+}
+
+static void test_catalog_traversal(void)
+{
+    struct image image = {.count = 40, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 2, 3);
+    put_word(&image, 8, 161, 3);
+    put_word(&image, 11, 0x4dee9, 5);
+    put_word(&image, 16, 0x22f2e, 5);
+    put_word(&image, 21, 0x123, 3);
+    /* A duplicate ID cannot hide either live library reference. */
+    put_word(&image, 24, 161, 3);
+    put_word(&image, 27, 0xdd56a, 5);
+    put_word(&image, 32, 0, 5);
+    put_word(&image, 37, 0x456, 3);
+    struct image before = image;
+    struct catalog_state state = {0};
+    assert(hpclang_rpl_catalog_visit(&reader, 5, 35, visit_catalog, &state) == 0);
+    assert(state.count == 2 && memcmp(&image, &before, sizeof(image)) == 0);
+    for (uint32_t limit = 0; limit < 35; ++limit) {
+        state.count = 0;
+        assert(hpclang_rpl_catalog_visit(&reader, 5, limit, visit_catalog, &state) < 0);
+        assert(state.count == 0);
+    }
+    for (uint32_t failed = 5; failed < 40; ++failed) {
+        image.fail_at = failed;
+        state.count = 0;
+        assert(hpclang_rpl_catalog_visit(&reader, 5, 35, visit_catalog, &state) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(state.count == (failed >= 24));
+    }
+    image = before;
+    state = (struct catalog_state){0, 73};
+    assert(hpclang_rpl_catalog_visit(&reader, 5, 35, visit_catalog, &state) == 73);
+    assert(state.count == 1);
+    state = (struct catalog_state){0};
+    image.data[37] = 16;
+    assert(hpclang_rpl_catalog_visit(&reader, 5, 35, visit_catalog, &state) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(state.count == 1);
+    image = before;
+    state.count = 0;
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_catalog_visit(&reader, 5, 3, visit_catalog, &state) == 0);
+    assert(state.count == 0);
+    assert(hpclang_rpl_catalog_visit(&reader, 0xfffff, 35, visit_catalog, &state) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_catalog_visit(NULL, 5, 35, visit_catalog, &state) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_catalog_visit(&reader, 5, 35, NULL, &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 static void test_library_catalog_lookup(void)
 {
     struct image image = {.count = 35, .fail_at = UINT32_MAX};
@@ -541,6 +612,7 @@ int main(void)
     test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();
+    test_catalog_traversal();
     test_library_references();
     test_flash();
     /* Owned synthetic library 123, title X, empty table offsets. The backup is

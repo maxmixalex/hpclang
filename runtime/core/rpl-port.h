@@ -47,6 +47,16 @@ struct hpclang_rpl_library_binding
     uint32_t flags;
 };
 
+/* Enumerate every catalog entry, including banked and duplicate-ID records.
+ * The record address identifies the catalog cell, not the library payload.
+ * The binding is callback-local; copy it if needed. No target is dereferenced.
+ * Keep the mapping stable and the callback read-only; discard partial results
+ * on any error. A nonzero callback result stops traversal unchanged. */
+typedef int (*hpclang_rpl_catalog_visit_fn)(void *context, uint32_t record, uint32_t number,
+                                            const struct hpclang_rpl_library_binding *binding);
+int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, hpclang_rpl_catalog_visit_fn visit, void *context);
+
 /* Resolve a library ID in a bounded classic Stock catalog (3-nibble count,
  * 16-nibble records). Preserve the bank-switch identity: address alone is not
  * a dereferenceable object pointer. Mapping the catalog and resolving the bank

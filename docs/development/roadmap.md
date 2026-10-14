@@ -694,6 +694,21 @@ entries. Machine-code, other unresolved nodes and complete live roots still
 require work; no reclamation is enabled on this evidence. All 95 host targets,
 sanitizers and ARM analysis pass.
 
+The internal tagged-object visitor now exposes the bounded inline child without
+treating label bytes as references. It matches the examined HP50g ROM tag at
+`0x50725` and its 1,098-nibble child. Catalog traversal independently retains
+all 62 examined native library bindings, including 56 banked entries that the
+main-RAM relocation root scan deliberately skips. Duplicate IDs remain visible
+to traversal rather than hiding a potential live reference.
+Local HP49g+/HP50g probes now capture roots during ARM execution, rather than
+inferring them from a post-return Stock snapshot. Each captures 434 cells,
+including the saved launcher return position and 396 system-table cells, then
+passes all three Flash-replacement lifecycle launches with normal return,
+`exit()` and `_Exit()`. Captures are read directly from saved RAM: attempting
+to also store the full sample in HOME returned `ENOSPC` in this native layout.
+These checks establish read-only enumeration during invocation, not complete
+bank-qualified execution-reference coverage or permission to reclaim objects.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

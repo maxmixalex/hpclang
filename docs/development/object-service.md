@@ -822,3 +822,16 @@ references; nested ACPTR targets remain separate traversal work. Like the
 sequence and array visitors, it requires a stable reader and a read-only
 callback. Extent validation does not certify opaque payload contents or prove
 that an allocation is safe to reclaim.
+
+## Library catalog traversal
+
+`hpclang_rpl_catalog_visit()` enumerates every bounded native catalog record,
+preserving its library ID, address, bank-switch entry and flags. This supplements
+`hpclang_rpl_mutation_visit_roots()`, whose relocation scan intentionally skips
+banked library addresses. Catalog traversal retains duplicate IDs so reference
+analysis cannot silently discard a live binding; ID lookup still rejects an
+ambiguous match. Callers must resolve and validate the selected mapping before
+reading a library, and discard partial traversal after an error. The actual C
+visitor matches all 62 entries, including 56 banked bindings, in the examined
+HP50g Stock catalog. This is catalog coverage, not complete execution-root or
+reclamation safety.

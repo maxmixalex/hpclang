@@ -18,6 +18,41 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, uint32_t c
     return 0;
 }
 
+int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, hpclang_rpl_catalog_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t count;
+    int result = word(reader, address, 3, &count);
+    if (result)
+        return result;
+    if (count > (limit - 3) / 16)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = address + 3 + 16 * i, number;
+        struct hpclang_rpl_library_binding binding;
+        result = word(reader, record, 3, &number);
+        if (result)
+            return result;
+        result = word(reader, record + 3, 5, &binding.address);
+        if (result)
+            return result;
+        result = word(reader, record + 8, 5, &binding.bank_switch);
+        if (result)
+            return result;
+        result = word(reader, record + 13, 3, &binding.flags);
+        if (result)
+            return result;
+        result = visit(context, record, number, &binding);
+        if (result)
+            return result;
+    }
+    return 0;
+}
+
 int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
                                uint32_t limit, uint32_t number,
                                struct hpclang_rpl_library_binding *binding)
