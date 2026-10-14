@@ -50,6 +50,9 @@ static volatile uint64_t hpclang_u64_b = UINT64_C(1000003);
 static volatile double hpclang_double_a = 1.25;
 static volatile double hpclang_double_b = 3.5;
 
+uint32_t hpclang_test_unsigned_divmod(uint32_t a, uint32_t b, uint32_t *r);
+int32_t hpclang_test_signed_divmod(int32_t a, int32_t b, int32_t *r);
+
 __attribute__((constructor)) static void hpclang_runtime_ctor(void)
 {
     hpclang_ctor_probe = 0xc0def00du;
@@ -1549,6 +1552,13 @@ int main(void)
         return finish(0x06, boot->model);
     uint32_t q32 = hpclang_u32_a / hpclang_u32_b;
     if (q32 != 10309u)
+        return finish(0x07, boot->model);
+    uint32_t r32;
+    int32_t signed_r32;
+    if (hpclang_test_unsigned_divmod(hpclang_u32_a, hpclang_u32_b, &r32) != 10309u || r32 != 30u ||
+        hpclang_test_signed_divmod(-(int32_t)hpclang_u32_a, (int32_t)hpclang_u32_b, &signed_r32) !=
+            -10309 ||
+        signed_r32 != -30)
         return finish(0x07, boot->model);
     uint64_t q64 = hpclang_u64_a / hpclang_u64_b;
     if (q64 != UINT64_C(1311764532170))

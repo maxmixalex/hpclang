@@ -18,6 +18,7 @@ add_executable(hpclang_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
+    divmod.S
     cpp.cpp)
 
 target_include_directories(hpclang_e2e PRIVATE "${HPCLANG_ROOT}/include")
