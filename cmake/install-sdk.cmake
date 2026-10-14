@@ -6,6 +6,7 @@ if(font_source_header MATCHES "^version https://git-lfs.github.com/spec/")
 endif()
 install(DIRECTORY include runtime platform DESTINATION "${sdk_root}")
 install(DIRECTORY third_party/fatfs DESTINATION "${sdk_root}/third_party")
+install(DIRECTORY third_party/tinf DESTINATION "${sdk_root}/third_party")
 install(DIRECTORY cmake/profiles cmake/toolchains DESTINATION "${sdk_root}/cmake")
 install(FILES cmake/fonts.cmake cmake/ui-text.cmake cmake/hpclangConfig.cmake cmake/launchers.cmake
     DESTINATION "${sdk_root}/cmake")

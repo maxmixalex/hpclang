@@ -11,6 +11,11 @@ set(CMAKE_ASM_COMPILER clang)
 set(CMAKE_AR llvm-ar)
 set(CMAKE_RANLIB llvm-ranlib)
 
+# Clang's smallest-code mode matters when Stock retains the installed object
+# alongside the running image. Callers may still override these cache entries.
+set(CMAKE_C_FLAGS_MINSIZEREL "-Oz -DNDEBUG" CACHE STRING "C flags for minimum code size")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "-Oz -DNDEBUG" CACHE STRING "C++ flags for minimum code size")
+
 set(HPCLANG_ARCH_FLAGS
     "--target=arm-none-eabi -march=armv4t -mfpu=none -mfloat-abi=soft -mabi=aapcs"
     CACHE STRING "hpclang Armv4T ABI flags"

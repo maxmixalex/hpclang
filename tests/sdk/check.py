@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import zlib
 
 
 def run(*args, env):
@@ -118,6 +119,12 @@ endforeach()
                 raise AssertionError(f"{name}: expected an ARM ELF executable")
             if hpc[:4] != b"HPC1" or len(hpc) <= 64:
                 raise AssertionError(f"{name}: expected a packaged HPC1 application")
+            embedded = (output / f"{name}-launchers/objects/application.bin").read_bytes()
+            restored = embedded
+            if embedded[:4] == b"HPCZ":
+                restored = b"HPC1" + embedded[4:16] + zlib.decompress(embedded[16:], wbits=-15)
+            if restored != hpc:
+                raise AssertionError(f"{name}: launcher image differs from public HPC1")
             for model in (
                 "hp39gplus",
                 "hp39gs",
@@ -129,14 +136,14 @@ endforeach()
                 launcher = output / f"{name}-launchers" / model
                 binary = launcher.with_suffix(".bin").read_bytes()
                 wrapped = launcher.with_suffix(".hp").read_bytes()
-                if hpc not in binary or binary not in wrapped or wrapped[:8] != b"HPHP49-C":
+                if embedded not in binary or binary not in wrapped or wrapped[:8] != b"HPHP49-C":
                     raise AssertionError(
                         f"{name}/{model}: application missing from native launcher"
                     )
                 if args.aplet_tool and model in ("hp39gplus", "hp39gs", "hp40gs"):
                     bundle = output / f"{name}-aplet" / model
                     aplet = (bundle / "HPGCC000.000").read_bytes()
-                    if not aplet.startswith(b"HP39BinB\x0bSDK example") or hpc not in aplet:
+                    if not aplet.startswith(b"HP39BinB\x0bSDK example") or embedded not in aplet:
                         raise AssertionError(f"{name}/{model}: invalid installable Aplet")
                     for asset in (
                         "HPCRESET.000",

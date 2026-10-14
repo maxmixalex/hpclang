@@ -51,6 +51,12 @@ This produces `hello_c.elf`, `hello_c.hpc`, `hello_cpp.elf` and `hello_cpp.hpc`,
 plus `hello_c-launchers/` and `hello_cpp-launchers/` with all six model launchers.
 The HPC1 payload is model-independent; it is not a calculator transfer file.
 Each launcher directory contains raw `.bin` images and wrapped `.hp` objects.
+Launcher packaging compresses the embedded application when this reduces its
+size, then the bootstrap expands it directly into the application's code pages.
+This reduces the memory occupied by the installed object while the app runs;
+the public `.hpc` file stays HPC1. `MinSizeRel` uses Clang's `-Oz` for C/C++.
+Compression does not remove the need for enough free calculator RAM for code,
+data, the application heap and stack.
 HP48gII/HP49g+/HP50g use the wrapped object with the corresponding installed
 ARMToolbox library. HP39g+/HP39gs/HP40gs need an additional Aplet envelope;
 the `.hp` file is an intermediate input, not a directly installable Aplet.

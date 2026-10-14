@@ -14,6 +14,15 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+add_executable(stage_image_driver stage_image_driver.c
+    "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
+    "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")
+target_include_directories(stage_image_driver PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/platform/armtoolbox")
+target_compile_options(stage_image_driver PRIVATE -Wall -Wextra -Werror)
+add_test(NAME stage_image COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_LIST_DIR}/stage_image_cases.py" $<TARGET_FILE:stage_image_driver>)
+
 hpclang_unit(notebook_store test_notebook_store.c
     "${HPCLANG_ROOT}/examples/notebook/store.c"
     "${HPCLANG_ROOT}/examples/notebook/export.c")

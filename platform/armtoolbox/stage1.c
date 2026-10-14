@@ -10,6 +10,7 @@
 
 #include "stage-layout.h"
 #include "port-memory.h"
+#include "stage-image.h"
 
 #define STAGE_WINDOW_BASE HPCLANG_STAGE_WINDOW_BASE
 #define STAGE_CODE_OFFSET 0x00000400u
@@ -1194,12 +1195,6 @@ int hpclang_hp39_portal_restore_hpc(void)
     return hp39_portal_stack_intact(portal) ? result : -17;
 }
 
-static int hpc1_header_ok(const struct hpclang_image_header *header)
-{
-    return header->magic[0] == 'H' && header->magic[1] == 'P' && header->magic[2] == 'C' &&
-           header->magic[3] == '1';
-}
-
 static int saturn_read_range_present(const void *saturn_state, uint32_t first_nibble,
                                      uint32_t last_nibble)
 {
@@ -1506,9 +1501,9 @@ static uintptr_t live_saturn_state(void *saturn_state, uint32_t model)
 int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_header *hpc1,
                               uint32_t stage1_size, uint32_t model, uint32_t saturn_pc,
                               uintptr_t emulator_lr, uint32_t stock_cpsr, uintptr_t stock_frame,
-                              uintptr_t stage0_code, uint32_t stage0_size)
+                              uintptr_t stage0_code, uint32_t stage0_size, uint32_t stored_size)
 {
-    if (!hpc1_header_ok(hpc1))
+    if (!hpclang_stage_image_valid(hpc1, stored_size))
         return -1;
 
     uint32_t total_pages = load32(saturn_state, ARMSYS_PAGE_COUNT);
@@ -1533,7 +1528,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
 
     if (code_count > HPCLANG_CODE_PAGE_CAPACITY)
         return -2;
-    if (rw_first + STAGE_STACK_PAGES >= total_pages)
+    if (total_pages > HPCLANG_L2_ENTRIES || rw_first + STAGE_STACK_PAGES >= total_pages)
         return -3;
 
     uint32_t rw_count = total_pages - STAGE_STACK_PAGES - rw_first;
@@ -1565,8 +1560,11 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         hpclang_stage0_resume_target = stock_alias + (hpclang_stage0_resume_target - stage0_code);
     }
 
-    uint32_t code_pages[HPCLANG_CODE_PAGE_CAPACITY];
-    uint32_t rw_pages[HPCLANG_RW_PAGE_CAPACITY];
+    /* Both sets come from one coarse page pool. Share its bounded address
+       array so decoding also fits comfortably in the one-page stage stack. */
+    uint32_t pages[HPCLANG_L2_ENTRIES];
+    uint32_t *code_pages = pages;
+    uint32_t *rw_pages = pages + code_count;
 
     for (uint32_t i = 0; i < code_count; ++i)
         code_pages[i] = old_l2[code_first + i] & 0xfffff000u;
@@ -1574,23 +1572,11 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     for (uint32_t i = 0; i < rw_count; ++i)
         rw_pages[i] = old_l2[rw_first + i] & 0xfffff000u;
 
-    const uint8_t *src = (const uint8_t *)(hpc1 + 1);
-    uint32_t left = hpc1->image_size;
-
-    for (uint32_t i = 0; i < code_count; ++i) {
-        volatile uint8_t *dst =
-            (volatile uint8_t *)(uintptr_t)(STAGE_WINDOW_BASE +
-                                            (code_first + i) * HPCLANG_PAGE_SIZE);
-        uint32_t n = left < HPCLANG_PAGE_SIZE ? left : HPCLANG_PAGE_SIZE;
-
-        for (uint32_t j = 0; j < n; ++j)
-            dst[j] = src[j];
-        for (uint32_t j = n; j < HPCLANG_PAGE_SIZE; ++j)
-            dst[j] = 0;
-
-        src += n;
-        left -= n;
-    }
+    if (hpclang_stage_image_unpack(
+            hpc1, stored_size,
+            (void *)(uintptr_t)(STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),
+            code_count * HPCLANG_PAGE_SIZE))
+        return -7;
 
     hpclang_cache_clean(
         (const void *)(uintptr_t)(STAGE_WINDOW_BASE + code_first * HPCLANG_PAGE_SIZE),

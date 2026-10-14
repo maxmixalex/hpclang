@@ -143,7 +143,7 @@ hpclang_armtoolbox_stage0:
     ldr     r11, [sp]                 /* saved r0-r12/lr Stock frame */
     ldr     r5, [r11, #0]            /* post-ARMSYS Saturn PC */
     ldr     r12, [r11, #52]          /* emulator continuation LR */
-    sub     sp, sp, #24
+    sub     sp, sp, #32
     str     r5, [sp, #0]
     str     r12, [sp, #4]
     str     r9, [sp, #8]             /* caller CPSR before stage0 masking */
@@ -151,6 +151,8 @@ hpclang_armtoolbox_stage0:
     str     r8, [sp, #16]            /* original PIC stage0 code */
     ldr     r5, =__stage0_code_size
     str     r5, [sp, #20]
+    ldr     r5, =__hpc1_blob_size
+    str     r5, [sp, #24]
 
     mov     r0, r10
     mov     r1, r7
@@ -159,7 +161,7 @@ hpclang_armtoolbox_stage0:
     ldr     r4, =STAGE1_BASE
     mov     lr, pc
     bx      r4
-    add     sp, sp, #24
+    add     sp, sp, #32
 
     /* Restore the original stock-launcher stack. */
     ldr     r5, [sp, #4]

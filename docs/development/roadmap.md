@@ -797,6 +797,11 @@ interruption and write/close errors without overwriting an existing file.
 Host tests cover all three port indices and export failures; device Port and
 raw-media export acceptance remain part of this application track.
 
+The integrated application exposed a Stock startup RAM limit on HP39g+ and
+HP48gII. Launcher compression and smaller C/C++ code generation are being
+validated against the complete application; host decoder bounds and relocated
+SDK packaging pass, but small-model execution acceptance is still pending.
+
 - [ ] Exercise non-trivial downstream applications combining UI, object data,
   time/system services and, where supported, files and native ports. Cover each
   hardware family and state exactly which scenarios were emulated or physical.

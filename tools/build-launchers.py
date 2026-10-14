@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
+import zlib
 
 
 # Stable model numbers from the public hpclang target ABI.
@@ -48,9 +49,11 @@ def build(
         "-fno-asynchronous-unwind-tables",
         "-fno-pic",
         "-fno-pie",
+        "-ffreestanding",
         "-ffunction-sections",
         "-fdata-sections",
         "-Os",
+        "-DNDEBUG",
         "-I" + str(root / "include"),
     ]
 
@@ -74,9 +77,11 @@ def build(
         for source, name in (
             ("stage1-entry.S", "stage1-entry"),
             ("stage1.c", "stage1"),
+            ("stage-image.c", "stage-image"),
             ("hp39-portal.S", "stage1-hp39-portal"),
         )
     ] + objects
+    objects.append(compile_source(root / "third_party/tinf/tinflate.c", "tinflate"))
     script = scratch / "stage1.ld"
     run(cc, "-E", "-P", "-x", "c", platform / "stage1.ld", "-o", script)
     stage1_elf = scratch / "stage1.elf"
@@ -99,12 +104,19 @@ def build(
         return str(path.resolve()).replace("\\", "/").replace('"', '\\"')
 
     bundle = scratch / "bundle.S"
+    original = payload.read_bytes()
+    compressor = zlib.compressobj(level=9, wbits=-15)
+    compressed = compressor.compress(original[16:]) + compressor.flush()
+    packed_payload = scratch / "application.bin"
+    packed_payload.write_bytes(
+        b"HPCZ" + original[4:16] + compressed if len(compressed) < len(original) - 16 else original
+    )
     bundle.write_text(
         f'''\
 .section .rodata.hpclang.bundle,"a",%progbits
 .align 2
 .global __stage1_blob_start, __stage1_blob_end, __stage1_blob_size, __stage1_memory_size
-.global __hpc1_blob_start, __hpc1_blob_end
+.global __hpc1_blob_start, __hpc1_blob_end, __hpc1_blob_size
 .set __stage1_memory_size, {sizes[0]}
 __stage1_blob_start:
 .incbin "{assembly_path(stage1)}"
@@ -112,8 +124,9 @@ __stage1_blob_end:
 .set __stage1_blob_size, __stage1_blob_end - __stage1_blob_start
 .align 2
 __hpc1_blob_start:
-.incbin "{assembly_path(payload)}"
+.incbin "{assembly_path(packed_payload)}"
 __hpc1_blob_end:
+.set __hpc1_blob_size, __hpc1_blob_end - __hpc1_blob_start
 ''',
         encoding="utf-8",
     )

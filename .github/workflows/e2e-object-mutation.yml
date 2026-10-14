@@ -9,6 +9,7 @@ on:
     paths:
       - "runtime/**"
       - "platform/armtoolbox/**"
+      - "third_party/tinf/**"
       - "include/**"
       - "cmake/**"
       - "tests/e2e/**"
@@ -41,6 +42,7 @@ on:
     paths:
       - "runtime/**"
       - "platform/armtoolbox/**"
+      - "third_party/tinf/**"
       - "include/**"
       - "cmake/**"
       - "tests/e2e/**"

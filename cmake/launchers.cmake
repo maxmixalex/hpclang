@@ -24,6 +24,7 @@ function(hpclang_target_launchers target)
     file(GLOB bootstrap_sources CONFIGURE_DEPENDS
         "${HPCLANG_ROOT}/runtime/bootstrap/*"
         "${HPCLANG_ROOT}/platform/armtoolbox/*"
+        "${HPCLANG_ROOT}/third_party/tinf/*"
         "${HPCLANG_ROOT}/include/hpclang/*.h")
     add_custom_command(OUTPUT ${outputs}
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/build-launchers.py"

@@ -23,6 +23,14 @@ existing FAT access-date field through `FILINFO`. The vendor verifier applies
 this declared patch to the official baseline before comparing checked-in bytes;
 ChaN's notices remain intact.
 
+## Launcher compression
+
+The private ARMToolbox launcher includes the small raw DEFLATE decoder from
+Joergen Ibsen's tinf under its permissive zlib license. The pinned commit and
+unchanged upstream files are recorded in `third_party/tinf/README.md`; their
+copyright and license notices are retained in the installed SDK. Historical
+HPGCC decompression code is not used.
+
 ## HP tools and binary assets
 
 Historical HP/System-RPL tools, bootloaders, firmware, full-NOR dumps, and calculator binary assets have separate provenance and redistribution terms.
