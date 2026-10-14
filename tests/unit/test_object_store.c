@@ -475,6 +475,9 @@ static void test_public_directory_lifecycle(void)
 
 int main(void)
 {
+    extern void test_object_store_cpp(void);
+    prepare_tree();
+    test_object_store_cpp();
     test_home_lookup_and_child();
     test_current_is_logical_path_snapshot();
     test_iterator_snapshots_metadata();

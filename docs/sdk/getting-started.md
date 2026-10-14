@@ -143,6 +143,38 @@ API; owning a snapshot does not grant access to a native RPL stack on HP39.
 
 See `examples/object-cpp` for a complete C++17 application. Automatic local
 cleanup applies to normal returns; `exit()` does not unwind local C++ objects.
+
+### Own directory handles and iterators
+
+`<hpclang/object-store.hpp>` adds `owned_object_store` and
+`owned_object_store_iterator`. They are `std::unique_ptr` aliases with the
+matching C close operations, allocate no storage of their own, and preserve
+`errno` when closing. The C services still determine model/context availability.
+
+```cpp
+#include <hpclang/object-store.hpp>
+
+hpclang::owned_object_store home{hpclang_object_store_home()};
+if (!home)
+    return 1;
+hpclang::owned_object_store_iterator entries{
+    hpclang_object_store_iterator_open(home.get())};
+if (!entries)
+    return 2;
+home.reset(); // Entry metadata is an independent snapshot.
+```
+
+Use the C iterator/read/write functions with `get()`. Names remain explicit
+calculator bytes; these wrappers do not reinterpret them as UTF-8. A child
+directory handle also owns its logical path independently of its parent handle.
+Move owners to transfer responsibility, or use `release()` to transfer it back
+to C. Never adopt a borrowed pointer or call `reset(owner.get())`.
+
+For failure-preserving replacement, construct a temporary owner from the new C
+result, check it, then `swap()` it into the old owner. Calling `reset()` with a
+failed null result would close the old handle. Local scopes clean up on normal
+return; explicitly reset owners before `exit()` or `_Exit()` if they must close
+before termination.
 Release such resources before calling it. Global-object destruction follows
 the runtime's ordinary exit handling.
 

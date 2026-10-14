@@ -928,7 +928,22 @@ snapshot ownership and failure-preserving C producer calls. Host and sanitizer
 checks cover transfer, replacement, failure cleanup and destruction. HP39g+ and
 HP50g Direct Runtime tests pass, as does the installed SDK relocation gate with
 the new object example, all six launchers and three HP39 Aplet packages. This
-slice still requires formal CI; broader migration and release goals remain.
+slice was subsequently accepted and merged at `70406cac`; broader migration
+and release goals remain.
+
+Directory handles and independent metadata iterators now have allocation-free
+C++17 `unique_ptr` owners in `object-store.hpp`. They preserve the C service's
+raw-byte names and context errors, close on normal scope exit, and preserve
+`errno` during cleanup. The real object-store host fixture covers parent/child
+independence, iterator use after the directory closes, move replacement,
+failed-open preservation and release/adoption. The installed object example
+uses the optional native HOME snapshot; Object Basics now exercises these
+owners in its existing context-aware E2E flow. This ownership addition does not
+claim that `exit()` unwinds automatic C++ objects.
+All 95 host targets, focused ASan/UBSan and ARM C++ analysis pass. Object Basics
+passes HP39g+ Direct and HP48gII/HP50g Stock locally, including normal return.
+The relocated SDK gate passes C/C++, all six model builds/launchers and the
+three HP39 Aplet package variants. CI acceptance of these new owners is pending.
 
 - [ ] Extend owned, lifetime-safe C++ wrappers and composable UI helpers within
   the supported no-exceptions/no-RTTI embedded profile; keep C applications

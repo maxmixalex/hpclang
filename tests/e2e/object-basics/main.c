@@ -11,6 +11,7 @@ volatile uint32_t hpclang_e2e_result;
 uint32_t hpclang_e2e_object_stack(uint32_t model);
 uint32_t hpclang_e2e_object_store(uint32_t model);
 int hpclang_e2e_saturn_compat_test(void);
+int hpclang_e2e_object_store_owners(void);
 extern const struct hpclang_font hpclang_object_basics_ui_font;
 static const char pass_label[] = HPCLANG_UI_TEXT("OBJECT PASS");
 static const char fail_label[] = HPCLANG_UI_TEXT("OBJECT FAIL");
@@ -55,5 +56,8 @@ int main(void)
     uint32_t failure = hpclang_e2e_object_stack(boot->model);
     if (failure != 0u)
         return finish(failure);
-    return finish(hpclang_e2e_object_store(boot->model));
+    failure = hpclang_e2e_object_store(boot->model);
+    if (failure != 0u)
+        return finish(failure);
+    return finish(hpclang_e2e_object_store_owners() ? 0xd0u : 0u);
 }

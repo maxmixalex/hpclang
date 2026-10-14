@@ -381,6 +381,7 @@ target_include_directories(test_object_construct PRIVATE
 hpclang_unit(object_store
     "${HPCLANG_ROOT}/runtime/core/object-construct.c"
     test_object_store.c
+    test_object_store_cpp.cpp
     rpl-stock-memory-stub.c
     "${HPCLANG_ROOT}/runtime/core/object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
@@ -391,6 +392,9 @@ hpclang_unit(object_store
 target_include_directories(test_object_store PRIVATE
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
+target_compile_features(test_object_store PRIVATE cxx_std_17)
+target_compile_options(test_object_store PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
 
 hpclang_unit(port
     test_port.c

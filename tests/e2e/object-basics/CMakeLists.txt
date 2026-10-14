@@ -14,7 +14,7 @@ add_executable(hpclang_object_basics_e2e
     ${HPCLANG_RUNTIME_SOFTFLOAT}
     ${HPCLANG_LIBC}
     main.c
-    stack.c store.c compat.cpp)
+    stack.c store.c compat.cpp owners.cpp)
 
 target_include_directories(hpclang_object_basics_e2e PRIVATE "${HPCLANG_ROOT}/include")
 target_compile_features(hpclang_object_basics_e2e PRIVATE c_std_11 cxx_std_23)
