@@ -813,3 +813,12 @@ requires that header. C lookup matches all 35 captured entries and the missing
 end index. These results do not generalize the mapping to other firmware or
 establish executable-reference and relocation safety.
 See the API reference for the operation masks and descriptor version contract.
+
+## Tagged object traversal
+
+The internal `hpclang_rpl_tagged_visit()` validates a DOTAG extent and exposes
+its single inline child, including the child's prologue. Label bytes are not
+references; nested ACPTR targets remain separate traversal work. Like the
+sequence and array visitors, it requires a stable reader and a read-only
+callback. Extent validation does not certify opaque payload contents or prove
+that an allocation is safe to reclaim.

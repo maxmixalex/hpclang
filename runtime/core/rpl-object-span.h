@@ -65,6 +65,15 @@ extern "C"
                                    uint32_t limit, hpclang_rpl_sequence_visit_fn visit,
                                    void *context);
 
+    /* Visit the one inline child of DOTAG after validating the complete object.
+     * Label bytes are not references. The callback receives the child's address
+     * as both field and target and its full span, including its prologue.
+     * Nested reference targets are not dereferenced. The same read-only and
+     * stable-mapping rules as sequence traversal apply. */
+    int hpclang_rpl_tagged_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t limit, hpclang_rpl_sequence_visit_fn visit,
+                                 void *context);
+
 #ifdef __cplusplus
 }
 #endif

@@ -544,6 +544,31 @@ int hpclang_rpl_object_span(const struct hpclang_rpl_reader *reader, uint32_t ad
     return parse_object(reader, address, limit, 0u, span);
 }
 
+int hpclang_rpl_tagged_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                             uint32_t limit, hpclang_rpl_sequence_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address > UINT32_MAX - limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t type;
+    int result = read_nibbles(reader, address, 5, limit, &type);
+    if (result)
+        return result;
+    if (type != RPL_DOTAG)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t span;
+    result = parse_object(reader, address, limit, 0, &span);
+    if (result)
+        return result;
+    uint32_t characters;
+    result = read_nibbles(reader, address + 5, 2, span - 5, &characters);
+    if (result)
+        return result;
+    uint32_t offset = 7 + characters * 2;
+    return visit(context, address + offset, address + offset, span - offset);
+}
+
 struct array_body_reader
 {
     const struct hpclang_rpl_reader *source;

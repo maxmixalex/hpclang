@@ -653,8 +653,87 @@ static void test_sequence_children(void)
            HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+struct tagged_state
+{
+    uint32_t address;
+    uint32_t span;
+    unsigned count;
+    int stop;
+};
+
+static int tagged_visit(void *context, uint32_t field, uint32_t target, uint32_t span)
+{
+    struct tagged_state *state = context;
+    assert(field == state->address && target == field && span == state->span);
+    ++state->count;
+    return state->stop;
+}
+
+static void test_tagged_children(void)
+{
+    struct image image = {0};
+    struct hpclang_rpl_reader reader = reader_for(&image);
+    /* Nonzero base, a label resembling a pointer, then an inline ACPTR.
+     * Its target is deliberately outside the readable fixture. */
+    put_nibbles(&image, 3, 0x02afc, 5);
+    put_nibbles(&image, 8, 3, 2);
+    put_nibbles(&image, 10, 0x81234, 6);
+    put_nibbles(&image, 16, 0x02baa, 5);
+    put_nibbles(&image, 21, 0x7327e, 5);
+    put_nibbles(&image, 26, 0x22f5a, 5);
+    struct image original = image;
+    struct tagged_state state = {16, 15, 0, 0};
+    assert(hpclang_rpl_tagged_visit(&reader, 3, 28, tagged_visit, &state) == 0);
+    assert(state.count == 1);
+    assert(memcmp(&image, &original, sizeof(image)) == 0);
+    for (uint32_t size = 0; size < 28; ++size) {
+        state.count = 0;
+        assert(hpclang_rpl_tagged_visit(&reader, 3, size, tagged_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    /* Extent validation reads headers, not opaque ACPTR payload bytes. */
+    for (image.used = 3; image.used < 21; ++image.used) {
+        state.count = 0;
+        assert(hpclang_rpl_tagged_visit(&reader, 3, 28, tagged_visit, &state) != 0);
+        assert(state.count == 0);
+    }
+    image = original;
+    state.stop = 79;
+    assert(hpclang_rpl_tagged_visit(&reader, 3, 28, tagged_visit, &state) == 79);
+    assert(state.count == 1);
+    state.count = 0;
+    assert(hpclang_rpl_tagged_visit(&reader, UINT32_MAX - 4, 28, tagged_visit, &state) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_tagged_visit(NULL, 3, 28, tagged_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_tagged_visit(&reader, 3, 28, NULL, &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    put_nibbles(&image, 3, 0x029bf, 5);
+    assert(hpclang_rpl_tagged_visit(&reader, 3, 28, tagged_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    image = original;
+    put_nibbles(&image, 16, 0x026d5, 5);
+    assert(hpclang_rpl_tagged_visit(&reader, 3, 28, tagged_visit, &state) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(state.count == 0);
+    /* Empty outer label wrapping another tag: only the immediate child visits. */
+    image = (struct image){0};
+    put_nibbles(&image, 0, 0x02afc, 5);
+    put_nibbles(&image, 5, 0, 2);
+    put_nibbles(&image, 7, 0x02afc, 5);
+    put_nibbles(&image, 12, 0, 2);
+    put_nibbles(&image, 14, 0x029bf, 5);
+    put_nibbles(&image, 19, 0x41, 2);
+    state = (struct tagged_state){7, 14, 0, 0};
+    assert(hpclang_rpl_tagged_visit(&reader, 0, 21, tagged_visit, &state) == 0);
+    assert(state.count == 1);
+    state = (struct tagged_state){14, 7, 0, 0};
+    assert(hpclang_rpl_tagged_visit(&reader, 7, 14, tagged_visit, &state) == 0);
+    assert(state.count == 1);
+}
+
 int main(void)
 {
+    test_tagged_children();
     test_sequence_children();
     test_linked_array_bodies();
     test_array_bodies();
