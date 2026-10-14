@@ -315,6 +315,82 @@ static void test_bank_lookup(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    if (address < 0x40000u)
+        return 0;
+    return read_nibble(context, address - 0x40000u, value);
+}
+
+static void test_flashptr_resolution(void)
+{
+    struct image source = {.count = 12, .fail_at = UINT32_MAX};
+    struct image table = {.count = 49, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    const struct hpclang_rpl_reader mapped = {mapped_nibble, &table};
+    put_word(&source, 0, 0x26ac, 5);
+    put_word(&source, 5, 6, 3);
+    put_word(&source, 8, 1, 4);
+    struct hpclang_rpl_flashptr pointer = {99, 99};
+    assert(hpclang_rpl_flashptr_decode(&reader, 0, 12, &pointer) == 1);
+    assert(pointer.bank == 6 && pointer.index == 1);
+    const struct hpclang_rpl_flashptr before = pointer;
+    for (unsigned i = 0; i < 12; ++i) {
+        assert(hpclang_rpl_flashptr_decode(&reader, 0, i, &pointer) == HPCLANG_RPL_SPAN_BOUNDS);
+        source.fail_at = i;
+        assert(hpclang_rpl_flashptr_decode(&reader, 0, 12, &pointer) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&before, &pointer, sizeof pointer));
+    }
+    source.fail_at = UINT32_MAX;
+    put_word(&table, 0, 0x60f, 4);
+    put_word(&table, 29, 3, 5);
+    put_word(&table, 34, 0x6f8e, 5);
+    put_word(&table, 39, 0x4f622, 5);
+    put_word(&table, 44, 0, 5);
+    uint32_t target = 0xaaaaa;
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) == 1);
+    assert(target == 0x4f622);
+    pointer.index = 0;
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) == 1);
+    assert(target == 0x6f8e);
+    pointer.index = 2;
+    assert(!hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target));
+    pointer.index = 3;
+    assert(!hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target));
+    assert(target == 0x6f8e);
+    pointer = before;
+    for (unsigned i = 0; i < 49; ++i) {
+        if (!(i < 4 || (i >= 29 && i < 34) || (i >= 39 && i < 44)))
+            continue;
+        table.fail_at = i;
+        assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(target == 0x6f8e);
+    }
+    table.fail_at = UINT32_MAX;
+    put_word(&table, 0, 0x6f0, 4);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&table, 0, 0x50f, 4);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    put_word(&table, 0, 0x60f, 4);
+    put_word(&table, 29, 0xfffff, 5);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    put_word(&table, 29, 3, 5);
+    put_word(&table, 39, 0x80000, 5);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x7ffff, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    pointer.bank = 16;
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(target == 0x6f8e);
+}
+
 static void test_acptr_resolution(void)
 {
     struct image rom = {.count = 125, .fail_at = UINT32_MAX};
@@ -385,6 +461,7 @@ static void test_acptr_resolution(void)
 int main(void)
 {
     test_acptr_resolution();
+    test_flashptr_resolution();
     test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();

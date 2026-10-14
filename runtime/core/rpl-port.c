@@ -171,6 +171,62 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
     return 1;
 }
 
+int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
+                                uint32_t limit, struct hpclang_rpl_flashptr *pointer)
+{
+    if (!source || !source->read_nibble || !pointer)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 12u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t prologue;
+    int result = word(source, address, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x026acu)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    struct hpclang_rpl_flashptr next;
+    result = word(source, address + 5u, 3, &next.bank);
+    if (result)
+        return result;
+    result = word(source, address + 8u, 4, &next.index);
+    if (result)
+        return result;
+    *pointer = next;
+    return 1;
+}
+
+int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                const struct hpclang_rpl_flashptr *pointer, uint32_t *target)
+{
+    if (!mapped || !mapped->read_nibble || !pointer || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (header < 0x40000u || header > 0x80000u - 34u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (pointer->bank >= 16u || pointer->index > 0xffffu)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t identity, count;
+    int result = word(mapped, header, 4, &identity);
+    if (result)
+        return result;
+    if (identity != (0x0fu | (pointer->bank << 8u)))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(mapped, header + 29u, 5, &count);
+    if (result)
+        return result;
+    if (count > 0x10000u || count > (0x80000u - header - 34u) / 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (pointer->index >= count)
+        return 0;
+    uint32_t value;
+    result = word(mapped, header + 34u + 5u * pointer->index, 5, &value);
+    if (result || !value)
+        return result;
+    if (value >= 0x80000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *target = value;
+    return 1;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {

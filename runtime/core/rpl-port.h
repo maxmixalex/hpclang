@@ -91,6 +91,26 @@ struct hpclang_rpl_banked_target
     uint32_t offset;
 };
 
+struct hpclang_rpl_flashptr
+{
+    uint32_t bank, index;
+};
+
+/* Decode DOFLASHP's two indices without assuming a mapping or table address.
+ * Returns 1 on success; negative errors preserve output. */
+int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
+                                uint32_t limit, struct hpclang_rpl_flashptr *pointer);
+
+/* Look up one index in a caller-mapped native ROM bank header. Validate the
+ * 0F bank identity and declared table count within the 0x40000..0x80000 window.
+ * The caller validates physical mapping and supplies the header location.
+ * Returns 1 found, 0 absent, negative malformed/unavailable/unsupported; output
+ * changes only on success. Targets below 0x40000 are fixed-ROM addresses;
+ * others retain this bank's identity. Never treats a user F0 allocation chain
+ * as a ROM pointer table, dereferences the result, or executes native code. */
+int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
+                                const struct hpclang_rpl_flashptr *pointer, uint32_t *target);
+
 /* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
  * source and ROM may have distinct readers. Return a bank-qualified nibble
  * offset within the native 0x40000..0x80000 window, never a physical address.

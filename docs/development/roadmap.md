@@ -675,6 +675,15 @@ and the saved HP50g ERAM pointer. All 95 host targets, focused sanitizers and AR
 analysis pass. Indexed FlashPtr tables, machine-code references and complete
 live-root coverage remain required before reclamation is safe.
 
+Bounded FlashPtr decoding and ROM-bank table lookup now preserve the two-index
+format, validate the selected bank identity/count, and distinguish fixed-ROM
+targets from addresses in the selected bank. The C implementation matches all
+3,941 entries and end boundaries in each saved HP49g+/HP50g ROM. Integrating it
+into the read-only graph experiment follows 3,056 FlashPtr edges across 15,533
+nodes. Eight observed pointers using selectors 1/15 remain unresolved by this
+mapping, alongside machine-code and other unresolved nodes; no reclamation is
+enabled on that evidence. All 95 host targets, sanitizers and ARM analysis pass.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

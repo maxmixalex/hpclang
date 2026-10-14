@@ -787,4 +787,15 @@ require the target allocation to be live: native HP49g+/HP50g pointers remain
 directed at preserved payloads after `PURGE`. The C resolver also matches a
 saved HP50g ERAM pointer. This is one component of reclamation safety; indexed
 FlashPtr objects and executable references still require their own traversal.
+
+FlashPtr decoding keeps its three-nibble selector and four-nibble table index
+separate, consistent with [Rick Grevelle's original description](https://www.finseth.com/hpdata/hp49g.php).
+The internal ROM-table lookup takes a caller-mapped reader and header location;
+it validates the native `0F` identity and bounded entry count before reading a
+target. It rejects user `F0` allocation chains and preserves output on failure
+or absence. Fixed-ROM targets remain distinct from selected-bank addresses.
+The C lookup matches 3,941 entries in each examined HP49g+/HP50g image. This does
+not generalize those header locations or mappings to unexamined ROM versions:
+observed selectors 1/15 still require mapping research, and executable-target
+resolution does not establish relocation safety.
 See the API reference for the operation masks and descriptor version contract.
