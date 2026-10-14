@@ -93,7 +93,7 @@ struct hpclang_rpl_banked_target
 
 struct hpclang_rpl_flashptr
 {
-    uint32_t bank, index;
+    uint32_t selector, index;
 };
 
 /* Decode DOFLASHP's two indices without assuming a mapping or table address.
@@ -101,15 +101,25 @@ struct hpclang_rpl_flashptr
 int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_t address,
                                 uint32_t limit, struct hpclang_rpl_flashptr *pointer);
 
+/* Match a logical FlashPtr selector's live configuration against a separate
+ * physical-bank configuration table. Both tables contain 16 five-nibble cells
+ * at caller-validated RAM addresses. Zero/unknown configuration returns 0;
+ * duplicate matches and invalid data fail. Never infer bank from selector or
+ * configuration bit patterns. Keep the mapping and both tables stable for
+ * the entire lookup. Output changes only on a unique match (1). */
+int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                              uint32_t banks, uint32_t selector, uint32_t *bank);
+
 /* Look up one index in a caller-mapped native ROM bank header. Validate the
  * 0F bank identity and declared table count within the 0x40000..0x80000 window.
- * The caller validates physical mapping and supplies the header location.
+ * bank is the resolved physical-bank index, not the FlashPtr selector. The
+ * caller validates physical mapping and supplies the header location.
  * Returns 1 found, 0 absent, negative malformed/unavailable/unsupported; output
  * changes only on success. Targets below 0x40000 are fixed-ROM addresses;
  * others retain this bank's identity. Never treats a user F0 allocation chain
  * as a ROM pointer table, dereferences the result, or executes native code. */
 int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
-                                const struct hpclang_rpl_flashptr *pointer, uint32_t *target);
+                                uint32_t bank, uint32_t index, uint32_t *target);
 
 /* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
  * source and ROM may have distinct readers. Return a bank-qualified nibble

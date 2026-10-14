@@ -322,6 +322,37 @@ static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
     return read_nibble(context, address - 0x40000u, value);
 }
 
+static void test_flashptr_bank(void)
+{
+    struct image image = {.count = 160, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    for (uint32_t i = 0; i < 16u; ++i)
+        put_word(&image, 80u + 5u * i, 0x7f020u + i * i, 5);
+    put_word(&image, 5, 0x7f024u, 5);  /* Selector 1 maps physical bank 2. */
+    put_word(&image, 75, 0x7f020u, 5); /* Selector 15 maps physical bank 0. */
+    uint32_t bank = 99;
+    assert(hpclang_rpl_flashptr_bank(&reader, 0, 80, 1, &bank) == 1 && bank == 2);
+    assert(hpclang_rpl_flashptr_bank(&reader, 0, 80, 15, &bank) == 1 && bank == 0);
+    bank = 99;
+    assert(!hpclang_rpl_flashptr_bank(&reader, 0, 80, 5, &bank) && bank == 99);
+    put_word(&image, 25, 0x12345, 5);
+    assert(!hpclang_rpl_flashptr_bank(&reader, 0, 80, 5, &bank) && bank == 99);
+    for (unsigned at = 0; at < 160; ++at) {
+        if (!(at >= 80 || (at >= 5 && at < 10)))
+            continue;
+        image.fail_at = at;
+        assert(hpclang_rpl_flashptr_bank(&reader, 0, 80, 1, &bank) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(bank == 99);
+    }
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 155, 0x7f024, 5);
+    assert(hpclang_rpl_flashptr_bank(&reader, 0, 80, 1, &bank) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(bank == 99);
+    assert(hpclang_rpl_flashptr_bank(&reader, 0xfffff, 80, 1, &bank) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flashptr_bank(&reader, 0, 80, 16, &bank) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(bank == 99);
+}
+
 static void test_flashptr_resolution(void)
 {
     struct image source = {.count = 12, .fail_at = UINT32_MAX};
@@ -333,7 +364,7 @@ static void test_flashptr_resolution(void)
     put_word(&source, 8, 1, 4);
     struct hpclang_rpl_flashptr pointer = {99, 99};
     assert(hpclang_rpl_flashptr_decode(&reader, 0, 12, &pointer) == 1);
-    assert(pointer.bank == 6 && pointer.index == 1);
+    assert(pointer.selector == 6 && pointer.index == 1);
     const struct hpclang_rpl_flashptr before = pointer;
     for (unsigned i = 0; i < 12; ++i) {
         assert(hpclang_rpl_flashptr_decode(&reader, 0, i, &pointer) == HPCLANG_RPL_SPAN_BOUNDS);
@@ -349,45 +380,49 @@ static void test_flashptr_resolution(void)
     put_word(&table, 39, 0x4f622, 5);
     put_word(&table, 44, 0, 5);
     uint32_t target = 0xaaaaa;
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) == 1);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == 1);
     assert(target == 0x4f622);
     pointer.index = 0;
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) == 1);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == 1);
     assert(target == 0x6f8e);
     pointer.index = 2;
-    assert(!hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target));
+    assert(
+        !hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index, &target));
     pointer.index = 3;
-    assert(!hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target));
+    assert(
+        !hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index, &target));
     assert(target == 0x6f8e);
     pointer = before;
     for (unsigned i = 0; i < 49; ++i) {
         if (!(i < 4 || (i >= 29 && i < 34) || (i >= 39 && i < 44)))
             continue;
         table.fail_at = i;
-        assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                           &target) == HPCLANG_RPL_SPAN_UNAVAILABLE);
         assert(target == 0x6f8e);
     }
     table.fail_at = UINT32_MAX;
     put_word(&table, 0, 0x6f0, 4);
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_MALFORMED);
     put_word(&table, 0, 0x50f, 4);
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_MALFORMED);
     put_word(&table, 0, 0x60f, 4);
     put_word(&table, 29, 0xfffff, 5);
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_BOUNDS);
     put_word(&table, 29, 3, 5);
     put_word(&table, 39, 0x80000, 5);
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x7ffff, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_BOUNDS);
-    pointer.bank = 16;
-    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, &pointer, &target) ==
-           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x7ffff, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_BOUNDS);
+    pointer.selector = 16;
+    assert(hpclang_rpl_flashptr_lookup(&mapped, 0x40000, pointer.selector, pointer.index,
+                                       &target) == HPCLANG_RPL_SPAN_UNSUPPORTED);
     assert(target == 0x6f8e);
 }
 
@@ -462,6 +497,7 @@ int main(void)
 {
     test_acptr_resolution();
     test_flashptr_resolution();
+    test_flashptr_bank();
     test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();

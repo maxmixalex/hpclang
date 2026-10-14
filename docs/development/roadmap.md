@@ -678,11 +678,15 @@ live-root coverage remain required before reclamation is safe.
 Bounded FlashPtr decoding and ROM-bank table lookup now preserve the two-index
 format, validate the selected bank identity/count, and distinguish fixed-ROM
 targets from addresses in the selected bank. The C implementation matches all
-3,941 entries and end boundaries in each saved HP49g+/HP50g ROM. Integrating it
-into the read-only graph experiment follows 3,056 FlashPtr edges across 15,533
-nodes. Eight observed pointers using selectors 1/15 remain unresolved by this
-mapping, alongside machine-code and other unresolved nodes; no reclamation is
-enabled on that evidence. All 95 host targets, sanitizers and ARM analysis pass.
+3,941 entries and end boundaries in each saved HP49g+/HP50g ROM. Logical
+selectors must first be matched through the live RAM configuration tables;
+they are not physical-bank indices. The C mapper matches both saved models,
+including selector 1 to physical bank 2 and selector 2 to bank 3, without
+hardcoding those relationships. With that mapping the read-only graph follows
+3,302 FlashPtr edges across 19,613 nodes. Nine observed selector-15 pointers
+still require validation of their special window, alongside machine-code and
+other unresolved nodes. No reclamation is enabled on that evidence. All 95
+host targets, sanitizers and ARM analysis pass.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and

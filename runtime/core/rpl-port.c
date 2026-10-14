@@ -185,7 +185,7 @@ int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_
     if (prologue != 0x026acu)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     struct hpclang_rpl_flashptr next;
-    result = word(source, address + 5u, 3, &next.bank);
+    result = word(source, address + 5u, 3, &next.selector);
     if (result)
         return result;
     result = word(source, address + 8u, 4, &next.index);
@@ -196,35 +196,67 @@ int hpclang_rpl_flashptr_decode(const struct hpclang_rpl_reader *source, uint32_
 }
 
 int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
-                                const struct hpclang_rpl_flashptr *pointer, uint32_t *target)
+                                uint32_t bank, uint32_t index, uint32_t *target)
 {
-    if (!mapped || !mapped->read_nibble || !pointer || !target)
+    if (!mapped || !mapped->read_nibble || !target)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
     if (header < 0x40000u || header > 0x80000u - 34u)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    if (pointer->bank >= 16u || pointer->index > 0xffffu)
+    if (bank >= 16u || index > 0xffffu)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     uint32_t identity, count;
     int result = word(mapped, header, 4, &identity);
     if (result)
         return result;
-    if (identity != (0x0fu | (pointer->bank << 8u)))
+    if (identity != (0x0fu | (bank << 8u)))
         return HPCLANG_RPL_SPAN_MALFORMED;
     result = word(mapped, header + 29u, 5, &count);
     if (result)
         return result;
     if (count > 0x10000u || count > (0x80000u - header - 34u) / 5u)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    if (pointer->index >= count)
+    if (index >= count)
         return 0;
     uint32_t value;
-    result = word(mapped, header + 34u + 5u * pointer->index, 5, &value);
+    result = word(mapped, header + 34u + 5u * index, 5, &value);
     if (result || !value)
         return result;
     if (value >= 0x80000u)
         return HPCLANG_RPL_SPAN_BOUNDS;
     *target = value;
     return 1;
+}
+
+int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t selectors,
+                              uint32_t banks, uint32_t selector, uint32_t *bank)
+{
+    if (!reader || !reader->read_nibble || !bank)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (selectors > 0x100000u - 80u || banks > 0x100000u - 80u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (selector >= 16u)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t configuration;
+    int result = word(reader, selectors + 5u * selector, 5, &configuration);
+    if (result || !configuration)
+        return result;
+    uint32_t selected = 0;
+    int found = 0;
+    for (uint32_t i = 0; i < 16u; ++i) {
+        uint32_t candidate;
+        result = word(reader, banks + 5u * i, 5, &candidate);
+        if (result)
+            return result;
+        if (candidate == configuration) {
+            if (found)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            selected = i;
+            found = 1;
+        }
+    }
+    if (found)
+        *bank = selected;
+    return found;
 }
 
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
