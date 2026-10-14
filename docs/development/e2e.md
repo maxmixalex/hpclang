@@ -167,6 +167,12 @@ result, including failures before payload injection. Key-delivery failures also
 report the key, requested edge, readiness, GPIO sample count and switch state.
 Gallery archives the failure screen with the affected shard.
 
+Stock failures also log all ARM registers, banked stack/link/status registers,
+and MMU fault registers. Object mutation builds retain application and launcher
+ELF symbols; failed Stock jobs additionally archive external and on-chip SRAM
+in a separate failure artifact. Match these to the failing run's log and exact
+build when investigating CPU faults or stale native pointers.
+
 **Direct runtime** boots a target-appropriate stock firmware or full-NOR fixture, bypasses calculator menus/installers, enters the common hpclang ARM boundary, runs the canonical runtime HPC1 application, and then restores the stock execution state.
 
 **Stock launch** drives the calculator's original UI and supported launcher path, then requires the same machine-readable E2E PASS result from that same runtime application.

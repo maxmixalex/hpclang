@@ -533,6 +533,19 @@ static void hpclang_log_cpu_snapshot(struct state *s, const char *tag)
             "sp=0x%08x lr=0x%08x r4=0x%08x spsr=0x%08x\n",
             tag, cpu->regs[15], cpsr_read(cpu), cpu->regs[13], cpu->regs[14], cpu->regs[4],
             cpu->spsr);
+    if (!s->failed)
+        return;
+    for (unsigned i = 0; i < 16; i += 4)
+        fprintf(stderr, "stock launcher CPU r%u-r%u: %08x %08x %08x %08x\n", i, i + 3, cpu->regs[i],
+                cpu->regs[i + 1], cpu->regs[i + 2], cpu->regs[i + 3]);
+    for (unsigned i = 0; i < 6; ++i)
+        fprintf(stderr, "stock launcher CPU bank %u: sp=%08x lr=%08x spsr=%08x\n", i,
+                cpu->banked_r13[i], cpu->banked_r14[i], cpu->banked_spsr[i]);
+    fprintf(stderr,
+            "stock launcher CPU MMU: control=%08x table=%08x domain=%08x "
+            "ifsr=%08x dfsr=%08x ifar=%08x dfar=%08x\n",
+            cpu->cp15.c1_sys, cpu->cp15.c2_base0, cpu->cp15.c3, cpu->cp15.c5_insn,
+            cpu->cp15.c5_data, cpu->cp15.c6_insn, cpu->cp15.c6_data);
 }
 
 static void write_runtime_json(struct state *s, const char *status)
