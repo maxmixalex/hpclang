@@ -682,11 +682,17 @@ targets from addresses in the selected bank. The C implementation matches all
 selectors must first be matched through the live RAM configuration tables;
 they are not physical-bank indices. The C mapper matches both saved models,
 including selector 1 to physical bank 2 and selector 2 to bank 3, without
-hardcoding those relationships. With that mapping the read-only graph follows
-3,302 FlashPtr edges across 19,613 nodes. Nine observed selector-15 pointers
-still require validation of their special window, alongside machine-code and
-other unresolved nodes. No reclamation is enabled on that evidence. All 95
-host targets, sanitizers and ARM analysis pass.
+hardcoding those relationships. Native selector-15 window probes on both
+models now copy the 35-entry table, restore the original configuration, return
+normally and leave all Flash bytes unchanged. Separate per-page probes identify
+the special window's nonstandard physical mapping; ambiguous pages are not
+guessed. A bounded count-prefixed-table resolver matches every captured entry
+and its end boundary without weakening ordinary ROM-bank identity checks.
+With those verified mappings the graph follows all 3,357 observed FlashPtr
+edges across 20,642 nodes, with no unresolved FlashPtr configurations/table
+entries. Machine-code, other unresolved nodes and complete live roots still
+require work; no reclamation is enabled on this evidence. All 95 host targets,
+sanitizers and ARM analysis pass.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and

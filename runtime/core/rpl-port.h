@@ -121,6 +121,16 @@ int hpclang_rpl_flashptr_bank(const struct hpclang_rpl_reader *reader, uint32_t 
 int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_t header,
                                 uint32_t bank, uint32_t index, uint32_t *target);
 
+/* Resolve a count-prefixed table after the caller has validated its mapping
+ * and format. first/end bound the readable native bank window; table points
+ * at the five-nibble count followed by absolute five-nibble targets. This
+ * primitive also supports special tables without an ordinary 0F header; it
+ * must not be used to infer a table from arbitrary user allocations. Same
+ * result/output contract as flashptr_lookup. Targets are not dereferenced. */
+int hpclang_rpl_flashptr_table_lookup(const struct hpclang_rpl_reader *mapped, uint32_t first,
+                                      uint32_t end, uint32_t table, uint32_t index,
+                                      uint32_t *target);
+
 /* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
  * source and ROM may have distinct readers. Return a bank-qualified nibble
  * offset within the native 0x40000..0x80000 window, never a physical address.

@@ -802,6 +802,14 @@ target. It rejects user `F0` allocation chains and preserves output on failure
 or absence. Fixed-ROM targets remain distinct from selected-bank addresses.
 The C lookup matches 3,941 entries in each examined HP49g+/HP50g image. This does
 not generalize those header locations or mappings to unexamined ROM versions:
-selector 15's special window still requires mapping research, and executable-target
-resolution does not establish relocation safety.
+selector 15 uses a different window and table format. Native probes on the two
+examined models copy its 35-entry table under the original configuration code,
+restore the prior configuration and return without changing Flash. Per-page
+content comparisons identify the pages needed by the observed references;
+ambiguous pages remain unavailable rather than being assigned guessed addresses.
+The internal count-prefixed-table resolver accepts caller-validated mappings
+and bounds without requiring an ordinary `0F` header. The ordinary lookup still
+requires that header. C lookup matches all 35 captured entries and the missing
+end index. These results do not generalize the mapping to other firmware or
+establish executable-reference and relocation safety.
 See the API reference for the operation masks and descriptor version contract.

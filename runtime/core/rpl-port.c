@@ -204,21 +204,37 @@ int hpclang_rpl_flashptr_lookup(const struct hpclang_rpl_reader *mapped, uint32_
         return HPCLANG_RPL_SPAN_BOUNDS;
     if (bank >= 16u || index > 0xffffu)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
-    uint32_t identity, count;
+    uint32_t identity;
     int result = word(mapped, header, 4, &identity);
     if (result)
         return result;
     if (identity != (0x0fu | (bank << 8u)))
         return HPCLANG_RPL_SPAN_MALFORMED;
-    result = word(mapped, header + 29u, 5, &count);
+    return hpclang_rpl_flashptr_table_lookup(mapped, 0x40000u, 0x80000u, header + 29u, index,
+                                             target);
+}
+
+int hpclang_rpl_flashptr_table_lookup(const struct hpclang_rpl_reader *mapped, uint32_t first,
+                                      uint32_t end, uint32_t table, uint32_t index,
+                                      uint32_t *target)
+{
+    if (!mapped || !mapped->read_nibble || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first < 0x40000u || end > 0x80000u || first >= end || table < first || table > end ||
+        end - table < 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (index > 0xffffu)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t count;
+    int result = word(mapped, table, 5, &count);
     if (result)
         return result;
-    if (count > 0x10000u || count > (0x80000u - header - 34u) / 5u)
+    if (count > 0x10000u || count > (end - table - 5u) / 5u)
         return HPCLANG_RPL_SPAN_BOUNDS;
     if (index >= count)
         return 0;
     uint32_t value;
-    result = word(mapped, header + 34u + 5u * index, 5, &value);
+    result = word(mapped, table + 5u + 5u * index, 5, &value);
     if (result || !value)
         return result;
     if (value >= 0x80000u)

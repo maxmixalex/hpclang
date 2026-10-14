@@ -353,6 +353,45 @@ static void test_flashptr_bank(void)
     assert(bank == 99);
 }
 
+static void test_flashptr_special_table(void)
+{
+    struct image image = {.count = 15, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {mapped_nibble, &image};
+    put_word(&image, 0, 2, 5);
+    put_word(&image, 5, 0x4d7ce, 5);
+    put_word(&image, 10, 0x6f8e, 5);
+    uint32_t target = 99;
+    assert(hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 0, &target) == 1);
+    assert(target == 0x4d7ce);
+    assert(hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 1, &target) == 1);
+    assert(target == 0x6f8e);
+    assert(!hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 2, &target));
+    assert(target == 0x6f8e);
+    for (uint32_t end = 0; end < 15; ++end) {
+        assert(hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x40000 + end, 0x40000, 0,
+                                                 &target) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(target == 0x6f8e);
+    }
+    for (uint32_t at = 0; at < 10; ++at) {
+        image.fail_at = at;
+        assert(hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 0, &target) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(target == 0x6f8e);
+    }
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 0, 0, 5);
+    assert(!hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 0, &target));
+    put_word(&image, 0, 2, 5);
+    put_word(&image, 5, 0x80000, 5);
+    assert(hpclang_rpl_flashptr_table_lookup(&reader, 0x40000, 0x4000f, 0x40000, 0, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(target == 0x6f8e);
+    /* This special format must not bypass ordinary ROM-bank identity checks. */
+    assert(hpclang_rpl_flashptr_lookup(&reader, 0x40000, 0, 0, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(target == 0x6f8e);
+}
+
 static void test_flashptr_resolution(void)
 {
     struct image source = {.count = 12, .fail_at = UINT32_MAX};
@@ -498,6 +537,7 @@ int main(void)
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();
+    test_flashptr_special_table();
     test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();
