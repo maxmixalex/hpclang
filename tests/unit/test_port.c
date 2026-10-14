@@ -10,6 +10,7 @@
 #include <hpclang/target.h>
 #include "saturn-view.h"
 #include "rpl-stock-memory.h"
+#include "rpl-flash-write.h"
 
 static uint8_t memory[0x100000];
 static int unavailable;
@@ -21,6 +22,40 @@ static uint32_t missing_flash_bank = UINT32_MAX;
 static uint32_t port1_limit = 0x2000u;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
+
+static int flash_word_read(void *context, uint32_t address, uint16_t *value)
+{
+    (void)context;
+    assert(address >= 0x140000u && address < 0x200000u && !(address & 1u));
+    uint32_t bank = (address - 0x140000u) / 0x20000u;
+    if (!port2_available || bank == missing_flash_bank)
+        return 0;
+    uint32_t offset = (address & 0x1ffffu) * 2u;
+    *value = 0;
+    for (unsigned i = 0; i < 4; ++i)
+        *value |= (uint16_t)flash[bank][offset + i] << (4u * i);
+    return 1;
+}
+
+static int flash_word_program(void *context, uint32_t address, uint16_t value)
+{
+    uint16_t old;
+    assert(flash_word_read(context, address, &old) && (old & value) == value);
+    uint32_t bank = (address - 0x140000u) / 0x20000u;
+    uint32_t offset = (address & 0x1ffffu) * 2u;
+    for (unsigned i = 0; i < 4; ++i)
+        flash[bank][offset + i] = (value >> (4u * i)) & 15u;
+    return 1;
+}
+
+int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
+{
+    if (!port2_available)
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    return hpclang_rpl_flash_create_backup(&io, record, bytes, NULL);
+}
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return &boot;
@@ -141,7 +176,7 @@ static void test_discovery(void)
             assert(hpclang_port_query(port, &info) == 0);
             assert(info.available == info.implemented);
             if (present && port == 2)
-                assert(info.available == reads);
+                assert(info.available == (reads | HPCLANG_PORT_CREATE_BACKUP));
         }
     }
     // Zero writable headroom means supported-but-full, not an unavailable API.
@@ -209,11 +244,23 @@ static void test_flash(void)
     struct hpclang_object *value = hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8);
     struct hpclang_object *library = hpclang_port_library_get(2, 123);
     assert(value && library && hpclang_object_kind(library) == HPCLANG_OBJECT_LIBRARY);
+    assert(!hpclang_port_backup_create(2, (const uint8_t *)"NEWFLASH", 8, value));
+    struct hpclang_object *created = hpclang_port_backup_get(2, (const uint8_t *)"NEWFLASH", 8);
+    int64_t number;
+    assert(created && !hpclang_object_integer_i64(created, &number) && number == 123);
+    hpclang_object_release(created);
+    assert(hpclang_port_backup_create(2, (const uint8_t *)"NEWFLASH", 8, value) == -1 &&
+           errno == EEXIST);
+    assert(hpclang_port_backup_create(2, (const uint8_t *)"PORTZERO", 8, value) == -1 &&
+           errno == EEXIST);
     assert(!hpclang_port_backup_get(2, (const uint8_t *)"missing", 7) && errno == ENOENT);
     missing_flash_bank = 3;
+    assert(hpclang_port_backup_create(2, (const uint8_t *)"FAIL", 4, value) == -1 && errno == EIO);
     assert(!hpclang_port_iterator_open(2) && errno == EIO);
     missing_flash_bank = UINT32_MAX;
     flash[5][0x202] ^= 1;
+    assert(hpclang_port_backup_create(2, (const uint8_t *)"FAIL", 4, value) == -1 &&
+           errno == EILSEQ);
     assert(!hpclang_port_iterator_open(2) && errno == EILSEQ);
     flash[5][0x202] ^= 1;
     flash[5][0x20a] = flash[5][0x20b] = 0;

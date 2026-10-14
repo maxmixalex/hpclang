@@ -118,12 +118,12 @@ focused payloads through the shared Direct/Stock family harness:
   API, and committed again without changing Flash. Both fixture phases restore
   their original bank-prefix sector. The test requires an unused bank in a
   disposable emulator image and checks the complete Flash fingerprint before
-  returning to Stock. A whole-port create also selects space among existing
+  returning to Stock. Public `hpclang_port_backup_create(2, ...)` selects space among existing
   native records, verifies its value through the public read API and rejects
   duplicate creation without any change. The selected sector is saved and
   restored, with the whole-image fingerprint checked again. This covers
-  internal physical, append and create primitives;
-  public Port create/replace/delete and power-loss recovery remain separate
+  internal physical/append primitives and public backup creation;
+  Port replacement/deletion, relaunch persistence and power-loss recovery remain separate
   acceptance gates. The emulator does not model real cache or NOR timing.
 
 `tools/e2e-runtime-plan.py` validates the registry before building. Each entry

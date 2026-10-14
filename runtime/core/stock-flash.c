@@ -233,7 +233,17 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
                                                  : HPCLANG_RPL_FLASH_FAILED;
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
-    result = hpclang_rpl_flash_create_backup(&io, record, bytes);
+    uint32_t attempted = UINT32_MAX;
+    result = hpclang_rpl_flash_create_backup(&io, record, bytes, &attempted);
+    if (result == HPCLANG_RPL_FLASH_DIRTY && attempted != UINT32_MAX) {
+        /* Keep IRQs/mapping and the expected RAM record owned until the native
+         * chain is safe again. Persistent hardware failure, like a chip that
+         * never leaves BUSY, cannot safely resume Stock and stays in RAM. */
+        while (hpclang_rpl_flash_discard_record(&io, attempted, record, bytes) !=
+               HPCLANG_RPL_FLASH_WRITTEN) {
+        }
+        result = HPCLANG_RPL_FLASH_FAILED;
+    }
     close_flash(&owner);
     return result;
 }

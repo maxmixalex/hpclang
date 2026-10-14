@@ -525,8 +525,18 @@ write; invalid/dirty/unreadable later banks also fail before mutation. Tests
 cover last-bank placement, full media without reclamation, duplicate names and
 unchanged existing allocations. All 95 host targets pass; HP49g+/HP50g Stock
 acceptance passes automatic placement, public readback, duplicate refusal,
-normal return and byte-for-byte whole-Flash restoration. This is not yet the public create API: error
-recovery ownership and restart integration still need to be connected.
+normal return and byte-for-byte whole-Flash restoration.
+The public `hpclang_port_backup_create(2, ...)` now encodes owned snapshots and
+uses this operation; discovery advertises creation on HP49g+/HP50g Stock.
+The backend retains the selected slot, expected record, IRQ state and mapping
+until a failed append has been verified as deleted. Therefore ordinary return,
+`exit()` and `_Exit()` cannot bypass cleanup. Persistent unrepairable hardware
+retains RAM execution, matching the existing permanently-BUSY handling.
+All 95 host tests pass, including public snapshot encoding/readback, cross-bank
+duplicate rejection and recovery after repeated programming failures. Public
+creation/readback and `EEXIST` pass HP49g+/HP50g Stock with normal return and
+independently verified whole-Flash restoration; relaunch acceptance remains open.
+Restart integration, replacement/removal and reclamation remain unfinished.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,

@@ -68,6 +68,16 @@ int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint3
  * Uses append's error/dirty contract, plus EXISTS and NOSPACE. No erase or
  * automatic recovery is attempted by this operation. */
 int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
-                                    uint32_t bytes);
+                                    uint32_t bytes, uint32_t *attempted_slot);
+
+/* Discard a caller-owned failed append using its retained expected record.
+ * Verify its exact extent before clearing status; no payload or other record
+ * is touched. Returns WRITTEN only after the deleted slot is verified.
+ * A DIRTY result requires retaining ownership/recovery before native return.
+ * create_backup writes attempted_slot immediately before append (and leaves
+ * it unchanged on preflight rejection), distinguishing an existing malformed
+ * bank from the caller's failed transaction. The pointer is optional. */
+int hpclang_rpl_flash_discard_record(const struct hpclang_rpl_flash_io *io, uint32_t address,
+                                     const uint8_t *record, uint32_t bytes);
 
 #endif

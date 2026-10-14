@@ -96,8 +96,13 @@ extern "C"
     /* Create a new named backup from an owned snapshot. An existing exact name
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port
      * objects remain at their original addresses. Supports classic Stock Port 0
-     * and HP49g+/HP50g Stock Port 1. Port 1 requires a launcher-provided ERAM
-     * ownership boundary; older launchers without it return ENOSYS. */
+     * and HP49g+/HP50g Stock Port 1/2. Port 1 requires a launcher-provided ERAM
+     * ownership boundary; older launchers without it return ENOSYS. Port 2 uses
+     * erased tail space without compaction; deleted slots are not reclaimed.
+     * Invalid existing Flash data is rejected before writing. Returned Flash
+     * IO errors leave the attempted slot absent/deleted; permanently busy or
+     * unrepairable hardware retains RAM execution instead of resuming Stock.
+     * This is synchronous create, not a power-loss/restart recovery guarantee. */
     int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
                                    const struct hpclang_object *value);
 

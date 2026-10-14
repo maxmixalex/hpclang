@@ -39,7 +39,7 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
         if (port == 0)
             result.implemented |= HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP |
                                   HPCLANG_PORT_REMOVE_BACKUP;
-        else if (port == 1)
+        else
             result.implemented |= HPCLANG_PORT_CREATE_BACKUP;
         const struct hpclang_boot_info *boot = hpclang_boot_info();
         if (boot && boot->model == device->model && boot->saturn_state) {
@@ -50,6 +50,8 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
                 result.available = result.implemented;
             else if (port == 1 && bounds && bounds->magic == HPCLANG_RPL_BOUNDS_MAGIC &&
                      bounds->port1_limit <= HPCLANG_RPL_PORT1_NIBBLES)
+                result.available |= HPCLANG_PORT_CREATE_BACKUP;
+            else if (port == 2)
                 result.available |= HPCLANG_PORT_CREATE_BACKUP;
         }
     }

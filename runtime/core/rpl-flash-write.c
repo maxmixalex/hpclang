@@ -134,7 +134,7 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
 }
 
 int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
-                                    uint32_t bytes)
+                                    uint32_t bytes, uint32_t *attempted_slot)
 {
     if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
         io->first > io->end || io->end - io->first != 6u * 0x20000u || !valid_record(record, bytes))
@@ -182,7 +182,22 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
     uint32_t bank = io->first + ((selected - io->first) / 0x20000u) * 0x20000u;
     reserved.first = bank + 0x104u;
     reserved.end = bank + 0x20000u;
+    if (attempted_slot)
+        *attempted_slot = selected;
     return hpclang_rpl_flash_append(&reserved, selected, record, bytes);
+}
+
+int hpclang_rpl_flash_discard_record(const struct hpclang_rpl_flash_io *io, uint32_t address,
+                                     const uint8_t *record, uint32_t bytes)
+{
+    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
+        address < io->first || address >= io->end || !valid_record(record, bytes) ||
+        bytes >= io->end - address)
+        return HPCLANG_RPL_FLASH_INVALID;
+    const uint8_t deleted = 0;
+    if (!write_bytes(io, address + 1u, record + 1u, 3u) || !write_bytes(io, address, &deleted, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
 int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t address,
@@ -208,8 +223,7 @@ int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t add
     /* The reserved extent is known even if its original programming failed.
      * Finish it before publishing a native tombstone. This also discards a
      * status write that completed but whose acknowledgement/readback failed. */
-    const uint8_t deleted = 0;
-    if (!write_bytes(io, address + 1u, record + 1u, 3u) || !write_bytes(io, address, &deleted, 1u))
+    if (hpclang_rpl_flash_discard_record(io, address, record, bytes))
         return HPCLANG_RPL_FLASH_DIRTY;
     return HPCLANG_RPL_FLASH_FAILED;
 }

@@ -8,6 +8,8 @@
 #include "rpl-backup.h"
 #include "rpl-port-mutation.h"
 #include "rpl-stock-memory.h"
+#include "rpl-flash-record.h"
+#include "stock-flash.h"
 
 static int snapshot_read(void *context, uint32_t offset, uint8_t *value)
 {
@@ -17,7 +19,7 @@ static int snapshot_read(void *context, uint32_t offset, uint8_t *value)
 
 static int mutation_result(int result);
 
-static int writable_port(uint32_t port, int allow_port1)
+static int writable_port(uint32_t port, int allow_create)
 {
     if (port > 2) {
         errno = EINVAL;
@@ -25,13 +27,65 @@ static int writable_port(uint32_t port, int allow_port1)
     }
     const struct hpclang_device_info *device = hpclang_device_info();
     const struct hpclang_boot_info *boot = hpclang_boot_info();
-    if (port == 2 || !device || !boot || !boot->saturn_state ||
-        (port == 1 && (!allow_port1 || device->family != HPCLANG_FAMILY_HP4950)) ||
+    if (!device || !boot || !boot->saturn_state ||
+        (port > 0 && (!allow_create || device->family != HPCLANG_FAMILY_HP4950)) ||
         (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950)) {
         errno = ENOSYS;
         return -1;
     }
     return 0;
+}
+
+struct packed_backup
+{
+    const uint8_t *data;
+    uint32_t span;
+};
+
+static int packed_read(void *context, uint32_t offset, uint8_t *value)
+{
+    const struct packed_backup *source = context;
+    if (offset >= source->span)
+        return 0;
+    *value = (source->data[offset / 2u] >> ((offset & 1u) * 4u)) & 15u;
+    return 1;
+}
+
+static int create_flash_backup(const uint8_t *packed, uint32_t span)
+{
+    struct packed_backup source = {packed, span};
+    const struct hpclang_rpl_reader reader = {packed_read, &source};
+    uint8_t *record = NULL;
+    uint32_t bytes;
+    int result = hpclang_rpl_flash_backup_record(&reader, 0, span, &record, &bytes);
+    if (result) {
+        errno = result == HPCLANG_RPL_BACKUP_NOMEM  ? ENOMEM
+                : result == HPCLANG_RPL_SPAN_BOUNDS ? ENOSPC
+                                                    : EILSEQ;
+        return -1;
+    }
+    result = hpclang_stock_flash_create_backup(record, bytes);
+    free(record);
+    switch (result) {
+    case HPCLANG_RPL_FLASH_WRITTEN:
+        return 0;
+    case HPCLANG_RPL_FLASH_EXISTS:
+        errno = EEXIST;
+        break;
+    case HPCLANG_RPL_FLASH_NOSPACE:
+        errno = ENOSPC;
+        break;
+    case HPCLANG_RPL_FLASH_UNSUPPORTED:
+        errno = ENOSYS;
+        break;
+    case HPCLANG_RPL_FLASH_FAILED:
+        errno = EIO;
+        break;
+    default:
+        errno = EILSEQ;
+        break;
+    }
+    return -1;
 }
 
 static int write_backup(uint32_t port, const uint8_t *name, uint32_t name_length,
@@ -51,6 +105,11 @@ static int write_backup(uint32_t port, const uint8_t *name, uint32_t name_length
     if (result) {
         errno = result == HPCLANG_RPL_BACKUP_NOMEM ? ENOMEM : EILSEQ;
         return -1;
+    }
+    if (port == 2) {
+        result = create_flash_backup(packed, span);
+        free(packed);
+        return result;
     }
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;

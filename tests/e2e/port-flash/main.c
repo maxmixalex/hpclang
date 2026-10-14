@@ -247,22 +247,28 @@ int main(void)
         saved_sector[i + 1u] = (uint8_t)(word >> 8u);
     }
     failure = 27;
-    if (hpclang_stock_flash_create_backup(native_record, sizeof native_record) !=
-        HPCLANG_RPL_FLASH_WRITTEN)
+    struct hpclang_object *source = NULL;
+    if (hpclang_object_create_integer_i64(987, &source))
+        goto done;
+    int created = hpclang_port_backup_create(2, (const uint8_t *)"FLASHONE", 8, source);
+    hpclang_object_release(source);
+    if (created)
         goto done;
     failure = 28;
     object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
     if (!object)
         goto done;
     valid = !hpclang_object_integer_i64(object, &value) && value == 987;
-    hpclang_object_release(object);
-    if (!valid)
+    if (!valid) {
+        hpclang_object_release(object);
         goto done;
+    }
     committed = fingerprint();
     failure = 29;
-    if (hpclang_stock_flash_create_backup(native_record, sizeof native_record) !=
-            HPCLANG_RPL_FLASH_EXISTS ||
-        fingerprint() != committed || l1[0] != original[0] || l1[1] != original[1])
+    created = hpclang_port_backup_create(2, (const uint8_t *)"FLASHONE", 8, object);
+    hpclang_object_release(object);
+    if (created != -1 || errno != EEXIST || fingerprint() != committed || l1[0] != original[0] ||
+        l1[1] != original[1])
         goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||

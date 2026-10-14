@@ -93,12 +93,18 @@ queries preserve `errno` and do not read hardware or allocate resources.
 | --- | --- | --- |
 | 0, main RAM | HP48gII, HP49g+, HP50g | Enumerate, read backups/libraries, create/replace/remove backups |
 | 1, extended RAM | HP49g+, HP50g | Enumerate, read backups/libraries, create backups |
-| 2, Flash | HP49g+, HP50g | Enumerate, read backups/libraries |
+| 2, Flash | HP49g+, HP50g | Enumerate, read backups/libraries, create backups |
 
 Port 0 mutations require valid launcher bounds; Port 1 creation requires the
 newer ERAM ownership extension. A zero free prefix still permits the operation
 to be queried as available: the eventual allocation reports `ENOSPC`. Queries
 do not guarantee valid live mappings, intact data or safe library relocation.
+Port 2 creation checks all six native banks for duplicate names and invalid
+contents before appending into an erased tail. It does not reclaim deleted
+records; insufficient tail space returns `ENOSPC`. A returned write error has
+completed native deleted-slot cleanup. A persistently busy or unrepairable
+Flash chip retains RAM execution rather than returning an unsafe chain to Stock.
+Power-loss/restart recovery and Port 2 replacement/removal remain unfinished.
 HP39 Aplet storage is a separate service, not a native Port 0/1/2 namespace.
 
 Host regression tests cover all six models, absent contexts, invalid portal
@@ -804,7 +810,7 @@ HPGCC 1.1 exposes about fifty `saturn.h` functions plus 29 `satdir.h` functions.
 | --- | --- | --- |
 | `struct hpclang_object` | ✅ opaque owned snapshot | ARM-side immutable copy of a proven-bounded native object; no Saturn pointer escapes the runtime |
 | `hpclang_catalog_list/get/put/remove()` | M7.3j accepted (`6a7f9a28`) | HP39 Stock Program/Note text catalogs; owned names and body snapshots, create/replace/upsert modes, native compilation/editor record maintenance. Names are 1–19 calculator bytes; Program `Editline` is protected. These are distinct from Aplet Variables and HOME directories. |
-| Port 0 / Port 1 / Port 2 | 🧪 M8.0 in progress | Port 0 metadata enumeration and owned backup/library reads have local Stock coverage on the three classic models. `hpclang_port_iterator_open/read/close`, `hpclang_port_backup_get` and `hpclang_port_library_get` expose no native addresses. `hpclang_port_backup_create/replace/remove` provide exact-name backup mutation; the grow/shrink/read/remove flow passes local Stock tests on HP48gII, HP49g+ and HP50g. Live references retain the old record; operations requiring relocation of a preceding library return `ENOTSUP`. A three-launch backup lifecycle also passes locally on all three classic models. HP49g+/HP50g Stock also passes Port 1 enumeration and backup readback across all three launches; owned library reads have host coverage. Port 1 backup creation also passes both models across relaunches and independent native RPL recall, using launcher-owned memory bounds. Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g Stock across all three launches, including absence of natively purged backups. Public library mutation, Port 1 replacement/removal and Port 2 writes remain pending. HOME CRUD does not imply port support. |
+| Port 0 / Port 1 / Port 2 | 🧪 M8.0 in progress | Port 0 metadata enumeration and owned backup/library reads have local Stock coverage on the three classic models. `hpclang_port_iterator_open/read/close`, `hpclang_port_backup_get` and `hpclang_port_library_get` expose no native addresses. `hpclang_port_backup_create/replace/remove` provide exact-name backup mutation; the grow/shrink/read/remove flow passes local Stock tests on HP48gII, HP49g+ and HP50g. Live references retain the old record; operations requiring relocation of a preceding library return `ENOTSUP`. A three-launch backup lifecycle also passes locally on all three classic models. HP49g+/HP50g Stock also passes Port 1 enumeration and backup readback across all three launches; owned library reads have host coverage. Port 1 backup creation also passes both models across relaunches and independent native RPL recall, using launcher-owned memory bounds. Port 2 owned enumeration and backup/library reads now pass HP49g+ and HP50g Stock across all three launches, including absence of natively purged backups. Port 2 backup creation is implemented with whole-port preflight and synchronous failed-slot cleanup. Public library mutation, Port 1 replacement/removal, and Port 2 replacement/removal and reclamation remain pending. HOME CRUD does not imply port support. |
 | `hpclang_object_kind()` / `release()` | ✅ | Stable coarse semantic class and explicit ARM-side lifetime |
 | `hpclang_object_create_character()` | ✅ | Construct an owned calculator CHARACTER object without exposing its native prologue |
 | `hpclang_object_create_string()` | ✅ | Construct an owned classic calculator DOCSTR from explicit-length raw calculator bytes; embedded zero bytes are preserved and no UTF-8 transcoding occurs |
