@@ -14,6 +14,9 @@ function(hpclang_unit name)
     add_test(NAME ${name} COMMAND test_${name})
 endfunction()
 
+hpclang_unit(sst_flash test_sst_flash.c "${HPCLANG_ROOT}/runtime/core/sst-flash.c")
+target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")
