@@ -50,8 +50,9 @@ and Port 2 writes remain unavailable).
 Host tests cover operation selection and rejected writes for all three port
 indices using simulated service capabilities. The separate `notebook-backup`
 Stock fixture verifies Port 0 create, restore without changing the primary save,
-replacement, and removal across three launches. Its first HP48gII ROM-emulator
-run passes. The UI fixture separately checks primary persistence and pixels;
+replacement, and removal across three launches. HP48gII and HP50g ROM-emulator
+runs pass. The UI fixture separately checks primary persistence and pixels,
+including all three HP39g+ launches with the model-specific build;
 this example does not establish completion of M8.6.
 
 ## Build resources

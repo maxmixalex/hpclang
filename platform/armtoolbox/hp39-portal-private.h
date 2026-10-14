@@ -37,10 +37,10 @@
 #define HP39P_REQUEST_NAME_LEN 232
 #define HP39P_EXPECTED_PROLOGUE 236
 #define HP39P_STACK 240
-/* Request serialization is nonrecursive. Reserve headroom above the measured
- * prepare -> request
- * -> operation writer call chain of the pinned ARM compiler. */
-#define HP39P_STACK_SIZE 384
+/* Request serialization is nonrecursive. Thumb/Oz preparation uses a 248-byte
+ * frame plus nested writers and compiler helpers. Keep headroom for that chain
+ * and the checked guard; the former ARM-only 384-byte budget is insufficient. */
+#define HP39P_STACK_SIZE 512
 #define HP39P_STACK_GUARD_SIZE 32
 #define HP39P_STACK_END (HP39P_STACK + HP39P_STACK_SIZE)
 
