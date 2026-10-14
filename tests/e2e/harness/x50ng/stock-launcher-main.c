@@ -116,6 +116,8 @@ KEY_PAIR(views, HP4950_KEY_L);
 KEY_PAIR(mode, HP4950_KEY_H);
 KEY_PAIR(var, HP4950_KEY_J);
 KEY_PAIR(eval, HP4950_KEY_N);
+KEY_PAIR(letter_p, HP4950_KEY_P);
+KEY_PAIR(alpha, HP4950_KEY_ALPHA);
 KEY_PAIR(nxt, HP4950_KEY_L);
 KEY_PAIR(neg, HP4950_KEY_W);
 KEY_PAIR(up, HP4950_KEY_UP);
@@ -140,12 +142,13 @@ struct key_pair_ref
 
 #define KEY_REF(name) {#name, &name##_down, &name##_up}
 static const struct key_pair_ref key_pairs[] = {
-    KEY_REF(f1),     KEY_REF(f2),    KEY_REF(f3),    KEY_REF(f4),     KEY_REF(f5),
-    KEY_REF(f6),     KEY_REF(files), KEY_REF(symb),  KEY_REF(plot),   KEY_REF(num),
-    KEY_REF(home),   KEY_REF(aplet), KEY_REF(views), KEY_REF(mode),   KEY_REF(var),
-    KEY_REF(eval),   KEY_REF(nxt),   KEY_REF(neg),   KEY_REF(up),     KEY_REF(down),
-    KEY_REF(left),   KEY_REF(right), KEY_REF(zero),  KEY_REF(two),    KEY_REF(sto),
-    KEY_REF(period), KEY_REF(enter), KEY_REF(on),    KEY_REF(lshift), KEY_REF(rshift),
+    KEY_REF(f1),       KEY_REF(f2),    KEY_REF(f3),    KEY_REF(f4),     KEY_REF(f5),
+    KEY_REF(f6),       KEY_REF(files), KEY_REF(symb),  KEY_REF(plot),   KEY_REF(num),
+    KEY_REF(home),     KEY_REF(aplet), KEY_REF(views), KEY_REF(mode),   KEY_REF(var),
+    KEY_REF(eval),     KEY_REF(nxt),   KEY_REF(neg),   KEY_REF(up),     KEY_REF(down),
+    KEY_REF(left),     KEY_REF(right), KEY_REF(zero),  KEY_REF(two),    KEY_REF(sto),
+    KEY_REF(period),   KEY_REF(enter), KEY_REF(on),    KEY_REF(lshift), KEY_REF(rshift),
+    KEY_REF(letter_p), KEY_REF(alpha),
 };
 #undef KEY_REF
 

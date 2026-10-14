@@ -1,8 +1,18 @@
 # Resume the saved native system. Recall HPCLANG from HOME and invoke PrRUN
 # through the already installed ARMToolbox; do not transfer or reinstall it.
+# Enter its name using the printed Alpha legends. New variables may move the
+# application away from F1 in the VAR menu.
 0 monitor 90000
-2000 tap var
-4000 tap f1
-6000 chord rshift two
-8500 tap f1
-11000 tap f1
+1000 tap on
+2000 chord alpha mode
+3000 chord alpha letter_p
+4000 chord alpha f3
+5000 chord alpha nxt
+6000 chord alpha f1
+7000 chord alpha eval
+8000 chord alpha files
+9000 tap enter
+11000 capture recalled-by-name
+12000 chord rshift two
+14500 tap f1
+17000 tap f1
