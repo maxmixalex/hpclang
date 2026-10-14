@@ -30,8 +30,21 @@ enum hpclang_sst_result
     HPCLANG_SST_INVALID,
     HPCLANG_SST_NEEDS_ERASE,
     HPCLANG_SST_BUSY,
-    HPCLANG_SST_VERIFY
+    HPCLANG_SST_VERIFY,
+    HPCLANG_SST_UNSUPPORTED
 };
+
+struct hpclang_sst_device
+{
+    uint32_t bytes, sector_bytes, block_bytes;
+    uint16_t manufacturer, product;
+};
+
+/* Probe only on a board already known to use the SST command protocol.
+ * Same RAM/mapping/interrupt ownership requirements as programming apply.
+ * Always exits identification/query mode; output is cleared on failure.
+ * Currently validates the SST39VF1601/1602/3201/3202 data sheet family. */
+int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_device *device);
 
 int hpclang_sst_program_word(const struct hpclang_sst_bus *bus,
                              const struct hpclang_sst_region *region, uint32_t address,

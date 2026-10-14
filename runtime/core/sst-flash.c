@@ -21,6 +21,67 @@ static void unlock(const struct hpclang_sst_bus *bus, uint16_t command)
     bus->write16(bus->context, 0xaaaau, command);
 }
 
+static void mode_delay(const struct hpclang_sst_bus *bus)
+{
+    /* Two ticks guarantee a full microsecond even at a timer tick boundary;
+     * S71223 requires 150 ns for software ID access and exit. */
+    uint32_t start = bus->time_us(bus->context);
+    while ((uint32_t)(bus->time_us(bus->context) - start) < 2u) {
+    }
+}
+
+static uint16_t query(const struct hpclang_sst_bus *bus, uint32_t word)
+{
+    return bus->read16(bus->context, word * 2u);
+}
+
+int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_device *device)
+{
+    if (!device)
+        return HPCLANG_SST_INVALID;
+    *device = (struct hpclang_sst_device){0};
+    if (!bus || !bus->read16 || !bus->write16 || !bus->time_us)
+        return HPCLANG_SST_INVALID;
+    unlock(bus, 0x90u);
+    mode_delay(bus);
+    uint16_t manufacturer = query(bus, 0);
+    uint16_t product = query(bus, 1);
+    bus->write16(bus->context, 0, 0xf0u);
+    mode_delay(bus);
+    uint32_t exponent;
+    if (manufacturer != 0xbfu)
+        return HPCLANG_SST_UNSUPPORTED;
+    switch (product) {
+    case 0x234au:
+    case 0x234bu:
+        exponent = 21;
+        break;
+    case 0x235au:
+    case 0x235bu:
+        exponent = 22;
+        break;
+    default:
+        return HPCLANG_SST_UNSUPPORTED;
+    }
+    unlock(bus, 0x98u);
+    mode_delay(bus);
+    /* SST S71223 tables 7, 9 and 10: these are two alternative erase
+     * granularities over the WHOLE chip, not two consecutive regions. */
+    int matches = query(bus, 0x10) == 'Q' && query(bus, 0x11) == 'R' && query(bus, 0x12) == 'Y' &&
+                  query(bus, 0x13) == 1 && query(bus, 0x14) == 7 && query(bus, 0x27) == exponent &&
+                  query(bus, 0x28) == 1 && query(bus, 0x29) == 0 && query(bus, 0x2c) == 2 &&
+                  query(bus, 0x2d) == 0xff && query(bus, 0x2e) == ((1u << (exponent - 20)) - 1u) &&
+                  query(bus, 0x2f) == 0x10 && query(bus, 0x30) == 0 &&
+                  query(bus, 0x31) == ((1u << (exponent - 16)) - 1u) && query(bus, 0x32) == 0 &&
+                  query(bus, 0x33) == 0 && query(bus, 0x34) == 1;
+    bus->write16(bus->context, 0, 0xf0u);
+    mode_delay(bus);
+    if (!matches)
+        return HPCLANG_SST_UNSUPPORTED;
+    *device = (struct hpclang_sst_device){1u << exponent, 4096, 65536, manufacturer, product};
+    return HPCLANG_SST_OK;
+}
+
 static int wait_ready(const struct hpclang_sst_bus *bus, uint32_t address, uint32_t timeout)
 {
     uint32_t start = bus->time_us(bus->context);

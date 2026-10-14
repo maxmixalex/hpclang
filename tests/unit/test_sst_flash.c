@@ -89,8 +89,113 @@ static void reset(uint8_t fill)
     memset(chip.memory, fill, sizeof chip.memory);
 }
 
+struct identification
+{
+    uint16_t manufacturer, product, cfi[0x35];
+    unsigned mode, step, writes;
+    uint32_t clock;
+};
+
+static uint16_t id_read(void *context, uint32_t address)
+{
+    struct identification *id = context;
+    assert(!(address & 1u));
+    if (id->mode == 0x90) {
+        assert(address == 0 || address == 2);
+        return address ? id->product : id->manufacturer;
+    }
+    assert(id->mode == 0x98 && address / 2 < 0x35);
+    return id->cfi[address / 2];
+}
+
+static void id_write(void *context, uint32_t address, uint16_t value)
+{
+    struct identification *id = context;
+    ++id->writes;
+    if (value == 0xf0) {
+        assert(id->mode && !id->step && address == 0);
+        id->mode = 0;
+        return;
+    }
+    assert(!id->mode);
+    if (id->step == 0)
+        assert(address == 0xaaaa && value == 0xaa);
+    else if (id->step == 1)
+        assert(address == 0x5554 && value == 0x55);
+    else {
+        assert(address == 0xaaaa && (value == 0x90 || value == 0x98));
+        id->mode = value;
+    }
+    id->step = (id->step + 1) % 3;
+}
+
+static uint32_t id_time(void *context)
+{
+    return ((struct identification *)context)->clock++;
+}
+
+static void test_identification(void)
+{
+    /* Literal 2 MiB query data from S71223 table 9. */
+    struct identification good = {.manufacturer = 0xbf,
+                                  .product = 0x234b,
+                                  .cfi = {[0x10] = 'Q',
+                                          [0x11] = 'R',
+                                          [0x12] = 'Y',
+                                          [0x13] = 1,
+                                          [0x14] = 7,
+                                          [0x27] = 0x15,
+                                          [0x28] = 1,
+                                          [0x2c] = 2,
+                                          [0x2d] = 0xff,
+                                          [0x2e] = 1,
+                                          [0x2f] = 0x10,
+                                          [0x31] = 0x1f,
+                                          [0x34] = 1},
+                                  .clock = UINT32_MAX};
+    struct identification id = good;
+    struct hpclang_sst_bus probe = {&id, id_read, id_write, id_time};
+    struct hpclang_sst_device device;
+    const uint16_t products[] = {0x234a, 0x234b, 0x235a, 0x235b};
+    for (unsigned i = 0; i < 4; ++i) {
+        id = good;
+        id.product = products[i];
+        if (i >= 2) {
+            id.cfi[0x27] = 0x16;
+            id.cfi[0x2e] = 3;
+            id.cfi[0x31] = 0x3f;
+        }
+        assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_OK);
+        assert(!id.mode && !id.step && id.writes == 8);
+        assert(device.product == products[i] && device.manufacturer == 0xbf);
+        assert(device.bytes == (i < 2 ? 2097152u : 4194304u));
+        assert(device.sector_bytes == 4096 && device.block_bytes == 65536);
+    }
+    const unsigned fields[] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x27, 0x28, 0x29, 0x2c,
+                               0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34};
+    for (unsigned i = 0; i < sizeof fields / sizeof fields[0]; ++i) {
+        id = good;
+        id.cfi[fields[i]] ^= 0x20;
+        memset(&device, 0xff, sizeof device);
+        assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
+        assert(!id.mode && id.writes == 8);
+        assert(!device.bytes && !device.product && !device.manufacturer);
+    }
+    id = good;
+    id.manufacturer = 1;
+    assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
+    assert(!id.mode && id.writes == 4);
+    id = good;
+    id.product = 0x2782; /* Old chip needs its own documented identification path. */
+    assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
+    assert(!id.mode && id.writes == 4);
+    assert(hpclang_sst_identify(NULL, &device) == HPCLANG_SST_INVALID);
+    assert(hpclang_sst_identify(&probe, NULL) == HPCLANG_SST_INVALID);
+}
+
 int main(void)
 {
+    test_identification();
     reset(0xff);
     chip.clock = UINT32_MAX - 2u;
     assert(hpclang_sst_program_word(&bus, &region, FIRST + 2, 0x1234, 20) == HPCLANG_SST_OK);
