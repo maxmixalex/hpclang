@@ -475,7 +475,9 @@ The internal SST command engine now identifies documented chip/CFI geometry,
 excludes firmware addresses from programming/erasure, and owns uncached Flash
 mappings until the chip is ready. Its isolated physical write/erase fixture
 passes local HP49g+/HP50g Stock and normal return, with byte-for-byte unchanged
-Flash images afterward; all 92 host targets pass. Native Port 2 object writes,
+Flash images afterward; all 93 host targets pass. Native backup record encoding
+also matches Stock bytes and passes local HP49g+/HP50g native RCL/PURGE/STO
+interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,
 full-media behavior and failure/recovery acceptance remain unfinished. The
 fixture does not establish real-hardware cache or NOR timing behavior.
 The HP48gII three-launch regression also passes, preserving `ENOSYS` for its

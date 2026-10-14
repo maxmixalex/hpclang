@@ -55,6 +55,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/saturn-view.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-object-span.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-backup.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-flash-record.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rpl-port.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/sst-flash.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/stock-flash.c"

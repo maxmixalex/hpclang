@@ -17,6 +17,13 @@ endfunction()
 hpclang_unit(sst_flash test_sst_flash.c "${HPCLANG_ROOT}/runtime/core/sst-flash.c")
 target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_flash_record test_rpl_flash_record.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_flash_record PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")
