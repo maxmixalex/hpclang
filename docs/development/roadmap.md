@@ -471,6 +471,13 @@ Stock across all three lifecycle launches. The backend validates the live
 Flash mapping and bank identities, and uses a separate slot iterator that skips
 native deletion markers. Host tests cover cross-bank reads and snapshot
 ownership. Port 2 writes and library mutation remain open.
+The internal SST command engine now identifies documented chip/CFI geometry,
+excludes firmware addresses from programming/erasure, and owns uncached Flash
+mappings until the chip is ready. Its isolated physical write/erase fixture
+passes local HP49g+/HP50g Stock and normal return, with byte-for-byte unchanged
+Flash images afterward; all 92 host targets pass. Native Port 2 object writes,
+full-media behavior and failure/recovery acceptance remain unfinished. The
+fixture does not establish real-hardware cache or NOR timing behavior.
 The HP48gII three-launch regression also passes, preserving `ENOSYS` for its
 unavailable Port 1/2 services. All 85 host tests, focused sanitizers, Clang
 analysis and strict documentation checks pass for this read-service batch.

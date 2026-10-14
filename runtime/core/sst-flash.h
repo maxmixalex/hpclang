@@ -43,8 +43,13 @@ struct hpclang_sst_device
 /* Probe only on a board already known to use the SST command protocol.
  * Same RAM/mapping/interrupt ownership requirements as programming apply.
  * Always exits identification/query mode; output is cleared on failure.
- * Currently validates the SST39VF1601/1602/3201/3202 data sheet family. */
+ * Validates SST39LF/VF160 and SST39VF1601/1602/3201/3202 data sheet families. */
 int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_device *device);
+
+/* Continue polling a previously issued operation without sending commands.
+ * Ownership must remain held while this returns BUSY. */
+int hpclang_sst_wait_ready(const struct hpclang_sst_bus *bus, uint32_t address,
+                           uint32_t timeout_us);
 
 int hpclang_sst_program_word(const struct hpclang_sst_bus *bus,
                              const struct hpclang_sst_region *region, uint32_t address,

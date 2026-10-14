@@ -4,6 +4,8 @@
  * References: SST S72006 application note and S71223 command/status tables.
  * https://ww1.microchip.com/downloads/cn/AppNotes/cn550978.pdf
  * https://ww1.microchip.com/downloads/en/DeviceDoc/S71223_.pdf
+ * Legacy SST39LF/VF160: SST S71145-04-000 (manufacturer data sheet mirror)
+ * https://www.mouser.com/datasheet/2/268/40280-1180206.pdf
  */
 static int valid(const struct hpclang_sst_bus *bus, const struct hpclang_sst_region *region,
                  uint32_t address, uint32_t timeout)
@@ -52,6 +54,7 @@ int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_d
     if (manufacturer != 0xbfu)
         return HPCLANG_SST_UNSUPPORTED;
     switch (product) {
+    case 0x2782u:
     case 0x234au:
     case 0x234bu:
         exponent = 21;
@@ -67,13 +70,19 @@ int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_d
     mode_delay(bus);
     /* SST S71223 tables 7, 9 and 10: these are two alternative erase
      * granularities over the WHOLE chip, not two consecutive regions. */
+    uint16_t blocks = query(bus, 0x31);
+    uint16_t expected_blocks = (uint16_t)((1u << (exponent - 16)) - 1u);
+    /* S71145 table 7 lists 003F at 31H but describes 32 blocks (001F).
+     * Accept either encoding only for that identified legacy part. Capacity
+     * and the supported 4 KiB erases are validated independently below;
+     * this contradictory block count never determines an address bound. */
+    int block_count_matches = blocks == expected_blocks || (product == 0x2782u && blocks == 0x3fu);
     int matches = query(bus, 0x10) == 'Q' && query(bus, 0x11) == 'R' && query(bus, 0x12) == 'Y' &&
                   query(bus, 0x13) == 1 && query(bus, 0x14) == 7 && query(bus, 0x27) == exponent &&
                   query(bus, 0x28) == 1 && query(bus, 0x29) == 0 && query(bus, 0x2c) == 2 &&
                   query(bus, 0x2d) == 0xff && query(bus, 0x2e) == ((1u << (exponent - 20)) - 1u) &&
-                  query(bus, 0x2f) == 0x10 && query(bus, 0x30) == 0 &&
-                  query(bus, 0x31) == ((1u << (exponent - 16)) - 1u) && query(bus, 0x32) == 0 &&
-                  query(bus, 0x33) == 0 && query(bus, 0x34) == 1;
+                  query(bus, 0x2f) == 0x10 && query(bus, 0x30) == 0 && block_count_matches &&
+                  query(bus, 0x32) == 0 && query(bus, 0x33) == 0 && query(bus, 0x34) == 1;
     bus->write16(bus->context, 0, 0xf0u);
     mode_delay(bus);
     if (!matches)
@@ -82,8 +91,10 @@ int hpclang_sst_identify(const struct hpclang_sst_bus *bus, struct hpclang_sst_d
     return HPCLANG_SST_OK;
 }
 
-static int wait_ready(const struct hpclang_sst_bus *bus, uint32_t address, uint32_t timeout)
+int hpclang_sst_wait_ready(const struct hpclang_sst_bus *bus, uint32_t address, uint32_t timeout)
 {
+    if (!bus || !bus->read16 || !bus->time_us || (address & 1u) || !timeout || timeout > INT32_MAX)
+        return HPCLANG_SST_INVALID;
     uint32_t start = bus->time_us(bus->context);
     for (;;) {
         uint16_t first = bus->read16(bus->context, address);
@@ -108,7 +119,7 @@ int hpclang_sst_program_word(const struct hpclang_sst_bus *bus,
         return HPCLANG_SST_NEEDS_ERASE;
     unlock(bus, 0xa0u);
     bus->write16(bus->context, address, value);
-    int result = wait_ready(bus, address, timeout_us);
+    int result = hpclang_sst_wait_ready(bus, address, timeout_us);
     if (result != HPCLANG_SST_OK)
         return result;
     return bus->read16(bus->context, address) == value ? HPCLANG_SST_OK : HPCLANG_SST_VERIFY;
@@ -126,7 +137,7 @@ int hpclang_sst_erase_sector(const struct hpclang_sst_bus *bus,
     bus->write16(bus->context, 0xaaaau, 0xaau);
     bus->write16(bus->context, 0x5554u, 0x55u);
     bus->write16(bus->context, address, 0x30u);
-    int result = wait_ready(bus, address, timeout_us);
+    int result = hpclang_sst_wait_ready(bus, address, timeout_us);
     if (result != HPCLANG_SST_OK)
         return result;
     for (uint32_t offset = 0; offset < region->sector_bytes; offset += 2u)

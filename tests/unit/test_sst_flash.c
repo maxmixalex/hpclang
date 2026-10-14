@@ -186,7 +186,21 @@ static void test_identification(void)
     assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
     assert(!id.mode && id.writes == 4);
     id = good;
-    id.product = 0x2782; /* Old chip needs its own documented identification path. */
+    id.product = 0x2782;
+    assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_OK);
+    assert(device.bytes == 2097152 && !id.mode);
+    id = good;
+    id.product = 0x2782;
+    id.cfi[0x31] = 0x3f; /* Literal S71145 table 7, also emulated by x50ng. */
+    assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_OK);
+    assert(device.bytes == 2097152 && device.sector_bytes == 4096 && !id.mode);
+    id = good;
+    id.product = 0x2782;
+    id.cfi[0x2e] = 3; /* The inconsistent block field cannot enlarge capacity. */
+    assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
+    assert(!id.mode && !device.bytes);
+    id = good;
+    id.product = 0xffff;
     assert(hpclang_sst_identify(&probe, &device) == HPCLANG_SST_UNSUPPORTED);
     assert(!id.mode && id.writes == 4);
     assert(hpclang_sst_identify(NULL, &device) == HPCLANG_SST_INVALID);
@@ -236,10 +250,19 @@ int main(void)
     assert(hpclang_sst_program_word(&bus, &region, FIRST, 0, 3) == HPCLANG_SST_BUSY);
     /* No reset/abort writes after timeout: SST may still be programming. */
     assert(chip.count == 4 && chip.active && chip.memory[0] == UINT16_MAX);
+    chip.stuck = 0;
+    assert(hpclang_sst_wait_ready(&bus, FIRST, 20) == HPCLANG_SST_OK);
+    assert(chip.count == 4 && !chip.active && chip.memory[0] == 0);
     reset(0);
     chip.stuck = 1;
     assert(hpclang_sst_erase_sector(&bus, &region, FIRST, 3) == HPCLANG_SST_BUSY);
     assert(chip.count == 6 && chip.active);
+    chip.stuck = 0;
+    assert(hpclang_sst_wait_ready(&bus, FIRST, 20) == HPCLANG_SST_OK);
+    assert(chip.count == 6 && !chip.active && chip.memory[0] == UINT16_MAX);
+    assert(hpclang_sst_wait_ready(NULL, FIRST, 20) == HPCLANG_SST_INVALID);
+    assert(hpclang_sst_wait_ready(&bus, FIRST + 1, 20) == HPCLANG_SST_INVALID);
+    assert(hpclang_sst_wait_ready(&bus, FIRST, 0) == HPCLANG_SST_INVALID);
 
     reset(0xff);
     chip.faulty = 1;
