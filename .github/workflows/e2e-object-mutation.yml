@@ -138,9 +138,12 @@ jobs:
           retention-days: 1
           path: |
             build/e2e/*/*/e2e.hpc
+            build/e2e/*/*/e2e.elf
             build/e2e/*/*/e2e.result-address
             build/e2e/*/*/e2e.stock-*.json
             build/e2e/*/*/launchers/*.bin
+            build/e2e/*/*/launchers/*.elf
+            build/e2e/*/*/launchers/objects/stage1.elf
             build/e2e/*/*/launchers/*.hp
             build/e2e/*/*/stock-fixtures/*.hp
           if-no-files-found: error
@@ -288,4 +291,16 @@ jobs:
             build/*-summary.png
             build/${{ matrix.mode }}-${{ matrix.family }}-targets.txt
             build/e2e/${{ matrix.suite }}/${{ matrix.family }}/e2e.hpc
+            build/e2e/${{ matrix.suite }}/${{ matrix.family }}/e2e.elf
+            build/e2e/${{ matrix.suite }}/${{ matrix.family }}/launchers/*.elf
+            build/e2e/${{ matrix.suite }}/${{ matrix.family }}/launchers/objects/stage1.elf
+      - name: Upload failed Stock RAM
+        if: failure() && matrix.mode == 'stock'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}-${{ matrix.suite }}-failure-ram
+          retention-days: 14
+          path: |
+            build/*-state/sram
+            build/*-state/s3c2410-sram
           if-no-files-found: warn
