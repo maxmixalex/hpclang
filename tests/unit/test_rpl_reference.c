@@ -6,12 +6,20 @@ struct image
 {
     uint8_t data[128];
     uint32_t size, fail;
+    uint32_t home;
+    int expose_home;
 };
 
 static int read_nibble(void *context, uint32_t at, uint8_t *value)
 {
     struct image *image = context;
-    if (at >= image->size || at == image->fail)
+    if (at == image->fail)
+        return 0;
+    if (image->expose_home && at >= 0x80711 && at < 0x80716) {
+        *value = (image->home >> (4 * (at - 0x80711))) & 15;
+        return 1;
+    }
+    if (at >= image->size)
         return 0;
     *value = image->data[at];
     return 1;
@@ -220,11 +228,85 @@ static void native_envelopes(void)
     assert(edges.count == 0);
 }
 
+static void directories(void)
+{
+    struct image image = {.size = 87, .fail = UINT32_MAX, .home = 0, .expose_home = 1};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put(&image, 0, 0x2a96, 5);
+    put(&image, 5, 1, 3);
+    put(&image, 8, 275, 3);
+    put(&image, 11, 0x865d2, 5);
+    put(&image, 16, 0, 5);
+    put(&image, 21, 49, 5); // Newest null-name entry at 70.
+    put(&image, 26, 0, 5);
+    put(&image, 31, 1, 2);
+    put(&image, 33, 'A', 2);
+    put(&image, 35, 1, 2);
+    put(&image, 37, 0x29bf, 5);
+    put(&image, 42, 'B', 2);
+    put(&image, 65, 34, 5); // Older item at 31.
+    put(&image, 70, 0, 2);
+    put(&image, 72, 0x2d9d, 5);
+    put(&image, 77, 0x81234, 5);
+    put(&image, 82, 0x312b, 5);
+    struct image original = image;
+    struct edges edges = {0};
+    assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) == 0);
+    assert(edges.count == 3);
+    assert(edges.items[0].kind == HPCLANG_RPL_REFERENCE_ATTACHMENT && edges.items[0].field == 11 &&
+           edges.items[0].target == 0x865d2 && edges.items[0].auxiliary == 275 &&
+           edges.items[0].extent == 0);
+    assert(edges.items[1].kind == HPCLANG_RPL_REFERENCE_INLINE && edges.items[1].target == 72 &&
+           edges.items[1].extent == 15);
+    assert(edges.items[2].kind == HPCLANG_RPL_REFERENCE_INLINE && edges.items[2].target == 37 &&
+           edges.items[2].extent == 7);
+    assert(memcmp(&image, &original, sizeof image) == 0);
+    const uint32_t reads[] = {0, 5, 8, 11, 16, 21, 70, 72, 77, 82, 65, 31, 33, 35, 37, 0x80711};
+    for (unsigned i = 0; i < sizeof reads / sizeof reads[0]; ++i) {
+        image.fail = reads[i];
+        edges.count = 0;
+        assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) < 0);
+    }
+    image = original;
+    edges = (struct edges){.stop = 79};
+    assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) == 79);
+    assert(edges.count == 1);
+    edges = (struct edges){0};
+    put(&image, 37, 0x2a2c, 5);
+    put(&image, 42, 60, 5); // Older object overlaps the next entry's metadata.
+    assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    image = original;
+    edges.count = 0;
+    put(&image, 31, 255, 2); // A damaged name cannot read outside the directory.
+    assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    image = original;
+    edges.count = 0;
+    put(&image, 65, 44, 5); // A backlink into the chain header is rejected.
+    assert(hpclang_rpl_reference_visit(&reader, 0, image.size, 0, collect, &edges) < 0);
+    image = original;
+    put(&image, 72, 0x2a96, 5);
+    put(&image, 77, 0, 3);
+    put(&image, 80, 0, 5);
+    edges.count = 0;
+    assert(hpclang_rpl_reference_visit(&reader, 72, 13, 0, collect, &edges) == 0);
+    assert(edges.count == 0);
+    put(&image, 77, 0x7ff, 3);
+    assert(hpclang_rpl_reference_visit(&reader, 72, 13, 0, collect, &edges) == 0);
+    assert(edges.count == 0);
+    put(&image, 77, 1, 3);
+    assert(hpclang_rpl_reference_visit(&reader, 72, 13, 0, collect, &edges) == 0);
+    assert(edges.count == 1 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_OPAQUE &&
+           edges.items[0].target == 77 && edges.items[0].extent == 3);
+}
+
 int main(void)
 {
     nested_array();
     indices_and_opaque();
     linked_aliases();
     native_envelopes();
+    directories();
     return 0;
 }

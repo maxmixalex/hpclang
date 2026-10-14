@@ -734,7 +734,17 @@ reports opaque code/binary/directory objects rather than certifying them empty.
 The actual C path matches the 16 native library-275 edges and saved Flash/ERAM
 ACPTRs, and expands 74 compact bodies from the existing ROM graph. All 96 host
 targets, focused sanitizers and ARM analysis pass. Opaque cases, complete
-directory/execution traversal and production guard integration remain unfinished.
+directory/execution traversal and production guard integration remain unfinished
+at that checkpoint.
+
+Directory traversal now supplies bounded named children and both HOME library
+attachment pointers, with library IDs preserved. The source-confirmed `7FF`
+child-directory marker is recognized; other nonzero headers remain opaque.
+All 96 host tests, focused sanitizers and ARM analysis pass. The native HP50g
+HOME graph matches all 20 attachment pointers and exposes 21 ACPTR edges,
+including ERAM. Its 148 unsupported nodes and opaque code/binary objects still
+prevent a complete safety claim; executable references and the production
+mutation guard remain open.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and

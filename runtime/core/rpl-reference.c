@@ -1,6 +1,7 @@
 #include "rpl-reference.h"
 #include "rpl-backup.h"
 #include "rpl-port.h"
+#include "rpl-object-store.h"
 #include <stddef.h>
 
 struct traversal
@@ -50,6 +51,100 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned c
     return 0;
 }
 
+struct directory_reader
+{
+    const struct hpclang_rpl_reader *source;
+    uint32_t first, end, home;
+    int outside;
+};
+
+static int directory_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct directory_reader *view = context;
+    /* Cursor validation also reads USEROB and HOME's prologue. These two
+     * fixed metadata reads do not authorize following links outside the node. */
+    if ((address >= view->first && address < view->end) ||
+        (address >= 0x80711 && address < 0x80716) ||
+        (address >= view->home && address - view->home < 5))
+        return view->source->read_nibble(view->source->context, address, value);
+    view->outside = 1;
+    return 0;
+}
+
+static int directory_error(int result, const struct directory_reader *view)
+{
+    if (view->outside || result == HPCLANG_RPL_STORE_LIMIT)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    return result == HPCLANG_RPL_STORE_UNAVAILABLE ? HPCLANG_RPL_SPAN_UNAVAILABLE
+                                                   : HPCLANG_RPL_SPAN_MALFORMED;
+}
+
+static int directory(const struct hpclang_rpl_reader *source, uint32_t address, uint32_t span,
+                     struct traversal *walk)
+{
+    uint32_t home, header;
+    int result = word(source, 0x80711, 5, &home);
+    if (result)
+        return result;
+    struct directory_reader view = {source, address, address + span, home, 0};
+    const struct hpclang_rpl_reader reader = {directory_read, &view};
+    struct hpclang_rpl_directory_cursor cursor;
+    result = hpclang_rpl_directory_cursor_open(&reader, address, &cursor);
+    if (result)
+        return directory_error(result, &view);
+    result = word(&reader, address + 5, 3, &header);
+    if (result)
+        return view.outside ? HPCLANG_RPL_SPAN_BOUNDS : result;
+    if (address == home) {
+        for (uint32_t i = 0; i < header; ++i) {
+            uint32_t record = address + 8 + i * 13, number;
+            result = word(&reader, record, 3, &number);
+            if (result)
+                return view.outside ? HPCLANG_RPL_SPAN_BOUNDS : result;
+            for (uint32_t offset = 3; offset <= 8; offset += 5) {
+                uint32_t target;
+                result = word(&reader, record + offset, 5, &target);
+                if (result)
+                    return view.outside ? HPCLANG_RPL_SPAN_BOUNDS : result;
+                if (target) {
+                    result = emit(walk, HPCLANG_RPL_REFERENCE_ATTACHMENT, record + offset, target,
+                                  0, number);
+                    if (result)
+                        return result;
+                }
+            }
+        }
+    } else if (header && header != 0x7ff) {
+        /* HPGCC3's empty-directory constructor writes 7FF here; the native
+         * saved subdirectories use the same marker. Other metadata remains
+         * explicit pending work, rather than an assumed pointer-free header. */
+        result = emit(walk, HPCLANG_RPL_REFERENCE_OPAQUE, address + 5, address + 5, 3, 0x2a96);
+        if (result)
+            return result;
+    }
+    uint32_t boundary = address + span;
+    while (!cursor.finished) {
+        uint32_t item = cursor.item;
+        struct hpclang_rpl_directory_entry_view entry;
+        result = hpclang_rpl_directory_cursor_next(&reader, &cursor, &entry);
+        if (result != 1)
+            return directory_error(result, &view);
+        if (entry.object_address < address || entry.object_address >= boundary)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t child_span;
+        result = hpclang_rpl_object_span(&reader, entry.object_address,
+                                         boundary - entry.object_address, &child_span);
+        if (result)
+            return view.outside ? HPCLANG_RPL_SPAN_BOUNDS : result;
+        result = emit(walk, HPCLANG_RPL_REFERENCE_INLINE, entry.object_address,
+                      entry.object_address, child_span, 0);
+        if (result)
+            return result;
+        boundary = item - 5;
+    }
+    return 0;
+}
+
 struct compact_reader
 {
     const struct hpclang_rpl_reader *source;
@@ -96,6 +191,8 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *source, uint32_
         return result;
     struct traversal walk = {visit, context};
     switch (prologue) {
+    case 0x2a96:
+        return directory(reader, address, span, &walk);
     case 0x2b62: {
         struct hpclang_rpl_backup_view backup;
         result = hpclang_rpl_backup_view(reader, address, span, &backup);

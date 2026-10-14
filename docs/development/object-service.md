@@ -879,11 +879,20 @@ The caller must retain the reader's bank identity and perform mapping lookup.
 The dispatcher does not recursively dereference targets or allocate graph
 storage. A caller schedules children, bounds work and tracks visited nodes.
 
-Machine code, binary data and directories produce explicit opaque events;
+Directories expose bounded named children and both pointer fields in each HOME
+library attachment, retaining the library number as provenance. Child spans
+cannot overlap the next entry's metadata. Non-HOME header values other than
+zero and the source-confirmed `7FF` marker produce explicit opaque events.
+The saved HP50g HOME scan matches all 20 nonzero attachment pointers and finds
+21 ACPTR edges, including the known ERAM reference.
+
+Machine code and binary data produce explicit opaque events;
 recognized but unsupported formats still fail. Opaque events are pending work,
 not proof that an object contains no references. Callers discard partial events
 after errors. Native checks match all 16 library-275 edges and their bounds,
 Flash ACPTRs before/after PURGE on HP49g+/HP50g and the saved HP50g ERAM ACPTR.
 The saved ROM graph also expands 74 compact array bodies through this C path;
 314 code objects and 10 binary objects remain explicit opaque cases. Complete
-directory/execution traversal and the production mutation guard remain open.
+execution traversal and the production mutation guard remain open. The HOME
+scan still encounters 148 unsupported nodes; successful directory decoding
+alone does not establish that reclamation is safe.

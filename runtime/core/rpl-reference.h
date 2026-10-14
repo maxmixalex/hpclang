@@ -11,7 +11,8 @@ enum hpclang_rpl_reference_kind
     HPCLANG_RPL_REFERENCE_ACPTR,
     HPCLANG_RPL_REFERENCE_ROMP,
     HPCLANG_RPL_REFERENCE_FLASHP,
-    HPCLANG_RPL_REFERENCE_OPAQUE
+    HPCLANG_RPL_REFERENCE_OPAQUE,
+    HPCLANG_RPL_REFERENCE_ATTACHMENT
 };
 
 struct hpclang_rpl_reference
@@ -32,8 +33,11 @@ struct hpclang_rpl_reference
  * ACPTR: target is the stored Saturn address; auxiliary is its bank switch.
  * ROMP: target/auxiliary are library/command indices.
  * FLASHP: target/auxiliary are logical selector/index (not physical banks).
+ * ATTACHMENT: target is a HOME attached-library pointer, auxiliary its library
+ * ID. extent is zero; bank qualification happens after reading the target.
  * OPAQUE: target/extent bound an unexpanded object; auxiliary is its prologue.
- * Opaque code, binary data and directories require their own semantic traversal;
+ * Opaque code, binary data and unrecognized child-directory header metadata require
+ * their own semantic traversal;
  * a caller must never treat an OPAQUE event as absence of references.
  * All addresses retain the input reader's mapping. No target is dereferenced.
  * The callback is read-only; keep mappings stable and discard partial results

@@ -287,6 +287,7 @@ hpclang_unit(rpl_reference test_rpl_reference.c
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-store.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_reference PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
