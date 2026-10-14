@@ -151,8 +151,7 @@ jobs:
           path: |
             build/e2e/*/e2e.hpc
             build/e2e/*/e2e.result-address
-            build/e2e/*/e2e.stock-lifecycle.json
-            build/e2e/*/e2e.stock-media.json
+            build/e2e/*/e2e.stock-*.json
             build/e2e/*/launchers/*.bin
             build/e2e/*/launchers/*.hp
           if-no-files-found: error
@@ -419,6 +418,7 @@ jobs:
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
+            build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json
           if-no-files-found: warn
 
   publish-evidence:
