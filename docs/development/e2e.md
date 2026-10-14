@@ -113,7 +113,10 @@ focused payloads through the shared Direct/Stock family harness:
   followed by a second recovery that must leave Flash unchanged.
   A native backup append after recovery uses an independent Stock record capture, verifies
   its value through the public read API, rejects occupied/cross-bank writes,
-  and restores the saved bank-prefix sector. It requires an unused bank in the
+  and restores the saved bank-prefix sector. A separate completed-body fixture with partial status `73`
+  is committed against the retained expected record, read through the public
+  API, and committed again without changing Flash. Both fixture phases restore
+  their original bank-prefix sector. The test requires an unused bank in a
   disposable emulator image and checks the complete Flash fingerprint before
   returning to Stock. This covers internal physical and append primitives;
   public Port create/replace/delete and power-loss recovery remain separate

@@ -29,4 +29,8 @@ int hpclang_stock_flash_append(uint32_t address, const uint8_t *record, uint32_t
  * Uses the recovery result/ownership contract from rpl-flash-write.h. */
 int hpclang_stock_flash_recover_tail(uint32_t bank_index);
 
+/* Finish a caller-owned pending commit against its exact expected RAM record.
+ * Same verification/result contract as hpclang_rpl_flash_finish_commit. */
+int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, uint32_t bytes);
+
 #endif

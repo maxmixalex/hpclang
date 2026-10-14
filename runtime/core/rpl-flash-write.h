@@ -46,4 +46,15 @@ int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t add
 int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32_t first,
                                    uint32_t end);
 
+/* Finish a known backup commit after interruption/uncertain acknowledgement.
+ * The caller retains the exact expected record and owns this reserved slot.
+ * Validate that complete record, compare every stored body/padding byte, and
+ * accept only status bits compatible with programming 53. Only the status
+ * byte may change. WRITTEN includes an already completed commit; FAILED means
+ * a preflight read failed without mutation; DIRTY means mismatched contents or
+ * an unverified status write. This does not infer transaction intent from a
+ * damaged bank: restart integration must supply durable expected contents. */
+int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint32_t address,
+                                    const uint8_t *record, uint32_t bytes);
+
 #endif

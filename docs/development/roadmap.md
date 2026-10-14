@@ -506,6 +506,18 @@ HP49g+/HP50g Stock tests pass recovery followed by backup append/public read,
 repeat recovery without changes, normal return and byte-for-byte Flash restoration.
 This handles an FF-marked interrupted body; partially published status bytes,
 restart integration and power-loss transaction guarantees remain unfinished.
+For a caller-owned pending backup with retained expected bytes, an internal
+commit-finishing primitive validates the expected record and compares every
+stored body/padding byte before completing the status. It accepts only status
+bits reachable on the way to native `53`, changes no body bytes, and supports
+an already completed commit. Host tests cover all 256 starting status bytes,
+every partial status-write mask, read failures, mismatched bodies and repeated
+completion. This requires known transaction intent; it does not classify an
+unknown damaged record or establish automatic recovery after restart.
+HP49g+/HP50g Stock acceptance completes a retained backup from status `73`,
+reads integer 987 through the public API, repeats completion without mutation,
+returns normally and restores the whole Flash image byte-for-byte. All 94 host
+targets, focused sanitizers and ARM static analysis pass for this primitive.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,

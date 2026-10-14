@@ -162,8 +162,74 @@ static void recovery(void)
     }
 }
 
+static void finish_commit(void)
+{
+    struct chip chip;
+    const struct hpclang_rpl_flash_io io = {&chip, read16, program16, 0, sizeof chip.data};
+    for (uint32_t slot = 32; slot <= 33; ++slot) {
+        for (unsigned status = 0; status <= 255; ++status) {
+            init(&chip, slot);
+            memcpy(chip.data + slot, record, sizeof record);
+            chip.data[slot] = (uint8_t)status;
+            uint8_t before[sizeof chip.data];
+            memcpy(before, chip.data, sizeof before);
+            int result = hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record);
+            if ((status & 0x53u) == 0x53u) {
+                assert(!result && chip.data[slot] == 0x53u);
+                unsigned writes = chip.writes;
+                assert(!hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record));
+                assert(chip.writes == writes);
+            } else {
+                assert(result == HPCLANG_RPL_FLASH_DIRTY && !chip.writes);
+                assert(chip.data[slot] == status);
+            }
+            assert(!memcmp(chip.data, before, slot));
+            assert(
+                !memcmp(chip.data + slot + 1u, before + slot + 1u, sizeof chip.data - slot - 1u));
+        }
+        init(&chip, slot);
+        memcpy(chip.data + slot + 1u, record + 1u, sizeof record - 1u);
+        struct chip pending = chip;
+        assert(!hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record));
+        unsigned reads = chip.reads;
+        for (unsigned cut = 0; cut < reads; ++cut) {
+            chip = pending;
+            chip.fail_read = cut;
+            int result = hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record);
+            assert(result == HPCLANG_RPL_FLASH_FAILED || result == HPCLANG_RPL_FLASH_DIRTY);
+            chip.fail_read = UINT32_MAX;
+            assert(!hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record));
+        }
+        for (unsigned mask = 0; mask < 256; ++mask) {
+            chip = pending;
+            chip.fail_write = 0;
+            chip.partial = (uint16_t)(mask << ((slot & 1u) * 8u));
+            assert(hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record) ==
+                   HPCLANG_RPL_FLASH_DIRTY);
+            chip.fail_write = UINT32_MAX;
+            assert(!hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record));
+            assert(!memcmp(chip.data + slot, record, sizeof record));
+        }
+        for (unsigned at = 1; at < sizeof record; ++at) {
+            chip = pending;
+            chip.data[slot + at] ^= 1;
+            assert(hpclang_rpl_flash_finish_commit(&io, slot, record, sizeof record) ==
+                   HPCLANG_RPL_FLASH_DIRTY);
+            assert(!chip.writes);
+        }
+        chip = pending;
+        uint8_t bad[sizeof record];
+        memcpy(bad, record, sizeof bad);
+        bad[30] ^= 1;
+        assert(hpclang_rpl_flash_finish_commit(&io, slot, bad, sizeof bad) ==
+               HPCLANG_RPL_FLASH_INVALID);
+        assert(!chip.reads && !chip.writes);
+    }
+}
+
 int main(void)
 {
+    finish_commit();
     recovery();
     struct chip chip;
     const struct hpclang_rpl_flash_io io = {&chip, read16, program16, 0, sizeof chip.data};

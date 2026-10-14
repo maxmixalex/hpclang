@@ -195,6 +195,38 @@ int main(void)
         hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) != HPCLANG_SST_OK ||
         fingerprint() != before || l1[0] != original[0] || l1[1] != original[1])
         goto done;
+    /* Recreate a completed body whose final status write stopped at 73.
+     * The expected record remains in RAM; finishing must only change 73->53. */
+    block[0] = saved_sector[0x104u];
+    for (uint32_t i = 0; i < sizeof native_record; ++i)
+        block[i + 1u] = native_record[i];
+    block[1] = 0x73;
+    block[sizeof native_record + 1u] = 0xff;
+    failure = 22;
+    if (hpclang_stock_flash_program(bank + 0x104u, block, sizeof native_record + 2u) !=
+            HPCLANG_SST_OK ||
+        hpclang_stock_flash_finish_commit(bank + 0x105u, native_record, sizeof native_record) !=
+            HPCLANG_RPL_FLASH_WRITTEN)
+        goto done;
+    failure = 23;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 987;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
+    failure = 24;
+    uint32_t committed = fingerprint();
+    if (hpclang_stock_flash_finish_commit(bank + 0x105u, native_record, sizeof native_record) !=
+            HPCLANG_RPL_FLASH_WRITTEN ||
+        fingerprint() != committed || l1[0] != original[0] || l1[1] != original[1])
+        goto done;
+    failure = 25;
+    if (hpclang_stock_flash_erase_sector(bank) != HPCLANG_SST_OK ||
+        hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) != HPCLANG_SST_OK ||
+        fingerprint() != before)
+        goto done;
     failure = 0;
 done:
     hpclang_e2e_result = failure ? UINT32_C(0x46410000) | failure : UINT32_C(0x50415353);

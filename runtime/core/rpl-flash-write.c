@@ -69,6 +69,25 @@ struct recovery_reader
     uint32_t first;
 };
 
+int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint32_t address,
+                                    const uint8_t *record, uint32_t bytes)
+{
+    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
+        address < io->first || address >= io->end || !valid_record(record, bytes) ||
+        bytes >= io->end - address)
+        return HPCLANG_RPL_FLASH_INVALID;
+    for (uint32_t offset = 0; offset < bytes; ++offset) {
+        uint16_t word;
+        if (!io->read16(io->context, (address + offset) & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        uint8_t value = (uint8_t)(word >> (((address + offset) & 1u) * 8u));
+        if (offset ? value != record[offset] : (value & record[0]) != record[0])
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return write_bytes(io, address, record, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
+                                                : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 static int io_nibble(void *context, uint32_t address, uint8_t *value)
 {
     const struct recovery_reader *reader = context;
