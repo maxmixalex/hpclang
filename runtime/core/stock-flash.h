@@ -25,4 +25,8 @@ int hpclang_stock_flash_erase_sector(uint32_t address);
  * A DIRTY result requires recovery before allowing native Flash mutation. */
 int hpclang_stock_flash_append(uint32_t address, const uint8_t *record, uint32_t bytes);
 
+/* Recover the FF-marked tail of a caller-validated native user bank (0..5).
+ * Uses the recovery result/ownership contract from rpl-flash-write.h. */
+int hpclang_stock_flash_recover_tail(uint32_t bank_index);
+
 #endif

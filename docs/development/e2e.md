@@ -109,7 +109,9 @@ focused payloads through the shared Direct/Stock family harness:
   checks cover complete-range preflight, bounds, identical rewrites and untouched
   neighbors. The native tail scan validates existing records, refuses data left
   behind an erased end marker, and recognizes free space again after erasure.
-  A native backup append uses an independent Stock record capture, verifies
+  A deliberately interrupted body is recovered into a deleted allocation,
+  followed by a second recovery that must leave Flash unchanged.
+  A native backup append after recovery uses an independent Stock record capture, verifies
   its value through the public read API, rejects occupied/cross-bank writes,
   and restores the saved bank-prefix sector. It requires an unused bank in the
   disposable emulator image and checks the complete Flash fingerprint before

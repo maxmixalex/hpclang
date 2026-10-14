@@ -1,5 +1,6 @@
 #include "rpl-flash-write.h"
 #include "rpl-port.h"
+#include "rpl-flash-record.h"
 #include <assert.h>
 #include <string.h>
 
@@ -10,6 +11,7 @@ static const uint8_t record[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
 struct chip
 {
     uint8_t data[160];
+    uint32_t base;
     unsigned reads, writes, fail_read, fail_write;
     uint16_t partial;
     int persistent, silent;
@@ -18,6 +20,8 @@ struct chip
 static int read16(void *context, uint32_t at, uint16_t *value)
 {
     struct chip *chip = context;
+    assert(at >= chip->base);
+    at -= chip->base;
     assert(!(at & 1u) && at + 1u < sizeof chip->data);
     if (chip->reads++ == chip->fail_read)
         return 0;
@@ -28,6 +32,8 @@ static int read16(void *context, uint32_t at, uint16_t *value)
 static int program16(void *context, uint32_t at, uint16_t value)
 {
     struct chip *chip = context;
+    assert(at >= chip->base);
+    at -= chip->base;
     assert(!(at & 1u) && at + 1u < sizeof chip->data);
     uint16_t old = (uint16_t)(chip->data[at] | (uint16_t)chip->data[at + 1u] << 8u);
     assert((old & value) == value);
@@ -70,8 +76,95 @@ static void verify_failed(struct chip *chip, uint32_t slot, const uint8_t *befor
     assert(chip->data[slot] == 0 || !memcmp(chip->data, before, sizeof chip->data));
 }
 
+static void recovery(void)
+{
+    for (uint32_t first = 16; first <= 17; ++first) {
+        struct chip chip;
+        const struct hpclang_rpl_flash_io io = {&chip, read16, program16, 0, sizeof chip.data};
+        uint32_t slot = first + sizeof record;
+        /* A live predecessor must survive recovery of every interrupted body
+         * bit, including interruptions before the length field is complete. */
+        for (unsigned bits = 0; bits <= (sizeof record - 1u) * 8u; ++bits) {
+            init(&chip, first);
+            memset(chip.data + first, 0xff, sizeof chip.data - first);
+            memcpy(chip.data + first, record, sizeof record);
+            for (unsigned bit = 0; bit < bits; ++bit)
+                chip.data[slot + 1u + bit / 8u] &=
+                    (uint8_t)(record[1u + bit / 8u] | ~(1u << (bit & 7u)));
+            uint8_t before[sizeof chip.data];
+            memcpy(before, chip.data, sizeof before);
+            assert(hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data) == 0);
+            assert(!memcmp(chip.data, before, slot));
+            assert(
+                !memcmp(chip.data + slot + 4u, before + slot + 4u, sizeof chip.data - slot - 4u));
+            struct hpclang_rpl_reader reader = {nibble, &chip};
+            struct hpclang_rpl_flash_space space;
+            assert(!hpclang_rpl_flash_tail(&reader, first * 2u, sizeof chip.data * 2u, &space));
+            unsigned writes = chip.writes;
+            assert(!hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data));
+            assert(chip.writes == writes);
+        }
+        /* A sparse interrupted body forces recovery to program an extent.
+         * All read failures must fail closed; all program cuts must preserve
+         * the preceding live object and bytes outside the recovery header. */
+        init(&chip, first);
+        memset(chip.data + first, 0xff, sizeof chip.data - first);
+        memcpy(chip.data + first, record, sizeof record);
+        chip.data[slot + 20u] = 0;
+        struct chip original = chip;
+        /* Physical NOR addresses exceed the native reader's coordinate space. */
+        const uint32_t bases[] = {0x140000u, 0x1e0000u, 0xffffff00u};
+        for (unsigned i = 0; i < sizeof bases / sizeof bases[0]; ++i) {
+            chip = original;
+            chip.base = bases[i];
+            struct hpclang_rpl_flash_io mapped = io;
+            mapped.first += chip.base;
+            mapped.end += chip.base;
+            assert(!hpclang_rpl_flash_recover_tail(&mapped, chip.base + first, mapped.end));
+            assert(!memcmp(chip.data, original.data, slot));
+            assert(chip.data[slot] == 0);
+        }
+        chip = original;
+        assert(!hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data));
+        unsigned reads = chip.reads, writes = chip.writes;
+        for (unsigned cut = 0; cut < reads; ++cut) {
+            chip = original;
+            chip.fail_read = cut;
+            assert(hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data) ==
+                   HPCLANG_RPL_FLASH_DIRTY);
+            assert(!memcmp(chip.data, original.data, slot));
+        }
+        for (unsigned cut = 0; cut < writes; ++cut) {
+            const uint16_t masks[] = {0, 0x5555, 0xaaaa, 0xffff};
+            for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask) {
+                chip = original;
+                chip.fail_write = cut;
+                chip.partial = masks[mask];
+                assert(hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data) ==
+                       HPCLANG_RPL_FLASH_DIRTY);
+                assert(!memcmp(chip.data, original.data, slot));
+                assert(!memcmp(chip.data + slot + 4u, original.data + slot + 4u,
+                               sizeof chip.data - slot - 4u));
+                /* Retry is safe after interrupted extent writes. A partially
+                 * written status is intentionally outside this primitive. */
+                chip.fail_write = UINT32_MAX;
+                if (chip.data[slot] == 0xff || chip.data[slot] == 0)
+                    assert(!hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data));
+            }
+        }
+        chip = original;
+        chip.data[slot] = 0x7f;
+        assert(hpclang_rpl_flash_recover_tail(&io, first, sizeof chip.data) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!chip.writes);
+        assert(hpclang_rpl_flash_recover_tail(&io, first, first) == HPCLANG_RPL_FLASH_INVALID);
+        assert(hpclang_rpl_flash_recover_tail(&io, first, UINT32_MAX) == HPCLANG_RPL_FLASH_INVALID);
+    }
+}
+
 int main(void)
 {
+    recovery();
     struct chip chip;
     const struct hpclang_rpl_flash_io io = {&chip, read16, program16, 0, sizeof chip.data};
     for (uint32_t slot = 32; slot <= 33; ++slot) {

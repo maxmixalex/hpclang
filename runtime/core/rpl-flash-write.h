@@ -34,4 +34,16 @@ enum hpclang_rpl_flash_write_result
 int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t address,
                              const uint8_t *record, uint32_t bytes);
 
+/* Recover an interrupted body behind an erased FF end marker. first/end are
+ * byte bounds of one caller-validated bank's allocation chain, excluding its
+ * header. Validate all preceding records, finish a NOR-compatible extent and
+ * verify it before publishing status 00. Preserve all other bytes. Returns
+ * WRITTEN for a clean or recovered tail, INVALID for bad arguments, DIRTY if
+ * recovery cannot be verified. DIRTY must not be exposed to native STO.
+ * Own the mapping/exclude writers throughout. No erase or space reclamation;
+ * unknown/partially programmed status bytes are rejected without mutation.
+ * This is a recovery primitive, not a complete power-loss transaction. */
+int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32_t first,
+                                   uint32_t end);
+
 #endif

@@ -1,5 +1,6 @@
 #include "rpl-flash-write.h"
 #include "rpl-backup.h"
+#include "rpl-flash-record.h"
 
 struct packed_record
 {
@@ -60,6 +61,55 @@ static int write_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, 
             return 0;
     }
     return 1;
+}
+
+struct recovery_reader
+{
+    const struct hpclang_rpl_flash_io *io;
+    uint32_t first;
+};
+
+static int io_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const struct recovery_reader *reader = context;
+    const struct hpclang_rpl_flash_io *io = reader->io;
+    uint32_t byte = reader->first + address / 2u;
+    uint16_t word;
+    if (byte < io->first || byte >= io->end || !io->read16(io->context, byte & ~1u, &word))
+        return 0;
+    *value = (uint8_t)((word >> (((byte & 1u) * 2u + (address & 1u)) * 4u)) & 15u);
+    return 1;
+}
+
+int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32_t first,
+                                   uint32_t end)
+{
+    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) || first < io->first ||
+        end > io->end || first >= end || end - first > 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    /* Native readers use 20-bit nibble coordinates. Translate physical Flash
+     * addresses to a bounded local origin, preserving odd-byte alignment. */
+    struct recovery_reader reader_io = {io, first};
+    const struct hpclang_rpl_reader reader = {io_nibble, &reader_io};
+    struct hpclang_rpl_flash_discard plan;
+    int result = hpclang_rpl_flash_discard_plan(&reader, 0, (end - first) * 2u, &plan);
+    if (result < 0)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    if (!result)
+        return HPCLANG_RPL_FLASH_WRITTEN;
+    uint8_t metadata;
+    if (!io_nibble(&reader_io, plan.address + 7u, &metadata))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t header[] = {(uint8_t)plan.extent, (uint8_t)(plan.extent >> 8u),
+                        (uint8_t)((plan.extent >> 16u) | (uint32_t)metadata << 4u)};
+    const uint8_t deleted = 0;
+    if (!write_bytes(io, first + plan.address / 2u + 1u, header, sizeof header) ||
+        !write_bytes(io, first + plan.address / 2u, &deleted, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct hpclang_rpl_flash_space space;
+    return hpclang_rpl_flash_tail(&reader, 0, (end - first) * 2u, &space)
+               ? HPCLANG_RPL_FLASH_DIRTY
+               : HPCLANG_RPL_FLASH_WRITTEN;
 }
 
 int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t address,

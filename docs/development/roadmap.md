@@ -497,6 +497,15 @@ Both byte alignments, partial writes, silent write failures and each read-failur
 position pass host fault injection. All 94 host targets pass. The Stock backend
 holds one mapping lease and rejects firmware, bank headers and cross-bank records.
 Public Port mutation integration and restart recovery remain open.
+An internal recovery executor now applies the dirty-tail plan under one Stock
+mapping lease, verifies the extent before publishing the deleted status, and
+rescans the resulting chain. It preserves live predecessors and rejects unknown
+status bytes without mutation. Host tests cover every interrupted body bit,
+each recovery read/write failure, partial writes and idempotent recovery.
+HP49g+/HP50g Stock tests pass recovery followed by backup append/public read,
+repeat recovery without changes, normal return and byte-for-byte Flash restoration.
+This handles an FF-marked interrupted body; partially published status bytes,
+restart integration and power-loss transaction guarantees remain unfinished.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,

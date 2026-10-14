@@ -26,6 +26,7 @@ target_include_directories(test_rpl_flash_record PRIVATE "${HPCLANG_ROOT}/runtim
 
 hpclang_unit(rpl_flash_write test_rpl_flash_write.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
