@@ -15,8 +15,17 @@ def font_rows(source: Path) -> dict:
     return glyphs
 
 
-def check_line(pixels: bytes, glyphs: dict, top: int, text: str, path: Path) -> None:
+def check_line(
+    pixels: bytes, glyphs: dict, top: int, text: str, path: Path, *, focused: bool = False
+) -> None:
     expected = bytearray([255] * (131 * 6))
+    if focused:
+        # The third launch initially focuses the editor. Its six-row content
+        # has a one-pixel outline and the caret follows the last character.
+        for row in range(6):
+            for column in range(131):
+                if row in (0, 5) or column in (0, 130):
+                    expected[row * 131 + column] = 0
     origin = 0
     for character in text:
         x, y, width, height, advance, stride, data = glyphs[ord(character)]
@@ -27,6 +36,9 @@ def check_line(pixels: bytes, glyphs: dict, top: int, text: str, path: Path) -> 
                     if 0 <= px < 131 and 0 <= py < 6:
                         expected[py * 131 + px] = 0
         origin += advance
+    if focused and origin < 131:
+        for row in range(6):
+            expected[row * 131 + origin] = 0
     actual = bytes(
         pixels[row * 131 + column] for row in range(top, top + 6) for column in range(131)
     )
@@ -50,7 +62,7 @@ def verify(build: Path, target: str, height: int, source: Path) -> None:
         assert frame.startswith(header) and len(frame) == len(header) + 131 * height
         pixels = frame[len(header) :]
         for top, line in ((0, "Notebook"), (16, "Alpha to type"), (24, text), (32, status)):
-            check_line(pixels, glyphs, top, line, path)
+            check_line(pixels, glyphs, top, line, path, focused=index == 3 and top == 24)
     print(f"PASS: {target}: notebook content across three Stock launches")
 
 
