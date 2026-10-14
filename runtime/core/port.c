@@ -38,7 +38,7 @@ int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
         result.implemented = reads;
         if (port == 0)
             result.implemented |= HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP |
-                                  HPCLANG_PORT_REMOVE_BACKUP;
+                                  HPCLANG_PORT_REMOVE_BACKUP | HPCLANG_PORT_CREATE_LIBRARY;
         else
             result.implemented |= HPCLANG_PORT_CREATE_BACKUP;
         if (port == 2)

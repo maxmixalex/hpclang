@@ -452,13 +452,22 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 Local implementation now includes Port 0 backup create, variable-size replace
 and remove, with owned reads and preservation of live references to old records.
 The native library table participates in reference scanning. Library record
-creation is internal and does not register or attach a library. Existing-library
+creation was initially internal and does not register or attach a library. Existing-library
 relocation, public library mutation, Port 1 replacement/removal and Port 2 writes remain unfinished. The 85 host
 tests and focused mutation/port sanitizer tests pass. The public grow/shrink/
 read/remove flow passes Stock on HP48gII, HP49g+ and HP50g. All three also pass
 a three-launch lifecycle: create an integer, return/relaunch and replace it
 with a string, then return/relaunch and verify/remove the string. No reinstall
 or calculator reset occurs between launches. These results do not close M8.0.
+The subsequent public `hpclang_port_library_create` entry now exposes Port 0
+record creation from an owned library snapshot, with a separate capability bit,
+CRC validation and duplicate-ID refusal. All 96 host tests, focused sanitizers
+and ARM analysis pass. The independent `port-library` E2E passes both launches
+on HP48gII, HP49g+ and HP50g: native RCL reads the record between launches, the
+owned witness matches, duplicate creation is refused and Stock return settles.
+HP48 uses its own L275 installation order in the setup contract. Formal CI for
+this addition is pending. Registration, attachment,
+library replacement/removal and relocation remain separate unfinished work.
 Port 1 enumeration and owned backup/library reads are implemented for HP49g+
 and HP50g; native-RPL-created backup enumeration/readback passes Stock on both
 models across the three-launch Port 0 lifecycle. Port 1 backup creation now

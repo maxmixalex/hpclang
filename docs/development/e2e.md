@@ -104,6 +104,11 @@ focused payloads through the shared Direct/Stock family harness:
   three launches on HP48gII/HP49g+/HP50g, without the UI renderer's allocation.
 - `notebook-export`: Stock-only native save and UTF-8 file export on HP49g+/HP50g,
   with a second launch checking persistence and exclusive-create refusal.
+- `port-library`: Stock-only Port 0 creation of a minimal CRC-valid library,
+  exact owned readback and duplicate-ID refusal on the three classic models.
+  Before a second launch, native RPL recalls the stored library into HOME;
+  the application checks that independent witness against the input encoding.
+  This verifies record storage and persistence, not registration or execution.
 - `port-flash`: Stock-only SST identification, mapping restoration, bounded
   physical word/block programming and sector erasure on HP49g+/HP50g. Block
   checks cover complete-range preflight, bounds, identical rewrites and untouched
@@ -141,7 +146,8 @@ requires `mode` and boolean `keyboard`, with optional `verifier`, `contexts`
 (`direct`/`stock`), `families` and `build` (`universal`/`model`). Defaults preserve
 both execution contexts and all families. The generated matrices select only
 eligible profiles and pair every job with its own payload and Stock assets.
-Lifecycle JSON travels with the application artifact. The build helper accepts
+All Stock setup, lifecycle and media JSON travels with the application artifact.
+The build helper accepts
 an optional fourth model argument, for example:
 `tools/build-e2e.sh notebook build/notebook-39 hp39 hp39gplus`.
 

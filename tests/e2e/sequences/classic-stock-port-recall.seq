@@ -1,4 +1,4 @@
-# Execute HPCA's native Port 2 RCL witness before independently launching HPCLANG.
+# Execute HPCA's native port RCL witness before independently launching HPCLANG.
 0 monitor 90000
 1000 tap on
 2000 chord alpha mode
@@ -6,7 +6,7 @@
 4000 chord alpha f3
 5000 chord alpha f1
 6000 tap enter
-7000 capture native-flash-recalled
+7000 capture native-port-recalled
 8000 chord alpha mode
 9000 chord alpha letter_p
 10000 chord alpha f3

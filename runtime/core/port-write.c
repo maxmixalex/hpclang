@@ -144,6 +144,24 @@ int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name
     return write_backup(port, name, name_length, value, 0);
 }
 
+int hpclang_port_library_create(uint32_t port, const struct hpclang_object *library)
+{
+    if (!library || library->kind != HPCLANG_OBJECT_LIBRARY) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (writable_port(port, 0))
+        return -1;
+    struct hpclang_rpl_stock_memory memory;
+    struct hpclang_rpl_mutation_io io;
+    if (!hpclang_rpl_stock_mutation_io(&io, &memory)) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return mutation_result(
+        hpclang_rpl_port0_create_library(&io, library->data, library->nibble_count));
+}
+
 int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
                                 const struct hpclang_object *value)
 {

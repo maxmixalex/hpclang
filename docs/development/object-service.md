@@ -637,6 +637,20 @@ using the existing validated USEROB relocation machinery, writes the record,
 then publishes the new port start. Existing port objects and libraries remain
 at their original addresses. Exact duplicate names return `EEXIST`; native
 space exhaustion returns `ENOSPC`. It never replaces an existing backup.
+
+`hpclang_port_library_create(0, snapshot)` uses the same Port 0 space reservation
+to store a complete owned library encoding. It validates the library format and
+CRC before moving memory, rejects a duplicate library number in that port with
+`EEXIST`, and leaves existing library records at their original addresses. The
+input snapshot remains owned by the caller. A non-library value returns `EINVAL`;
+Port 1/2 and unsupported launch contexts return `ENOSYS`. Capability discovery
+reports `HPCLANG_PORT_CREATE_LIBRARY` separately from backup creation.
+This stores a record only: it does not register, attach or execute it. Library
+replacement/removal, active-library lifecycle and relocation remain open.
+The separate `port-library` fixture passes two Stock launches on HP48gII,
+HP49g+ and HP50g, including original-system RCL into HOME between launches,
+byte-for-byte owned readback, duplicate-ID refusal and settled return.
+
 Port 2 creation on HP49g+/HP50g validates all six native banks and duplicate
 names under one exclusive Flash mapping, then appends into erased tail space.
 It preserves existing addresses and does not erase or reclaim deleted slots.

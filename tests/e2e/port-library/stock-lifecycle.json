@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "families": {
+    "hp48": {
+      "initial_phase": "0x4f53d000",
+      "relaunches": [
+        {"sequence": "classic-stock-port-recall.seq", "phase": "0x4f53d001"}
+      ]
+    },
+    "hp4950": {
+      "initial_phase": "0x4f53d000",
+      "relaunches": [
+        {"sequence": "classic-stock-port-recall.seq", "phase": "0x4f53d001"}
+      ]
+    }
+  }
+}

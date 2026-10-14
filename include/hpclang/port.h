@@ -28,7 +28,8 @@ extern "C"
         HPCLANG_PORT_READ_LIBRARY = 1u << 2,
         HPCLANG_PORT_CREATE_BACKUP = 1u << 3,
         HPCLANG_PORT_REPLACE_BACKUP = 1u << 4,
-        HPCLANG_PORT_REMOVE_BACKUP = 1u << 5
+        HPCLANG_PORT_REMOVE_BACKUP = 1u << 5,
+        HPCLANG_PORT_CREATE_LIBRARY = 1u << 6
     };
 
     struct hpclang_port_info
@@ -92,6 +93,15 @@ extern "C"
     /* Copy a complete library encoding by its 12-bit native library number.
      * This does not attach, install or execute the library. */
     struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_number);
+
+    /* Store a complete owned library snapshot in classic Stock Port 0. Its
+     * embedded library number identifies it; an existing number in that port
+     * returns EEXIST. This does not register, attach or execute the library.
+     * Existing port records keep their addresses. Invalid encoding/CRC returns
+     * EILSEQ, insufficient native space ENOSPC, and a non-library value EINVAL.
+     * Other valid ports/contexts return ENOSYS. The caller retains its snapshot.
+     */
+    int hpclang_port_library_create(uint32_t port, const struct hpclang_object *library);
 
     /* Create a new named backup from an owned snapshot. An existing exact name
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port

@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "families": {
+    "hp48": [
+      "HOME \\{171} :0:123 RCL 'HPCWIT' STO \\{187} 'HPCA' STO",
+      "HOME { HPCLANG L275 } ORDER"
+    ],
+    "hp4950": [
+      "HOME \\{171} :0:123 RCL 'HPCWIT' STO \\{187} 'HPCA' STO",
+      "HOME { HPCLANG SETUP } ORDER"
+    ]
+  }
+}

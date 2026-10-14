@@ -18,5 +18,7 @@
   {"mode": "port-flash-remove", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]},
   {"mode": "port-flash-replace", "keyboard": false,
-   "contexts": ["stock"], "families": ["hp4950"]}
+   "contexts": ["stock"], "families": ["hp4950"]},
+  {"mode": "port-library", "keyboard": false,
+   "contexts": ["stock"], "families": ["hp48", "hp4950"]}
 ]

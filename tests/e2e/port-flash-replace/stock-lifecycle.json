@@ -4,8 +4,8 @@
     "hp4950": {
       "initial_phase": "0x4f53c000",
       "relaunches": [
-        {"sequence": "classic-stock-flash-recall.seq", "phase": "0x4f53c001"},
-        {"sequence": "classic-stock-flash-recall.seq", "phase": "0x4f53c002"}
+        {"sequence": "classic-stock-port-recall.seq", "phase": "0x4f53c001"},
+        {"sequence": "classic-stock-port-recall.seq", "phase": "0x4f53c002"}
       ]
     }
   }

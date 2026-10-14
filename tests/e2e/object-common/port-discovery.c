@@ -19,7 +19,7 @@ uint32_t hpclang_e2e_port_discovery(void)
             return 0xe3u;
         uint32_t expected = 0, medium = HPCLANG_PORT_ABSENT;
         if (boot->model >= HPCLANG_MODEL_HP48GII && port == 0) {
-            expected = reads | writes;
+            expected = reads | writes | HPCLANG_PORT_CREATE_LIBRARY;
             medium = HPCLANG_PORT_MAIN_RAM;
         } else if (boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G) {
             expected = reads | HPCLANG_PORT_CREATE_BACKUP;

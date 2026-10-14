@@ -11,6 +11,7 @@
 #include "saturn-view.h"
 #include "rpl-stock-memory.h"
 #include "rpl-flash-write.h"
+#include "object-snapshot.h"
 
 static uint8_t memory[0x100000];
 static int unavailable;
@@ -187,6 +188,7 @@ static void test_discovery(void)
             assert(info.port == port && info.available == 0);
             assert((info.medium != HPCLANG_PORT_ABSENT) == present);
             assert((info.implemented & reads) == (present ? reads : 0));
+            assert(!!(info.implemented & HPCLANG_PORT_CREATE_LIBRARY) == (present && port == 0));
             if (present)
                 assert(info.medium == port + HPCLANG_PORT_MAIN_RAM);
             boot.saturn_state = 1;
@@ -411,7 +413,7 @@ int main(void)
     assert(hpclang_object_kind(object) == HPCLANG_OBJECT_LIBRARY);
     assert(hpclang_object_kind(port1_library) == HPCLANG_OBJECT_LIBRARY);
     hpclang_object_release(port1_library);
-    hpclang_object_release(object);
+    struct hpclang_object *library_snapshot = object;
     fixture();
     object = hpclang_port_backup_get(0, (const uint8_t *)"PORTZERO", 8);
     assert(object);
@@ -475,6 +477,27 @@ int main(void)
            errno == ENOSPC);
     writable = 0;
     assert(hpclang_port_backup_create(0, NULL, 0, object) == -1 && errno == ENOSYS);
+    assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == ENOSYS);
+    writable = 1;
+    assert(hpclang_port_library_create(0, NULL) == -1 && errno == EINVAL);
+    assert(hpclang_port_library_create(0, object) == -1 && errno == EINVAL);
+    assert(hpclang_port_library_create(3, library_snapshot) == -1 && errno == EINVAL);
+    assert(hpclang_port_library_create(1, library_snapshot) == -1 && errno == ENOSYS);
+    assert(hpclang_port_library_create(2, library_snapshot) == -1 && errno == ENOSYS);
+    boot.saturn_state = 0;
+    assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == ENOSYS);
+    boot.saturn_state = 1;
+    library_snapshot->data[21] ^= 1;
+    assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == EILSEQ);
+    library_snapshot->data[21] ^= 1;
+    assert(hpclang_port_library_create(0, library_snapshot) == 0);
+    assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == EEXIST);
+    copy = hpclang_port_library_get(0, 123);
+    assert(copy && copy->nibble_count == library_snapshot->nibble_count);
+    assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));
+    hpclang_object_release(library_snapshot);
+    assert(hpclang_object_kind(copy) == HPCLANG_OBJECT_LIBRARY);
+    hpclang_object_release(copy);
     hpclang_object_release(object);
     return 0;
 }
