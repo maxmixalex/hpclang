@@ -12,6 +12,11 @@ int hpclang_stock_flash_identify(struct hpclang_sst_device *device);
  * These keep mappings/interrupts owned until the chip finishes. A permanently
  * busy chip cannot safely return to Stock and therefore keeps polling in RAM. */
 int hpclang_stock_flash_program_word(uint32_t address, uint16_t value);
+/* Preflight the entire nonempty, halfword-aligned range before programming.
+ * data must remain in RAM for the call. A rejected 0-to-1 transition writes
+ * nothing; a hardware failure can leave a partially programmed range.
+ * This is a physical operation, not an atomic native-object transaction. */
+int hpclang_stock_flash_program(uint32_t address, const uint8_t *data, uint32_t bytes);
 int hpclang_stock_flash_erase_sector(uint32_t address);
 
 #endif

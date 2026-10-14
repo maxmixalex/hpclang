@@ -73,13 +73,9 @@ int hpclang_stock_flash_identify(struct hpclang_sst_device *device)
     return result;
 }
 
-static int mutate(uint32_t address, uint16_t value, int erase)
+static int open_writable_flash(struct flash_owner *owner)
 {
-    if ((address & 1u) || address < user_flash.first || address >= user_flash.end ||
-        (erase && (address & (user_flash.sector_bytes - 1u))))
-        return HPCLANG_SST_INVALID;
-    struct flash_owner owner;
-    int result = open_flash(&owner);
+    int result = open_flash(owner);
     if (result != HPCLANG_SST_OK)
         return result;
     struct hpclang_sst_device device;
@@ -87,31 +83,76 @@ static int mutate(uint32_t address, uint16_t value, int erase)
     if (result == HPCLANG_SST_OK &&
         (device.bytes != user_flash.end || device.sector_bytes != user_flash.sector_bytes))
         result = HPCLANG_SST_UNSUPPORTED;
-    if (result == HPCLANG_SST_OK) {
-        result = erase ? hpclang_sst_erase_sector(&bus, &user_flash, address, 100000u)
-                       : hpclang_sst_program_word(&bus, &user_flash, address, value, 1000u);
-        if (result == HPCLANG_SST_BUSY) {
-            /* F0 cannot abort SST programming/erasure. Retain exclusive RAM
-             * execution until completion, then independently verify the data. */
-            while (hpclang_sst_wait_ready(&bus, address, 100000u) == HPCLANG_SST_BUSY) {
-            }
-            result = HPCLANG_SST_OK;
-            uint32_t bytes = erase ? user_flash.sector_bytes : 2u;
-            for (uint32_t offset = 0; offset < bytes; offset += 2u)
-                if (hpclang_flash_read16(0, address + offset) != value)
-                    result = HPCLANG_SST_VERIFY;
+    if (result != HPCLANG_SST_OK)
+        close_flash(owner);
+    return result;
+}
+
+static int finish_command(int result, uint32_t address, uint16_t value, uint32_t bytes)
+{
+    if (result == HPCLANG_SST_BUSY) {
+        /* F0 cannot abort SST programming/erasure. Retain exclusive RAM
+         * execution until completion, then independently verify the data. */
+        while (hpclang_sst_wait_ready(&bus, address, 100000u) == HPCLANG_SST_BUSY) {
+        }
+        result = HPCLANG_SST_OK;
+        for (uint32_t offset = 0; offset < bytes; offset += 2u)
+            if (hpclang_flash_read16(0, address + offset) != value)
+                result = HPCLANG_SST_VERIFY;
+    }
+    return result;
+}
+
+static uint16_t packed_word(const uint8_t *data)
+{
+    return (uint16_t)((uint16_t)data[0] | (uint16_t)data[1] << 8u);
+}
+
+int hpclang_stock_flash_program(uint32_t address, const uint8_t *data, uint32_t bytes)
+{
+    if (!data || !bytes || ((address | bytes) & 1u) || address < user_flash.first ||
+        address >= user_flash.end || bytes > user_flash.end - address)
+        return HPCLANG_SST_INVALID;
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result;
+    for (uint32_t offset = 0; offset < bytes; offset += 2u) {
+        uint16_t value = packed_word(data + offset);
+        if ((hpclang_flash_read16(0, address + offset) & value) != value) {
+            result = HPCLANG_SST_NEEDS_ERASE;
+            goto done;
         }
     }
+    for (uint32_t offset = 0; offset < bytes; offset += 2u) {
+        uint16_t value = packed_word(data + offset);
+        result = hpclang_sst_program_word(&bus, &user_flash, address + offset, value, 1000u);
+        result = finish_command(result, address + offset, value, 2u);
+        if (result != HPCLANG_SST_OK)
+            break;
+    }
+done:
     close_flash(&owner);
     return result;
 }
 
 int hpclang_stock_flash_program_word(uint32_t address, uint16_t value)
 {
-    return mutate(address, value, 0);
+    const uint8_t data[2] = {(uint8_t)value, (uint8_t)(value >> 8u)};
+    return hpclang_stock_flash_program(address, data, sizeof(data));
 }
 
 int hpclang_stock_flash_erase_sector(uint32_t address)
 {
-    return mutate(address, UINT16_MAX, 1);
+    if (address < user_flash.first || address >= user_flash.end ||
+        (address & (user_flash.sector_bytes - 1u)))
+        return HPCLANG_SST_INVALID;
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result;
+    result = hpclang_sst_erase_sector(&bus, &user_flash, address, 100000u);
+    result = finish_command(result, address, UINT16_MAX, user_flash.sector_bytes);
+    close_flash(&owner);
+    return result;
 }

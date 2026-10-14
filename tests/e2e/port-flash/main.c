@@ -3,6 +3,7 @@
 
 volatile uint32_t hpclang_e2e_result;
 struct hpclang_sst_device hpclang_flash_probe_device;
+static uint8_t block[512];
 
 uint16_t hpclang_flash_read16(void *context, uint32_t address);
 
@@ -74,6 +75,37 @@ int main(void)
         hpclang_flash_read16(0, scratch + 4094u) != 0x5678u)
         goto done;
     failure = 9;
+    const uint8_t conflict[4] = {0, 0, 0xff, 0xff};
+    if (hpclang_stock_flash_program(scratch, conflict, sizeof(conflict)) !=
+            HPCLANG_SST_NEEDS_ERASE ||
+        hpclang_flash_read16(0, scratch) != UINT16_MAX ||
+        hpclang_flash_read16(0, scratch + 2u) != 0x1234u)
+        goto done;
+    failure = 10;
+    if (hpclang_stock_flash_program(0x1ffffeu, conflict, sizeof(conflict)) != HPCLANG_SST_INVALID ||
+        hpclang_stock_flash_program(scratch, conflict, UINT32_MAX - 1u) != HPCLANG_SST_INVALID ||
+        hpclang_stock_flash_program(scratch + 1u, conflict, 2u) != HPCLANG_SST_INVALID ||
+        hpclang_stock_flash_program(scratch, conflict, 3u) != HPCLANG_SST_INVALID ||
+        hpclang_stock_flash_program(scratch, conflict, 0u) != HPCLANG_SST_INVALID ||
+        hpclang_stock_flash_program(scratch, 0, 2u) != HPCLANG_SST_INVALID)
+        goto done;
+    failure = 11;
+    for (uint32_t i = 0; i < sizeof(block); ++i)
+        block[i] = (uint8_t)(i * 37u + 11u);
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        if (hpclang_stock_flash_program(scratch + 16u, block, sizeof(block)) != HPCLANG_SST_OK)
+            goto done;
+        for (uint32_t i = 0; i < sizeof(block); i += 2u)
+            if (hpclang_flash_read16(0, scratch + 16u + i) !=
+                ((uint16_t)block[i] | (uint16_t)block[i + 1u] << 8u))
+                goto done;
+    }
+    failure = 12;
+    if (hpclang_flash_read16(0, scratch + 14u) != UINT16_MAX ||
+        hpclang_flash_read16(0, scratch + 16u + sizeof(block)) != UINT16_MAX ||
+        l1[0] != original[0] || l1[1] != original[1])
+        goto done;
+    failure = 13;
     if (hpclang_stock_flash_erase_sector(scratch) != HPCLANG_SST_OK || fingerprint() != before ||
         l1[0] != original[0] || l1[1] != original[1])
         goto done;

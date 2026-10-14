@@ -105,7 +105,9 @@ focused payloads through the shared Direct/Stock family harness:
 - `notebook-export`: Stock-only native save and UTF-8 file export on HP49g+/HP50g,
   with a second launch checking persistence and exclusive-create refusal.
 - `port-flash`: Stock-only SST identification, mapping restoration, bounded
-  physical word programming and sector erasure on HP49g+/HP50g. It requires
+  physical word/block programming and sector erasure on HP49g+/HP50g. Block
+  checks cover complete-range preflight, bounds, identical rewrites and untouched
+  neighbors. It requires
   an unused bank in the disposable emulator image, restores its erased bytes,
   and checks the complete Flash fingerprint before returning to Stock. This
   tests internal physical primitives, not native Port object mutation or
