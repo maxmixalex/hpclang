@@ -575,7 +575,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 | --- | --- | --- |
 | Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
 | Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup creation pass local Stock, including relaunch and native RPL recall. Replacement/removal and library writes still require bank/reference handling. |
-| Port 2 | Flash, containing library/backup objects | Owned backup/library reads and enumeration pass HP49g+/HP50g Stock across three launches. Backup creation uses validated erased tails with synchronous error cleanup; replacement/removal, reclamation and power-loss behavior remain open. |
+| Port 2 | Flash, containing library/backup objects | Owned backup/library reads and enumeration pass HP49g+/HP50g Stock across three launches. Backup creation uses validated erased tails with synchronous error cleanup; removal preserves the payload and clears its status only. Replacement, reclamation and power-loss behavior remain open. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
 areas explicitly. None has HOME-style subdirectories. Acceptance of these
@@ -644,12 +644,25 @@ Returned write errors finish and verify a native deleted slot before releasing
 the mapping and expected RAM record. Persistent hardware failure retains RAM
 execution, as does a chip that never leaves BUSY; normal return and both exit
 paths cannot bypass this synchronous operation. This does not guarantee
-power-loss recovery, and replacement/removal and library writes remain open.
+power-loss recovery; replacement and library writes remain open.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
 Normal return, `exit()` and `_Exit()` preserve the backup. Independent image
 comparison confirms only the intended 30-byte allocation changed.
+Port 2 removal uses a native tombstone: only the status byte changes from `53`
+to `00`. Whole-port preflight rejects malformed banks and ambiguous duplicate
+names before writing; missing names return `ENOENT`. Partial status writes are
+completed while mapping and interrupt ownership remain held. Payload, extents
+and existing pointers are unchanged, so deletion does not reclaim capacity.
+Independent HP49g+/HP50g native `PURGE` probes confirm this behavior with a value
+on the stack, an explicit Flash ACPTR, and a program deleting itself while
+executing. This immediate deletion evidence does not establish reference safety
+for compaction, space reclamation or library relocation.
+The independent `port-flash-remove` client passes three Stock launches on both
+models, consuming native absence/presence witnesses around deletion and
+same-name recreation. Owned snapshots survive removal. Final Flash images
+contain the two expected deleted records and no unrelated changes.
 As with HOME mutation, the captured
 RAM mapping must remain stable during commit; preflight does not promise
 rollback for an artificial backend that fails writes midway through commit.
@@ -679,7 +692,7 @@ integer backup, read and replace it with a string after relaunch, then read and
 remove the string after another relaunch. No reinstallation, reset or fixture
 injection occurs between launches. Internal library-record creation preserves
 existing record addresses and rejects duplicate library IDs; it does not yet
-provide public library installation or attachment. Port 1 replacement/removal, Port 2 replacement/removal and full
+provide public library installation or attachment. Port 1 replacement/removal, Port 2 replacement and full
 library mutation remain M8.0 requirements.
 
 Port 1 enumeration and owned reads use the HP49/50 physical ERAM window after

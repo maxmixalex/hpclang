@@ -56,6 +56,14 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
                                             0x200000u};
     return hpclang_rpl_flash_create_backup(&io, record, bytes, NULL);
 }
+int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
+{
+    if (!port2_available)
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    return hpclang_rpl_flash_remove_backup(&io, name, name_length, NULL);
+}
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
     return &boot;
@@ -176,7 +184,8 @@ static void test_discovery(void)
             assert(hpclang_port_query(port, &info) == 0);
             assert(info.available == info.implemented);
             if (present && port == 2)
-                assert(info.available == (reads | HPCLANG_PORT_CREATE_BACKUP));
+                assert(info.available ==
+                       (reads | HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP));
         }
     }
     // Zero writable headroom means supported-but-full, not an unavailable API.
@@ -253,12 +262,19 @@ static void test_flash(void)
            errno == EEXIST);
     assert(hpclang_port_backup_create(2, (const uint8_t *)"PORTZERO", 8, value) == -1 &&
            errno == EEXIST);
+    assert(!hpclang_port_backup_remove(2, (const uint8_t *)"NEWFLASH", 8));
+    assert(!hpclang_port_backup_get(2, (const uint8_t *)"NEWFLASH", 8) && errno == ENOENT);
+    assert(hpclang_port_backup_remove(2, (const uint8_t *)"NEWFLASH", 8) == -1 && errno == ENOENT);
+    assert(!hpclang_object_integer_i64(value, &number) && number == 123);
+    assert(!hpclang_port_backup_create(2, (const uint8_t *)"NEWFLASH", 8, value));
     assert(!hpclang_port_backup_get(2, (const uint8_t *)"missing", 7) && errno == ENOENT);
     missing_flash_bank = 3;
+    assert(hpclang_port_backup_remove(2, (const uint8_t *)"NEWFLASH", 8) == -1 && errno == EIO);
     assert(hpclang_port_backup_create(2, (const uint8_t *)"FAIL", 4, value) == -1 && errno == EIO);
     assert(!hpclang_port_iterator_open(2) && errno == EIO);
     missing_flash_bank = UINT32_MAX;
     flash[5][0x202] ^= 1;
+    assert(hpclang_port_backup_remove(2, (const uint8_t *)"NEWFLASH", 8) == -1 && errno == EILSEQ);
     assert(hpclang_port_backup_create(2, (const uint8_t *)"FAIL", 4, value) == -1 &&
            errno == EILSEQ);
     assert(!hpclang_port_iterator_open(2) && errno == EILSEQ);

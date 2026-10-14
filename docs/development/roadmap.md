@@ -541,7 +541,18 @@ return, `exit()` and `_Exit()`. Native RPL recalls value 987 before both relaunc
 the application checks and deletes each HOME witness so a stale value cannot
 pass the next run. Independent saved-image comparison finds exactly one new
 30-byte allocation, with every unrelated Flash byte unchanged.
-Restart integration, replacement/removal and reclamation remain unfinished.
+Port 2 backup removal now validates all six banks before clearing only a unique
+backup's native status byte. Payload and addresses remain unchanged; uncertain
+status writes are completed before releasing ownership. Independent native
+HP49g+/HP50g probes cover stack values, explicit Flash pointers and a program
+purging itself. The separate `port-flash-remove` client passes three Stock
+launches on both models: remove, native absence witness, recreate, native
+presence witness and remove again. Owned snapshots survive deletion. Saved
+images contain only the two expected deleted 30-byte records; unrelated Flash
+is unchanged. All 95 host targets, focused ASan/UBSan and ARM static analysis
+pass, including partial status writes and whole-port preflight failures.
+Restart integration, replacement and reclamation remain unfinished; these
+deletion results do not certify reference safety during later reclamation.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,

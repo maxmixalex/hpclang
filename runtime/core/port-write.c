@@ -18,8 +18,9 @@ static int snapshot_read(void *context, uint32_t offset, uint8_t *value)
 }
 
 static int mutation_result(int result);
+static int flash_result(int result);
 
-static int writable_port(uint32_t port, int allow_create)
+static int writable_port(uint32_t port, int allow_extended)
 {
     if (port > 2) {
         errno = EINVAL;
@@ -28,7 +29,7 @@ static int writable_port(uint32_t port, int allow_create)
     const struct hpclang_device_info *device = hpclang_device_info();
     const struct hpclang_boot_info *boot = hpclang_boot_info();
     if (!device || !boot || !boot->saturn_state ||
-        (port > 0 && (!allow_create || device->family != HPCLANG_FAMILY_HP4950)) ||
+        (port > 0 && (!allow_extended || device->family != HPCLANG_FAMILY_HP4950)) ||
         (device->family != HPCLANG_FAMILY_HP48 && device->family != HPCLANG_FAMILY_HP4950)) {
         errno = ENOSYS;
         return -1;
@@ -66,11 +67,19 @@ static int create_flash_backup(const uint8_t *packed, uint32_t span)
     }
     result = hpclang_stock_flash_create_backup(record, bytes);
     free(record);
+    return flash_result(result);
+}
+
+static int flash_result(int result)
+{
     switch (result) {
     case HPCLANG_RPL_FLASH_WRITTEN:
         return 0;
     case HPCLANG_RPL_FLASH_EXISTS:
         errno = EEXIST;
+        break;
+    case HPCLANG_RPL_FLASH_NOT_FOUND:
+        errno = ENOENT;
         break;
     case HPCLANG_RPL_FLASH_NOSPACE:
         errno = ENOSPC;
@@ -146,8 +155,10 @@ int hpclang_port_backup_remove(uint32_t port, const uint8_t *name, uint32_t name
         errno = EINVAL;
         return -1;
     }
-    if (writable_port(port, 0))
+    if (writable_port(port, port == 2))
         return -1;
+    if (port == 2)
+        return flash_result(hpclang_stock_flash_remove_backup(name, name_length));
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;
     if (!hpclang_rpl_stock_mutation_io(&io, &memory)) {

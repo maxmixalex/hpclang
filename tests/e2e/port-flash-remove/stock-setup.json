@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "families": {
+    "hp4950": [
+      "HOME 0 'HPCSTEP' STO",
+      "HOME \\{171} IFERR :2:HPCFONE RCL DROP 0 THEN 1 END 'HPCFWIT' STO \\{187} 'HPCA' STO",
+      "HOME { HPCLANG SETUP } ORDER"
+    ]
+  }
+}

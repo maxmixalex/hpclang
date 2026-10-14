@@ -20,7 +20,8 @@ enum hpclang_rpl_flash_write_result
     HPCLANG_RPL_FLASH_DIRTY = -4,
     HPCLANG_RPL_FLASH_UNSUPPORTED = -5,
     HPCLANG_RPL_FLASH_EXISTS = -6,
-    HPCLANG_RPL_FLASH_NOSPACE = -7
+    HPCLANG_RPL_FLASH_NOSPACE = -7,
+    HPCLANG_RPL_FLASH_NOT_FOUND = -8
 };
 
 /* Append one CRC-valid native backup allocation into a reserved erased tail.
@@ -69,6 +70,19 @@ int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint3
  * automatic recovery is attempted by this operation. */
 int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                     uint32_t bytes, uint32_t *attempted_slot);
+
+/* Validate all six banks before deleting one uniquely named backup. Only its
+ * status byte changes; payload, references and allocation extents stay put.
+ * No erase/reclamation. Missing names return NOT_FOUND; ambiguous names DIRTY.
+ * attempted_slot is changed only immediately before clearing the status. Own
+ * the mapping throughout, including finish_remove after an uncertain write. */
+int hpclang_rpl_flash_remove_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                                    uint32_t name_length, uint32_t *attempted_slot);
+
+/* Complete a caller-owned, previously validated deletion. Accept status 53,
+ * a partially cleared subset, or already deleted 00. No other byte changes.
+ * DIRTY requires retaining ownership and retrying before native return. */
+int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint32_t address);
 
 /* Discard a caller-owned failed append using its retained expected record.
  * Verify its exact extent before clearing status; no payload or other record

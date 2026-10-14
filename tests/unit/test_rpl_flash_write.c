@@ -227,8 +227,60 @@ static void finish_commit(void)
     }
 }
 
+static void remove_status(void)
+{
+    for (uint32_t slot = 16; slot <= 17; ++slot) {
+        struct chip chip;
+        const struct hpclang_rpl_flash_io io = {&chip, read16, program16, 0, sizeof chip.data};
+        for (unsigned status = 0; status < 256; ++status) {
+            init(&chip, slot);
+            memcpy(chip.data + slot, record, sizeof record);
+            chip.data[slot] = (uint8_t)status;
+            uint8_t before[sizeof chip.data];
+            memcpy(before, chip.data, sizeof before);
+            int result = hpclang_rpl_flash_finish_remove(&io, slot);
+            if (status & ~0x53u) {
+                assert(result == HPCLANG_RPL_FLASH_DIRTY && !chip.writes);
+            } else {
+                assert(!result);
+                before[slot] = 0;
+                assert(!hpclang_rpl_flash_finish_remove(&io, slot));
+            }
+            assert(!memcmp(before, chip.data, sizeof before));
+        }
+        for (unsigned mask = 0; mask < 256; ++mask) {
+            init(&chip, slot);
+            memcpy(chip.data + slot, record, sizeof record);
+            chip.fail_write = 0;
+            chip.partial = (uint16_t)(mask << ((slot & 1u) * 8u));
+            uint8_t before[sizeof chip.data];
+            memcpy(before, chip.data, sizeof before);
+            assert(hpclang_rpl_flash_finish_remove(&io, slot) == HPCLANG_RPL_FLASH_DIRTY);
+            assert(!hpclang_rpl_flash_finish_remove(&io, slot));
+            before[slot] = 0;
+            assert(!memcmp(before, chip.data, sizeof before));
+        }
+        /* Read failures before programming and during verification must not
+         * permit an uncertain status to escape the owner's recovery loop. */
+        init(&chip, slot);
+        memcpy(chip.data + slot, record, sizeof record);
+        assert(!hpclang_rpl_flash_finish_remove(&io, slot));
+        unsigned reads = chip.reads;
+        for (unsigned cut = 0; cut < reads; ++cut) {
+            init(&chip, slot);
+            memcpy(chip.data + slot, record, sizeof record);
+            chip.fail_read = cut;
+            assert(hpclang_rpl_flash_finish_remove(&io, slot) == HPCLANG_RPL_FLASH_DIRTY);
+            assert(!hpclang_rpl_flash_finish_remove(&io, slot));
+            assert(chip.data[slot] == 0);
+            assert(!memcmp(chip.data + slot + 1u, record + 1u, sizeof record - 1u));
+        }
+    }
+}
+
 int main(void)
 {
+    remove_status();
     finish_commit();
     recovery();
     struct chip chip;

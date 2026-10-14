@@ -247,3 +247,25 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
     close_flash(&owner);
     return result;
 }
+
+int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
+{
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
+                                                 : HPCLANG_RPL_FLASH_FAILED;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
+                                            user_flash.end};
+    uint32_t attempted = UINT32_MAX;
+    result = hpclang_rpl_flash_remove_backup(&io, name, name_length, &attempted);
+    if (result == HPCLANG_RPL_FLASH_DIRTY && attempted != UINT32_MAX) {
+        /* Preserve payload and mapping ownership until the native tombstone
+         * is verified. Never resume Stock with a partial status byte. */
+        while (hpclang_rpl_flash_finish_remove(&io, attempted) != HPCLANG_RPL_FLASH_WRITTEN) {
+        }
+        result = HPCLANG_RPL_FLASH_WRITTEN;
+    }
+    close_flash(&owner);
+    return result;
+}

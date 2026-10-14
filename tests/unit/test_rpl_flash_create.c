@@ -70,6 +70,58 @@ static void fill_bank(uint32_t index)
     flash[at + 3u] = (uint8_t)(0xf0u | (extent >> 16u));
 }
 
+static void remove_backups(const struct hpclang_rpl_flash_io *io)
+{
+    const uint8_t *name = (const uint8_t *)"FLASHONE";
+    uint32_t attempted = UINT32_MAX;
+    init();
+    assert(hpclang_rpl_flash_remove_backup(io, name, 8, &attempted) == HPCLANG_RPL_FLASH_NOT_FOUND);
+    assert(!writes && attempted == UINT32_MAX);
+    assert(hpclang_rpl_flash_remove_backup(io, NULL, 1, &attempted) == HPCLANG_RPL_FLASH_INVALID);
+    for (uint32_t bank = 0; bank < 6; ++bank) {
+        init();
+        uint32_t slot = bank * 0x20000u + 0x105u;
+        memcpy(flash + slot, record, sizeof record);
+        /* Compare the entire medium to the intended single-byte change. */
+        flash[slot] = 0;
+        uint32_t expected = fingerprint(sizeof flash);
+        flash[slot] = 0x53;
+        assert(!hpclang_rpl_flash_remove_backup(io, name, 8, &attempted));
+        assert(attempted == base + slot && writes == 1);
+        assert(fingerprint(sizeof flash) == expected);
+        assert(hpclang_rpl_flash_remove_backup(io, name, 8, NULL) == HPCLANG_RPL_FLASH_NOT_FOUND);
+        assert(writes == 1);
+    }
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    memcpy(flash + 5u * 0x20000u + 0x105u, record, sizeof record);
+    uint32_t before = fingerprint(sizeof flash);
+    attempted = UINT32_MAX;
+    assert(hpclang_rpl_flash_remove_backup(io, name, 8, &attempted) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(!writes && attempted == UINT32_MAX && fingerprint(sizeof flash) == before);
+    for (uint32_t bank = 0; bank < 6; ++bank) {
+        init();
+        memcpy(flash + 0x105u, record, sizeof record);
+        flash[bank * 0x20000u + 0x1ffffu] = 0;
+        before = fingerprint(sizeof flash);
+        assert(hpclang_rpl_flash_remove_backup(io, name, 8, &attempted) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!writes && attempted == UINT32_MAX && fingerprint(sizeof flash) == before);
+        init();
+        memcpy(flash + 0x105u, record, sizeof record);
+        fail_address = base + bank * 0x20000u + 0x1fffeu;
+        assert(hpclang_rpl_flash_remove_backup(io, name, 8, &attempted) ==
+               HPCLANG_RPL_FLASH_FAILED);
+        assert(!writes && attempted == UINT32_MAX);
+    }
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    write_failures = 1;
+    assert(hpclang_rpl_flash_remove_backup(io, name, 8, &attempted) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(attempted == base + 0x105u);
+    assert(!hpclang_rpl_flash_finish_remove(io, attempted));
+    assert(flash[0x105u] == 0 && !memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {0, read16, program16, base, base + sizeof flash};
@@ -148,5 +200,6 @@ int main(void)
     assert(hpclang_rpl_flash_create_backup(&io, record, sizeof record, NULL) ==
            HPCLANG_RPL_FLASH_NOSPACE);
     assert(!writes && fingerprint(sizeof flash) == before);
+    remove_backups(&io);
     return 0;
 }

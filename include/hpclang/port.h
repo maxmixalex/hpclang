@@ -106,12 +106,20 @@ extern "C"
     int hpclang_port_backup_create(uint32_t port, const uint8_t *name, uint32_t name_length,
                                    const struct hpclang_object *value);
 
-    /* Replace/remove an existing backup; missing names return ENOENT. Live
+    /* Replace an existing backup; missing names return ENOENT. Live
      * calculator references retain the old value. Currently Port 0 only;
      * operations requiring relocation of a preceding library return ENOTSUP.
      * Replacement never implicitly creates a missing backup. */
     int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_object *value);
+    /* Remove an existing backup; missing names return ENOENT. Supports Port 0
+     * and HP49g+/HP50g Stock Port 2. Port 0 preserves live references as above.
+     * Port 2 validates the entire port and clears only the selected status:
+     * payload and native references stay put; no space is reclaimed. Duplicate
+     * matching names or malformed banks return EILSEQ before mutation. An
+     * uncertain status write is completed before return; permanent hardware
+     * failure retains ownership/RAM execution as with Flash creation. This is
+     * not a power-loss guarantee. Owned snapshots remain valid after removal. */
     int hpclang_port_backup_remove(uint32_t port, const uint8_t *name, uint32_t name_length);
 
 #ifdef __cplusplus

@@ -14,5 +14,7 @@
   {"mode": "port-flash", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]},
   {"mode": "port-flash-backup", "keyboard": false,
+   "contexts": ["stock"], "families": ["hp4950"]},
+  {"mode": "port-flash-remove", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]}
 ]

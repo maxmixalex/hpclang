@@ -39,4 +39,8 @@ int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, u
  * and ownership, just as a permanently BUSY chip does; it cannot resume Stock. */
 int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes);
 
+/* Whole-port deletion with the same exclusive ownership/fault policy.
+ * Only the selected backup's status is cleared; no space is reclaimed. */
+int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length);
+
 #endif
