@@ -2,6 +2,7 @@
 #define HPCLANG_STOCK_FLASH_H
 
 #include "sst-flash.h"
+#include "rpl-flash-write.h"
 
 /* Internal probe. Owns/restores the Stock Flash mapping around the command.
  * Does not program or erase any array data. */
@@ -18,5 +19,10 @@ int hpclang_stock_flash_program_word(uint32_t address, uint16_t value);
  * This is a physical operation, not an atomic native-object transaction. */
 int hpclang_stock_flash_program(uint32_t address, const uint8_t *data, uint32_t bytes);
 int hpclang_stock_flash_erase_sector(uint32_t address);
+
+/* Internal native backup append under exclusive Flash mapping ownership.
+ * Uses rpl-flash-write result codes and its reservation/uniqueness contract.
+ * A DIRTY result requires recovery before allowing native Flash mutation. */
+int hpclang_stock_flash_append(uint32_t address, const uint8_t *record, uint32_t bytes);
 
 #endif

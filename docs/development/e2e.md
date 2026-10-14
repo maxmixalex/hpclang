@@ -109,11 +109,13 @@ focused payloads through the shared Direct/Stock family harness:
   checks cover complete-range preflight, bounds, identical rewrites and untouched
   neighbors. The native tail scan validates existing records, refuses data left
   behind an erased end marker, and recognizes free space again after erasure.
-  It requires
-  an unused bank in the disposable emulator image, restores its erased bytes,
-  and checks the complete Flash fingerprint before returning to Stock. This
-  tests internal physical primitives, not native Port object mutation or
-  power-loss recovery; the emulator does not model real cache or NOR timing.
+  A native backup append uses an independent Stock record capture, verifies
+  its value through the public read API, rejects occupied/cross-bank writes,
+  and restores the saved bank-prefix sector. It requires an unused bank in the
+  disposable emulator image and checks the complete Flash fingerprint before
+  returning to Stock. This covers internal physical and append primitives;
+  public Port create/replace/delete and power-loss recovery remain separate
+  acceptance gates. The emulator does not model real cache or NOR timing.
 
 `tools/e2e-runtime-plan.py` validates the registry before building. Each entry
 requires `mode` and boolean `keyboard`, with optional `verifier`, `contexts`

@@ -2,10 +2,19 @@
 #include "rpl-flash-record.h"
 #include "rpl-stock-memory.h"
 #include <stdint.h>
+#include <errno.h>
+#include <hpclang/object.h>
+#include <hpclang/port.h>
 
 volatile uint32_t hpclang_e2e_result;
 struct hpclang_sst_device hpclang_flash_probe_device;
 static uint8_t block[512];
+static uint8_t saved_sector[4096];
+
+/* Independent native HP50g STO capture: backup FLASHONE contains integer 987. */
+static const uint8_t native_record[] = {
+    0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46, 0x4c, 0x41, 0x53, 0x48, 0x4f,
+    0x4e, 0x45, 0x08, 0x14, 0x26, 0x90, 0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 
 uint16_t hpclang_flash_read16(void *context, uint32_t address);
 
@@ -129,6 +138,44 @@ int main(void)
     failure = 14;
     if (hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space) || space.address != 0x20au ||
         space.nibbles != 0x3fdf4u)
+        goto done;
+    failure = 15;
+    struct hpclang_object *object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (object || errno != ENOENT) {
+        hpclang_object_release(object);
+        goto done;
+    }
+    uint32_t bank = scratch & ~0x1ffffu;
+    for (uint32_t i = 0; i < sizeof saved_sector; i += 2u) {
+        uint16_t value = hpclang_flash_read16(0, bank + i);
+        saved_sector[i] = (uint8_t)value;
+        saved_sector[i + 1u] = (uint8_t)(value >> 8u);
+    }
+    failure = 16;
+    if (hpclang_stock_flash_append(bank + 0x105u, native_record, sizeof native_record) !=
+        HPCLANG_RPL_FLASH_WRITTEN)
+        goto done;
+    failure = 17;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    int64_t value;
+    int valid = !hpclang_object_integer_i64(object, &value) && value == 987;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
+    failure = 18;
+    if (hpclang_stock_flash_append(bank + 0x105u, native_record, sizeof native_record) !=
+            HPCLANG_RPL_FLASH_OCCUPIED ||
+        hpclang_stock_flash_append(bank + 0x1fff0u, native_record, sizeof native_record) !=
+            HPCLANG_RPL_FLASH_INVALID)
+        goto done;
+    /* This bank was independently checked empty. Restore its original prefix
+     * sector before Stock resumes, including every native bank-header byte. */
+    failure = 19;
+    if (hpclang_stock_flash_erase_sector(bank) != HPCLANG_SST_OK ||
+        hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) != HPCLANG_SST_OK ||
+        fingerprint() != before || l1[0] != original[0] || l1[1] != original[1])
         goto done;
     failure = 0;
 done:

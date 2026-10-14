@@ -156,3 +156,33 @@ int hpclang_stock_flash_erase_sector(uint32_t address)
     close_flash(&owner);
     return result;
 }
+
+static int append_read(void *context, uint32_t address, uint16_t *value)
+{
+    *value = hpclang_flash_read16(context, address);
+    return 1;
+}
+
+static int append_program(void *context, uint32_t address, uint16_t value)
+{
+    (void)context;
+    int result = hpclang_sst_program_word(&bus, &user_flash, address, value, 1000u);
+    return finish_command(result, address, value, 2u) == HPCLANG_SST_OK;
+}
+
+int hpclang_stock_flash_append(uint32_t address, const uint8_t *record, uint32_t bytes)
+{
+    if (address < user_flash.first || address >= user_flash.end || (address & 0x1ffffu) < 0x105u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
+                                                 : HPCLANG_RPL_FLASH_FAILED;
+    uint32_t bank = address & ~0x1ffffu;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, bank + 0x104u,
+                                            bank + 0x20000u};
+    result = hpclang_rpl_flash_append(&io, address, record, bytes);
+    close_flash(&owner);
+    return result;
+}

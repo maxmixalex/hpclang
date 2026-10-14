@@ -489,6 +489,14 @@ Local HP49g+/HP50g experiments confirm why rollback is necessary: native STO
 overwrites an FF-marked dirty tail and produces an invalid object. Converting
 the uncommitted record into a deleted slot permits subsequent native STO/RCL
 to succeed, with unrelated Flash bytes unchanged.
+The internal backup append engine now verifies a CRC-valid source and the
+reserved erased range, verifies each programmed word, then publishes status.
+Returned write/read failures trigger a deleted-slot rollback, including failed
+commit acknowledgement; an unverified cleanup has a distinct dirty result.
+Both byte alignments, partial writes, silent write failures and each read-failure
+position pass host fault injection. All 94 host targets pass. The Stock backend
+holds one mapping lease and rejects firmware, bank headers and cross-bank records.
+Public Port mutation integration and restart recovery remain open.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,
