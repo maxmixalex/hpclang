@@ -33,4 +33,8 @@ int hpclang_stock_flash_recover_tail(uint32_t bank_index);
  * Same verification/result contract as hpclang_rpl_flash_finish_commit. */
 int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, uint32_t bytes);
 
+/* Internal whole-port create, including name uniqueness and tail validation,
+ * under one mapping lease. A DIRTY result still requires caller recovery. */
+int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes);
+
 #endif

@@ -227,6 +227,49 @@ int main(void)
         hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) != HPCLANG_SST_OK ||
         fingerprint() != before)
         goto done;
+    /* Independently locate the expected first-fit tail, preserving its entire
+     * sector (including existing native objects) for restoration afterwards. */
+    failure = 26;
+    uint32_t create_slot = 0;
+    for (uint32_t index = 0; index < 6u; ++index) {
+        if (!hpclang_rpl_stock_port2_reader(index, &reader) ||
+            hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space))
+            goto done;
+        if (!create_slot && space.nibbles >= sizeof native_record * 2u)
+            create_slot = 0x140000u + index * 0x20000u + space.address / 2u;
+    }
+    if (!create_slot || (create_slot & 4095u) + sizeof native_record > sizeof saved_sector)
+        goto done;
+    uint32_t create_sector = create_slot & ~4095u;
+    for (uint32_t i = 0; i < sizeof saved_sector; i += 2u) {
+        uint16_t word = hpclang_flash_read16(0, create_sector + i);
+        saved_sector[i] = (uint8_t)word;
+        saved_sector[i + 1u] = (uint8_t)(word >> 8u);
+    }
+    failure = 27;
+    if (hpclang_stock_flash_create_backup(native_record, sizeof native_record) !=
+        HPCLANG_RPL_FLASH_WRITTEN)
+        goto done;
+    failure = 28;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 987;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
+    committed = fingerprint();
+    failure = 29;
+    if (hpclang_stock_flash_create_backup(native_record, sizeof native_record) !=
+            HPCLANG_RPL_FLASH_EXISTS ||
+        fingerprint() != committed || l1[0] != original[0] || l1[1] != original[1])
+        goto done;
+    failure = 30;
+    if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||
+        hpclang_stock_flash_program(create_sector, saved_sector, sizeof saved_sector) !=
+            HPCLANG_SST_OK ||
+        fingerprint() != before)
+        goto done;
     failure = 0;
 done:
     hpclang_e2e_result = failure ? UINT32_C(0x46410000) | failure : UINT32_C(0x50415353);

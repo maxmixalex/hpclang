@@ -223,3 +223,17 @@ int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, u
     close_flash(&owner);
     return result;
 }
+
+int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
+{
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
+                                                 : HPCLANG_RPL_FLASH_FAILED;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
+                                            user_flash.end};
+    result = hpclang_rpl_flash_create_backup(&io, record, bytes);
+    close_flash(&owner);
+    return result;
+}

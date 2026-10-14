@@ -1,6 +1,8 @@
 #include "rpl-flash-write.h"
 #include "rpl-backup.h"
 #include "rpl-flash-record.h"
+#include "rpl-port.h"
+#include <string.h>
 
 struct packed_record
 {
@@ -129,6 +131,58 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
     return hpclang_rpl_flash_tail(&reader, 0, (end - first) * 2u, &space)
                ? HPCLANG_RPL_FLASH_DIRTY
                : HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes)
+{
+    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
+        io->first > io->end || io->end - io->first != 6u * 0x20000u || !valid_record(record, bytes))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor source_cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &source_cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t selected = io->end;
+    int exists = 0;
+    for (uint32_t index = 0; index < 6u; ++index) {
+        uint32_t bank = io->first + index * 0x20000u;
+        uint16_t identity;
+        if (!io->read16(io->context, bank + 0x100u, &identity))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (identity != (0xf0u | ((index + 8u) << 8u)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        struct recovery_reader mapped = {io, bank};
+        const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+        struct hpclang_rpl_port_cursor cursor = {0x20au, 0x40000u, 0};
+        struct hpclang_rpl_port_entry entry;
+        int result;
+        while ((result = hpclang_rpl_flash_next(&reader, &cursor, &entry)) > 0)
+            if (entry.prologue == 0x02b62u && entry.name_length == wanted.name_length &&
+                !memcmp(entry.name, wanted.name, wanted.name_length))
+                exists = 1;
+        if (result)
+            return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                          : HPCLANG_RPL_FLASH_DIRTY;
+        struct hpclang_rpl_flash_space space;
+        result = hpclang_rpl_flash_tail(&reader, cursor.address, cursor.end, &space);
+        if (result)
+            return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                          : HPCLANG_RPL_FLASH_DIRTY;
+        if (selected == io->end && space.nibbles >= bytes * 2u)
+            selected = bank + space.address / 2u;
+    }
+    if (exists)
+        return HPCLANG_RPL_FLASH_EXISTS;
+    if (selected == io->end)
+        return HPCLANG_RPL_FLASH_NOSPACE;
+    struct hpclang_rpl_flash_io reserved = *io;
+    uint32_t bank = io->first + ((selected - io->first) / 0x20000u) * 0x20000u;
+    reserved.first = bank + 0x104u;
+    reserved.end = bank + 0x20000u;
+    return hpclang_rpl_flash_append(&reserved, selected, record, bytes);
 }
 
 int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t address,

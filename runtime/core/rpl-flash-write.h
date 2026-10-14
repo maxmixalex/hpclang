@@ -18,7 +18,9 @@ enum hpclang_rpl_flash_write_result
     HPCLANG_RPL_FLASH_OCCUPIED = -2,
     HPCLANG_RPL_FLASH_FAILED = -3,
     HPCLANG_RPL_FLASH_DIRTY = -4,
-    HPCLANG_RPL_FLASH_UNSUPPORTED = -5
+    HPCLANG_RPL_FLASH_UNSUPPORTED = -5,
+    HPCLANG_RPL_FLASH_EXISTS = -6,
+    HPCLANG_RPL_FLASH_NOSPACE = -7
 };
 
 /* Append one CRC-valid native backup allocation into a reserved erased tail.
@@ -56,5 +58,16 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * damaged bank: restart integration must supply durable expected contents. */
 int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint32_t address,
                                     const uint8_t *record, uint32_t bytes);
+
+/* Create one native backup across the six user Flash banks. IO spans exactly
+ * six 128-KiB banks; its first address corresponds to native bank 8. Validate
+ * all bank identities, records and erased tails before mutation, even after
+ * finding space. Exact backup names must be unique across the whole port.
+ * Existing records stay put; deleted slots are not reclaimed. The caller owns
+ * the mapping and excludes other writers throughout selection and append.
+ * Uses append's error/dirty contract, plus EXISTS and NOSPACE. No erase or
+ * automatic recovery is attempted by this operation. */
+int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes);
 
 #endif

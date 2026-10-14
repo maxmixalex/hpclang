@@ -518,6 +518,15 @@ HP49g+/HP50g Stock acceptance completes a retained backup from status `73`,
 reads integer 987 through the public API, repeats completion without mutation,
 returns normally and restores the whole Flash image byte-for-byte. All 94 host
 targets, focused sanitizers and ARM static analysis pass for this primitive.
+An internal whole-port create operation now validates all six native bank
+identities, existing records and erased tails before selecting a slot and
+appending under one mapping lease. A name in a later bank prevents an earlier
+write; invalid/dirty/unreadable later banks also fail before mutation. Tests
+cover last-bank placement, full media without reclamation, duplicate names and
+unchanged existing allocations. All 95 host targets pass; HP49g+/HP50g Stock
+acceptance passes automatic placement, public readback, duplicate refusal,
+normal return and byte-for-byte whole-Flash restoration. This is not yet the public create API: error
+recovery ownership and restart integration still need to be connected.
 Native backup record encoding also matches Stock bytes and passes local
 HP49g+/HP50g native RCL/PURGE/STO
 interoperability, including unchanged unrelated Flash data. Native Port 2 object writes,
