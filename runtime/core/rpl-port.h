@@ -160,7 +160,8 @@ int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t 
                               uint32_t flash_table, uint32_t eram_entry,
                               struct hpclang_rpl_banked_target *target);
 
-/* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
+/* A read-only visitor: each callback's limit excludes the library CRC; the
+ * input object limit must include it. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
  * discard partial traversal on error. This enumerates structural references;
  * it does not prove that referenced code has no further live references. */

@@ -863,3 +863,27 @@ the value's type: system/support tables can carry metadata, launcher roots can
 be return positions, and stack values can be sentinels. No category is
 automatically safe to skip. Banked library catalog entries still require the
 separate catalog visitor and mapping resolution.
+
+## Structural reference dispatch
+
+`hpclang_rpl_reference_visit()` provides one read-only entry point for immediate
+object edges. It delegates sequence, tag, array, backup and library validation
+to the existing parsers. Inline objects and compact array bodies remain
+distinct; a compact body carries its shared prologue and is read through a
+temporary prefix without writing native memory. Linked aliases remain separate
+events. Backup/library CRC failures stop traversal.
+
+Runstream addresses, ACPTR address/switch pairs, ROM library/command indices and
+logical FlashPtr selector/index pairs remain distinct unresolved references.
+The caller must retain the reader's bank identity and perform mapping lookup.
+The dispatcher does not recursively dereference targets or allocate graph
+storage. A caller schedules children, bounds work and tracks visited nodes.
+
+Machine code, binary data and directories produce explicit opaque events;
+recognized but unsupported formats still fail. Opaque events are pending work,
+not proof that an object contains no references. Callers discard partial events
+after errors. Native checks match all 16 library-275 edges and their bounds,
+Flash ACPTRs before/after PURGE on HP49g+/HP50g and the saved HP50g ERAM ACPTR.
+The saved ROM graph also expands 74 compact array bodies through this C path;
+314 code objects and 10 binary objects remain explicit opaque cases. Complete
+directory/execution traversal and the production mutation guard remain open.

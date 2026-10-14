@@ -283,6 +283,13 @@ hpclang_unit(rpl_object_store
 target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_reference test_rpl_reference.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_reference PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hp39_transfer_directory
     test_hp39_transfer_directory.c
     "${HPCLANG_ROOT}/runtime/core/hp39-transfer-directory.c")

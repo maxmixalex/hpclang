@@ -727,6 +727,15 @@ Both models pass all three Flash replacement/return lifecycles with this scan.
 Source labels do not assert object types or authorize skipping any category;
 execution-position interpretation and complete reference safety remain open.
 
+A common structural-reference dispatcher now integrates sequences, tags, arrays,
+CRC-validated backups and library tables. It preserves compact bodies and linked
+aliases, separates native addresses from bank/index references, and explicitly
+reports opaque code/binary/directory objects rather than certifying them empty.
+The actual C path matches the 16 native library-275 edges and saved Flash/ERAM
+ACPTRs, and expands 74 compact bodies from the existing ROM graph. All 96 host
+targets, focused sanitizers and ARM analysis pass. Opaque cases, complete
+directory/execution traversal and production guard integration remain unfinished.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
