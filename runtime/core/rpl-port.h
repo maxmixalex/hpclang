@@ -85,6 +85,23 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding);
 
+struct hpclang_rpl_banked_target
+{
+    struct hpclang_rpl_bank_binding bank;
+    uint32_t offset;
+};
+
+/* Resolve a bounded DOACPTR through caller-validated ROM switch tables. The
+ * source and ROM may have distinct readers. Return a bank-qualified nibble
+ * offset within the native 0x40000..0x80000 window, never a physical address.
+ * Return 1 resolved, 0 unknown switch, negative on invalid/unreadable input;
+ * output stays unchanged except on success. Does not dereference the target,
+ * require a live allocation, or prove that reclamation/relocation is safe. */
+int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t address,
+                              uint32_t limit, const struct hpclang_rpl_reader *rom,
+                              uint32_t flash_table, uint32_t eram_entry,
+                              struct hpclang_rpl_banked_target *target);
+
 /* A read-only visitor: limit excludes the library CRC. Nonzero return aborts
  * traversal and is returned to the caller. The caller must keep the reader/mapping stable and must
  * discard partial traversal on error. This enumerates structural references;

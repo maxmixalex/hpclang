@@ -139,6 +139,38 @@ int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t fl
     return found;
 }
 
+int hpclang_rpl_acptr_resolve(const struct hpclang_rpl_reader *source, uint32_t address,
+                              uint32_t limit, const struct hpclang_rpl_reader *rom,
+                              uint32_t flash_table, uint32_t eram_entry,
+                              struct hpclang_rpl_banked_target *target)
+{
+    if (!source || !source->read_nibble || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 15u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t prologue, pointer, bank_switch;
+    int result = word(source, address, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x02baau)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    result = word(source, address + 5u, 5, &pointer);
+    if (result)
+        return result;
+    if (pointer < 0x40000u || pointer >= 0x80000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = word(source, address + 10u, 5, &bank_switch);
+    if (result)
+        return result;
+    struct hpclang_rpl_banked_target next;
+    result = hpclang_rpl_bank_lookup(rom, flash_table, eram_entry, bank_switch, &next.bank);
+    if (result != 1)
+        return result;
+    next.offset = pointer - 0x40000u;
+    *target = next;
+    return 1;
+}
+
 static int library(const struct hpclang_rpl_reader *reader, uint32_t limit,
                    struct hpclang_rpl_port_entry *entry, uint32_t *name_address)
 {

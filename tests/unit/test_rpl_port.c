@@ -315,8 +315,76 @@ static void test_bank_lookup(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+static void test_acptr_resolution(void)
+{
+    struct image rom = {.count = 125, .fail_at = UINT32_MAX};
+    struct image source = {.count = 15, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader tables = {read_nibble, &rom};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    for (uint32_t i = 0; i < 16; ++i)
+        put_word(&rom, i * 7u, 0x12345u + i * i, 5);
+    put_word(&rom, 120, 0x45678u, 5);
+    put_word(&source, 0, 0x02baau, 5);
+    const uint32_t pointers[] = {0x40000u, 0x7327eu, 0x7ffffu};
+    struct hpclang_rpl_banked_target target;
+    for (uint32_t bank = 0; bank <= 16; ++bank) {
+        put_word(&source, 10, bank < 16 ? 0x12345u + bank * bank : 0x45678u, 5);
+        for (unsigned i = 0; i < sizeof pointers / sizeof pointers[0]; ++i) {
+            put_word(&source, 5, pointers[i], 5);
+            assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) == 1);
+            assert(target.bank.kind ==
+                   (bank < 16 ? HPCLANG_RPL_BANK_FLASH : HPCLANG_RPL_BANK_ERAM));
+            assert(target.bank.index == (bank < 16 ? bank : 0));
+            assert(target.offset == pointers[i] - 0x40000u);
+        }
+    }
+    const struct hpclang_rpl_banked_target before = target;
+    for (unsigned limit = 0; limit < 15; ++limit) {
+        assert(hpclang_rpl_acptr_resolve(&reader, 0, limit, &tables, 0, 120, &target) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&target, &before, sizeof target));
+    }
+    for (unsigned at = 0; at < 15; ++at) {
+        source.fail_at = at;
+        assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&target, &before, sizeof target));
+    }
+    source.fail_at = UINT32_MAX;
+    const uint32_t invalid[] = {0, 0x3ffffu, 0x80000u, 0xfffffu};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        put_word(&source, 5, invalid[i], 5);
+        assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&target, &before, sizeof target));
+    }
+    put_word(&source, 5, 0x50000u, 5);
+    put_word(&source, 10, 0x99999u, 5);
+    assert(!hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target));
+    assert(!memcmp(&target, &before, sizeof target));
+    put_word(&source, 10, 0x45678u, 5);
+    rom.fail_at = 120;
+    assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&target, &before, sizeof target));
+    rom.fail_at = UINT32_MAX;
+    put_word(&rom, 0, 0x45678u, 5);
+    assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&target, &before, sizeof target));
+    source.data[0] = 16;
+    assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&target, &before, sizeof target));
+    put_word(&source, 0, 0x2614u, 5);
+    assert(hpclang_rpl_acptr_resolve(&reader, 0, 15, &tables, 0, 120, &target) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&target, &before, sizeof target));
+}
+
 int main(void)
 {
+    test_acptr_resolution();
     test_bank_lookup();
     test_library_command_resolution();
     test_library_catalog_lookup();

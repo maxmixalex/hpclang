@@ -778,4 +778,13 @@ power-loss behavior remain separate M8.0 requirements.
 launch-available operations without touching port contents. This separates
 absent model ports from unavailable launch contexts and from unfinished write
 services. It does not replace data/mapping checks in the actual service calls.
+
+Internal reference traversal can resolve a bounded native ACPTR through
+caller-validated ROM switch tables into a bank kind/index and relative nibble
+offset. Source and ROM readers remain separate; unknown switches, malformed
+tables and out-of-window targets leave output unchanged. Resolution does not
+require the target allocation to be live: native HP49g+/HP50g pointers remain
+directed at preserved payloads after `PURGE`. The C resolver also matches a
+saved HP50g ERAM pointer. This is one component of reclamation safety; indexed
+FlashPtr objects and executable references still require their own traversal.
 See the API reference for the operation masks and descriptor version contract.

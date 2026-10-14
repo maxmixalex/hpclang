@@ -667,6 +667,14 @@ all 16 Flash entries and the ERAM entry in saved HP48gII, HP49g+ and HP50g ROMs;
 HP48gII's switch routine addresses differ from the other two models. This verifies
 table interpretation, not physical bank availability or runtime mapping ownership.
 
+The bounded ACPTR resolver now combines a validated object with those ROM switch
+tables and reports a bank-qualified nibble offset, without dereferencing or
+discarding deleted targets. The actual C implementation resolves live and
+natively purged Flash references to the preserved integer 987 on HP49g+/HP50g,
+and the saved HP50g ERAM pointer. All 95 host targets, focused sanitizers and ARM
+analysis pass. Indexed FlashPtr tables, machine-code references and complete
+live-root coverage remain required before reclamation is safe.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
