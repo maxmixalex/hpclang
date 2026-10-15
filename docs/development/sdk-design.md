@@ -286,8 +286,15 @@ cmake --build build/port-recovery
 Core CI builds this witness and checks linked relocation kinds, image entry and
 BSS bounds before producing `recovery.hp`. The fixture records replay, mapping,
 TLS and clock diagnostics for independent saved-state verification; its marker
-alone is not acceptance. This build gate does not yet run the damaged-bank
-Stock scenario in CI or provide user-facing recovery/error handling.
+alone is not acceptance. `tests/e2e/port-recovery/verify.py` compares complete
+before/after Flash images against the CRC-checked sector journal, checks the
+native empty stack and absence of Library 275, and verifies owned image/stack,
+guards, TLS, mapping restoration, clock progression, repeat-write counts and
+return to Stock ROM. It takes explicit saved-state paths, built ELF/binary/package
+paths and journal/target addresses; it does not modify the saved state. Its host
+tests reject collateral writes, incomplete replay, corrupt journals and truncated
+state. This build gate does not yet generate and execute the damaged-bank Stock
+scenario in CI or provide user-facing recovery/error handling.
 
 ## Capabilities
 

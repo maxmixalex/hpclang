@@ -1193,6 +1193,15 @@ Formatting and ARM analysis under the repository's MMIO policy pass. This closes
 the witness's dependency on temporary build sources, not production recovery
 installation or CI execution of the damaged-bank scenario.
 
+The recovery saved-state verifier is now maintained beside the witness. It
+accepts explicit artifacts and before/after state, independently checks journal
+CRC/geometry and complete Flash differences, and checks native stack/catalog,
+owned memory/guards, TLS, mapping/IRQ restoration, timing, repeat writes and
+return to Stock ROM. It accepts the native HP50g recovery result; host corruption
+tests and five saved-state negative controls reject damaged code/guards,
+unexpected repeat writes, mapping drift and unfinished return. CI scenario
+preparation and execution remain pending.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
