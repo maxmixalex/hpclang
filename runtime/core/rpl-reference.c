@@ -83,6 +83,39 @@ static int emit(struct traversal *walk, enum hpclang_rpl_reference_kind kind, ui
     return walk->visit(walk->context, &edge);
 }
 
+int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
+                                          const struct hpclang_rpl_reference_guard *guards,
+                                          uint32_t count)
+{
+    if (!count)
+        return HPCLANG_RPL_SPAN_OK;
+    if (!reader || !reader->read_nibble || !guards)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    for (uint32_t i = 0; i < count; ++i) {
+        const struct hpclang_rpl_reference_guard *guard = &guards[i];
+        if (!guard->width || guard->width > 5)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (guard->field > 0x100000u - guard->width ||
+            guard->expected >= (1u << (4 * guard->width)))
+            return HPCLANG_RPL_SPAN_BOUNDS;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t actual = 0;
+        for (uint32_t j = 0; j < guards[i].width; ++j) {
+            uint8_t nibble;
+            if (!reader->read_nibble(reader->context, guards[i].mapping, guards[i].field + j,
+                                     &nibble))
+                return HPCLANG_RPL_SPAN_UNAVAILABLE;
+            if (nibble > 15)
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            actual |= (uint32_t)nibble << (4 * j);
+        }
+        if (actual != guards[i].expected)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
                                          const struct hpclang_rpl_reference_edit *edits,
                                          uint32_t count)

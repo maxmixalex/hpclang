@@ -160,6 +160,18 @@ struct hpclang_rpl_reference_reader
     void *context;
 };
 
+/* Read-only dependencies of a relocation plan, including short native count,
+ * ID and flag fields. Width is 1..5 nibbles. Overlap is allowed: guards do not
+ * write. Validate alongside edits while retaining exclusive ownership through
+ * commit; neither validation supplies synchronization or discovers omissions. */
+struct hpclang_rpl_reference_guard
+{
+    uint32_t mapping, field, expected, width;
+};
+int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
+                                          const struct hpclang_rpl_reference_guard *guards,
+                                          uint32_t count);
+
 /* Read-only preflight of a complete caller-owned edit array. Mapping IDs must
  * normalize physical aliases to the same identity. All fields/words and
  * same-mapping overlaps (including duplicate fields) are checked before I/O;

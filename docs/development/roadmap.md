@@ -873,8 +873,11 @@ and the native catalog-state check pass. A read-only integration experiment
 enumerates all 62 entries in the HP50g PACK capture, resolves nine mapping
 identities and validates 124 target/switch fields as one batch. Only library
 275 requires an address change; changing the final record's bank metadata
-rejects the batch. Catalog count/ID/flag stability still needs ownership
-guards. Full root discovery, assembly of a complete qualified batch and live
+rejects the batch. Read-only short-field guards now check the catalog count,
+IDs and flags: all 125 native guards pass, and each of 375 injected nibble
+changes is rejected. Host failure tests, sanitizers and ARM analysis pass.
+These checks require exclusive ownership through commit; they do not provide
+synchronization. Full root discovery, assembly of a complete qualified batch and live
 commit remain required before reclamation is enabled.
 
 The Port development branch now integrates the standalone historical-system client

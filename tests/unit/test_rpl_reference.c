@@ -608,8 +608,62 @@ static void batch_preflight(void)
     assert(hpclang_rpl_reference_edits_validate(NULL, edits, 1) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void metadata_guards(void)
+{
+    struct mapped_images images = {
+        .banks = {{.size = 40, .fail = UINT32_MAX}, {.size = 40, .fail = UINT32_MAX}}};
+    struct hpclang_rpl_reference_reader reader = {mapped_read, &images};
+    struct hpclang_rpl_reference_guard guards[] = {
+        {0, 0, 2, 3}, {0, 3, 275, 3}, {0, 16, 7, 3}, {1, 3, 123, 3}};
+    for (unsigned i = 0; i < 4; ++i)
+        put(&images.banks[guards[i].mapping], guards[i].field, guards[i].expected, 3);
+    assert(!hpclang_rpl_reference_guards_validate(NULL, NULL, 0));
+    assert(!hpclang_rpl_reference_guards_validate(&reader, guards, 4));
+    struct mapped_images saved = images;
+    for (unsigned i = 0; i < 4; ++i) {
+        for (unsigned j = 0; j < 3; ++j) {
+            images = saved;
+            images.banks[guards[i].mapping].data[guards[i].field + j] ^= 1;
+            assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) ==
+                   HPCLANG_RPL_SPAN_MALFORMED);
+            images = saved;
+            images.banks[guards[i].mapping].fail = guards[i].field + j;
+            assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+        }
+    }
+    images = saved;
+    images.reads = 0;
+    guards[3].width = 0;
+    assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
+    guards[3].width = 6;
+    assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
+    guards[3].width = 3;
+    guards[3].expected = 0x1000;
+    assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_BOUNDS);
+    guards[3].expected = 123;
+    guards[3].field = 0xffffe;
+    assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!images.reads);
+    guards[3] = guards[0]; /* Overlapping read-only dependencies are permitted. */
+    assert(!hpclang_rpl_reference_guards_validate(&reader, guards, 4));
+    images.banks[0].data[0] = 16;
+    assert(hpclang_rpl_reference_guards_validate(&reader, guards, 4) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_guards_validate(NULL, guards, 4) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_reference_guards_validate(&reader, NULL, 4) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    for (uint32_t width = 1; width <= 5; ++width) {
+        struct hpclang_rpl_reference_guard guard = {0, 0, (1u << (4 * width)) - 1, width};
+        put(&images.banks[0], 0, guard.expected, width);
+        assert(!hpclang_rpl_reference_guards_validate(&reader, &guard, 1));
+        ++guard.expected;
+        assert(hpclang_rpl_reference_guards_validate(&reader, &guard, 1) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+    }
+}
+
 int main(void)
 {
+    metadata_guards();
     batch_preflight();
     qualified_relocation();
     dispatch_schemas();
