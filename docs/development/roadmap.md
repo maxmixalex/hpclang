@@ -1064,6 +1064,16 @@ interruption recovery and production packaging are not yet accepted. The 4 KiB
 probe stack passes these fixtures but still needs worst-case nested-object
 depth acceptance before use as a recovery stack contract.
 
+The independent entry now uses the existing supervisor IRQ bridge and Flash
+mapping exchange instead of relying on direct CPSR writes. Native HP50g
+observations confirm user-mode entry (`0x80000010`), masked execution
+(`0x800000d0`) and restored caller control (`0x80000010`). Whole-port preflight
+still passes while the two Flash sections are uncached and writable; both L1
+descriptors and the Stock SWI vector are restored exactly, guards/code remain
+intact and Flash unchanged. Actual writes remain gated on the recovery runtime:
+linking the shared Timer0/RTC clock also requires its libc TLS/errno environment,
+which the minimal freestanding probe does not yet initialize.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
