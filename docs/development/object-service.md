@@ -766,11 +766,16 @@ probe passed when those slots were provisionally published as launcher roots.
 That unconditional publication was subsequently removed: `RSTK=C` also saves
 ordinary numbers, as described in the original
 [safe-GC programming notes](https://www.hpcalc.org/hp48/docs/programming/garbage2.txt).
-The observed continuation belongs to a byte-identical TEMP copy of library 275
-command 0 (`PrRUN`), at offset 106 within its 213-nibble program. This establishes
-the reference's provenance in the probe, not the types of arbitrary machine
-stack contents. Catalog registration still needs caller-context classification
-before supplying additional roots; general object operations retain only their
+The suspended live probe contains three candidates in byte-identical TEMP
+copies of library 275 commands: offsets 106 and 111 in command 0 (`PrRUN`,
+213 nibbles), and offset 165 in command 4 (1164 nibbles). The last lies inside
+an inline CODE object. A probe accepting only these three positions passes
+HP49g+/HP50g registration, a native-RCL witness and a second invocation; accepting
+only the first position rejects the call before catalog modification. These
+checks establish provenance and the observed caller's requirements, not the
+types of arbitrary machine stack contents. Offsets in this experiment are not
+a production classification rule. Catalog registration still needs caller-context
+classification before supplying additional roots; general object operations retain only their
 previously established launcher roots. Public registration remains unavailable.
 The internal catalog-growth primitive now reserves one 16-nibble entry using
 the launcher's native-page fence, a five-nibble guard and hidden stack-cell
