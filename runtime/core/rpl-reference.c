@@ -10,6 +10,51 @@ struct traversal
     void *context;
 };
 
+int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *reference, uint32_t first,
+                                     uint32_t end, int32_t delta,
+                                     struct hpclang_rpl_reference_patch *patch)
+{
+    if (!reference || !patch)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (first >= end || end > 0x100000u || (int64_t)first + delta < 0 ||
+        (int64_t)end + delta > 0x100000)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    switch (reference->kind) {
+    case HPCLANG_RPL_REFERENCE_INLINE:
+    case HPCLANG_RPL_REFERENCE_COMPACT:
+    case HPCLANG_RPL_REFERENCE_ROMP:
+    case HPCLANG_RPL_REFERENCE_FLASHP:
+        return 0;
+    case HPCLANG_RPL_REFERENCE_OPAQUE:
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    case HPCLANG_RPL_REFERENCE_ACPTR:
+        if (reference->auxiliary)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        break;
+    case HPCLANG_RPL_REFERENCE_DIRECT:
+    case HPCLANG_RPL_REFERENCE_ATTACHMENT:
+        break;
+    default:
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    uint32_t field = reference->field, target = reference->target;
+    if (field > 0xffffbu || target >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    int field_moves = field >= first && field < end;
+    if ((field_moves && end - field < 5) || (field < first && first - field < 5))
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t shifted_field = (uint32_t)((int64_t)field + (field_moves ? delta : 0));
+    uint32_t shifted_target =
+        (uint32_t)((int64_t)target + (target >= first && target < end ? delta : 0));
+    int relative = reference->kind == HPCLANG_RPL_REFERENCE_DIRECT && reference->auxiliary;
+    uint32_t old_value = relative ? (target - field) & 0xfffffu : target;
+    uint32_t value = relative ? (shifted_target - shifted_field) & 0xfffffu : shifted_target;
+    if (value == old_value)
+        return 0;
+    *patch = (struct hpclang_rpl_reference_patch){field, value};
+    return 1;
+}
+
 static int emit(struct traversal *walk, enum hpclang_rpl_reference_kind kind, uint32_t field,
                 uint32_t target, uint32_t extent, uint32_t auxiliary)
 {

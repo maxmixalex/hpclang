@@ -301,8 +301,63 @@ static void directories(void)
            edges.items[0].target == 77 && edges.items[0].extent == 3);
 }
 
+static void relocation_patches(void)
+{
+    const struct hpclang_rpl_reference_patch sentinel = {71, 72};
+    struct hpclang_rpl_reference_patch patch = sentinel;
+    struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, 0x200, 0x110, 0, 0};
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, 16, &patch) == 1);
+    assert(patch.field == 0x200 && patch.value == 0x120);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, -16, &patch) == 1);
+    assert(patch.value == 0x100);
+    edge.kind = HPCLANG_RPL_REFERENCE_ATTACHMENT;
+    edge.auxiliary = 275; /* Library ID is not a bank or relative-field flag. */
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, 16, &patch) == 1);
+    assert(patch.value == 0x120);
+    edge.kind = HPCLANG_RPL_REFERENCE_ACPTR;
+    patch = sentinel;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, 16, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&patch, &sentinel, sizeof patch));
+    edge.auxiliary = 0;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, 16, &patch) == 1);
+    assert(patch.value == 0x120);
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_DIRECT, 0x120, 0x100, 0, 1};
+    patch = sentinel;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, 16, &patch) == 0);
+    assert(!memcmp(&patch, &sentinel, sizeof patch));
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x110, 16, &patch) == 1);
+    assert(patch.field == 0x120 && patch.value == 0xffff0);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x120, 0x125, 16, &patch) == 1);
+    assert(patch.value == 0xfffd0);
+    patch = sentinel;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x122, 0x130, 16, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x123, 16, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, INT32_MIN, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x100000, 1, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&patch, &sentinel, sizeof patch));
+    edge.kind = HPCLANG_RPL_REFERENCE_OPAQUE;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, 16, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    const enum hpclang_rpl_reference_kind unchanged[] = {
+        HPCLANG_RPL_REFERENCE_INLINE, HPCLANG_RPL_REFERENCE_COMPACT, HPCLANG_RPL_REFERENCE_ROMP,
+        HPCLANG_RPL_REFERENCE_FLASHP};
+    for (unsigned i = 0; i < sizeof unchanged / sizeof unchanged[0]; ++i) {
+        edge.kind = unchanged[i];
+        assert(!hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, 16, &patch));
+        assert(!memcmp(&patch, &sentinel, sizeof patch));
+    }
+    assert(hpclang_rpl_reference_plan_shift(NULL, 0x100, 0x130, 16, &patch) < 0);
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, 16, NULL) < 0);
+}
+
 int main(void)
 {
+    relocation_patches();
     nested_array();
     indices_and_opaque();
     linked_aliases();

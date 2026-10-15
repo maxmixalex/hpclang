@@ -54,4 +54,21 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t limit, uint32_t body_prologue,
                                 hpclang_rpl_reference_visit_fn visit, void *context);
 
+struct hpclang_rpl_reference_patch
+{
+    uint32_t field; /* Old address: apply before moving the containing bytes. */
+    uint32_t value; /* Replacement five-nibble word. */
+};
+
+/* Plan one edge previously validated by reference_visit, for relocation of
+ * [first,end) by delta within the same Saturn mapping. Return 1 with a patch,
+ * 0 when its encoding does not change, or a negative span result. Output only
+ * changes on 1. Relative library fields account for movement of both ends.
+ * INLINE/COMPACT need recursive traversal; ROMP/FLASHP retain their indices.
+ * Banked ACPTR and opaque contents return UNSUPPORTED and require separate
+ * resolution. This is neither a graph-completeness check nor a mutation API. */
+int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *reference, uint32_t first,
+                                     uint32_t end, int32_t delta,
+                                     struct hpclang_rpl_reference_patch *patch);
+
 #endif

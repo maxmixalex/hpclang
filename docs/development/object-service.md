@@ -723,6 +723,25 @@ require their own validation.
 The combined display/HOME-root changes also pass the two-launch HP50g Stock
 library fixture: all three ports create and retain the library, original RPL
 recalls each one, duplicate creation is refused, and return settles normally.
+On both paired states, actual C root enumeration identifies 24 references into
+the metadata interval following the catalog insertion point: 17 HOME attachment
+fields, four display fields and three SYSUPD fields. Each matches the native
+16-nibble relocation. A saved-state insertion simulation also matches the new
+catalog entry, every subsequent catalog record, all 17 ACPTR objects and the
+unchanged graph objects byte for byte; menu pixels change during native recall.
+This establishes the metadata-prefix behavior for these probes. It does not yet
+validate moving the TEMP allocations and return stack or updating references
+embedded in their contents, and does not enable SDK registration.
+The internal per-edge relocation planner now computes five-nibble patches for
+absolute runstream references, unbanked ACPTRs and HOME attachment fields. Library
+relative fields account for movement of both the field and its target, including
+backward offsets. It rejects partial-field moves, address overflow, opaque
+contents and unresolved banked ACPTRs. Child traversal and indexed ROM/Flash
+resolution remain separate obligations; a no-patch result is not a graph-safety
+claim. Actual C parsing and planning reproduce all 17 native HOME patches on
+both paired models. TEMP comparison across these full application launches also
+shows intervening allocations, so those snapshots do not establish a uniform
+TEMP shift or complete registration safety.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
