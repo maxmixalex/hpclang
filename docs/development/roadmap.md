@@ -555,8 +555,11 @@ Read-only replacement planning validates every bank, requires a unique old
 backup, computes both allocation CRCs and selects space for the intent and new
 record, including separate banks in either order. Full-media, late corruption
 and read failures leave Flash and the output plan unchanged. The format is not
-yet emitted by normal mutation APIs: publication, referenced-record validation
-during recovery and the restart executor remain open.
+yet emitted by normal mutation APIs. Internal publication now verifies the body
+before setting hidden status `7E`; whole-port recovery can retire the intent if
+the old backup still matches and the new reservation remains erased. Publication
+cuts and returned errors preserve both value regions. Recovery after the new
+value starts writing/commits and normal replacement integration remain open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

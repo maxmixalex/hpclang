@@ -885,7 +885,7 @@ A candidate hidden transaction envelope with metadata `2` and status `7E`
 (or its publication intermediates `7F`/`FE`) is skipped by native RCL on both
 HP49g+ and HP50g, even with an invalid body; a later live control remains readable
 and every Flash byte is unchanged. This establishes native visibility only:
-the replacement writer and recovery executor are not implemented yet.
+the complete replacement writer and recovery executor remain unfinished.
 The internal intent codec now defines a 44-byte allocation with metadata `2`,
 committed status `7E` and versioned magic `HPCREPL1`. It stores its own physical
 slot plus the old/new allocation addresses, byte lengths and CRC32 values, all
@@ -899,8 +899,8 @@ not authorize mutation. Host tests cover every status byte, each single-bit
 corruption, truncated input, a separately computed checksum vector and a valid-CRC
 overlap. Native probes using the actual C encoder pass on both models with a
 later live control and unchanged Flash. Normal mutation APIs do not emit this
-format yet; durable intent publication, target verification and restart execution
-remain required before replacement can claim power-loss recovery.
+format yet; complete target-state verification and restart execution remain
+required before replacement can claim power-loss recovery.
 The internal replacement planner validates all six banks before returning the
 old allocation, checksums and two erased reservations. It tries both same-bank
 and cross-bank placement, so a small journal-only tail can be paired with an
@@ -908,6 +908,19 @@ earlier tail that fits only the new object. Insufficient combined capacity,
 duplicate names, damaged later banks and failures while rereading the old value
 leave the output and Flash unchanged. The plan uses no heap allocation and
 requires stable caller ownership until publication; it is not itself a write.
+An internal publisher now plans the transaction, programs and verifies the whole
+intent body, then publishes hidden status `7E`, without touching the old backup
+or new reservation. Its output identifies the attempted transaction before the
+first write; a programming/readback failure returns DIRTY and requires recovery.
+Whole-port recovery can retire such an intent when the old live backup still
+matches its type, allocation length, native CRC and recorded CRC32, and the new
+reservation remains entirely erased. Publication cuts behind FF use ordinary
+dirty-tail recovery; complete unpublished/ready/retiring intents use the validated
+abort. Corrupt intent data, stale old contents and a non-erased new reservation
+are rejected before any recovery writes. Host tests cut each publication write,
+inject returned errors/readback failures and verify recovery without transaction
+RAM state. This covers publication and abort before replacement starts, not
+recovery after the new value begins writing or commits.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

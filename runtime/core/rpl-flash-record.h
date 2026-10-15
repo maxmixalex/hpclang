@@ -18,7 +18,7 @@ enum hpclang_rpl_flash_intent_phase
     HPCLANG_RPL_FLASH_INTENT_RETIRED
 };
 
-/* Internal replacement-intent wire format; not yet published by mutation APIs.
+/* Internal replacement-intent wire format; not yet published by public mutation APIs.
  * A 44-byte native allocation uses metadata 2 and hidden committed status 7E.
  * The body contains HPCREPL1, its own physical slot, both allocation addresses/
  * lengths/checksums, and a CRC32 over every byte except status and that CRC.

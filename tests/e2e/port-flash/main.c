@@ -35,6 +35,12 @@ static int plan_program(void *context, uint32_t address, uint16_t value)
     return 0;
 }
 
+static int intent_program(void *context, uint32_t address, uint16_t value)
+{
+    (void)context;
+    return hpclang_stock_flash_program_word(address, value) == HPCLANG_SST_OK;
+}
+
 static uint32_t fingerprint(void)
 {
     uint32_t value = 2166136261u;
@@ -356,6 +362,32 @@ int main(void)
         fingerprint() != committed ||
         hpclang_rpl_flash_intent_encode(plan_io.first, plan_io.end, plan.intent_slot, &plan.intent,
                                         intent, sizeof intent))
+        goto done;
+    failure = 36;
+    if ((plan.intent_slot & ~4095u) != create_sector ||
+        plan.intent.new_slot + plan.intent.new_bytes > create_sector + sizeof saved_sector)
+        goto done;
+    const struct hpclang_rpl_flash_io publish_io = {0, plan_read, intent_program, 0x140000u,
+                                                    0x200000u};
+    if (hpclang_rpl_flash_publish_intent(&publish_io, native_record, sizeof native_record, &plan))
+        goto done;
+    for (uint32_t i = 0; i < sizeof intent; ++i) {
+        uint32_t address = plan.intent_slot + i;
+        uint8_t actual = (uint8_t)(hpclang_flash_read16(0, address & ~1u) >> ((address & 1u) * 8u));
+        if (actual != intent[i])
+            goto done;
+    }
+    failure = 37;
+    if (hpclang_stock_flash_recover_tails() ||
+        ((hpclang_flash_read16(0, plan.intent_slot & ~1u) >> ((plan.intent_slot & 1u) * 8u)) &
+         255u))
+        goto done;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 987;
+    hpclang_object_release(object);
+    if (!valid)
         goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||

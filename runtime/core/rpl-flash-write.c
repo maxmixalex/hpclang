@@ -187,6 +187,63 @@ static int recovery_word(const struct hpclang_rpl_reader *reader, uint32_t addre
     return 0;
 }
 
+static int recover_unstarted_intent(const struct hpclang_rpl_flash_io *io, uint32_t bank,
+                                    uint32_t at, int apply)
+{
+    struct recovery_reader mapped = {io, bank};
+    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+    uint8_t encoded[HPCLANG_RPL_FLASH_INTENT_BYTES];
+    for (uint32_t i = 0; i < sizeof encoded; ++i) {
+        uint32_t byte;
+        int result = recovery_word(&reader, at + i * 2u, 2u, &byte);
+        if (result)
+            return result;
+        encoded[i] = (uint8_t)byte;
+    }
+    struct hpclang_rpl_flash_intent intent;
+    enum hpclang_rpl_flash_intent_phase phase;
+    if (hpclang_rpl_flash_intent_decode(io->first, io->end, bank + at / 2u, encoded, sizeof encoded,
+                                        &intent, &phase))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* This abort is valid only before any replacement value was written.
+     * Later phases need the full replacement executor, not a guessed winner. */
+    uint32_t old_bank = io->first + ((intent.old_slot - io->first) / 0x20000u) * 0x20000u;
+    struct recovery_reader old_mapped = {io, old_bank};
+    const struct hpclang_rpl_reader old_reader = {io_nibble, &old_mapped};
+    uint32_t old_at = (intent.old_slot - old_bank) * 2u, status;
+    int result = recovery_word(&old_reader, old_at, 2u, &status);
+    if (result)
+        return result;
+    if (status != 0x53u)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct hpclang_rpl_port_cursor cursor = {old_at, 0x40000u, 0};
+    struct hpclang_rpl_port_entry entry;
+    result = hpclang_rpl_flash_next(&old_reader, &cursor, &entry);
+    if (result != 1)
+        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                      : HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t crc;
+    if (entry.prologue != 0x02b62u || cursor.address - old_at != intent.old_bytes * 2u)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    result = hpclang_rpl_flash_record_crc(&old_reader, old_at, intent.old_bytes, &crc);
+    if (result)
+        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                      : HPCLANG_RPL_FLASH_DIRTY;
+    if (crc != intent.old_crc)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    for (uint32_t i = 0; i < intent.new_bytes; ++i) {
+        uint32_t address = intent.new_slot + i;
+        uint16_t word;
+        if (!io->read16(io->context, address & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (((word >> ((address & 1u) * 8u)) & 255u) != 255u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (apply && !discard_status(io, bank + at / 2u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
 static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, int apply)
 {
     struct recovery_reader mapped = {io, bank};
@@ -214,6 +271,15 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         uint32_t extent = header & 0xfffffu;
         if (extent < 11u || extent > 0x40000u - at - 2u)
             return HPCLANG_RPL_FLASH_DIRTY;
+        if (status && status != 0x53u && (header >> 20u) == 2u) {
+            if ((at & 1u) || extent + 2u != HPCLANG_RPL_FLASH_INTENT_BYTES * 2u)
+                return HPCLANG_RPL_FLASH_DIRTY;
+            result = recover_unstarted_intent(io, bank, at, apply);
+            if (result)
+                return result;
+            at += extent + 2u;
+            continue;
+        }
         if (status && !(status & 1u) && !(header >> 20u)) {
             /* Tail cleanup verifies zero metadata and the extent before
              * clearing bit zero. Every subsequent status remains even.
@@ -507,6 +573,26 @@ int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const 
         return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
                                                       : HPCLANG_RPL_FLASH_DIRTY;
     *plan = next;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan)
+{
+    if (!plan)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct hpclang_rpl_flash_replace_plan next;
+    int result = hpclang_rpl_flash_plan_replace(io, record, bytes, &next);
+    if (result)
+        return result;
+    uint8_t encoded[HPCLANG_RPL_FLASH_INTENT_BYTES];
+    if (hpclang_rpl_flash_intent_encode(io->first, io->end, next.intent_slot, &next.intent, encoded,
+                                        sizeof encoded))
+        return HPCLANG_RPL_FLASH_INVALID;
+    *plan = next;
+    if (!write_bytes(io, next.intent_slot + 1u, encoded + 1u, sizeof encoded - 1u) ||
+        !write_bytes(io, next.intent_slot, encoded, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 

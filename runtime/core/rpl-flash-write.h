@@ -62,6 +62,9 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * at the bank tail, accepted only with a bounded halfword allocation covering
  * the revalidated discard plan and an erased remainder.
  * This permits repeated recovery cuts without retaining an in-memory plan.
+ * A CRC-valid replacement intent can be retired before replacement starts:
+ * require the original live backup/extent/CRC and an entirely erased new slot.
+ * Changed targets or a started replacement remain DIRTY rather than guessing.
  * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
  * the record. Partial libraries and other unknown encodings remain DIRTY.
@@ -139,6 +142,16 @@ struct hpclang_rpl_flash_replace_plan
  * not itself publish an intent or change the existing replacement API. */
 int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                    uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
+
+/* Plan and publish the durable intent before touching the replacement value.
+ * Writes/reads back the complete body before publishing hidden status 7E.
+ * plan is unchanged on preflight failure and receives the attempted transaction
+ * immediately before writing. WRITTEN means intent publication only; old/new
+ * objects are untouched. DIRTY after a programming/readback failure requires
+ * retaining ownership and recovery; do not begin writing the new value unless
+ * publication succeeded. Not yet used by the public replacement API. */
+int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
 
 /* Replace exactly one existing backup without relocating its payload. Validate
  * all banks, append the complete replacement, then tombstone the old record.
