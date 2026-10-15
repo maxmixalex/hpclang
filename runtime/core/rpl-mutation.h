@@ -65,7 +65,7 @@ extern "C"
     };
 
     /* Read-only enumeration of the pointer cells already covered by native
-     * relocation: launcher roots, stacks and supported Stock pointer tables.
+     * relocation: launcher/CPU roots, stacks and supported Stock pointer tables.
      * slot is zero for an ARM-side launcher root. Values may be sentinels,
      * execution positions or metadata, not necessarily object beginnings.
      * HOME attachment fields and model-validated display cells are included.

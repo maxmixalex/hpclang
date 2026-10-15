@@ -1580,7 +1580,9 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     struct hpclang_launch_context launch;
     struct hpclang_rpl_memory_bounds rpl_bounds;
     struct stage_launcher_bias launcher_bias = {0u, 0u};
-    uint32_t *native_roots[] = {&launcher_bias.object, (uint32_t *)stock_frame};
+    uint32_t *native_roots[10];
+    native_roots[0] = &launcher_bias.object;
+    native_roots[1] = (uint32_t *)stock_frame;
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace =
@@ -1663,7 +1665,18 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         /* Hidden launcher value and saved post-ARMSYS Saturn PC are live
            roots even though neither is in a Stock-visible pointer table. */
         rpl_bounds.native_roots = native_roots;
-        rpl_bounds.native_root_count = sizeof(native_roots) / sizeof(native_roots[0]);
+        rpl_bounds.native_root_count = 2u;
+        if (model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G) {
+            /* Stock's Saturn instruction return stack is distinct from the
+             * RPL return stack in main RAM. ROM push/pop use eight 20-bit
+             * addresses at SAT_CPU+0x978 and a circular index at +0x998.
+             * A suspended ARMSYS invocation can retain TEMP code here; moving
+             * that code without these roots resumes at a stale instruction.
+             * Popped slots are cleared; preserve the circular index itself. */
+            for (uint32_t i = 0u; i < 8u; ++i)
+                native_roots[rpl_bounds.native_root_count++] =
+                    (uint32_t *)(live_state + 0x978u + i * sizeof(uint32_t));
+        }
 
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window

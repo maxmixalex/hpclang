@@ -754,6 +754,18 @@ check (`0x46410060`). This is evidence for the sampled suspended Stock states,
 not for relocation while an ARM application owns pages or for arbitrary opaque
 TEMP contents. Public registration remains unavailable until those ownership
 and reference obligations are implemented and tested.
+Live registration probing also exposed a separate return-address source:
+HP49g+/HP50g Stock's Saturn instruction return stack contains eight ARM-stored
+20-bit addresses at `SAT_CPU+0x978`, with a circular index at `+0x998`. These
+are distinct from the RPL return stack in mapped main RAM. ROM push/pop code
+masks pushed addresses, wraps the index modulo eight and clears popped slots.
+The launcher now includes all eight address slots in its native roots, leaving
+the index unchanged. The initial live HP50g probe passed its application checks
+but crashed on return; updating these slots made the same registration,
+native-RCL witness and second invocation pass. The same two-invocation HP49g+
+probe passes using the launcher's published roots without a probe-side CPU fix.
+This corrects root coverage;
+it does not certify arbitrary opaque TEMP bodies or enable public registration.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
