@@ -1124,9 +1124,20 @@ both return to their expected relocated bindings without further Flash changes.
 The final transfer first required native cleanup of the two retained fault-probe
 programs after Stock rejected a third large probe for insufficient RAM. Production
 packaging therefore still needs a bounded memory contract. The abnormal catalog
-state also motivates publishing a restored bank identity only after verifying
-its sector body. Existing x50ng Flash operations complete immediately; native
+state led to delaying restored bank-identity publication until sector-body
+verification, implemented and accepted below. Existing x50ng Flash operations complete immediately; native
 command-boundary cuts do not establish busy-chip power-loss behavior.
+
+Sector replay now leaves the first sector's bank-identity word erased until
+every other word has been independently verified, then publishes and verifies
+the identity last. Ordinary sectors retain their existing behavior. Exhaustive
+read/program/erase-cut retries, silent programming failure, non-header-sector
+coverage, ASan/UBSan, ARM analysis and formatting pass. Native HP50g interruption
+before the final identity write leaves the bank hidden after hardware reset,
+without the earlier abnormal library bindings. Independent retry then restores
+only the target sector, preserves the journal and returns normally; repeated
+replay performs no writes. This change does not protect a failed/partial erase
+or other sectors, and does not establish automatic startup recovery.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn

@@ -32,6 +32,10 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
  * Read and validate the entire durable record before any target mutation.
  * If the target already matches, do not erase/program it. Otherwise erase,
  * verify, program and verify the complete target, retaining the journal.
+ * For a bank's first sector, leave its identity word erased until every other
+ * word verifies, then publish and verify the identity last. This prevents
+ * command-boundary cuts from exposing that sector's incomplete chain through
+ * a restored bank identity; it does not protect other sectors or a failed erase.
  * Callbacks must leave command mode before returning, even on failure.
  * DIRTY requires continued ownership/retry. INVALID never authorizes Stock
  * return: an earlier erase may already have occurred. WRITTEN establishes only

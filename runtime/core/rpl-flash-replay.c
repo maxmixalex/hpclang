@@ -131,14 +131,26 @@ int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io
         if (!flash->read16(flash->context, target + offset, &word) || word != UINT16_MAX)
             return HPCLANG_RPL_FLASH_DIRTY;
     }
+    /* Keep a bank's identity erased until its first sector is complete. Stock
+     * may rebuild its library catalog after a reset between program commands;
+     * an early identity would expose a partly restored allocation chain. */
+    uint32_t identity = (target & 0x1ffffu) ? HPCLANG_RPL_FLASH_SECTOR_BYTES : 0x100u;
     for (uint32_t offset = 0; offset < HPCLANG_RPL_FLASH_SECTOR_BYTES; offset += 2u) {
         uint16_t expected = image_word(image, offset);
-        if (expected != UINT16_MAX && !flash->program16(flash->context, target + offset, expected))
+        if (offset != identity && expected != UINT16_MAX &&
+            !flash->program16(flash->context, target + offset, expected))
             return HPCLANG_RPL_FLASH_DIRTY;
     }
     for (uint32_t offset = 0; offset < HPCLANG_RPL_FLASH_SECTOR_BYTES; offset += 2u) {
-        if (!flash->read16(flash->context, target + offset, &word) ||
-            word != image_word(image, offset))
+        uint16_t expected = offset == identity ? UINT16_MAX : image_word(image, offset);
+        if (!flash->read16(flash->context, target + offset, &word) || word != expected)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (identity < HPCLANG_RPL_FLASH_SECTOR_BYTES) {
+        uint16_t expected = image_word(image, identity);
+        if ((expected != UINT16_MAX &&
+             !flash->program16(flash->context, target + identity, expected)) ||
+            !flash->read16(flash->context, target + identity, &word) || word != expected)
             return HPCLANG_RPL_FLASH_DIRTY;
     }
     return HPCLANG_RPL_FLASH_WRITTEN;

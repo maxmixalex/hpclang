@@ -14,6 +14,7 @@ static uint8_t desired[SECTOR], scratch[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 static unsigned reads, programs, erases, fail_read, fail_program, erase_prefix;
 static int erase_error, silent_program;
 static int publishing;
+static uint32_t sector_address = FIRST, last_program;
 
 static int read16(void *context, uint32_t address, uint16_t *value)
 {
@@ -33,9 +34,16 @@ static int program16(void *context, uint32_t address, uint16_t value)
             assert(!memcmp(flash + SLOT - FIRST + 1, original + SLOT - FIRST + 1,
                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 1));
     } else {
-        assert(address >= FIRST && address < FIRST + SECTOR);
+        assert(address >= sector_address && address < sector_address + SECTOR);
+        if (sector_address == FIRST && address == FIRST + 0x100) {
+            /* Identity publication must follow independent body verification,
+             * including when an earlier program silently did nothing. */
+            assert(!memcmp(flash, desired, 0x100));
+            assert(!memcmp(flash + 0x102, desired + 0x102, SECTOR - 0x102));
+        }
     }
     ++programs;
+    last_program = address;
     if (silent_program)
         return 1;
     uint32_t offset = address - FIRST;
@@ -49,9 +57,9 @@ static int program16(void *context, uint32_t address, uint16_t value)
 
 static int erase(void *context, uint32_t address)
 {
-    assert(context == flash && address == FIRST);
+    assert(context == flash && address == sector_address);
     ++erases;
-    memset(flash, 255, erase_prefix);
+    memset(flash + address - FIRST, 255, erase_prefix);
     return !erase_error;
 }
 
@@ -61,6 +69,7 @@ static const struct hpclang_rpl_flash_replay_io io = {{flash, read16, program16,
 static void reset_counters(void)
 {
     reads = programs = erases = fail_read = fail_program = 0;
+    last_program = 0;
     erase_prefix = SECTOR;
     erase_error = silent_program = 0;
     /* Retry must reconstruct its entire image from durable Flash. */
@@ -435,6 +444,28 @@ static void restart_retirement_tests(void)
     }
 }
 
+static void non_header_sector_test(void)
+{
+    prepare();
+    sector_address = FIRST + SECTOR;
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, SLOT, sector_address, desired,
+                                            flash + SLOT - FIRST,
+                                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES));
+    uint8_t journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    memcpy(journal, flash + SLOT - FIRST, sizeof journal);
+    assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash + SECTOR, desired, SECTOR));
+    assert(!memcmp(flash, original, SECTOR));
+    assert(!memcmp(flash + SLOT - FIRST, journal, sizeof journal));
+    assert(last_program == sector_address + SECTOR - 2);
+    reset_counters();
+    assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!erases && !programs);
+    sector_address = FIRST;
+}
+
 int main(void)
 {
     for (unsigned i = 0; i < sizeof original; ++i)
@@ -450,6 +481,7 @@ int main(void)
     assert(replay() == HPCLANG_RPL_FLASH_WRITTEN);
     unsigned total_reads = reads, total_programs = programs;
     assert(erases == 1 && total_programs == (SECTOR - 128) / 2);
+    assert(last_program == FIRST + 0x100);
     retry();
 
     /* Cut every read, including initial journal reads, post-erase blank checks
@@ -505,6 +537,7 @@ int main(void)
     assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch - 1) ==
            HPCLANG_RPL_FLASH_INVALID);
     assert(!reads && !programs && !erases);
+    non_header_sector_test();
     publication_tests();
     retirement_tests();
     discovery_tests();
