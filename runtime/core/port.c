@@ -13,6 +13,7 @@
 #include "rpl-stock-memory.h"
 #include "saturn-view.h"
 #include "launch-services.h"
+#include "stock-flash.h"
 
 int hpclang_port_query(uint32_t port, struct hpclang_port_info *info)
 {
@@ -101,6 +102,13 @@ static int open_cursor(uint32_t port, struct hpclang_rpl_reader *reader,
     if (port == 2) {
         if (device->family != HPCLANG_FAMILY_HP4950 || !hpclang_rpl_stock_port2_reader(0, reader)) {
             errno = ENOSYS;
+            return -1;
+        }
+        int recovered = hpclang_stock_flash_recover_tails();
+        if (recovered) {
+            errno = recovered == HPCLANG_RPL_FLASH_UNSUPPORTED ? ENOSYS
+                    : recovered == HPCLANG_RPL_FLASH_FAILED    ? EIO
+                                                               : EILSEQ;
             return -1;
         }
         *cursor = (struct hpclang_rpl_port_cursor){0x20au, HPCLANG_RPL_FLASH_BANK_NIBBLES, 0};

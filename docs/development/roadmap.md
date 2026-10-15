@@ -545,8 +545,10 @@ Normal Port 2 mutations now prepare the port with recovery under the same Flash
 mapping lease. Preflight errors do not write; once programming starts, transient
 read/write errors are retried while ownership is retained. The public-create
 fixture includes a hidden backup from an interrupted prior operation and requires
-successful recovery without calling the internal recovery API. Read-only access,
-calculator startup, library lifecycle and replacement-intent recovery remain
+successful recovery without calling the internal recovery API. Port 2 reads and
+enumeration now prepare recovery too, covering committed and partial new values
+without an intervening write request. Capability queries and owned iterator
+reads remain non-mutating. Calculator startup and library lifecycle remain
 separate work; the full power-loss goal is unchanged.
 Replacement-intent encoding/decoding now has a bounded 44-byte hidden format,
 allocation identities and CRC32 protection. Host corruption/bounds tests and

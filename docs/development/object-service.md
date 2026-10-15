@@ -879,9 +879,14 @@ under their existing mapping lease before the requested mutation. Preflight
 errors return without writes; after programming starts, recovery keeps ownership
 and retries until the chain is verified. A repaired tail stays repaired even if
 the requested operation subsequently reports an existing/missing name or full
-media. Reads do not trigger repair. This is recovery on mutation, not calculator
-startup repair: library status recovery, replacement intent and interrupted
-sector erasure still require separate protocols.
+media. Opening Port 2 enumeration, backup reads or library reads also runs the
+same recovery before accessing native records. An already-open iterator owns
+its snapshot and needs no repair; capability queries remain non-mutating.
+Unknown later-bank corruption prevents all repair writes and returns an error
+instead of exposing an earlier matching value. This is recovery on SDK access,
+not calculator startup repair: library status recovery and interrupted sector
+erasure still require separate protocols. Replacement intents use the protocol
+below.
 Replacement has a distinct restart boundary: a cut after the new record commits
 but before the old status clears leaves two valid same-name backups. A host test
 reproduces this with different value types, drops the in-memory transaction,

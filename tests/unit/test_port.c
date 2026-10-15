@@ -21,6 +21,7 @@ static int port2_available;
 static uint8_t flash[HPCLANG_RPL_PORT2_BANKS][HPCLANG_RPL_FLASH_BANK_NIBBLES];
 static uint32_t missing_flash_bank = UINT32_MAX;
 static uint32_t port1_limit = 0x2000u;
+static unsigned flash_writes;
 static struct hpclang_boot_info boot = {.saturn_state = 1};
 static struct hpclang_device_info device = {.family = HPCLANG_FAMILY_HP4950};
 
@@ -40,6 +41,7 @@ static int flash_word_read(void *context, uint32_t address, uint16_t *value)
 
 static int flash_word_program(void *context, uint32_t address, uint16_t value)
 {
+    ++flash_writes;
     uint16_t old;
     assert(flash_word_read(context, address, &old) && (old & value) == value);
     uint32_t bank = (address - 0x140000u) / 0x20000u;
@@ -47,6 +49,15 @@ static int flash_word_program(void *context, uint32_t address, uint16_t value)
     for (unsigned i = 0; i < 4; ++i)
         flash[bank][offset + i] = (value >> (4u * i)) & 15u;
     return 1;
+}
+
+int hpclang_stock_flash_recover_tails(void)
+{
+    if (!port2_available)
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    return hpclang_rpl_flash_prepare_write(&io);
 }
 
 int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
@@ -246,6 +257,70 @@ static void test_discovery(void)
     device = saved_device;
 }
 
+static int packed_flash_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const uint8_t *data = context;
+    *value = (data[address / 2u] >> (4u * (address & 1u))) & 15u;
+    return 1;
+}
+
+static void test_flash_read_recovery(const struct hpclang_object *original)
+{
+    const uint8_t integer[] = {0x14, 0x26, 0x90, 0, 0, 0x86, 0x09}; /* ZINT 986. */
+    const struct hpclang_rpl_reader source = {packed_flash_nibble, (void *)integer};
+    uint8_t *backup, *record;
+    uint32_t span, bytes;
+    assert(
+        !hpclang_rpl_backup_encode(&source, 0, 14, (const uint8_t *)"PORTZERO", 8, &backup, &span));
+    const struct hpclang_rpl_reader encoded = {packed_flash_nibble, backup};
+    assert(!hpclang_rpl_flash_backup_record(&encoded, 0, span, &record, &bytes));
+    free(backup);
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    for (unsigned scenario = 0; scenario < 5; ++scenario) {
+        struct hpclang_rpl_flash_replace_plan plan;
+        assert(!hpclang_rpl_flash_publish_intent(&io, record, bytes, &plan));
+        if (scenario == 1)
+            assert(flash_word_program(NULL, (plan.intent.new_slot + 6u) & ~1u, 0));
+        else if (scenario >= 2) {
+            assert(!hpclang_rpl_flash_append(&io, plan.intent.new_slot, record, bytes));
+            if (scenario == 3) {
+                uint32_t bank = (plan.intent.new_slot - io.first) / 0x20000u;
+                uint32_t at = (plan.intent.new_slot & 0x1ffffu) * 2u;
+                flash[bank][at] = 15;
+                flash[bank][at + 1u] = 7;
+            }
+        }
+        if (scenario == 4) {
+            flash[5][0x202] ^= 1u;
+            unsigned before = flash_writes;
+            assert(!hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8));
+            assert(errno == EILSEQ && flash_writes == before);
+            flash[5][0x202] ^= 1u;
+        }
+        if (scenario == 1) {
+            struct hpclang_port_iterator *iterator = hpclang_port_iterator_open(2);
+            assert(iterator);
+            hpclang_port_iterator_close(iterator);
+        } else if (scenario == 3) {
+            struct hpclang_object *library = hpclang_port_library_get(2, 123);
+            assert(library);
+            hpclang_object_release(library);
+        }
+        struct hpclang_object *value = hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8);
+        int64_t number;
+        assert(value && !hpclang_object_integer_i64(value, &number));
+        assert(number == (scenario < 2 ? 123 : 986));
+        hpclang_object_release(value);
+        unsigned recovered = flash_writes;
+        value = hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8);
+        assert(value && flash_writes == recovered);
+        hpclang_object_release(value);
+        assert(!hpclang_port_backup_replace(2, (const uint8_t *)"PORTZERO", 8, original));
+    }
+    free(record);
+}
+
 static void test_flash(void)
 {
     memset(flash, 15, sizeof(flash));
@@ -273,6 +348,7 @@ static void test_flash(void)
     struct hpclang_object *value = hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8);
     struct hpclang_object *library = hpclang_port_library_get(2, 123);
     assert(value && library && hpclang_object_kind(library) == HPCLANG_OBJECT_LIBRARY);
+    test_flash_read_recovery(value);
     assert(!hpclang_port_backup_create(2, (const uint8_t *)"NEWFLASH", 8, value));
     struct hpclang_object *created = hpclang_port_backup_get(2, (const uint8_t *)"NEWFLASH", 8);
     int64_t number;
@@ -310,7 +386,7 @@ static void test_flash(void)
            errno == EILSEQ);
     assert(!hpclang_port_iterator_open(2) && errno == EILSEQ);
     flash[5][0x202] ^= 1;
-    flash[5][0x20a] = flash[5][0x20b] = 0;
+    assert(!hpclang_port_backup_remove(2, (const uint8_t *)"PORTZERO", 8));
     assert(!hpclang_port_backup_get(2, (const uint8_t *)"PORTZERO", 8) && errno == ENOENT);
     port2_available = 0;
     memset(flash, 0, sizeof(flash));

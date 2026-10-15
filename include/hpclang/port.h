@@ -77,6 +77,11 @@ extern "C"
      * and HP49g+/HP50g Stock Port 1/2 reads are implemented; other valid
      * ports/contexts return ENOSYS. This does not
      * imply that the calculator lacks those ports. Indices above 2 return EINVAL.
+     * Opening Port 2 reads/enumeration first recovers recognized interrupted
+     * Flash writes and replacement intents. This may write recovery metadata;
+     * unknown corruption fails before writes. Existing owned snapshots remain
+     * valid. Capability queries and reads of an already-open iterator do not
+     * initiate recovery. This is not a calculator power-on hook.
      */
     struct hpclang_port_iterator *hpclang_port_iterator_open(uint32_t port);
     /* Initialize entry.size and entry.version. Returns 1/0/-1 for entry/end/error. */
@@ -106,13 +111,13 @@ extern "C"
      */
     int hpclang_port_library_create(uint32_t port, const struct hpclang_object *library);
 
-    /* Port 2 mutations first recover validated interrupted backups and marked
+    /* Port 2 access first recovers validated interrupted backups and marked
      * incomplete tails under the same exclusive Flash ownership. Recovery may
      * remain committed even if the requested operation then reports EEXIST,
      * ENOENT or ENOSPC. Unknown corruption and partial libraries are rejected;
-     * this neither chooses between duplicate live replacements nor reclaims
-     * space. Reads do not initiate repair. This applies to library creation
-     * and all backup mutations below. */
+     * duplicate replacements are resolved only with a validated durable intent.
+     * No space is reclaimed. Reads and enumeration use the same recovery;
+     * library creation and all backup mutations also recover before writing. */
 
     /* Create a new named backup from an owned snapshot. An existing exact name
      * returns EEXIST; insufficient native space returns ENOSPC. Existing port
@@ -130,13 +135,14 @@ extern "C"
     /* Replace an existing backup; missing names return ENOENT. Live
      * calculator references retain the old value. Supports Port 0 and
      * HP49g+/HP50g Stock Port 2. Port 0 operations requiring relocation of a
-     * preceding library return ENOTSUP. Port 2 appends the complete new record
-     * before tombstoning the old one, preserving its payload and pointers.
+     * preceding library return ENOTSUP. Port 2 reserves a 44-byte transaction
+     * record plus the new backup, records the intent before writing the new
+     * value, then tombstones the old one, preserving its payload and pointers.
      * Insufficient erased tail space returns ENOSPC without deleting the old
-     * value. Failed appends are discarded; after commit, old-status cleanup
-     * completes under exclusive ownership before success is returned. Permanent
+     * value. Recovery determines whether an uncertain write retained the old
+     * value or committed the new one before returning that outcome. Permanent
      * hardware failure retains RAM execution as with creation. No reclamation
-     * or power-loss guarantee. Replacement never creates a missing backup. */
+     * or automatic power-on recovery. Replacement never creates a missing backup. */
     int hpclang_port_backup_replace(uint32_t port, const uint8_t *name, uint32_t name_length,
                                     const struct hpclang_object *value);
     /* Remove an existing backup; missing names return ENOENT. Supports Port 0

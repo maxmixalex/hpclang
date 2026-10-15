@@ -432,17 +432,14 @@ int main(void)
     if (appended)
         goto done;
     failure = 39;
-    if (hpclang_stock_flash_recover_tails() ||
-        ((hpclang_flash_read16(0, plan.intent.old_slot & ~1u) >>
-          ((plan.intent.old_slot & 1u) * 8u)) &
-         255u))
-        goto done;
     object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
     if (!object)
         goto done;
     valid = !hpclang_object_integer_i64(object, &value) && value == 986;
     hpclang_object_release(object);
-    if (!valid)
+    if (!valid || ((hpclang_flash_read16(0, plan.intent.old_slot & ~1u) >>
+                    ((plan.intent.old_slot & 1u) * 8u)) &
+                   255u))
         goto done;
     /* An interrupted new body is not a native object. Recover using the
      * durable reservation, retaining the current value and later tail. */
@@ -462,17 +459,14 @@ int main(void)
     if (published || !intent_program(0, (plan.intent.new_slot + 6u) & ~1u, 0))
         goto done;
     failure = 41;
-    if (hpclang_stock_flash_recover_tails() ||
-        ((hpclang_flash_read16(0, plan.intent.new_slot & ~1u) >>
-          ((plan.intent.new_slot & 1u) * 8u)) &
-         255u))
-        goto done;
     object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
     if (!object)
         goto done;
     valid = !hpclang_object_integer_i64(object, &value) && value == 986;
     hpclang_object_release(object);
-    if (!valid)
+    if (!valid || ((hpclang_flash_read16(0, plan.intent.new_slot & ~1u) >>
+                    ((plan.intent.new_slot & 1u) * 8u)) &
+                   255u))
         goto done;
     /* A fully verified body with an interrupted FF-to-53 publication must
      * finish publishing before recovery deletes the original backup. */
@@ -508,20 +502,18 @@ int main(void)
     if (partial)
         goto done;
     failure = 43;
-    if (hpclang_stock_flash_recover_tails() ||
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 986;
+    hpclang_object_release(object);
+    if (!valid ||
         ((hpclang_flash_read16(0, plan.intent.old_slot & ~1u) >>
           ((plan.intent.old_slot & 1u) * 8u)) &
          255u) ||
         ((hpclang_flash_read16(0, plan.intent.new_slot & ~1u) >>
           ((plan.intent.new_slot & 1u) * 8u)) &
          255u) != 0x53u)
-        goto done;
-    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
-    if (!object)
-        goto done;
-    valid = !hpclang_object_integer_i64(object, &value) && value == 986;
-    hpclang_object_release(object);
-    if (!valid)
         goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||

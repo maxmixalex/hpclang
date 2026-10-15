@@ -119,7 +119,7 @@ the old value; verified publication can finish the new value even when a write
 acknowledgement fails. Recovery must resolve that outcome before return.
 The old payload and references stay in place. `ENOSPC` never deletes the old
 record to make room, and `ENOENT` never implicitly creates a new name.
-The next SDK mutation performs recovery of recognized interrupted transactions;
+The next SDK read, enumeration or mutation performs recovery of recognized interrupted transactions;
 automatic calculator-startup recovery is not yet implemented. Neither old
 payloads nor retired transaction records are reclaimed.
 HP39 Aplet storage is a separate service, not a native Port 0/1/2 namespace.
