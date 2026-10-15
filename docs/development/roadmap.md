@@ -1212,6 +1212,14 @@ maintained verifier; reset leaves the damaged Flash unchanged. The scenario no
 longer requires historical research snapshots. CI orchestration and busy-chip
 power-loss coverage remain open.
 
+The maintained runner now completes fresh boot, offline fault preparation,
+hardware reset, USB upload and independent saved-state verification locally
+from a Linux source export. Core's Stock recovery / HP50g job is wired to the
+shared portable emulator setup and Kermit watchdog, with retained phase evidence.
+All 100 host targets, changed-file formatting, Python lint and strict docs pass
+locally. Remote acceptance is pending. User-facing installation, memory-budget
+acceptance, other models and busy-chip power-loss coverage remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

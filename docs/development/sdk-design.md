@@ -302,8 +302,26 @@ then erases that sector in the copied Flash image. The original state and any
 existing destination are preserved. The copied state must undergo hardware
 reset before transfer so Stock rebuilds its catalog from the damaged Flash.
 This is explicit offline fault injection, not a model of an erase/program pulse
-interrupted while the chip is busy. The build gate does not yet orchestrate
-these Stock phases in CI or provide user-facing recovery/error handling.
+interrupted while the chip is busy.
+
+`tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
+fault preparation, hardware reset, USB transfer and independent verification.
+Core's **Stock recovery / HP50g** job uses the shared portable x50ng setup and
+Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
+requires a new output directory to prevent stale evidence, reaps its child
+processes on failure/cancellation, and emits `result.json` only after verification.
+With the portable Stock runtime prepared and its tools/libraries on the process
+search paths:
+
+```sh
+python3 tests/e2e/port-recovery/run.py \
+  --dist build/x50ng/dist --build build/port-recovery \
+  --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
+```
+
+This gate covers the explicit erased-header-sector scenario on HP50g. It does
+not provide user-facing installation/error handling, other-model acceptance or
+busy-chip power-loss coverage.
 
 ## Capabilities
 

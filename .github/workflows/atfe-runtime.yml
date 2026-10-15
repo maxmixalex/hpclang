@@ -35,6 +35,15 @@ on:
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
+      - "tools/run-hp48-kermit-send.sh"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/build-ckermit.sh"
+      - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/ckermit-*.patch"
+      - "tests/e2e/harness/test-kermit-timers.py"
+      - ".github/actions/setup-x50ng/**"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
@@ -71,6 +80,15 @@ on:
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
       - "tools/package-recovery.py"
+      - "tools/run-hp48-kermit-send.sh"
+      - "tools/prepare-x50ng.py"
+      - "tools/fetch-x50ng.sh"
+      - "tools/build-ckermit.sh"
+      - "tests/e2e/sequences/hp4950-stock-usb-run.seq"
+      - "tests/e2e/harness/setup-runtime.sh"
+      - "tests/e2e/harness/ckermit-*.patch"
+      - "tests/e2e/harness/test-kermit-timers.py"
+      - ".github/actions/setup-x50ng/**"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 
@@ -103,6 +121,17 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
             -DCMAKE_BUILD_TYPE=MinSizeRel
           cmake --build build/port-recovery -j2
+
+      - name: Upload independent recovery witness
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-recovery-build
+          retention-days: 1
+          path: |
+            build/port-recovery/recovery.elf
+            build/port-recovery/recovery.bin
+            build/port-recovery/recovery.hp
+          if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache
         uses: actions/cache@v6
@@ -144,6 +173,42 @@ jobs:
             build/e2e/launchers/hp39gs.hp
             build/e2e/launchers/hp40gs.hp
           if-no-files-found: error
+
+  port-recovery:
+    name: Stock recovery / HP50g
+    needs: runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-atfe
+      - uses: ./.github/actions/setup-x50ng
+      - uses: actions/download-artifact@v7
+        with:
+          name: port-recovery-build
+          path: build/port-recovery
+      - name: Prepare Stock runtime
+        run: bash tests/e2e/harness/setup-runtime.sh stock hp4950
+      - name: Execute independent recovery
+        run: |
+          python3 tests/e2e/port-recovery/run.py \
+            --dist build/x50ng/dist --build build/port-recovery \
+            --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
+      - name: Upload recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hp50g-independent-recovery
+          retention-days: 14
+          path: |
+            build/port-recovery-evidence/**/*.json
+            build/port-recovery-evidence/**/*.log
+            build/port-recovery-evidence/**/*.seq
+            build/port-recovery-evidence/**/*.pgm
+            build/port-recovery-evidence/**/state
+            build/port-recovery-evidence/**/sram
+            build/port-recovery-evidence/**/flash
+          if-no-files-found: warn
 
   hp39-package:
     name: HP39 package
