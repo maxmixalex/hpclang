@@ -18,7 +18,7 @@ enum hpclang_rpl_flash_intent_phase
     HPCLANG_RPL_FLASH_INTENT_RETIRED
 };
 
-/* Internal replacement-intent wire format; not yet published by public mutation APIs.
+/* Internal replacement-intent wire format used by backup replacement.
  * A 44-byte native allocation uses metadata 2 and hidden committed status 7E.
  * The body contains HPCREPL1, its own physical slot, both allocation addresses/
  * lengths/checksums, and a CRC32 over every byte except status and that CRC.
@@ -35,6 +35,26 @@ int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
                                     const uint8_t *data, uint32_t bytes,
                                     struct hpclang_rpl_flash_intent *intent,
                                     enum hpclang_rpl_flash_intent_phase *phase);
+
+#define HPCLANG_RPL_FLASH_SECTOR_BYTES 4096u
+#define HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES (HPCLANG_RPL_FLASH_SECTOR_BYTES + 28u)
+
+/* Proposed internal redo-image allocation (metadata 3, HPCSECT1), not yet
+ * published or recognized by whole-port recovery. It holds a complete 4 KiB
+ * desired sector image, its target/self addresses and a status-independent
+ * CRC32. The journal allocation must be outside the target sector and native
+ * bank headers, with an erased end-marker position remaining in its bank.
+ * Callers separately prove real allocation boundaries and erased capacity;
+ * the codec checks geometry only.
+ * Encode/decode are memory-only; neither authorizes erase, establishes that
+ * the image is a valid native bank, or provides startup recovery. Successful
+ * decode returns the target and an image view into the caller's stable buffer.
+ * Outputs are unchanged on failure. Source/output overlap is supported. */
+int hpclang_rpl_flash_sector_encode(uint32_t first, uint32_t end, uint32_t slot, uint32_t target,
+                                    const uint8_t *image, uint8_t *data, uint32_t capacity);
+int hpclang_rpl_flash_sector_decode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const uint8_t *data, uint32_t bytes, uint32_t *target,
+                                    const uint8_t **image);
 
 /* CRC32/ISO-HDLC of allocation bytes after the status byte. Status publication
  * or deletion does not change record identity. This supplements, rather than

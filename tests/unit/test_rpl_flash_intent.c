@@ -39,8 +39,73 @@ static void crc_tests(void)
     assert(hpclang_rpl_flash_record_crc(&reader, 0xfffffu, 2, &crc) == HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+static void sector_images(void)
+{
+    const uint32_t first = 0x140000, end = 0x200000, slot = 0x160105;
+    uint8_t image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
+    uint8_t record[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES], saved[sizeof record];
+    for (uint32_t i = 0; i < sizeof image; ++i)
+        image[i] = (uint8_t)(73u * i);
+    assert(!hpclang_rpl_flash_sector_encode(first, end, slot, first, image, record, sizeof record));
+    /* Independent Python zlib vector covers the entire header and sector. */
+    const uint8_t expected_crc[] = {0x26, 0xcd, 0x74, 0xcd};
+    assert(!memcmp(record + sizeof record - 4, expected_crc, sizeof expected_crc));
+    memcpy(saved, record, sizeof record);
+    uint32_t target = 123;
+    const uint8_t *view = NULL;
+    assert(
+        !hpclang_rpl_flash_sector_decode(first, end, slot, record, sizeof record, &target, &view));
+    assert(target == first && view == record + 24 && !memcmp(view, image, sizeof image));
+    /* A damaged byte anywhere in metadata, image or checksum rejects the image. */
+    for (uint32_t i = 0; i < sizeof record; ++i) {
+        record[i] ^= 1;
+        target = 123;
+        view = NULL;
+        assert(hpclang_rpl_flash_sector_decode(first, end, slot, record, sizeof record, &target,
+                                               &view) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(target == 123 && !view);
+        record[i] ^= 1;
+    }
+    for (unsigned status = 0; status < 256; ++status) {
+        record[0] = (uint8_t)status;
+        int result = hpclang_rpl_flash_sector_decode(first, end, slot, record, sizeof record,
+                                                     &target, &view);
+        assert(result == (status == 0x7e ? 0 : HPCLANG_RPL_SPAN_MALFORMED));
+    }
+    record[0] = 0x7e;
+    const uint32_t bad_slots[] = {first, first + 0x100, first + 0x105, first + 4096 - 2, end - 4096,
+                                  end};
+    for (unsigned i = 0; i < sizeof bad_slots / sizeof bad_slots[0]; ++i) {
+        assert(hpclang_rpl_flash_sector_encode(first, end, bad_slots[i], first, image, record,
+                                               sizeof record) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(record, saved, sizeof record));
+    }
+    assert(hpclang_rpl_flash_sector_encode(first, end, slot, first + 2, image, record,
+                                           sizeof record) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flash_sector_encode(first, end, slot, first - 4096, image, record,
+                                           sizeof record) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flash_sector_encode(first, end, slot, end, image, record, sizeof record) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flash_sector_encode(first, end, slot, first, image, record,
+                                           sizeof record - 1) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_flash_sector_decode(first, end, slot + 2, record, sizeof record, &target,
+                                           &view) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(record, saved, sizeof record));
+    /* Encoding from an overlapping buffer preserves the complete image. */
+    memcpy(record, image, sizeof image);
+    assert(
+        !hpclang_rpl_flash_sector_encode(first, end, slot, first, record, record, sizeof record));
+    assert(!memcmp(record, saved, sizeof record));
+    /* Same-bank journaling is allowed only beyond the erased target sector. */
+    assert(!hpclang_rpl_flash_sector_encode(first, end, first + 4096, first, image, record,
+                                            sizeof record));
+    assert(!hpclang_rpl_flash_sector_decode(first, end, first + 4096, record, sizeof record,
+                                            &target, &view));
+}
+
 int main(void)
 {
+    sector_images();
     const uint32_t first = 0x140000u, end = 0x200000u, slot = first + 0x105u;
     const struct hpclang_rpl_flash_intent source = {
         0x160105u, 0x180105u, 32u, 64u, UINT32_C(0x11223344), UINT32_C(0xaabbccdd)};

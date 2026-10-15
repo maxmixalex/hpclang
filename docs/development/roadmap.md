@@ -900,6 +900,15 @@ copy; the resumed library command reaches PASS, settles in Stock and leaves
 validates the sampled relocation/launch path, not live graph completeness,
 atomic reference repair, embedded legacy ARM realignment or interrupted erase.
 
+The proposed erase-recovery image codec now holds a complete 4 KiB desired
+sector in a hidden native allocation outside that sector, with self/target
+addresses and a status-independent CRC32. Host tests inject corruption at every
+record byte, reject non-published status values and overlapping/out-of-bank
+locations, and cover overlapping input buffers; sanitizers and ARM analysis pass.
+This format is not yet published or accepted by whole-port recovery. Durable
+publication, erase/replay ordering, journal retirement, allocation ownership and
+startup integration remain required before any recovery claim.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

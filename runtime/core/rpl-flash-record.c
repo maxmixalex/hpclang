@@ -106,6 +106,65 @@ int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
     return HPCLANG_RPL_SPAN_OK;
 }
 
+static int sector_bounds(uint32_t first, uint32_t end, uint32_t slot, uint32_t target)
+{
+    return !(first & 0x1ffffu) && first <= end && end - first == 6u * 0x20000u && target >= first &&
+           target <= end - HPCLANG_RPL_FLASH_SECTOR_BYTES &&
+           !(target & (HPCLANG_RPL_FLASH_SECTOR_BYTES - 1u)) &&
+           intent_allocation(first, end, slot, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) &&
+           separate(slot, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, target,
+                    HPCLANG_RPL_FLASH_SECTOR_BYTES);
+}
+
+static uint32_t sector_crc(const uint8_t *data)
+{
+    uint32_t crc = UINT32_MAX;
+    for (uint32_t i = 1; i < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4u; ++i)
+        crc = crc_byte(crc, data[i]);
+    return ~crc;
+}
+
+int hpclang_rpl_flash_sector_encode(uint32_t first, uint32_t end, uint32_t slot, uint32_t target,
+                                    const uint8_t *image, uint8_t *data, uint32_t capacity)
+{
+    if (!image || !data || capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES ||
+        !sector_bounds(first, end, slot, target))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    memmove(data + 24u, image, HPCLANG_RPL_FLASH_SECTOR_BYTES);
+    uint32_t extent = 2u * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 2u;
+    data[0] = 0x7eu;
+    data[1] = (uint8_t)extent;
+    data[2] = (uint8_t)(extent >> 8u);
+    data[3] = (uint8_t)((extent >> 16u) | 0x30u);
+    memcpy(data + 4u, "HPCSECT1", 8u);
+    write_le32(data + 12u, slot);
+    write_le32(data + 16u, target);
+    write_le32(data + 20u, HPCLANG_RPL_FLASH_SECTOR_BYTES);
+    write_le32(data + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4u, sector_crc(data));
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_sector_decode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const uint8_t *data, uint32_t bytes, uint32_t *target,
+                                    const uint8_t **image)
+{
+    if (!data || !target || !image || bytes != HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t extent = 2u * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 2u;
+    uint32_t address = read_le32(data + 16u);
+    /* Only a fully published image is a recovery candidate. Torn publication
+     * and retirement are deliberately not interpreted by this codec. */
+    if (data[0] != 0x7eu || data[1] != (uint8_t)extent || data[2] != (uint8_t)(extent >> 8u) ||
+        data[3] != (uint8_t)((extent >> 16u) | 0x30u) || memcmp(data + 4u, "HPCSECT1", 8u) ||
+        read_le32(data + 12u) != slot || read_le32(data + 20u) != HPCLANG_RPL_FLASH_SECTOR_BYTES ||
+        read_le32(data + bytes - 4u) != sector_crc(data) ||
+        !sector_bounds(first, end, slot, address))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *target = address;
+    *image = data + 24u;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 int hpclang_rpl_flash_record_crc(const struct hpclang_rpl_reader *reader, uint32_t address,
                                  uint32_t bytes, uint32_t *crc)
 {
