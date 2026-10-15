@@ -1070,6 +1070,18 @@ do not replace physical-device validation or close the remaining release goals.
 - [ ] Evaluate the retained independent-launcher option against concrete
   packaging/portability benefits. Any scope decision remains explicit; M8
   does not silently turn this evaluation into an implemented launcher claim.
+  This is retained follow-up work, not the current Port 2 priority or a
+  prerequisite for continuing native port services.
+  - [ ] Prototype Stock-to-ARM entry and normal return without invoking
+    ARMToolbox / library 275, then connect the existing HPC1 loader. A minimal
+    entry probe alone does not establish an independent application launcher.
+  - [ ] Evaluate owned page allocation, MMU setup, relocation roots, native
+    service coexistence and exit recovery across all three platform families,
+    including the HP39 Aplet boundary and smallest-model memory budget.
+  - [ ] Present a migration decision and acceptance plan before retiring the
+    historical dependency. Any replacement must preserve six-model packaging,
+    application ABI, Stock return and documented compatibility; retirement is
+    not implied by successful prototype tests.
 
 Suggested work order: M8.0 and the M8.1 packaging foundation first, followed by
 M8.2/M8.3 as the early UI track. UI design and host fixtures need not wait for
