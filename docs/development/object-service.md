@@ -1222,6 +1222,16 @@ address; a bank-9 control with the same numeric target produces no patch. This
 is a checked individual-field plan, not a complete root-set repair or a commit
 to live calculator memory.
 
+`hpclang_rpl_reference_edits_validate` checks a supplied edit batch before any
+write: word/address bounds and overlapping fields are checked before reads,
+then all current values must match the captured expectations. Mapping IDs must
+already normalize physical aliases. Duplicate fields are rejected, and a
+no-change entry can guard mapping metadata alongside an address update. Native
+catalog validation covers both library 275's old target and its bank-switch
+field; changing the latter rejects the batch. The API is read-only and does not
+prove that all roots were collected. Exclusive ownership, an immutable plan,
+write-failure handling and the relocation commit remain caller obligations.
+
 The internal `hpclang_rpl_entry_inspect` separates bounded RPL objects from an
 entry whose dispatch word equals its own address plus five. Known object
 prologues take precedence, even at an address where the two patterns coincide.

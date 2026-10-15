@@ -539,8 +539,78 @@ static void qualified_relocation(void)
     assert(!memcmp(&patch, &saved, sizeof patch));
 }
 
+struct mapped_images
+{
+    struct image banks[2];
+    unsigned reads;
+};
+
+static int mapped_read(void *context, uint32_t mapping, uint32_t address, uint8_t *value)
+{
+    struct mapped_images *images = context;
+    ++images->reads;
+    return mapping < 2 && read_nibble(&images->banks[mapping], address, value);
+}
+
+static void batch_preflight(void)
+{
+    struct mapped_images images = {
+        .banks = {{.size = 20, .fail = UINT32_MAX}, {.size = 20, .fail = UINT32_MAX}}};
+    put(&images.banks[0], 5, 0x12345, 5);
+    put(&images.banks[1], 5, 0x54321, 5);
+    put(&images.banks[0], 10, 0x67890, 5);
+    struct hpclang_rpl_reference_edit edits[] = {
+        {0, 5, 0x12345, 0x12340}, {1, 5, 0x54321, 0x54320}, {0, 10, 0x67890, 0x67880}};
+    struct hpclang_rpl_reference_reader reader = {mapped_read, &images};
+    struct mapped_images original = images;
+    assert(!hpclang_rpl_reference_edits_validate(NULL, NULL, 0));
+    assert(!hpclang_rpl_reference_edits_validate(&reader, edits, 3));
+    assert(images.reads == 15 && !memcmp(images.banks, original.banks, sizeof images.banks));
+    /* Every read can fail, including the final nibble of the final edit. */
+    for (unsigned i = 0; i < 3; ++i) {
+        for (uint32_t j = 0; j < 5; ++j) {
+            images = original;
+            images.banks[edits[i].mapping].fail = edits[i].field + j;
+            assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            images.banks[edits[i].mapping].fail = UINT32_MAX;
+            assert(!memcmp(images.banks, original.banks, sizeof images.banks));
+        }
+    }
+    images = original;
+    images.banks[0].data[14] ^= 1;
+    assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) == HPCLANG_RPL_SPAN_MALFORMED);
+    images.banks[0].data[14] = 16;
+    assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) == HPCLANG_RPL_SPAN_MALFORMED);
+    /* Check both overlap orders, exact duplicates and endpoint adjacency. */
+    struct hpclang_rpl_reference_edit saved = edits[1];
+    edits[1].mapping = 0;
+    for (uint32_t field = 1; field < 10; ++field) {
+        edits[1].field = field;
+        images = original;
+        assert(hpclang_rpl_reference_edits_validate(&reader, edits, 2) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!images.reads);
+    }
+    edits[1] = saved;
+    images = original;
+    edits[2].field = 0xffffc;
+    assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!images.reads); /* Even late metadata errors precede all reads. */
+    edits[2].field = 10;
+    edits[2].value = 0x100000;
+    assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) == HPCLANG_RPL_SPAN_BOUNDS);
+    edits[2].value = 0x67880;
+    edits[2].expected = 0x100000;
+    assert(hpclang_rpl_reference_edits_validate(&reader, edits, 3) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!images.reads);
+    assert(hpclang_rpl_reference_edits_validate(&reader, NULL, 1) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_reference_edits_validate(NULL, edits, 1) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    batch_preflight();
     qualified_relocation();
     dispatch_schemas();
     execution_entries();

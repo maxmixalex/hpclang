@@ -149,4 +149,28 @@ int hpclang_rpl_reference_plan_qualified_shift(
     const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
     int32_t delta, struct hpclang_rpl_reference_patch *patch);
 
+struct hpclang_rpl_reference_edit
+{
+    uint32_t mapping, field, expected, value;
+};
+
+struct hpclang_rpl_reference_reader
+{
+    int (*read_nibble)(void *context, uint32_t mapping, uint32_t address, uint8_t *value);
+    void *context;
+};
+
+/* Read-only preflight of a complete caller-owned edit array. Mapping IDs must
+ * normalize physical aliases to the same identity. All fields/words and
+ * same-mapping overlaps (including duplicate fields) are checked before I/O;
+ * then every five-nibble old value must equal expected. Returns a span result:
+ * malformed plans or changed old values are MALFORMED, read errors UNAVAILABLE.
+ * Empty arrays succeed without a reader. No write callback is accepted.
+ * Caller must retain exclusive ownership and the unchanged array/mappings
+ * through any later commit. This verifies neither missing roots nor write
+ * failure recovery; success alone does not authorize native relocation. */
+int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
+                                         const struct hpclang_rpl_reference_edit *edits,
+                                         uint32_t count);
+
 #endif

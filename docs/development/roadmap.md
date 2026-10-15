@@ -866,8 +866,11 @@ Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
 actual C bank resolver/planner computes the relocated library-275 catalog target
-while leaving an equal address in another bank unchanged. Full root discovery,
-batched validation and live commit remain required before reclamation is enabled.
+while leaving an equal address in another bank unchanged. Supplied edit batches
+now receive read-only bounds/overlap and expected-value preflight, including
+bank-switch metadata guards. Host failure injection, sanitizers, ARM analysis
+and the native catalog-state check pass. Full root discovery, assembly of a
+complete qualified batch and live commit remain required before reclamation is enabled.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
