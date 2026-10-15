@@ -1086,6 +1086,22 @@ with library 275 absent and Flash unchanged. This supplies the timing dependency
 for the next independent SST command/replay experiment; it does not establish
 general SDK TLS loading, actual Flash replay or production recovery acceptance.
 
+Calculator-side sector replay now passes in the isolated native HP50g fixture.
+The independent entry uses the existing SST identification/command engine and
+sector-replay module: one erase and 2,048 halfword programs restore the journal's
+target sector exactly, with no other Flash changes and the journal retained.
+An immediate second replay performs no erase/program operations. TLS/clock,
+owned stack guards/code, mapping/vector/control restoration and the native
+return integer all pass. A subsequent Stock ON/F3 rebuilds both library 124/275
+bindings at their relocated addresses while preserving the recovered Flash and
+journal. The first command probe exposed non-relocated GOT callback addresses;
+local position-independent callbacks and a packaging relocation check correct
+that probe defect. Interrupted calculator-side replay, startup access during
+partially restored headers, journal retirement after reference acceptance,
+worst-case stack/cache behavior and production packaging remain open. This is
+an actual native command-path result, not automatic recovery or public Port 2
+reclamation acceptance.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
