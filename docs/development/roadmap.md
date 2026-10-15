@@ -1151,6 +1151,18 @@ research: a transfer attempt in the earlier two-probe/abnormal-library state
 timed out without changing Flash. Reduced package size does not yet establish
 a sufficient-memory check, peak installation budget or acceptance of that state.
 
+Thumb compilation with position-independent ARM/Thumb interworking veneers
+reduces the private package further to 39,986 bytes (13,656 initialized bytes,
+26,232 owned runtime bytes), without reducing stack/workspace capacity. Native
+HP50g recovery, TLS/clock, guards/alignment, exact Flash changes, no-op replay
+and Stock return pass; residual GOT/absolute-address relocations are rejected.
+Crowded-state uploads still fail: the damaged fixture times out, while the
+restored-Flash control reports Invalid Server Cmd. A tiny transfer followed by
+Stock MEM succeeds in the damaged fixture and reports only 11,658.5 bytes free,
+independently establishing insufficient space for the recovery object. Flash
+remains unchanged. An installation-space preflight and measured peak budget
+are still required; the specific transport error paths remain unexplained.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
