@@ -523,6 +523,38 @@ static int scan_library_references(const struct hpclang_rpl_mutation_io *io,
     return HPCLANG_RPL_MUTATION_OK;
 }
 
+static int scan_home_library_references(const struct hpclang_rpl_mutation_io *io,
+                                        const struct pointer_scan_request *request)
+{
+    uint32_t home, prologue, count;
+    int result = read_word(io, 0x80711u, 5, &home);
+    if (result || !home)
+        return result;
+    if (home < RPL_MAIN_FIRST || home > RPL_MAIN_END - 8)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, home, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != RPL_DORRP)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    result = read_word(io, home + 5, 3, &count);
+    if (result)
+        return result;
+    if (count > (RPL_MAIN_END - home - 8) / 13)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = home + 8 + i * 13;
+        /* Library ID precedes two pointers to objects in the current mapping;
+         * these are not the bank-qualified words of the system catalog. */
+        result = scan_pointer_slot(io, record + 3, request);
+        if (!result)
+            result = scan_pointer_slot(io, record + 8, request);
+        if (result)
+            return result;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
 static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
                                const struct pointer_scan_request *original)
 {
@@ -567,6 +599,12 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     request->source = HPCLANG_RPL_ROOT_VGER;
     result = scan_vger_references(io, request);
     if (result != HPCLANG_RPL_MUTATION_OK)
+        return result;
+    /* Read HOME through its old root before SYSUPD rewrites that root. Its
+     * pointer cells carry corrected values if HOME itself subsequently moves. */
+    request->source = HPCLANG_RPL_ROOT_ATTACHMENT;
+    result = scan_home_library_references(io, request);
+    if (result)
         return result;
     request->source = HPCLANG_RPL_ROOT_SYSTEM;
     result = scan_system_references(io, request);

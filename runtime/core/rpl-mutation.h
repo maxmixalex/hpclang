@@ -68,7 +68,8 @@ extern "C"
      * relocation: launcher roots, stacks and supported Stock pointer tables.
      * slot is zero for an ARM-side launcher root. Values may be sentinels,
      * execution positions or metadata, not necessarily object beginnings.
-     * Banked library entries and pointers inside object bodies need separate
+     * HOME attachment fields and model-validated display cells are included.
+     * Banked catalog entries and other object-body references need separate
      * traversal. Keep mappings stable and discard partial results on error. */
     typedef int (*hpclang_rpl_root_visit_fn)(void *context, uint32_t slot, uint32_t value);
     int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
@@ -84,7 +85,8 @@ extern "C"
         HPCLANG_RPL_ROOT_VGER,
         HPCLANG_RPL_ROOT_SYSTEM,
         HPCLANG_RPL_ROOT_LIBRARY,
-        HPCLANG_RPL_ROOT_DISPLAY
+        HPCLANG_RPL_ROOT_DISPLAY,
+        HPCLANG_RPL_ROOT_ATTACHMENT
     };
 
     /* The same cells as visit_roots, with their source preserved. Source is

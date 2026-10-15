@@ -711,6 +711,18 @@ and includes them in relocation preflight/commit. Host tests cover one-time
 updates, unchanged out-of-range values, unreadable cells and overlapping root
 definitions. Actual C traversal matches all four changes in both paired states.
 HP48gII display roots and complete catalog-growth relocation remain unverified.
+The same paired operation updates 17 HOME attachment fields pointing to those
+ACPTR objects. The relocation scanner now includes both pointer fields of each
+bounded HOME attachment record, preserving its library ID. It processes them
+through the old HOME root before SYSUPD updates that root, so moving HOME carries
+the corrected fields. Actual C traversal matches all 17 native updates on both
+HP49g+ and HP50g. Host coverage includes unreadable-field rejection without
+writes, TEMP relocation, and growth/contraction where HOME and its referenced
+object move together. Other embedded references and complete registration still
+require their own validation.
+The combined display/HOME-root changes also pass the two-launch HP50g Stock
+library fixture: all three ports create and retain the library, original RPL
+recalls each one, duplicate creation is refused, and return settles normally.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.

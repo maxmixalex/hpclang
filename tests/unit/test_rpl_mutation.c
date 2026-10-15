@@ -1677,7 +1677,7 @@ struct root_visit_state
 struct source_visit_state
 {
     uint32_t slots[512], values[512], count, index;
-    unsigned counts[9];
+    unsigned counts[10];
     int stop;
 };
 
@@ -1721,6 +1721,55 @@ static int visit_source_root(void *context, enum hpclang_rpl_root_source source,
     assert(source == expected);
     ++state->counts[source];
     return state->stop;
+}
+
+static void test_attachment_relocation(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    uint32_t home = 0x92000;
+    put_word(USEROB, 5, home);
+    put_word(home, 5, DORRP);
+    put_word(home + 5, 3, 2);
+    put_word(home + 8, 3, 171);
+    put_word(home + 11, 5, 0x84003);
+    put_word(home + 16, 5, 0x83000);
+    put_word(home + 21, 3, 222);
+    put_word(home + 24, 5, 0);
+    put_word(home + 29, 5, 0x84ffe);
+    put_word(home + 34, 5, 0); /* Empty HOME after the attachment records. */
+    struct hpclang_object *object = make_char('L');
+    for (unsigned offset = 0; offset < 5; ++offset) {
+        rejected_read = home + 29 + offset;
+        assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_IO);
+        assert(!writes && get_word(home + 11, 5) == 0x84003);
+    }
+    rejected_read = UINT32_MAX;
+    assert(!hpclang_rpl_mutation_push_snapshot(&io, object));
+    uint32_t delta = object->nibble_count + 6;
+    assert(get_word(home + 11, 5) == 0x84003 + delta);
+    assert(get_word(home + 29, 5) == 0x84ffe + delta);
+    assert(get_word(home + 16, 5) == 0x83000 && !get_word(home + 24, 5));
+    assert(get_word(home + 8, 3) == 171 && get_word(home + 21, 3) == 222);
+    hpclang_object_release(object);
+
+    /* HOME and one referenced object move together. Rewrite through the old
+     * HOME root before SYSUPD changes it, then carry those fields with HOME. */
+    io = setup(1);
+    struct named_pair pair = prepare_two_named_chars();
+    memmove(memory + pair.chain + 13, memory + pair.chain, pair.object_a + 7 - pair.chain);
+    put_word(pair.home + 5, 3, 1);
+    put_word(pair.home + 8, 3, 171);
+    put_word(pair.home + 11, 5, pair.object_b + 13);
+    put_word(pair.home + 16, 5, pair.object_a + 13);
+    assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a + 13, 5));
+    home = get_word(USEROB, 5);
+    assert(home == pair.home - 5 && get_word(home + 8, 3) == 171);
+    assert(get_word(home + 11, 5) == pair.object_b + 13 - 5);
+    assert(get_word(home + 16, 5) == pair.object_a + 13);
+    assert(!hpclang_rpl_mutation_userob_shift_before(&io, pair.link_a + 13, -5));
+    assert(get_word(USEROB, 5) == pair.home);
+    assert(get_word(pair.home + 11, 5) == pair.object_b + 13);
+    assert(get_word(pair.home + 16, 5) == pair.object_a + 13);
 }
 
 static void test_display_root_relocation(void)
@@ -1773,7 +1822,7 @@ static void test_root_sources(void)
     assert(hpclang_rpl_mutation_visit_roots(&io, collect_flat_root, &state) == 0);
     assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 0);
     assert(state.index == state.count);
-    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4};
+    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4, 0};
     assert(memcmp(counts, state.counts, sizeof counts) == 0);
     state.index = 0;
     state.stop = 73;
@@ -1905,6 +1954,7 @@ int main(void)
     test_read_only_root_visit();
     test_root_sources();
     test_display_root_relocation();
+    test_attachment_relocation();
     test_port1_append_respects_native_pool();
     test_port1_library_append();
     test_port1_edit_owned_suffix();
