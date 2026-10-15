@@ -58,7 +58,8 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * are tombstoned only after validating their complete CRC, extent, metadata and
  * padding. Their bodies remain unchanged and never become visible.
  * Zero metadata with an even hidden status identifies an interrupted discard
- * at the bank tail, accepted only with an exact revalidated discard extent.
+ * at the bank tail, accepted only with a bounded halfword allocation covering
+ * the revalidated discard plan and an erased remainder.
  * This permits repeated recovery cuts without retaining an in-memory plan.
  * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
@@ -129,7 +130,9 @@ int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, cons
                                      struct hpclang_rpl_flash_replacement *transaction);
 
 /* Discard a caller-owned failed append using its retained expected record.
- * Verify its exact extent before clearing status; no payload or other record
+ * Verify its exact reserved extent before clearing status. If publication has
+ * not started (FF status), also verify zero discard metadata first; retries
+ * preserve that marker. No payload or other record
  * is touched. Returns WRITTEN only after the deleted slot is verified.
  * A DIRTY result requires retaining ownership/recovery before native return.
  * create_backup writes attempted_slot immediately before append (and leaves

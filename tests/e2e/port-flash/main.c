@@ -232,7 +232,7 @@ int main(void)
     const struct
     {
         uint8_t status, discarded_body;
-    } interrupted[] = {{0x73, 0}, {0x03, 0}, {0xfe, 0}, {0x72, 0}, {0x72, 1}};
+    } interrupted[] = {{0x73, 0}, {0x03, 0}, {0xfe, 0}, {0x72, 0}, {0x72, 1}, {0x72, 2}};
     for (unsigned i = 0; i < sizeof interrupted / sizeof interrupted[0]; ++i) {
         for (uint32_t j = 0; j < sizeof native_record; ++j)
             block[j + 1u] = native_record[j];
@@ -240,7 +240,8 @@ int main(void)
         if (interrupted[i].discarded_body) {
             block[4] &= 15u;
             for (uint32_t j = 4; j < sizeof native_record; ++j)
-                block[j + 1u] = 0;
+                block[j + 1u] = interrupted[i].discarded_body == 2 ? 0xff : 0;
+            block[10] = 0;
         }
         failure = 31;
         if (hpclang_stock_flash_program(bank + 0x104u, block, sizeof native_record + 2u) !=

@@ -217,13 +217,15 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         if (status && !(status & 1u) && !(header >> 20u)) {
             /* Tail cleanup verifies zero metadata and the extent before
              * clearing bit zero. Every subsequent status remains even.
-             * Require the exact discard plan and an erased remainder; do not
+             * Require a bounded allocation covering the discard plan and an
+             * erased remainder; a failed append may have reserved more space
+             * than its partial body needs. Do not
              * interpret an incomplete body as a CRC-valid backup. */
             struct recovery_status view = {&reader, at, 0xffu};
             const struct hpclang_rpl_reader erased = {committed_status_nibble, &view};
             struct hpclang_rpl_flash_discard plan;
             result = hpclang_rpl_flash_discard_plan(&erased, at, 0x40000u, &plan);
-            if (result != 1 || plan.address != at || plan.extent != extent)
+            if (result != 1 || plan.address != at || plan.extent > extent || ((extent + 2u) & 3u))
                 return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
                                                               : HPCLANG_RPL_FLASH_DIRTY;
             if (apply && !discard_status(io, bank + at / 2u))
@@ -465,7 +467,20 @@ int hpclang_rpl_flash_discard_record(const struct hpclang_rpl_flash_io *io, uint
         address < io->first || address >= io->end || !valid_record(record, bytes) ||
         bytes >= io->end - address)
         return HPCLANG_RPL_FLASH_INVALID;
-    if (!write_bytes(io, address + 1u, record + 1u, 3u) || !discard_status(io, address))
+    uint16_t status_word, metadata_word;
+    if (!io->read16(io->context, address & ~1u, &status_word) ||
+        !io->read16(io->context, (address + 3u) & ~1u, &metadata_word))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t status = (uint8_t)(status_word >> ((address & 1u) * 8u));
+    uint8_t metadata = (uint8_t)(metadata_word >> (((address + 3u) & 1u) * 8u));
+    /* Before publication, a failed append can have an incomplete body. Mark
+     * its reserved extent as a discard while FF still hides it. Preserve that
+     * marker when the owner retries cleanup after an uncertain status write.
+     * A published record retains its ordinary metadata during deletion. */
+    uint8_t header[] = {
+        record[1], record[2],
+        (uint8_t)((record[3] & 15u) | (status == 0xffu ? 0u : (record[3] & metadata & 0xf0u)))};
+    if (!write_bytes(io, address + 1u, header, sizeof header) || !discard_status(io, address))
         return HPCLANG_RPL_FLASH_DIRTY;
     return HPCLANG_RPL_FLASH_WRITTEN;
 }

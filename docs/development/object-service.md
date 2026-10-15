@@ -858,8 +858,12 @@ exhaust all clearing masks at both byte alignments and cut whole-port recovery
 without caller cleanup. For an incomplete FF-marked body, recovery verifies zero
 metadata together with its discard extent before clearing status bit zero.
 After another cut, any even hidden status with zero metadata is recognized only
-when its extent exactly matches the revalidated tail discard plan, with no later
-non-erased data. Tests cut this recovery twice in succession during extent,
+when its bounded, halfword-aligned allocation covers the revalidated tail discard
+plan, with no non-erased data beyond the allocation. Failed-append cleanup may
+retain its original reservation, larger than the partially written body; it
+verifies the same zero metadata before clearing an FF status. Tests fail each
+append programming step and then cut each cleanup step before restarting solely
+from Flash. Tests also cut explicit recovery twice in succession during extent,
 metadata and status programming, then resume using only Flash bytes and verify
 preservation and idempotence. This discard marker is separate from metadata-one
 backups, which still require valid CRC and padding. Unknown encodings, partial

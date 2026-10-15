@@ -242,6 +242,45 @@ static void restart_after_append(const struct hpclang_rpl_flash_io *io)
     free(keep);
 }
 
+static void restart_failed_append_cleanup(const struct hpclang_rpl_flash_io *io)
+{
+    const uint32_t slot = 0x105u + sizeof record;
+    const uint16_t masks[] = {0, 0x00ff, 0xff00, 0xffff};
+    uint8_t *before = malloc(sizeof flash);
+    assert(before);
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    assert(!hpclang_rpl_flash_append(io, base + slot, record, sizeof record));
+    unsigned append_steps = writes;
+    for (unsigned failure = 0; failure < append_steps; ++failure) {
+        init();
+        memcpy(flash + 0x105u, record, sizeof record);
+        fail_write_at = failure;
+        assert(hpclang_rpl_flash_append(io, base + slot, record, sizeof record) ==
+               HPCLANG_RPL_FLASH_FAILED);
+        unsigned steps = writes;
+        assert(steps > failure + 1u);
+        for (unsigned cut = failure + 1u; cut < steps; ++cut) {
+            for (unsigned i = 0; i < sizeof masks / sizeof masks[0]; ++i) {
+                init();
+                memcpy(flash + 0x105u, record, sizeof record);
+                fail_write_at = failure;
+                power_cut_at = cut;
+                power_cut_mask = masks[i];
+                cut_append(io, base + slot);
+                memcpy(before, flash, sizeof flash);
+                fail_write_at = UINT32_MAX;
+                assert(flash[slot] != 0x53);
+                assert(!hpclang_rpl_flash_recover_tails(io));
+                assert(flash[slot] == 0);
+                assert(!memcmp(flash, before, slot));
+                assert(!memcmp(flash + slot + 4u, before + slot + 4u, sizeof flash - slot - 4u));
+            }
+        }
+    }
+    free(before);
+}
+
 static void recover_partial_backups(const struct hpclang_rpl_flash_io *io)
 {
     uint8_t *before = malloc(sizeof flash);
@@ -364,7 +403,7 @@ static void discard_never_publishes(const struct hpclang_rpl_flash_io *io)
         for (unsigned status = 0; status <= 255; ++status) {
             if (status == 0x53 || (status & 0x53u) != 0x53u)
                 continue;
-            for (unsigned step = 0; step < 2; ++step) {
+            for (unsigned step = 0; step < (status == 0xff ? 3u : 2u); ++step) {
                 for (unsigned mask = 0; mask <= 255; ++mask) {
                     init();
                     memcpy(flash + slot, record, sizeof record);
@@ -373,7 +412,9 @@ static void discard_never_publishes(const struct hpclang_rpl_flash_io *io)
                     power_cut_mask = (uint16_t)(mask << (alignment * 8u));
                     cut_discard(io, base + slot);
                     assert(flash[slot] != 0x53);
-                    assert(!memcmp(flash + slot + 1u, record + 1u, sizeof record - 1u));
+                    unsigned preserved = status == 0xff ? 4u : 1u;
+                    assert(!memcmp(flash + slot + preserved, record + preserved,
+                                   sizeof record - preserved));
                     assert(flash[slot - 1u] == 0xff && flash[slot + sizeof record] == 0xff);
                 }
             }
@@ -770,6 +811,7 @@ int main(void)
     create_libraries(&io);
     recover_port_tails(&io);
     restart_after_append(&io);
+    restart_failed_append_cleanup(&io);
     recover_partial_backups(&io);
     discard_never_publishes(&io);
     recovery_never_publishes(&io);

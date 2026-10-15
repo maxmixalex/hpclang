@@ -533,8 +533,11 @@ clearing the remaining bits: a cut cannot accidentally produce live status `53`.
 Host tests exhaust the status-clear masks at both byte alignments and interrupt
 whole-port recovery without caller cleanup. Incomplete-tail cleanup verifies
 zero metadata and an exact discard extent before clearing status bit zero.
-Subsequent even hidden states are recoverable only with that revalidated tail
-plan. Repeated cuts in extent, metadata and status programming resume from Flash
+Subsequent even hidden states require a bounded allocation covering that
+revalidated tail plan and an erased remainder. Failed-append cleanup records
+the same marker while retaining its reserved extent; tests fail every append
+step and then interrupt each cleanup step. Repeated cuts in extent, metadata
+and status programming resume from Flash
 alone, preserving preceding records and partial bodies. Complete backups retain
 CRC checks and their original metadata. This is host fault-model coverage;
 automatic startup recovery and the full power-loss requirement remain open.
