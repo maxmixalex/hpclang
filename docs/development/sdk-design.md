@@ -311,6 +311,16 @@ catalog against the clean boot (IDs, bindings, bank switches and flags, independ
 of ordering). The repaired Flash and retained journal must remain unchanged, the
 stack empty and execution back in Stock ROM. This catches recovery that returns
 once but leaves libraries missing or incorrectly bound on the next startup.
+The optional `--interrupted-build` accepts a second witness built with
+`-DHPCLANG_RECOVERY_STOP_BEFORE_IDENTITY=ON`. It stops before the bank-identity
+program command, retaining IRQ/stack ownership in its failure loop. The verifier
+requires the exact completed sector body with erased identity, intact initialized
+code/guards/journal and the expected failure diagnostics. After hardware reset,
+the native catalog must still match the damaged-bank baseline. The runner then
+uploads the normal witness under a different name and retries recovery, retaining
+both program objects. Core exercises this path on both supported models. This
+is interruption between completed Flash commands, not a simulated busy-chip
+power loss.
 Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child

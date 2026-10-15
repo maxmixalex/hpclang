@@ -76,6 +76,75 @@ def require_stock_pc(state_directory):
     require(0 <= pc < 0x140000, "Execution has not returned to Stock ROM")
 
 
+def symbol_offsets(elf, nm):
+    symbols = {}
+    for line in subprocess.check_output([nm, elf], text=True).splitlines():
+        fields = line.split()
+        if len(fields) == 3:
+            symbols[fields[2]] = int(fields[0], 16)
+    return symbols
+
+
+def verify_interruption(args):
+    """Require a complete sector body, unpublished identity and owned failure loop."""
+    before = (args.before / "flash").read_bytes()
+    after = (args.after / "flash").read_bytes()
+    require(args.target % 0x20000 == 0, "Interruption scenario requires a bank header sector")
+    record = before[args.slot : args.slot + 4124]
+    restored = bytearray(before)
+    restored[args.target : args.target + 4096] = record[24:4120]
+    verify_flash(before, restored, args.slot, args.target)
+    require(record[24 + 0x100 : 24 + 0x102] != b"\xff\xff", "Journal contains no native identity")
+    restored[args.target + 0x100 : args.target + 0x102] = b"\xff\xff"
+    require(
+        after == restored, "Interruption did not preserve exactly the unpublished bank identity"
+    )
+    ram = (args.after / "sram").read_bytes()
+    symbols = symbol_offsets(args.elf, args.nm)
+    binary = args.binary.read_bytes()
+    candidates = [
+        i
+        for i in range(len(ram) - symbols["__image_end"] + 1)
+        if ram[i : i + 32] == binary[:32]
+        and ram[i + symbols["workspace"] : i + symbols["workspace"] + 4]
+        == struct.pack("<I", 0x48504641)
+    ]
+    require(len(candidates) == 1, "Interrupted image is missing or ambiguous")
+    start = candidates[0]
+    require(start % 8 == 0, "Interrupted image is misaligned")
+    require(ram[start : start + len(binary)] == binary, "Interrupted initialized image changed")
+    physical = 0x08000000 + start
+    result = struct.unpack_from("<Ii4I", ram, start + symbols["workspace"])
+    require(result[1:4] == (1, args.slot, args.target), "Interrupted preflight/discovery failed")
+    scratch = start + symbols["workspace"] + 24
+    require(ram[scratch : scratch + 4124] == record, "Interrupted RAM journal changed")
+    for symbol, values in (
+        ("guard_low", (0x13579BDF, 0x2468ACE0)),
+        ("guard_high", (0x89ABCDEF, 0xFEDCBA98)),
+    ):
+        require(
+            struct.unpack_from("<2I", ram, start + symbols[symbol]) == values,
+            "Interrupted stack guard changed",
+        )
+    d = struct.unpack_from("<32I", ram, start + symbols["workspace"] + 8272)
+    programs = sum(record[24 + i : 26 + i] != b"\xff\xff" for i in range(0, 4096, 2) if i != 0x100)
+    require(d[26:32] == (0, 0xFFFFFFFC, 1, programs, 0, 0), "Unexpected interrupted replay result")
+    state = configparser.ConfigParser()
+    state.read(args.after / "state")
+    cpu = state["s3c2410-arm"]
+    require(
+        physical <= int(cpu["reg-15"], 0) < physical + len(binary),
+        "Interrupted recovery returned instead of retaining ownership",
+    )
+    require(
+        physical + symbols["stack_start"]
+        <= int(cpu["reg-13"], 0)
+        < physical + symbols["stack_end"],
+        "Interrupted stack escaped owned storage",
+    )
+    require(int(cpu["cpsr"], 0) & 0xC0 == 0xC0, "Interrupted recovery released IRQ ownership")
+
+
 def verify_restart(clean, repaired, restarted):
     """Check native catalog reconstruction against the original clean boot."""
     require(
@@ -117,11 +186,7 @@ def verify(args):
     original_read = native_words((args.before / "sram").read_bytes(), before)
     require(original_read(0x806FD) - original_read(0x806F8) == 5, "Baseline stack must be empty")
 
-    symbols = {}
-    for line in subprocess.check_output([args.nm, args.elf], text=True).splitlines():
-        fields = line.split()
-        if len(fields) == 3:
-            symbols[fields[2]] = int(fields[0], 16)
+    symbols = symbol_offsets(args.elf, args.nm)
     initialized = args.binary.read_bytes()
     size = symbols["__image_end"]
     expected = bytearray(initialized + bytes(size - len(initialized)))

@@ -1235,6 +1235,17 @@ now requires this phase before reporting success. Host negative controls reject
 missing/changed catalog entries, Flash changes, nonempty stack and unfinished
 return, while permitting catalog reordering.
 
+The maintained witness now has a test-only stop immediately before the final
+bank-identity program command. Both models pass interruption verification,
+hardware reset with the partial bank still hidden, upload of the normal witness
+under a separate name, successful retry and final catalog reconstruction. Both
+programs remain stored throughout the test. The oracle checks the exact partial
+Flash image, retained journal, initialized code/guards, replay diagnostics and
+owned PC/SP/IRQ state. Twelve verifier host tests and the interrupted ARM build's
+static analysis pass. Core builds normal/interrupted packages and runs this
+scenario for both models; remote acceptance is pending. This covers a command
+boundary, not power loss during an erase/program pulse.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

@@ -2,7 +2,9 @@ import importlib.util
 from pathlib import Path
 import struct
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 import zlib
 
 
@@ -71,6 +73,104 @@ class RecoveryVerifierTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 VERIFY.verify_flash(before, after, slot, target)
+
+
+class RecoveryInterruptionTests(unittest.TestCase):
+    def setUp(self):
+        RecoveryVerifierTests.setUp(self)
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        self.args = SimpleNamespace(
+            before=root / "before",
+            after=root / "after",
+            slot=self.slot,
+            target=self.target,
+            elf=root / "image.elf",
+            binary=root / "image.bin",
+            nm="unused",
+        )
+        self.args.before.mkdir()
+        self.args.after.mkdir()
+        self.after[self.target + 0x100 : self.target + 0x102] = b"\xff\xff"
+        (self.args.before / "flash").write_bytes(self.before)
+        (self.args.after / "flash").write_bytes(self.after)
+        self.symbols = dict(
+            workspace=64,
+            guard_low=8464,
+            stack_start=8472,
+            stack_end=12568,
+            guard_high=12568,
+            __image_end=12576,
+        )
+        self.start = 0x1000
+        self.physical = 0x08000000 + self.start
+        self.ram = bytearray(0x80000)
+        image = bytes(range(64))
+        self.args.binary.write_bytes(image)
+        self.ram[self.start : self.start + len(image)] = image
+        workspace = self.start + self.symbols["workspace"]
+        struct.pack_into(
+            "<Ii4I",
+            self.ram,
+            workspace,
+            0x48504641,
+            1,
+            self.slot,
+            self.target,
+            1,
+            self.physical + self.symbols["stack_start"] + 32,
+        )
+        self.ram[workspace + 24 : workspace + 24 + 4124] = self.record
+        struct.pack_into(
+            "<2I", self.ram, self.start + self.symbols["guard_low"], 0x13579BDF, 0x2468ACE0
+        )
+        struct.pack_into(
+            "<2I", self.ram, self.start + self.symbols["guard_high"], 0x89ABCDEF, 0xFEDCBA98
+        )
+        struct.pack_into("<6I", self.ram, workspace + 8272 + 26 * 4, 0, 0xFFFFFFFC, 1, 2047, 0, 0)
+        (self.args.after / "sram").write_bytes(self.ram)
+        self.write_cpu()
+        mock = patch.object(VERIFY, "symbol_offsets", return_value=self.symbols)
+        mock.start()
+        self.addCleanup(mock.stop)
+
+    def write_cpu(self, *, pc=None, sp=None, cpsr=0xD0):
+        pc = self.physical + 16 if pc is None else pc
+        sp = self.physical + self.symbols["stack_start"] + 32 if sp is None else sp
+        (self.args.after / "state").write_text(
+            f"[s3c2410-arm]\nreg-15={pc:#x}\nreg-13={sp:#x}\ncpsr={cpsr:#x}\n"
+        )
+
+    def test_owned_interruption_is_accepted(self):
+        VERIFY.verify_interruption(self.args)
+
+    def test_early_identity_or_incomplete_body_is_rejected(self):
+        for offset in (0, 0x100, 4095):
+            changed = self.after.copy()
+            changed[self.target + offset] ^= 1
+            (self.args.after / "flash").write_bytes(changed)
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_interruption(self.args)
+
+    def test_released_execution_ownership_is_rejected(self):
+        for changes in (dict(pc=0x8428), dict(sp=0x08000000), dict(cpsr=0x10)):
+            self.write_cpu(**changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                VERIFY.verify_interruption(self.args)
+
+    def test_wrong_result_or_broken_guard_is_rejected(self):
+        for offset in (
+            40,
+            self.symbols["workspace"],
+            self.symbols["guard_low"],
+            self.symbols["workspace"] + 8272 + 31 * 4,
+        ):
+            changed = self.ram.copy()
+            changed[self.start + offset] ^= 1
+            (self.args.after / "sram").write_bytes(changed)
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_interruption(self.args)
 
 
 class RecoveryRestartTests(unittest.TestCase):

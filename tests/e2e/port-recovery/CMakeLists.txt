@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(hpclang_port_recovery_witness LANGUAGES C ASM)
+option(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY
+    "Stop the witness before publishing a restored bank identity" OFF)
 
 get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -26,6 +28,9 @@ foreach(module IN ITEMS rpl-flash-record rpl-flash-write rpl-flash-replay
 endforeach()
 target_include_directories(recovery PRIVATE "${CORE}" "${HPCLANG_ROOT}/include")
 target_compile_features(recovery PRIVATE c_std_11)
+if(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY)
+    target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY=1)
+endif()
 target_compile_options(recovery PRIVATE -Oz -ffreestanding -fno-builtin -fpie
     -fvisibility=hidden -ffunction-sections -fdata-sections)
 target_link_options(recovery PRIVATE -nostdlib -Wl,--gc-sections -Wl,--emit-relocs

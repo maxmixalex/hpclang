@@ -13,7 +13,7 @@ import time
 from types import SimpleNamespace
 
 from prepare import prepare
-from verify import verify, verify_restart
+from verify import verify, verify_interruption, verify_restart
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -81,6 +81,65 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
+def transfer(args, recovery, source, build, name):
+    recovery.mkdir()
+    shutil.copytree(source, recovery / "state")
+    send = recovery / "send"
+    send.mkdir()
+    shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
+    prefix = []
+    for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
+        tokens = line.split()
+        # Welcome prompts were acknowledged during the clean boot.
+        if tokens[1:] != ["tap", "f6"]:
+            prefix.append(line)
+        if tokens[1:] == ["host-gate"]:
+            break
+    else:
+        raise ValueError("Stock USB sequence has no host gate")
+    sequence = (
+        "\n".join(prefix)
+        + "\n500 capture deposited\n1000 tap eval\n15000 capture checkpoint\n17000 finish-install\n"
+    )
+    xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
+    with process(
+        ["socat", f"PTY,raw,echo=0,link={xtty}", f"PTY,raw,echo=0,link={ktty}"],
+        os.environ,
+        recovery / "socat.log",
+    ) as bridge:
+        wait_for(lambda: xtty.exists() and ktty.exists(), [bridge], 10, "PTY creation")
+        with emulator(args, recovery, sequence, usb=xtty) as child:
+            wait_for(
+                lambda: (recovery / "stock-server-usb.pgm").exists(),
+                [bridge, child],
+                120,
+                "Stock USB server readiness",
+            )
+            log = recovery / "kermit.log"
+            with process(
+                [
+                    sys.executable,
+                    str(ROOT / "tools/kermit_watchdog.py"),
+                    "run",
+                    str(log),
+                    "bash",
+                    str(ROOT / "tools/run-hp48-kermit-send.sh"),
+                    str(ktty),
+                    str(send),
+                    str(log),
+                    "--remote-host",
+                    f"-95 CF HOME '{name}' RCL",
+                    f"RECOVERY.HP={name}",
+                ],
+                os.environ,
+                recovery / "transfer.log",
+            ) as sender:
+                if sender.wait():
+                    raise RuntimeError("Recovery transfer failed; inspect transfer.log")
+            (recovery / "complete").touch()
+            completed(child, 90)
+
+
 def run(args):
     # No stale ready captures, host gates, saved RAM or output from another run.
     args.output.mkdir(parents=True)
@@ -114,63 +173,38 @@ def run(args):
         raise RuntimeError("Hardware reset changed the injected Flash state")
     print("Fault prepared and hardware reset complete", flush=True)
 
-    recovery = args.output / "recovery"
-    recovery.mkdir()
-    shutil.copytree(reset / "state", recovery / "state")
-    send = recovery / "send"
-    send.mkdir()
-    shutil.copyfile(args.build / "recovery.hp", send / "RECOVERY.HP")
-    prefix = []
-    for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
-        tokens = line.split()
-        # Welcome prompts were acknowledged during the clean boot.
-        if tokens[1:] != ["tap", "f6"]:
-            prefix.append(line)
-        if tokens[1:] == ["host-gate"]:
-            break
-    else:
-        raise ValueError("Stock USB sequence has no host gate")
-    sequence = (
-        "\n".join(prefix)
-        + "\n500 capture deposited\n1000 tap eval\n15000 capture returned\n17000 finish-install\n"
-    )
-    xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
-    with process(
-        ["socat", f"PTY,raw,echo=0,link={xtty}", f"PTY,raw,echo=0,link={ktty}"],
-        os.environ,
-        recovery / "socat.log",
-    ) as bridge:
-        wait_for(lambda: xtty.exists() and ktty.exists(), [bridge], 10, "PTY creation")
-        with emulator(args, recovery, sequence, usb=xtty) as child:
-            wait_for(
-                lambda: (recovery / "stock-server-usb.pgm").exists(),
-                [bridge, child],
-                120,
-                "Stock USB server readiness",
+    if args.interrupted_build is not None:
+        interrupted = args.output / "interrupted"
+        transfer(args, interrupted, reset / "state", args.interrupted_build, "RECOVERYCUT")
+        verify_interruption(
+            SimpleNamespace(
+                before=reset / "state",
+                after=interrupted / "state",
+                elf=args.interrupted_build / "recovery.elf",
+                binary=args.interrupted_build / "recovery.bin",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
             )
-            log = recovery / "kermit.log"
-            with process(
-                [
-                    sys.executable,
-                    str(ROOT / "tools/kermit_watchdog.py"),
-                    "run",
-                    str(log),
-                    "bash",
-                    str(ROOT / "tools/run-hp48-kermit-send.sh"),
-                    str(ktty),
-                    str(send),
-                    str(log),
-                    "--remote-host",
-                    "-95 CF HOME 'RECOVERY' RCL",
-                    "RECOVERY.HP=RECOVERY",
-                ],
-                os.environ,
-                recovery / "transfer.log",
-            ) as sender:
-                if sender.wait():
-                    raise RuntimeError("Recovery transfer failed; inspect transfer.log")
-            (recovery / "complete").touch()
+        )
+        resume = args.output / "resume"
+        resume.mkdir()
+        shutil.copytree(interrupted / "state", resume / "state")
+        with emulator(
+            args,
+            resume,
+            "2000 capture restart\n10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+        ) as child:
             completed(child, 90)
+        # Until the bank identity is published, Stock must expose the same
+        # catalog as the original damaged-bank boot, with no partial library.
+        verify_restart(reset / "state", interrupted / "state", resume / "state")
+        reset = resume
+        print("Interrupted recovery verified; reset kept the partial bank hidden", flush=True)
+
+    recovery = args.output / "recovery"
+    transfer(args, recovery, reset / "state", args.build, "RECOVERY")
     verify(
         SimpleNamespace(
             before=reset / "state",
@@ -203,6 +237,7 @@ def run(args):
                 "slot": args.slot,
                 "target": args.target,
                 "restored_catalog_entries": catalog_entries,
+                "interrupted_before_identity": args.interrupted_build is not None,
             },
             indent=2,
         )
@@ -223,6 +258,11 @@ def main():
         "--build", type=Path, required=True, help="built recovery witness directory"
     )
     parser.add_argument("--output", type=Path, required=True, help="new evidence directory")
+    parser.add_argument(
+        "--interrupted-build",
+        type=Path,
+        help="optional witness built with HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY",
+    )
     parser.add_argument("--nm", default="llvm-nm")
     parser.add_argument("--slot", type=lambda value: int(value, 0), default=0x160105)
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
@@ -231,6 +271,8 @@ def main():
     args.dist, args.build, args.output = (
         path.resolve() for path in (args.dist, args.build, args.output)
     )
+    if args.interrupted_build is not None:
+        args.interrupted_build = args.interrupted_build.resolve()
     run(args)
 
 

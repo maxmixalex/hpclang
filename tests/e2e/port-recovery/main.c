@@ -84,6 +84,12 @@ static int program_flash(void *context, unsigned address, unsigned short value)
     struct workspace *out = context;
     if ((address & ~4095u) != out->target)
         return 0;
+#ifdef HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY
+    /* Test-only command-boundary interruption. The caller retains ownership
+     * in its failure loop; this does not simulate a Flash pulse in progress. */
+    if (address == out->target + 0x100u)
+        return 0;
+#endif
     struct hpclang_sst_bus bus = bus_for(context);
     struct hpclang_sst_region region = {0x140000, 0x200000, 4096};
     ++out->diagnostics[29];

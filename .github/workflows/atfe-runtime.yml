@@ -114,13 +114,20 @@ jobs:
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
 
-      - name: Build independent recovery witness
+      - name: Build independent recovery witnesses
         run: |
           export PATH="$ATFE/bin:$PATH"
-          cmake -S tests/e2e/port-recovery -B build/port-recovery \
-            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
-            -DCMAKE_BUILD_TYPE=MinSizeRel
-          cmake --build build/port-recovery -j2
+          for mode in normal interrupted; do
+            stop_before_identity=OFF
+            if [[ "$mode" == interrupted ]]; then
+              stop_before_identity=ON
+            fi
+            cmake -S tests/e2e/port-recovery -B "build/port-recovery/$mode" \
+              -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
+              -DCMAKE_BUILD_TYPE=MinSizeRel \
+              -DHPCLANG_RECOVERY_STOP_BEFORE_IDENTITY="$stop_before_identity"
+            cmake --build "build/port-recovery/$mode" -j2
+          done
 
       - name: Upload independent recovery witness
         uses: actions/upload-artifact@v7
@@ -128,9 +135,9 @@ jobs:
           name: port-recovery-build
           retention-days: 1
           path: |
-            build/port-recovery/recovery.elf
-            build/port-recovery/recovery.bin
-            build/port-recovery/recovery.hp
+            build/port-recovery/*/recovery.elf
+            build/port-recovery/*/recovery.bin
+            build/port-recovery/*/recovery.hp
           if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache
@@ -197,7 +204,8 @@ jobs:
         run: |
           python3 tests/e2e/port-recovery/run.py \
             --model "${{ matrix.target }}" \
-            --dist build/x50ng/dist --build build/port-recovery \
+            --dist build/x50ng/dist --build build/port-recovery/normal \
+            --interrupted-build build/port-recovery/interrupted \
             --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
       - name: Upload recovery evidence
         if: always()
