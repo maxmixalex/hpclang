@@ -405,8 +405,91 @@ static void execution_entries(void)
     assert(hpclang_rpl_entry_inspect(NULL, 0, 6, &entry) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void dispatch_schemas(void)
+{
+    struct image image = {.size = 20, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_dispatch_descriptor descriptor = {80,
+                                                         HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY};
+    put(&image, 0, 80, 5);
+    put(&image, 5, 90, 5);
+    put(&image, 10, 0x2a2c, 5);
+    struct image original = image;
+    struct edges edges = {0};
+    assert(!hpclang_rpl_dispatch_reference_visit(&reader, 0, 15, &descriptor, collect, &edges));
+    assert(edges.count == 2);
+    assert(edges.items[0].kind == HPCLANG_RPL_REFERENCE_EXECUTION && edges.items[0].field == 0 &&
+           edges.items[0].target == 80 && !edges.items[0].extent);
+    assert(edges.items[1].kind == HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY &&
+           edges.items[1].field == 5 && edges.items[1].target == 5 && !edges.items[1].extent);
+    struct hpclang_rpl_reference_patch patch = {123, 456}, saved = patch;
+    assert(!hpclang_rpl_reference_plan_shift(&edges.items[1], 0, 15, 32, &patch));
+    assert(!memcmp(&patch, &saved, sizeof patch));
+    assert(hpclang_rpl_reference_plan_shift(&edges.items[0], 0, 100, 32, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&patch, &saved, sizeof patch));
+
+    edges.count = 0;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 0, 5, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    image.fail = 5;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 0, 6, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!edges.count);
+    image.fail = UINT32_MAX;
+    edges.stop = 37;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 0, 6, &descriptor, collect, &edges) == 37);
+    assert(edges.count == 1);
+    edges = (struct edges){0};
+    descriptor = (struct hpclang_rpl_dispatch_descriptor){90, HPCLANG_RPL_DISPATCH_TYPE_PREDICATE};
+    edges.count = 0;
+    assert(!hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges));
+    /* The type prologue is a scalar, even if it numerically falls in a moved region. */
+    assert(edges.count == 1 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_EXECUTION &&
+           edges.items[0].field == 5 && edges.items[0].target == 90);
+    assert(!memcmp(&image, &original, sizeof image));
+    for (uint32_t at = 5; at < 15; ++at) {
+        image.fail = at;
+        edges.count = 0;
+        assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!edges.count);
+    }
+    image.fail = UINT32_MAX;
+    for (uint32_t size = 0; size < 10; ++size) {
+        edges.count = 0;
+        assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, size, &descriptor, collect,
+                                                    &edges) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!edges.count);
+    }
+    image.data[14] = 16;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    image = original;
+    edges.stop = 37;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges) ==
+           37);
+    edges = (struct edges){0};
+    descriptor.dispatch = 91;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    descriptor.dispatch = 0x2a2c;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 10, 10, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    descriptor.dispatch = 90;
+    descriptor.schema = (enum hpclang_rpl_dispatch_schema)99;
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, &descriptor, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!edges.count);
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 0xffffc, 10, &descriptor, collect,
+                                                &edges) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_dispatch_reference_visit(&reader, 5, 10, NULL, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    dispatch_schemas();
     execution_entries();
     relocation_patches();
     nested_array();

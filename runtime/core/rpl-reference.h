@@ -36,7 +36,9 @@ enum hpclang_rpl_reference_kind
     HPCLANG_RPL_REFERENCE_ROMP,
     HPCLANG_RPL_REFERENCE_FLASHP,
     HPCLANG_RPL_REFERENCE_OPAQUE,
-    HPCLANG_RPL_REFERENCE_ATTACHMENT
+    HPCLANG_RPL_REFERENCE_ATTACHMENT,
+    HPCLANG_RPL_REFERENCE_EXECUTION,
+    HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY
 };
 
 struct hpclang_rpl_reference
@@ -59,6 +61,11 @@ struct hpclang_rpl_reference
  * FLASHP: target/auxiliary are logical selector/index (not physical banks).
  * ATTACHMENT: target is a HOME attached-library pointer, auxiliary its library
  * ID. extent is zero; bank qualification happens after reading the target.
+ * EXECUTION: field stores the dispatch address in target. Its machine-code
+ * extent and reference semantics remain unresolved; do not treat it as a
+ * normal object or a reference-free leaf. extent and auxiliary are zero.
+ * EMBEDDED_ENTRY: field == target is the start of an inline execution entry,
+ * not a stored address. Its extent is unknown (zero); inspect it separately.
  * OPAQUE: target/extent bound an unexpanded object; auxiliary is its prologue.
  * Opaque code, binary data and unrecognized child-directory header metadata require
  * their own semantic traversal;
@@ -78,6 +85,33 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t limit, uint32_t body_prologue,
                                 hpclang_rpl_reference_visit_fn visit, void *context);
 
+enum hpclang_rpl_dispatch_schema
+{
+    HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY,
+    HPCLANG_RPL_DISPATCH_TYPE_PREDICATE
+};
+
+/* Caller-proven dispatch identity in the reader's stable mapping. Establish
+ * the handler's semantics separately before supplying this descriptor; this
+ * function neither discovers nor authenticates ROM code. No model addresses
+ * are built in. Known object prologues cannot be overridden by a descriptor.
+ * DUPLICATE_THEN_ENTRY exposes an execution entry at address+5, not a stored
+ * pointer field. TYPE_PREDICATE consumes a five-nibble scalar type identifier,
+ * which must never be emitted as an object reference. Both emit EXECUTION for
+ * the header, retaining the unresolved machine-code obligation. This is an
+ * immediate-edge decoder, not a complete extent or mutation-safety proof.
+ * Callback/read errors propagate; discard partial output on any error. */
+struct hpclang_rpl_dispatch_descriptor
+{
+    uint32_t dispatch;
+    enum hpclang_rpl_dispatch_schema schema;
+};
+
+int hpclang_rpl_dispatch_reference_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                         uint32_t limit,
+                                         const struct hpclang_rpl_dispatch_descriptor *descriptor,
+                                         hpclang_rpl_reference_visit_fn visit, void *context);
+
 struct hpclang_rpl_reference_patch
 {
     uint32_t field; /* Old address: apply before moving the containing bytes. */
@@ -88,8 +122,8 @@ struct hpclang_rpl_reference_patch
  * [first,end) by delta within the same Saturn mapping. Return 1 with a patch,
  * 0 when its encoding does not change, or a negative span result. Output only
  * changes on 1. Relative library fields account for movement of both ends.
- * INLINE/COMPACT need recursive traversal; ROMP/FLASHP retain their indices.
- * Banked ACPTR and opaque contents return UNSUPPORTED and require separate
+ * INLINE/COMPACT/EMBEDDED_ENTRY need recursive traversal; ROMP/FLASHP retain their indices.
+ * Banked ACPTR, execution dispatches and opaque contents return UNSUPPORTED and require separate
  * resolution. This is neither a graph-completeness check nor a mutation API. */
 int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *reference, uint32_t first,
                                      uint32_t end, int32_t delta,

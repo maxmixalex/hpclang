@@ -838,6 +838,23 @@ The 18 opaque code/binary objects also remain unresolved. Neither observation
 proves absence of dynamic references; executable references and the production
 mutation guard remain open.
 
+Further ROM inspection identifies 11 unresolved entries sharing a dispatcher
+that duplicates the stack top before executing the trailing entry. Native
+HP49g+/HP50g probes verify ten of these as type predicates: each preserves an
+empty input string and pushes a boolean, with only the string-type predicate
+returning true. Their trailing five-nibble operands are type identifiers, not
+object-reference fields. The remaining trailing DOCOL body has an exact
+20-nibble span under the current C inspector. An internal descriptor-driven
+decoder now exposes these embedded entries without treating their positions as
+stored pointers or their type operands as references. Both native states pass
+the actual C decoder; host bounds/read-failure tests, sanitizers and ARM analysis
+pass. Descriptors require separately proven handler identity in a stable mapping;
+automatic ROM recognition and production guard integration remain unfinished.
+Execution-code edges remain explicit and reject relocation planning. Representative
+unresolved bytes also match a freshly installed Stock image, including the
+repeated-fill regions; those other entry semantics remain unresolved. Neither
+fill bytes nor a shared dispatcher justify treating an entry as reference-free.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

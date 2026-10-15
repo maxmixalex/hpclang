@@ -22,10 +22,12 @@ int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *referen
     switch (reference->kind) {
     case HPCLANG_RPL_REFERENCE_INLINE:
     case HPCLANG_RPL_REFERENCE_COMPACT:
+    case HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY:
     case HPCLANG_RPL_REFERENCE_ROMP:
     case HPCLANG_RPL_REFERENCE_FLASHP:
         return 0;
     case HPCLANG_RPL_REFERENCE_OPAQUE:
+    case HPCLANG_RPL_REFERENCE_EXECUTION:
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     case HPCLANG_RPL_REFERENCE_ACPTR:
         if (reference->auxiliary)
@@ -94,6 +96,47 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned c
     }
     *value = result;
     return 0;
+}
+
+int hpclang_rpl_dispatch_reference_visit(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                         uint32_t limit,
+                                         const struct hpclang_rpl_dispatch_descriptor *descriptor,
+                                         hpclang_rpl_reference_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !descriptor || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 5u ||
+        descriptor->dispatch >= 0x100000u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (hpclang_rpl_object_prologue_known(descriptor->dispatch))
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    unsigned width;
+    switch (descriptor->schema) {
+    case HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY:
+        width = 1;
+        break;
+    case HPCLANG_RPL_DISPATCH_TYPE_PREDICATE:
+        width = 5;
+        break;
+    default:
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    uint32_t dispatch, operand;
+    int result = word(reader, address, 5, &dispatch);
+    if (result)
+        return result;
+    if (dispatch != descriptor->dispatch)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (limit - 5u < width)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    result = word(reader, address + 5u, width, &operand);
+    if (result)
+        return result;
+    struct traversal walk = {visit, context};
+    result = emit(&walk, HPCLANG_RPL_REFERENCE_EXECUTION, address, dispatch, 0, 0);
+    if (result || descriptor->schema == HPCLANG_RPL_DISPATCH_TYPE_PREDICATE)
+        return result;
+    return emit(&walk, HPCLANG_RPL_REFERENCE_EMBEDDED_ENTRY, address + 5u, address + 5u, 0, 0);
 }
 
 int hpclang_rpl_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t address,

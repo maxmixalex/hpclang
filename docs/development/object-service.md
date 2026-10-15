@@ -1207,3 +1207,14 @@ classifies 287 ordinary objects and 98 self-dispatch entries in the saved HOME
 graph, leaving 50 unsupported dispatches unchanged. All 148 came from direct
 runstream references, rather than library-table metadata. No execution or
 reclamation safety is inferred from this classification.
+
+`hpclang_rpl_dispatch_reference_visit` decodes caller-proven shared-dispatch
+schemas in a stable mapping. Duplicate-then-entry wrappers report the embedded
+execution entry; type predicates consume a scalar type identifier without
+emitting it as a reference. Both retain an explicit `EXECUTION` edge to the
+handler, which relocation planning rejects. An `EMBEDDED_ENTRY` identifies the
+child's location, not a stored pointer to rewrite. No ROM addresses are built
+into this decoder, and supplying a descriptor does not authenticate a handler
+or establish complete code-reference safety. Native HP49g+/HP50g type-predicate
+execution and decoding of both saved states validate the observed schemas;
+automatic handler recognition and production mutation guards remain open.
