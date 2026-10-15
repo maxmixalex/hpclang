@@ -40,7 +40,8 @@ int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t add
 /* Recover an interrupted body behind an erased FF end marker. first/end are
  * byte bounds of one caller-validated bank's allocation chain, excluding its
  * header. Validate all preceding records, finish a NOR-compatible extent and
- * verify it before publishing status 00. Preserve all other bytes. Returns
+ * verify it with zero metadata before publishing status 00. Preserve all bytes
+ * outside that four-byte discard header. Returns
  * WRITTEN for a clean or recovered tail, INVALID for bad arguments, DIRTY if
  * recovery cannot be verified. DIRTY must not be exposed to native STO.
  * Own the mapping/exclude writers throughout. No erase or space reclamation;
@@ -53,16 +54,17 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * bank identity and discard plan before the first write. Invalid/unknown states
  * leave the whole port unchanged. Once commit starts, a backend failure may
  * leave earlier banks recovered; retry under the same exclusive ownership.
- * FF tails are discarded. Backups with partial FF->53 or 53->00 status values
+ * FF tails are discarded. Backups with any hidden non-FF status value
  * are tombstoned only after validating their complete CRC, extent, metadata and
- * padding. Their bodies remain unchanged and never become visible. Partial
- * An FE discard marker is also accepted at the bank tail only when its extent
- * exactly matches a newly validated discard plan. Clearing a hidden status
+ * padding. Their bodies remain unchanged and never become visible.
+ * Zero metadata with an even hidden status identifies an interrupted discard
+ * at the bank tail, accepted only with an exact revalidated discard extent.
+ * This permits repeated recovery cuts without retaining an in-memory plan.
+ * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
- * the record. Partial libraries and other unknown encodings remain DIRTY. This cannot infer
- * replacement intent or perform sector erasure. Interruption during recovery
- * can create other status patterns, which remain DIRTY; this is not a complete
- * restart protocol.
+ * the record. Partial libraries and other unknown encodings remain DIRTY.
+ * This cannot infer replacement intent or perform sector erasure, and does not
+ * implement automatic startup recovery.
  * The IO extent is the same six-bank extent used by create_backup. */
 int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io);
 

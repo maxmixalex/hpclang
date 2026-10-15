@@ -818,7 +818,7 @@ provide power-loss recovery or reclaim the old allocation.
 The internal `hpclang_rpl_flash_recover_tails` primitive preflights identities
 and discard plans for all six user banks before recovering uncommitted bodies
 behind erased `FF` status markers, plus complete backups with partially written
-`FF -> 53` or `53 -> 00` statuses. Those backups require valid CRC, allocation
+statuses, including interruptions of recovery itself. Those backups require valid CRC, allocation
 extent, metadata and erased padding; only their status is cleared to `00`.
 They never become live objects. An unreadable or unknown later bank prevents
 all writes. During commit, a backend error may leave earlier tails recovered;
@@ -847,17 +847,25 @@ control backup. On HP49g+ and HP50g, native RCL sees only the `53` record and
 still recalls the later control; stored HOME results and complete Flash-image
 comparison verify visibility and absence of native repair. This establishes
 backup visibility, not record-integrity checks or library/cold-boot recovery.
+A second 255-state matrix sets zero metadata and invalid bodies on every hidden
+record while preserving the valid `53` record and later control. Both models
+again recall only the live entries and leave every Flash byte unchanged. This
+checks native traversal of the discard marker independently of SDK recovery.
 Explicit recovery uses tombstones for these validated interrupted backups.
 Before clearing a hidden superset of `53`, it first clears and verifies bit zero;
 neither programming step can accidentally expose a live `53` status. Fault tests
 exhaust all clearing masks at both byte alignments and cut whole-port recovery
-without caller cleanup. An `FE` tail marker is recognized only when its extent
-exactly matches the revalidated discard plan, with no later non-erased data.
-Other status patterns, partial libraries, invalid CRC/padding/metadata and damaged
-later banks are rejected without preflight writes. This is not automatic startup
-repair: power loss during recovery can create other status patterns, and library
-status recovery, replacement intent and interrupted sector erasure still require
-separate protocols.
+without caller cleanup. For an incomplete FF-marked body, recovery verifies zero
+metadata together with its discard extent before clearing status bit zero.
+After another cut, any even hidden status with zero metadata is recognized only
+when its extent exactly matches the revalidated tail discard plan, with no later
+non-erased data. Tests cut this recovery twice in succession during extent,
+metadata and status programming, then resume using only Flash bytes and verify
+preservation and idempotence. This discard marker is separate from metadata-one
+backups, which still require valid CRC and padding. Unknown encodings, partial
+libraries and damaged later banks are rejected without preflight writes.
+This is not automatic startup repair: library status recovery, replacement intent
+and interrupted sector erasure still require separate protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

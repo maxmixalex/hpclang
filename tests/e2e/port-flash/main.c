@@ -229,9 +229,19 @@ int main(void)
         goto done;
     /* With no retained transaction intent, recovery must keep an interrupted
      * backup invisible. Preserve its complete body rather than committing it. */
-    const uint8_t interrupted_statuses[] = {0x73, 0x03, 0xfe};
-    for (unsigned i = 0; i < sizeof interrupted_statuses; ++i) {
-        block[1] = interrupted_statuses[i];
+    const struct
+    {
+        uint8_t status, discarded_body;
+    } interrupted[] = {{0x73, 0}, {0x03, 0}, {0xfe, 0}, {0x72, 0}, {0x72, 1}};
+    for (unsigned i = 0; i < sizeof interrupted / sizeof interrupted[0]; ++i) {
+        for (uint32_t j = 0; j < sizeof native_record; ++j)
+            block[j + 1u] = native_record[j];
+        block[1] = interrupted[i].status;
+        if (interrupted[i].discarded_body) {
+            block[4] &= 15u;
+            for (uint32_t j = 4; j < sizeof native_record; ++j)
+                block[j + 1u] = 0;
+        }
         failure = 31;
         if (hpclang_stock_flash_program(bank + 0x104u, block, sizeof native_record + 2u) !=
                 HPCLANG_SST_OK ||

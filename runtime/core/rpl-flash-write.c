@@ -141,11 +141,11 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
         return HPCLANG_RPL_FLASH_DIRTY;
     if (!result)
         return HPCLANG_RPL_FLASH_WRITTEN;
-    uint8_t metadata;
-    if (!io_nibble(&reader_io, plan.address + 7u, &metadata))
-        return HPCLANG_RPL_FLASH_DIRTY;
+    /* Zero metadata durably distinguishes a discarded incomplete body from
+     * an ordinary backup (metadata one). Publish it with the verified extent
+     * while FF still hides the tail, before changing any status bits. */
     uint8_t header[] = {(uint8_t)plan.extent, (uint8_t)(plan.extent >> 8u),
-                        (uint8_t)((plan.extent >> 16u) | (uint32_t)metadata << 4u)};
+                        (uint8_t)(plan.extent >> 16u)};
     if (!write_bytes(io, first + plan.address / 2u + 1u, header, sizeof header) ||
         !discard_status(io, first + plan.address / 2u))
         return HPCLANG_RPL_FLASH_DIRTY;
@@ -214,11 +214,11 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         uint32_t extent = header & 0xfffffu;
         if (extent < 11u || extent > 0x40000u - at - 2u)
             return HPCLANG_RPL_FLASH_DIRTY;
-        if (status == 0xfeu) {
-            /* FF-tail cleanup first clears bit zero. Recognize that marker
-             * only when the already-written extent is exactly the bounded
-             * discard plan and the remaining bank is erased. This does not
-             * relax CRC validation for interrupted backup publication. */
+        if (status && !(status & 1u) && !(header >> 20u)) {
+            /* Tail cleanup verifies zero metadata and the extent before
+             * clearing bit zero. Every subsequent status remains even.
+             * Require the exact discard plan and an erased remainder; do not
+             * interpret an incomplete body as a CRC-valid backup. */
             struct recovery_status view = {&reader, at, 0xffu};
             const struct hpclang_rpl_reader erased = {committed_status_nibble, &view};
             struct hpclang_rpl_flash_discard plan;
@@ -233,7 +233,7 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         }
         if (status) {
             int partial = status != 0x53u;
-            if (partial && ((at & 1u) || ((status & 0x53u) != 0x53u && (status & ~0x53u) != 0u)))
+            if (partial && (at & 1u))
                 return HPCLANG_RPL_FLASH_DIRTY;
             /* Read-only status substitution lets the ordinary parser validate
              * the full object and CRC; it never publishes a live record. */
