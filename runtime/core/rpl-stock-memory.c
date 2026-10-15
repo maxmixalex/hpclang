@@ -149,6 +149,11 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
     volatile const uint32_t *l1 = (const void *)(uintptr_t)0x07f00000u;
     if (!hpclang_rpl_stock_memory_capture(memory, (const void *)boot->saturn_state, l1[0x80]))
         return 0;
+    /* Paired HP49g+/HP50g native library-registration captures relocate both
+     * graph object bases and their pixel-data pointers outside SYSUPD. */
+    static const uint32_t display_roots[] = {0x8068du, 0x80695u, 0x806d0u, 0x806d5u};
+    int display_supported =
+        boot->model == HPCLANG_MODEL_HP49GPLUS || boot->model == HPCLANG_MODEL_HP50G;
     *io = (struct hpclang_rpl_mutation_io){
         .read_nibble = hpclang_rpl_stock_memory_read,
         .write_nibble = hpclang_rpl_stock_memory_write,
@@ -161,6 +166,9 @@ int hpclang_rpl_stock_mutation_io(struct hpclang_rpl_mutation_io *io,
         .library_table = boot->model >= HPCLANG_MODEL_HP48GII && boot->model <= HPCLANG_MODEL_HP50G
                              ? 0x8611du
                              : 0u,
+        .display_roots = display_supported ? display_roots : NULL,
+        .display_root_count =
+            display_supported ? sizeof display_roots / sizeof display_roots[0] : 0,
     };
     return 1;
 }

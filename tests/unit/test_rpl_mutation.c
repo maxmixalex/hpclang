@@ -1677,7 +1677,7 @@ struct root_visit_state
 struct source_visit_state
 {
     uint32_t slots[512], values[512], count, index;
-    unsigned counts[8];
+    unsigned counts[9];
     int stop;
 };
 
@@ -1712,6 +1712,8 @@ static int visit_source_root(void *context, enum hpclang_rpl_root_source source,
         expected = HPCLANG_RPL_ROOT_VGER;
     else if (slot == 0x86123)
         expected = HPCLANG_RPL_ROOT_LIBRARY;
+    else if (slot == 0x8068d || slot == 0x80695 || slot == 0x806d0 || slot == 0x806d5)
+        expected = HPCLANG_RPL_ROOT_DISPLAY;
     else {
         assert(slot >= 0x806da && slot < 0x806da + 396 * 5 && (slot - 0x806da) % 5 == 0);
         expected = HPCLANG_RPL_ROOT_SYSTEM;
@@ -1719,6 +1721,29 @@ static int visit_source_root(void *context, enum hpclang_rpl_root_source source,
     assert(source == expected);
     ++state->counts[source];
     return state->stop;
+}
+
+static void test_display_root_relocation(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    const uint32_t slots[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
+    io.display_roots = slots;
+    io.display_root_count = 4;
+    const uint32_t pointers[] = {0x84003, 0x84fff, 0x83000, 0};
+    for (unsigned i = 0; i < 4; ++i)
+        put_word(slots[i], 5, pointers[i]);
+    struct hpclang_object *object = make_char('D');
+    rejected_read = slots[3];
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == HPCLANG_RPL_MUTATION_IO);
+    assert(!writes && get_word(TEMPTOP, 5) == 0x84000);
+    rejected_read = UINT32_MAX;
+    assert(hpclang_rpl_mutation_push_snapshot(&io, object) == 0);
+    uint32_t delta = object->nibble_count + 6;
+    assert(get_word(slots[0], 5) == pointers[0] + delta);
+    assert(get_word(slots[1], 5) == pointers[1] + delta);
+    assert(get_word(slots[2], 5) == pointers[2]);
+    assert(get_word(slots[3], 5) == 0);
+    hpclang_object_release(object);
 }
 
 static void test_root_sources(void)
@@ -1731,6 +1756,11 @@ static void test_root_sources(void)
     io.native_roots = roots;
     io.native_root_count = 1;
     io.library_table = 0x8611d;
+    const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
+    io.display_roots = display;
+    io.display_root_count = 4;
+    for (unsigned i = 0; i < 4; ++i)
+        put_word(display[i], 5, 0x86800 + i * 20);
     put_word(0x8611d, 3, 2);
     put_word(0x86123, 5, 0x81234);
     put_word(0x86128, 5, 0);
@@ -1743,7 +1773,7 @@ static void test_root_sources(void)
     assert(hpclang_rpl_mutation_visit_roots(&io, collect_flat_root, &state) == 0);
     assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 0);
     assert(state.index == state.count);
-    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1};
+    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4};
     assert(memcmp(counts, state.counts, sizeof counts) == 0);
     state.index = 0;
     state.stop = 73;
@@ -1757,6 +1787,23 @@ static void test_root_sources(void)
     assert(writes == 0 && native == pair.object_b && memcmp(before, memory, sizeof memory) == 0);
     assert(hpclang_rpl_mutation_visit_root_sources(&io, NULL, &state) ==
            HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    for (unsigned i = 0; i < 4; ++i) {
+        state.index = 0;
+        rejected_read = display[i];
+        assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) ==
+               HPCLANG_RPL_MUTATION_IO);
+    }
+    rejected_read = UINT32_MAX;
+    uint32_t invalid[] = {0x8068d, 0x8068f};
+    io.display_roots = invalid;
+    io.display_root_count = 2;
+    state.index = 0;
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(state.index == 0 && !writes);
+    invalid[1] = 0x806da;
+    assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) ==
+           HPCLANG_RPL_MUTATION_MALFORMED);
     free(before);
 }
 
@@ -1857,6 +1904,7 @@ int main(void)
     test_temp_allocation_visit();
     test_read_only_root_visit();
     test_root_sources();
+    test_display_root_relocation();
     test_port1_append_respects_native_pool();
     test_port1_library_append();
     test_port1_edit_owned_suffix();

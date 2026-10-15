@@ -701,6 +701,16 @@ its output on rejection. Actual C execution against saved HP49g+/HP50g catalogs
 matches the native position for ID 123 and detects its registered form. This is
 read-only planning; memory reservation, relocation and registration are still
 required before publishing a new catalog entry.
+Paired saved states from the same native operation identify the intervening
+region on HP49g+/HP50g: 17 ACPTR objects followed by graph storage. The graph
+bases and pixel pointers include four five-nibble cells below the existing
+SYSUPD scan (`8068D`, `80695`, `806D0`, `806D5`). All four advance by 16 nibbles
+when the catalog grows. The Stock mutation backend now supplies those
+model-validated display roots explicitly; the scanner reports their provenance
+and includes them in relocation preflight/commit. Host tests cover one-time
+updates, unchanged out-of-range values, unreadable cells and overlapping root
+definitions. Actual C traversal matches all four changes in both paired states.
+HP48gII display roots and complete catalog-growth relocation remain unverified.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.

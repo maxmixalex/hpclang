@@ -40,6 +40,10 @@ extern "C"
         /* Optional classic ROM-part table: 3-nibble count, 16-nibble records.
          * Zero disables this model-specific source of native references. */
         uint32_t library_table;
+        /* Model-validated nonoverlapping five-nibble display cells below SYSUPD.
+         * Addresses, not pointer values; optional for synthetic backends. */
+        const uint32_t *display_roots;
+        uint32_t display_root_count;
     };
 
     enum hpclang_rpl_mutation_result
@@ -79,7 +83,8 @@ extern "C"
         HPCLANG_RPL_ROOT_TOUCHTAB,
         HPCLANG_RPL_ROOT_VGER,
         HPCLANG_RPL_ROOT_SYSTEM,
-        HPCLANG_RPL_ROOT_LIBRARY
+        HPCLANG_RPL_ROOT_LIBRARY,
+        HPCLANG_RPL_ROOT_DISPLAY
     };
 
     /* The same cells as visit_roots, with their source preserved. Source is

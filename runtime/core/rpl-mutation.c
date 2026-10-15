@@ -526,6 +526,17 @@ static int scan_library_references(const struct hpclang_rpl_mutation_io *io,
 static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
                                const struct pointer_scan_request *original)
 {
+    if (io->display_root_count > (RPL_SYSUPDSTART - RPL_MAIN_FIRST) / 5 ||
+        (io->display_root_count && !io->display_roots))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    for (uint32_t i = 0; i < io->display_root_count; ++i) {
+        uint32_t slot = io->display_roots[i];
+        if (slot < RPL_MAIN_FIRST || slot > RPL_SYSUPDSTART - 5)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        for (uint32_t j = 0; j < i; ++j)
+            if (slot < io->display_roots[j] + 5 && io->display_roots[j] < slot + 5)
+                return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
     struct pointer_scan_request classified = *original;
     struct pointer_scan_request *request = &classified;
     request->source = HPCLANG_RPL_ROOT_NATIVE;
@@ -562,7 +573,17 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
     request->source = HPCLANG_RPL_ROOT_LIBRARY;
-    return scan_library_references(io, request);
+    result = scan_library_references(io, request);
+    if (result)
+        return result;
+    request->source = HPCLANG_RPL_ROOT_DISPLAY;
+    for (uint32_t i = 0; i < io->display_root_count; ++i) {
+        uint32_t slot = io->display_roots[i];
+        result = scan_pointer_slot(io, slot, request);
+        if (result)
+            return result;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
 }
 
 int hpclang_rpl_mutation_visit_temp(const struct hpclang_rpl_mutation_io *io,
