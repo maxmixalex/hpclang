@@ -1031,6 +1031,16 @@ decoded integers. Library 275 remains absent and Flash unchanged. General
 payload sizes, cache reuse, a dedicated stack/workspace and recovery execution
 still need acceptance beyond this fixed-size marker probe.
 
+A subsequent calculator-side counted-copy prototype accepts build-time bounded
+payload lengths and replaces the fixed three-word copy. Native HP50g execution
+passes eight payload sizes from 24 through 4,096 bytes across all eight CODE
+nibble-alignment phases. Independent checks compare every copied byte, verify
+each destination lies within its own reserved object space, and decode all
+eight post-return integers; library 275 remains absent and Flash unchanged.
+This establishes variable-size placement for these probes, not runtime input
+validation or an accepted recovery launcher. Dedicated stack/workspace, cache
+reuse, actual recovery execution and cross-model acceptance remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
