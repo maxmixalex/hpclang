@@ -916,11 +916,21 @@ Whole-port recovery can retire such an intent when the old live backup still
 matches its type, allocation length, native CRC and recorded CRC32, and the new
 reservation remains entirely erased. Publication cuts behind FF use ordinary
 dirty-tail recovery; complete unpublished/ready/retiring intents use the validated
-abort. Corrupt intent data, stale old contents and a non-erased new reservation
-are rejected before any recovery writes. Host tests cut each publication write,
+abort. Corrupt intent data and stale old contents are rejected before any recovery
+writes; a non-erased new reservation requires the committed-value path below.
+Host tests cut each publication write,
 inject returned errors/readback failures and verify recovery without transaction
-RAM state. This covers publication and abort before replacement starts, not
-recovery after the new value begins writing or commits.
+RAM state.
+For a fully committed new backup, recovery verifies both allocation boundaries,
+lengths, native object CRCs, recorded CRC32 values and exact names. It accepts the
+old status as live, partially deleted or deleted, finishes its tombstone, then
+retires the intent; both payloads remain unchanged. A retiring intent requires
+the old deletion to have already completed. Unpublished intents with a committed
+new value, mismatched names/content, interior addresses and multiple active
+intents are rejected before any writes. Host tests cover all old-deletion states,
+same/cross-bank layouts and hard cuts while deleting the old status or retiring
+the journal. Recovery of an incomplete new value and public replacement's use of
+the journal remain unfinished.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <setjmp.h>
+#include <stdlib.h>
 
 static const uint8_t record[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46,
                                  0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
@@ -215,6 +216,161 @@ static void reject_changed_intent(const struct hpclang_rpl_flash_io *io)
     }
 }
 
+static int packed_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const uint8_t *bytes = context;
+    *value = (bytes[address / 2u] >> ((address & 1u) * 4u)) & 15u;
+    return 1;
+}
+
+static uint8_t *replacement_named(const char *name, uint32_t *bytes)
+{
+    uint8_t value[] = {0x14, 0x26, 0x90, 0, 0, 0x86, 0x09}; /* ZINT 986, rather than old 987. */
+    const struct hpclang_rpl_reader source = {packed_nibble, value};
+    uint8_t *backup, *replacement;
+    uint32_t span;
+    assert(!hpclang_rpl_backup_encode(&source, 0, 14u, (const uint8_t *)name,
+                                      (uint32_t)strlen(name), &backup, &span));
+    const struct hpclang_rpl_reader encoded = {packed_nibble, backup};
+    assert(!hpclang_rpl_flash_backup_record(&encoded, 0, span, &replacement, bytes));
+    free(backup);
+    return replacement;
+}
+
+static uint8_t *replacement_record(uint32_t *bytes)
+{
+    return replacement_named("FLASHONE", bytes);
+}
+
+static void committed_recovery(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = replacement_record(&bytes);
+    for (unsigned layout = 0; layout < 3; ++layout) {
+        for (unsigned status = 0; status <= 0x53u; ++status) {
+            if (status & ~0x53u)
+                continue;
+            init();
+            if (layout) {
+                for (unsigned bank = 2; bank < 6; ++bank)
+                    leave_tail(bank, 0, 0);
+                leave_tail(0, sizeof record, layout == 1 ? HPCLANG_RPL_FLASH_INTENT_BYTES : bytes);
+                leave_tail(1, 0, layout == 1 ? bytes : HPCLANG_RPL_FLASH_INTENT_BYTES);
+            }
+            allow_program = 1;
+            struct hpclang_rpl_flash_replace_plan plan;
+            assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
+            assert(plan.intent.old_crc != plan.intent.new_crc);
+            assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+            uint32_t old = plan.intent.old_slot - base, journal = plan.intent_slot - base;
+            flash[old] = (uint8_t)status;
+            memcpy(before, flash, sizeof flash);
+            assert(!hpclang_rpl_flash_recover_tails(io));
+            for (uint32_t at = 0; at < sizeof flash; ++at)
+                assert(flash[at] == (at == old || at == journal ? 0 : before[at]));
+            assert(!memcmp(flash + plan.intent.new_slot - base, replacement, bytes));
+            unsigned completed = write_calls;
+            assert(!hpclang_rpl_flash_recover_tails(io) && completed == write_calls);
+        }
+    }
+    free(replacement);
+}
+
+static void committed_rejections(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = replacement_record(&bytes);
+    for (unsigned fault = 0; fault < 6; ++fault) {
+        init();
+        allow_program = 1;
+        struct hpclang_rpl_flash_replace_plan plan;
+        assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
+        assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+        if (fault == 0) {
+            flash[plan.intent_slot - base] = 0x7f; /* New value before publication is impossible. */
+        } else if (fault == 1) {
+            flash[plan.intent_slot - base] = 0x7c; /* Retirement cannot precede old deletion. */
+        } else if (fault == 2) {
+            uint32_t second = plan.intent.new_slot + bytes;
+            assert(!hpclang_rpl_flash_intent_encode(io->first, io->end, second, &plan.intent,
+                                                    flash + second - base,
+                                                    HPCLANG_RPL_FLASH_INTENT_BYTES));
+        } else if (fault == 3) {
+            /* The bytes and checksums match, but this is inside a deleted
+             * allocation, not a record start. Do not modify retained payload. */
+            leave_tail(1, 0, 0);
+            plan.intent.old_slot = base + 0x20115u;
+            memcpy(flash + plan.intent.old_slot - base, record, sizeof record);
+            assert(!hpclang_rpl_flash_intent_encode(io->first, io->end, plan.intent_slot,
+                                                    &plan.intent, flash + plan.intent_slot - base,
+                                                    HPCLANG_RPL_FLASH_INTENT_BYTES));
+        } else if (fault == 4) {
+            plan.intent.new_crc ^= 1u;
+            assert(!hpclang_rpl_flash_intent_encode(io->first, io->end, plan.intent_slot,
+                                                    &plan.intent, flash + plan.intent_slot - base,
+                                                    HPCLANG_RPL_FLASH_INTENT_BYTES));
+        } else {
+            uint32_t other_bytes;
+            uint8_t *other = replacement_named("OTHERONE", &other_bytes);
+            assert(other_bytes == bytes);
+            memcpy(flash + plan.intent.new_slot - base, other, bytes);
+            const struct hpclang_rpl_reader reader = {packed_nibble, other};
+            assert(!hpclang_rpl_flash_record_crc(&reader, 0, bytes, &plan.intent.new_crc));
+            free(other);
+            assert(!hpclang_rpl_flash_intent_encode(io->first, io->end, plan.intent_slot,
+                                                    &plan.intent, flash + plan.intent_slot - base,
+                                                    HPCLANG_RPL_FLASH_INTENT_BYTES));
+        }
+        memcpy(before, flash, sizeof flash);
+        write_calls = 0;
+        assert(hpclang_rpl_flash_recover_tails(io) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!write_calls && !memcmp(before, flash, sizeof flash));
+    }
+    free(replacement);
+}
+
+static void cut_committed_recovery(const struct hpclang_rpl_flash_io *io)
+{
+    if (!setjmp(power_cut)) {
+        (void)hpclang_rpl_flash_recover_tails(io);
+        assert(0 && "recovery cut was not reached");
+    }
+    cut_program = UINT32_MAX;
+}
+
+static void restart_committed_recovery(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = replacement_record(&bytes);
+    struct hpclang_rpl_flash_replace_plan plan;
+    init();
+    allow_program = 1;
+    assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
+    assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+    memcpy(before, flash, sizeof flash);
+    write_calls = 0;
+    assert(!hpclang_rpl_flash_recover_tails(io));
+    unsigned calls = write_calls;
+    const uint16_t masks[] = {0, 0x00ff, 0xff00, 0x5555, 0xaaaa, 0xffff};
+    for (unsigned at = 0; at < calls; ++at) {
+        for (unsigned m = 0; m < sizeof masks / sizeof masks[0]; ++m) {
+            init();
+            memcpy(flash, before, sizeof flash);
+            allow_program = 1;
+            partial_mask = masks[m];
+            cut_program = at;
+            cut_committed_recovery(io);
+            assert(!hpclang_rpl_flash_recover_tails(io));
+            for (uint32_t offset = 0; offset < sizeof flash; ++offset)
+                assert(flash[offset] ==
+                       (offset == plan.intent.old_slot - base || offset == plan.intent_slot - base
+                            ? 0
+                            : before[offset]));
+        }
+    }
+    free(replacement);
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read16, program16, base, base + sizeof flash};
@@ -268,5 +424,8 @@ int main(void)
     rejected(&io, HPCLANG_RPL_FLASH_FAILED);
     publication(&io);
     reject_changed_intent(&io);
+    committed_recovery(&io);
+    committed_rejections(&io);
+    restart_committed_recovery(&io);
     return 0;
 }

@@ -558,8 +558,12 @@ and read failures leave Flash and the output plan unchanged. The format is not
 yet emitted by normal mutation APIs. Internal publication now verifies the body
 before setting hidden status `7E`; whole-port recovery can retire the intent if
 the old backup still matches and the new reservation remains erased. Publication
-cuts and returned errors preserve both value regions. Recovery after the new
-value starts writing/commits and normal replacement integration remain open.
+cuts and returned errors preserve both value regions. A committed new value now
+supports validated old-status completion and intent retirement, including all
+old-deletion states and repeated recovery cuts. Allocation-boundary/name/checksum
+checks and a single-active-intent gate reject inconsistent transactions without
+writes. Incomplete new-value recovery and normal replacement integration remain
+open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

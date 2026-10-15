@@ -64,7 +64,10 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * This permits repeated recovery cuts without retaining an in-memory plan.
  * A CRC-valid replacement intent can be retired before replacement starts:
  * require the original live backup/extent/CRC and an entirely erased new slot.
- * Changed targets or a started replacement remain DIRTY rather than guessing.
+ * A committed new backup requires both exact allocation starts, lengths,
+ * checksums and matching names; recovery finishes old-status deletion before
+ * retiring the intent. Only one active intent is accepted per port. Changed
+ * targets, impossible phase ordering and partial new writes remain DIRTY.
  * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
  * the record. Partial libraries and other unknown encodings remain DIRTY.

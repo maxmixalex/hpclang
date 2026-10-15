@@ -3,6 +3,7 @@
 #include "rpl-stock-memory.h"
 #include <stdint.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <hpclang/object.h>
 #include <hpclang/port.h>
 
@@ -39,6 +40,28 @@ static int intent_program(void *context, uint32_t address, uint16_t value)
 {
     (void)context;
     return hpclang_stock_flash_program_word(address, value) == HPCLANG_SST_OK;
+}
+
+static int packed_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const uint8_t *bytes = context;
+    *value = (bytes[address / 2u] >> ((address & 1u) * 4u)) & 15u;
+    return 1;
+}
+
+static uint8_t *replacement_record(uint32_t *bytes)
+{
+    uint8_t value[] = {0x14, 0x26, 0x90, 0, 0, 0x86, 0x09}; /* ZINT 986. */
+    const struct hpclang_rpl_reader source = {packed_nibble, value};
+    uint8_t *backup = NULL, *replacement = NULL;
+    uint32_t span;
+    if (!hpclang_rpl_backup_encode(&source, 0, 14u, (const uint8_t *)"FLASHONE", 8u, &backup,
+                                   &span)) {
+        const struct hpclang_rpl_reader encoded = {packed_nibble, backup};
+        (void)hpclang_rpl_flash_backup_record(&encoded, 0, span, &replacement, bytes);
+    }
+    free(backup);
+    return replacement;
 }
 
 static uint32_t fingerprint(void)
@@ -386,6 +409,38 @@ int main(void)
     if (!object)
         goto done;
     valid = !hpclang_object_integer_i64(object, &value) && value == 987;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
+    failure = 38;
+    uint32_t replacement_bytes;
+    uint8_t *replacement = replacement_record(&replacement_bytes);
+    if (!replacement)
+        goto done;
+    int prepared = hpclang_rpl_flash_plan_replace(&plan_io, replacement, replacement_bytes, &plan);
+    if (prepared || (plan.intent_slot & ~4095u) != create_sector ||
+        plan.intent.new_slot + plan.intent.new_bytes > create_sector + sizeof saved_sector) {
+        free(replacement);
+        goto done;
+    }
+    int published =
+        hpclang_rpl_flash_publish_intent(&publish_io, replacement, replacement_bytes, &plan);
+    int appended = published ? published
+                             : hpclang_rpl_flash_append(&publish_io, plan.intent.new_slot,
+                                                        replacement, replacement_bytes);
+    free(replacement);
+    if (appended)
+        goto done;
+    failure = 39;
+    if (hpclang_stock_flash_recover_tails() ||
+        ((hpclang_flash_read16(0, plan.intent.old_slot & ~1u) >>
+          ((plan.intent.old_slot & 1u) * 8u)) &
+         255u))
+        goto done;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 986;
     hpclang_object_release(object);
     if (!valid)
         goto done;
