@@ -53,6 +53,55 @@ int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t 
     return 0;
 }
 
+int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_insertion *plan)
+{
+    if (!reader || !reader->read_nibble || !plan)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 3)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t count;
+    int result = word(reader, address, 3, &count);
+    if (result)
+        return result;
+    if (count > (limit - 3) / 16)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t end = address + 3 + count * 16, slot = end, previous = 0;
+    int found = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t record = address + 3 + i * 16, id;
+        result = word(reader, record, 3, &id);
+        if (result)
+            return result;
+        if (i && id <= previous)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        previous = id;
+        if (id == number)
+            found = 1;
+        if (id > number && slot == end)
+            slot = record;
+        /* Binding words belong to different mappings. Check their encoding
+         * without treating them as main-RAM pointers or dereferencing them. */
+        uint32_t ignored;
+        result = word(reader, record + 3, 5, &ignored);
+        if (!result)
+            result = word(reader, record + 8, 5, &ignored);
+        if (!result)
+            result = word(reader, record + 13, 3, &ignored);
+        if (result)
+            return result;
+    }
+    if (found)
+        return 0;
+    if (count == 0xfff || end > 0x100000u - 16)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *plan = (struct hpclang_rpl_catalog_insertion){slot, end, count};
+    return 1;
+}
+
 int hpclang_rpl_library_lookup(const struct hpclang_rpl_reader *reader, uint32_t address,
                                uint32_t limit, uint32_t number,
                                struct hpclang_rpl_library_binding *binding)

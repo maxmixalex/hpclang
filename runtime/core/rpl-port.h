@@ -55,6 +55,24 @@ struct hpclang_rpl_library_binding
     uint32_t flags;
 };
 
+struct hpclang_rpl_catalog_insertion
+{
+    uint32_t slot; /* Insert before this record, or at end. */
+    uint32_t end;  /* Exclusive end of the existing table. */
+    uint32_t count;
+};
+
+/* Plan insertion into the native strictly ID-ordered catalog. Validate every
+ * existing record before returning 1 with a plan, or 0 for an existing ID.
+ * Negative span results indicate invalid/unreadable input. Output changes only
+ * on 1. limit bounds the readable existing table, not free space after it.
+ * The caller must separately reserve 16 nibbles, relocate following memory and
+ * its references, and preserve the mapping through commit. This never writes
+ * or authorizes relocation, registration, attachment or library execution. */
+int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t limit, uint32_t number,
+                                    struct hpclang_rpl_catalog_insertion *plan);
+
 /* Enumerate every catalog entry, including banked and duplicate-ID records.
  * The record address identifies the catalog cell, not the library payload.
  * The binding is callback-local; copy it if needed. No target is dereferenced.

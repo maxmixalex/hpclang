@@ -310,6 +310,61 @@ static void test_catalog_traversal(void)
     assert(hpclang_rpl_catalog_visit(&reader, 5, 35, NULL, &state) == HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void test_catalog_insertion(void)
+{
+    struct image image = {.count = 56, .fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 3, 3);
+    put_word(&image, 8, 1, 3);
+    put_word(&image, 24, 161, 3);
+    put_word(&image, 40, 275, 3);
+    /* Nonzero bank switches and flags must be preserved as opaque metadata. */
+    put_word(&image, 32, 0x12345, 5);
+    put_word(&image, 37, 0xabc, 3);
+    const uint32_t ids[] = {0, 123, 256, 4095};
+    const uint32_t slots[] = {8, 24, 40, 56};
+    struct hpclang_rpl_catalog_insertion plan;
+    for (unsigned i = 0; i < 4; ++i) {
+        assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, ids[i], &plan) == 1);
+        assert(plan.slot == slots[i] && plan.end == 56 && plan.count == 3);
+    }
+    const struct hpclang_rpl_catalog_insertion sentinel = {17, 18, 19};
+    plan = sentinel;
+    assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 161, &plan) == 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    for (unsigned cut = 5; cut < 56; ++cut) {
+        image.fail_at = cut;
+        assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 123, &plan) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    image.fail_at = UINT32_MAX;
+    /* A match must not hide an unreadable or unordered later record. */
+    image.fail_at = 55;
+    assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 1, &plan) < 0);
+    image.fail_at = UINT32_MAX;
+    for (unsigned id = 160; id <= 161; ++id) {
+        put_word(&image, 40, id, 3);
+        assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 1, &plan) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&plan, &sentinel, sizeof plan));
+    }
+    put_word(&image, 40, 275, 3);
+    for (unsigned limit = 0; limit < 51; ++limit)
+        assert(hpclang_rpl_catalog_plan_insert(&reader, 5, limit, 123, &plan) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 4096, &plan) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_catalog_plan_insert(&reader, UINT32_MAX, 51, 1, &plan) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_catalog_plan_insert(NULL, 5, 51, 1, &plan) < 0);
+    assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 51, 1, NULL) < 0);
+    assert(!memcmp(&plan, &sentinel, sizeof plan));
+    put_word(&image, 5, 0, 3);
+    assert(hpclang_rpl_catalog_plan_insert(&reader, 5, 3, 0, &plan) == 1);
+    assert(plan.slot == 8 && plan.end == 8 && plan.count == 0);
+}
+
 static void test_library_catalog_lookup(void)
 {
     struct image image = {.count = 35, .fail_at = UINT32_MAX};
@@ -646,6 +701,7 @@ static void test_acptr_resolution(void)
 
 int main(void)
 {
+    test_catalog_insertion();
     test_acptr_resolution();
     test_flashptr_resolution();
     test_flashptr_bank();

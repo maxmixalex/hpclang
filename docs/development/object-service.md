@@ -683,6 +683,24 @@ The independent `port-library` client passes both Stock launches on HP49g+
 and HP50g, checking original RPL witnesses for all three ports and duplicate-ID
 refusal. Host coverage includes IDs with different titles, CRC/type rejection,
 all-bank preflight, full media and cleanup at each programming failure point.
+
+Library registration requires a separate relocation operation. Paired HP49g+
+and HP50g Stock probes first create library 123 in Port 0 through the SDK, then
+use native `:0:123 RCL 2 STO` between launches. The first launch finds no matching
+system-catalog binding; the second finds one unbanked binding, a catalog count
+increase of one and a TEMP-bottom increase of 16 nibbles. The probe stores its
+first-launch measurements in HOME and checks the deltas in the second launch.
+Consequently, registering a stored library cannot be implemented as merely
+writing an ID into the current table: catalog growth must preserve the following
+memory and its live references. This observation does not establish registration
+or attachment support in the SDK, or safe replacement of an executing library.
+The internal catalog insertion planner validates every existing record and
+strict ID ordering before identifying the insertion slot and old table end.
+It rejects unreadable tails even after finding an existing ID, and preserves
+its output on rejection. Actual C execution against saved HP49g+/HP50g catalogs
+matches the native position for ID 123 and detects its registered form. This is
+read-only planning; memory reservation, relocation and registration are still
+required before publishing a new catalog entry.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
