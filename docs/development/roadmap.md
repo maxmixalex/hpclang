@@ -870,6 +870,12 @@ so its byte-preservation result does not test that obligation. Add an owned
 embedded-code fixture with a changed alignment after movement, execute it after
 relaunch, and verify its updated library CRC. Historical implementation code
 is reference material only under the project's licensing policy.
+The current hpclang launcher uses a Launcher V3 DOCSTR envelope; the HPGCC3
+DOARMC envelope remains unsupported and is not interchangeable with it. An
+owned test library containing the hpclang Stock program now passes CRC, link
+resolution and complete command-span checks at three shifted bases, including
+odd nibble alignment. This prepares a relocation witness, but native execution
+after Flash movement and legacy-envelope alignment acceptance remain untested.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
