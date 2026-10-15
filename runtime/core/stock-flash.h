@@ -31,22 +31,27 @@ int hpclang_stock_flash_recover_tail(uint32_t bank_index);
 
 /* Whole-port interrupted-backup/FF-tail recovery under one mapping lease. This is an
  * explicit internal operation, not automatic startup repair. The caller must
- * resolve DIRTY before allowing native Flash mutation, as for recover_tail. */
+ * resolve pre-existing DIRTY data before native Flash mutation. Once recovery
+ * starts programming, it retains the lease until the chain is verified. */
 int hpclang_stock_flash_recover_tails(void);
 
 /* Finish a caller-owned pending commit against its exact expected RAM record.
  * Same verification/result contract as hpclang_rpl_flash_finish_commit. */
 int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, uint32_t bytes);
 
-/* Whole-port create under one mapping lease. Returns DIRTY only for a bank
+/* Whole-port create under one mapping lease, including recovery of recognized
+ * interrupted backups/tails before the requested mutation. The same preparation
+ * applies to removal/replacement. A successful repair is retained even when the
+ * requested operation fails (for example, duplicate name or no space).
+ * Returns DIRTY only for a bank
  * already malformed before mutation. Own failed writes are discarded before
  * returning FAILED. Permanently unrepairable hardware retains RAM execution
  * and ownership, just as a permanently BUSY chip does; it cannot resume Stock. */
 int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes);
 int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes);
 
-/* Whole-port deletion with the same exclusive ownership/fault policy.
- * Only the selected backup's status is cleared; no space is reclaimed. */
+/* Whole-port deletion with the same preparation and ownership/fault policy.
+ * After recovery, only the selected backup's status is cleared; no space is reclaimed. */
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length);
 /* Keep the old value on failed append; after a verified new commit, finish
  * deleting the old status before releasing exclusive mapping ownership. */

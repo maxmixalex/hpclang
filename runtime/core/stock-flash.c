@@ -216,7 +216,7 @@ int hpclang_stock_flash_recover_tails(void)
                                                  : HPCLANG_RPL_FLASH_DIRTY;
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
-    result = hpclang_rpl_flash_recover_tails(&io);
+    result = hpclang_rpl_flash_prepare_write(&io);
     close_flash(&owner);
     return result;
 }
@@ -238,13 +238,26 @@ int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, u
     return result;
 }
 
-static int create_record(const uint8_t *record, uint32_t bytes, int library)
+static int open_prepared_flash(struct flash_owner *owner)
 {
-    struct flash_owner owner;
-    int result = open_writable_flash(&owner);
+    int result = open_writable_flash(owner);
     if (result != HPCLANG_SST_OK)
         return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
                                                  : HPCLANG_RPL_FLASH_FAILED;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
+                                            user_flash.end};
+    result = hpclang_rpl_flash_prepare_write(&io);
+    if (result != HPCLANG_RPL_FLASH_WRITTEN)
+        close_flash(owner);
+    return result;
+}
+
+static int create_record(const uint8_t *record, uint32_t bytes, int library)
+{
+    struct flash_owner owner;
+    int result = open_prepared_flash(&owner);
+    if (result != HPCLANG_RPL_FLASH_WRITTEN)
+        return result;
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
     uint32_t attempted = UINT32_MAX;
@@ -276,10 +289,9 @@ int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes)
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
 {
     struct flash_owner owner;
-    int result = open_writable_flash(&owner);
-    if (result != HPCLANG_SST_OK)
-        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
-                                                 : HPCLANG_RPL_FLASH_FAILED;
+    int result = open_prepared_flash(&owner);
+    if (result != HPCLANG_RPL_FLASH_WRITTEN)
+        return result;
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
     uint32_t attempted = UINT32_MAX;
@@ -298,10 +310,9 @@ int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
 int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes)
 {
     struct flash_owner owner;
-    int result = open_writable_flash(&owner);
-    if (result != HPCLANG_SST_OK)
-        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
-                                                 : HPCLANG_RPL_FLASH_FAILED;
+    int result = open_prepared_flash(&owner);
+    if (result != HPCLANG_RPL_FLASH_WRITTEN)
+        return result;
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
     struct hpclang_rpl_flash_replacement transaction = {UINT32_MAX, UINT32_MAX, 0};

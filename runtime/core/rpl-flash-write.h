@@ -69,6 +69,13 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * The IO extent is the same six-bank extent used by create_backup. */
 int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io);
 
+/* Prepare a whole port for a normal mutation under continued exclusive ownership.
+ * Preflight errors return without writes. Once any programming is attempted,
+ * retry recovery until the native chain is verified; never release ownership
+ * with uncertain cleanup. Persistent hardware failure consequently does not
+ * return, matching the Stock backend's append/remove cleanup policy. */
+int hpclang_rpl_flash_prepare_write(const struct hpclang_rpl_flash_io *io);
+
 /* Finish a known backup/library commit after interruption/uncertain acknowledgement.
  * The caller retains the exact expected record and owns this reserved slot.
  * Validate that complete record, compare every stored body/padding byte, and

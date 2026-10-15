@@ -296,6 +296,39 @@ int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+struct recovery_owner
+{
+    const struct hpclang_rpl_flash_io *io;
+    int started;
+};
+
+static int owned_read(void *context, uint32_t address, uint16_t *value)
+{
+    const struct recovery_owner *owner = context;
+    return owner->io->read16(owner->io->context, address, value);
+}
+
+static int owned_program(void *context, uint32_t address, uint16_t value)
+{
+    struct recovery_owner *owner = context;
+    owner->started = 1;
+    return owner->io->program16(owner->io->context, address, value);
+}
+
+int hpclang_rpl_flash_prepare_write(const struct hpclang_rpl_flash_io *io)
+{
+    if (!io || !io->read16 || !io->program16)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct recovery_owner owner = {io, 0};
+    const struct hpclang_rpl_flash_io tracked = {&owner, owned_read, owned_program, io->first,
+                                                 io->end};
+    int result;
+    do {
+        result = hpclang_rpl_flash_recover_tails(&tracked);
+    } while (result != HPCLANG_RPL_FLASH_WRITTEN && owner.started);
+    return result;
+}
+
 struct record_selection
 {
     uint32_t free_slot, match_slot, matches;

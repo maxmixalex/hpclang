@@ -15,6 +15,7 @@ static unsigned writes;
 static uint32_t fail_address;
 static unsigned write_failures;
 static unsigned fail_write_at;
+static int fail_read_after_write;
 static unsigned power_cut_at = UINT32_MAX;
 static uint16_t power_cut_mask;
 static jmp_buf power_cut;
@@ -26,6 +27,10 @@ static int read16(void *context, uint32_t address, uint16_t *value)
     assert(!(address & 1u) && address >= base && address - base < sizeof flash);
     if (address == fail_address)
         return 0;
+    if (fail_read_after_write && writes) {
+        fail_read_after_write = 0;
+        return 0;
+    }
     uint32_t at = address - base;
     *value = (uint16_t)(flash[at] | (uint16_t)flash[at + 1u] << 8u);
     return 1;
@@ -66,6 +71,7 @@ static void init(void)
     write_failures = 0;
     fail_write_at = UINT32_MAX;
     fail_address = UINT32_MAX;
+    fail_read_after_write = 0;
     power_cut_at = UINT32_MAX;
 }
 
@@ -126,6 +132,33 @@ static void recover_port_tails(const struct hpclang_rpl_flash_io *io)
             assert(!memcmp(flash + index * 0x20000u + 0x105u, record, sizeof record));
     }
     free(before);
+}
+
+static void prepare_mutation(const struct hpclang_rpl_flash_io *io)
+{
+    assert(hpclang_rpl_flash_prepare_write(NULL) == HPCLANG_RPL_FLASH_INVALID);
+    interrupted_tails();
+    flash[5u * 0x20000u + 0x101u] = 0;
+    assert(hpclang_rpl_flash_prepare_write(io) == HPCLANG_RPL_FLASH_DIRTY && !writes);
+    interrupted_tails();
+    fail_address = base + 5u * 0x20000u + 0x100u;
+    assert(hpclang_rpl_flash_prepare_write(io) == HPCLANG_RPL_FLASH_FAILED && !writes);
+    for (unsigned fault = 0; fault < 2; ++fault) {
+        interrupted_tails();
+        if (fault)
+            fail_read_after_write = 1;
+        else
+            write_failures = 3;
+        assert(!hpclang_rpl_flash_prepare_write(io));
+        assert(!write_failures && !fail_read_after_write);
+        for (uint32_t index = 0; index < 6; ++index) {
+            uint32_t first = index * 0x20000u + 0x105u;
+            assert(!memcmp(flash + first, record, sizeof record));
+            assert(!flash[first + sizeof record]);
+        }
+        unsigned completed = writes;
+        assert(!hpclang_rpl_flash_prepare_write(io) && writes == completed);
+    }
 }
 
 static uint32_t fingerprint(uint32_t end)
@@ -810,6 +843,7 @@ int main(void)
     accept_legacy_padding(&io);
     create_libraries(&io);
     recover_port_tails(&io);
+    prepare_mutation(&io);
     restart_after_append(&io);
     restart_failed_append_cleanup(&io);
     recover_partial_backups(&io);

@@ -868,8 +868,14 @@ metadata and status programming, then resume using only Flash bytes and verify
 preservation and idempotence. This discard marker is separate from metadata-one
 backups, which still require valid CRC and padding. Unknown encodings, partial
 libraries and damaged later banks are rejected without preflight writes.
-This is not automatic startup repair: library status recovery, replacement intent
-and interrupted sector erasure still require separate protocols.
+Normal Port 2 backup create/replace/remove and library creation now run recovery
+under their existing mapping lease before the requested mutation. Preflight
+errors return without writes; after programming starts, recovery keeps ownership
+and retries until the chain is verified. A repaired tail stays repaired even if
+the requested operation subsequently reports an existing/missing name or full
+media. Reads do not trigger repair. This is recovery on mutation, not calculator
+startup repair: library status recovery, replacement intent and interrupted
+sector erasure still require separate protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

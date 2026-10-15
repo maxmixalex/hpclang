@@ -279,10 +279,10 @@ int main(void)
         if (!hpclang_rpl_stock_port2_reader(index, &reader) ||
             hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space))
             goto done;
-        if (!create_slot && space.nibbles >= sizeof native_record * 2u)
+        if (!create_slot && space.nibbles >= sizeof native_record * 4u)
             create_slot = 0x140000u + index * 0x20000u + space.address / 2u;
     }
-    if (!create_slot || (create_slot & 4095u) + sizeof native_record > sizeof saved_sector)
+    if (!create_slot || (create_slot & 4095u) + 2u * sizeof native_record > sizeof saved_sector)
         goto done;
     uint32_t create_sector = create_slot & ~4095u;
     for (uint32_t i = 0; i < sizeof saved_sector; i += 2u) {
@@ -290,6 +290,19 @@ int main(void)
         saved_sector[i] = (uint8_t)word;
         saved_sector[i + 1u] = (uint8_t)(word >> 8u);
     }
+    /* A previous launch left this hidden backup. The public create operation
+     * must recover it without an explicit call to an internal recovery API. */
+    for (uint32_t i = 0; i < sizeof block; ++i)
+        block[i] = 0xff;
+    uint32_t prefix = create_slot & 1u;
+    if (prefix)
+        block[0] = (uint8_t)hpclang_flash_read16(0, create_slot & ~1u);
+    for (uint32_t i = 0; i < sizeof native_record; ++i)
+        block[prefix + i] = native_record[i];
+    block[prefix] = 0x72;
+    if (hpclang_stock_flash_program(create_slot & ~1u, block,
+                                    (sizeof native_record + prefix + 1u) & ~1u) != HPCLANG_SST_OK)
+        goto done;
     failure = 27;
     struct hpclang_object *source = NULL;
     if (hpclang_object_create_integer_i64(987, &source))
@@ -297,6 +310,8 @@ int main(void)
     int created = hpclang_port_backup_create(2, (const uint8_t *)"FLASHONE", 8, source);
     hpclang_object_release(source);
     if (created)
+        goto done;
+    if ((hpclang_flash_read16(0, create_slot & ~1u) >> (prefix * 8u)) & 255u)
         goto done;
     failure = 28;
     object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);

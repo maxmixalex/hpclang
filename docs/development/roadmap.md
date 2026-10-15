@@ -541,6 +541,13 @@ and status programming resume from Flash
 alone, preserving preceding records and partial bodies. Complete backups retain
 CRC checks and their original metadata. This is host fault-model coverage;
 automatic startup recovery and the full power-loss requirement remain open.
+Normal Port 2 mutations now prepare the port with recovery under the same Flash
+mapping lease. Preflight errors do not write; once programming starts, transient
+read/write errors are retried while ownership is retained. The public-create
+fixture includes a hidden backup from an interrupted prior operation and requires
+successful recovery without calling the internal recovery API. Read-only access,
+calculator startup, library lifecycle and replacement-intent recovery remain
+separate work; the full power-loss goal is unchanged.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status
