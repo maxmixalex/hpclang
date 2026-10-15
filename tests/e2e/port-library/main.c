@@ -38,29 +38,43 @@ int main(void)
     unsigned failure = 1, phase = 0;
     if (hpclang_object_snapshot_copy(&reader, 0, sizeof encoding - 1, &source))
         goto done;
-    struct hpclang_port_info info = {.size = sizeof info, .version = HPCLANG_PORT_INFO_VERSION};
-    if (hpclang_port_query(0, &info) || !(info.available & HPCLANG_PORT_CREATE_LIBRARY))
-        goto done;
-    failure = 2;
-    copy = hpclang_port_library_get(0, 123);
-    if (!copy) {
-        if (errno != ENOENT || hpclang_port_library_create(0, source))
+    for (uint32_t port = 0; port < 2; ++port) {
+        failure = 1 + 16 * port;
+        struct hpclang_port_info info = {.size = sizeof info, .version = HPCLANG_PORT_INFO_VERSION};
+        if (hpclang_port_query(port, &info))
             goto done;
-        copy = hpclang_port_library_get(0, 123);
-    } else {
-        phase = 1;
-        failure = 3;
-        home = hpclang_object_store_home();
-        if (!home || hpclang_object_store_get(home, (const uint8_t *)"HPCWIT", 6, &witness) ||
-            !equal(witness, source))
+        if (port && info.medium == HPCLANG_PORT_ABSENT)
+            continue;
+        if (!(info.available & HPCLANG_PORT_CREATE_LIBRARY))
             goto done;
+        failure = 2 + 16 * port;
+        copy = hpclang_port_library_get(port, 123);
+        if (!port)
+            phase = copy != NULL;
+        if (!phase) {
+            if (copy || errno != ENOENT || hpclang_port_library_create(port, source))
+                goto done;
+            copy = hpclang_port_library_get(port, 123);
+        } else {
+            failure = 3 + 16 * port;
+            if (!home)
+                home = hpclang_object_store_home();
+            const uint8_t *key = (const uint8_t *)(port ? "HPCWIT1" : "HPCWIT");
+            if (!home || hpclang_object_store_get(home, key, port ? 7 : 6, &witness) ||
+                !equal(witness, source))
+                goto done;
+        }
+        failure = 4 + 16 * port;
+        if (!equal(copy, source))
+            goto done;
+        failure = 5 + 16 * port;
+        if (hpclang_port_library_create(port, source) != -1 || errno != EEXIST)
+            goto done;
+        hpclang_object_release(copy);
+        copy = NULL;
+        hpclang_object_release(witness);
+        witness = NULL;
     }
-    failure = 4;
-    if (!equal(copy, source))
-        goto done;
-    failure = 5;
-    if (hpclang_port_library_create(0, source) != -1 || errno != EEXIST)
-        goto done;
     hpclang_e2e_result = 0x4f53d000u | phase;
     hold();
     failure = 0;

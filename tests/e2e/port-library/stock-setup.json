@@ -6,7 +6,7 @@
       "HOME { HPCLANG L275 } ORDER"
     ],
     "hp4950": [
-      "HOME \\{171} :0:123 RCL 'HPCWIT' STO \\{187} 'HPCA' STO",
+      "HOME \\{171} :0:123 RCL 'HPCWIT' STO :1:123 RCL 'HPCWIT1' STO \\{187} 'HPCA' STO",
       "HOME { HPCLANG SETUP } ORDER"
     ]
   }

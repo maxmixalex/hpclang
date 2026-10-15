@@ -574,7 +574,7 @@ On 2026-10-04 the maintainer accepted these individual M7.3j limitations:
 | Namespace | Native model | Current limitation and retained work |
 | --- | --- | --- |
 | Port 0 | Main RAM, containing library/backup objects | Enumeration, owned reads and backup create/replace/remove have local Stock coverage, including three-launch persistence. Complete library mutation and relocation remain in M8.0. |
-| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup creation pass local Stock, including relaunch and native RPL recall. Replacement/removal and library writes still require bank/reference handling. |
+| Port 1 | Extended/banked RAM, containing library/backup objects | HP49g+/HP50g owned reads and backup/library creation pass local Stock, including relaunch and native RPL recall. Replacement/removal still require bank/reference handling. |
 | Port 2 | Flash, containing library/backup objects | Owned backup/library reads and enumeration pass HP49g+/HP50g Stock across three launches. Backup creation uses validated erased tails with synchronous error cleanup; removal preserves the payload and clears its status only. Replacement appends before deleting the old status; reclamation and power-loss behavior remain open. |
 
 HPGCC3 `libs_workspace/headers/sat3.h` documents these object types and memory
@@ -643,13 +643,22 @@ to store a complete owned library encoding. It validates the library format and
 CRC before moving memory, rejects a duplicate library number in that port with
 `EEXIST`, and leaves existing library records at their original addresses. The
 input snapshot remains owned by the caller. A non-library value returns `EINVAL`;
-Port 1/2 and unsupported launch contexts return `ENOSYS`. Capability discovery
+Port 2 and unsupported launch contexts return `ENOSYS`. Capability discovery
 reports `HPCLANG_PORT_CREATE_LIBRARY` separately from backup creation.
 This stores a record only: it does not register, attach or execute it. Library
 replacement/removal, active-library lifecycle and relocation remain open.
 The separate `port-library` fixture passes two Stock launches on HP48gII,
 HP49g+ and HP50g, including original-system RCL into HOME between launches,
 byte-for-byte owned readback, duplicate-ID refusal and settled return.
+
+On HP49g+/HP50g, `hpclang_port_library_create(1, snapshot)` appends to ERAM using
+the same validated chain and launcher-owned limit as backup creation. Existing
+records stay at their addresses; the body and next terminator are prepared
+before the new prologue is published. Space for the native six-nibble terminator
+is included in the limit check. A missing ownership boundary returns `ENOSYS`;
+insufficient owned space returns `ENOSPC`. The shared `port-library` fixture
+passes both launches on HP49g+ and HP50g with independent native RCL witnesses
+for both ports. Library registration, attachment and execution remain separate.
 
 Port 2 creation on HP49g+/HP50g validates all six native banks and duplicate
 names under one exclusive Flash mapping, then appends into erased tail space.

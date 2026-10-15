@@ -26,8 +26,17 @@ static int parse_error(int result)
                                                     : HPCLANG_RPL_MUTATION_MALFORMED;
 }
 
-int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
-                                    const uint8_t *packed, uint32_t span)
+static int same_record(const struct hpclang_rpl_port_entry *a,
+                       const struct hpclang_rpl_port_entry *b)
+{
+    return a->prologue == b->prologue &&
+           (a->prologue == 0x02b40u
+                ? a->library_number == b->library_number
+                : a->name_length == b->name_length && !memcmp(a->name, b->name, a->name_length));
+}
+
+static int port1_append(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                        const uint8_t *packed, uint32_t span, uint32_t prologue)
 {
     if (!io || !io->read_nibble || !io->write_nibble)
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -38,14 +47,13 @@ int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, ui
     struct hpclang_rpl_port_cursor input_cursor = {.end = span};
     struct hpclang_rpl_port_entry added;
     int result = hpclang_rpl_port_next(&input, &input_cursor, &added);
-    if (result != 1 || added.prologue != 0x02b62u || added.span != span)
+    if (result != 1 || added.prologue != prologue || added.span != span)
         return HPCLANG_RPL_MUTATION_MALFORMED;
     const struct hpclang_rpl_reader reader = {io->read_nibble, io->context};
     struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
     struct hpclang_rpl_port_entry existing;
     while ((result = hpclang_rpl_port_next(&reader, &cursor, &existing)) > 0) {
-        if (existing.prologue == added.prologue && existing.name_length == added.name_length &&
-            !memcmp(existing.name, added.name, added.name_length))
+        if (same_record(&existing, &added))
             return HPCLANG_RPL_MUTATION_EXISTS;
     }
     if (result < 0)
@@ -74,6 +82,18 @@ int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, ui
             return HPCLANG_RPL_MUTATION_IO;
     }
     return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                    const uint8_t *packed, uint32_t span)
+{
+    return port1_append(io, limit, packed, span, 0x02b62u);
+}
+
+int hpclang_rpl_port1_create_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                     const uint8_t *packed, uint32_t span)
+{
+    return port1_append(io, limit, packed, span, 0x02b40u);
 }
 
 static int port1_edit(const struct hpclang_rpl_mutation_io *io, uint32_t limit, const uint8_t *name,
@@ -277,10 +297,7 @@ static int prepend_record(const struct hpclang_rpl_mutation_io *io, const uint8_
     struct hpclang_rpl_port_cursor cursor = {start, 0x100000u, 0};
     struct hpclang_rpl_port_entry existing;
     while ((result = hpclang_rpl_port_next(&reader, &cursor, &existing)) > 0) {
-        if (existing.prologue == added.prologue &&
-            (prologue == 0x02b40u ? existing.library_number == added.library_number
-                                  : existing.name_length == added.name_length &&
-                                        !memcmp(existing.name, added.name, added.name_length)))
+        if (same_record(&existing, &added))
             return HPCLANG_RPL_MUTATION_EXISTS;
     }
     if (result < 0)

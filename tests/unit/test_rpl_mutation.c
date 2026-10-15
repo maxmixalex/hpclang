@@ -1347,6 +1347,55 @@ static void test_port1_append_respects_native_pool(void)
     }
 }
 
+static void test_port1_library_append(void)
+{
+    const char *backup = "26b20130008005f42545a55425f48041620900003210119200f9e3";
+    const char *library = "04b2062000108510b7000000000000000000000d5c2";
+    for (unsigned failure = 0; failure < 6; ++failure) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        uint8_t packed[22] = {0};
+        for (uint32_t i = 0; i < 43; ++i) {
+            uint8_t n = library[i] <= '9' ? library[i] - '0' : library[i] - 'a' + 10;
+            packed[i / 2] |= n << (4 * (i & 1));
+        }
+        for (uint32_t i = 0; i < 54; ++i)
+            memory[i] = backup[i] <= '9' ? backup[i] - '0' : backup[i] - 'a' + 10;
+        uint8_t saved[54];
+        memcpy(saved, memory, sizeof saved);
+        uint32_t limit = 103;
+        memory[limit] = 11;
+        if (failure == 1)
+            --limit;
+        else if (failure == 2)
+            packed[21] ^= 1;
+        else if (failure == 3)
+            memory[53] ^= 1;
+        else if (failure == 4)
+            rejected_read = 102;
+        else if (failure == 5)
+            packed[0] = 0x62;
+        int result = hpclang_rpl_port1_create_library(&io, limit, packed, 43);
+        if (failure) {
+            assert(result != HPCLANG_RPL_MUTATION_OK && writes == 0);
+            assert(memory[103] == 11);
+            continue;
+        }
+        assert(result == HPCLANG_RPL_MUTATION_OK && memory[103] == 11);
+        assert(!memcmp(saved, memory, sizeof saved));
+        const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+        struct hpclang_rpl_port_cursor cursor = {0, 0x40000u, 0};
+        struct hpclang_rpl_port_entry entry;
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 0);
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 1 && entry.address == 54);
+        assert(entry.library_number == 123 && entry.name_length == 1 && entry.name[0] == 'X');
+        assert(hpclang_rpl_port_next(&reader, &cursor, &entry) == 0);
+        uint32_t before = writes;
+        assert(hpclang_rpl_port1_create_library(&io, limit, packed, 43) ==
+               HPCLANG_RPL_MUTATION_EXISTS);
+        assert(writes == before);
+    }
+}
+
 struct port1_guard_fixture
 {
     uint32_t start, end, calls;
@@ -1809,6 +1858,7 @@ int main(void)
     test_read_only_root_visit();
     test_root_sources();
     test_port1_append_respects_native_pool();
+    test_port1_library_append();
     test_port1_edit_owned_suffix();
     test_port0_create_library();
     test_library_table_reference_preservation();

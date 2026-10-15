@@ -7,6 +7,10 @@
  * launcher-proven exclusive nibble boundary before its physical page pool. */
 int hpclang_rpl_port1_create_backup(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
                                     const uint8_t *packed, uint32_t span);
+/* Same ownership/append contract for a library. Does not register or attach it;
+ * duplicate library IDs are rejected independently of their title. */
+int hpclang_rpl_port1_create_library(const struct hpclang_rpl_mutation_io *io, uint32_t limit,
+                                     const uint8_t *packed, uint32_t span);
 
 /* Read-only reference preflight. The callback must prove no live banked
  * reference targets [start,end), expressed as ERAM-relative nibble offsets.

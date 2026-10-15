@@ -468,6 +468,13 @@ owned witness matches, duplicate creation is refused and Stock return settles.
 HP48 uses its own L275 installation order in the setup contract. Formal CI for
 this addition is pending. Registration, attachment,
 library replacement/removal and relocation remain separate unfinished work.
+Port 1 library creation now uses the same bounded ERAM append as backup records,
+without moving existing objects. The public capability query requires the
+launcher-owned ERAM boundary. All 96 host targets, focused sanitizers and ARM
+analysis pass; the expanded `port-library` fixture passes both Stock launches
+on HP49g+ and HP50g, including independent original-system RCL of both ports.
+Library registration/attachment, reference-preserving replacement/removal and
+Flash reclamation remain open. This addition is local pending a batched push.
 Port 1 enumeration and owned backup/library reads are implemented for HP49g+
 and HP50g; native-RPL-created backup enumeration/readback passes Stock on both
 models across the three-launch Port 0 lifecycle. Port 1 backup creation now

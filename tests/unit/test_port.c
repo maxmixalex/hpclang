@@ -188,7 +188,7 @@ static void test_discovery(void)
             assert(info.port == port && info.available == 0);
             assert((info.medium != HPCLANG_PORT_ABSENT) == present);
             assert((info.implemented & reads) == (present ? reads : 0));
-            assert(!!(info.implemented & HPCLANG_PORT_CREATE_LIBRARY) == (present && port == 0));
+            assert(!!(info.implemented & HPCLANG_PORT_CREATE_LIBRARY) == (present && port < 2));
             if (present)
                 assert(info.medium == port + HPCLANG_PORT_MAIN_RAM);
             boot.saturn_state = 1;
@@ -482,7 +482,11 @@ int main(void)
     assert(hpclang_port_library_create(0, NULL) == -1 && errno == EINVAL);
     assert(hpclang_port_library_create(0, object) == -1 && errno == EINVAL);
     assert(hpclang_port_library_create(3, library_snapshot) == -1 && errno == EINVAL);
+    assert(hpclang_port_library_create(1, library_snapshot) == -1 && errno == ENOSPC);
+    port1_available = 0;
     assert(hpclang_port_library_create(1, library_snapshot) == -1 && errno == ENOSYS);
+    port1_available = 1;
+    port1_limit = 0x2000;
     assert(hpclang_port_library_create(2, library_snapshot) == -1 && errno == ENOSYS);
     boot.saturn_state = 0;
     assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == ENOSYS);
@@ -492,6 +496,15 @@ int main(void)
     library_snapshot->data[21] ^= 1;
     assert(hpclang_port_library_create(0, library_snapshot) == 0);
     assert(hpclang_port_library_create(0, library_snapshot) == -1 && errno == EEXIST);
+    assert(hpclang_port_library_create(1, library_snapshot) == 0);
+    assert(hpclang_port_library_create(1, library_snapshot) == -1 && errno == EEXIST);
+    copy = hpclang_port_backup_get(1, (const uint8_t *)"ERAM", 4);
+    assert(copy && hpclang_object_integer_i64(copy, &value) == 0 && value == 123);
+    hpclang_object_release(copy);
+    copy = hpclang_port_library_get(1, 123);
+    assert(copy && copy->nibble_count == library_snapshot->nibble_count);
+    assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));
+    hpclang_object_release(copy);
     copy = hpclang_port_library_get(0, 123);
     assert(copy && copy->nibble_count == library_snapshot->nibble_count);
     assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));

@@ -25,6 +25,8 @@ uint32_t hpclang_e2e_port_discovery(void)
             expected = reads | HPCLANG_PORT_CREATE_BACKUP;
             if (port == 2)
                 expected |= HPCLANG_PORT_REMOVE_BACKUP | HPCLANG_PORT_REPLACE_BACKUP;
+            else
+                expected |= HPCLANG_PORT_CREATE_LIBRARY;
             medium = port == 1 ? HPCLANG_PORT_EXTENDED_RAM : HPCLANG_PORT_FLASH;
         }
         if (info.port != port || info.medium != medium || info.implemented != expected ||
