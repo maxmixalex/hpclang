@@ -1116,6 +1116,18 @@ These two cases establish command-boundary interruption/re-entry, not power loss
 while the Flash chip is busy, all partial-header patterns, automatic startup
 recovery or a completed public reclamation service.
 
+A repeated-interruption chain now passes: after the 132-program cut and reset,
+another native replay stops after 2,047 programs; a second hardware reset and
+independent retry recover the exact image. Before final recovery, Stock retains
+library 124/275 IDs with abnormal `0x1b08` bindings. After recovery and ON/F3,
+both return to their expected relocated bindings without further Flash changes.
+The final transfer first required native cleanup of the two retained fault-probe
+programs after Stock rejected a third large probe for insufficient RAM. Production
+packaging therefore still needs a bounded memory contract. The abnormal catalog
+state also motivates publishing a restored bank identity only after verifying
+its sector body. Existing x50ng Flash operations complete immediately; native
+command-boundary cuts do not establish busy-chip power-loss behavior.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
