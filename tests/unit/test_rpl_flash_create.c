@@ -209,6 +209,25 @@ static void replace_backups(const struct hpclang_rpl_flash_io *io)
     assert(!writes && transaction.new_slot == UINT32_MAX && fingerprint(sizeof flash) == before);
 }
 
+static void accept_legacy_padding(const struct hpclang_rpl_flash_io *io)
+{
+    /* Native HP50g `987 :2:BB STO`: the final three bytes are padding.
+     * Older SDK encoders used only one padding byte for this object. */
+    uint8_t encoded[] = {0x53, 0x36, 0x00, 0x10, 0x62, 0x2b, 0x50, 0x02, 0x00, 0x02,
+                         0x42, 0x42, 0x02, 0x14, 0x26, 0x90, 0x00, 0x00, 0x87, 0x09,
+                         0x11, 0x29, 0x00, 0x88, 0x9d, 0xff, 0xff, 0xff};
+    for (unsigned legacy = 0; legacy < 2; ++legacy) {
+        init();
+        uint32_t size = sizeof encoded - 2 * legacy;
+        encoded[1] = (uint8_t)(size * 2 - 2);
+        assert(hpclang_rpl_flash_create_backup(io, encoded, size, NULL) == 0);
+        assert(!memcmp(flash + 0x105, encoded, size));
+        assert(hpclang_rpl_flash_finish_commit(io, base + 0x105, encoded, size) == 0);
+        assert(hpclang_rpl_flash_discard_record(io, base + 0x105, encoded, size) == 0);
+        assert(flash[0x105] == 0);
+    }
+}
+
 static void remove_backups(const struct hpclang_rpl_flash_io *io)
 {
     const uint8_t *name = (const uint8_t *)"FLASHONE";
@@ -341,5 +360,6 @@ int main(void)
     assert(!writes && fingerprint(sizeof flash) == before);
     remove_backups(&io);
     replace_backups(&io);
+    accept_legacy_padding(&io);
     return 0;
 }

@@ -668,11 +668,19 @@ the mapping and expected RAM record. Persistent hardware failure retains RAM
 execution, as does a chip that never leaves BUSY; normal return and both exit
 paths cannot bypass this synchronous operation. This does not guarantee
 power-loss recovery; library writes remain open.
+New Flash backup envelopes round their complete allocation size to four bytes,
+matching independent native STO captures across four backup-name lengths.
+Existing halfword-sized SDK envelopes remain accepted for failed-write cleanup.
+An internal library encoder also matches the native 43-nibble library record
+captured on HP49g+ and HP50g; its unused padding remains erased. This encoder
+does not yet enable public Port 2 library creation or library registration.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
 Normal return, `exit()` and `_Exit()` preserve the backup. Independent image
 comparison confirms only the intended 30-byte allocation changed.
+The current short-name regression uses `BB`: all three HP50g Stock launches
+pass, and its 28-byte saved record matches native `987 :2:BB STO` byte for byte.
 Port 2 removal uses a native tombstone: only the status byte changes from `53`
 to `00`. Whole-port preflight rejects malformed banks and ambiguous duplicate
 names before writing; missing names return `ENOENT`. Partial status writes are

@@ -10,6 +10,12 @@ static const uint8_t native_record[] = {
     0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46, 0x4c, 0x41, 0x53, 0x48, 0x4f,
     0x4e, 0x45, 0x08, 0x14, 0x26, 0x90, 0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 
+/* HP49g+ and HP50g native `:0:123 RCL 2 STO`, followed by SDK readback and
+ * normal return. The 43-nibble library occupies a 56-nibble allocation. */
+static const uint8_t native_library_record[] = {
+    0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01, 0x58, 0x01, 0x7b, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd0, 0xc5, 0x02, 0xff, 0xff};
+
 struct image
 {
     const uint8_t *data;
@@ -33,6 +39,76 @@ static void put_word(uint8_t *data, uint32_t at, uint32_t value)
         unsigned shift = (at & 1u) * 4u;
         data[at / 2u] =
             (uint8_t)((data[at / 2u] & ~(15u << shift)) | (((value >> (4u * i)) & 15u) << shift));
+    }
+}
+
+static void test_native_library(void)
+{
+    uint8_t bank[sizeof native_library_record + 2];
+    memcpy(bank, native_library_record, sizeof native_library_record);
+    memset(bank + sizeof native_library_record, 0xff, 2);
+    struct image source = {bank, sizeof bank * 2, 0x20a, 0, UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &source};
+    struct hpclang_rpl_port_cursor cursor = {source.base, source.base + source.nibbles, 0};
+    struct hpclang_rpl_port_entry entry;
+    assert(hpclang_rpl_flash_next(&reader, &cursor, &entry) == 1);
+    assert(entry.prologue == 0x2b40 && entry.span == 43 && entry.library_number == 123);
+    assert(entry.name_length == 1 && entry.name[0] == 'X');
+    assert(cursor.address == source.base + sizeof native_library_record * 2);
+    assert(hpclang_rpl_flash_next(&reader, &cursor, &entry) == 0 && cursor.finished);
+    source = (struct image){native_library_record + 4, 43, 0x100, 0, UINT32_MAX};
+    uint8_t *encoded;
+    uint32_t bytes;
+    assert(hpclang_rpl_flash_library_record(&reader, source.base, 43, &encoded, &bytes) == 0);
+    uint8_t expected[sizeof native_library_record];
+    memcpy(expected, native_library_record, sizeof expected);
+    /* Stock copied the unused high nibble as zero. Our padding stays erased. */
+    expected[25] |= 0xf0;
+    assert(bytes == sizeof expected && !memcmp(encoded, expected, bytes));
+    free(encoded);
+    source.reads = 0;
+    assert(hpclang_rpl_flash_library_record(&reader, source.base, 43, &encoded, &bytes) == 0);
+    unsigned reads = source.reads;
+    free(encoded);
+    uint8_t sentinel;
+    for (unsigned cut = 0; cut < reads; ++cut) {
+        encoded = &sentinel;
+        bytes = 123;
+        source.reads = 0;
+        source.fail_after = cut;
+        assert(hpclang_rpl_flash_library_record(&reader, source.base, 43, &encoded, &bytes) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(encoded == &sentinel && bytes == 123);
+    }
+    source.fail_after = UINT32_MAX;
+    assert(hpclang_rpl_flash_backup_record(&reader, source.base, 43, &encoded, &bytes) < 0);
+    uint8_t corrupt[22];
+    memcpy(corrupt, native_library_record + 4, sizeof corrupt);
+    corrupt[21] ^= 1;
+    source.data = corrupt;
+    assert(hpclang_rpl_flash_library_record(&reader, source.base, 43, &encoded, &bytes) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(encoded == &sentinel && bytes == 123);
+}
+
+static void test_native_word_padding(void)
+{
+    /* Independent HP50g `987 :2:BB STO` and `987 :2:CCC STO` captures.
+     * Halfword rounding would incorrectly produce 26 rather than 28 bytes. */
+    static const uint8_t records[2][28] = {
+        {0x53, 0x36, 0x00, 0x10, 0x62, 0x2b, 0x50, 0x02, 0x00, 0x02, 0x42, 0x42, 0x02, 0x14,
+         0x26, 0x90, 0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0x88, 0x9d, 0xff, 0xff, 0xff},
+        {0x53, 0x36, 0x00, 0x10, 0x62, 0x2b, 0x70, 0x02, 0x00, 0x03, 0x43, 0x43, 0x43, 0x03,
+         0x14, 0x26, 0x90, 0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xdf, 0x63, 0xff, 0xff}};
+    for (unsigned i = 0; i < 2; ++i) {
+        struct image source = {records[i] + 4, 42 + 2 * i, 0, 0, UINT32_MAX};
+        const struct hpclang_rpl_reader reader = {read_nibble, &source};
+        uint8_t *encoded;
+        uint32_t bytes;
+        assert(hpclang_rpl_flash_backup_record(&reader, 0, source.nibbles, &encoded, &bytes) == 0);
+        assert(bytes == sizeof records[i] && !memcmp(encoded, records[i], bytes));
+        free(encoded);
+        assert(hpclang_rpl_flash_library_record(&reader, 0, source.nibbles, &encoded, &bytes) < 0);
     }
 }
 
@@ -222,6 +298,8 @@ static void test_discard(void)
 
 int main(void)
 {
+    test_native_library();
+    test_native_word_padding();
     test_allocation_find();
     test_tail();
     test_discard();
@@ -292,7 +370,7 @@ int main(void)
     /* A full bank still needs its prefix and erased end marker. Exercise
      * the largest fitting record and the next halfword beyond that bound. */
     for (unsigned extra = 0; extra <= 2; extra += 2) {
-        uint32_t object_span = 0x40000u - 0x20au - 2u - 8u - 24u + extra;
+        uint32_t object_span = ((0x40000u - 0x20au - 2u) & ~7u) - 8u - 24u + extra;
         uint8_t *string = calloc((object_span + 1u) / 2u, 1);
         assert(string);
         put_word(string, 0, 0x02a2cu);
@@ -302,7 +380,7 @@ int main(void)
         source = (struct image){backup, span, 0, 0, UINT32_MAX};
         int result = hpclang_rpl_flash_backup_record(&reader, 0, span, &record, &bytes);
         if (!extra) {
-            assert(result == 0 && bytes == 0x1fefau);
+            assert(result == 0 && bytes == 0x1fef8u);
             free(record);
         } else {
             assert(result == HPCLANG_RPL_SPAN_BOUNDS);

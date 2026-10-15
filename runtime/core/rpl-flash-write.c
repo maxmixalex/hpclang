@@ -31,8 +31,10 @@ static int valid_record(const uint8_t *record, uint32_t bytes)
     const struct hpclang_rpl_reader reader = {packed_read, &packed};
     struct hpclang_rpl_backup_view view;
     if (hpclang_rpl_backup_view(&reader, 8u, bytes * 2u - 8u, &view) ||
-        ((view.span + 11u) & ~3u) != bytes * 2u)
+        (((view.span + 15u) & ~7u) != bytes * 2u && ((view.span + 11u) & ~3u) != bytes * 2u))
         return 0;
+    /* Accept old SDK halfword-sized envelopes for pending-write cleanup;
+     * newly encoded records follow native STO's four-byte allocation size. */
     for (uint32_t at = 8u + view.span; at < bytes * 2u; ++at) {
         uint8_t nibble;
         if (!packed_read(&packed, at, &nibble) || nibble != 15u)

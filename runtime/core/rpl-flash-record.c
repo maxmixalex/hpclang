@@ -109,22 +109,26 @@ int hpclang_rpl_flash_allocation_find(const struct hpclang_rpl_reader *reader, u
     return 0;
 }
 
-int hpclang_rpl_flash_backup_record(const struct hpclang_rpl_reader *reader, uint32_t address,
-                                    uint32_t span, uint8_t **record, uint32_t *bytes)
+static int encode_record(const struct hpclang_rpl_reader *reader, uint32_t address, uint32_t span,
+                         uint32_t prologue, uint8_t **record, uint32_t *bytes)
 {
     if (!record || !bytes)
         return HPCLANG_RPL_SPAN_MALFORMED;
     /* A native bank has 0x40000 nibbles, a 0x20A-nibble prefix and an
      * erased end marker. Never allocate a record that cannot fit one bank. */
-    if (span > 0x40000u - 0x20au - 2u - 8u)
+    if (span > ((0x40000u - 0x20au - 2u) & ~7u) - 8u || address >= 0x100000u ||
+        span > 0x100000u - address)
         return HPCLANG_RPL_SPAN_BOUNDS;
-    struct hpclang_rpl_backup_view view;
-    int result = hpclang_rpl_backup_view(reader, address, span, &view);
-    if (result)
+    struct hpclang_rpl_port_cursor cursor = {address, address + span, 0};
+    struct hpclang_rpl_port_entry view;
+    int result = hpclang_rpl_port_next(reader, &cursor, &view);
+    if (result < 0)
         return result;
-    if (view.span != span)
+    if (result != 1 || view.prologue != prologue || view.span != span)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    uint32_t nibbles = (span + 8u + 3u) & ~3u;
+    /* Native STO rounds the complete allocation to a four-byte size. The
+     * slot itself may start at an odd byte address within the native chain. */
+    uint32_t nibbles = (span + 8u + 7u) & ~7u;
     uint32_t count = nibbles / 2u;
     uint8_t *data = malloc(count);
     if (!data)
@@ -152,4 +156,16 @@ int hpclang_rpl_flash_backup_record(const struct hpclang_rpl_reader *reader, uin
     *record = data;
     *bytes = count;
     return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_backup_record(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                    uint32_t span, uint8_t **record, uint32_t *bytes)
+{
+    return encode_record(reader, address, span, 0x02b62u, record, bytes);
+}
+
+int hpclang_rpl_flash_library_record(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                     uint32_t span, uint8_t **record, uint32_t *bytes)
+{
+    return encode_record(reader, address, span, 0x02b40u, record, bytes);
 }

@@ -557,6 +557,13 @@ return, `exit()` and `_Exit()`. Native RPL recalls value 987 before both relaunc
 the application checks and deletes each HOME witness so a stale value cannot
 pass the next run. Independent saved-image comparison finds exactly one new
 30-byte allocation, with every unrelated Flash byte unchanged.
+Native STO samples across four backup-name lengths establish four-byte
+allocation sizes. The encoder now follows that rule while preserving cleanup
+compatibility with older SDK halfword-sized records. The short-name `BB`
+regression passes all three HP50g Stock launches and matches the native 28-byte
+record exactly. All 96 host targets and focused ASan/UBSan checks pass. A separate
+internal library encoder matches HP49g+/HP50g native samples; public Port 2
+library creation, registration and attachment remain unfinished.
 Port 2 backup removal now validates all six banks before clearing only a unique
 backup's native status byte. Payload and addresses remain unchanged; uncertain
 status writes are completed before releasing ownership. Independent native

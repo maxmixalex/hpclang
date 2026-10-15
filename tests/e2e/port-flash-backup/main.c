@@ -36,17 +36,19 @@ int main(void)
     if (hpclang_port_query(2, &info) || !(info.available & HPCLANG_PORT_CREATE_BACKUP))
         goto done;
     if (!phase) {
+        /* This short name exercises the extra padding required by native
+         * four-byte allocation sizes, unlike the former seven-byte name. */
         failure = 3;
-        object = hpclang_port_backup_get(2, (const uint8_t *)"HPCFONE", 7);
+        object = hpclang_port_backup_get(2, (const uint8_t *)"BB", 2);
         if (object || errno != ENOENT)
             goto done;
         if (hpclang_object_create_integer_i64(987, &object) ||
-            hpclang_port_backup_create(2, (const uint8_t *)"HPCFONE", 7, object))
+            hpclang_port_backup_create(2, (const uint8_t *)"BB", 2, object))
             goto done;
         hpclang_object_release(object);
         object = NULL;
     } else {
-        /* HPCA executes native :2:HPCFONE RCL before this independent launch.
+        /* HPCA executes native :2:BB RCL before this independent launch.
          * The application never writes HPCFWIT, so SDK readback alone cannot
          * satisfy this witness. */
         failure = 4;
@@ -54,12 +56,11 @@ int main(void)
             goto done;
     }
     failure = 5;
-    object = hpclang_port_backup_get(2, (const uint8_t *)"HPCFONE", 7);
+    object = hpclang_port_backup_get(2, (const uint8_t *)"BB", 2);
     if (!object || hpclang_object_integer_i64(object, &number) || number != 987)
         goto done;
     failure = 6;
-    if (hpclang_port_backup_create(2, (const uint8_t *)"HPCFONE", 7, object) != -1 ||
-        errno != EEXIST)
+    if (hpclang_port_backup_create(2, (const uint8_t *)"BB", 2, object) != -1 || errno != EEXIST)
         goto done;
     hpclang_object_release(object);
     object = NULL;
