@@ -1,4 +1,5 @@
 #include "rpl-reference.h"
+#include "rpl-port.h"
 #include <assert.h>
 #include <string.h>
 
@@ -747,8 +748,69 @@ static void batch_replay(void)
     assert(!memcmp(memory.banks, initial.banks, sizeof memory.banks));
 }
 
+struct rebind_memory
+{
+    struct image image;
+    uint32_t field;
+    unsigned writes, fail_write;
+};
+
+static int rebind_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
+{
+    struct rebind_memory *memory = context;
+    assert(!mapping);
+    return read_nibble(&memory->image, at, value);
+}
+
+static int rebind_write(void *context, uint32_t mapping, uint32_t at, uint8_t value)
+{
+    struct rebind_memory *memory = context;
+    assert(!mapping && at >= memory->field && at < memory->field + 5 && value < 16);
+    memory->image.data[at] = value;
+    return ++memory->writes != memory->fail_write;
+}
+
+static void rebuilt_catalog_replay(void)
+{
+    const struct hpclang_rpl_catalog_rebind identity = {275, 0x22f5a, 0x12345, 0xabcde};
+    for (unsigned cut = 1; cut <= 5; ++cut) {
+        struct rebind_memory memory = {
+            .image = {.size = 128, .fail = UINT32_MAX}, .field = 11, .fail_write = cut};
+        put(&memory.image, 5, 1, 3);
+        put(&memory.image, 8, identity.number, 3);
+        put(&memory.image, 11, identity.previous, 5);
+        put(&memory.image, 16, identity.bank_switch, 5);
+        struct hpclang_rpl_reader catalog = {read_nibble, &memory.image};
+        struct hpclang_rpl_reference_writer writer = {{rebind_read, &memory}, rebind_write};
+        uint32_t field = 0;
+        assert(hpclang_rpl_catalog_rebind_field(&catalog, 5, 19, &identity, &field) == 1);
+        struct hpclang_rpl_reference_edit edit = {0, field, identity.previous,
+                                                  identity.replacement};
+        assert(hpclang_rpl_reference_edits_replay(&writer, &edit, 1) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        /* Rebuild elsewhere with the partial value; discard the saved RAM edit. */
+        memcpy(memory.image.data + 64, memory.image.data + 5, 19);
+        memset(&edit, 0, sizeof edit);
+        memory.field = 70;
+        memory.fail_write = 0;
+        struct image before = memory.image;
+        assert(hpclang_rpl_catalog_rebind_field(&catalog, 64, 19, &identity, &field) == 1);
+        assert(field == 70);
+        edit =
+            (struct hpclang_rpl_reference_edit){0, field, identity.previous, identity.replacement};
+        assert(!hpclang_rpl_reference_edits_replay(&writer, &edit, 1));
+        for (unsigned at = 0; at < memory.image.size; ++at) {
+            if (at >= 70 && at < 75)
+                assert(memory.image.data[at] == ((identity.replacement >> (4 * (at - 70))) & 15));
+            else
+                assert(memory.image.data[at] == before.data[at]);
+        }
+    }
+}
+
 int main(void)
 {
+    rebuilt_catalog_replay();
     batch_replay();
     metadata_guards();
     batch_preflight();

@@ -65,7 +65,8 @@ struct hpclang_rpl_catalog_rebind
 
 /* Resolve the current RAM field for one authorized library relocation. Scan
  * the entire supplied catalog, require a unique matching ID, exact bank switch
- * and a binding equal to previous or replacement (already repaired). Returns
+ * and binding nibbles equal to their previous or replacement values, permitting
+ * interrupted atomic-nibble RAM writes and already repaired bindings. Returns
  * 1 with field, 0 absent, or a negative span result; field changes only on 1.
  * The caller can construct a RAM edit with this fresh field and previous/value.
  * No writes occur. Absent bindings must be handled explicitly by the transaction.

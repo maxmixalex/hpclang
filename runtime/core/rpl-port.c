@@ -66,10 +66,17 @@ static int catalog_rebind_visit(void *context, uint32_t record, uint32_t number,
     struct catalog_rebind_search *search = context;
     if (number != search->rebind->number)
         return HPCLANG_RPL_SPAN_OK;
-    if (search->found || binding->bank_switch != search->rebind->bank_switch ||
-        (binding->address != search->rebind->previous &&
-         binding->address != search->rebind->replacement))
+    if (search->found || binding->bank_switch != search->rebind->bank_switch)
         return HPCLANG_RPL_SPAN_MALFORMED;
+    /* Match the atomic-nibble RAM writer's interrupted states. The semantic
+     * ID and bank remain intact; a whole-word old/new comparison would reject
+     * a valid restart between two nibble writes. */
+    for (unsigned shift = 0; shift < 20; shift += 4) {
+        uint32_t actual = (binding->address >> shift) & 15u;
+        if (actual != ((search->rebind->previous >> shift) & 15u) &&
+            actual != ((search->rebind->replacement >> shift) & 15u))
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    }
     search->found = 1;
     search->field = record + 3u;
     return HPCLANG_RPL_SPAN_OK;

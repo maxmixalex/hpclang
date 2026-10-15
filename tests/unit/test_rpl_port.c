@@ -750,6 +750,26 @@ static void test_catalog_rebind(void)
     put_word(&image, 73, 100, 3);
     assert(!hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field));
     assert(field == 123);
+    put_word(&image, 73, 275, 3);
+    const struct hpclang_rpl_catalog_rebind multi = {275, 0x22f5a, 0x12345, 0xabcde};
+    for (unsigned mask = 0; mask < 32; ++mask) {
+        uint32_t mixed = 0;
+        for (unsigned j = 0; j < 5; ++j) {
+            uint32_t source = (mask & (1u << j)) ? multi.replacement : multi.previous;
+            mixed |= source & (15u << (4 * j));
+        }
+        put_word(&image, 76, mixed, 5);
+        assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &multi, &field) == 1);
+        assert(field == 76);
+        for (unsigned j = 0; j < 5; ++j) {
+            put_word(&image, 76 + j, 0, 1); /* Neither old nor new nibble. */
+            field = 123;
+            assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &multi, &field) ==
+                   HPCLANG_RPL_SPAN_MALFORMED);
+            assert(field == 123);
+            put_word(&image, 76, mixed, 5);
+        }
+    }
 }
 
 int main(void)

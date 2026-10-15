@@ -978,6 +978,11 @@ also finds both repair fields in the saved native HP50g catalog before checked
 replay. Sanitizers and ARM analysis pass. The transaction still must locate the
 current catalog, authenticate the relocation and reconstruct all other roots;
 this locator alone does not make arbitrary persisted RAM edits restart-safe.
+Locator checks also accept the atomic writer's interrupted old/new nibble
+combinations. Tests cover all 32 combinations for a five-nibble binding and
+reject unrelated values. An integrated test interrupts each write, rebuilds
+the partial catalog elsewhere, discards the old RAM edit and resolves a fresh
+field before finishing; old catalog bytes and neighbors stay unchanged.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
