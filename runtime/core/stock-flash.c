@@ -207,6 +207,20 @@ int hpclang_stock_flash_recover_tail(uint32_t bank_index)
     return result;
 }
 
+int hpclang_stock_flash_recover_tails(void)
+{
+    struct flash_owner owner;
+    int result = open_writable_flash(&owner);
+    if (result != HPCLANG_SST_OK)
+        return result == HPCLANG_SST_UNSUPPORTED ? HPCLANG_RPL_FLASH_UNSUPPORTED
+                                                 : HPCLANG_RPL_FLASH_DIRTY;
+    const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
+                                            user_flash.end};
+    result = hpclang_rpl_flash_recover_tails(&io);
+    close_flash(&owner);
+    return result;
+}
+
 int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, uint32_t bytes)
 {
     if (address < user_flash.first || address >= user_flash.end || (address & 0x1ffffu) < 0x105u)

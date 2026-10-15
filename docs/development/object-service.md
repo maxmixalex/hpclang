@@ -821,6 +821,10 @@ behind erased `FF` status markers. An unreadable or unknown later bank prevents
 all writes. During commit, a backend error may leave earlier tails recovered;
 retry requires continued exclusive mapping ownership. Recovery changes only
 discard headers and preserves preceding live records and partial payloads.
+`hpclang_stock_flash_recover_tails` applies this operation under one Stock Flash
+mapping lease, restoring mappings and interrupt state afterward. The standalone
+Flash fixture exercises explicit whole-port recovery before further append/read
+operations, plus a repeated recovery that must leave the image unchanged.
 This is not automatic startup repair: partial status commits, replacement intent
 and interrupted sector erasure still require separate recovery protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.

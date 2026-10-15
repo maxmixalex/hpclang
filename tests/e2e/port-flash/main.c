@@ -156,8 +156,7 @@ int main(void)
     failure = 20;
     if (hpclang_stock_flash_program_word(bank + 0x11au, 0) != HPCLANG_SST_OK ||
         hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space) != HPCLANG_RPL_SPAN_MALFORMED ||
-        hpclang_stock_flash_recover_tail((bank - 0x140000u) / 0x20000u) !=
-            HPCLANG_RPL_FLASH_WRITTEN ||
+        hpclang_stock_flash_recover_tails() != HPCLANG_RPL_FLASH_WRITTEN ||
         hpclang_rpl_flash_tail(&reader, 0x20au, 0x40000u, &space) || space.address <= 0x234u ||
         l1[0] != original[0] || l1[1] != original[1])
         goto done;
@@ -166,6 +165,7 @@ int main(void)
     uint32_t recovered = fingerprint();
     if (hpclang_stock_flash_recover_tail((bank - 0x140000u) / 0x20000u) !=
             HPCLANG_RPL_FLASH_WRITTEN ||
+        hpclang_stock_flash_recover_tails() != HPCLANG_RPL_FLASH_WRITTEN ||
         hpclang_stock_flash_recover_tail(6) != HPCLANG_RPL_FLASH_INVALID ||
         fingerprint() != recovered)
         goto done;
