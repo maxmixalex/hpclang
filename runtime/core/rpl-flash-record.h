@@ -3,6 +3,45 @@
 
 #include "rpl-backup.h"
 
+#define HPCLANG_RPL_FLASH_INTENT_BYTES 44u
+
+struct hpclang_rpl_flash_intent
+{
+    uint32_t old_slot, new_slot, old_bytes, new_bytes, old_crc, new_crc;
+};
+
+enum hpclang_rpl_flash_intent_phase
+{
+    HPCLANG_RPL_FLASH_INTENT_UNPUBLISHED,
+    HPCLANG_RPL_FLASH_INTENT_READY,
+    HPCLANG_RPL_FLASH_INTENT_RETIRING,
+    HPCLANG_RPL_FLASH_INTENT_RETIRED
+};
+
+/* Internal replacement-intent wire format; not yet published by mutation APIs.
+ * A 44-byte native allocation uses metadata 2 and hidden committed status 7E.
+ * The body contains HPCREPL1, its own physical slot, both allocation addresses/
+ * lengths/checksums, and a CRC32 over every byte except status and that CRC.
+ * All integers are little-endian. Bounds cover exactly six native user banks.
+ * The three allocations must be disjoint, exclude headers and remain within
+ * their respective banks with space for an end marker. No Flash is changed.
+ * Decode classifies publication/retirement cuts but cannot authorize recovery:
+ * callers must separately validate the referenced records and transaction state.
+ * Outputs remain unchanged on error. */
+int hpclang_rpl_flash_intent_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const struct hpclang_rpl_flash_intent *intent, uint8_t *data,
+                                    uint32_t capacity);
+int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const uint8_t *data, uint32_t bytes,
+                                    struct hpclang_rpl_flash_intent *intent,
+                                    enum hpclang_rpl_flash_intent_phase *phase);
+
+/* CRC32/ISO-HDLC of allocation bytes after the status byte. Status publication
+ * or deletion does not change record identity. This supplements, rather than
+ * replaces, object CRC/shape validation. Reader coordinates are nibbles. */
+int hpclang_rpl_flash_record_crc(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t bytes, uint32_t *crc);
+
 /* Encode the allocation envelope around an exact, CRC-validated backup.
  * Coordinates in the input reader are nibbles; the owned output is bytes.
  * Matches native HP49/50 STO records: status 53, relative extent, metadata 1,

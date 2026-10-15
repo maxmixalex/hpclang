@@ -3,6 +3,129 @@
 #include <stdlib.h>
 #include <string.h>
 
+static uint32_t crc_byte(uint32_t crc, uint8_t value)
+{
+    crc ^= value;
+    for (unsigned bit = 0; bit < 8; ++bit)
+        crc = (crc >> 1u) ^ ((crc & 1u) ? UINT32_C(0xedb88320) : 0u);
+    return crc;
+}
+
+static uint32_t intent_crc(const uint8_t *data)
+{
+    uint32_t crc = UINT32_MAX;
+    for (uint32_t i = 1; i < HPCLANG_RPL_FLASH_INTENT_BYTES - 4u; ++i)
+        crc = crc_byte(crc, data[i]);
+    return ~crc;
+}
+
+static uint32_t read_le32(const uint8_t *data)
+{
+    return data[0] | (uint32_t)data[1] << 8u | (uint32_t)data[2] << 16u | (uint32_t)data[3] << 24u;
+}
+
+static void write_le32(uint8_t *data, uint32_t value)
+{
+    for (unsigned i = 0; i < 4; ++i)
+        data[i] = (uint8_t)(value >> (i * 8u));
+}
+
+static int intent_allocation(uint32_t first, uint32_t end, uint32_t slot, uint32_t bytes)
+{
+    if (slot < first || slot >= end || bytes < 8u || (bytes & 1u))
+        return 0;
+    uint32_t offset = (slot - first) % 0x20000u;
+    return offset >= 0x105u && bytes < 0x20000u - offset;
+}
+
+static int separate(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes)
+{
+    return a + a_bytes <= b || b + b_bytes <= a;
+}
+
+static int intent_bounds(uint32_t first, uint32_t end, uint32_t slot,
+                         const struct hpclang_rpl_flash_intent *intent)
+{
+    return intent && !((first | end) & 1u) && first <= end && end - first == 6u * 0x20000u &&
+           intent_allocation(first, end, slot, HPCLANG_RPL_FLASH_INTENT_BYTES) &&
+           intent_allocation(first, end, intent->old_slot, intent->old_bytes) &&
+           intent_allocation(first, end, intent->new_slot, intent->new_bytes) &&
+           separate(slot, HPCLANG_RPL_FLASH_INTENT_BYTES, intent->old_slot, intent->old_bytes) &&
+           separate(slot, HPCLANG_RPL_FLASH_INTENT_BYTES, intent->new_slot, intent->new_bytes) &&
+           separate(intent->old_slot, intent->old_bytes, intent->new_slot, intent->new_bytes);
+}
+
+int hpclang_rpl_flash_intent_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const struct hpclang_rpl_flash_intent *intent, uint8_t *data,
+                                    uint32_t capacity)
+{
+    if (!data || capacity < HPCLANG_RPL_FLASH_INTENT_BYTES ||
+        !intent_bounds(first, end, slot, intent))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint8_t encoded[HPCLANG_RPL_FLASH_INTENT_BYTES] = {0x7e, 0x56, 0, 0x20};
+    memcpy(encoded + 4u, "HPCREPL1", 8u);
+    write_le32(encoded + 12u, slot);
+    write_le32(encoded + 16u, intent->old_slot);
+    write_le32(encoded + 20u, intent->new_slot);
+    write_le32(encoded + 24u, intent->old_bytes);
+    write_le32(encoded + 28u, intent->new_bytes);
+    write_le32(encoded + 32u, intent->old_crc);
+    write_le32(encoded + 36u, intent->new_crc);
+    write_le32(encoded + 40u, intent_crc(encoded));
+    memcpy(data, encoded, sizeof encoded);
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
+                                    const uint8_t *data, uint32_t bytes,
+                                    struct hpclang_rpl_flash_intent *intent,
+                                    enum hpclang_rpl_flash_intent_phase *phase)
+{
+    if (!data || !intent || !phase || bytes != HPCLANG_RPL_FLASH_INTENT_BYTES || data[1] != 0x56u ||
+        data[2] || data[3] != 0x20u || memcmp(data + 4u, "HPCREPL1", 8u) ||
+        read_le32(data + 12u) != slot || read_le32(data + 40u) != intent_crc(data))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    enum hpclang_rpl_flash_intent_phase decoded_phase;
+    if (data[0] == 0xffu || data[0] == 0x7fu || data[0] == 0xfeu)
+        decoded_phase = HPCLANG_RPL_FLASH_INTENT_UNPUBLISHED;
+    else if (data[0] == 0x7eu)
+        decoded_phase = HPCLANG_RPL_FLASH_INTENT_READY;
+    else if (!data[0])
+        decoded_phase = HPCLANG_RPL_FLASH_INTENT_RETIRED;
+    else if (!(data[0] & ~0x7eu))
+        decoded_phase = HPCLANG_RPL_FLASH_INTENT_RETIRING;
+    else
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_flash_intent decoded = {read_le32(data + 16u), read_le32(data + 20u),
+                                               read_le32(data + 24u), read_le32(data + 28u),
+                                               read_le32(data + 32u), read_le32(data + 36u)};
+    if (!intent_bounds(first, end, slot, &decoded))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *intent = decoded;
+    *phase = decoded_phase;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_record_crc(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                 uint32_t bytes, uint32_t *crc)
+{
+    if (!reader || !reader->read_nibble || !crc || !bytes || address >= 0x100000u ||
+        bytes > (0x100000u - address) / 2u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t result = UINT32_MAX;
+    for (uint32_t i = 1; i < bytes; ++i) {
+        uint8_t low, high;
+        if (!reader->read_nibble(reader->context, address + i * 2u, &low) ||
+            !reader->read_nibble(reader->context, address + i * 2u + 1u, &high))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (low > 15u || high > 15u)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        result = crc_byte(result, (uint8_t)(low | high << 4u));
+    }
+    *crc = ~result;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 int hpclang_rpl_flash_discard_plan(const struct hpclang_rpl_reader *reader, uint32_t first,
                                    uint32_t end, struct hpclang_rpl_flash_discard *plan)
 {

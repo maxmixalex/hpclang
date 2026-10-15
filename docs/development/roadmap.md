@@ -548,6 +548,11 @@ fixture includes a hidden backup from an interrupted prior operation and require
 successful recovery without calling the internal recovery API. Read-only access,
 calculator startup, library lifecycle and replacement-intent recovery remain
 separate work; the full power-loss goal is unchanged.
+Replacement-intent encoding/decoding now has a bounded 44-byte hidden format,
+allocation identities and CRC32 protection. Host corruption/bounds tests and
+native visibility checks of actual C-produced records pass on HP49g+/HP50g.
+The format is not yet emitted by normal mutation APIs: journal reservation,
+publication, reference verification and the restart executor remain open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

@@ -885,7 +885,22 @@ A candidate hidden transaction envelope with metadata `2` and status `7E`
 (or its publication intermediates `7F`/`FE`) is skipped by native RCL on both
 HP49g+ and HP50g, even with an invalid body; a later live control remains readable
 and every Flash byte is unchanged. This establishes native visibility only:
-the durable transaction format and replacement recovery are not implemented yet.
+the replacement writer and recovery executor are not implemented yet.
+The internal intent codec now defines a 44-byte allocation with metadata `2`,
+committed status `7E` and versioned magic `HPCREPL1`. It stores its own physical
+slot plus the old/new allocation addresses, byte lengths and CRC32 values, all
+little-endian. A separate CRC32 protects the envelope and body except the mutable
+status byte. Record-identity CRC32 excludes only the record status; ordinary
+object shape/CRC validation remains mandatory before acting on either reference.
+Encoding and decoding reject overlapping allocations, bank-header addresses,
+cross-bank extents, missing end-marker space and relocation of the intent itself.
+Decoding distinguishes unpublished, ready, retiring and retired states but does
+not authorize mutation. Host tests cover every status byte, each single-bit
+corruption, truncated input, a separately computed checksum vector and a valid-CRC
+overlap. Native probes using the actual C encoder pass on both models with a
+later live control and unchanged Flash. Normal mutation APIs do not emit this
+format yet; durable intent publication, target verification and restart execution
+remain required before replacement can claim power-loss recovery.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and
