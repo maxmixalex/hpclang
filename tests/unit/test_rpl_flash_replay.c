@@ -244,6 +244,79 @@ static void discovery_tests(void)
     assert(slot == 17 && target == 19);
 }
 
+static void prepare_preflight(void)
+{
+    prepare_discovery();
+    for (unsigned i = 0; i < 6; ++i) {
+        flash[i * 0x20000 + 0x100] = 0xf0;
+        flash[i * 0x20000 + 0x101] = (uint8_t)(8 + i);
+    }
+    memcpy(desired, flash, SECTOR);
+}
+
+static void preflight_tests(void)
+{
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint32_t slot = 17, target = 19;
+    prepare_preflight();
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+    assert(slot == 17 && target == 19);
+    memset(flash, 0, SECTOR);
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    discovery_image(SLOT);
+    memcpy(original, flash, sizeof flash);
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == 1);
+    assert(slot == SLOT && target == FIRST && !programs && !erases);
+    assert(!memcmp(original, flash, sizeof flash));
+    /* The discovered candidate can now be replayed and revalidated using the
+     * same durable record, while the caller retains ownership. */
+    assert(hpclang_rpl_flash_sector_replay(&io, slot, scratch, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash, desired, SECTOR));
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == 1);
+
+    prepare_preflight();
+    desired[0x100] = 0; /* CRC-valid image with wrong bank identity. */
+    discovery_image(SLOT);
+    slot = 17;
+    target = 19;
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == 17 && target == 19 && !programs && !erases);
+    prepare_preflight();
+    desired[0x105] = 0x53; /* CRC-valid capsule containing an invalid live object. */
+    discovery_image(SLOT);
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_preflight();
+    discovery_image(SLOT);
+    flash[SECTOR + 3] = 0; /* Damage in the target bank outside the image. */
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    flash[SECTOR + 3] = 255;
+    flash[0xa0100] = 0; /* An unrelated bank must also remain valid. */
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_preflight();
+    discovery_image(SLOT);
+    discovery_image(0x180105); /* Conflicting journals in different banks. */
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == 17 && target == 19 && !programs && !erases);
+    prepare_preflight();
+    discovery_image(SLOT);
+    fail_read = 1;
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_FAILED);
+    assert(slot == 17 && target == 19 && !programs && !erases);
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace - 1, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_INVALID);
+}
+
 int main(void)
 {
     for (unsigned i = 0; i < sizeof original; ++i)
@@ -316,5 +389,6 @@ int main(void)
     assert(!reads && !programs && !erases);
     publication_tests();
     discovery_tests();
+    preflight_tests();
     return 0;
 }

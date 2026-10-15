@@ -930,9 +930,15 @@ journal integrity, uniqueness and the complete erased tail before returning
 its location. A valid-looking journal embedded in a deleted payload is ignored;
 corrupt tails, objects and conflicting journals fail without writes. The target
 bank can already be damaged because this scan reads only the journal bank.
-This does not traverse a broken journal-bank chain, arbitrate transactions across
-banks or authorize replay. Recovery planning must retain an independently
-discoverable journal and validate the restored bank and references before use.
+Whole-port read-only preflight now requires one discoverable journal, overlays
+its image in RAM and validates all six restored bank identities, allocation
+chains, live-object CRCs and erased tails. Tests reject cross-bank journal
+conflicts, structurally invalid images with valid capsule CRCs, and damage
+outside the target sector; an accepted image passes replay and revalidation.
+Focused sanitizers and ARM analysis pass. This does not traverse a broken
+journal-bank chain or prove transaction freshness, object-name/ID uniqueness,
+reference correctness or erase authority. Recovery planning must retain an
+independently discoverable journal and establish those remaining invariants.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn

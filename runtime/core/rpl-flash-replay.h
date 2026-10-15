@@ -9,6 +9,20 @@ struct hpclang_rpl_flash_replay_io
     int (*erase_sector)(void *context, uint32_t address);
 };
 
+/* Read-only whole-port sector-recovery preflight. Discover exactly one journal
+ * through intact bank allocation chains, then overlay its image in RAM and
+ * validate all six restored bank identities/chains/live CRCs/erased tails.
+ * scratch has room for two SECTOR_RECORD_BYTES buffers, disjoint from IO state.
+ * Returns 1 with slot/target, 0 for a clean port with no journal, or a negative
+ * write result; outputs change only on 1. Multiple journals, unreadable storage
+ * and damage outside the image fail closed. Keep Flash stable throughout.
+ * Success proves structural consistency only, not transaction freshness,
+ * name/ID uniqueness, reference correctness or authority to erase/return to
+ * Stock. The journal must remain discoverable without reading a damaged chain;
+ * this is not a startup hook or a replacement for the ownership protocol. */
+int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, uint8_t *scratch,
+                                       uint32_t capacity, uint32_t *slot, uint32_t *target);
+
 /* Replay a caller-authorized, fully published sector image from Flash. scratch
  * is caller-owned RAM of at least SECTOR_RECORD_BYTES, disjoint from IO state.
  * Read and validate the entire durable record before any target mutation.
