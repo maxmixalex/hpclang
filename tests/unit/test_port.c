@@ -57,6 +57,14 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
                                             0x200000u};
     return hpclang_rpl_flash_create_backup(&io, record, bytes, NULL);
 }
+int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes)
+{
+    if (!port2_available)
+        return HPCLANG_RPL_FLASH_UNSUPPORTED;
+    const struct hpclang_rpl_flash_io io = {0, flash_word_read, flash_word_program, 0x140000u,
+                                            0x200000u};
+    return hpclang_rpl_flash_create_library(&io, record, bytes, NULL);
+}
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)
 {
     if (!port2_available)
@@ -188,7 +196,7 @@ static void test_discovery(void)
             assert(info.port == port && info.available == 0);
             assert((info.medium != HPCLANG_PORT_ABSENT) == present);
             assert((info.implemented & reads) == (present ? reads : 0));
-            assert(!!(info.implemented & HPCLANG_PORT_CREATE_LIBRARY) == (present && port < 2));
+            assert(!!(info.implemented & HPCLANG_PORT_CREATE_LIBRARY) == present);
             if (present)
                 assert(info.medium == port + HPCLANG_PORT_MAIN_RAM);
             boot.saturn_state = 1;
@@ -197,7 +205,7 @@ static void test_discovery(void)
             if (present && port == 2)
                 assert(info.available ==
                        (reads | HPCLANG_PORT_CREATE_BACKUP | HPCLANG_PORT_REMOVE_BACKUP |
-                        HPCLANG_PORT_REPLACE_BACKUP));
+                        HPCLANG_PORT_REPLACE_BACKUP | HPCLANG_PORT_CREATE_LIBRARY));
         }
     }
     // Zero writable headroom means supported-but-full, not an unavailable API.
@@ -506,6 +514,19 @@ int main(void)
     assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));
     hpclang_object_release(copy);
     copy = hpclang_port_library_get(0, 123);
+    assert(copy && copy->nibble_count == library_snapshot->nibble_count);
+    assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));
+    hpclang_object_release(copy);
+    port2_available = 1;
+    memset(flash, 15, sizeof flash);
+    for (unsigned bank = 0; bank < HPCLANG_RPL_PORT2_BANKS; ++bank) {
+        flash[bank][0x200] = 0;
+        flash[bank][0x202] = bank + 8;
+        flash[bank][0x203] = 0;
+    }
+    assert(hpclang_port_library_create(2, library_snapshot) == 0);
+    assert(hpclang_port_library_create(2, library_snapshot) == -1 && errno == EEXIST);
+    copy = hpclang_port_library_get(2, 123);
     assert(copy && copy->nibble_count == library_snapshot->nibble_count);
     assert(!memcmp(copy->data, library_snapshot->data, (copy->nibble_count + 1) / 2));
     hpclang_object_release(library_snapshot);

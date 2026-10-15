@@ -643,7 +643,7 @@ to store a complete owned library encoding. It validates the library format and
 CRC before moving memory, rejects a duplicate library number in that port with
 `EEXIST`, and leaves existing library records at their original addresses. The
 input snapshot remains owned by the caller. A non-library value returns `EINVAL`;
-Port 2 and unsupported launch contexts return `ENOSYS`. Capability discovery
+Unsupported launch contexts return `ENOSYS`. Capability discovery
 reports `HPCLANG_PORT_CREATE_LIBRARY` separately from backup creation.
 This stores a record only: it does not register, attach or execute it. Library
 replacement/removal, active-library lifecycle and relocation remain open.
@@ -667,13 +667,22 @@ Returned write errors finish and verify a native deleted slot before releasing
 the mapping and expected RAM record. Persistent hardware failure retains RAM
 execution, as does a chip that never leaves BUSY; normal return and both exit
 paths cannot bypass this synchronous operation. This does not guarantee
-power-loss recovery; library writes remain open.
+power-loss recovery.
 New Flash backup envelopes round their complete allocation size to four bytes,
 matching independent native STO captures across four backup-name lengths.
 Existing halfword-sized SDK envelopes remain accepted for failed-write cleanup.
 An internal library encoder also matches the native 43-nibble library record
 captured on HP49g+ and HP50g; its unused padding remains erased. This encoder
-does not yet enable public Port 2 library creation or library registration.
+supplies the record for public Port 2 library creation; registration remains open.
+`hpclang_port_library_create(2, snapshot)` validates the full library and CRC,
+checks library-ID uniqueness across all six user banks, and appends under the
+same exclusive mapping and failed-write cleanup as backups. Existing libraries
+and backups remain at their original addresses. The operation neither registers
+nor attaches the library. Full media returns `ENOSPC` without reclamation.
+The independent `port-library` client passes both Stock launches on HP49g+
+and HP50g, checking original RPL witnesses for all three ports and duplicate-ID
+refusal. Host coverage includes IDs with different titles, CRC/type rejection,
+all-bank preflight, full media and cleanup at each programming failure point.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.

@@ -150,8 +150,24 @@ int hpclang_port_library_create(uint32_t port, const struct hpclang_object *libr
         errno = EINVAL;
         return -1;
     }
-    if (writable_port(port, port == 1))
+    if (writable_port(port, 1))
         return -1;
+    if (port == 2) {
+        const struct hpclang_rpl_reader reader = {snapshot_read, &library};
+        uint8_t *record = NULL;
+        uint32_t bytes;
+        int result =
+            hpclang_rpl_flash_library_record(&reader, 0, library->nibble_count, &record, &bytes);
+        if (result) {
+            errno = result == HPCLANG_RPL_BACKUP_NOMEM  ? ENOMEM
+                    : result == HPCLANG_RPL_SPAN_BOUNDS ? ENOSPC
+                                                        : EILSEQ;
+            return -1;
+        }
+        result = hpclang_stock_flash_create_library(record, bytes);
+        free(record);
+        return flash_result(result);
+    }
     struct hpclang_rpl_stock_memory memory;
     struct hpclang_rpl_mutation_io io;
     uint32_t limit;

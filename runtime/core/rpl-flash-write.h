@@ -24,7 +24,7 @@ enum hpclang_rpl_flash_write_result
     HPCLANG_RPL_FLASH_NOT_FOUND = -8
 };
 
-/* Append one CRC-valid native backup allocation into a reserved erased tail.
+/* Append one CRC-valid native backup/library allocation into a reserved erased tail.
  * All coordinates are bytes. IO bounds are even and exclude firmware. Callbacks
  * return 1 on success; program16 may partially clear requested bits on failure,
  * but must wait for the chip to leave command mode before returning. The caller
@@ -49,7 +49,7 @@ int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t add
 int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32_t first,
                                    uint32_t end);
 
-/* Finish a known backup commit after interruption/uncertain acknowledgement.
+/* Finish a known backup/library commit after interruption/uncertain acknowledgement.
  * The caller retains the exact expected record and owns this reserved slot.
  * Validate that complete record, compare every stored body/padding byte, and
  * accept only status bits compatible with programming 53. Only the status
@@ -70,6 +70,12 @@ int hpclang_rpl_flash_finish_commit(const struct hpclang_rpl_flash_io *io, uint3
  * automatic recovery is attempted by this operation. */
 int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                     uint32_t bytes, uint32_t *attempted_slot);
+
+/* Same selection/append contract as create_backup, with library-ID uniqueness
+ * across all six banks. Stores the record only; no registration or attachment.
+ * Each typed create function rejects the other object's encoding. */
+int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes, uint32_t *attempted_slot);
 
 /* Validate all six banks before deleting one uniquely named backup. Only its
  * status byte changes; payload, references and allocation extents stay put.

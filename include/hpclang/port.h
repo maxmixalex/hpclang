@@ -95,13 +95,14 @@ extern "C"
     struct hpclang_object *hpclang_port_library_get(uint32_t port, uint32_t library_number);
 
     /* Store a complete owned library snapshot in classic Stock Port 0 or
-     * HP49g+/HP50g Stock Port 1. Port 1 requires launcher-proven ERAM ownership
+     * HP49g+/HP50g Stock Port 1/2. Port 1 requires launcher-proven ERAM ownership
      * bounds and appends without relocating existing records. Its
      * embedded library number identifies it; an existing number in that port
      * returns EEXIST. This does not register, attach or execute the library.
      * Existing port records keep their addresses. Invalid encoding/CRC returns
      * EILSEQ, insufficient native space ENOSPC, and a non-library value EINVAL.
-     * Other valid ports/contexts return ENOSYS. The caller retains its snapshot.
+     * Port 2 validates all banks and appends to erased space without reclamation.
+     * Other valid contexts return ENOSYS. The caller retains its snapshot.
      */
     int hpclang_port_library_create(uint32_t port, const struct hpclang_object *library);
 

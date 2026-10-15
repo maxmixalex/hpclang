@@ -224,7 +224,7 @@ int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, u
     return result;
 }
 
-int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
+static int create_record(const uint8_t *record, uint32_t bytes, int library)
 {
     struct flash_owner owner;
     int result = open_writable_flash(&owner);
@@ -234,7 +234,8 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
     const struct hpclang_rpl_flash_io io = {0, append_read, append_program, user_flash.first,
                                             user_flash.end};
     uint32_t attempted = UINT32_MAX;
-    result = hpclang_rpl_flash_create_backup(&io, record, bytes, &attempted);
+    result = library ? hpclang_rpl_flash_create_library(&io, record, bytes, &attempted)
+                     : hpclang_rpl_flash_create_backup(&io, record, bytes, &attempted);
     if (result == HPCLANG_RPL_FLASH_DIRTY && attempted != UINT32_MAX) {
         /* Keep IRQs/mapping and the expected RAM record owned until the native
          * chain is safe again. Persistent hardware failure, like a chip that
@@ -246,6 +247,16 @@ int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
     }
     close_flash(&owner);
     return result;
+}
+
+int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes)
+{
+    return create_record(record, bytes, 0);
+}
+
+int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes)
+{
+    return create_record(record, bytes, 1);
 }
 
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length)

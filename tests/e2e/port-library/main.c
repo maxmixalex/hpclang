@@ -38,7 +38,7 @@ int main(void)
     unsigned failure = 1, phase = 0;
     if (hpclang_object_snapshot_copy(&reader, 0, sizeof encoding - 1, &source))
         goto done;
-    for (uint32_t port = 0; port < 2; ++port) {
+    for (uint32_t port = 0; port < 3; ++port) {
         failure = 1 + 16 * port;
         struct hpclang_port_info info = {.size = sizeof info, .version = HPCLANG_PORT_INFO_VERSION};
         if (hpclang_port_query(port, &info))
@@ -59,7 +59,9 @@ int main(void)
             failure = 3 + 16 * port;
             if (!home)
                 home = hpclang_object_store_home();
-            const uint8_t *key = (const uint8_t *)(port ? "HPCWIT1" : "HPCWIT");
+            const uint8_t *key = (const uint8_t *)(port == 2 ? "HPCWIT2"
+                                                   : port    ? "HPCWIT1"
+                                                             : "HPCWIT");
             if (!home || hpclang_object_store_get(home, key, port ? 7 : 6, &witness) ||
                 !equal(witness, source))
                 goto done;

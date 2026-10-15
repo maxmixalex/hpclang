@@ -564,6 +564,13 @@ regression passes all three HP50g Stock launches and matches the native 28-byte
 record exactly. All 96 host targets and focused ASan/UBSan checks pass. A separate
 internal library encoder matches HP49g+/HP50g native samples; public Port 2
 library creation, registration and attachment remain unfinished.
+The subsequent public Port 2 library-create implementation now uses that encoder
+and the shared exclusive Flash append/cleanup path. It checks IDs across all six
+banks and preserves existing addresses. Both HP49g+ and HP50g pass two Stock
+launches with native RPL witnesses for libraries stored in Ports 0, 1 and 2.
+All 96 host targets, focused sanitizers, ARM analysis and strict docs pass;
+library registration/attachment and replacement/removal remain open, as do
+Port 1 replacement/removal, Flash reclamation and power-loss recovery.
 Port 2 backup removal now validates all six banks before clearing only a unique
 backup's native status byte. Payload and addresses remain unchanged; uncertain
 status writes are completed before releasing ownership. Independent native

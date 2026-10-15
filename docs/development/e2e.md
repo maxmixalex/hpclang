@@ -108,8 +108,8 @@ focused payloads through the shared Direct/Stock family harness:
   exact owned readback and duplicate-ID refusal on the three classic models.
   Before a second launch, native RPL recalls the stored library into HOME;
   the application checks that independent witness against the input encoding.
-  HP49g+/HP50g also create a library in Port 1 and check its separate native RCL
-  witness. HP48gII skips that absent port through capability discovery.
+  HP49g+/HP50g also create libraries in Ports 1 and 2 and check separate native
+  RCL witnesses. HP48gII skips absent ports through capability discovery.
   This verifies record storage and persistence, not registration or execution.
 - `port-flash`: Stock-only SST identification, mapping restoration, bounded
   physical word/block programming and sector erasure on HP49g+/HP50g. Block

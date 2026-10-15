@@ -38,6 +38,7 @@ int hpclang_stock_flash_finish_commit(uint32_t address, const uint8_t *record, u
  * returning FAILED. Permanently unrepairable hardware retains RAM execution
  * and ownership, just as a permanently BUSY chip does; it cannot resume Stock. */
 int hpclang_stock_flash_create_backup(const uint8_t *record, uint32_t bytes);
+int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes);
 
 /* Whole-port deletion with the same exclusive ownership/fault policy.
  * Only the selected backup's status is cleared; no space is reclaimed. */

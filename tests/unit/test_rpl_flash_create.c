@@ -280,6 +280,90 @@ static void remove_backups(const struct hpclang_rpl_flash_io *io)
     assert(flash[0x105u] == 0 && !memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
 }
 
+static void create_libraries(const struct hpclang_rpl_flash_io *io)
+{
+    /* Native library 123, with the unused high nibble left erased by SDK. */
+    const uint8_t library[] = {0x53, 0x36, 0x00, 0x10, 0x40, 0x2b, 0x60, 0x02, 0x00, 0x01,
+                               0x58, 0x01, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                               0x00, 0x00, 0x00, 0xd0, 0xc5, 0xf2, 0xff, 0xff};
+    init();
+    uint32_t attempted = UINT32_MAX;
+    struct hpclang_rpl_flash_replacement transaction = {0};
+    assert(hpclang_rpl_flash_create_backup(io, library, sizeof library, &attempted) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_replace_backup(io, library, sizeof library, &transaction) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_create_library(io, record, sizeof record, &attempted) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(!writes && attempted == UINT32_MAX);
+    uint8_t corrupt[sizeof library];
+    memcpy(corrupt, library, sizeof corrupt);
+    corrupt[25] ^= 1;
+    assert(hpclang_rpl_flash_create_library(io, corrupt, sizeof corrupt, &attempted) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(!writes && attempted == UINT32_MAX);
+    memcpy(flash + 0x105, record, sizeof record);
+    assert(!hpclang_rpl_flash_create_library(io, library, sizeof library, &attempted));
+    assert(attempted == base + 0x105 + sizeof record);
+    assert(!memcmp(flash + 0x105, record, sizeof record));
+    assert(!memcmp(flash + 0x105 + sizeof record, library, sizeof library));
+    assert(!hpclang_rpl_flash_finish_commit(io, attempted, library, sizeof library));
+    unsigned programming_steps = writes;
+    uint8_t renamed[sizeof library];
+    memcpy(renamed, library, sizeof renamed);
+    renamed[10] = 'Y';
+    uint32_t crc = 0;
+    for (unsigned at = 13; at < 47; ++at) {
+        uint8_t nibble = (renamed[at / 2] >> (4 * (at & 1))) & 15;
+        crc = (crc >> 4) ^ (((crc ^ nibble) & 15) * 0x1081);
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        unsigned at = 47 + i, shift = 4 * (at & 1);
+        renamed[at / 2] =
+            (uint8_t)((renamed[at / 2] & ~(15u << shift)) | (((crc >> (4 * i)) & 15) << shift));
+    }
+    /* Titles are presentation metadata; identity is the embedded number. */
+    assert(hpclang_rpl_flash_create_library(io, renamed, sizeof renamed, NULL) ==
+           HPCLANG_RPL_FLASH_EXISTS);
+    assert(writes == programming_steps);
+    for (unsigned bank = 0; bank < 6; ++bank) {
+        init();
+        memcpy(flash + bank * 0x20000 + 0x105, library, sizeof library);
+        uint32_t before = fingerprint(sizeof flash);
+        attempted = UINT32_MAX;
+        assert(hpclang_rpl_flash_create_library(io, library, sizeof library, &attempted) ==
+               HPCLANG_RPL_FLASH_EXISTS);
+        assert(!writes && attempted == UINT32_MAX && fingerprint(sizeof flash) == before);
+        /* A matching library must not hide a corrupt later tail. */
+        flash[sizeof flash - 1] = 0;
+        assert(hpclang_rpl_flash_create_library(io, library, sizeof library, NULL) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!writes);
+        init();
+        fail_address = base + bank * 0x20000 + 0x1fffe;
+        assert(hpclang_rpl_flash_create_library(io, library, sizeof library, NULL) ==
+               HPCLANG_RPL_FLASH_FAILED);
+        assert(!writes);
+    }
+    for (unsigned cut = 0; cut < programming_steps; ++cut) {
+        init();
+        fail_write_at = cut;
+        assert(hpclang_rpl_flash_create_library(io, library, sizeof library, &attempted) ==
+               HPCLANG_RPL_FLASH_FAILED);
+        assert(flash[0x105] == 0);
+        assert(!hpclang_rpl_flash_discard_record(io, attempted, library, sizeof library));
+        fail_write_at = UINT32_MAX;
+        assert(!hpclang_rpl_flash_create_library(io, library, sizeof library, &attempted));
+        assert(attempted == base + 0x105 + sizeof library);
+    }
+    init();
+    for (unsigned bank = 0; bank < 6; ++bank)
+        fill_bank(bank);
+    assert(hpclang_rpl_flash_create_library(io, library, sizeof library, NULL) ==
+           HPCLANG_RPL_FLASH_NOSPACE);
+    assert(!writes);
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {0, read16, program16, base, base + sizeof flash};
@@ -361,5 +445,6 @@ int main(void)
     remove_backups(&io);
     replace_backups(&io);
     accept_legacy_padding(&io);
+    create_libraries(&io);
     return 0;
 }

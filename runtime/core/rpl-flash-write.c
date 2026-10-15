@@ -29,8 +29,9 @@ static int valid_record(const uint8_t *record, uint32_t bytes)
         return 0;
     struct packed_record packed = {record, bytes};
     const struct hpclang_rpl_reader reader = {packed_read, &packed};
-    struct hpclang_rpl_backup_view view;
-    if (hpclang_rpl_backup_view(&reader, 8u, bytes * 2u - 8u, &view) ||
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry view;
+    if (hpclang_rpl_port_next(&reader, &cursor, &view) != 1 ||
         (((view.span + 15u) & ~7u) != bytes * 2u && ((view.span + 11u) & ~3u) != bytes * 2u))
         return 0;
     /* Accept old SDK halfword-sized envelopes for pending-write cleanup;
@@ -135,19 +136,20 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
                : HPCLANG_RPL_FLASH_WRITTEN;
 }
 
-struct backup_selection
+struct record_selection
 {
     uint32_t free_slot, match_slot, matches;
 };
 
-static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
-                         uint32_t name_length, uint32_t bytes, struct backup_selection *selection)
+static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                         uint32_t name_length, uint32_t prologue, uint32_t library_number,
+                         uint32_t bytes, struct record_selection *selection)
 {
     if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
         io->first > io->end || io->end - io->first != 6u * 0x20000u || (!name && name_length) ||
         name_length > 255u)
         return HPCLANG_RPL_FLASH_INVALID;
-    *selection = (struct backup_selection){io->end, io->end, 0};
+    *selection = (struct record_selection){io->end, io->end, 0};
     for (uint32_t index = 0; index < 6u; ++index) {
         uint32_t bank = io->first + index * 0x20000u;
         uint16_t identity;
@@ -161,8 +163,11 @@ static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *n
         struct hpclang_rpl_port_entry entry;
         int result;
         while ((result = hpclang_rpl_flash_next(&reader, &cursor, &entry)) > 0)
-            if (entry.prologue == 0x02b62u && entry.name_length == name_length &&
-                (!name_length || !memcmp(entry.name, name, name_length))) {
+            if (entry.prologue == prologue &&
+                (prologue == 0x02b40u
+                     ? entry.library_number == library_number
+                     : entry.name_length == name_length &&
+                           (!name_length || !memcmp(entry.name, name, name_length)))) {
                 selection->match_slot = bank + entry.address / 2u - 4u;
                 ++selection->matches;
             }
@@ -180,8 +185,14 @@ static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *n
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
-int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
-                                    uint32_t bytes, uint32_t *attempted_slot)
+static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                         uint32_t name_length, uint32_t bytes, struct record_selection *selection)
+{
+    return select_record(io, name, name_length, 0x02b62u, 0, bytes, selection);
+}
+
+static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                         uint32_t bytes, uint32_t prologue, uint32_t *attempted_slot)
 {
     if (!valid_record(record, bytes))
         return HPCLANG_RPL_FLASH_INVALID;
@@ -189,10 +200,11 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
     const struct hpclang_rpl_reader source = {packed_read, &packed};
     struct hpclang_rpl_port_cursor source_cursor = {8u, bytes * 2u, 0};
     struct hpclang_rpl_port_entry wanted;
-    if (hpclang_rpl_port_next(&source, &source_cursor, &wanted) != 1)
+    if (hpclang_rpl_port_next(&source, &source_cursor, &wanted) != 1 || wanted.prologue != prologue)
         return HPCLANG_RPL_FLASH_INVALID;
-    struct backup_selection selection;
-    int result = select_backup(io, wanted.name, wanted.name_length, bytes, &selection);
+    struct record_selection selection;
+    int result = select_record(io, wanted.name, wanted.name_length, wanted.prologue,
+                               wanted.library_number, bytes, &selection);
     if (result)
         return result;
     if (selection.matches)
@@ -207,6 +219,18 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
     if (attempted_slot)
         *attempted_slot = selected;
     return hpclang_rpl_flash_append(&reserved, selected, record, bytes);
+}
+
+int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes, uint32_t *attempted_slot)
+{
+    return create_record(io, record, bytes, 0x02b62u, attempted_slot);
+}
+
+int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                     uint32_t bytes, uint32_t *attempted_slot)
+{
+    return create_record(io, record, bytes, 0x02b40u, attempted_slot);
 }
 
 int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint32_t address)
@@ -235,9 +259,9 @@ int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, cons
     const struct hpclang_rpl_reader source = {packed_read, &packed};
     struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
     struct hpclang_rpl_port_entry wanted;
-    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1 || wanted.prologue != 0x02b62u)
         return HPCLANG_RPL_FLASH_INVALID;
-    struct backup_selection selection;
+    struct record_selection selection;
     int result = select_backup(io, wanted.name, wanted.name_length, bytes, &selection);
     if (result)
         return result;
@@ -263,7 +287,7 @@ int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_remove_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
                                     uint32_t name_length, uint32_t *attempted_slot)
 {
-    struct backup_selection selection;
+    struct record_selection selection;
     int result = select_backup(io, name, name_length, 0, &selection);
     if (result)
         return result;
