@@ -962,6 +962,13 @@ unchanged neighbors, distinct mappings, conflict refusal and silent-write
 detection. Focused sanitizers and ARM analysis pass. The caller must retain the
 authorized plan and exclusive ownership; persistence of that plan, complete
 root discovery and coordination with Flash transactions remain open.
+In the stopped native HP50g PACK-state copy, the actual C writer now applies
+both planned library-124/275 catalog repairs, changing only two RAM bytes.
+Failures before or after either write retry to the same result, and repeating
+the completed batch performs no writes. Resuming that copy executes the moved
+library command, reaches PASS, settles back in Stock and retains the independently
+decoded integer 124275. This replaces the earlier Python byte-patching step;
+it does not establish live ownership, complete roots or restart-safe RAM addresses.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
