@@ -1210,6 +1210,18 @@ than a payload-copy failure; native PACK is not an accepted synchronous
 replacement for hpclang's application-safe reclamation service. The probe does
 not establish interrupted-erase recovery or safe return to an active ARM client.
 
+The internal qualified relocation planner now distinguishes the physical
+mapping containing a field from the mapping containing its target. Callers
+resolve bank switches before supplying those identities. Equal numeric Saturn
+addresses in different banks do not move together; relative fields account for
+movement of each endpoint independently. Patches retain the old source address
+and its caller-owned mapping, and no bank-switch operand is rewritten. The
+unqualified planner still rejects banked ACPTRs. The actual C planner resolves
+the captured bank-8 library binding above and computes its relocated library-275
+address; a bank-9 control with the same numeric target produces no patch. This
+is a checked individual-field plan, not a complete root-set repair or a commit
+to live calculator memory.
+
 The internal `hpclang_rpl_entry_inspect` separates bounded RPL objects from an
 entry whose dispatch word equals its own address plus five. Known object
 prologues take precedence, even at an address where the two patterns coincide.

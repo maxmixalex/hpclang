@@ -129,4 +129,24 @@ int hpclang_rpl_reference_plan_shift(const struct hpclang_rpl_reference *referen
                                      uint32_t end, int32_t delta,
                                      struct hpclang_rpl_reference_patch *patch);
 
+/* Identities of resolved physical mappings, assigned by the caller. The field
+ * and target must each be qualified separately; identical Saturn addresses in
+ * different banks do not alias. These are not raw bank-switch entry addresses.
+ * Resolve ACPTR switches and catalog bindings before supplying these identities.
+ * Keep mappings stable throughout planning and commit. */
+struct hpclang_rpl_reference_mappings
+{
+    uint32_t field, target, moving;
+};
+
+/* As plan_shift, with independently qualified source/target locations. Allows
+ * an ACPTR only because the caller has resolved its target mapping above.
+ * patch.field remains the old address in mappings.field; retain that mapping
+ * with the patch. No bank switch, native bytes or index tables are modified.
+ * This does not discover roots or prove graph completeness/erase safety. */
+int hpclang_rpl_reference_plan_qualified_shift(
+    const struct hpclang_rpl_reference *reference,
+    const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
+    int32_t delta, struct hpclang_rpl_reference_patch *patch);
+
 #endif

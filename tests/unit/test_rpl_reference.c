@@ -487,8 +487,61 @@ static void dispatch_schemas(void)
            HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
+static void qualified_relocation(void)
+{
+    struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_ACPTR, 0x100, 0x120, 0, 0x23456};
+    struct hpclang_rpl_reference_mappings maps = {1, 8, 8};
+    struct hpclang_rpl_reference_patch patch = {123, 456}, saved = patch;
+    assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x180, -32, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           1);
+    assert(patch.field == 0x100 && patch.value == 0x100);
+    maps.target = 9; /* Same native address in another bank must not move. */
+    patch = saved;
+    assert(!hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch));
+    assert(!memcmp(&patch, &saved, sizeof patch));
+    maps.field = 8;
+    assert(!hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch));
+    assert(!memcmp(&patch, &saved, sizeof patch));
+    /* A relative library field changes if either end moves, but not when both
+     * move equally. The returned field always addresses the old source bytes. */
+    edge.kind = HPCLANG_RPL_REFERENCE_DIRECT;
+    edge.auxiliary = 1;
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           1);
+    assert(patch.field == 0x100 && patch.value == 0x40);
+    maps.target = 8;
+    patch = saved;
+    assert(!hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch));
+    assert(!memcmp(&patch, &saved, sizeof patch));
+    maps.field = 1;
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           1);
+    assert(patch.value == 0);
+    /* An overlapping numeric field in a different mapping is not a torn field. */
+    edge = (struct hpclang_rpl_reference){HPCLANG_RPL_REFERENCE_ACPTR, 0xfe, 0x120, 0, 0x23456};
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           1);
+    maps.field = 8;
+    patch = saved;
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&patch, &saved, sizeof patch));
+    maps.field = 1;
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -0x101, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, NULL, 0x100, 0x180, -32, &patch) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    edge.kind = HPCLANG_RPL_REFERENCE_EXECUTION;
+    assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x180, -32, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&patch, &saved, sizeof patch));
+}
+
 int main(void)
 {
+    qualified_relocation();
     dispatch_schemas();
     execution_entries();
     relocation_patches();

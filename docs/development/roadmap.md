@@ -862,6 +862,13 @@ moved attached libraries. Reusing native compaction therefore still requires
 the active-reference and ARM-ownership work; it does not close the application
 return or interrupted-erase gates.
 
+Qualified reference planning now separates source and target mappings before
+adjusting absolute or relative fields. Host tests cover bank aliasing and torn
+fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
+actual C bank resolver/planner computes the relocated library-275 catalog target
+while leaving an equal address in another bank unchanged. Full root discovery,
+batched validation and live commit remain required before reclamation is enabled.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
