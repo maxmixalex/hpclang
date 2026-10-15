@@ -1,4 +1,4 @@
-"""Run independent HP50g recovery from a fresh Stock boot and explicit fault injection."""
+"""Run independent HP49g+/HP50g recovery from fresh Stock and explicit fault injection."""
 
 import argparse
 from contextlib import contextmanager
@@ -54,10 +54,10 @@ def emulator(args, phase, sequence, extra=(), usb=None):
         if key.startswith(("HPCLANG_X50NG_", "HPCLANG_STOCK_", "HPCLANG_E2E_")):
             del env[key]
     env.update(
-        TARGET="hp50g",
+        TARGET=args.model,
         HPCLANG_X50NG_HARNESS="stock",
         HPCLANG_X50NG_SRAM_SIZE="0x00080000",
-        HPCLANG_X50NG_LCD_HEIGHT="80",
+        HPCLANG_X50NG_LCD_HEIGHT=str(args.profile["lcd_height"]),
         HPCLANG_STOCK_MODE="install",
         HPCLANG_E2E_SEQUENCE=str(seq),
         HPCLANG_STOCK_PREFIX=str(phase / "stock"),
@@ -91,13 +91,16 @@ def run(args):
         clean,
         "2000 tap f6\n4000 tap f6\n7000 capture home\n9000 finish-install\n",
         [
-            "--bootloader=" + str(firmware / "boot-50g.bin"),
+            "--bootloader=" + str(firmware / args.profile["bootloader"]),
             "--firmware=" + str(firmware / "hp4950v215/2MB_FIX/2MB_215f.bin"),
             "--flash",
         ],
     ) as child:
         completed(child, 90)
-    print("Clean Stock boot complete", flush=True)
+    bootloader = (firmware / args.profile["bootloader"]).read_bytes()
+    if (clean / "state/flash").read_bytes()[: len(bootloader)] != bootloader:
+        raise RuntimeError("Clean Stock state does not contain the selected model's bootloader")
+    print(f"Clean {args.model} Stock boot complete", flush=True)
 
     reset = args.output / "reset"
     reset.mkdir()
@@ -184,7 +187,7 @@ def run(args):
         json.dumps(
             {
                 "status": "pass",
-                "model": "hp50g",
+                "model": args.model,
                 "fault": "offline-erased-header-sector",
                 "slot": args.slot,
                 "target": args.target,
@@ -202,6 +205,7 @@ def main():
 
     signal.signal(signal.SIGTERM, terminate)
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")
     parser.add_argument(
         "--build", type=Path, required=True, help="built recovery witness directory"
@@ -211,6 +215,7 @@ def main():
     parser.add_argument("--slot", type=lambda value: int(value, 0), default=0x160105)
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
     args = parser.parse_args()
+    args.profile = json.loads((ROOT / "tests/e2e/targets" / (args.model + ".json")).read_text())
     args.dist, args.build, args.output = (
         path.resolve() for path in (args.dist, args.build, args.output)
     )

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Internal HP50g recovery CODE envelope; not an HPC1 application launcher.
+"""Internal HP49g+/HP50g recovery CODE envelope; not an HPC1 application launcher.
 
 The payload must be a trusted position-independent ARM entry at offset zero.
 It owns BSS initialization, its stack, hardware state and return through LR.
 This envelope supplies aligned object-owned storage, not MMU/page allocation.
-Only the HP50g Stock main-RAM mapping has been validated for this entry.
+Only the HP49g+/HP50g Stock main-RAM mapping has been validated for this entry.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 
 MAX_INITIALIZED = 32768
 MAX_NIBBLES = 0xFFFFF
+MODELS = ("hp49gplus", "hp50g")
 
 
 def immediate(value: int, width: int = 5) -> str:
@@ -39,7 +40,7 @@ def entry(initialized_size: int, source_offset: int) -> str:
     code += "80880" + "80881" + "80882" + "80883" + "135" + "d5"
     code += "34" + immediate(initialized_size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
-    # Convert the object-owned Saturn destination to the HP50g ARM SRAM address.
+    # Convert the object-owned Saturn destination to the hp4950 ARM SRAM address.
     code += "af2" + "d9" + "81e" + "25" + "32" + "080" + "20"
     code += "80bfe" + "8f" + immediate(0x67D2) + "142164808c"
     return code
@@ -53,8 +54,8 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     Bounds here prevent truncated Saturn lengths and copy/reservation overlap;
     they do not establish free calculator RAM or a sufficient transfer budget.
     """
-    if model != "hp50g":
-        raise ValueError("independent recovery entry is validated only for hp50g")
+    if model not in MODELS:
+        raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
     if not initialized or len(initialized) > MAX_INITIALIZED:
         raise ValueError("initialized image size must be 1..32768 bytes")
     initialized += bytes((-len(initialized)) % 8)
@@ -85,7 +86,7 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", required=True, choices=["hp50g"])
+    parser.add_argument("--model", required=True, choices=MODELS)
     parser.add_argument("--runtime-size", required=True, type=lambda value: int(value, 0))
     parser.add_argument("input", type=Path, help="trusted PIC ARM-entry binary, not HPC1")
     parser.add_argument("output", type=Path)

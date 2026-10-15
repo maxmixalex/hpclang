@@ -175,10 +175,14 @@ jobs:
           if-no-files-found: error
 
   port-recovery:
-    name: Stock recovery / HP50g
+    name: Stock recovery / ${{ matrix.target }}
     needs: runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [hp49gplus, hp50g]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-atfe
@@ -192,13 +196,14 @@ jobs:
       - name: Execute independent recovery
         run: |
           python3 tests/e2e/port-recovery/run.py \
+            --model "${{ matrix.target }}" \
             --dist build/x50ng/dist --build build/port-recovery \
             --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
       - name: Upload recovery evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hp50g-independent-recovery
+          name: ${{ matrix.target }}-independent-recovery
           retention-days: 14
           path: |
             build/port-recovery-evidence/**/*.json

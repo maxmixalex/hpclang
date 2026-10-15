@@ -1,4 +1,4 @@
-"""Create an explicit erased-sector fault fixture from clean HP50g Stock state.
+"""Create an erased-sector fault fixture from clean HP49g+/HP50g Stock state.
 
 This is offline fault injection, not evidence of power loss while Flash is busy.
 The source state is preserved. Boot the output with hardware reset before use;
@@ -15,7 +15,7 @@ import zlib
 def prepare(source: Path, destination: Path, slot: int, target: int) -> None:
     flash = bytearray((source / "flash").read_bytes())
     if len(flash) != 0x200000:
-        raise ValueError("Expected a complete HP50g Flash image")
+        raise ValueError("Expected a complete hp4950 Flash image")
     if target != 0x140000:
         raise ValueError("This scenario erases the first user bank's header sector")
     bank = slot & ~0x1FFFF

@@ -1,4 +1,4 @@
-"""Independently verify the HP50g recovery witness from saved native state."""
+"""Independently verify the HP49g+/HP50g recovery witness from saved native state."""
 
 import argparse
 import configparser
@@ -38,7 +38,7 @@ def verify_flash(before, after, slot, target):
 
 
 def native_words(ram, flash):
-    require(len(ram) == 0x80000, "Expected HP50g SRAM")
+    require(len(ram) == 0x80000, "Expected hp4950 SRAM")
     words = struct.unpack("<" + "I" * (len(ram) // 4), ram)
     for table, value in enumerate(words[:-128]):
         if not 0x08000000 <= value < 0x08080000 or value % 2048:

@@ -53,13 +53,20 @@ class RecoveryPackageTests(unittest.TestCase):
             (bytes(8), 9, "hp50g"),
             (bytes(8), -8, "hp50g"),
             (bytes(8), 0x80000, "hp50g"),
-            (bytes(8), 8, "hp49gplus"),
+            (bytes(8), 8, "hp48gii"),
         ):
             with (
                 self.subTest(runtime=runtime, model=model),
                 self.assertRaises(ValueError),
             ):
                 PACK.package(payload, runtime, model=model)
+
+    def test_hp4950_models_share_the_validated_envelope(self):
+        payload = bytes(range(32))
+        self.assertEqual(
+            PACK.package(payload, 4096, model="hp49gplus"),
+            PACK.package(payload, 4096, model="hp50g"),
+        )
 
 
 if __name__ == "__main__":

@@ -252,10 +252,10 @@ Historical `saturn.h` / `satdir.h` APIs are adapters above this model. Raw addre
 
 ### Independent recovery envelope
 
-`tools/package-recovery.py` is an internal HP50g Stock recovery packager. It
+`tools/package-recovery.py` is an internal HP49g+/HP50g Stock recovery packager. It
 wraps a trusted position-independent ARM-entry binary in a self-copying RPL CODE
 object without invoking Library 275. This is separate from the installed SDK's
-HPC1 application launcher. Its current entry relies on the HP50g main-RAM map;
+HPC1 application launcher. Its current entry relies on the hp4950 main-RAM map;
 other models are rejected until their entry boundaries are validated.
 
 ```sh
@@ -296,7 +296,7 @@ tests reject collateral writes, incomplete replay, corrupt journals and truncate
 state.
 
 `tests/e2e/port-recovery/prepare.py` creates a separate fault-state directory
-from a clean HP50g Stock boot. It validates the six native bank identities and
+from a clean HP49g+/HP50g Stock boot. It validates the six native bank identities and
 an empty journal bank, preserves the target sector in a CRC-protected journal,
 then erases that sector in the copied Flash image. The original state and any
 existing destination are preserved. The copied state must undergo hardware
@@ -306,7 +306,7 @@ interrupted while the chip is busy.
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.
-Core's **Stock recovery / HP50g** job uses the shared portable x50ng setup and
+Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child
 processes on failure/cancellation, and emits `result.json` only after verification.
@@ -315,13 +315,17 @@ search paths:
 
 ```sh
 python3 tests/e2e/port-recovery/run.py \
+  --model hp50g \
   --dist build/x50ng/dist --build build/port-recovery \
   --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
 ```
 
-This gate covers the explicit erased-header-sector scenario on HP50g. It does
-not provide user-facing installation/error handling, other-model acceptance or
-busy-chip power-loss coverage.
+`--model hp49gplus` selects HP49g+; the runner reads the existing target profile
+and verifies that the initial Flash contains that model's bootloader. Both
+models use the same recovery image and independent verifier. This gate covers
+their explicit erased-header-sector scenario. It does not provide user-facing
+installation/error handling, HP48/HP39 entry support or busy-chip power-loss
+coverage.
 
 ## Capabilities
 

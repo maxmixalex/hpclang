@@ -1220,6 +1220,14 @@ All 100 host targets, changed-file formatting, Python lint and strict docs pass
 locally. Remote acceptance is pending. User-facing installation, memory-budget
 acceptance, other models and busy-chip power-loss coverage remain open.
 
+HP49g+ now independently passes the same fresh-boot recovery scenario using its
+own bootloader, first in the controlled comparison and then through the maintained
+runner's model option. The runner selects bootloader/LCD metadata from existing
+target profiles and verifies the bootloader in saved Flash. HP49g+/HP50g share
+the validated package format; unsupported families remain rejected. The Core
+recovery matrix now includes both models. These changes are locally accepted;
+their remote acceptance and the remaining installation/power-loss work are open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
