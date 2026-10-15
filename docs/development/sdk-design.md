@@ -293,8 +293,17 @@ guards, TLS, mapping restoration, clock progression, repeat-write counts and
 return to Stock ROM. It takes explicit saved-state paths, built ELF/binary/package
 paths and journal/target addresses; it does not modify the saved state. Its host
 tests reject collateral writes, incomplete replay, corrupt journals and truncated
-state. This build gate does not yet generate and execute the damaged-bank Stock
-scenario in CI or provide user-facing recovery/error handling.
+state.
+
+`tests/e2e/port-recovery/prepare.py` creates a separate fault-state directory
+from a clean HP50g Stock boot. It validates the six native bank identities and
+an empty journal bank, preserves the target sector in a CRC-protected journal,
+then erases that sector in the copied Flash image. The original state and any
+existing destination are preserved. The copied state must undergo hardware
+reset before transfer so Stock rebuilds its catalog from the damaged Flash.
+This is explicit offline fault injection, not a model of an erase/program pulse
+interrupted while the chip is busy. The build gate does not yet orchestrate
+these Stock phases in CI or provide user-facing recovery/error handling.
 
 ## Capabilities
 

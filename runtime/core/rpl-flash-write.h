@@ -171,7 +171,8 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
  * not native return or reclamation. FAILED/OCCUPIED preflight changes nothing;
  * DIRTY requires retaining ownership and resolving the attempted journal.
  * Retrying a partially written allocation is not supported by this entry.
- * Whole-port discovery/startup recovery do not yet recognize this format. */
+ * Discovery and whole-port preflight are separate operations; publication
+ * does not establish automatic startup recovery. */
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
 

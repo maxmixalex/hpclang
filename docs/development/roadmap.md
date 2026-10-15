@@ -1202,6 +1202,16 @@ tests and five saved-state negative controls reject damaged code/guards,
 unexpected repeat writes, mapping drift and unfinished return. CI scenario
 preparation and execution remain pending.
 
+The fault-state preparation script now starts from a clean HP50g Stock boot,
+validates native bank identities and an empty separate journal bank, and creates
+a new state with the saved sector journal and erased target header sector.
+Host tests cover source/output preservation, exact changes and invalid/nonempty
+bank rejection. A fresh boot from standard firmware, offline fault preparation,
+hardware reset and USB upload of the repository-built recovery witness pass the
+maintained verifier; reset leaves the damaged Flash unchanged. The scenario no
+longer requires historical research snapshots. CI orchestration and busy-chip
+power-loss coverage remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
