@@ -498,6 +498,44 @@ static void restart_partial_tail(const struct hpclang_rpl_flash_io *io)
     free(before);
 }
 
+static void cut_replace(const struct hpclang_rpl_flash_io *io, const uint8_t *replacement,
+                        uint32_t bytes)
+{
+    struct hpclang_rpl_flash_replacement transaction;
+    if (!setjmp(power_cut)) {
+        (void)hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction);
+        assert(0 && "replacement cut was not reached");
+    }
+    power_cut_at = UINT32_MAX;
+}
+
+static void ambiguous_replacement_restart(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = string_record(9, &bytes);
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    struct hpclang_rpl_flash_replacement transaction;
+    assert(!hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction));
+    unsigned steps = writes;
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    power_cut_at = steps - 1u;
+    power_cut_mask = 0;
+    cut_replace(io, replacement, bytes);
+    /* The new string committed, but the old integer was not deleted. RAM
+     * transaction state is gone. Neither duplicate alone proves intent. */
+    assert(!memcmp(flash + 0x105u, record, sizeof record));
+    assert(!memcmp(flash + 0x105u + sizeof record, replacement, bytes));
+    uint32_t before = fingerprint(sizeof flash);
+    writes = 0;
+    assert(!hpclang_rpl_flash_prepare_write(io));
+    assert(hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(!writes && fingerprint(sizeof flash) == before);
+    free(replacement);
+}
+
 static void replace_backups(const struct hpclang_rpl_flash_io *io)
 {
     struct hpclang_rpl_flash_replacement transaction = {UINT32_MAX, UINT32_MAX, 0};
@@ -840,6 +878,7 @@ int main(void)
     assert(!writes && fingerprint(sizeof flash) == before);
     remove_backups(&io);
     replace_backups(&io);
+    ambiguous_replacement_restart(&io);
     accept_legacy_padding(&io);
     create_libraries(&io);
     recover_port_tails(&io);

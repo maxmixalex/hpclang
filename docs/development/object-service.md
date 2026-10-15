@@ -876,6 +876,16 @@ the requested operation subsequently reports an existing/missing name or full
 media. Reads do not trigger repair. This is recovery on mutation, not calculator
 startup repair: library status recovery, replacement intent and interrupted
 sector erasure still require separate protocols.
+Replacement has a distinct restart boundary: a cut after the new record commits
+but before the old status clears leaves two valid same-name backups. A host test
+reproduces this with different value types, drops the in-memory transaction,
+and verifies that preparation preserves both records and replacement refuses
+the ambiguity without writes. Recovery must not infer intent from name/order.
+A candidate hidden transaction envelope with metadata `2` and status `7E`
+(or its publication intermediates `7F`/`FE`) is skipped by native RCL on both
+HP49g+ and HP50g, even with an invalid body; a later live control remains readable
+and every Flash byte is unchanged. This establishes native visibility only:
+the durable transaction format and replacement recovery are not implemented yet.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and
