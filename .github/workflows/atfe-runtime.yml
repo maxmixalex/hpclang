@@ -33,6 +33,7 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
+      - "tools/package-recovery.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
   pull_request:
@@ -67,6 +68,7 @@ on:
       - "tools/bootstrap-hp39-aplet.sh"
       - "tools/package-hp39-aplet.sh"
       - "tools/package-aplet.py"
+      - "tools/package-recovery.py"
       - ".github/actions/setup-atfe/**"
       - ".github/workflows/atfe-runtime.yml"
 

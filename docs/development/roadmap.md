@@ -1173,6 +1173,17 @@ no-op replay and Stock return without Library 275. This is a necessary object
 size check only, not a sufficient peak-memory budget or production installer;
 transfer/installation overhead, error handling and other models remain open.
 
+The independent CODE envelope is now maintained in `tools/package-recovery.py`
+with host coverage for object lengths, initialized payloads, every destination
+nibble alignment, reserved storage and invalid size/model rejection. Core CI
+includes its Python tests and watches the tool. It accepts a trusted PIC ARM
+binary plus explicit runtime size; it does not yet build the recovery kernel or
+install it. The HP50g package removes the prototype's test-only return integer
+and is 39,978 bytes. Native Stock recovery passes with the original empty stack,
+exact target-sector restoration, retained journal, no-op replay and restored
+hardware state. Other model entries and complete installer integration remain
+pending; the raw binary caller still owns relocation validation.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

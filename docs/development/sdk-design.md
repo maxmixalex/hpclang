@@ -250,6 +250,28 @@ Stack mutations are failure-safe: peek is non-mutating; pop snapshots before dro
 
 Historical `saturn.h` / `satdir.h` APIs are adapters above this model. Raw address/memory helpers remain Migration/Internal unless a clean application requirement appears.
 
+### Independent recovery envelope
+
+`tools/package-recovery.py` is an internal HP50g Stock recovery packager. It
+wraps a trusted position-independent ARM-entry binary in a self-copying RPL CODE
+object without invoking Library 275. This is separate from the installed SDK's
+HPC1 application launcher. Its current entry relies on the HP50g main-RAM map;
+other models are rejected until their entry boundaries are validated.
+
+```sh
+python3 tools/package-recovery.py --model hp50g --runtime-size SIZE recovery.bin recovery.hp
+```
+
+`SIZE` is the eight-byte-aligned total runtime image size, including initialized
+bytes, BSS, workspace and the owned stack. The packager reserves those bytes
+inside the CODE object, copies initialized bytes to an eight-byte-aligned
+destination and returns to RPL without adding a stack result. The ARM payload
+must initialize BSS, establish its stack, preserve hardware/native state and
+return through LR. The build must separately reject unsafe relocations; a raw
+binary cannot supply that proof. This envelope neither allocates MMU pages nor
+proves sufficient installation memory. Recovery-kernel build integration,
+installation-space budgeting and a distributable recovery tool remain pending.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
