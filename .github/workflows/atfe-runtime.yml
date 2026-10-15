@@ -18,6 +18,7 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/port-recovery/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -53,6 +54,7 @@ on:
       - "tests/font-cmake/**"
       - "tests/e2e/CMakeLists.txt"
       - "tests/e2e/main.c"
+      - "tests/e2e/port-recovery/**"
       - "tests/e2e/phase.c"
       - "tests/e2e/harness/x50ng/**"
       - "tools/wait-hp39-kermit-fetch.py"
@@ -93,6 +95,14 @@ jobs:
 
       - name: Setup Arm Toolchain for Embedded
         uses: ./.github/actions/setup-atfe
+
+      - name: Build independent recovery witness
+        run: |
+          export PATH="$ATFE/bin:$PATH"
+          cmake -S tests/e2e/port-recovery -B build/port-recovery \
+            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/port-recovery -j2
 
       - name: Restore prepared HPGCC39 cache
         uses: actions/cache@v6

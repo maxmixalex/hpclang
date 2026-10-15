@@ -269,8 +269,25 @@ destination and returns to RPL without adding a stack result. The ARM payload
 must initialize BSS, establish its stack, preserve hardware/native state and
 return through LR. The build must separately reject unsafe relocations; a raw
 binary cannot supply that proof. This envelope neither allocates MMU pages nor
-proves sufficient installation memory. Recovery-kernel build integration,
-installation-space budgeting and a distributable recovery tool remain pending.
+proves sufficient installation memory. Installation-space budgeting and a
+distributable recovery tool remain pending.
+
+The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
+stack/TLS layout and actual shared sector-replay implementation entirely from
+repository sources. With ATfE's `bin` on PATH:
+
+```sh
+cmake -S tests/e2e/port-recovery -B build/port-recovery \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/toolchains/hpclang-armv4t.cmake" \
+  -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build/port-recovery
+```
+
+Core CI builds this witness and checks linked relocation kinds, image entry and
+BSS bounds before producing `recovery.hp`. The fixture records replay, mapping,
+TLS and clock diagnostics for independent saved-state verification; its marker
+alone is not acceptance. This build gate does not yet run the damaged-bank
+Stock scenario in CI or provide user-facing recovery/error handling.
 
 ## Capabilities
 

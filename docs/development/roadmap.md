@@ -1184,6 +1184,15 @@ exact target-sector restoration, retained journal, no-op replay and restored
 hardware state. Other model entries and complete installer integration remain
 pending; the raw binary caller still owns relocation validation.
 
+The standalone `tests/e2e/port-recovery` CMake witness now builds the independent
+entry, TLS/guarded stack and actual shared C sector replay from repository
+sources. Core CI builds and packages it, checking relocation kinds and image/BSS
+bounds; the existing Quality discovery also covers its ARM C source. The local
+build reproduces the previously native-validated 39,978-byte package exactly.
+Formatting and ARM analysis under the repository's MMIO policy pass. This closes
+the witness's dependency on temporary build sources, not production recovery
+installation or CI execution of the damaged-bank scenario.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
