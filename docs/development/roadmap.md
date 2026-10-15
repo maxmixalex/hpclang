@@ -940,6 +940,15 @@ journal-bank chain or prove transaction freshness, object-name/ID uniqueness,
 reference correctness or erase authority. Recovery planning must retain an
 independently discoverable journal and establish those remaining invariants.
 
+Caller-owned journal retirement now verifies the complete retained record and
+target sector before clearing only the status byte. Tests cover every partial
+retirement status, each interrupted read, failed/silent programming and corruption
+at every journal-body or target byte. An integrated host fixture discovers,
+preflights, replays, retires and revalidates a structurally clean port. Sanitizers
+and ARM analysis pass. Retirement requires the caller to finish reference repair
+first; automatic restart recognition of partial retirement and the public
+reclamation transaction remain unimplemented.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

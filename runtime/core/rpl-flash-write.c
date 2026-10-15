@@ -89,6 +89,33 @@ int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+int hpclang_rpl_flash_retire_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t word = 0;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        uint32_t at = slot + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (i ? value != record[i] : (value & 0x7eu) != value)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    for (uint32_t offset = 0; offset < HPCLANG_RPL_FLASH_SECTOR_BYTES; offset += 2u) {
+        uint16_t expected = (uint16_t)(image[offset] | (uint16_t)image[offset + 1u] << 8u);
+        if (!io->read16(io->context, target + offset, &word) || word != expected)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    const uint8_t retired = 0;
+    return write_bytes(io, slot, &retired, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
+                                               : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 static int discard_status(const struct hpclang_rpl_flash_io *io, uint32_t address)
 {
     uint16_t word;

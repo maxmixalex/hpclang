@@ -175,6 +175,18 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
 
+/* Retire a caller-owned sector journal only after reference repair and all
+ * transaction obligations have completed. record is the original committed
+ * image retained in stable RAM. Verify its complete Flash body and the complete
+ * target image before clearing status to 00. Accept 7E, a partially cleared
+ * subset, or 00 for retry; no publication state or different body is accepted.
+ * Only the status byte changes. DIRTY means retain ownership and retry/resolve;
+ * even a preflight mismatch cannot authorize Stock return. WRITTEN proves the
+ * journal retired with matching target, not reference safety or startup recovery.
+ * Caller establishes allocation identity, freshness and exclusive ownership. */
+int hpclang_rpl_flash_retire_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes);
+
 /* Read-only discovery in one intact native bank. Validate its identity, walk
  * allocation boundaries (never search payload bytes), validate live objects,
  * require an erased tail and at most one committed sector journal. Unknown

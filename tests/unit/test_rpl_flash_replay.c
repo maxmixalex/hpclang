@@ -160,6 +160,77 @@ static void publication_tests(void)
     publishing = 0;
 }
 
+static void prepare_retirement(void)
+{
+    prepare();
+    publishing = 1;
+    memcpy(flash, desired, SECTOR);
+}
+
+static int retire(void)
+{
+    int result = hpclang_rpl_flash_retire_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                                 HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+    assert(!erases && !memcmp(flash, desired, SECTOR));
+    assert(!memcmp(flash + SECTOR, original + SECTOR, SLOT - FIRST - SECTOR));
+    assert(!memcmp(flash + SLOT - FIRST + 1, original + SLOT - FIRST + 1,
+                   sizeof flash - (SLOT - FIRST + 1)));
+    return result;
+}
+
+static void retirement_tests(void)
+{
+    prepare_retirement();
+    assert(retire() == HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!flash[SLOT - FIRST] && programs == 1);
+    unsigned total_reads = reads;
+    reset_counters();
+    assert(retire() == HPCLANG_RPL_FLASH_WRITTEN && !programs);
+    for (unsigned cut = 1; cut <= total_reads; ++cut) {
+        prepare_retirement();
+        fail_read = cut;
+        assert(retire() == HPCLANG_RPL_FLASH_DIRTY);
+        reset_counters();
+        assert(retire() == HPCLANG_RPL_FLASH_WRITTEN);
+    }
+    prepare_retirement();
+    fail_program = 1;
+    assert(retire() == HPCLANG_RPL_FLASH_DIRTY);
+    reset_counters();
+    assert(retire() == HPCLANG_RPL_FLASH_WRITTEN);
+    /* Every possible partial retirement status, not just a byte-boundary cut. */
+    for (unsigned status = 0; status < 256; ++status) {
+        prepare_retirement();
+        flash[SLOT - FIRST] = (uint8_t)status;
+        int result = retire();
+        if ((status & 0x7e) == status) {
+            assert(result == HPCLANG_RPL_FLASH_WRITTEN && !flash[SLOT - FIRST]);
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        }
+    }
+    for (unsigned i = 1; i < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES; ++i) {
+        prepare_retirement();
+        flash[SLOT - FIRST + i] ^= 1;
+        assert(hpclang_rpl_flash_retire_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases && flash[SLOT - FIRST] == 0x7e);
+    }
+    for (unsigned i = 0; i < SECTOR; ++i) {
+        prepare_retirement();
+        flash[i] ^= 1;
+        assert(hpclang_rpl_flash_retire_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases && flash[SLOT - FIRST] == 0x7e);
+    }
+    prepare_retirement();
+    silent_program = 1;
+    assert(retire() == HPCLANG_RPL_FLASH_DIRTY);
+    publishing = 0;
+}
+
 static void prepare_discovery(void)
 {
     reset_counters();
@@ -279,6 +350,14 @@ static void preflight_tests(void)
     assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
                                               &target) == 1);
 
+    publishing = 1;
+    assert(hpclang_rpl_flash_retire_sector(&io.flash, slot, workspace,
+                                           HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    publishing = 0;
+    assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                               &target));
+
     prepare_preflight();
     desired[0x100] = 0; /* CRC-valid image with wrong bank identity. */
     discovery_image(SLOT);
@@ -388,6 +467,7 @@ int main(void)
            HPCLANG_RPL_FLASH_INVALID);
     assert(!reads && !programs && !erases);
     publication_tests();
+    retirement_tests();
     discovery_tests();
     preflight_tests();
     return 0;
