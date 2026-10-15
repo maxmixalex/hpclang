@@ -832,6 +832,11 @@ Flash bytes: FF tails are discarded, fully committed records remain unchanged,
 and partial status markers are rejected without mutation. The existing named
 backup and unrelated bytes survive each case. These are host fault-model tests,
 not evidence of calculator boot behavior after physical power loss.
+Separate saved-state Stock probes change only an otherwise complete backup's
+status: native RCL reports Undefined Name for `73` on HP49g+/HP50g and `03`
+on HP50g. Full Flash comparisons show no native repair beyond the injected byte.
+These samples do not establish all intermediate states or permission to repair
+an unknown allocation; the production parser continues to reject those states.
 This is not automatic startup repair: partial status commits, replacement intent
 and interrupted sector erasure still require separate recovery protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
