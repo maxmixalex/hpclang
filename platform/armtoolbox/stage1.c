@@ -11,6 +11,7 @@
 #include "stage-layout.h"
 #include "port-memory.h"
 #include "stage-image.h"
+#include "stage-stack.h"
 
 #define STAGE_WINDOW_BASE HPCLANG_STAGE_WINDOW_BASE
 #define STAGE_CODE_OFFSET 0x00000400u
@@ -1282,111 +1283,40 @@ static int stage_saturn_write_word5(const uint32_t *read_map, uint32_t address, 
     return 1;
 }
 
-static int stage_saturn_read_byte(const uint32_t *read_map, uint32_t address, uint8_t *value)
+static int stage_stack_read(void *context, uint32_t address, unsigned width, uint32_t *value)
 {
-    if (value == NULL)
-        return 0;
-
-    uint8_t low = 0u;
-    uint8_t high = 0u;
-    if (!stage_saturn_read_nibble(read_map, address, &low) ||
-        !stage_saturn_read_nibble(read_map, address + 1u, &high))
-        return 0;
-
-    *value = (uint8_t)(low | (uint8_t)(high << 4));
+    uint32_t result = 0u;
+    for (unsigned i = 0; i < width; ++i) {
+        uint8_t nibble;
+        if (!stage_saturn_read_nibble(context, address + i, &nibble))
+            return 0;
+        result |= (uint32_t)nibble << (4u * i);
+    }
+    *value = result;
     return 1;
 }
-
-struct stage_launcher_bias
+static int stage_stack_write(void *context, uint32_t address, uint32_t value)
 {
-    uint32_t object;
-    uint32_t active;
-};
-
+    return stage_saturn_write_word5(context, address, value);
+}
 static int stage_hide_launcher_bias(const void *saturn_state, uintptr_t stage0_code,
                                     struct stage_launcher_bias *bias)
 {
-    static const uint8_t launcher_magic[] = {0x4cu, 0xb3u, 0x80u, 0x41u, 0x3eu, 0x43u, 0x50u};
-
-    if (saturn_state == NULL || bias == NULL)
+    if (!saturn_state)
         return 0;
-
-    bias->object = 0u;
-    bias->active = 0u;
-
-    const uint32_t *read_map = (const uint32_t *)saturn_state;
-    uint32_t dsktop = 0u;
-    uint32_t object = 0u;
-    uint32_t prologue = 0u;
-    uint32_t length = 0u;
-
-    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || dsktop > RPL_MAIN_END - 5u ||
-        !stage_saturn_read_word5(read_map, dsktop, &object) || object > RPL_MAIN_END - 24u ||
-        !stage_saturn_read_word5(read_map, object, &prologue) ||
-        !stage_saturn_read_word5(read_map, object + 5u, &length) || length < 19u)
-        return 0;
-
-    if (prologue == RPL_DOCSTR) {
-        for (uint32_t i = 0u; i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0]));
-             ++i) {
-            uint8_t byte = 0u;
-            if (!stage_saturn_read_byte(read_map, object + 10u + i * 2u, &byte) ||
-                byte != launcher_magic[i])
-                return 0;
-        }
-    } else if (prologue == 0x2a4eu && length == 45u && object >= RPL_MAIN_FIRST &&
-               object <= RPL_MAIN_END - 50u && stage0_code != 0u && (stage0_code & 3u) == 0u) {
-        /* ARMToolbox can replace the string with a five-word HEXSTR launch
-         * descriptor. Match both its entry and code-base words to the actual
-         * executing stage0, rather than hiding an arbitrary user HEXSTR. The
-         * native PrRUN continuation consumes this cell after ARM returns. */
-        uint32_t entry = 0u, code_base = 0u;
-        for (uint32_t i = 0u; i < 4u; ++i) {
-            uint8_t entry_byte, base_byte;
-            if (!stage_saturn_read_byte(read_map, object + 18u + 2u * i, &entry_byte) ||
-                !stage_saturn_read_byte(read_map, object + 34u + 2u * i, &base_byte))
-                return 0;
-            entry |= (uint32_t)entry_byte << (8u * i);
-            code_base |= (uint32_t)base_byte << (8u * i);
-        }
-        if (entry != stage0_code || code_base != stage0_code)
-            return 0;
-    } else {
-        return 0;
-    }
-
-    /*
-     * HPGCC 1.1's sat_stack_init() pseudo-drops this launcher cell without
-     * changing AVMEM. Preserve that exact reservation: it is needed again when
-     * the launcher object is restored after HPC1 returns.
-     */
-    if (!stage_saturn_write_word5(read_map, RPL_DSKTOP, dsktop + 5u))
-        return -1;
-
-    bias->object = object;
-    bias->active = 1u;
-    return 1;
+    const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read,
+                                              stage_stack_write};
+    return hpclang_stage_stack_hide(&io, stage0_code, bias);
 }
-
 static int stage_restore_launcher_bias(const void *saturn_state,
                                        const struct stage_launcher_bias *bias)
 {
-    if (bias == NULL || bias->active == 0u)
-        return 1;
-    if (saturn_state == NULL)
-        return 0;
-
-    const uint32_t *read_map = (const uint32_t *)saturn_state;
-    uint32_t dsktop = 0u;
-    if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || dsktop < RPL_MAIN_FIRST + 5u)
-        return 0;
-
-    uint32_t slot = dsktop - 5u;
-    if (!stage_saturn_write_word5(read_map, slot, bias->object))
-        return 0;
-    return stage_saturn_write_word5(read_map, RPL_DSKTOP, slot);
+    if (!saturn_state)
+        return bias == NULL || !bias->active;
+    const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read,
+                                              stage_stack_write};
+    return hpclang_stage_stack_restore(&io, bias);
 }
-
 /*
  * Convert one 4 KiB physical main-RAM page into the corresponding 0x2000
  * Saturn-nibble interval by using Stock SAT_CPU.Read[] as the authority.

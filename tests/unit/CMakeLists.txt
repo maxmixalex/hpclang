@@ -55,6 +55,9 @@ hpclang_unit(rpl_flash_plan test_rpl_flash_plan.c
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_flash_plan PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(stage_stack test_stage_stack.c "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c")
+target_include_directories(test_stage_stack PRIVATE "${HPCLANG_ROOT}/platform/armtoolbox")
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")

@@ -79,6 +79,7 @@ def build(
             ("stage1-entry.S", "stage1-entry"),
             ("stage1.c", "stage1"),
             ("stage-image.c", "stage-image"),
+            ("stage-stack.c", "stage-stack"),
             ("hp39-portal.S", "stage1-hp39-portal"),
         )
     ] + objects

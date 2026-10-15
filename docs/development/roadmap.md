@@ -884,8 +884,12 @@ and the descriptor left behind after native return. The bias detector now also
 recognizes this descriptor when its entry and code-base words both match the
 executing stage0. Local HP50g direct-program and Port 2 library-command probes
 then both preserve the integer 124275 after PASS and settled Stock return,
-confirmed by independent native-stack decoding. Repository regression coverage,
-other classic models and post-relocation execution remain acceptance work.
+confirmed by independent native-stack decoding. The shared stack-reservation
+implementation now has repository host regression tests for descriptor identity,
+bounds, failed reads/writes and preservation of application output and caller
+input. Focused sanitizers and ARM launcher builds pass; the HP49g+ direct-program
+probe also preserves 124275 after settled return. HP48 and post-relocation
+execution remain acceptance work.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
