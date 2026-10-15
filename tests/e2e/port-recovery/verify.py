@@ -69,6 +69,41 @@ def native_words(ram, flash):
     raise ValueError("Native Saturn map not found")
 
 
+def require_stock_pc(state_directory):
+    state = configparser.ConfigParser()
+    state.read(state_directory / "state")
+    pc = int(state["s3c2410-arm"]["reg-15"], 0)
+    require(0 <= pc < 0x140000, "Execution has not returned to Stock ROM")
+
+
+def verify_restart(clean, repaired, restarted):
+    """Check native catalog reconstruction against the original clean boot."""
+    require(
+        (repaired / "flash").read_bytes() == (restarted / "flash").read_bytes(),
+        "Post-recovery reset changed Flash or its retained journal",
+    )
+    catalogs = []
+    for directory in (clean, restarted):
+        read = native_words((directory / "sram").read_bytes(), (directory / "flash").read_bytes())
+        require(read(0x806FD) - read(0x806F8) == 5, "Restart did not preserve the empty stack")
+        count = read(0x8611D, 3)
+        require(0 < count < 128, "Invalid native library catalog count")
+        catalogs.append(
+            sorted(
+                tuple(
+                    read(0x86120 + 16 * i + offset, width)
+                    for offset, width in ((0, 3), (3, 5), (8, 5), (13, 3))
+                )
+                for i in range(count)
+            )
+        )
+    require(
+        catalogs[0] == catalogs[1], "Restart did not restore the original native library catalog"
+    )
+    require_stock_pc(restarted)
+    return len(catalogs[0])
+
+
 def verify(args):
     before = (args.before / "flash").read_bytes()
     after = (args.after / "flash").read_bytes()
@@ -169,10 +204,7 @@ def verify(args):
         d[28] == (0 if already_restored else 1) and (d[29] == 0 if already_restored else d[29] > 0),
         "Unexpected erase/program count",
     )
-    state = configparser.ConfigParser()
-    state.read(args.after / "state")
-    pc = int(state["s3c2410-arm"]["reg-15"], 0)
-    require(0 <= pc < 0x140000, "Execution has not returned to Stock ROM")
+    require_stock_pc(args.after)
 
 
 def main():

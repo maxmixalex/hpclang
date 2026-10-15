@@ -1228,6 +1228,13 @@ the validated package format; unsupported families remain rejected. The Core
 recovery matrix now includes both models. These changes are locally accepted;
 their remote acceptance and the remaining installation/power-loss work are open.
 
+Post-recovery hardware restart also passes on both models: all 61 original
+native catalog entries, including bindings/switches/flags, are restored, while
+complete Flash and the retained journal remain unchanged. The maintained runner
+now requires this phase before reporting success. Host negative controls reject
+missing/changed catalog entries, Flash changes, nonempty stack and unfinished
+return, while permitting catalog reordering.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

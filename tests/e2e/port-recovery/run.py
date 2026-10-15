@@ -13,7 +13,7 @@ import time
 from types import SimpleNamespace
 
 from prepare import prepare
-from verify import verify
+from verify import verify, verify_restart
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -183,6 +183,17 @@ def run(args):
             target=args.target,
         )
     )
+    restarted = args.output / "restarted"
+    restarted.mkdir()
+    shutil.copytree(recovery / "state", restarted / "state")
+    with emulator(
+        args,
+        restarted,
+        "2000 capture restart\n10000 capture home\n12000 finish-install\n",
+        ["--reset"],
+    ) as child:
+        completed(child, 90)
+    catalog_entries = verify_restart(clean / "state", recovery / "state", restarted / "state")
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -191,6 +202,7 @@ def run(args):
                 "fault": "offline-erased-header-sector",
                 "slot": args.slot,
                 "target": args.target,
+                "restored_catalog_entries": catalog_entries,
             },
             indent=2,
         )

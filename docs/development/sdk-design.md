@@ -306,6 +306,11 @@ interrupted while the chip is busy.
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.
+It then performs another hardware reset and compares the complete native library
+catalog against the clean boot (IDs, bindings, bank switches and flags, independent
+of ordering). The repaired Flash and retained journal must remain unchanged, the
+stack empty and execution back in Stock ROM. This catches recovery that returns
+once but leaves libraries missing or incorrectly bound on the next startup.
 Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child
