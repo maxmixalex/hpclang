@@ -58,6 +58,65 @@ static void init(void)
     fail_address = UINT32_MAX;
 }
 
+static void interrupted_tails(void)
+{
+    init();
+    for (uint32_t index = 0; index < 6u; ++index) {
+        uint32_t first = index * 0x20000u + 0x105u;
+        memcpy(flash + first, record, sizeof record);
+        /* The next body's write stopped before status publication. */
+        memcpy(flash + first + sizeof record + 1u, record + 1u, 12u);
+    }
+}
+
+static void recover_port_tails(const struct hpclang_rpl_flash_io *io)
+{
+    uint8_t *before = malloc(sizeof flash);
+    assert(before);
+    interrupted_tails();
+    memcpy(before, flash, sizeof flash);
+    assert(!hpclang_rpl_flash_recover_tails(io));
+    unsigned complete_writes = writes;
+    assert(complete_writes);
+    /* Every original live record, header and partial body is preserved; only
+     * the four-byte discard header may change in each interrupted slot. */
+    for (uint32_t index = 0; index < 6u; ++index) {
+        uint32_t first = index * 0x20000u, slot = first + 0x105u + sizeof record;
+        assert(flash[slot] == 0);
+        assert(!memcmp(flash + first, before + first, slot - first));
+        assert(!memcmp(flash + slot + 4u, before + slot + 4u, first + 0x20000u - slot - 4u));
+    }
+    assert(!hpclang_rpl_flash_recover_tails(io) && writes == complete_writes);
+    for (uint32_t index = 0; index < 6u; ++index) {
+        for (unsigned failure = 0; failure < 4u; ++failure) {
+            interrupted_tails();
+            uint32_t bank = index * 0x20000u;
+            if (failure == 0)
+                flash[bank + 0x101u] ^= 1u;
+            else if (failure == 1)
+                flash[bank + 0x105u + sizeof record] = 0x7fu;
+            else
+                fail_address = base + bank + (failure == 2 ? 0x1fffeu : 0x100u);
+            memcpy(before, flash, sizeof flash);
+            int expected = failure >= 2 ? HPCLANG_RPL_FLASH_FAILED : HPCLANG_RPL_FLASH_DIRTY;
+            assert(hpclang_rpl_flash_recover_tails(io) == expected);
+            assert(!writes && !memcmp(before, flash, sizeof flash));
+        }
+    }
+    /* Retry after each returned programming failure, including failures in
+     * later banks after earlier tails have already been recovered. */
+    for (unsigned cut = 0; cut < complete_writes; ++cut) {
+        interrupted_tails();
+        fail_write_at = cut;
+        assert(hpclang_rpl_flash_recover_tails(io) == HPCLANG_RPL_FLASH_DIRTY);
+        fail_write_at = UINT32_MAX;
+        assert(!hpclang_rpl_flash_recover_tails(io));
+        for (uint32_t index = 0; index < 6u; ++index)
+            assert(!memcmp(flash + index * 0x20000u + 0x105u, record, sizeof record));
+    }
+    free(before);
+}
+
 static uint32_t fingerprint(uint32_t end)
 {
     uint32_t hash = 2166136261u;
@@ -446,5 +505,6 @@ int main(void)
     replace_backups(&io);
     accept_legacy_padding(&io);
     create_libraries(&io);
+    recover_port_tails(&io);
     return 0;
 }

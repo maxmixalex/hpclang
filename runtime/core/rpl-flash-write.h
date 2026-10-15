@@ -49,6 +49,15 @@ int hpclang_rpl_flash_append(const struct hpclang_rpl_flash_io *io, uint32_t add
 int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32_t first,
                                    uint32_t end);
 
+/* Recover erased-marker tails across all six native user banks. Validate every
+ * bank identity and discard plan before the first write. Invalid/unknown states
+ * leave the whole port unchanged. Once commit starts, a backend failure may
+ * leave earlier banks recovered; retry under the same exclusive ownership.
+ * This only discards uncommitted bodies behind FF markers. It cannot infer
+ * replacement intent, repair partial status commits or perform sector erasure.
+ * The IO extent is the same six-bank extent used by create_backup. */
+int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io);
+
 /* Finish a known backup/library commit after interruption/uncertain acknowledgement.
  * The caller retains the exact expected record and owns this reserved slot.
  * Validate that complete record, compare every stored body/padding byte, and

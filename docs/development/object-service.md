@@ -815,6 +815,14 @@ after a verified new commit, old-status cleanup completes before return.
 Existing payload addresses and references do not move. Missing names and full
 media fail without deleting the old record. This synchronous ordering does not
 provide power-loss recovery or reclaim the old allocation.
+The internal `hpclang_rpl_flash_recover_tails` primitive preflights identities
+and discard plans for all six user banks before recovering uncommitted bodies
+behind erased `FF` status markers. An unreadable or unknown later bank prevents
+all writes. During commit, a backend error may leave earlier tails recovered;
+retry requires continued exclusive mapping ownership. Recovery changes only
+discard headers and preserves preceding live records and partial payloads.
+This is not automatic startup repair: partial status commits, replacement intent
+and interrupted sector erasure still require separate recovery protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

@@ -136,6 +136,37 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
                : HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
+{
+    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
+        io->first > io->end || io->end - io->first != 6u * 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    for (uint32_t index = 0; index < 6u; ++index) {
+        uint32_t bank = io->first + index * 0x20000u;
+        uint16_t identity;
+        if (!io->read16(io->context, bank + 0x100u, &identity))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (identity != (0xf0u | ((index + 8u) << 8u)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        struct recovery_reader mapped = {io, bank};
+        const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+        struct hpclang_rpl_flash_discard plan;
+        int result = hpclang_rpl_flash_discard_plan(&reader, 0x20au, 0x40000u, &plan);
+        if (result < 0)
+            return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                          : HPCLANG_RPL_FLASH_DIRTY;
+    }
+    /* Re-read under the caller's stable mapping/ownership. No potentially
+     * repairable early bank is changed before every later bank is checked. */
+    for (uint32_t index = 0; index < 6u; ++index) {
+        uint32_t bank = io->first + index * 0x20000u;
+        int result = hpclang_rpl_flash_recover_tail(io, bank + 0x105u, bank + 0x20000u);
+        if (result)
+            return result;
+    }
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
 struct record_selection
 {
     uint32_t free_slot, match_slot, matches;
