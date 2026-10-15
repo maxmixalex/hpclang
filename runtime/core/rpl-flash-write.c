@@ -710,35 +710,46 @@ int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, cons
                                      uint32_t bytes,
                                      struct hpclang_rpl_flash_replacement *transaction)
 {
-    if (!transaction || !valid_record(record, bytes))
+    if (!transaction)
         return HPCLANG_RPL_FLASH_INVALID;
-    struct packed_record packed = {record, bytes};
-    const struct hpclang_rpl_reader source = {packed_read, &packed};
-    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
-    struct hpclang_rpl_port_entry wanted;
-    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1 || wanted.prologue != 0x02b62u)
-        return HPCLANG_RPL_FLASH_INVALID;
-    struct record_selection selection;
-    int result = select_backup(io, wanted.name, wanted.name_length, bytes, &selection);
-    if (result)
+    struct hpclang_rpl_flash_replace_plan plan = {.intent_slot = UINT32_MAX};
+    int result = hpclang_rpl_flash_publish_intent(io, record, bytes, &plan);
+    if (plan.intent_slot == UINT32_MAX)
         return result;
-    if (!selection.matches)
-        return HPCLANG_RPL_FLASH_NOT_FOUND;
-    if (selection.matches != 1u)
-        return HPCLANG_RPL_FLASH_DIRTY;
-    if (selection.free_slot == io->end)
-        return HPCLANG_RPL_FLASH_NOSPACE;
-    struct hpclang_rpl_flash_io reserved = *io;
-    uint32_t bank = io->first + ((selection.free_slot - io->first) / 0x20000u) * 0x20000u;
-    reserved.first = bank + 0x104u;
-    reserved.end = bank + 0x20000u;
     *transaction =
-        (struct hpclang_rpl_flash_replacement){selection.match_slot, selection.free_slot, 0};
-    result = hpclang_rpl_flash_append(&reserved, transaction->new_slot, record, bytes);
-    if (result)
-        return result;
-    transaction->committed = 1;
-    return hpclang_rpl_flash_finish_remove(io, transaction->old_slot);
+        (struct hpclang_rpl_flash_replacement){plan.intent.old_slot, plan.intent.new_slot, 0};
+    /* Do not use append's legacy failure cleanup: the durable intent decides
+     * whether an uncertain publication rolls back or finishes committing. */
+    if (result || !write_bytes(io, transaction->new_slot + 1u, record + 1u, bytes - 1u) ||
+        !write_bytes(io, transaction->new_slot, record, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return hpclang_rpl_flash_finish_replace(io, transaction);
+}
+
+int hpclang_rpl_flash_finish_replace(const struct hpclang_rpl_flash_io *io,
+                                     struct hpclang_rpl_flash_replacement *transaction)
+{
+    if (!io || !transaction || !io->read16 || transaction->new_slot < io->first ||
+        transaction->new_slot >= io->end || transaction->old_slot < io->first ||
+        transaction->old_slot >= io->end)
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (hpclang_rpl_flash_recover_tails(io))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint16_t new_word, old_word;
+    if (!io->read16(io->context, transaction->new_slot & ~1u, &new_word) ||
+        !io->read16(io->context, transaction->old_slot & ~1u, &old_word))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t new_status = (new_word >> ((transaction->new_slot & 1u) * 8u)) & 255u;
+    uint32_t old_status = (old_word >> ((transaction->old_slot & 1u) * 8u)) & 255u;
+    if (new_status == 0x53u && !old_status) {
+        transaction->committed = 1;
+        return HPCLANG_RPL_FLASH_WRITTEN;
+    }
+    if ((new_status == 0 || new_status == 0xffu) && old_status == 0x53u) {
+        transaction->committed = 0;
+        return HPCLANG_RPL_FLASH_FAILED;
+    }
+    return HPCLANG_RPL_FLASH_DIRTY;
 }
 
 int hpclang_rpl_flash_remove_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,

@@ -318,20 +318,11 @@ int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes)
     struct hpclang_rpl_flash_replacement transaction = {UINT32_MAX, UINT32_MAX, 0};
     result = hpclang_rpl_flash_replace_backup(&io, record, bytes, &transaction);
     if (result == HPCLANG_RPL_FLASH_DIRTY && transaction.new_slot != UINT32_MAX) {
-        /* Until the new record is complete, preserve the old record and
-         * discard only the attempted append. Afterwards finish the old
-         * tombstone before allowing Stock to see the new unique name. */
-        if (transaction.committed) {
-            while (hpclang_rpl_flash_finish_remove(&io, transaction.old_slot) !=
-                   HPCLANG_RPL_FLASH_WRITTEN) {
-            }
-            result = HPCLANG_RPL_FLASH_WRITTEN;
-        } else {
-            while (hpclang_rpl_flash_discard_record(&io, transaction.new_slot, record, bytes) !=
-                   HPCLANG_RPL_FLASH_WRITTEN) {
-            }
-            result = HPCLANG_RPL_FLASH_FAILED;
-        }
+        /* Retain the mapping until durable recovery establishes the outcome,
+         * including publication that succeeded without an acknowledgement. */
+        do {
+            result = hpclang_rpl_flash_finish_replace(&io, &transaction);
+        } while (result == HPCLANG_RPL_FLASH_DIRTY);
     }
     close_flash(&owner);
     return result;

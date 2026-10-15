@@ -516,15 +516,9 @@ static void ambiguous_replacement_restart(const struct hpclang_rpl_flash_io *io)
     init();
     memcpy(flash + 0x105u, record, sizeof record);
     struct hpclang_rpl_flash_replacement transaction;
-    assert(!hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction));
-    unsigned steps = writes;
-    init();
-    memcpy(flash + 0x105u, record, sizeof record);
-    power_cut_at = steps - 1u;
-    power_cut_mask = 0;
-    cut_replace(io, replacement, bytes);
-    /* The new string committed, but the old integer was not deleted. RAM
-     * transaction state is gone. Neither duplicate alone proves intent. */
+    /* A legacy duplicate pair has no intent. Neither valid backup alone
+     * authorizes deleting the other, even with the new replacement writer. */
+    memcpy(flash + 0x105u + sizeof record, replacement, bytes);
     assert(!memcmp(flash + 0x105u, record, sizeof record));
     assert(!memcmp(flash + 0x105u + sizeof record, replacement, bytes));
     uint32_t before = fingerprint(sizeof flash);
@@ -533,6 +527,42 @@ static void ambiguous_replacement_restart(const struct hpclang_rpl_flash_io *io)
     assert(hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction) ==
            HPCLANG_RPL_FLASH_DIRTY);
     assert(!writes && fingerprint(sizeof flash) == before);
+    free(replacement);
+}
+
+static void journaled_replacement_restart(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = string_record(9, &bytes);
+    init();
+    memcpy(flash + 0x105u, record, sizeof record);
+    struct hpclang_rpl_flash_replace_plan plan;
+    assert(!hpclang_rpl_flash_plan_replace(io, replacement, bytes, &plan));
+    struct hpclang_rpl_flash_replacement transaction;
+    assert(!hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction));
+    unsigned steps = writes;
+    const uint16_t masks[] = {0, 0x00ff, 0xff00, 0x5555, 0xaaaa, 0xffff};
+    for (unsigned step = 0; step < steps; ++step) {
+        for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask) {
+            init();
+            memcpy(flash + 0x105u, record, sizeof record);
+            power_cut_at = step;
+            power_cut_mask = masks[mask];
+            cut_replace(io, replacement, bytes);
+            assert(!hpclang_rpl_flash_recover_tails(io));
+            uint32_t next = plan.intent.new_slot - base;
+            if (flash[next] == 0x53u) {
+                assert(!flash[0x105u]);
+                assert(!memcmp(flash + next, replacement, bytes));
+            } else {
+                assert(flash[next] == 0 || flash[next] == 0xff);
+                assert(!memcmp(flash + 0x105u, record, sizeof record));
+            }
+            assert(!memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
+            unsigned recovered = writes;
+            assert(!hpclang_rpl_flash_recover_tails(io) && writes == recovered);
+        }
+    }
     free(replacement);
 }
 
@@ -547,23 +577,25 @@ static void replace_backups(const struct hpclang_rpl_flash_io *io)
     assert(!hpclang_rpl_flash_replace_backup(io, record, sizeof record, &transaction));
     unsigned complete_writes = writes;
     assert(transaction.committed && transaction.old_slot == base + 0x105u &&
-           transaction.new_slot == base + 0x105u + sizeof record);
+           transaction.new_slot == base + 0x105u + sizeof record + HPCLANG_RPL_FLASH_INTENT_BYTES);
     assert(flash[0x105u] == 0 && !memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
-    assert(!memcmp(flash + 0x105u + sizeof record, record, sizeof record));
+    assert(!memcmp(flash + transaction.new_slot - base, record, sizeof record));
     for (unsigned cut = 0; cut < complete_writes; ++cut) {
         init();
         memcpy(flash + 0x105u, record, sizeof record);
         fail_write_at = cut;
         int result = hpclang_rpl_flash_replace_backup(io, record, sizeof record, &transaction);
-        if (transaction.committed) {
-            assert(result == HPCLANG_RPL_FLASH_DIRTY);
-            assert(!hpclang_rpl_flash_finish_remove(io, transaction.old_slot));
+        if (result == HPCLANG_RPL_FLASH_DIRTY)
+            result = hpclang_rpl_flash_finish_replace(io, &transaction);
+        if (result == HPCLANG_RPL_FLASH_WRITTEN) {
+            assert(transaction.committed);
             assert(flash[0x105u] == 0);
-            assert(!memcmp(flash + 0x105u + sizeof record, record, sizeof record));
+            assert(!memcmp(flash + transaction.new_slot - base, record, sizeof record));
         } else {
             assert(result == HPCLANG_RPL_FLASH_FAILED);
             assert(!memcmp(flash + 0x105u, record, sizeof record));
-            assert(flash[0x105u + sizeof record] == 0);
+            assert(flash[transaction.new_slot - base] == 0 ||
+                   flash[transaction.new_slot - base] == 0xff);
         }
         assert(!memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
     }
@@ -574,15 +606,15 @@ static void replace_backups(const struct hpclang_rpl_flash_io *io)
            HPCLANG_RPL_FLASH_DIRTY);
     assert(!transaction.committed && !memcmp(flash + 0x105u, record, sizeof record));
     write_failures = 0;
-    assert(!hpclang_rpl_flash_discard_record(io, transaction.new_slot, record, sizeof record));
+    assert(hpclang_rpl_flash_finish_replace(io, &transaction) == HPCLANG_RPL_FLASH_FAILED);
     /* Old and new records may reside in different native banks. */
     init();
     memcpy(flash + 5u * 0x20000u + 0x105u, record, sizeof record);
     assert(!hpclang_rpl_flash_replace_backup(io, record, sizeof record, &transaction));
-    assert(transaction.new_slot == base + 0x105u);
+    assert(transaction.new_slot == base + 0x105u + HPCLANG_RPL_FLASH_INTENT_BYTES);
     assert(transaction.old_slot == base + 5u * 0x20000u + 0x105u);
     assert(flash[5u * 0x20000u + 0x105u] == 0);
-    assert(!memcmp(flash + 0x105u, record, sizeof record));
+    assert(!memcmp(flash + transaction.new_slot - base, record, sizeof record));
     init();
     memcpy(flash + 0x105u, record, sizeof record);
     memcpy(flash + 5u * 0x20000u + 0x105u, record, sizeof record);
@@ -601,21 +633,27 @@ static void replace_backups(const struct hpclang_rpl_flash_io *io)
     /* Grow and shrink an actual value, retaining every byte of each old body. */
     init();
     memcpy(flash + 0x105u, record, sizeof record);
-    uint32_t old_slot = 0x105u, next_slot = old_slot + sizeof record;
+    uint32_t old_slot = 0x105u;
     for (uint32_t length = 32u;; length = 0) {
         uint32_t bytes;
         uint8_t *replacement = string_record(length, &bytes);
+        struct hpclang_rpl_flash_replace_plan plan;
+        assert(!hpclang_rpl_flash_plan_replace(io, replacement, bytes, &plan));
+        uint32_t next_slot = plan.intent.new_slot - base, journal = plan.intent_slot - base;
         before = fingerprint(sizeof flash);
+        assert(!hpclang_rpl_flash_intent_encode(io->first, io->end, plan.intent_slot, &plan.intent,
+                                                flash + journal, HPCLANG_RPL_FLASH_INTENT_BYTES));
+        flash[journal] = 0;
         memcpy(flash + next_slot, replacement, bytes);
         flash[old_slot] = 0;
         uint32_t expected = fingerprint(sizeof flash);
         memset(flash + next_slot, 255, bytes);
+        memset(flash + journal, 255, HPCLANG_RPL_FLASH_INTENT_BYTES);
         flash[old_slot] = 0x53;
         assert(fingerprint(sizeof flash) == before);
         assert(!hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction));
         assert(fingerprint(sizeof flash) == expected);
         old_slot = next_slot;
-        next_slot += bytes;
         free(replacement);
         if (!length)
             break;
@@ -879,6 +917,7 @@ int main(void)
     remove_backups(&io);
     replace_backups(&io);
     ambiguous_replacement_restart(&io);
+    journaled_replacement_restart(&io);
     accept_legacy_padding(&io);
     create_libraries(&io);
     recover_port_tails(&io);

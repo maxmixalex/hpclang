@@ -148,7 +148,7 @@ struct hpclang_rpl_flash_replace_plan
  * allocation lengths and status-independent CRC32 values. No Flash writes or
  * RAM allocation; output changes only on success. Caller must keep the port
  * and source record stable until the eventual journal publication. This does
- * not itself publish an intent or change the existing replacement API. */
+ * not itself publish an intent. */
 int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                    uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
 
@@ -158,21 +158,30 @@ int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const 
  * immediately before writing. WRITTEN means intent publication only; old/new
  * objects are untouched. DIRTY after a programming/readback failure requires
  * retaining ownership and recovery; do not begin writing the new value unless
- * publication succeeded. Not yet used by the public replacement API. */
+ * publication succeeded. */
 int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
 
 /* Replace exactly one existing backup without relocating its payload. Validate
- * all banks, append the complete replacement, then tombstone the old record.
+ * all banks, publish a durable intent, write the complete replacement, then
+ * recover the intent to tombstone the old record and retire the journal.
  * Hold exclusive ownership across the transient duplicate-name interval.
  * Missing/ambiguous names and insufficient erased space do not change Flash.
  * transaction is required and unchanged on preflight rejection. On DIRTY after
- * mutation, committed==0 requires discard_record(new_slot, retained record);
- * committed==1 requires finish_remove(old_slot). Do not return to Stock until
- * that recovery succeeds. Initialize new_slot to UINT32_MAX to distinguish
- * preflight DIRTY. No reclamation or power-loss/restart guarantee. */
+ * mutation, finish_replace must resolve the outcome; committed is only set
+ * after recovery verifies a published new value and deleted old value. Do not
+ * use legacy discard_record cleanup. Initialize new_slot to UINT32_MAX to
+ * distinguish preflight DIRTY. No reclamation or automatic startup hook. */
 int hpclang_rpl_flash_replace_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes,
+                                     struct hpclang_rpl_flash_replacement *transaction);
+
+/* Resolve a caller-owned replacement using durable whole-port recovery.
+ * WRITTEN means the new value committed; FAILED means the old value remains.
+ * DIRTY means recovery/readback is unresolved and ownership must be retained.
+ * The transaction must be from replace_backup and the mapping still owned;
+ * replay after restart uses recover_tails without this optional RAM outcome. */
+int hpclang_rpl_flash_finish_replace(const struct hpclang_rpl_flash_io *io,
                                      struct hpclang_rpl_flash_replacement *transaction);
 
 /* Discard a caller-owned failed append using its retained expected record.

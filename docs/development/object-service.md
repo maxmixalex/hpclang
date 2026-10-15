@@ -807,14 +807,20 @@ The independent `port-flash-remove` client passes three Stock launches on both
 models, consuming native absence/presence witnesses around deletion and
 same-name recreation. Owned snapshots survive removal. Final Flash images
 contain the two expected deleted records and no unrelated changes.
-Port 2 replacement reuses whole-port preflight, reserves an erased tail, writes
-and verifies the new backup, then tombstones the old one under the same mapping
-lease. Native readers cannot observe the temporary duplicate-name interval.
-Append failure discards only the attempted new record, preserving the old value;
-after a verified new commit, old-status cleanup completes before return.
+Port 2 replacement reuses whole-port preflight, reserves disjoint erased space
+for a durable intent and new backup, and publishes the intent before touching
+the new value. It verifies the complete new backup, finishes old-status deletion
+and retires the intent under the same mapping lease. Native readers cannot
+observe the temporary duplicate-name interval during an owned SDK call.
+Returned programming/readback failures use the same durable recovery rules as
+restart recovery: unpublished bodies roll back, while verified publication can
+finish committing even if the programming acknowledgement was lost. The result
+reports the recovered outcome, and the mapping remains owned until it is known.
 Existing payload addresses and references do not move. Missing names and full
-media fail without deleting the old record. This synchronous ordering does not
-provide power-loss recovery or reclaim the old allocation.
+media fail without deleting the old record. Each replacement consumes an extra
+44-byte intent allocation; neither it nor old payloads are reclaimed. Explicit
+restart recovery is implemented, but automatic calculator-startup integration
+remains open.
 The internal `hpclang_rpl_flash_recover_tails` primitive preflights identities
 and discard plans for all six user banks before recovering uncommitted bodies
 behind erased `FF` status markers, plus complete backups with partially written
@@ -898,9 +904,9 @@ Decoding distinguishes unpublished, ready, retiring and retired states but does
 not authorize mutation. Host tests cover every status byte, each single-bit
 corruption, truncated input, a separately computed checksum vector and a valid-CRC
 overlap. Native probes using the actual C encoder pass on both models with a
-later live control and unchanged Flash. Normal mutation APIs do not emit this
-format yet; complete target-state verification and restart execution remain
-required before replacement can claim power-loss recovery.
+later live control and unchanged Flash. Backup replacement now emits this format
+and uses the target-state verification and recovery below. Calculator-startup
+integration remains required before claiming full power-loss coverage.
 The internal replacement planner validates all six banks before returning the
 old allocation, checksums and two erased reservations. It tries both same-bank
 and cross-bank placement, so a small journal-only tail can be paired with an
@@ -947,8 +953,13 @@ the journal. FF still takes the rollback path even when its body is complete.
 Tests enumerate all 256 new statuses, interrupt actual append publication in
 both bank orders and cut the recovery publication itself. Invalid phases,
 premature old deletion and corrupt new bodies fail without writes.
-Public replacement's use of the journal remains unfinished; its legacy returned
-error cleanup is not yet part of this durable transaction protocol.
+The public replacement path now emits this journal and uses its recovery for
+both normal completion and returned errors. It no longer uses append's legacy
+discard-on-error policy. Host tests interrupt every actual replacement write,
+recover without transaction RAM, and retain the refusal to resolve legacy
+duplicate backups lacking an intent. Returned zero/full programming failures
+and readback failures are tested at each write; repeated outcome queries do not
+write again. Startup integration and sector reclamation remain open.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

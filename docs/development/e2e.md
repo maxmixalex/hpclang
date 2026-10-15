@@ -129,7 +129,10 @@ focused payloads through the shared Direct/Stock family harness:
   native records, verifies its value through the public read API and rejects
   duplicate creation without any change. The selected sector is saved and
   restored, with the whole-image fingerprint checked again. This covers
-  internal physical/append primitives and public backup creation;
+  internal physical/append primitives and public backup creation. Durable-intent
+  fixtures also verify unstarted abort, committed-new recovery, incomplete-body
+  rollback and partial-publication completion through public readback, restoring
+  the complete image after each test run;
   Port replacement/deletion and power-loss recovery remain separate
   acceptance gates. The emulator does not model real cache or NOR timing.
 - `port-flash-backup`: a separate public-API persistence client on HP49g+/HP50g.

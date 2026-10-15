@@ -554,8 +554,8 @@ native visibility checks of actual C-produced records pass on HP49g+/HP50g.
 Read-only replacement planning validates every bank, requires a unique old
 backup, computes both allocation CRCs and selects space for the intent and new
 record, including separate banks in either order. Full-media, late corruption
-and read failures leave Flash and the output plan unchanged. The format is not
-yet emitted by normal mutation APIs. Internal publication now verifies the body
+and read failures leave Flash and the output plan unchanged. The format is
+now emitted by the backup replacement API. Publication verifies the body
 before setting hidden status `7E`; whole-port recovery can retire the intent if
 the old backup still matches and the new reservation remains erased. Publication
 cuts and returned errors preserve both value regions. A committed new value now
@@ -568,8 +568,11 @@ The intent is resolved before generic cleanup regardless of bank order; host
 tests cover interrupted body programming and repeated rollback cuts. Partial
 FF-to-53 publication now finishes only after validating a ready intent, live old
 value and complete matching new body, then deletes the old value. All new status
-bytes and repeated publication cuts are covered. Normal replacement integration
-and its returned-error handling remain open.
+bytes and repeated publication cuts are covered. Normal replacement now uses
+the journal and durable recovery for completion and returned errors, retaining
+mapping ownership until the old/new outcome is verified. Actual replacement
+write cuts recover without transaction RAM; legacy duplicates without an intent
+remain rejected. Automatic startup integration and reclamation remain open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status
@@ -629,9 +632,11 @@ presence witness and remove again. Owned snapshots survive deletion. Saved
 images contain only the two expected deleted 30-byte records; unrelated Flash
 is unchanged. All 95 host targets, focused ASan/UBSan and ARM static analysis
 pass, including partial status writes and whole-port preflight failures.
-Port 2 backup replacement now appends and verifies the complete new record
-before tombstoning the old one under exclusive ownership. Failed appends retain
-the old value; failed old-status writes finish before returning success. All
+Port 2 backup replacement publishes a durable intent and verifies the complete
+new record before tombstoning the old one under exclusive ownership. Incomplete
+bodies retain the old value; verified partial publication finishes the new value
+before old-status deletion. Returned failures resolve through the same recovery
+protocol before releasing the mapping. The initial implementation's
 95 host targets pass, including every programming failure position, cross-bank
 replacement, grow/shrink, duplicate refusal and full media without old-value
 deletion. Focused ASan/UBSan and ARM analysis pass. The independent

@@ -53,8 +53,8 @@ int hpclang_stock_flash_create_library(const uint8_t *record, uint32_t bytes);
 /* Whole-port deletion with the same preparation and ownership/fault policy.
  * After recovery, only the selected backup's status is cleared; no space is reclaimed. */
 int hpclang_stock_flash_remove_backup(const uint8_t *name, uint32_t name_length);
-/* Keep the old value on failed append; after a verified new commit, finish
- * deleting the old status before releasing exclusive mapping ownership. */
+/* Journaled replacement. Resolve returned failures through durable recovery
+ * and report the resulting old/new outcome before releasing mapping ownership. */
 int hpclang_stock_flash_replace_backup(const uint8_t *record, uint32_t bytes);
 
 #endif

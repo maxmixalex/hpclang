@@ -531,6 +531,47 @@ static void publication_status_recovery(const struct hpclang_rpl_flash_io *io)
     free(replacement);
 }
 
+static void replacement_returned_errors(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = replacement_record(&bytes);
+    init();
+    allow_program = 1;
+    struct hpclang_rpl_flash_replacement transaction;
+    assert(!hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction));
+    unsigned calls = write_calls;
+    for (unsigned at = 0; at < calls; ++at) {
+        for (unsigned fault = 0; fault < 3; ++fault) {
+            init();
+            allow_program = 1;
+            if (fault == 2)
+                fail_readback = at;
+            else {
+                fail_program = at;
+                partial_mask = fault ? 0xffffu : 0;
+            }
+            int result = hpclang_rpl_flash_replace_backup(io, replacement, bytes, &transaction);
+            assert(result == HPCLANG_RPL_FLASH_DIRTY);
+            fail_program = fail_readback = UINT32_MAX;
+            result = hpclang_rpl_flash_finish_replace(io, &transaction);
+            if (result == HPCLANG_RPL_FLASH_WRITTEN) {
+                assert(transaction.committed && !flash[transaction.old_slot - base]);
+                assert(!memcmp(flash + transaction.new_slot - base, replacement, bytes));
+            } else {
+                assert(result == HPCLANG_RPL_FLASH_FAILED && !transaction.committed);
+                assert(!memcmp(flash + transaction.old_slot - base, record, sizeof record));
+                assert(flash[transaction.new_slot - base] != 0x53u);
+            }
+            assert(
+                !memcmp(flash + transaction.old_slot - base + 1u, record + 1u, sizeof record - 1u));
+            unsigned recovered = write_calls;
+            assert(hpclang_rpl_flash_finish_replace(io, &transaction) == result);
+            assert(write_calls == recovered);
+        }
+    }
+    free(replacement);
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read16, program16, base, base + sizeof flash};
@@ -591,5 +632,6 @@ int main(void)
     partial_body_recovery(&io);
     partial_body_rejections(&io);
     publication_status_recovery(&io);
+    replacement_returned_errors(&io);
     return 0;
 }
