@@ -661,8 +661,95 @@ static void metadata_guards(void)
     }
 }
 
+struct edit_memory
+{
+    uint8_t banks[2][32];
+    unsigned reads, writes, fail_read, fail_write;
+    int acknowledge_failure, silent_write;
+};
+
+static int edit_read(void *context, uint32_t mapping, uint32_t at, uint8_t *value)
+{
+    struct edit_memory *memory = context;
+    assert(mapping < 2 && at < 32);
+    if (++memory->reads == memory->fail_read)
+        return 0;
+    *value = memory->banks[mapping][at];
+    return 1;
+}
+
+static int edit_write(void *context, uint32_t mapping, uint32_t at, uint8_t value)
+{
+    struct edit_memory *memory = context;
+    assert(mapping < 2 && at >= 5 && at < 10 && value < 16);
+    int failed = ++memory->writes == memory->fail_write;
+    if ((!failed || memory->acknowledge_failure) && !memory->silent_write)
+        memory->banks[mapping][at] = value;
+    return !failed;
+}
+
+static void batch_replay(void)
+{
+    struct edit_memory initial = {0}, completed;
+    memset(initial.banks, 7, sizeof initial.banks);
+    struct hpclang_rpl_reference_edit edits[] = {{0, 5, 0x12345, 0xabcde},
+                                                 {1, 5, 0x54321, 0xedcba}};
+    for (unsigned i = 0; i < 2; ++i)
+        for (unsigned j = 0; j < 5; ++j)
+            initial.banks[i][5 + j] = (uint8_t)((edits[i].expected >> (4 * j)) & 15);
+    completed = initial;
+    for (unsigned i = 0; i < 2; ++i)
+        for (unsigned j = 0; j < 5; ++j)
+            completed.banks[i][5 + j] = (uint8_t)((edits[i].value >> (4 * j)) & 15);
+    struct edit_memory memory = initial;
+    struct hpclang_rpl_reference_writer writer = {{edit_read, &memory}, edit_write};
+    assert(!hpclang_rpl_reference_edits_replay(NULL, NULL, 0));
+    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
+    unsigned reads = memory.reads, writes = memory.writes;
+    assert(writes == 10);
+    assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+    assert(memory.writes == writes);
+    for (unsigned cut = 1; cut <= reads; ++cut) {
+        memory = initial;
+        memory.fail_read = cut;
+        assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        if (cut <= 10)
+            assert(!memory.writes);
+        memory.fail_read = 0;
+        assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+        assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
+    }
+    for (unsigned cut = 1; cut <= writes; ++cut) {
+        for (int committed = 0; committed <= 1; ++committed) {
+            memory = initial;
+            memory.fail_write = cut;
+            memory.acknowledge_failure = committed;
+            assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            memory.fail_write = 0;
+            assert(!hpclang_rpl_reference_edits_replay(&writer, edits, 2));
+            assert(!memcmp(memory.banks, completed.banks, sizeof memory.banks));
+        }
+    }
+    memory = initial;
+    memory.banks[1][9] = 0; /* A late changed field prevents even the first write. */
+    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memory.writes);
+    memory = initial;
+    edits[1].mapping = 0; /* Same-address edits in distinct banks above were valid. */
+    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memory.reads && !memory.writes);
+    edits[1].mapping = 1;
+    memory.silent_write = 1;
+    assert(hpclang_rpl_reference_edits_replay(&writer, edits, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(memory.banks, initial.banks, sizeof memory.banks));
+}
+
 int main(void)
 {
+    batch_replay();
     metadata_guards();
     batch_preflight();
     qualified_relocation();

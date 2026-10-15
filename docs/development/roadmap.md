@@ -954,6 +954,15 @@ using only the durable record. The codec covers all 256 status values. Automatic
 startup invocation, reconstruction of reference obligations and the public
 reclamation transaction remain unimplemented.
 
+Caller-owned RAM reference batches now support checked, repeatable writes through
+an atomic nibble callback. Full metadata and expected/replacement-value checks
+precede mutation; each changed nibble is read back. Tests interrupt every read
+and write, including writes that complete but report failure, and verify retry,
+unchanged neighbors, distinct mappings, conflict refusal and silent-write
+detection. Focused sanitizers and ARM analysis pass. The caller must retain the
+authorized plan and exclusive ownership; persistence of that plan, complete
+root discovery and coordination with Flash transactions remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

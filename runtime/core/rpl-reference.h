@@ -185,4 +185,26 @@ int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_read
                                          const struct hpclang_rpl_reference_edit *edits,
                                          uint32_t count);
 
+struct hpclang_rpl_reference_writer
+{
+    struct hpclang_rpl_reference_reader reader;
+    /* Atomic RAM nibble replacement, preserving neighboring data. On failure
+     * the nibble is either unchanged or fully replaced. Never a NOR writer. */
+    int (*write_nibble)(void *context, uint32_t mapping, uint32_t address, uint8_t value);
+};
+
+/* Finish a previously authorized, caller-owned RAM reference edit batch.
+ * Validate all metadata/overlaps before IO, then require every nibble to equal
+ * its expected or replacement value before any write. This admits interrupted
+ * RAM updates, not unknown values. Write only differing nibbles and verify each.
+ * Caller has already established complete roots, immutable plan/guards, resolved
+ * physical aliases and exclusive ownership through commit/retry. Flash fields
+ * require staged sector images instead. Every error retains the ownership and
+ * recovery obligation: earlier writes or an earlier attempt may have happened.
+ * This does not persist the plan, infer freshness, supply synchronization or
+ * authorize relocation/Stock return. Zero-count batches succeed without IO. */
+int hpclang_rpl_reference_edits_replay(const struct hpclang_rpl_reference_writer *writer,
+                                       const struct hpclang_rpl_reference_edit *edits,
+                                       uint32_t count);
+
 #endif

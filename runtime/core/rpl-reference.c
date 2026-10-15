@@ -116,14 +116,8 @@ int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_rea
     return HPCLANG_RPL_SPAN_OK;
 }
 
-int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
-                                         const struct hpclang_rpl_reference_edit *edits,
-                                         uint32_t count)
+static int edits_metadata(const struct hpclang_rpl_reference_edit *edits, uint32_t count)
 {
-    if (!count)
-        return HPCLANG_RPL_SPAN_OK;
-    if (!reader || !reader->read_nibble || !edits)
-        return HPCLANG_RPL_SPAN_UNAVAILABLE;
     for (uint32_t i = 0; i < count; ++i) {
         const struct hpclang_rpl_reference_edit *edit = &edits[i];
         if (edit->field > 0xffffbu || edit->expected > 0xfffffu || edit->value > 0xfffffu)
@@ -133,6 +127,20 @@ int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_read
                 edits[j].field < edit->field + 5u)
                 return HPCLANG_RPL_SPAN_MALFORMED;
     }
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_reader *reader,
+                                         const struct hpclang_rpl_reference_edit *edits,
+                                         uint32_t count)
+{
+    if (!count)
+        return HPCLANG_RPL_SPAN_OK;
+    if (!reader || !reader->read_nibble || !edits)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = edits_metadata(edits, count);
+    if (result)
+        return result;
     for (uint32_t i = 0; i < count; ++i) {
         uint32_t actual = 0;
         for (unsigned j = 0; j < 5; ++j) {
@@ -146,6 +154,42 @@ int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_read
         }
         if (actual != edits[i].expected)
             return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_reference_edits_replay(const struct hpclang_rpl_reference_writer *writer,
+                                       const struct hpclang_rpl_reference_edit *edits,
+                                       uint32_t count)
+{
+    if (!count)
+        return HPCLANG_RPL_SPAN_OK;
+    if (!writer || !writer->reader.read_nibble || !writer->write_nibble || !edits)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    int result = edits_metadata(edits, count);
+    if (result)
+        return result;
+    const struct hpclang_rpl_reference_reader *reader = &writer->reader;
+    /* Pass zero preflights the complete batch before any mutation. */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        for (uint32_t i = 0; i < count; ++i) {
+            for (unsigned j = 0; j < 5; ++j) {
+                uint8_t actual, expected = (uint8_t)((edits[i].expected >> (4u * j)) & 15u);
+                uint8_t value = (uint8_t)((edits[i].value >> (4u * j)) & 15u);
+                uint32_t at = edits[i].field + j;
+                if (!reader->read_nibble(reader->context, edits[i].mapping, at, &actual))
+                    return HPCLANG_RPL_SPAN_UNAVAILABLE;
+                if (actual != expected && actual != value)
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+                if (!pass || actual == value)
+                    continue;
+                if (!writer->write_nibble(reader->context, edits[i].mapping, at, value) ||
+                    !reader->read_nibble(reader->context, edits[i].mapping, at, &actual))
+                    return HPCLANG_RPL_SPAN_UNAVAILABLE;
+                if (actual != value)
+                    return HPCLANG_RPL_SPAN_MALFORMED;
+            }
+        }
     }
     return HPCLANG_RPL_SPAN_OK;
 }
