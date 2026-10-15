@@ -162,6 +162,19 @@ int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const 
 int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
 
+/* Publish a sector recovery image into a caller-reserved erased allocation.
+ * Validate the encoded record and require its complete span plus end marker
+ * to be erased before writing. Verify the body before publishing hidden 7E.
+ * Caller proves the allocation boundary, transaction freshness, native image
+ * semantics and exclusive ownership; record remains stable in RAM. No erase
+ * or target-sector mutation occurs here. WRITTEN permits subsequent replay,
+ * not native return or reclamation. FAILED/OCCUPIED preflight changes nothing;
+ * DIRTY requires retaining ownership and resolving the attempted journal.
+ * Retrying a partially written allocation is not supported by this entry.
+ * Whole-port discovery/startup recovery do not yet recognize this format. */
+int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *record, uint32_t bytes);
+
 /* Replace exactly one existing backup without relocating its payload. Validate
  * all banks, publish a durable intent, write the complete replacement, then
  * recover the intent to tombstone the old record and retire the journal.

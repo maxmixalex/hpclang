@@ -39,9 +39,9 @@ int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
 #define HPCLANG_RPL_FLASH_SECTOR_BYTES 4096u
 #define HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES (HPCLANG_RPL_FLASH_SECTOR_BYTES + 28u)
 
-/* Proposed internal redo-image allocation (metadata 3, HPCSECT1), not yet
- * published or recognized by whole-port recovery. It holds a complete 4 KiB
- * desired sector image, its target/self addresses and a status-independent
+/* Internal redo-image allocation (metadata 3, HPCSECT1), not yet
+ * used by public mutations or recognized by whole-port recovery. It holds a
+ * complete 4 KiB desired sector image, its target/self addresses and a status-independent
  * CRC32. The journal allocation must be outside the target sector and native
  * bank headers, with an erased end-marker position remaining in its bank.
  * Callers separately prove real allocation boundaries and erased capacity;

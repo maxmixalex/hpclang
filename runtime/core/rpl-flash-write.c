@@ -68,6 +68,27 @@ static int write_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, 
     return 1;
 }
 
+int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *record, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t word = 0;
+    for (uint32_t i = 0; i <= bytes; ++i) {
+        uint32_t at = slot + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (((word >> (8u * (at & 1u))) & 255u) != 255u)
+            return HPCLANG_RPL_FLASH_OCCUPIED;
+    }
+    if (!write_bytes(io, slot + 1u, record + 1u, bytes - 1u) || !write_bytes(io, slot, record, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
 static int discard_status(const struct hpclang_rpl_flash_io *io, uint32_t address)
 {
     uint16_t word;

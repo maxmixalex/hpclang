@@ -13,6 +13,7 @@ static uint8_t flash[END - FIRST], original[END - FIRST];
 static uint8_t desired[SECTOR], scratch[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 static unsigned reads, programs, erases, fail_read, fail_program, erase_prefix;
 static int erase_error, silent_program;
+static int publishing;
 
 static int read16(void *context, uint32_t address, uint16_t *value)
 {
@@ -25,7 +26,15 @@ static int read16(void *context, uint32_t address, uint16_t *value)
 
 static int program16(void *context, uint32_t address, uint16_t value)
 {
-    assert(context == flash && !(address & 1u) && address >= FIRST && address < FIRST + SECTOR);
+    assert(context == flash && !(address & 1u));
+    if (publishing) {
+        assert(address >= (SLOT & ~1u) && address < SLOT + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        if (address == (SLOT & ~1u))
+            assert(!memcmp(flash + SLOT - FIRST + 1, original + SLOT - FIRST + 1,
+                           HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 1));
+    } else {
+        assert(address >= FIRST && address < FIRST + SECTOR);
+    }
     ++programs;
     if (silent_program)
         return 1;
@@ -80,6 +89,75 @@ static void retry(void)
     reset_counters();
     assert(replay() == HPCLANG_RPL_FLASH_WRITTEN);
     assert(!programs && !erases);
+}
+
+static void prepare_publication(void)
+{
+    prepare();
+    publishing = 1;
+    memset(flash + SLOT - FIRST, 255, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES + 1);
+}
+
+static void check_publication(void)
+{
+    const unsigned offset = SLOT - FIRST, bytes = HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
+    assert(!erases);
+    assert(!memcmp(flash, original, offset));
+    assert(flash[offset + bytes] == 255);
+    assert(!memcmp(flash + offset + bytes + 1, original + offset + bytes + 1,
+                   sizeof flash - offset - bytes - 1));
+    if (flash[offset] == 0x7e)
+        assert(!memcmp(flash + offset, original + offset, bytes));
+    else
+        assert(flash[offset] == 0xff || flash[offset] == 0xfe || flash[offset] == 0x7f);
+}
+
+static int publish(void)
+{
+    int result = hpclang_rpl_flash_publish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                                  HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+    check_publication();
+    return result;
+}
+
+static void publication_tests(void)
+{
+    prepare_publication();
+    assert(publish() == HPCLANG_RPL_FLASH_WRITTEN);
+    unsigned total_reads = reads, total_programs = programs;
+    assert(total_programs > 0);
+    publishing = 0;
+    reset_counters();
+    assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch) ==
+           HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash, desired, SECTOR));
+    for (unsigned cut = 1; cut <= total_reads; ++cut) {
+        prepare_publication();
+        fail_read = cut;
+        int result = publish();
+        assert(result == HPCLANG_RPL_FLASH_FAILED || result == HPCLANG_RPL_FLASH_DIRTY);
+        if (result == HPCLANG_RPL_FLASH_FAILED)
+            assert(!programs);
+    }
+    for (unsigned cut = 1; cut <= total_programs; ++cut) {
+        prepare_publication();
+        fail_program = cut;
+        assert(publish() == HPCLANG_RPL_FLASH_DIRTY);
+    }
+    /* Occupation anywhere, including the next end marker, forbids all writes. */
+    for (unsigned i = 0; i <= HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES; ++i) {
+        prepare_publication();
+        flash[SLOT - FIRST + i] = 0;
+        assert(hpclang_rpl_flash_publish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                                HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_OCCUPIED);
+        assert(!programs && !erases);
+    }
+    prepare_publication();
+    silent_program = 1;
+    assert(publish() == HPCLANG_RPL_FLASH_DIRTY);
+    assert(flash[SLOT - FIRST] == 255);
+    publishing = 0;
 }
 
 int main(void)
@@ -152,5 +230,6 @@ int main(void)
     assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch - 1) ==
            HPCLANG_RPL_FLASH_INVALID);
     assert(!reads && !programs && !erases);
+    publication_tests();
     return 0;
 }

@@ -905,8 +905,8 @@ sector in a hidden native allocation outside that sector, with self/target
 addresses and a status-independent CRC32. Host tests inject corruption at every
 record byte, reject non-published status values and overlapping/out-of-bank
 locations, and cover overlapping input buffers; sanitizers and ARM analysis pass.
-This format is not yet published or accepted by whole-port recovery. Durable
-publication, erase/replay ordering, journal retirement, allocation ownership and
+This format is not yet used by public mutations or accepted by whole-port
+recovery. Transaction ordering, journal retirement, allocation ownership and
 startup integration remain required before any recovery claim.
 
 The internal sector replay primitive reads and validates that durable image,
@@ -916,8 +916,13 @@ repair and retry. Host tests interrupt every read and programming operation and
 every byte boundary of a partial erase, clear scratch RAM and replay from the
 retained Flash record; unrelated sectors remain unchanged. Corrupt/unpublished
 records cannot authorize erasure, and silent erase/program failures are detected.
-Focused sanitizers and ARM analysis pass. Public reclamation, journal publication
-and retirement, complete reference repair and startup recovery remain open.
+Focused sanitizers and ARM analysis pass. A separate publication primitive
+requires an erased reserved span and end marker, writes and verifies the whole
+body before publishing status, and leaves the target sector untouched. Host
+tests cut every read/program step, reject occupation at every byte and check
+publication followed by replay. It does not resume partial publication or select
+safe journal storage. Public reclamation, journal discovery and retirement,
+complete reference repair and startup recovery remain open.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
