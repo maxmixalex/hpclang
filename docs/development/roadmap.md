@@ -855,6 +855,13 @@ unresolved bytes also match a freshly installed Stock image, including the
 repeated-fill regions; those other entry semantics remain unresolved. Neither
 fill bytes nor a shared dispatcher justify treating an entry as reference-free.
 
+A native FlashTools PACK comparison on HP50g removes a deleted 32-byte record
+and preserves live payloads, but leaves library 275's catalog pointing to its
+old position after movement. The tool documents a Warmstart requirement for
+moved attached libraries. Reusing native compaction therefore still requires
+the active-reference and ARM-ownership work; it does not close the application
+return or interrupted-erase gates.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

@@ -1197,6 +1197,19 @@ decoding alone does not establish that reclamation is safe. Historical HPGCC3
 contents into TEMP before removing them; neither supplies a Flash-sector
 reclamation protocol. Flash still needs bank-qualified reference protection and
 recoverable sector erase/copy ordering.
+
+The independent [FlashTools 1.02](https://www.hpcalc.org/details/6545) package
+provides a useful native compaction comparison. Its supplied documentation
+requires following the Warmstart recommendation after moving attached libraries.
+In an isolated HP50g Stock probe, PACK removes one 32-byte deleted backup from
+the first user Flash bank and preserves all live record payloads. Library 275
+then moves by 64 nibbles, but its catalog binding still holds the old address:
+the old library-ID field reads 1606 while the relocated field reads 275.
+Changes stay within that bank. This confirms a live-reference obligation rather
+than a payload-copy failure; native PACK is not an accepted synchronous
+replacement for hpclang's application-safe reclamation service. The probe does
+not establish interrupted-erase recovery or safe return to an active ARM client.
+
 The internal `hpclang_rpl_entry_inspect` separates bounded RPL objects from an
 entry whose dispatch word equals its own address plus five. Known object
 prologues take precedence, even at an address where the two patterns coincide.
