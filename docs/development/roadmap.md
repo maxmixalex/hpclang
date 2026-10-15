@@ -1041,6 +1041,16 @@ This establishes variable-size placement for these probes, not runtime input
 validation or an accepted recovery launcher. Dedicated stack/workspace, cache
 reuse, actual recovery execution and cross-model acceptance remain open.
 
+The next native HP50g probe calls compiled freestanding C using an object-owned
+4 KiB stack and a 536-byte workspace, with the original ARM context restored
+before returning to Saturn. Independent state checks verify all 128 computed
+workspace values and their checksum, the C local-array and stack addresses,
+eight-byte stack alignment, both stack guards, unchanged code and object-owned
+placement. Stock then pushes the expected integer 124275; library 275 remains
+absent and Flash unchanged. This validates a C-call boundary for the probe;
+actual journal discovery/replay, sufficient recovery stack depth, cache reuse
+and cross-model behavior are still unaccepted.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
