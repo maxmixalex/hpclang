@@ -396,6 +396,45 @@ static void preflight_tests(void)
                                               &target) == HPCLANG_RPL_FLASH_INVALID);
 }
 
+static void restart_retirement_tests(void)
+{
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    const uint8_t statuses[] = {0x02, 0x40, 0x7c};
+    for (unsigned i = 0; i < sizeof statuses; ++i) {
+        prepare_preflight();
+        discovery_image(SLOT);
+        memcpy(original, flash, sizeof flash);
+        flash[SLOT - FIRST] = statuses[i];
+        memset(workspace, 0xa5, sizeof workspace);
+        uint32_t slot = 17, target = 19;
+        assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                                  &target) == HPCLANG_RPL_FLASH_SECTOR_RETIRING);
+        assert(slot == SLOT && target == FIRST && workspace[0] == 0x7e);
+        assert(flash[SLOT - FIRST] == statuses[i] && !programs && !erases);
+        /* A retirement cut never permits erasing/replaying the target. */
+        assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch) ==
+               HPCLANG_RPL_FLASH_INVALID);
+        assert(!programs && !erases);
+        flash[0] ^= 1;
+        slot = 17;
+        target = 19;
+        assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                                  &target) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(slot == 17 && target == 19 && !programs && !erases);
+        flash[0] ^= 1;
+        memset(workspace, 0, sizeof workspace);
+        assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                                  &target) == HPCLANG_RPL_FLASH_SECTOR_RETIRING);
+        publishing = 1;
+        assert(hpclang_rpl_flash_retire_sector(&io.flash, slot, workspace,
+                                               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_WRITTEN);
+        publishing = 0;
+        assert(!hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                                   &target));
+    }
+}
+
 int main(void)
 {
     for (unsigned i = 0; i < sizeof original; ++i)
@@ -470,5 +509,6 @@ int main(void)
     retirement_tests();
     discovery_tests();
     preflight_tests();
+    restart_retirement_tests();
     return 0;
 }

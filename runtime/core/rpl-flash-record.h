@@ -39,6 +39,22 @@ int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
 #define HPCLANG_RPL_FLASH_SECTOR_BYTES 4096u
 #define HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES (HPCLANG_RPL_FLASH_SECTOR_BYTES + 28u)
 
+enum hpclang_rpl_flash_sector_phase
+{
+    HPCLANG_RPL_FLASH_SECTOR_READY = 1,
+    HPCLANG_RPL_FLASH_SECTOR_RETIRING = 2,
+    HPCLANG_RPL_FLASH_SECTOR_RETIRED = 3
+};
+
+/* Validate a complete sector capsule and classify 7E-to-00 retirement cuts.
+ * Unpublished/partially published statuses are rejected. Outputs change only
+ * on success. RETIRING/RETIRED never authorize replay; recovery must verify the
+ * existing target before completing retirement. This is not freshness proof. */
+int hpclang_rpl_flash_sector_inspect(uint32_t first, uint32_t end, uint32_t slot,
+                                     const uint8_t *data, uint32_t bytes, uint32_t *target,
+                                     const uint8_t **image,
+                                     enum hpclang_rpl_flash_sector_phase *phase);
+
 /* Internal redo-image allocation (metadata 3, HPCSECT1), not yet
  * used by public mutations or recognized by whole-port recovery. It holds a
  * complete 4 KiB desired sector image, its target/self addresses and a status-independent

@@ -71,6 +71,20 @@ static void sector_images(void)
         int result = hpclang_rpl_flash_sector_decode(first, end, slot, record, sizeof record,
                                                      &target, &view);
         assert(result == (status == 0x7e ? 0 : HPCLANG_RPL_SPAN_MALFORMED));
+        target = 123;
+        view = NULL;
+        enum hpclang_rpl_flash_sector_phase phase = HPCLANG_RPL_FLASH_SECTOR_READY;
+        result = hpclang_rpl_flash_sector_inspect(first, end, slot, record, sizeof record, &target,
+                                                  &view, &phase);
+        if ((status & 0x7e) == status) {
+            assert(!result && target == first && view == record + 24);
+            assert(phase == (status == 0      ? HPCLANG_RPL_FLASH_SECTOR_RETIRED
+                             : status == 0x7e ? HPCLANG_RPL_FLASH_SECTOR_READY
+                                              : HPCLANG_RPL_FLASH_SECTOR_RETIRING));
+        } else {
+            assert(result == HPCLANG_RPL_SPAN_MALFORMED && target == 123 && !view);
+            assert(phase == HPCLANG_RPL_FLASH_SECTOR_READY);
+        }
     }
     record[0] = 0x7e;
     const uint32_t bad_slots[] = {first, first + 0x100, first + 0x105, first + 4096 - 2, end - 4096,

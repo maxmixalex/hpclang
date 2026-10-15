@@ -189,9 +189,10 @@ int hpclang_rpl_flash_retire_sector(const struct hpclang_rpl_flash_io *io, uint3
 
 /* Read-only discovery in one intact native bank. Validate its identity, walk
  * allocation boundaries (never search payload bytes), validate live objects,
- * require an erased tail and at most one committed sector journal. Unknown
- * active transactions and partial publication fail closed. Returns 1 found,
- * 0 absent or a negative write result; slot/target change only on 1. scratch
+ * require an erased tail and at most one ready/retiring sector journal. Unknown
+ * active transactions and partial publication fail closed. Returns sector phase
+ * READY (1), RETIRING (2), 0 absent or a negative write result; slot/target change
+ * only on positive results. Retired records are skipped as native tombstones. scratch
  * holds at least SECTOR_RECORD_BYTES. Caller keeps mapping and Flash stable.
  * This locates evidence, not erase authorization: all other banks, freshness,
  * restored-image validity and reference ownership still require validation.

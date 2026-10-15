@@ -252,6 +252,7 @@ int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_
     struct recovery_reader mapped = {io, bank};
     const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
     uint32_t found = io->end, destination = 0;
+    enum hpclang_rpl_flash_sector_phase phase = HPCLANG_RPL_FLASH_SECTOR_READY;
     for (uint32_t at = 0x20au; at <= 0x3fffeu;) {
         uint32_t status, header;
         int result = recovery_word(&reader, at, 2u, &status);
@@ -270,7 +271,7 @@ int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_
                 return 0;
             *slot = found;
             *target = destination;
-            return 1;
+            return phase;
         }
         if (at > 0x3fff8u)
             return HPCLANG_RPL_FLASH_DIRTY;
@@ -280,7 +281,7 @@ int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_
         uint32_t extent = header & 0xfffffu;
         if (extent < 11u || extent >= 0x40000u - at - 2u)
             return HPCLANG_RPL_FLASH_DIRTY;
-        if (status == 0x7eu && (header >> 20u) == 3u) {
+        if (status && (status & 0x7eu) == status && (header >> 20u) == 3u) {
             if (found != io->end || (at & 1u) ||
                 extent + 2u != HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES * 2u)
                 return HPCLANG_RPL_FLASH_DIRTY;
@@ -293,9 +294,9 @@ int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_
             }
             const uint8_t *image;
             found = bank + at / 2u;
-            if (hpclang_rpl_flash_sector_decode(io->first, io->end, found, scratch,
-                                                HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &destination,
-                                                &image))
+            if (hpclang_rpl_flash_sector_inspect(io->first, io->end, found, scratch,
+                                                 HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES,
+                                                 &destination, &image, &phase))
                 return HPCLANG_RPL_FLASH_DIRTY;
         } else if (status == 0x53u) {
             struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};

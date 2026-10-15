@@ -31,7 +31,7 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
         io->first > io->end || io->end - io->first != 6u * 0x20000u)
         return HPCLANG_RPL_FLASH_INVALID;
     uint32_t journal = io->end, destination = 0;
-    int damaged = 0;
+    int damaged = 0, phase = 0;
     for (uint32_t bank = io->first; bank < io->end; bank += 0x20000u) {
         uint32_t found, candidate_target;
         int result =
@@ -42,11 +42,12 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
         }
         if (result < 0)
             return result;
-        if (result == 1) {
+        if (result > 0) {
             if (journal != io->end)
                 return HPCLANG_RPL_FLASH_DIRTY;
             journal = found;
             destination = candidate_target;
+            phase = result;
         }
     }
     if (journal == io->end)
@@ -56,8 +57,17 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
     uint32_t found, candidate_target;
     int result = hpclang_rpl_flash_find_sector(io, journal & ~0x1ffffu, scratch, capacity, &found,
                                                &candidate_target);
-    if (result != 1 || found != journal || candidate_target != destination)
+    if (result != phase || found != journal || candidate_target != destination)
         return result < 0 ? result : HPCLANG_RPL_FLASH_DIRTY;
+    if (phase == HPCLANG_RPL_FLASH_SECTOR_RETIRING) {
+        for (uint32_t offset = 0; offset < HPCLANG_RPL_FLASH_SECTOR_BYTES; offset += 2u) {
+            uint16_t word;
+            if (!io->read16(io->context, destination + offset, &word))
+                return HPCLANG_RPL_FLASH_FAILED;
+            if (word != image_word(scratch + 24u, offset))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
     struct sector_overlay overlay = {io, destination, scratch + 24u};
     const struct hpclang_rpl_flash_io restored = {&overlay, overlay_read, NULL, io->first, io->end};
     unsigned journals = 0;
@@ -67,8 +77,9 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
             HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &found, &candidate_target);
         if (result < 0)
             return result;
-        if (result == 1) {
-            if (found != journal || candidate_target != destination || ++journals != 1)
+        if (result > 0) {
+            if (result != phase || found != journal || candidate_target != destination ||
+                ++journals != 1)
                 return HPCLANG_RPL_FLASH_DIRTY;
         }
     }
@@ -76,7 +87,10 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
         return HPCLANG_RPL_FLASH_DIRTY;
     *slot = journal;
     *target = destination;
-    return 1;
+    /* Normalize only the owned RAM copy for retire_sector's expected-record
+     * contract. Durable status is unchanged; the returned phase controls use. */
+    scratch[0] = 0x7eu;
+    return phase;
 }
 
 int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,

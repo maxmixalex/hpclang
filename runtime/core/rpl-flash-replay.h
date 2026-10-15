@@ -13,8 +13,12 @@ struct hpclang_rpl_flash_replay_io
  * through intact bank allocation chains, then overlay its image in RAM and
  * validate all six restored bank identities/chains/live CRCs/erased tails.
  * scratch has room for two SECTOR_RECORD_BYTES buffers, disjoint from IO state.
- * Returns 1 with slot/target, 0 for a clean port with no journal, or a negative
- * write result; outputs change only on 1. Multiple journals, unreadable storage
+ * Returns phase READY (1), RETIRING (2), 0 for a clean port with no journal, or a
+ * negative write result; outputs change only on positive results. RETIRING also
+ * requires the current target to match exactly, never permission to replay.
+ * The first scratch record is normalized to ready status in RAM for use as
+ * retire_sector's expected record; durable status remains unchanged.
+ * Multiple journals, unreadable storage
  * and damage outside the image fail closed. Keep Flash stable throughout.
  * Success proves structural consistency only, not transaction freshness,
  * name/ID uniqueness, reference correctness or authority to erase/return to

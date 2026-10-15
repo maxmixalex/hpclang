@@ -946,7 +946,12 @@ retirement status, each interrupted read, failed/silent programming and corrupti
 at every journal-body or target byte. An integrated host fixture discovers,
 preflights, replays, retires and revalidates a structurally clean port. Sanitizers
 and ARM analysis pass. Retirement requires the caller to finish reference repair
-first; automatic restart recognition of partial retirement and the public
+first. Discovery/preflight now distinguish ready and partially retired journals
+from their durable status. A retiring journal requires the actual target to
+match the image; replay rejects it without erasure. Tests clear scratch RAM,
+rediscover partial retirement, reject changed targets and finish retirement
+using only the durable record. The codec covers all 256 status values. Automatic
+startup invocation, reconstruction of reference obligations and the public
 reclamation transaction remain unimplemented.
 
 Qualified reference planning now separates source and target mappings before
