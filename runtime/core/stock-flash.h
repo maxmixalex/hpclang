@@ -29,7 +29,7 @@ int hpclang_stock_flash_append(uint32_t address, const uint8_t *record, uint32_t
  * Uses the recovery result/ownership contract from rpl-flash-write.h. */
 int hpclang_stock_flash_recover_tail(uint32_t bank_index);
 
-/* Whole-port FF-tail recovery under one exclusive mapping lease. This is an
+/* Whole-port interrupted-backup/FF-tail recovery under one mapping lease. This is an
  * explicit internal operation, not automatic startup repair. The caller must
  * resolve DIRTY before allowing native Flash mutation, as for recover_tail. */
 int hpclang_stock_flash_recover_tails(void);

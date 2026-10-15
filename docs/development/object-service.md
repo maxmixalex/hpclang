@@ -817,7 +817,10 @@ media fail without deleting the old record. This synchronous ordering does not
 provide power-loss recovery or reclaim the old allocation.
 The internal `hpclang_rpl_flash_recover_tails` primitive preflights identities
 and discard plans for all six user banks before recovering uncommitted bodies
-behind erased `FF` status markers. An unreadable or unknown later bank prevents
+behind erased `FF` status markers, plus complete backups with partially written
+`FF -> 53` or `53 -> 00` statuses. Those backups require valid CRC, allocation
+extent, metadata and erased padding; only their status is cleared to `00`.
+They never become live objects. An unreadable or unknown later bank prevents
 all writes. During commit, a backend error may leave earlier tails recovered;
 retry requires continued exclusive mapping ownership. Recovery changes only
 discard headers and preserves preceding live records and partial payloads.
@@ -829,14 +832,14 @@ Host restart tests also abort the actual append callback at every programming
 position with zero, partial and complete halfword programming, bypassing all
 returned-error cleanup. A fresh recovery invocation receives only the stored
 Flash bytes: FF tails are discarded, fully committed records remain unchanged,
-and partial status markers are rejected without mutation. The existing named
+and validated partial-status backups are tombstoned. The existing named
 backup and unrelated bytes survive each case. These are host fault-model tests,
 not evidence of calculator boot behavior after physical power loss.
 Separate saved-state Stock probes change only an otherwise complete backup's
 status: native RCL reports Undefined Name for `73` on HP49g+/HP50g and `03`
 on HP50g. Full Flash comparisons show no native repair beyond the injected byte.
-These samples do not establish all intermediate states or permission to repair
-an unknown allocation; the production parser continues to reject those states.
+These samples alone do not establish all intermediate states or permission to
+repair an unknown allocation; normal enumeration still rejects those states.
 The subsequent native backup matrix covers all 30 status values reachable
 while programming `FF -> 53 -> 00`, excluding the `FF` end marker itself.
 Each status has an independently named, CRC-valid backup, followed by a live
@@ -844,10 +847,12 @@ control backup. On HP49g+ and HP50g, native RCL sees only the `53` record and
 still recalls the later control; stored HOME results and complete Flash-image
 comparison verify visibility and absence of native repair. This establishes
 backup visibility, not record-integrity checks or library/cold-boot recovery.
-It supports investigating tombstones for validated interrupted backups;
-production recovery still rejects partially programmed statuses.
-This is not automatic startup repair: partial status commits, replacement intent
-and interrupted sector erasure still require separate recovery protocols.
+Explicit recovery uses tombstones for these validated interrupted backups.
+Other status patterns, partial libraries, invalid CRC/padding/metadata and damaged
+later banks are rejected without preflight writes. This is not automatic startup
+repair: power loss during recovery can create other status patterns, and library
+status recovery, replacement intent and interrupted sector erasure still require
+separate protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

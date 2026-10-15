@@ -136,6 +136,101 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
                : HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+struct recovery_status
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t address;
+};
+
+static int committed_status_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const struct recovery_status *view = context;
+    if (address == view->address || address == view->address + 1u) {
+        *value = address == view->address ? 3u : 5u;
+        return 1;
+    }
+    return view->reader->read_nibble(view->reader->context, address, value);
+}
+
+static int recovery_word(const struct hpclang_rpl_reader *reader, uint32_t address, unsigned width,
+                         uint32_t *value)
+{
+    *value = 0;
+    for (unsigned i = 0; i < width; ++i) {
+        uint8_t nibble;
+        if (!reader->read_nibble(reader->context, address + i, &nibble))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (nibble > 15u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        *value |= (uint32_t)nibble << (4u * i);
+    }
+    return 0;
+}
+
+static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, int apply)
+{
+    struct recovery_reader mapped = {io, bank};
+    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+    uint32_t at = 0x20au;
+    while (at <= 0x3fffeu) {
+        uint32_t status, header;
+        int result = recovery_word(&reader, at, 2u, &status);
+        if (result)
+            return result;
+        if (status == 0xffu) {
+            struct hpclang_rpl_flash_discard plan;
+            result = hpclang_rpl_flash_discard_plan(&reader, at, 0x40000u, &plan);
+            if (result < 0)
+                return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                              : HPCLANG_RPL_FLASH_DIRTY;
+            return apply ? hpclang_rpl_flash_recover_tail(io, bank + 0x105u, bank + 0x20000u)
+                         : HPCLANG_RPL_FLASH_WRITTEN;
+        }
+        if (at > 0x3fff8u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        result = recovery_word(&reader, at + 2u, 6u, &header);
+        if (result)
+            return result;
+        uint32_t extent = header & 0xfffffu;
+        if (extent < 11u || extent > 0x40000u - at - 2u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (status) {
+            int partial = status != 0x53u;
+            if (partial && ((at & 1u) || ((status & 0x53u) != 0x53u && (status & ~0x53u) != 0u)))
+                return HPCLANG_RPL_FLASH_DIRTY;
+            /* Read-only status substitution lets the ordinary parser validate
+             * the full object and CRC; it never publishes a live record. */
+            struct recovery_status view = {&reader, at};
+            const struct hpclang_rpl_reader committed = {committed_status_nibble, &view};
+            struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};
+            struct hpclang_rpl_port_entry entry;
+            result = hpclang_rpl_flash_next(&committed, &cursor, &entry);
+            if (result != 1)
+                return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                              : HPCLANG_RPL_FLASH_DIRTY;
+            if (partial) {
+                if (entry.prologue != 0x02b62u || (header >> 20u) != 1u ||
+                    (((entry.span + 15u) & ~7u) != extent + 2u &&
+                     ((entry.span + 11u) & ~3u) != extent + 2u))
+                    return HPCLANG_RPL_FLASH_DIRTY;
+                for (uint32_t pad = at + 8u + entry.span; pad < at + extent + 2u; ++pad) {
+                    uint32_t value;
+                    result = recovery_word(&reader, pad, 1u, &value);
+                    if (result)
+                        return result;
+                    if (value != 15u)
+                        return HPCLANG_RPL_FLASH_DIRTY;
+                }
+                const uint8_t deleted = 0;
+                if (apply && !write_bytes(io, bank + at / 2u, &deleted, 1u))
+                    return HPCLANG_RPL_FLASH_DIRTY;
+            }
+        }
+        at += extent + 2u;
+    }
+    return HPCLANG_RPL_FLASH_DIRTY;
+}
+
 int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
 {
     if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
@@ -148,21 +243,17 @@ int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
             return HPCLANG_RPL_FLASH_FAILED;
         if (identity != (0xf0u | ((index + 8u) << 8u)))
             return HPCLANG_RPL_FLASH_DIRTY;
-        struct recovery_reader mapped = {io, bank};
-        const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
-        struct hpclang_rpl_flash_discard plan;
-        int result = hpclang_rpl_flash_discard_plan(&reader, 0x20au, 0x40000u, &plan);
-        if (result < 0)
-            return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
-                                                          : HPCLANG_RPL_FLASH_DIRTY;
+        int result = recover_bank(io, bank, 0);
+        if (result)
+            return result;
     }
     /* Re-read under the caller's stable mapping/ownership. No potentially
      * repairable early bank is changed before every later bank is checked. */
     for (uint32_t index = 0; index < 6u; ++index) {
         uint32_t bank = io->first + index * 0x20000u;
-        int result = hpclang_rpl_flash_recover_tail(io, bank + 0x105u, bank + 0x20000u);
+        int result = recover_bank(io, bank, 1);
         if (result)
-            return result;
+            return HPCLANG_RPL_FLASH_DIRTY;
     }
     return HPCLANG_RPL_FLASH_WRITTEN;
 }

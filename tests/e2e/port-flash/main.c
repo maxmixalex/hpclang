@@ -227,6 +227,39 @@ int main(void)
         hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) != HPCLANG_SST_OK ||
         fingerprint() != before)
         goto done;
+    /* With no retained transaction intent, recovery must keep an interrupted
+     * backup invisible. Preserve its complete body rather than committing it. */
+    const uint8_t interrupted_statuses[] = {0x73, 0x03};
+    for (unsigned i = 0; i < sizeof interrupted_statuses; ++i) {
+        block[1] = interrupted_statuses[i];
+        failure = 31;
+        if (hpclang_stock_flash_program(bank + 0x104u, block, sizeof native_record + 2u) !=
+                HPCLANG_SST_OK ||
+            hpclang_stock_flash_recover_tails() != HPCLANG_RPL_FLASH_WRITTEN)
+            goto done;
+        block[1] = 0;
+        failure = 32;
+        for (uint32_t offset = 0; offset < sizeof native_record + 2u; offset += 2u)
+            if (hpclang_flash_read16(0, bank + 0x104u + offset) !=
+                ((uint16_t)block[offset] | (uint16_t)block[offset + 1u] << 8u))
+                goto done;
+        object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+        if (object || errno != ENOENT) {
+            hpclang_object_release(object);
+            goto done;
+        }
+        failure = 33;
+        uint32_t discarded = fingerprint();
+        if (hpclang_stock_flash_recover_tails() != HPCLANG_RPL_FLASH_WRITTEN ||
+            fingerprint() != discarded || l1[0] != original[0] || l1[1] != original[1])
+            goto done;
+        failure = 34;
+        if (hpclang_stock_flash_erase_sector(bank) != HPCLANG_SST_OK ||
+            hpclang_stock_flash_program(bank, saved_sector, sizeof saved_sector) !=
+                HPCLANG_SST_OK ||
+            fingerprint() != before)
+            goto done;
+    }
     /* Independently locate the expected first-fit tail, preserving its entire
      * sector (including existing native objects) for restoration afterwards. */
     failure = 26;

@@ -522,6 +522,12 @@ HP49g+/HP50g Stock tests pass recovery followed by backup append/public read,
 repeat recovery without changes, normal return and byte-for-byte Flash restoration.
 This handles an FF-marked interrupted body; partially published status bytes,
 restart integration and power-loss transaction guarantees remain unfinished.
+Whole-port explicit recovery now preflights all six banks and can tombstone
+complete, CRC-valid backups whose status stopped during `FF -> 53 -> 00`,
+preserving their contents and native invisibility. Fault tests bypass append
+cleanup and restart using only Flash bytes. Recovery interrupted again, partial
+library statuses, replacement intent, startup integration and sector reclamation
+remain open; this does not close the power-loss requirement.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status
