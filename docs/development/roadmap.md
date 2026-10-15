@@ -565,8 +565,11 @@ checks and a single-active-intent gate reject inconsistent transactions without
 writes. Incomplete new bodies hidden by FF now roll back using the exact
 reservation and a durable zero-metadata discard marker, retaining the old value.
 The intent is resolved before generic cleanup regardless of bank order; host
-tests cover interrupted body programming and repeated rollback cuts. Partially
-published new status bytes and normal replacement integration remain open.
+tests cover interrupted body programming and repeated rollback cuts. Partial
+FF-to-53 publication now finishes only after validating a ready intent, live old
+value and complete matching new body, then deletes the old value. All new status
+bytes and repeated publication cuts are covered. Normal replacement integration
+and its returned-error handling remain open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

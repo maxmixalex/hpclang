@@ -275,9 +275,10 @@ static int recover_intent(const struct hpclang_rpl_flash_io *io, uint32_t bank, 
     if (!io->read16(io->context, intent.new_slot & ~1u, &new_word))
         return HPCLANG_RPL_FLASH_FAILED;
     uint32_t new_status = (new_word >> ((intent.new_slot & 1u) * 8u)) & 255u;
-    if (new_status == 0x53u) {
+    if (new_status != 0xffu && (new_status & 0x53u) == 0x53u) {
         if (phase == HPCLANG_RPL_FLASH_INTENT_UNPUBLISHED ||
-            (phase == HPCLANG_RPL_FLASH_INTENT_RETIRING && status))
+            (phase == HPCLANG_RPL_FLASH_INTENT_RETIRING && status) ||
+            (new_status != 0x53u && (phase != HPCLANG_RPL_FLASH_INTENT_READY || status != 0x53u)))
             return HPCLANG_RPL_FLASH_DIRTY;
         struct hpclang_rpl_port_entry new_entry;
         result = intent_backup(io, intent.new_slot, intent.new_bytes, intent.new_crc, &new_entry);
@@ -286,7 +287,9 @@ static int recover_intent(const struct hpclang_rpl_flash_io *io, uint32_t bank, 
         if (old_entry.name_length != new_entry.name_length ||
             memcmp(old_entry.name, new_entry.name, old_entry.name_length))
             return HPCLANG_RPL_FLASH_DIRTY;
-        if (apply && (hpclang_rpl_flash_finish_remove(io, intent.old_slot) ||
+        const uint8_t live = 0x53u;
+        if (apply && (!write_bytes(io, intent.new_slot, &live, 1u) ||
+                      hpclang_rpl_flash_finish_remove(io, intent.old_slot) ||
                       !discard_status(io, bank + at / 2u)))
             return HPCLANG_RPL_FLASH_DIRTY;
         return HPCLANG_RPL_FLASH_WRITTEN;

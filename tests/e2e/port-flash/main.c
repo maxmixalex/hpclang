@@ -474,6 +474,55 @@ int main(void)
     hpclang_object_release(object);
     if (!valid)
         goto done;
+    /* A fully verified body with an interrupted FF-to-53 publication must
+     * finish publishing before recovery deletes the original backup. */
+    failure = 42;
+    replacement = replacement_record(&replacement_bytes);
+    if (!replacement)
+        goto done;
+    prepared = hpclang_rpl_flash_plan_replace(&plan_io, replacement, replacement_bytes, &plan);
+    if (prepared || (plan.intent_slot & ~4095u) != create_sector ||
+        plan.intent.new_slot + plan.intent.new_bytes > create_sector + sizeof saved_sector) {
+        free(replacement);
+        goto done;
+    }
+    published =
+        hpclang_rpl_flash_publish_intent(&publish_io, replacement, replacement_bytes, &plan);
+    replacement[0] = 0x7f;
+    uint32_t aligned = plan.intent.new_slot & ~1u;
+    uint32_t offset = plan.intent.new_slot & 1u;
+    uint32_t physical_bytes = (offset + replacement_bytes + 1u) & ~1u;
+    if (physical_bytes > sizeof block) {
+        free(replacement);
+        goto done;
+    }
+    for (uint32_t i = 0; i < physical_bytes; ++i) {
+        uint32_t address = aligned + i;
+        block[i] = (uint8_t)(hpclang_flash_read16(0, address & ~1u) >> ((address & 1u) * 8u));
+        if (i >= offset && i - offset < replacement_bytes)
+            block[i] = replacement[i - offset];
+    }
+    int partial =
+        published ? published : hpclang_stock_flash_program(aligned, block, physical_bytes);
+    free(replacement);
+    if (partial)
+        goto done;
+    failure = 43;
+    if (hpclang_stock_flash_recover_tails() ||
+        ((hpclang_flash_read16(0, plan.intent.old_slot & ~1u) >>
+          ((plan.intent.old_slot & 1u) * 8u)) &
+         255u) ||
+        ((hpclang_flash_read16(0, plan.intent.new_slot & ~1u) >>
+          ((plan.intent.new_slot & 1u) * 8u)) &
+         255u) != 0x53u)
+        goto done;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 986;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||
         hpclang_stock_flash_program(create_sector, saved_sector, sizeof saved_sector) !=

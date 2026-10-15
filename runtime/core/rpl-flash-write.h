@@ -71,7 +71,9 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * behind FF is discarded using the exact reservation and zero metadata while
  * keeping the old value live; repeated cuts resume from this discard marker.
  * Resolve the intent before ordinary tail cleanup, regardless of bank order.
- * Partially published new status bytes still require further recovery support.
+ * A partially published new status compatible with FF-to-53 requires a ready
+ * intent, live old value and fully verified new body; finish its publication
+ * before deleting the old value. This excludes FF, which rolls back instead.
  * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
  * the record. Partial libraries and other unknown encodings remain DIRTY.

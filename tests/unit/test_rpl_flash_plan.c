@@ -339,7 +339,7 @@ static void cut_committed_recovery(const struct hpclang_rpl_flash_io *io)
     cut_program = UINT32_MAX;
 }
 
-static void restart_committed_recovery(const struct hpclang_rpl_flash_io *io)
+static void restart_committed_recovery(const struct hpclang_rpl_flash_io *io, uint8_t status)
 {
     uint32_t bytes;
     uint8_t *replacement = replacement_record(&bytes);
@@ -348,6 +348,7 @@ static void restart_committed_recovery(const struct hpclang_rpl_flash_io *io)
     allow_program = 1;
     assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
     assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+    flash[plan.intent.new_slot - base] = status;
     memcpy(before, flash, sizeof flash);
     write_calls = 0;
     assert(!hpclang_rpl_flash_recover_tails(io));
@@ -366,7 +367,8 @@ static void restart_committed_recovery(const struct hpclang_rpl_flash_io *io)
                 assert(flash[offset] ==
                        (offset == plan.intent.old_slot - base || offset == plan.intent_slot - base
                             ? 0
-                            : before[offset]));
+                        : offset == plan.intent.new_slot - base ? 0x53u
+                                                                : before[offset]));
         }
     }
     free(replacement);
@@ -412,10 +414,12 @@ static void partial_body_recovery(const struct hpclang_rpl_flash_io *io)
                 partial_mask = masks[m];
                 cut_program = at;
                 cut_append(io, plan.intent.new_slot, replacement, bytes);
-                /* Publication-status interruption is a separate transition;
-                 * this matrix covers all body/header programming cuts. */
-                if (flash[slot] != 0xff)
+                if (flash[slot] != 0xff) {
+                    assert(!hpclang_rpl_flash_recover_tails(io));
+                    assert(!flash[plan.intent.old_slot - base] && !flash[journal]);
+                    assert(!memcmp(flash + slot, replacement, bytes));
                     continue;
+                }
                 memcpy(pending, flash, sizeof flash);
                 write_calls = 0;
                 assert(!hpclang_rpl_flash_recover_tails(io));
@@ -478,6 +482,55 @@ static void partial_body_rejections(const struct hpclang_rpl_flash_io *io)
     }
 }
 
+static void publication_status_recovery(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t bytes;
+    uint8_t *replacement = replacement_record(&bytes);
+    for (unsigned status = 0; status < 256u; ++status) {
+        init();
+        allow_program = 1;
+        struct hpclang_rpl_flash_replace_plan plan;
+        assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
+        assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+        uint32_t slot = plan.intent.new_slot - base;
+        flash[slot] = (uint8_t)status;
+        memcpy(before, flash, sizeof flash);
+        write_calls = 0;
+        int result = hpclang_rpl_flash_recover_tails(io);
+        if (status != 0xffu && (status & 0x53u) == 0x53u) {
+            assert(!result && !flash[plan.intent.old_slot - base]);
+            assert(!memcmp(flash + slot, replacement, bytes));
+        } else if (status == 0xffu) {
+            assert(!result && !memcmp(flash + plan.intent.old_slot - base, record, sizeof record));
+            assert(!flash[slot]);
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY);
+            assert(!write_calls && !memcmp(before, flash, sizeof flash));
+        }
+    }
+    for (unsigned fault = 0; fault < 4; ++fault) {
+        init();
+        allow_program = 1;
+        struct hpclang_rpl_flash_replace_plan plan;
+        assert(!hpclang_rpl_flash_publish_intent(io, replacement, bytes, &plan));
+        assert(!hpclang_rpl_flash_append(io, plan.intent.new_slot, replacement, bytes));
+        flash[plan.intent.new_slot - base] = 0x7f;
+        if (fault == 0)
+            flash[plan.intent.old_slot - base] = 0;
+        else if (fault == 1)
+            flash[plan.intent_slot - base] = 0x7f;
+        else if (fault == 2)
+            flash[plan.intent_slot - base] = 0x7c;
+        else
+            flash[plan.intent.new_slot - base + 5u] ^= 1u;
+        memcpy(before, flash, sizeof flash);
+        write_calls = 0;
+        assert(hpclang_rpl_flash_recover_tails(io) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!write_calls && !memcmp(before, flash, sizeof flash));
+    }
+    free(replacement);
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read16, program16, base, base + sizeof flash};
@@ -533,8 +586,10 @@ int main(void)
     reject_changed_intent(&io);
     committed_recovery(&io);
     committed_rejections(&io);
-    restart_committed_recovery(&io);
+    restart_committed_recovery(&io, 0x53u);
+    restart_committed_recovery(&io, 0x7fu);
     partial_body_recovery(&io);
     partial_body_rejections(&io);
+    publication_status_recovery(&io);
     return 0;
 }

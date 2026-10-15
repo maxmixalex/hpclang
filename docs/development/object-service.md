@@ -939,8 +939,16 @@ Whole-port preflight still precedes all writes; the active intent is resolved
 before generic cleanup, independent of bank order. Host tests interrupt every
 new-body programming position and every rollback write with partial halfword
 masks. Invalid phases, changed old values, incompatible headers and data beyond
-the reservation fail without writes. Partially published new status bytes and
-public replacement's use of the journal remain unfinished.
+the reservation fail without writes.
+A partially published new status on the FF-to-53 path requires a ready intent,
+an unchanged live old backup and a completely verified new backup. Recovery
+finishes and verifies the new status before deleting the old value and retiring
+the journal. FF still takes the rollback path even when its body is complete.
+Tests enumerate all 256 new statuses, interrupt actual append publication in
+both bank orders and cut the recovery publication itself. Invalid phases,
+premature old deletion and corrupt new bodies fail without writes.
+Public replacement's use of the journal remains unfinished; its legacy returned
+error cleanup is not yet part of this durable transaction protocol.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and
