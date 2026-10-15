@@ -175,6 +175,20 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
 
+/* Read-only discovery in one intact native bank. Validate its identity, walk
+ * allocation boundaries (never search payload bytes), validate live objects,
+ * require an erased tail and at most one committed sector journal. Unknown
+ * active transactions and partial publication fail closed. Returns 1 found,
+ * 0 absent or a negative write result; slot/target change only on 1. scratch
+ * holds at least SECTOR_RECORD_BYTES. Caller keeps mapping and Flash stable.
+ * This locates evidence, not erase authorization: all other banks, freshness,
+ * restored-image validity and reference ownership still require validation.
+ * Recovery from a damaged target bank needs an intact journal bank; this does
+ * not discover records beyond a broken allocation chain or implement startup. */
+int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_t bank,
+                                  uint8_t *scratch, uint32_t capacity, uint32_t *slot,
+                                  uint32_t *target);
+
 /* Replace exactly one existing backup without relocating its payload. Validate
  * all banks, publish a durable intent, write the complete replacement, then
  * recover the intent to tombstone the old record and retire the journal.

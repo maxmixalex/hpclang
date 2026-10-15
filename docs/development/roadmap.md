@@ -924,6 +924,16 @@ publication followed by replay. It does not resume partial publication or select
 safe journal storage. Public reclamation, journal discovery and retirement,
 complete reference repair and startup recovery remain open.
 
+Read-only discovery can now locate a committed sector journal in an intact
+native bank, checking bank identity, allocation boundaries, live-object CRCs,
+journal integrity, uniqueness and the complete erased tail before returning
+its location. A valid-looking journal embedded in a deleted payload is ignored;
+corrupt tails, objects and conflicting journals fail without writes. The target
+bank can already be damaged because this scan reads only the journal bank.
+This does not traverse a broken journal-bank chain, arbitrate transactions across
+banks or authorize replay. Recovery planning must retain an independently
+discoverable journal and validate the restored bank and references before use.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

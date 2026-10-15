@@ -208,6 +208,83 @@ static int recovery_word(const struct hpclang_rpl_reader *reader, uint32_t addre
     return 0;
 }
 
+int hpclang_rpl_flash_find_sector(const struct hpclang_rpl_flash_io *io, uint32_t bank,
+                                  uint8_t *scratch, uint32_t capacity, uint32_t *slot,
+                                  uint32_t *target)
+{
+    if (!io || !io->read16 || !scratch || !slot || !target ||
+        capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES || (io->first & 0x1ffffu) ||
+        io->first > io->end || io->end - io->first != 6u * 0x20000u || bank < io->first ||
+        bank >= io->end || (bank & 0x1ffffu))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t identity;
+    if (!io->read16(io->context, bank + 0x100u, &identity))
+        return HPCLANG_RPL_FLASH_FAILED;
+    if (identity != (0xf0u | ((8u + (bank - io->first) / 0x20000u) << 8u)))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct recovery_reader mapped = {io, bank};
+    const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
+    uint32_t found = io->end, destination = 0;
+    for (uint32_t at = 0x20au; at <= 0x3fffeu;) {
+        uint32_t status, header;
+        int result = recovery_word(&reader, at, 2u, &status);
+        if (result)
+            return result;
+        if (status == 0xffu) {
+            for (uint32_t tail = at + 2u; tail < 0x40000u; ++tail) {
+                uint32_t value;
+                result = recovery_word(&reader, tail, 1u, &value);
+                if (result)
+                    return result;
+                if (value != 15u)
+                    return HPCLANG_RPL_FLASH_DIRTY;
+            }
+            if (found == io->end)
+                return 0;
+            *slot = found;
+            *target = destination;
+            return 1;
+        }
+        if (at > 0x3fff8u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        result = recovery_word(&reader, at + 2u, 6u, &header);
+        if (result)
+            return result;
+        uint32_t extent = header & 0xfffffu;
+        if (extent < 11u || extent >= 0x40000u - at - 2u)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (status == 0x7eu && (header >> 20u) == 3u) {
+            if (found != io->end || (at & 1u) ||
+                extent + 2u != HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES * 2u)
+                return HPCLANG_RPL_FLASH_DIRTY;
+            for (uint32_t i = 0; i < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES; ++i) {
+                uint32_t value;
+                result = recovery_word(&reader, at + i * 2u, 2u, &value);
+                if (result)
+                    return result;
+                scratch[i] = (uint8_t)value;
+            }
+            const uint8_t *image;
+            found = bank + at / 2u;
+            if (hpclang_rpl_flash_sector_decode(io->first, io->end, found, scratch,
+                                                HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &destination,
+                                                &image))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        } else if (status == 0x53u) {
+            struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};
+            struct hpclang_rpl_port_entry entry;
+            result = hpclang_rpl_flash_next(&reader, &cursor, &entry);
+            if (result != 1)
+                return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                              : HPCLANG_RPL_FLASH_DIRTY;
+        } else if (status) {
+            return HPCLANG_RPL_FLASH_DIRTY;
+        }
+        at += extent + 2u;
+    }
+    return HPCLANG_RPL_FLASH_DIRTY;
+}
+
 static int allocation_start(const struct hpclang_rpl_flash_io *io, uint32_t slot)
 {
     uint32_t bank = io->first + ((slot - io->first) / 0x20000u) * 0x20000u;

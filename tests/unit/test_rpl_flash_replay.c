@@ -160,6 +160,90 @@ static void publication_tests(void)
     publishing = 0;
 }
 
+static void prepare_discovery(void)
+{
+    reset_counters();
+    memset(flash, 255, sizeof flash);
+    flash[0x20100] = 0xf0;
+    flash[0x20101] = 9;
+}
+
+static void discovery_image(uint32_t address)
+{
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, address, FIRST, desired,
+                                            flash + address - FIRST,
+                                            HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES));
+}
+
+static void discovery_tests(void)
+{
+    const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46,
+                              0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
+                              0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
+    uint32_t slot = 17, target = 19;
+    prepare_discovery();
+    assert(!hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                          &target));
+    assert(slot == 17 && target == 19);
+    discovery_image(SLOT);
+    /* The target bank need not be readable as an allocation chain yet. */
+    memset(flash, 0, SECTOR);
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == 1);
+    assert(slot == SLOT && target == FIRST && !programs && !erases);
+    slot = 17;
+    target = 19;
+    flash[0x20101] = 8;
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_DIRTY);
+    flash[0x20101] = 9;
+    flash[0x3ffff] = 0;
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == 17 && target == 19);
+    flash[0x3ffff] = 255;
+    discovery_image(SLOT + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == 17 && target == 19);
+
+    /* A valid self-addressed capsule inside a deleted object's payload is not
+     * a transaction. Discovery must follow the outer allocation's extent. */
+    prepare_discovery();
+    discovery_image(SLOT + 4);
+    unsigned extent = (HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES + 8) * 2 - 2;
+    flash[SLOT - FIRST] = 0;
+    flash[SLOT - FIRST + 1] = (uint8_t)extent;
+    flash[SLOT - FIRST + 2] = (uint8_t)(extent >> 8);
+    flash[SLOT - FIRST + 3] = (uint8_t)(extent >> 16);
+    assert(!hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                          &target));
+    assert(slot == 17 && target == 19);
+    prepare_discovery();
+    discovery_image(SLOT);
+    flash[SLOT - FIRST + 25] ^= 1;
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_DIRTY);
+    discovery_image(SLOT);
+    reset_counters();
+    fail_read = 10;
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_FAILED);
+    assert(slot == 17 && target == 19 && !programs && !erases);
+    prepare_discovery();
+    memcpy(flash + SLOT - FIRST, backup, sizeof backup);
+    discovery_image(SLOT + sizeof backup);
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == 1);
+    assert(slot == SLOT + sizeof backup && target == FIRST);
+    slot = 17;
+    target = 19;
+    flash[SLOT - FIRST + 29] ^= 1; /* Bad live-object CRC before journal. */
+    assert(hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
+                                         &target) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == 17 && target == 19);
+}
+
 int main(void)
 {
     for (unsigned i = 0; i < sizeof original; ++i)
@@ -231,5 +315,6 @@ int main(void)
            HPCLANG_RPL_FLASH_INVALID);
     assert(!reads && !programs && !erases);
     publication_tests();
+    discovery_tests();
     return 0;
 }
