@@ -1009,6 +1009,13 @@ the journal and all other Flash bytes. A subsequent native restart rebuilds both
 library bindings at the correct addresses without modifying Flash or the active
 journal. This verifies native coexistence and restored-data acceptance, not
 on-calculator execution of the recovery entry or automatic power-loss recovery.
+An independently assembled minimal entry probe now runs on the damaged-bank
+HP50g state with library 275 absent: native ARMSYS executes owned ARM code that
+writes a marker, returns to Saturn and continues to push integer 124275. Flash
+is unchanged. The private experiment aligns code and patches its entry address
+inside the deposited object's owned RAM while the emulator is stopped. It proves
+the entry/return boundary only; on-calculator placement/relocation, memory
+ownership, HPC1 integration and an executable recovery application remain open.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
