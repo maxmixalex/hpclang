@@ -291,16 +291,45 @@ static int recover_intent(const struct hpclang_rpl_flash_io *io, uint32_t bank, 
             return HPCLANG_RPL_FLASH_DIRTY;
         return HPCLANG_RPL_FLASH_WRITTEN;
     }
-    /* An unstarted transaction may be aborted only with the old value live
-     * and its complete new reservation erased. Partial new bodies remain open. */
+    /* Roll back an unpublished body while retaining the exact reservation.
+     * Zero metadata is made durable before any status bit is cleared, so a
+     * second interruption is distinguishable from an incomplete backup. */
     if (status != 0x53u)
         return HPCLANG_RPL_FLASH_DIRTY;
+    int erased = 1;
+    uint32_t header = 0;
     for (uint32_t i = 0; i < intent.new_bytes; ++i) {
         uint32_t address = intent.new_slot + i;
         uint16_t word;
         if (!io->read16(io->context, address & ~1u, &word))
             return HPCLANG_RPL_FLASH_FAILED;
-        if (((word >> ((address & 1u) * 8u)) & 255u) != 255u)
+        uint32_t byte = (word >> ((address & 1u) * 8u)) & 255u;
+        if (byte != 255u)
+            erased = 0;
+        if (i >= 1u && i <= 3u)
+            header |= byte << ((i - 1u) * 8u);
+    }
+    if (!erased) {
+        uint32_t extent = intent.new_bytes * 2u - 2u;
+        int discarded = !(new_status & 1u) && header == extent;
+        if (phase == HPCLANG_RPL_FLASH_INTENT_UNPUBLISHED ||
+            (phase == HPCLANG_RPL_FLASH_INTENT_RETIRING && new_status) ||
+            (!discarded && (new_status != 0xffu || (header & extent) != extent)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        /* The reservation was an erased tail when planned. Reject stale
+         * evidence if another allocation or dirty data now follows it. */
+        uint32_t end = io->first + ((intent.new_slot - io->first) / 0x20000u + 1u) * 0x20000u;
+        for (uint32_t address = intent.new_slot + intent.new_bytes; address < end; ++address) {
+            uint16_t word;
+            if (!io->read16(io->context, address & ~1u, &word))
+                return HPCLANG_RPL_FLASH_FAILED;
+            if (((word >> ((address & 1u) * 8u)) & 255u) != 255u)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+        const uint8_t marker[] = {(uint8_t)extent, (uint8_t)(extent >> 8u),
+                                  (uint8_t)(extent >> 16u)};
+        if (apply && (!write_bytes(io, intent.new_slot + 1u, marker, sizeof marker) ||
+                      !discard_status(io, intent.new_slot)))
             return HPCLANG_RPL_FLASH_DIRTY;
     }
     if (apply && !discard_status(io, bank + at / 2u))
@@ -309,7 +338,7 @@ static int recover_intent(const struct hpclang_rpl_flash_io *io, uint32_t bank, 
 }
 
 static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, int apply,
-                        unsigned *intents)
+                        uint32_t *intent_slot)
 {
     struct recovery_reader mapped = {io, bank};
     const struct hpclang_rpl_reader reader = {io_nibble, &mapped};
@@ -339,8 +368,11 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         if (status && status != 0x53u && (header >> 20u) == 2u) {
             if ((at & 1u) || extent + 2u != HPCLANG_RPL_FLASH_INTENT_BYTES * 2u)
                 return HPCLANG_RPL_FLASH_DIRTY;
-            if (intents && ++*intents > 1u)
-                return HPCLANG_RPL_FLASH_DIRTY;
+            if (intent_slot) {
+                if (*intent_slot != io->end)
+                    return HPCLANG_RPL_FLASH_DIRTY;
+                *intent_slot = bank + at / 2u;
+            }
             result = recover_intent(io, bank, at, apply);
             if (result)
                 return result;
@@ -407,7 +439,7 @@ int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
     if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
         io->first > io->end || io->end - io->first != 6u * 0x20000u)
         return HPCLANG_RPL_FLASH_INVALID;
-    unsigned intents = 0;
+    uint32_t intent_slot = io->end;
     for (uint32_t index = 0; index < 6u; ++index) {
         uint32_t bank = io->first + index * 0x20000u;
         uint16_t identity;
@@ -415,12 +447,19 @@ int hpclang_rpl_flash_recover_tails(const struct hpclang_rpl_flash_io *io)
             return HPCLANG_RPL_FLASH_FAILED;
         if (identity != (0xf0u | ((index + 8u) << 8u)))
             return HPCLANG_RPL_FLASH_DIRTY;
-        int result = recover_bank(io, bank, 0, &intents);
+        int result = recover_bank(io, bank, 0, &intent_slot);
         if (result)
             return result;
     }
     /* Re-read under the caller's stable mapping/ownership. No potentially
      * repairable early bank is changed before every later bank is checked. */
+    if (intent_slot != io->end) {
+        uint32_t bank = io->first + ((intent_slot - io->first) / 0x20000u) * 0x20000u;
+        /* Resolve the transaction before generic cleanup can change either
+         * target, including when the journal lives in a later bank. */
+        if (recover_intent(io, bank, (intent_slot - bank) * 2u, 1))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
     for (uint32_t index = 0; index < 6u; ++index) {
         uint32_t bank = io->first + index * 0x20000u;
         int result = recover_bank(io, bank, 1, NULL);

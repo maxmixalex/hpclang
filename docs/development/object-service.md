@@ -917,7 +917,7 @@ matches its type, allocation length, native CRC and recorded CRC32, and the new
 reservation remains entirely erased. Publication cuts behind FF use ordinary
 dirty-tail recovery; complete unpublished/ready/retiring intents use the validated
 abort. Corrupt intent data and stale old contents are rejected before any recovery
-writes; a non-erased new reservation requires the committed-value path below.
+writes; non-erased reservations require one of the validated recovery paths below.
 Host tests cut each publication write,
 inject returned errors/readback failures and verify recovery without transaction
 RAM state.
@@ -929,8 +929,18 @@ the old deletion to have already completed. Unpublished intents with a committed
 new value, mismatched names/content, interior addresses and multiple active
 intents are rejected before any writes. Host tests cover all old-deletion states,
 same/cross-bank layouts and hard cuts while deleting the old status or retiring
-the journal. Recovery of an incomplete new value and public replacement's use of
-the journal remain unfinished.
+the journal.
+For an incomplete new body still hidden by FF, recovery requires the original
+backup to remain live, a published intent, a NOR-compatible reserved extent and
+an erased remainder of the bank. It verifies the exact reserved extent with
+zero metadata before clearing the new status, then retires the intent. This
+preserves both payloads and resumes from the discard marker after another cut.
+Whole-port preflight still precedes all writes; the active intent is resolved
+before generic cleanup, independent of bank order. Host tests interrupt every
+new-body programming position and every rollback write with partial halfword
+masks. Invalid phases, changed old values, incompatible headers and data beyond
+the reservation fail without writes. Partially published new status bytes and
+public replacement's use of the journal remain unfinished.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and

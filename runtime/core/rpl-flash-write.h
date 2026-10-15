@@ -67,7 +67,11 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * A committed new backup requires both exact allocation starts, lengths,
  * checksums and matching names; recovery finishes old-status deletion before
  * retiring the intent. Only one active intent is accepted per port. Changed
- * targets, impossible phase ordering and partial new writes remain DIRTY.
+ * targets and impossible phase ordering remain DIRTY. An incomplete new body
+ * behind FF is discarded using the exact reservation and zero metadata while
+ * keeping the old value live; repeated cuts resume from this discard marker.
+ * Resolve the intent before ordinary tail cleanup, regardless of bank order.
+ * Partially published new status bytes still require further recovery support.
  * Clearing a hidden status
  * first clears and verifies a required live bit, so interruption cannot publish
  * the record. Partial libraries and other unknown encodings remain DIRTY.

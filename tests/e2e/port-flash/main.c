@@ -444,6 +444,36 @@ int main(void)
     hpclang_object_release(object);
     if (!valid)
         goto done;
+    /* An interrupted new body is not a native object. Recover using the
+     * durable reservation, retaining the current value and later tail. */
+    failure = 40;
+    replacement = replacement_record(&replacement_bytes);
+    if (!replacement)
+        goto done;
+    prepared = hpclang_rpl_flash_plan_replace(&plan_io, replacement, replacement_bytes, &plan);
+    if (prepared || (plan.intent_slot & ~4095u) != create_sector ||
+        plan.intent.new_slot + plan.intent.new_bytes > create_sector + sizeof saved_sector) {
+        free(replacement);
+        goto done;
+    }
+    published =
+        hpclang_rpl_flash_publish_intent(&publish_io, replacement, replacement_bytes, &plan);
+    free(replacement);
+    if (published || !intent_program(0, (plan.intent.new_slot + 6u) & ~1u, 0))
+        goto done;
+    failure = 41;
+    if (hpclang_stock_flash_recover_tails() ||
+        ((hpclang_flash_read16(0, plan.intent.new_slot & ~1u) >>
+          ((plan.intent.new_slot & 1u) * 8u)) &
+         255u))
+        goto done;
+    object = hpclang_port_backup_get(2, (const uint8_t *)"FLASHONE", 8);
+    if (!object)
+        goto done;
+    valid = !hpclang_object_integer_i64(object, &value) && value == 986;
+    hpclang_object_release(object);
+    if (!valid)
+        goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||
         hpclang_stock_flash_program(create_sector, saved_sector, sizeof saved_sector) !=
