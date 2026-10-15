@@ -1074,6 +1074,18 @@ intact and Flash unchanged. Actual writes remain gated on the recovery runtime:
 linking the shared Timer0/RTC clock also requires its libc TLS/errno environment,
 which the minimal freestanding probe does not yet initialize.
 
+A subsequent native HP50g probe includes object-owned static TLS and the actual
+shared Timer0/RTC clock modules. Its packaged extent now includes initialized
+TLS bytes and zero-filled TLS storage; an error-path test exposed and corrected
+an earlier probe packaging omission before any Flash writes were attempted.
+Native checks verify the TLS initial value and mutation, EINVAL from a null
+time-read output, the errno address inside the owned image, and a clock advance
+of at least one millisecond while IRQ/FIQ remain masked. Whole-port preflight,
+exact mapping/vector/control restoration, guards and Stock return still pass,
+with library 275 absent and Flash unchanged. This supplies the timing dependency
+for the next independent SST command/replay experiment; it does not establish
+general SDK TLS loading, actual Flash replay or production recovery acceptance.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
