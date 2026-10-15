@@ -837,6 +837,15 @@ status: native RCL reports Undefined Name for `73` on HP49g+/HP50g and `03`
 on HP50g. Full Flash comparisons show no native repair beyond the injected byte.
 These samples do not establish all intermediate states or permission to repair
 an unknown allocation; the production parser continues to reject those states.
+The subsequent native backup matrix covers all 30 status values reachable
+while programming `FF -> 53 -> 00`, excluding the `FF` end marker itself.
+Each status has an independently named, CRC-valid backup, followed by a live
+control backup. On HP49g+ and HP50g, native RCL sees only the `53` record and
+still recalls the later control; stored HOME results and complete Flash-image
+comparison verify visibility and absence of native repair. This establishes
+backup visibility, not record-integrity checks or library/cold-boot recovery.
+It supports investigating tombstones for validated interrupted backups;
+production recovery still rejects partially programmed statuses.
 This is not automatic startup repair: partial status commits, replacement intent
 and interrupted sector erasure still require separate recovery protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
