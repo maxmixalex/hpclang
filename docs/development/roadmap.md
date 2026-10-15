@@ -528,6 +528,12 @@ preserving their contents and native invisibility. Fault tests bypass append
 cleanup and restart using only Flash bytes. Recovery interrupted again, partial
 library statuses, replacement intent, startup integration and sector reclamation
 remain open; this does not close the power-loss requirement.
+Discarding a hidden status now clears and verifies a required live bit before
+clearing the remaining bits: a cut cannot accidentally produce live status `53`.
+Host tests exhaust the status-clear masks at both byte alignments and interrupt
+whole-port recovery without caller cleanup. The intermediate `FE` tail marker
+is recoverable only with an exact, revalidated discard extent; other recovery
+intermediates still need restart support before the power-loss requirement closes.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

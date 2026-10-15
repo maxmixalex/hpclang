@@ -56,7 +56,10 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * FF tails are discarded. Backups with partial FF->53 or 53->00 status values
  * are tombstoned only after validating their complete CRC, extent, metadata and
  * padding. Their bodies remain unchanged and never become visible. Partial
- * libraries and other unknown encodings remain DIRTY. This cannot infer
+ * An FE discard marker is also accepted at the bank tail only when its extent
+ * exactly matches a newly validated discard plan. Clearing a hidden status
+ * first clears and verifies a required live bit, so interruption cannot publish
+ * the record. Partial libraries and other unknown encodings remain DIRTY. This cannot infer
  * replacement intent or perform sector erasure. Interruption during recovery
  * can create other status patterns, which remain DIRTY; this is not a complete
  * restart protocol.

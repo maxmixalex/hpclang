@@ -68,6 +68,26 @@ static int write_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, 
     return 1;
 }
 
+static int discard_status(const struct hpclang_rpl_flash_io *io, uint32_t address)
+{
+    uint16_t word;
+    if (!io->read16(io->context, address & ~1u, &word))
+        return 0;
+    uint8_t status = (uint8_t)(word >> ((address & 1u) * 8u));
+    /* Clearing a hidden superset of 0x53 straight to zero can transiently
+     * publish it. First clear one required live bit, leaving all other bits
+     * unchanged, and verify it before clearing the rest. A power cut during
+     * either step then cannot expose an uncommitted (possibly partial) body.
+     * Some resulting hidden states still require explicit recovery evidence. */
+    if (status != 0x53u && (status & 0x53u) == 0x53u) {
+        uint8_t hidden = status & (uint8_t)~1u;
+        if (!write_bytes(io, address, &hidden, 1u))
+            return 0;
+    }
+    const uint8_t deleted = 0;
+    return write_bytes(io, address, &deleted, 1u);
+}
+
 struct recovery_reader
 {
     const struct hpclang_rpl_flash_io *io;
@@ -126,9 +146,8 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
         return HPCLANG_RPL_FLASH_DIRTY;
     uint8_t header[] = {(uint8_t)plan.extent, (uint8_t)(plan.extent >> 8u),
                         (uint8_t)((plan.extent >> 16u) | (uint32_t)metadata << 4u)};
-    const uint8_t deleted = 0;
     if (!write_bytes(io, first + plan.address / 2u + 1u, header, sizeof header) ||
-        !write_bytes(io, first + plan.address / 2u, &deleted, 1u))
+        !discard_status(io, first + plan.address / 2u))
         return HPCLANG_RPL_FLASH_DIRTY;
     struct hpclang_rpl_flash_space space;
     return hpclang_rpl_flash_tail(&reader, 0, (end - first) * 2u, &space)
@@ -140,13 +159,14 @@ struct recovery_status
 {
     const struct hpclang_rpl_reader *reader;
     uint32_t address;
+    uint8_t status;
 };
 
 static int committed_status_nibble(void *context, uint32_t address, uint8_t *value)
 {
     const struct recovery_status *view = context;
     if (address == view->address || address == view->address + 1u) {
-        *value = address == view->address ? 3u : 5u;
+        *value = (view->status >> (address == view->address ? 0u : 4u)) & 15u;
         return 1;
     }
     return view->reader->read_nibble(view->reader->context, address, value);
@@ -194,13 +214,30 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
         uint32_t extent = header & 0xfffffu;
         if (extent < 11u || extent > 0x40000u - at - 2u)
             return HPCLANG_RPL_FLASH_DIRTY;
+        if (status == 0xfeu) {
+            /* FF-tail cleanup first clears bit zero. Recognize that marker
+             * only when the already-written extent is exactly the bounded
+             * discard plan and the remaining bank is erased. This does not
+             * relax CRC validation for interrupted backup publication. */
+            struct recovery_status view = {&reader, at, 0xffu};
+            const struct hpclang_rpl_reader erased = {committed_status_nibble, &view};
+            struct hpclang_rpl_flash_discard plan;
+            result = hpclang_rpl_flash_discard_plan(&erased, at, 0x40000u, &plan);
+            if (result != 1 || plan.address != at || plan.extent != extent)
+                return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                              : HPCLANG_RPL_FLASH_DIRTY;
+            if (apply && !discard_status(io, bank + at / 2u))
+                return HPCLANG_RPL_FLASH_DIRTY;
+            at += extent + 2u;
+            continue;
+        }
         if (status) {
             int partial = status != 0x53u;
             if (partial && ((at & 1u) || ((status & 0x53u) != 0x53u && (status & ~0x53u) != 0u)))
                 return HPCLANG_RPL_FLASH_DIRTY;
             /* Read-only status substitution lets the ordinary parser validate
              * the full object and CRC; it never publishes a live record. */
-            struct recovery_status view = {&reader, at};
+            struct recovery_status view = {&reader, at, 0x53u};
             const struct hpclang_rpl_reader committed = {committed_status_nibble, &view};
             struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};
             struct hpclang_rpl_port_entry entry;
@@ -221,8 +258,7 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
                     if (value != 15u)
                         return HPCLANG_RPL_FLASH_DIRTY;
                 }
-                const uint8_t deleted = 0;
-                if (apply && !write_bytes(io, bank + at / 2u, &deleted, 1u))
+                if (apply && !discard_status(io, bank + at / 2u))
                     return HPCLANG_RPL_FLASH_DIRTY;
             }
         }
@@ -429,8 +465,7 @@ int hpclang_rpl_flash_discard_record(const struct hpclang_rpl_flash_io *io, uint
         address < io->first || address >= io->end || !valid_record(record, bytes) ||
         bytes >= io->end - address)
         return HPCLANG_RPL_FLASH_INVALID;
-    const uint8_t deleted = 0;
-    if (!write_bytes(io, address + 1u, record + 1u, 3u) || !write_bytes(io, address, &deleted, 1u))
+    if (!write_bytes(io, address + 1u, record + 1u, 3u) || !discard_status(io, address))
         return HPCLANG_RPL_FLASH_DIRTY;
     return HPCLANG_RPL_FLASH_WRITTEN;
 }

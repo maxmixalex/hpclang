@@ -840,14 +840,19 @@ status: native RCL reports Undefined Name for `73` on HP49g+/HP50g and `03`
 on HP50g. Full Flash comparisons show no native repair beyond the injected byte.
 These samples alone do not establish all intermediate states or permission to
 repair an unknown allocation; normal enumeration still rejects those states.
-The subsequent native backup matrix covers all 30 status values reachable
-while programming `FF -> 53 -> 00`, excluding the `FF` end marker itself.
+The subsequent native backup matrix covers all 255 status values other than
+the `FF` end marker, including every state reachable during recovery itself.
 Each status has an independently named, CRC-valid backup, followed by a live
 control backup. On HP49g+ and HP50g, native RCL sees only the `53` record and
 still recalls the later control; stored HOME results and complete Flash-image
 comparison verify visibility and absence of native repair. This establishes
 backup visibility, not record-integrity checks or library/cold-boot recovery.
 Explicit recovery uses tombstones for these validated interrupted backups.
+Before clearing a hidden superset of `53`, it first clears and verifies bit zero;
+neither programming step can accidentally expose a live `53` status. Fault tests
+exhaust all clearing masks at both byte alignments and cut whole-port recovery
+without caller cleanup. An `FE` tail marker is recognized only when its extent
+exactly matches the revalidated discard plan, with no later non-erased data.
 Other status patterns, partial libraries, invalid CRC/padding/metadata and damaged
 later banks are rejected without preflight writes. This is not automatic startup
 repair: power loss during recovery can create other status patterns, and library

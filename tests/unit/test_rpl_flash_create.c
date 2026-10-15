@@ -253,7 +253,7 @@ static void recover_partial_backups(const struct hpclang_rpl_flash_io *io)
         memcpy(flash + 0x105u, record, sizeof record);
         flash[0x105u] = (uint8_t)status;
         memcpy(before, flash, sizeof flash);
-        int supported = (status & 0x53u) == 0x53u || !(status & ~0x53u);
+        int supported = status == 0xfeu || (status & 0x53u) == 0x53u || !(status & ~0x53u);
         int result = hpclang_rpl_flash_recover_tails(io);
         if (supported) {
             assert(!result && flash[0x105u] == 0);
@@ -295,6 +295,82 @@ static void recover_partial_backups(const struct hpclang_rpl_flash_io *io)
     assert(!hpclang_rpl_flash_recover_tails(io) && flash[0x105u] == 0);
     assert(!memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
     free(before);
+}
+
+static void cut_discard(const struct hpclang_rpl_flash_io *io, uint32_t address)
+{
+    if (!setjmp(power_cut))
+        (void)hpclang_rpl_flash_discard_record(io, address, record, sizeof record);
+    power_cut_at = UINT32_MAX;
+}
+
+static void cut_recovery(const struct hpclang_rpl_flash_io *io)
+{
+    if (!setjmp(power_cut))
+        (void)hpclang_rpl_flash_recover_tails(io);
+    power_cut_at = UINT32_MAX;
+}
+
+static void recovery_never_publishes(const struct hpclang_rpl_flash_io *io)
+{
+    const uint8_t statuses[] = {0xff, 0x73, 0x03};
+    const uint8_t masks[] = {0, 1, 0x20, 0x53, 0xfe, 0xff};
+    for (unsigned i = 0; i < sizeof statuses; ++i) {
+        for (unsigned step = 0; step < 2; ++step) {
+            for (unsigned j = 0; j < sizeof masks; ++j) {
+                init();
+                memcpy(flash + 0x105u, record, sizeof record);
+                flash[0x105u] = statuses[i];
+                power_cut_at = step;
+                power_cut_mask = (uint16_t)masks[j] << 8u;
+                cut_recovery(io);
+                assert(flash[0x105u] != 0x53);
+                assert(!memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
+            }
+        }
+    }
+    /* A discard marker cannot consume a later record or an unverified extent. */
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        init();
+        memcpy(flash + 0x105u, record, sizeof record);
+        flash[0x105u] = 0xfe;
+        if (fault == 0)
+            memcpy(flash + 0x105u + sizeof record, record, sizeof record);
+        else if (fault == 1)
+            flash[0x106u] = 0x1e;
+        else
+            fail_address = base + 0x1fffeu;
+        uint32_t before = fingerprint(sizeof flash);
+        assert(hpclang_rpl_flash_recover_tails(io) ==
+               (fault == 2 ? HPCLANG_RPL_FLASH_FAILED : HPCLANG_RPL_FLASH_DIRTY));
+        assert(!writes && fingerprint(sizeof flash) == before);
+    }
+}
+
+static void discard_never_publishes(const struct hpclang_rpl_flash_io *io)
+{
+    /* Exhaust every subset of bits cleared by either status programming step,
+     * in both halves of the physical word. No caller cleanup runs after a cut. */
+    for (unsigned alignment = 0; alignment < 2; ++alignment) {
+        uint32_t slot = 0x104u + alignment;
+        for (unsigned status = 0; status <= 255; ++status) {
+            if (status == 0x53 || (status & 0x53u) != 0x53u)
+                continue;
+            for (unsigned step = 0; step < 2; ++step) {
+                for (unsigned mask = 0; mask <= 255; ++mask) {
+                    init();
+                    memcpy(flash + slot, record, sizeof record);
+                    flash[slot] = (uint8_t)status;
+                    power_cut_at = step;
+                    power_cut_mask = (uint16_t)(mask << (alignment * 8u));
+                    cut_discard(io, base + slot);
+                    assert(flash[slot] != 0x53);
+                    assert(!memcmp(flash + slot + 1u, record + 1u, sizeof record - 1u));
+                    assert(flash[slot - 1u] == 0xff && flash[slot + sizeof record] == 0xff);
+                }
+            }
+        }
+    }
 }
 
 static void replace_backups(const struct hpclang_rpl_flash_io *io)
@@ -644,5 +720,7 @@ int main(void)
     recover_port_tails(&io);
     restart_after_append(&io);
     recover_partial_backups(&io);
+    discard_never_publishes(&io);
+    recovery_never_publishes(&io);
     return 0;
 }

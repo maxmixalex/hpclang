@@ -229,7 +229,7 @@ int main(void)
         goto done;
     /* With no retained transaction intent, recovery must keep an interrupted
      * backup invisible. Preserve its complete body rather than committing it. */
-    const uint8_t interrupted_statuses[] = {0x73, 0x03};
+    const uint8_t interrupted_statuses[] = {0x73, 0x03, 0xfe};
     for (unsigned i = 0; i < sizeof interrupted_statuses; ++i) {
         block[1] = interrupted_statuses[i];
         failure = 31;
