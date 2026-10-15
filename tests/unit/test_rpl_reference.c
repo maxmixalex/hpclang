@@ -355,8 +355,59 @@ static void relocation_patches(void)
     assert(hpclang_rpl_reference_plan_shift(&edge, 0x100, 0x130, 16, NULL) < 0);
 }
 
+static int shifted_read(void *context, uint32_t address, uint8_t *value)
+{
+    if (address < 0x290cu)
+        return 0;
+    return read_nibble(context, address - 0x290cu, value);
+}
+
+static void execution_entries(void)
+{
+    struct image image = {.size = 16, .fail = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_entry entry, saved;
+    memset(&saved, 0x5a, sizeof saved);
+    put(&image, 0, 5, 5);
+    assert(!hpclang_rpl_entry_inspect(&reader, 0, 6, &entry));
+    assert(entry.kind == HPCLANG_RPL_ENTRY_SELF_DISPATCH && entry.dispatch == 5 && !entry.span);
+    for (uint32_t i = 0; i < 6; ++i) {
+        image.fail = i;
+        entry = saved;
+        assert(hpclang_rpl_entry_inspect(&reader, 0, 6, &entry) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&entry, &saved, sizeof entry));
+    }
+    image.fail = UINT32_MAX;
+    for (uint32_t limit = 0; limit < 6; ++limit) {
+        entry = saved;
+        assert(hpclang_rpl_entry_inspect(&reader, 0, limit, &entry) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!memcmp(&entry, &saved, sizeof entry));
+    }
+    image.data[5] = 16;
+    entry = saved;
+    assert(hpclang_rpl_entry_inspect(&reader, 0, 6, &entry) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(&entry, &saved, sizeof entry));
+    image.data[5] = 0;
+    put(&image, 0, 7, 5);
+    assert(hpclang_rpl_entry_inspect(&reader, 0, 16, &entry) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&entry, &saved, sizeof entry));
+    /* At this address a known binary-integer prologue also equals self+5.
+     * Object semantics must win, including truncation failures. */
+    const struct hpclang_rpl_reader shifted = {shifted_read, &image};
+    put(&image, 0, 0x2911u, 5);
+    assert(!hpclang_rpl_entry_inspect(&shifted, 0x290cu, 10, &entry));
+    assert(entry.kind == HPCLANG_RPL_ENTRY_OBJECT && entry.span == 10);
+    entry = saved;
+    assert(hpclang_rpl_entry_inspect(&shifted, 0x290cu, 6, &entry) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&entry, &saved, sizeof entry));
+    assert(hpclang_rpl_entry_inspect(&reader, 0xffffcu, 5, &entry) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_entry_inspect(&reader, 0, UINT32_MAX, &entry) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_entry_inspect(NULL, 0, 6, &entry) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+}
+
 int main(void)
 {
+    execution_entries();
     relocation_patches();
     nested_array();
     indices_and_opaque();

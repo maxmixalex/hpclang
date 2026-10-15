@@ -3,6 +3,30 @@
 
 #include "rpl-object-span.h"
 
+enum hpclang_rpl_entry_kind
+{
+    HPCLANG_RPL_ENTRY_OBJECT,
+    HPCLANG_RPL_ENTRY_SELF_DISPATCH
+};
+
+struct hpclang_rpl_entry
+{
+    enum hpclang_rpl_entry_kind kind;
+    uint32_t dispatch;
+    uint32_t span; /* Exact object span, or zero for an unbounded execution body. */
+};
+
+/* Inspect a caller-proven runstream entry in a stable mapping. Known object
+ * prologues take precedence and require their ordinary bounded validation.
+ * Otherwise recognize only a dispatch word equal to address+5, with its first
+ * body nibble readable inside limit. This does not decode instructions, infer
+ * code length, follow other dispatch words or certify absence of references.
+ * Unknown dispatches remain UNSUPPORTED. Never use this to scan arbitrary data
+ * for executable objects or to bypass object_span's failure contract.
+ * Returns a span result; output changes only on success. */
+int hpclang_rpl_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, struct hpclang_rpl_entry *entry);
+
 enum hpclang_rpl_reference_kind
 {
     HPCLANG_RPL_REFERENCE_INLINE,

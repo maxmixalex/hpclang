@@ -96,6 +96,36 @@ static int word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned c
     return 0;
 }
 
+int hpclang_rpl_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t address,
+                              uint32_t limit, struct hpclang_rpl_entry *entry)
+{
+    if (!reader || !reader->read_nibble || !entry)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || limit > 0x100000u - address || limit < 5u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_entry next = {HPCLANG_RPL_ENTRY_OBJECT, 0, 0};
+    int result = word(reader, address, 5u, &next.dispatch);
+    if (result)
+        return result;
+    if (hpclang_rpl_object_prologue_known(next.dispatch)) {
+        result = hpclang_rpl_object_span(reader, address, limit, &next.span);
+        if (result)
+            return result;
+    } else {
+        if (next.dispatch != address + 5u)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        if (limit < 6u)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t first;
+        result = word(reader, address + 5u, 1u, &first);
+        if (result)
+            return result;
+        next.kind = HPCLANG_RPL_ENTRY_SELF_DISPATCH;
+    }
+    *entry = next;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 struct directory_reader
 {
     const struct hpclang_rpl_reader *source;

@@ -829,7 +829,11 @@ All 96 host tests, focused sanitizers and ARM analysis pass. The native HP50g
 HOME graph matches all 20 attachment pointers and exposes 21 ACPTR edges,
 including ERAM. Rechecking with the current C visitor locates all 148 unsupported
 targets in fixed ROM; 98 have a dispatch word equal to their address plus five.
-These require execution-entry classification rather than ordinary object parsing.
+The internal entry inspector now distinguishes those 98 self-dispatch headers
+from bounded ordinary objects; known object prologues take precedence. It reports
+no code extent or reference-safety conclusion, and 50 other dispatches remain
+unsupported. Native checks use the current C implementation and confirm that
+all 148 originate in direct runstream references rather than library metadata.
 The 18 opaque code/binary objects also remain unresolved. Neither observation
 proves absence of dynamic references; executable references and the production
 mutation guard remain open.

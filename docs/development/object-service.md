@@ -1197,3 +1197,13 @@ decoding alone does not establish that reclamation is safe. Historical HPGCC3
 contents into TEMP before removing them; neither supplies a Flash-sector
 reclamation protocol. Flash still needs bank-qualified reference protection and
 recoverable sector erase/copy ordering.
+The internal `hpclang_rpl_entry_inspect` separates bounded RPL objects from an
+entry whose dispatch word equals its own address plus five. Known object
+prologues take precedence, even at an address where the two patterns coincide.
+Self-dispatch reports zero span: its code length and references remain unknown.
+Callers must already know they are inspecting an execution entry; this is not
+permission to reinterpret arbitrary binary contents. The current C inspector
+classifies 287 ordinary objects and 98 self-dispatch entries in the saved HOME
+graph, leaving 50 unsupported dispatches unchanged. All 148 came from direct
+runstream references, rather than library-table metadata. No execution or
+reclamation safety is inferred from this classification.
