@@ -1188,5 +1188,12 @@ Flash ACPTRs before/after PURGE on HP49g+/HP50g and the saved HP50g ERAM ACPTR.
 The saved ROM graph also expands 74 compact array bodies through this C path;
 314 code objects and 10 binary objects remain explicit opaque cases. Complete
 execution traversal and the production mutation guard remain open. The HOME
-scan still encounters 148 unsupported nodes; successful directory decoding
-alone does not establish that reclamation is safe.
+scan's 148 unsupported targets all lie in fixed ROM; 98 contain their own address
+plus five as the dispatch word. Execution-entry classification must handle these
+separately from ordinary RPL data objects without declaring them reference-free.
+The same HOME scan retains 18 opaque code/binary objects. Successful directory
+decoding alone does not establish that reclamation is safe. Historical HPGCC3
+`sat3_garbcol` collects TEMPOB, while `sat3_purgeobj` moves referenced USEROB
+contents into TEMP before removing them; neither supplies a Flash-sector
+reclamation protocol. Flash still needs bank-qualified reference protection and
+recoverable sector erase/copy ordering.

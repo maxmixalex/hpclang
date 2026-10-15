@@ -827,8 +827,11 @@ attachment pointers, with library IDs preserved. The source-confirmed `7FF`
 child-directory marker is recognized; other nonzero headers remain opaque.
 All 96 host tests, focused sanitizers and ARM analysis pass. The native HP50g
 HOME graph matches all 20 attachment pointers and exposes 21 ACPTR edges,
-including ERAM. Its 148 unsupported nodes and opaque code/binary objects still
-prevent a complete safety claim; executable references and the production
+including ERAM. Rechecking with the current C visitor locates all 148 unsupported
+targets in fixed ROM; 98 have a dispatch word equal to their address plus five.
+These require execution-entry classification rather than ordinary object parsing.
+The 18 opaque code/binary objects also remain unresolved. Neither observation
+proves absence of dynamic references; executable references and the production
 mutation guard remain open.
 
 The Port development branch now integrates the standalone historical-system client
