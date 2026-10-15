@@ -992,6 +992,15 @@ library command reaches PASS, returns to settled Stock and retains integer
 already rebuilt by Stock and resolve current bindings rather than replay saved
 RAM addresses. This evidence covers intact compacted Flash; reaching a recovery
 entry with a partially erased bank remains a separate startup requirement.
+An isolated follow-up erases the first 4 KiB of the user bank containing
+libraries 124 and 275 before the same native restart. Stock reaches its HOME
+screen, but neither library appears in the rebuilt catalog; all later library
+payload bytes remain intact and the bank identity remains erased. The existing
+Library-275-dependent application path therefore cannot be assumed available
+for recovery. Before public reclamation, establish a recovery entry independent
+of the bank being erased and retain its journal in independently discoverable
+storage. Recovery only when an application opens Port 2 is insufficient for
+this observed failure. No firmware patch or automatic startup hook is implied.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
