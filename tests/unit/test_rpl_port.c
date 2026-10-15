@@ -699,8 +699,62 @@ static void test_acptr_resolution(void)
     assert(!memcmp(&target, &before, sizeof target));
 }
 
+static void test_catalog_rebind(void)
+{
+    struct image image = {.count = 160, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const struct hpclang_rpl_catalog_rebind rebind = {275, 0x22f5a, 0x6fdd4, 0x6fd94};
+    put_word(&image, 5, 2, 3);
+    put_word(&image, 8, 124, 3);
+    put_word(&image, 11, 0x732b2, 5);
+    put_word(&image, 16, 0x22f5a, 5);
+    put_word(&image, 24, 275, 3);
+    put_word(&image, 27, rebind.previous, 5);
+    put_word(&image, 32, rebind.bank_switch, 5);
+    uint32_t field = 123;
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 5, 35, &rebind, &field) == 1);
+    assert(field == 27);
+    /* Rebuilt catalog at a different RAM address, with reversed record order.
+     * The old field still contains plausible data but must never be returned. */
+    put_word(&image, 70, 2, 3);
+    memcpy(image.data + 73, image.data + 24, 16);
+    memcpy(image.data + 89, image.data + 8, 16);
+    struct image before = image;
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) == 1);
+    assert(field == 76 && !memcmp(&image, &before, sizeof image));
+    put_word(&image, 76, rebind.replacement, 5);
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) == 1 && field == 76);
+    for (uint32_t at = 70; at < 105; ++at) {
+        image.fail_at = at;
+        field = 123;
+        assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(field == 123);
+    }
+    image.fail_at = UINT32_MAX;
+    put_word(&image, 81, rebind.bank_switch + 1, 5);
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) ==
+               HPCLANG_RPL_SPAN_MALFORMED &&
+           field == 123);
+    put_word(&image, 81, rebind.bank_switch, 5);
+    put_word(&image, 76, rebind.previous + 1, 5);
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) ==
+               HPCLANG_RPL_SPAN_MALFORMED &&
+           field == 123);
+    put_word(&image, 76, rebind.previous, 5);
+    put_word(&image, 89, 275, 3);
+    assert(hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field) ==
+               HPCLANG_RPL_SPAN_MALFORMED &&
+           field == 123);
+    put_word(&image, 89, 124, 3);
+    put_word(&image, 73, 100, 3);
+    assert(!hpclang_rpl_catalog_rebind_field(&reader, 70, 35, &rebind, &field));
+    assert(field == 123);
+}
+
 int main(void)
 {
+    test_catalog_rebind();
     test_catalog_insertion();
     test_acptr_resolution();
     test_flashptr_resolution();

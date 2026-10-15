@@ -53,6 +53,47 @@ int hpclang_rpl_catalog_visit(const struct hpclang_rpl_reader *reader, uint32_t 
     return 0;
 }
 
+struct catalog_rebind_search
+{
+    const struct hpclang_rpl_catalog_rebind *rebind;
+    uint32_t field;
+    int found;
+};
+
+static int catalog_rebind_visit(void *context, uint32_t record, uint32_t number,
+                                const struct hpclang_rpl_library_binding *binding)
+{
+    struct catalog_rebind_search *search = context;
+    if (number != search->rebind->number)
+        return HPCLANG_RPL_SPAN_OK;
+    if (search->found || binding->bank_switch != search->rebind->bank_switch ||
+        (binding->address != search->rebind->previous &&
+         binding->address != search->rebind->replacement))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    search->found = 1;
+    search->field = record + 3u;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_catalog_rebind_field(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                     uint32_t limit,
+                                     const struct hpclang_rpl_catalog_rebind *rebind,
+                                     uint32_t *field)
+{
+    if (!rebind || !field)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (rebind->number > 0xfffu || rebind->bank_switch > 0xfffffu || rebind->previous > 0xfffffu ||
+        rebind->replacement > 0xfffffu)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct catalog_rebind_search search = {rebind, 0, 0};
+    int result = hpclang_rpl_catalog_visit(reader, address, limit, catalog_rebind_visit, &search);
+    if (result)
+        return result;
+    if (search.found)
+        *field = search.field;
+    return search.found;
+}
+
 int hpclang_rpl_catalog_plan_insert(const struct hpclang_rpl_reader *reader, uint32_t address,
                                     uint32_t limit, uint32_t number,
                                     struct hpclang_rpl_catalog_insertion *plan)

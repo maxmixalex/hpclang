@@ -969,6 +969,15 @@ the completed batch performs no writes. Resuming that copy executes the moved
 library command, reaches PASS, settles back in Stock and retains the independently
 decoded integer 124275. This replaces the earlier Python byte-patching step;
 it does not establish live ownership, complete roots or restart-safe RAM addresses.
+Catalog repair can now resolve the current field from library ID, bank-switch
+identity and the authorized previous/replacement binding, rather than retaining
+an old RAM field address. Host tests move and reorder the catalog, accept an
+already repaired binding and reject duplicate IDs, changed banks, unexpected
+targets and failures anywhere in the complete catalog. The actual C resolver
+also finds both repair fields in the saved native HP50g catalog before checked
+replay. Sanitizers and ARM analysis pass. The transaction still must locate the
+current catalog, authenticate the relocation and reconstruct all other roots;
+this locator alone does not make arbitrary persisted RAM edits restart-safe.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn

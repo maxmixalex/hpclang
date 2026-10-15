@@ -55,6 +55,28 @@ struct hpclang_rpl_library_binding
     uint32_t flags;
 };
 
+/* Semantic identity for a moved library's native catalog binding. Addresses
+ * belong to the mapping selected by bank_switch, not saved RAM field addresses.
+ * Caller validates library identity, mapping and transaction freshness. */
+struct hpclang_rpl_catalog_rebind
+{
+    uint32_t number, bank_switch, previous, replacement;
+};
+
+/* Resolve the current RAM field for one authorized library relocation. Scan
+ * the entire supplied catalog, require a unique matching ID, exact bank switch
+ * and a binding equal to previous or replacement (already repaired). Returns
+ * 1 with field, 0 absent, or a negative span result; field changes only on 1.
+ * The caller can construct a RAM edit with this fresh field and previous/value.
+ * No writes occur. Absent bindings must be handled explicitly by the transaction.
+ * Keep the current catalog stable through commit and re-resolve after rebuilding
+ * it. This neither discovers the catalog nor proves complete roots, surviving
+ * RAM ownership or a safe startup point for Flash recovery. */
+int hpclang_rpl_catalog_rebind_field(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                     uint32_t limit,
+                                     const struct hpclang_rpl_catalog_rebind *rebind,
+                                     uint32_t *field);
+
 struct hpclang_rpl_catalog_insertion
 {
     uint32_t slot; /* Insert before this record, or at end. */
