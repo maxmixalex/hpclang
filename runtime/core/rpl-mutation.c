@@ -695,6 +695,65 @@ int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
     return scan_all_references(io, &request);
 }
 
+int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, uint32_t position)
+{
+    if (!io_ready(io) || io->library_table < RPL_MAIN_FIRST ||
+        io->library_table > RPL_MAIN_END - 3u)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    uint32_t count, bottom, top, rstk, dstk, avmem;
+    int result = read_word(io, io->library_table, 3u, &count);
+    if (result || (result = read_word(io, RPL_TEMPBOTTOM, 5u, &bottom)) ||
+        (result = read_word(io, RPL_TEMPTOP, 5u, &top)) ||
+        (result = read_word(io, RPL_RSKTOP, 5u, &rstk)) ||
+        (result = read_word(io, RPL_DSKTOP, 5u, &dstk)) ||
+        (result = read_word(io, RPL_AVMEM, 5u, &avmem)))
+        return result;
+    uint32_t records = io->library_table + 3u;
+    if (count == 0xfffu || count > (RPL_MAIN_END - records) / 16u || position < records ||
+        position > records + count * 16u || (position - records) % 16u ||
+        records + count * 16u > bottom || bottom > top || top > rstk || rstk >= dstk ||
+        dstk > RPL_MAIN_END || rstk > io->temp_limit)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    /* Retain the same five-nibble guard used by TEMP allocation, in addition
+     * to the launcher's hidden data-stack-cell reservation. */
+    if (io->temp_limit - rstk < 21u || dstk - rstk < 21u ||
+        io->stack_reserve_nibbles > dstk - rstk - 21u)
+        return HPCLANG_RPL_MUTATION_NOSPACE;
+    uint32_t new_avmem;
+    result = plan_free_cells(avmem, (dstk - rstk) / 5u, (dstk - rstk - 16u) / 5u, &new_avmem);
+    if (result)
+        return result;
+    /* Read every source/destination nibble before modifying roots. A mapped
+     * endpoint alone cannot establish a callback backend's readable extent. */
+    for (uint32_t at = position; at < rstk + 16u; ++at) {
+        uint8_t nibble;
+        if (!io->read_nibble(io->context, at, &nibble))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (nibble > 15u)
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    struct pointer_scan_request request = {
+        .move_start = position,
+        .move_end = rstk,
+        .offset = 16,
+        .mode = POINTER_SCAN_VALIDATE_SHIFT,
+    };
+    result = scan_all_references(io, &request);
+    if (result)
+        return result;
+    request.mode = POINTER_SCAN_APPLY_SHIFT;
+    result = scan_all_references(io, &request);
+    if (result || (result = move_nibbles(io, position + 16u, position, rstk - position)))
+        return result;
+    /* Boundary values can equal the exclusive movement end. Publish each from
+     * its original value, independently of the general reference scan. */
+    if ((result = write_word(io, RPL_TEMPBOTTOM, 5u, bottom + 16u)) ||
+        (result = write_word(io, RPL_TEMPTOP, 5u, top + 16u)) ||
+        (result = write_word(io, RPL_RSKTOP, 5u, rstk + 16u)))
+        return result;
+    return write_word(io, RPL_AVMEM, 5u, new_avmem);
+}
+
 static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,
                                                 uint32_t start, uint32_t end, int port_boundary)
 {

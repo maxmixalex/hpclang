@@ -1948,8 +1948,88 @@ static void test_temp_allocation_visit(void)
            HPCLANG_RPL_MUTATION_MALFORMED);
 }
 
+static struct hpclang_rpl_mutation_io setup_catalog_growth(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1);
+    io.library_table = 0x82000;
+    put_word(io.library_table, 3, 2);
+    put_word(0x82003, 3, 10);
+    put_word(0x82006, 5, 0x83001);
+    put_word(0x82013, 3, 20);
+    put_word(0x82016, 5, 0x83002);
+    put_word(0x806e9, 5, 0x83000);
+    put_word(TEMPTOP, 5, 0x83005);
+    put_word(RSKTOP, 5, 0x8300f);
+    put_word(0x83005, 5, 0);
+    put_word(0x8300a, 5, 0x83001);
+    put_word(0x90000, 5, 0x83002);
+    put_word(AVMEM, 5, (0x90000 - 0x8300f) / 5 - 7);
+    memory[0x82555] = 11;
+    return io;
+}
+
+static void test_catalog_growth(void)
+{
+    struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+    uint32_t native = 0x83003, *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    uint32_t before_avmem = get_word(AVMEM, 5);
+    assert(hpclang_rpl_mutation_catalog_grow(&io, 0x82013) == 0);
+    assert(get_word(io.library_table, 3) == 2); /* Caller publishes the new entry/count. */
+    assert(get_word(0x82006, 5) == 0x83011);
+    assert(get_word(0x82023, 3) == 20 && get_word(0x82026, 5) == 0x83012);
+    assert(memory[0x82565] == 11);
+    assert(get_word(0x83015, 5) == 0 && get_word(0x8301a, 5) == 0x83011);
+    assert(get_word(0x90000, 5) == 0x83012 && native == 0x83013);
+    assert(get_word(0x806e9, 5) == 0x83010 && get_word(TEMPTOP, 5) == 0x83015);
+    assert(get_word(RSKTOP, 5) == 0x8301f);
+    assert(get_word(AVMEM, 5) ==
+           before_avmem - ((0x90000 - 0x8300f) / 5 - (0x90000 - 0x8301f) / 5));
+
+    /* Interior unreadability, roots, native fences and bad record positions
+     * must all fail before either RAM or ARM-side roots are modified. */
+    for (unsigned failure = 0; failure < 8; ++failure) {
+        io = setup_catalog_growth();
+        native = 0x83003;
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        uint32_t position = 0x82013;
+        if (failure == 0)
+            rejected_read = 0x82555;
+        if (failure == 1)
+            rejected_read = 0x90000;
+        if (failure == 2)
+            io.temp_limit = 0x83023; /* Only 20 nibbles remain. */
+        if (failure == 3)
+            ++position;
+        if (failure == 4)
+            put_word(AVMEM, 5, 0);
+        if (failure == 5)
+            io.stack_reserve_nibbles = 0xd000;
+        if (failure == 6)
+            put_word(0x806e9, 5, 0x82022);
+        if (failure == 7)
+            put_word(io.library_table, 3, 0xfff);
+        uint8_t *before = malloc(sizeof memory);
+        assert(before);
+        memcpy(before, memory, sizeof memory);
+        assert(hpclang_rpl_mutation_catalog_grow(&io, position) < 0);
+        assert(writes == 0 && native == 0x83003 && !memcmp(before, memory, sizeof memory));
+        free(before);
+    }
+    io = setup_catalog_growth();
+    put_word(0x8201b, 5, 1);      /* Bank-qualified binding is not a main-RAM address. */
+    put_word(RSKTOP, 5, 0x83005); /* Empty RPL return stack: TEMPTOP == RSKTOP. */
+    put_word(AVMEM, 5, (0x90000 - 0x83005) / 5);
+    assert(hpclang_rpl_mutation_catalog_grow(&io, 0x82003) == 0);
+    assert(get_word(TEMPTOP, 5) == 0x83015 && get_word(RSKTOP, 5) == 0x83015);
+    assert(get_word(0x82026, 5) == 0x83002 && get_word(0x8202b, 5) == 1);
+}
+
 int main(void)
 {
+    test_catalog_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();
     test_root_sources();

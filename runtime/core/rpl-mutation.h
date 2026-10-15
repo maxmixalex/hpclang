@@ -223,6 +223,18 @@ extern "C"
     int hpclang_rpl_mutation_userob_shift_before(const struct hpclang_rpl_mutation_io *io,
                                                  uint32_t position, int32_t delta);
 
+    /* Internal catalog geometry: open one 16-nibble record at position, moving
+     * the catalog suffix, metadata, TEMP and RPL return stack upward. Caller
+     * must validate the catalog and prove relocation safety of all object
+     * contents, including opaque code/binary data and banked references. This
+     * only relocates the root sources supplied by io; it is not registration.
+     * On success the caller must fill the gap and publish the new catalog count
+     * before restoring Stock execution. Mapping/IRQ ownership spans both steps.
+     * Preflight failures make no writes; stable backend reads/writes are required
+     * during commit, as for the other mutation primitives. */
+    int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io,
+                                          uint32_t position);
+
 #ifdef __cplusplus
 }
 #endif

@@ -766,6 +766,16 @@ native-RCL witness and second invocation pass. The same two-invocation HP49g+
 probe passes using the launcher's published roots without a probe-side CPU fix.
 This corrects root coverage;
 it does not certify arbitrary opaque TEMP bodies or enable public registration.
+The internal catalog-growth primitive now reserves one 16-nibble entry using
+the launcher's native-page fence, a five-nibble guard and hidden stack-cell
+reservation. It preflights the complete moved byte extent and known roots,
+preserves AVMEM reservations, and handles an empty RPL return stack. Host
+failure tests require unchanged RAM and ARM roots for unreadable contents,
+unreadable roots, malformed positions/counts and insufficient space. Banked
+bindings retain their addresses. The caller still owns object-body relocation
+proof and must fill the gap and publish the catalog count under the same stable
+mapping before returning to Stock. Replacing the probe's manual movement with
+this primitive passes HP50g registration, native recall and a second invocation.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
