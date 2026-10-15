@@ -880,10 +880,12 @@ The executable witness also exposes a launcher-stack gap before relocation:
 both direct-program and library-command launches reach PASS and settle back in
 Stock, but lose a newly pushed integer. An invocation capture shows a HEXSTR
 launcher descriptor at entry, the correct integer after the application's push,
-and the descriptor left behind after native return. The current bias detector
-recognizes the launcher string but not this descriptor. Correct descriptor
-recognition/restoration and independent post-return stack validation are required
-before accepting the library execution witness.
+and the descriptor left behind after native return. The bias detector now also
+recognizes this descriptor when its entry and code-base words both match the
+executing stage0. Local HP50g direct-program and Port 2 library-command probes
+then both preserve the integer 124275 after PASS and settled Stock return,
+confirmed by independent native-stack decoding. Repository regression coverage,
+other classic models and post-relocation execution remain acceptance work.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn

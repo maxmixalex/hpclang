@@ -1303,7 +1303,8 @@ struct stage_launcher_bias
     uint32_t active;
 };
 
-static int stage_hide_launcher_bias(const void *saturn_state, struct stage_launcher_bias *bias)
+static int stage_hide_launcher_bias(const void *saturn_state, uintptr_t stage0_code,
+                                    struct stage_launcher_bias *bias)
 {
     static const uint8_t launcher_magic[] = {0x4cu, 0xb3u, 0x80u, 0x41u, 0x3eu, 0x43u, 0x50u};
 
@@ -1321,15 +1322,37 @@ static int stage_hide_launcher_bias(const void *saturn_state, struct stage_launc
 
     if (!stage_saturn_read_word5(read_map, RPL_DSKTOP, &dsktop) || dsktop > RPL_MAIN_END - 5u ||
         !stage_saturn_read_word5(read_map, dsktop, &object) || object > RPL_MAIN_END - 24u ||
-        !stage_saturn_read_word5(read_map, object, &prologue) || prologue != RPL_DOCSTR ||
+        !stage_saturn_read_word5(read_map, object, &prologue) ||
         !stage_saturn_read_word5(read_map, object + 5u, &length) || length < 19u)
         return 0;
 
-    for (uint32_t i = 0u; i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0])); ++i) {
-        uint8_t byte = 0u;
-        if (!stage_saturn_read_byte(read_map, object + 10u + i * 2u, &byte) ||
-            byte != launcher_magic[i])
+    if (prologue == RPL_DOCSTR) {
+        for (uint32_t i = 0u; i < (uint32_t)(sizeof(launcher_magic) / sizeof(launcher_magic[0]));
+             ++i) {
+            uint8_t byte = 0u;
+            if (!stage_saturn_read_byte(read_map, object + 10u + i * 2u, &byte) ||
+                byte != launcher_magic[i])
+                return 0;
+        }
+    } else if (prologue == 0x2a4eu && length == 45u && object >= RPL_MAIN_FIRST &&
+               object <= RPL_MAIN_END - 50u && stage0_code != 0u && (stage0_code & 3u) == 0u) {
+        /* ARMToolbox can replace the string with a five-word HEXSTR launch
+         * descriptor. Match both its entry and code-base words to the actual
+         * executing stage0, rather than hiding an arbitrary user HEXSTR. The
+         * native PrRUN continuation consumes this cell after ARM returns. */
+        uint32_t entry = 0u, code_base = 0u;
+        for (uint32_t i = 0u; i < 4u; ++i) {
+            uint8_t entry_byte, base_byte;
+            if (!stage_saturn_read_byte(read_map, object + 18u + 2u * i, &entry_byte) ||
+                !stage_saturn_read_byte(read_map, object + 34u + 2u * i, &base_byte))
+                return 0;
+            entry |= (uint32_t)entry_byte << (8u * i);
+            code_base |= (uint32_t)base_byte << (8u * i);
+        }
+        if (entry != stage0_code || code_base != stage0_code)
             return 0;
+    } else {
+        return 0;
     }
 
     /*
@@ -1624,7 +1647,7 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
      * the actual object instead of hard-coding launcher version/model policy.
      */
     if (launch.saturn_state != 0u) {
-        int bias_status = stage_hide_launcher_bias(saturn_state, &launcher_bias);
+        int bias_status = stage_hide_launcher_bias(saturn_state, stage0_code, &launcher_bias);
         if (bias_status < 0)
             return -5;
     }
