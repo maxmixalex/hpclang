@@ -1001,6 +1001,14 @@ for recovery. Before public reclamation, establish a recovery entry independent
 of the bank being erased and retain its journal in independently discoverable
 storage. Recovery only when an application opens Port 2 is insufficient for
 this observed failure. No firmware patch or automatic startup hook is implied.
+The actual C publisher now places a recovery image in a different native HP50g
+bank before that header-sector failure. Its full record survives ON/F3 unchanged;
+C discovery and whole-port overlay preflight still accept it. Executing the C
+replay against a stopped-state copy restores only the target sector, retaining
+the journal and all other Flash bytes. A subsequent native restart rebuilds both
+library bindings at the correct addresses without modifying Flash or the active
+journal. This verifies native coexistence and restored-data acceptance, not
+on-calculator execution of the recovery entry or automatic power-loss recovery.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
