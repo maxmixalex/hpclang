@@ -869,8 +869,13 @@ actual C bank resolver/planner computes the relocated library-275 catalog target
 while leaving an equal address in another bank unchanged. Supplied edit batches
 now receive read-only bounds/overlap and expected-value preflight, including
 bank-switch metadata guards. Host failure injection, sanitizers, ARM analysis
-and the native catalog-state check pass. Full root discovery, assembly of a
-complete qualified batch and live commit remain required before reclamation is enabled.
+and the native catalog-state check pass. A read-only integration experiment
+enumerates all 62 entries in the HP50g PACK capture, resolves nine mapping
+identities and validates 124 target/switch fields as one batch. Only library
+275 requires an address change; changing the final record's bank metadata
+rejects the batch. Catalog count/ID/flag stability still needs ownership
+guards. Full root discovery, assembly of a complete qualified batch and live
+commit remain required before reclamation is enabled.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
