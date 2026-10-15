@@ -18,6 +18,23 @@ static const uint8_t native_record[] = {
 
 uint16_t hpclang_flash_read16(void *context, uint32_t address);
 
+static unsigned plan_program_calls;
+
+static int plan_read(void *context, uint32_t address, uint16_t *value)
+{
+    *value = hpclang_flash_read16(context, address);
+    return 1;
+}
+
+static int plan_program(void *context, uint32_t address, uint16_t value)
+{
+    (void)context;
+    (void)address;
+    (void)value;
+    ++plan_program_calls;
+    return 0;
+}
+
 static uint32_t fingerprint(void)
 {
     uint32_t value = 2166136261u;
@@ -328,6 +345,17 @@ int main(void)
     hpclang_object_release(object);
     if (created != -1 || errno != EEXIST || fingerprint() != committed || l1[0] != original[0] ||
         l1[1] != original[1])
+        goto done;
+    failure = 35;
+    const struct hpclang_rpl_flash_io plan_io = {0, plan_read, plan_program, 0x140000u, 0x200000u};
+    struct hpclang_rpl_flash_replace_plan plan;
+    uint8_t intent[HPCLANG_RPL_FLASH_INTENT_BYTES];
+    if (hpclang_rpl_flash_plan_replace(&plan_io, native_record, sizeof native_record, &plan) ||
+        plan.intent.old_slot != create_slot + sizeof native_record ||
+        plan.intent.new_bytes != sizeof native_record || plan_program_calls ||
+        fingerprint() != committed ||
+        hpclang_rpl_flash_intent_encode(plan_io.first, plan_io.end, plan.intent_slot, &plan.intent,
+                                        intent, sizeof intent))
         goto done;
     failure = 30;
     if (hpclang_stock_flash_erase_sector(create_sector) != HPCLANG_SST_OK ||

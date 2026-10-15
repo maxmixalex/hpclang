@@ -47,6 +47,14 @@ hpclang_unit(rpl_flash_create test_rpl_flash_create.c
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_flash_create PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_flash_plan test_rpl_flash_plan.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_flash_plan PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 add_executable(stage_image_driver stage_image_driver.c
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-image.c"
     "${HPCLANG_ROOT}/third_party/tinf/tinflate.c")

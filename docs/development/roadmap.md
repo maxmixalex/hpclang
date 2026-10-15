@@ -551,8 +551,12 @@ separate work; the full power-loss goal is unchanged.
 Replacement-intent encoding/decoding now has a bounded 44-byte hidden format,
 allocation identities and CRC32 protection. Host corruption/bounds tests and
 native visibility checks of actual C-produced records pass on HP49g+/HP50g.
-The format is not yet emitted by normal mutation APIs: journal reservation,
-publication, reference verification and the restart executor remain open.
+Read-only replacement planning validates every bank, requires a unique old
+backup, computes both allocation CRCs and selects space for the intent and new
+record, including separate banks in either order. Full-media, late corruption
+and read failures leave Flash and the output plan unchanged. The format is not
+yet emitted by normal mutation APIs: publication, referenced-record validation
+during recovery and the restart executor remain open.
 For a caller-owned pending backup with retained expected bytes, an internal
 commit-finishing primitive validates the expected record and compares every
 stored body/padding byte before completing the status. It accepts only status

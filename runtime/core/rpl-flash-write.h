@@ -2,6 +2,7 @@
 #define HPCLANG_RPL_FLASH_WRITE_H
 
 #include <stdint.h>
+#include "rpl-flash-record.h"
 
 struct hpclang_rpl_flash_io
 {
@@ -122,6 +123,22 @@ struct hpclang_rpl_flash_replacement
     uint32_t old_slot, new_slot;
     int committed;
 };
+
+struct hpclang_rpl_flash_replace_plan
+{
+    uint32_t intent_slot;
+    struct hpclang_rpl_flash_intent intent;
+};
+
+/* Read-only preparation for journaled replacement. Validate the whole port,
+ * require exactly one existing backup, and reserve disjoint erased tails for
+ * the intent and new record (possibly in different banks). Record both exact
+ * allocation lengths and status-independent CRC32 values. No Flash writes or
+ * RAM allocation; output changes only on success. Caller must keep the port
+ * and source record stable until the eventual journal publication. This does
+ * not itself publish an intent or change the existing replacement API. */
+int hpclang_rpl_flash_plan_replace(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                   uint32_t bytes, struct hpclang_rpl_flash_replace_plan *plan);
 
 /* Replace exactly one existing backup without relocating its payload. Validate
  * all banks, append the complete replacement, then tombstone the old record.

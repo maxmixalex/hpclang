@@ -901,6 +901,13 @@ overlap. Native probes using the actual C encoder pass on both models with a
 later live control and unchanged Flash. Normal mutation APIs do not emit this
 format yet; durable intent publication, target verification and restart execution
 remain required before replacement can claim power-loss recovery.
+The internal replacement planner validates all six banks before returning the
+old allocation, checksums and two erased reservations. It tries both same-bank
+and cross-bank placement, so a small journal-only tail can be paired with an
+earlier tail that fits only the new object. Insufficient combined capacity,
+duplicate names, damaged later banks and failures while rereading the old value
+leave the output and Flash unchanged. The plan uses no heap allocation and
+requires stable caller ownership until publication; it is not itself a write.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
 Native RPL independently recalls the grown and shrunken integer values before
 relaunch; owned snapshots retain the prior value. Normal return, `exit()` and
