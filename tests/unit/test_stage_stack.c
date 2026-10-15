@@ -111,6 +111,20 @@ int main(void)
     assert(hpclang_stage_stack_restore(NULL, NULL));
 
     setup();
+    put(0x90005, 21, 5);
+    put(0x9000a, 0x08012340, 8);
+    put(0x90012, 0x01c00000, 8);
+    assert(hpclang_stage_stack_hide(&io, 0x08012340, &bias) == 1);
+    assert(hpclang_stage_stack_restore(&io, &bias));
+    for (uint32_t at = 0x9000a; at < 0x90012; ++at) {
+        fault = at;
+        writes = 0;
+        assert(!hpclang_stage_stack_hide(&io, 0x08012340, &bias) && !writes);
+    }
+    fault = UINT32_MAX;
+    put(0x9000a, 0x08012344, 8);
+    assert(!hpclang_stage_stack_hide(&io, 0x08012340, &bias) && !writes);
+    setup();
     put(0x90000, 0x2a2c, 5);
     put(0x90005, 19, 5);
     const uint8_t magic[] = {0x4c, 0xb3, 0x80, 0x41, 0x3e, 0x43, 0x50};

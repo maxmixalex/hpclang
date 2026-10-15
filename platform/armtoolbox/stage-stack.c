@@ -45,17 +45,20 @@ int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t 
             if (!read_byte(io, object + 10u + i * 2u, &byte) || byte != launcher_magic[i])
                 return 0;
         }
-    } else if (prologue == 0x2a4eu && length == 45u && object >= RPL_MAIN_FIRST &&
-               object <= RPL_MAIN_END - 50u && stage0_code != 0u && (stage0_code & 3u) == 0u) {
-        /* ARMToolbox can replace the string with a five-word HEXSTR launch
-         * descriptor. Match both its entry and code-base words to the actual
-         * executing stage0, rather than hiding an arbitrary user HEXSTR. The
+    } else if (prologue == 0x2a4eu && (length == 21u || length == 45u) &&
+               object >= RPL_MAIN_FIRST && object <= RPL_MAIN_END - 5u - length &&
+               stage0_code != 0u && (stage0_code & 3u) == 0u) {
+        /* ARMToolbox can replace the string with a two- or five-word HEXSTR
+         * descriptor. Match its entry, and the separate code base when present,
+         * to the executing stage0 rather than hiding an arbitrary user HEXSTR. The
          * native PrRUN continuation consumes this cell after ARM returns. */
         uint32_t entry = 0u, code_base = 0u;
         for (uint32_t i = 0u; i < 4u; ++i) {
             uint8_t entry_byte, base_byte;
-            if (!read_byte(io, object + 18u + 2u * i, &entry_byte) ||
-                !read_byte(io, object + 34u + 2u * i, &base_byte))
+            uint32_t entry_offset = length == 21u ? 10u : 18u;
+            uint32_t base_offset = length == 21u ? 10u : 34u;
+            if (!read_byte(io, object + entry_offset + 2u * i, &entry_byte) ||
+                !read_byte(io, object + base_offset + 2u * i, &base_byte))
                 return 0;
             entry |= (uint32_t)entry_byte << (8u * i);
             code_base |= (uint32_t)base_byte << (8u * i);

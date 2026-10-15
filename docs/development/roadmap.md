@@ -885,11 +885,20 @@ recognizes this descriptor when its entry and code-base words both match the
 executing stage0. Local HP50g direct-program and Port 2 library-command probes
 then both preserve the integer 124275 after PASS and settled Stock return,
 confirmed by independent native-stack decoding. The shared stack-reservation
-implementation now has repository host regression tests for descriptor identity,
+implementation handles both two-word and five-word descriptors and now has
+repository host regression tests for descriptor identity,
 bounds, failed reads/writes and preservation of application output and caller
 input. Focused sanitizers and ARM launcher builds pass; the HP49g+ direct-program
-probe also preserves 124275 after settled return. HP48 and post-relocation
-execution remain acceptance work.
+probe also preserves 124275 after settled return. HP48's two-word descriptor
+path passes the same independent post-return output check.
+
+An offline HP50g relocation experiment now passes execution and output
+preservation after native PACK moves libraries 275 and 124 by 32 bytes. The
+qualified C planner computes the two catalog-address repairs in a stopped-state
+copy; the resumed library command reaches PASS, settles in Stock and leaves
+124275 on the native stack. All live Flash payloads remain identical. This
+validates the sampled relocation/launch path, not live graph completeness,
+atomic reference repair, embedded legacy ARM realignment or interrupted erase.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
