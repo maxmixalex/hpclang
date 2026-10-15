@@ -984,6 +984,15 @@ reject unrelated values. An integrated test interrupts each write, rebuilds
 the partial catalog elsewhere, discards the old RAM edit and resolves a fresh
 field before finishing; old catalog bytes and neighbors stay unchanged.
 
+An isolated native HP50g restart experiment now starts from the PACK state with
+both stale bindings still unpatched. The ON/F3 sequence rebuilds library 124/275
+bindings at their moved addresses without changing any Flash byte. The resumed
+library command reaches PASS, returns to settled Stock and retains integer
+124275. Recovery must distinguish an interrupted live invocation from a catalog
+already rebuilt by Stock and resolve current bindings rather than replay saved
+RAM addresses. This evidence covers intact compacted Flash; reaching a recovery
+entry with a partially erased bank remains a separate startup requirement.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
