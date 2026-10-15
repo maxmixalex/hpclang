@@ -3,6 +3,7 @@
 #include "rpl-backup.h"
 #include <assert.h>
 #include <stdint.h>
+#include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,6 +15,9 @@ static unsigned writes;
 static uint32_t fail_address;
 static unsigned write_failures;
 static unsigned fail_write_at;
+static unsigned power_cut_at = UINT32_MAX;
+static uint16_t power_cut_mask;
+static jmp_buf power_cut;
 static const uint32_t base = 0x140000u;
 
 static int read16(void *context, uint32_t address, uint16_t *value)
@@ -32,6 +36,12 @@ static int program16(void *context, uint32_t address, uint16_t value)
     uint16_t old;
     assert(read16(context, address, &old));
     assert((old & value) == value);
+    if (writes == power_cut_at) {
+        uint16_t partial = old & (value | (uint16_t)~power_cut_mask);
+        flash[address - base] = (uint8_t)partial;
+        flash[address - base + 1u] = (uint8_t)(partial >> 8u);
+        longjmp(power_cut, 1); /* No returned error, readback or caller cleanup. */
+    }
     if (write_failures || writes == fail_write_at) {
         if (write_failures)
             --write_failures;
@@ -56,6 +66,7 @@ static void init(void)
     write_failures = 0;
     fail_write_at = UINT32_MAX;
     fail_address = UINT32_MAX;
+    power_cut_at = UINT32_MAX;
 }
 
 static void interrupted_tails(void)
@@ -153,17 +164,80 @@ static int packed_nibble(void *context, uint32_t address, uint8_t *value)
     return 1;
 }
 
-static uint8_t *string_record(uint32_t length, uint32_t *bytes)
+static uint8_t *named_string_record(uint32_t length, const char *name, uint32_t *bytes)
 {
     const struct hpclang_rpl_reader reader = {string_nibble, &length};
     uint8_t *backup, *result;
     uint32_t span;
-    assert(!hpclang_rpl_backup_encode(&reader, 0, 10u + length * 2u, (const uint8_t *)"FLASHONE", 8,
-                                      &backup, &span));
+    assert(!hpclang_rpl_backup_encode(&reader, 0, 10u + length * 2u, (const uint8_t *)name,
+                                      (uint32_t)strlen(name), &backup, &span));
     const struct hpclang_rpl_reader packed = {packed_nibble, backup};
     assert(!hpclang_rpl_flash_backup_record(&packed, 0, span, &result, bytes));
     free(backup);
     return result;
+}
+
+static uint8_t *string_record(uint32_t length, uint32_t *bytes)
+{
+    return named_string_record(length, "FLASHONE", bytes);
+}
+
+static void cut_append(const struct hpclang_rpl_flash_io *io, uint32_t slot)
+{
+    if (!setjmp(power_cut)) {
+        (void)hpclang_rpl_flash_append(io, slot, record, sizeof record);
+        assert(0 && "programming cut was not reached");
+    }
+    power_cut_at = UINT32_MAX;
+}
+
+static void restart_after_append(const struct hpclang_rpl_flash_io *io)
+{
+    uint32_t keep_bytes;
+    uint8_t *keep = named_string_record(3, "KEEP", &keep_bytes);
+    uint8_t *interrupted = malloc(sizeof flash);
+    assert(interrupted);
+    const uint32_t slot = 0x105u + keep_bytes;
+    init();
+    memcpy(flash + 0x105u, keep, keep_bytes);
+    assert(!hpclang_rpl_flash_append(io, base + slot, record, sizeof record));
+    unsigned count = writes;
+    const uint16_t masks[] = {0, 0x00ff, 0x0fff, 0xffff};
+    unsigned recovered = 0, rejected = 0, committed = 0;
+    for (unsigned cut = 0; cut < count; ++cut) {
+        for (unsigned m = 0; m < sizeof masks / sizeof masks[0]; ++m) {
+            init();
+            memcpy(flash + 0x105u, keep, keep_bytes);
+            power_cut_at = cut;
+            power_cut_mask = masks[m];
+            cut_append(io, base + slot);
+            memcpy(interrupted, flash, sizeof flash);
+            /* A new invocation gets no append slot/extent/expected record.
+             * Only the persistent Flash bytes survive into tail recovery. */
+            writes = 0;
+            int result = hpclang_rpl_flash_recover_tails(io);
+            uint8_t status = interrupted[slot];
+            if (status == 0xff) {
+                assert(!result);
+                ++recovered;
+                assert(!memcmp(flash, interrupted, slot));
+                assert(
+                    !memcmp(flash + slot + 4u, interrupted + slot + 4u, sizeof flash - slot - 4u));
+            } else if (status == 0x53) {
+                assert(!result && !writes && !memcmp(flash, interrupted, sizeof flash));
+                assert(!memcmp(flash + slot, record, sizeof record));
+                ++committed;
+            } else {
+                assert(result == HPCLANG_RPL_FLASH_DIRTY && !writes);
+                assert(!memcmp(flash, interrupted, sizeof flash));
+                ++rejected;
+            }
+            assert(!memcmp(flash + 0x105u, keep, keep_bytes));
+        }
+    }
+    assert(recovered && committed && rejected);
+    free(interrupted);
+    free(keep);
 }
 
 static void replace_backups(const struct hpclang_rpl_flash_io *io)
@@ -506,5 +580,6 @@ int main(void)
     accept_legacy_padding(&io);
     create_libraries(&io);
     recover_port_tails(&io);
+    restart_after_append(&io);
     return 0;
 }

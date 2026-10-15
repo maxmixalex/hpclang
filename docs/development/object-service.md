@@ -825,6 +825,13 @@ discard headers and preserves preceding live records and partial payloads.
 mapping lease, restoring mappings and interrupt state afterward. The standalone
 Flash fixture exercises explicit whole-port recovery before further append/read
 operations, plus a repeated recovery that must leave the image unchanged.
+Host restart tests also abort the actual append callback at every programming
+position with zero, partial and complete halfword programming, bypassing all
+returned-error cleanup. A fresh recovery invocation receives only the stored
+Flash bytes: FF tails are discarded, fully committed records remain unchanged,
+and partial status markers are rejected without mutation. The existing named
+backup and unrelated bytes survive each case. These are host fault-model tests,
+not evidence of calculator boot behavior after physical power loss.
 This is not automatic startup repair: partial status commits, replacement intent
 and interrupted sector erasure still require separate recovery protocols.
 The separate `port-flash-replace` client passes three HP49g+/HP50g Stock launches.
