@@ -1051,6 +1051,19 @@ absent and Flash unchanged. This validates a C-call boundary for the probe;
 actual journal discovery/replay, sufficient recovery stack depth, cache reuse
 and cross-model behavior are still unaccepted.
 
+The independent HP50g entry now also executes the actual ARM-compiled sector
+discovery/preflight modules against native Flash after the damaged-bank restart.
+It discovers the retained journal at `0x160105`, validates the restored whole-port
+overlay for target sector `0x140000`, and copies the exact durable journal into
+its owned workspace. A separate fixture with a corrupted journal CRC returns
+DIRTY without publishing output coordinates. Both fixtures preserve all Flash
+bytes, stack guards and code, and return to Stock with integer 124275 while
+library 275 is absent. These are calculator-side read-only recovery checks;
+Flash command ownership, erase/program replay through this entry, repeated
+interruption recovery and production packaging are not yet accepted. The 4 KiB
+probe stack passes these fixtures but still needs worst-case nested-object
+depth acceptance before use as a recovery stack contract.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
