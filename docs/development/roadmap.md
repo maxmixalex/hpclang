@@ -1163,6 +1163,16 @@ independently establishing insufficient space for the recovery object. Flash
 remains unchanged. An installation-space preflight and measured peak budget
 are still required; the specific transport error paths remain unexplained.
 
+A private pre-transfer check now queries Stock MEM over Kermit and drops its
+result before deciding whether to upload. The crowded HP50g fixture reports
+23,387 free nibbles against 79,956 serialized-object nibbles: upload is refused,
+the server exits normally, the original empty stack is preserved and full Flash
+is unchanged. The normal damaged-bank fixture reports 269,321 free nibbles and
+passes upload plus independently checked native recovery, retained journal,
+no-op replay and Stock return without Library 275. This is a necessary object
+size check only, not a sufficient peak-memory budget or production installer;
+transfer/installation overhead, error handling and other models remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
