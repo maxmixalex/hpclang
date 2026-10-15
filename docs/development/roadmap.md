@@ -1016,6 +1016,14 @@ is unchanged. The private experiment aligns code and patches its entry address
 inside the deposited object's owned RAM while the emulator is stopped. It proves
 the entry/return boundary only; on-calculator placement/relocation, memory
 ownership, HPC1 integration and an executable recovery application remain open.
+The next native HP50g prototype removes that stopped-state patch: independently
+assembled Saturn code obtains its own PC, copies the ARM marker probe to an
+aligned destination within its CODE object's reserved payload, computes the
+main-RAM ARM address and enters ARMSYS. Direct transfer/execution with library
+275 absent writes the expected marker, returns and pushes integer 124275; Flash
+is unchanged. Independent decoding confirms the aligned executed copy remains
+inside the owned object. This is a small private entry probe, not generalized
+allocation, cache-coherency/layout acceptance, HPC1 loading or a recovery payload.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
