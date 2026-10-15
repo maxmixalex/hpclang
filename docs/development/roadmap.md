@@ -1024,6 +1024,12 @@ main-RAM ARM address and enters ARMSYS. Direct transfer/execution with library
 is unchanged. Independent decoding confirms the aligned executed copy remains
 inside the owned object. This is a small private entry probe, not generalized
 allocation, cache-coherency/layout acceptance, HPC1 loading or a recovery payload.
+An eight-probe native program now exercises every CODE nibble-alignment phase
+in one invocation. All eight self-aligned ARM copies remain inside their own
+reserved CODE payloads, write distinct markers and return eight independently
+decoded integers. Library 275 remains absent and Flash unchanged. General
+payload sizes, cache reuse, a dedicated stack/workspace and recovery execution
+still need acceptance beyond this fixed-size marker probe.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
