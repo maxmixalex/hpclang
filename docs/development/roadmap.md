@@ -909,6 +909,16 @@ This format is not yet published or accepted by whole-port recovery. Durable
 publication, erase/replay ordering, journal retirement, allocation ownership and
 startup integration remain required before any recovery claim.
 
+The internal sector replay primitive reads and validates that durable image,
+skips an already matching target, otherwise erases, checks blankness, programs
+and verifies the entire sector. It retains the journal for subsequent reference
+repair and retry. Host tests interrupt every read and programming operation and
+every byte boundary of a partial erase, clear scratch RAM and replay from the
+retained Flash record; unrelated sectors remain unchanged. Corrupt/unpublished
+records cannot authorize erasure, and silent erase/program failures are detected.
+Focused sanitizers and ARM analysis pass. Public reclamation, journal publication
+and retirement, complete reference repair and startup recovery remain open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
