@@ -876,6 +876,14 @@ owned test library containing the hpclang Stock program now passes CRC, link
 resolution and complete command-span checks at three shifted bases, including
 odd nibble alignment. This prepares a relocation witness, but native execution
 after Flash movement and legacy-envelope alignment acceptance remain untested.
+The executable witness also exposes a launcher-stack gap before relocation:
+both direct-program and library-command launches reach PASS and settle back in
+Stock, but lose a newly pushed integer. An invocation capture shows a HEXSTR
+launcher descriptor at entry, the correct integer after the application's push,
+and the descriptor left behind after native return. The current bias detector
+recognizes the launcher string but not this descriptor. Correct descriptor
+recognition/restoration and independent post-return stack validation are required
+before accepting the library execution witness.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
