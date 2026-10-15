@@ -1102,6 +1102,20 @@ worst-case stack/cache behavior and production packaging remain open. This is
 an actual native command-path result, not automatic recovery or public Port 2
 reclamation acceptance.
 
+Native interruption acceptance now covers cuts after 128 and 132 completed SST
+program callbacks, including an erased bank identity and a partially restored
+first allocation header. Each interrupted replay reports DIRTY and stays in
+owned ARM execution with guards intact; exact Flash comparison confirms only
+the expected programmed prefix and an unchanged journal. Emulator hardware
+reset preserves that partial image. Stock USB then accepts a separately named
+recovery program, which discovers the journal, restores the target sector and
+returns normally without library 275; repeated replay performs no writes. The
+first retry accidentally selected the old fault-injection program because Stock
+renamed a same-name upload; using a distinct recovery variable fixes the fixture.
+These two cases establish command-boundary interruption/re-entry, not power loss
+while the Flash chip is busy, all partial-header patterns, automatic startup
+recovery or a completed public reclamation service.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
