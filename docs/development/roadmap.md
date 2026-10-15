@@ -862,6 +862,15 @@ moved attached libraries. Reusing native compaction therefore still requires
 the active-reference and ARM-ownership work; it does not close the application
 return or interrupted-erase gates.
 
+Library relocation acceptance must also exercise embedded ARM code alignment.
+Historical HPGCC3 has a PACK callback that realigns supported ARM envelopes in
+the RAM staging copy and refreshes the library CRC before Flash storage. The
+library-275 PACK fixture contains no matching legacy ARM envelope signature,
+so its byte-preservation result does not test that obligation. Add an owned
+embedded-code fixture with a changed alignment after movement, execute it after
+relaunch, and verify its updated library CRC. Historical implementation code
+is reference material only under the project's licensing policy.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
