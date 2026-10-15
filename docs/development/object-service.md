@@ -742,6 +742,18 @@ claim. Actual C parsing and planning reproduce all 17 native HOME patches on
 both paired models. TEMP comparison across these full application launches also
 shows intervening allocations, so those snapshots do not establish a uniform
 TEMP shift or complete registration safety.
+An independent saved-state relocation probe now passes on HP49g+/HP50g: it
+inserts the binding for library 123, moves the catalog suffix, metadata, TEMP
+allocations and return stack by 16 nibbles, updates 44 enumerated root fields,
+and adjusts AVMEM by the change in whole free stack cells. Native RCL then
+produces the library witness, and a fresh application invocation verifies the
+binding, catalog count and TEMP bottom before returning normally. The witness
+program's native registration call is removed in both the probe and its
+control; without the injected relocation, the control fails the missing-binding
+check (`0x46410060`). This is evidence for the sampled suspended Stock states,
+not for relocation while an ARM application owns pages or for arbitrary opaque
+TEMP contents. Public registration remains unavailable until those ownership
+and reference obligations are implemented and tested.
 The separate `port-flash-backup` client passes three independent launches on
 HP49g+/HP50g Stock. Native RPL recalls the created value before each relaunch,
 and the application consumes the witness then verifies duplicate refusal.
