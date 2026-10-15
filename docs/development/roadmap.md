@@ -1139,6 +1139,18 @@ only the target sector, preserves the journal and returns normally; repeated
 replay performs no writes. This change does not protect a failed/partial erase
 or other sectors, and does not establish automatic startup recovery.
 
+The next independent prototype separates initialized bytes from zero-filled
+runtime storage instead of embedding two copies of blank stack/workspace.
+Its Stock package decreases from 61,788 to 49,442 bytes; the initialized ARM
+copy is 18,384 bytes and the owned execution image is 30,960 bytes, retaining
+the 4 KiB stack and existing workspace capacity. Entry clears BSS, initializes
+guards and uses eight-byte image alignment. Native HP50g recovery and re-entry
+of the same stored program pass TLS/workspace reset, bounds/guards, exact Flash
+restoration and no writes on repeated recovery. This is still private packaging
+research: a transfer attempt in the earlier two-probe/abnormal-library state
+timed out without changing Flash. Reduced package size does not yet establish
+a sufficient-memory check, peak installation budget or acceptance of that state.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
