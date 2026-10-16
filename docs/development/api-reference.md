@@ -439,6 +439,17 @@ See [historical console output](hpgcc-compat.md#historical-console-output) for
 cursor/clear/tab calls, model-native blocking character input and remaining
 line-editor limitations.
 
+`hpclang_hpgcc_gets(buffer, capacity)` edits a bounded calculator-byte line,
+including backspace, scroll undo and ON cancellation. Capacity includes NUL;
+the old unbounded `gets/_gets` aliases are not supplied. `hpstdio.h` supplies
+`readint/readuint/readhex/readlonglong/readulonglong/readdouble` over this editor
+with 32-byte internal buffers. Integer syntax follows the documented historical
+prefix/sign rules; floating conversion uses C `strtod`. No conversion reports
+`EINVAL`, and integer overflow saturates with `ERANGE`. These convenience calls
+accept a numeric prefix. The clean text-input parsers remain the interface for
+whole-line validation and separate status/output. Including `hpstdio.h` alone
+does not select a default console; calling the input adapters does.
+
 ## Display and surfaces
 
 The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y, width, height`; this intentionally differs from historical HPG inclusive `x1, y1, x2, y2` rectangle calls.
@@ -827,7 +838,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | HPGCC2/3 `FS*` adapter | ✅ bounded useful subset over clean FatFs core |
-| HPGCC `hpstdio.h` adapter | ✅ standard libc + thin `fdelete()` |
+| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, and bounded `readint/readuint/readhex/readlonglong/readulonglong/readdouble`; historical decimal-format controls remain open |
 | HPGCC `fsystem.h` useful subset | ✅ implemented and exercised in Storage #53 |
 | public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 

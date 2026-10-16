@@ -82,14 +82,19 @@ the units and the boundary between historical timer calls and hpclang rendering;
 it does not imply complete HPGCC compatibility.
 
 `examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
-graphics, edits a name in a 16-byte buffer, then waits for a key before returning.
+graphics, edits a name in a 16-byte buffer, reads a count and a value, prints
+their product, then waits for a key before returning.
 Including `hpconio.h` enables
 lazy calculator-byte output without replacing standard C/C++ function names.
 The same header can appear in multiple translation units. Explicit
 `hpclang_stdio_bind` callbacks take priority over the historical default.
 The bounded editor takes an explicit capacity and supports backspace and ON
-cancellation. Old unbounded `gets` aliases and historical numeric-format
-adapters remain separate work.
+cancellation. `hpstdio.h` provides `readint/readdouble` and the unsigned,
+hexadecimal and 64-bit integer variants. These use a 31-byte edited line and
+report conversion/input errors through `errno` and stream flags. They accept
+numeric prefixes; use the clean text-input parsers for whole-line validation.
+Old unbounded `gets` aliases and historical decimal-format controls remain
+separate work.
 
 An application CMake file uses:
 
