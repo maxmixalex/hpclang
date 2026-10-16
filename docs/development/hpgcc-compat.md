@@ -759,6 +759,31 @@ propagation. The HPGCC System E2E exercises both tone spellings with measured
 duration bounds, BCD results and independent report pixels. The separate sound
 service tests cover hardware ownership and restoration.
 
+### RTC tick compatibility requirements
+
+The remaining `sys_setRTCTickPeriod`, `sys_isRTCTick` and `sys_waitRTCTicks`
+adapters form one stateful interface; `sys_waitRTCTicks` is not a fixed-unit
+delay. The reviewed four-generation implementations establish these contracts:
+
+- A period selector `n` in 1..127 means `(n + 1) / 128` seconds. The software
+  default is 15 (8 Hz). Odd half-microsecond periods must not accumulate drift.
+- In 1.1/2.0/3, setting a valid selector returns the previous selector; zero or
+  values above 127 query the current selector without changing it. Version 1.0
+  has a void setter instead. The later software selector does not establish
+  what period an unrelated caller has written directly to hardware.
+- `sys_isRTCTick` consumes one pending indication. Multiple expirations before
+  a poll coalesce into one indication; there is no accumulated tick count.
+- `sys_waitRTCTicks(count)` repeatedly consumes indications; nonpositive counts
+  return immediately. A preexisting pending tick can satisfy the first count,
+  so multiplying count by the period is not equivalent.
+
+The historical implementation changes TICNT and clears the RTC bit in SRCPND.
+An hpclang implementation still needs explicit ownership, phase/pending-state
+semantics, error handling and exit restoration. An application-local timer
+would need to document its different relationship to the real interrupt latch;
+the existing cooperative timer's accumulated-expiration count alone is not a
+drop-in implementation. These three adapters remain unimplemented.
+
 ### SD media discovery and replacement
 
 Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3

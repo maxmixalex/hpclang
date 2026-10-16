@@ -1619,6 +1619,10 @@ below are retained.
   groups. Expand the four-generation declaration/implementation/evidence ledger.
 - [ ] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
+- [ ] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
+  second periods, query/restore semantics and coalesced pending indications.
+  Preserve nonpositive wait behavior and account for a pending first tick;
+  define ownership and exit restoration before claiming hardware equivalence.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.
