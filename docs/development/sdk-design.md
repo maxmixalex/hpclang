@@ -459,6 +459,12 @@ relocation roots would corrupt such values. A platform contract must classify
 the suspended caller's entries, or use an entry/return path whose root ownership
 is established independently.
 
+A standalone entry does not by itself establish that ownership. Read-only
+HP49g+/HP50g captures through the independent recovery envelope, with library
+275 absent, still contain one machine-stack value inside the movable TEMP
+range. The surrounding Stock evaluation path therefore remains part of the
+execution-root analysis even when the ARM image and its stack are owned.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.

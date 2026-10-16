@@ -1371,6 +1371,15 @@ checks on both HP49g+ and HP50g for the tested launcher path. This broadens the
 native integration evidence without accepting unconditional stack repair; caller
 classification or independently owned entry/return roots remain required.
 
+Read-only captures through the existing independent recovery entry also pass
+on HP49g+/HP50g with library 275 absent: exact CPSR restoration, intact image/
+stack guards, empty native data stack, Stock ROM return and unchanged Flash.
+Both retain one machine-stack value in the proposed movable TEMP interval,
+despite different ring cursor positions. Independent entry therefore does not
+remove the need to analyze the outer Stock caller; replacing the historical
+runner is not treated as a shortcut to complete relocation safety or as an
+implicit change to the retained M8.6 evaluation scope.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
