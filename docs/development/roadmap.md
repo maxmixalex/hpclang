@@ -1330,6 +1330,16 @@ Thus paired payload differences alone do not identify relocation fields. These
 objects still require semantic classification; no raw-address scanning or
 reference-free assumption is accepted from this experiment.
 
+Shared edit assembly now merges identical observations across discovery paths
+and rejects conflicting values, partial overlaps and exhausted storage without
+publishing a partial count. Host tests, sanitizers and ARM compilation/analysis
+pass. In both HP49g+/HP50g saved registration states, root/catalog/attachment
+observations merge from 601/604 to 575/577 unique fields (26/27 duplicates).
+Forward/reverse discovery order gives identical batches; native expected-value
+preflight passes and a contradictory duplicate is rejected. This read-only
+experiment uses unchanged values to verify assembly, not relocation semantics
+or complete reference coverage.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

@@ -178,6 +178,25 @@ struct hpclang_rpl_reference_edit
     uint32_t mapping, field, expected, value;
 };
 
+struct hpclang_rpl_reference_edit_builder
+{
+    struct hpclang_rpl_reference_edit *edits;
+    uint32_t capacity, count;
+    int error;
+};
+
+/* Merge independently discovered edits into a sorted, nonoverlapping batch.
+ * Exact duplicates (including unchanged fields) consume no extra capacity.
+ * Conflicting duplicates and partial overlaps are malformed. Any error latches
+ * and invalidates count; begin is required to restart. Caller owns storage and
+ * normalizes physical aliases before adding entries. No IO or allocation.
+ * Only complete successful discovery permits later validation/use of the batch;
+ * this builder does not discover missing references or authorize relocation. */
+int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder *builder,
+                                      struct hpclang_rpl_reference_edit *edits, uint32_t capacity);
+int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *builder,
+                                    const struct hpclang_rpl_reference_edit *edit);
+
 struct hpclang_rpl_reference_reader
 {
     int (*read_nibble)(void *context, uint32_t mapping, uint32_t address, uint8_t *value);

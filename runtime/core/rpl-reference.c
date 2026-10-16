@@ -83,6 +83,67 @@ static int emit(struct traversal *walk, enum hpclang_rpl_reference_kind kind, ui
     return walk->visit(walk->context, &edge);
 }
 
+static int edit_builder_error(struct hpclang_rpl_reference_edit_builder *builder, int error)
+{
+    builder->count = 0;
+    builder->error = error;
+    return error;
+}
+
+int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder *builder,
+                                      struct hpclang_rpl_reference_edit *edits, uint32_t capacity)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *builder = (struct hpclang_rpl_reference_edit_builder){edits, capacity, 0, 0};
+    if (capacity && !edits)
+        return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    return 0;
+}
+
+int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *builder,
+                                    const struct hpclang_rpl_reference_edit *edit)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (!edit || builder->count > builder->capacity || (builder->capacity && !builder->edits))
+        return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    const struct hpclang_rpl_reference_edit next = *edit;
+    if (next.field > 0xffffbu || next.expected > 0xfffffu || next.value > 0xfffffu)
+        return edit_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    struct hpclang_rpl_reference_edit *edits = builder->edits;
+    uint32_t first = 0, end = builder->count;
+    while (first < end) {
+        uint32_t middle = first + (end - first) / 2;
+        if (edits[middle].mapping < next.mapping ||
+            (edits[middle].mapping == next.mapping && edits[middle].field < next.field))
+            first = middle + 1;
+        else
+            end = middle;
+    }
+    if (first < builder->count && edits[first].mapping == next.mapping) {
+        if (edits[first].field == next.field) {
+            if (edits[first].expected != next.expected || edits[first].value != next.value)
+                return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+            return 0;
+        }
+        if (edits[first].field - next.field < 5)
+            return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    }
+    if (first && edits[first - 1].mapping == next.mapping &&
+        next.field - edits[first - 1].field < 5)
+        return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (builder->count == builder->capacity)
+        return edit_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    for (uint32_t i = builder->count; i > first; --i)
+        edits[i] = edits[i - 1];
+    edits[first] = next;
+    ++builder->count;
+    return 0;
+}
+
 static int guard_builder_error(struct hpclang_rpl_reference_guard_builder *builder, int error)
 {
     builder->count = 0;

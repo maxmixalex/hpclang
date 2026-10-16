@@ -1025,8 +1025,76 @@ static void compact_guard_observations(void)
     assert(hpclang_rpl_reference_guards_observe(NULL, 0, 0, 0) == HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+static void merge_reference_edits(void)
+{
+    const struct hpclang_rpl_reference_edit inputs[] = {
+        {0, 5, 0x12345, 0x12355}, {0, 10, 0x23456, 0x23456}, {UINT32_MAX, 5, 3, 4}};
+    struct hpclang_rpl_reference_edit storage[4];
+    struct hpclang_rpl_reference_edit_builder builder;
+    for (unsigned a = 0; a < 3; ++a)
+        for (unsigned b = 0; b < 3; ++b) {
+            if (a == b)
+                continue;
+            unsigned order[] = {a, b, 3 - a - b};
+            storage[3] = (struct hpclang_rpl_reference_edit){123, 456, 789, 1011};
+            assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 3));
+            for (unsigned i = 0; i < 3; ++i) {
+                assert(!hpclang_rpl_reference_edits_add(&builder, &inputs[order[i]]));
+                assert(!hpclang_rpl_reference_edits_add(&builder, &inputs[order[i]]));
+                assert(builder.count == i + 1 && !builder.error);
+            }
+            assert(!memcmp(storage, inputs, sizeof inputs));
+            assert(storage[3].mapping == 123 && storage[3].field == 456 &&
+                   storage[3].expected == 789 && storage[3].value == 1011);
+            assert(hpclang_rpl_reference_edits_validate(NULL, storage, builder.count) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+        }
+    for (int offset = -4; offset <= 4; ++offset) {
+        if (!offset)
+            continue;
+        struct hpclang_rpl_reference_edit overlap = {0, (uint32_t)(10 + offset), 1, 2};
+        assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 3));
+        assert(!hpclang_rpl_reference_edits_add(&builder, &inputs[1]));
+        assert(hpclang_rpl_reference_edits_add(&builder, &overlap) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!builder.count && builder.error == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(hpclang_rpl_reference_edits_add(&builder, &inputs[2]) == builder.error);
+    }
+    for (unsigned field = 0; field < 2; ++field) {
+        struct hpclang_rpl_reference_edit conflict = inputs[0];
+        if (field)
+            conflict.value ^= 1;
+        else
+            conflict.expected ^= 1;
+        assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 3));
+        assert(!hpclang_rpl_reference_edits_add(&builder, &inputs[0]));
+        assert(hpclang_rpl_reference_edits_add(&builder, &conflict) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!builder.count);
+    }
+    const struct hpclang_rpl_reference_edit invalid[] = {
+        {0, 0xffffc, 0, 0}, {0, 0, 0x100000, 0}, {0, 0, 0, 0x100000}};
+    for (unsigned i = 0; i < 3; ++i) {
+        assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 3));
+        assert(hpclang_rpl_reference_edits_add(&builder, &invalid[i]) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(!builder.count && builder.error == HPCLANG_RPL_SPAN_BOUNDS);
+    }
+    assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 1));
+    struct hpclang_rpl_reference_edit last = {0, 0xffffb, 0xfffff, 0xfffff};
+    assert(!hpclang_rpl_reference_edits_add(&builder, &last));
+    assert(!hpclang_rpl_reference_edits_add(&builder, &last));
+    assert(hpclang_rpl_reference_edits_add(&builder, &inputs[0]) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!builder.count);
+    assert(!hpclang_rpl_reference_edits_begin(&builder, NULL, 0));
+    assert(hpclang_rpl_reference_edits_add(&builder, &inputs[0]) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_edits_begin(&builder, NULL, 1) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_edits_begin(NULL, storage, 3) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!hpclang_rpl_reference_edits_begin(&builder, storage, 3));
+    assert(hpclang_rpl_reference_edits_add(&builder, NULL) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_edits_add(NULL, &inputs[0]) == HPCLANG_RPL_SPAN_MALFORMED);
+}
+
 int main(void)
 {
+    merge_reference_edits();
     nested_unresolved();
     compact_guard_observations();
     catalog_relocation_plan();

@@ -432,6 +432,16 @@ bound their reads. External targets remain for bank-qualified resolution, and
 opaque/execution entries remain explicit unresolved obligations. A successful
 structural walk therefore does not certify a complete relocation graph.
 
+`hpclang_rpl_reference_edits_begin()` and `edits_add()` merge separately
+discovered fields into a caller-owned, sorted batch. Identical edits consume
+one slot, including unchanged fields retained for preflight. Conflicting old
+or replacement values and partial field overlaps invalidate the entire batch;
+capacity and input failures also latch until collection restarts. Physical
+mapping aliases must already be normalized. This removes duplicate writes
+when root, catalog and object visitors identify the same native field, while
+retaining conflicts as errors. It performs no IO and does not replace complete
+reference discovery or later expected-value validation.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
