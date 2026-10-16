@@ -1300,7 +1300,9 @@ journal retirement and the two automatic warmstarts. A separate native Stock
 2.15 ordering probe on HP49g+ and HP50g observes library configuration before HOME `STARTUP`.
 Consequently the production entry must address recovery before other library
 code can access damaged Flash, as well as survival after loss of HOME RAM.
-Ordering among multiple configuration programs remains unverified.
+On HP50g, two Port 2 probe libraries (1701 and 1702) configure in ascending ID
+order with either installation order, before `STARTUP`. Ordering across arbitrary
+libraries/ports and an available earliest recovery callback remain unverified.
 
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay

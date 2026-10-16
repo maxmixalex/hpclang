@@ -378,9 +378,12 @@ The fixture does not install a recovery service into an existing user's HOME.
 Native HP49g+/HP50g Stock 2.15 ordering probes install a temporary Port 0 library
 whose configuration appends `C` to a HOME string, while `STARTUP` appends `S`.
 After warmstart, independent RAM inspection finds `CS` on both models, the
-installed library in the rebuilt catalog and execution back in Stock. Thus HOME `STARTUP` alone
-cannot guarantee recovery before library configuration accesses a damaged bank.
-This probe does not establish ordering among multiple library configurations.
+installed library in the rebuilt catalog and execution back in Stock. Thus HOME
+`STARTUP` alone cannot guarantee recovery before library configuration accesses
+a damaged bank. A separate HP50g probe puts libraries 1701 and 1702 in Port 2:
+both installation orders run 1701's configuration before 1702's, then `STARTUP`.
+This is evidence for that pair, not a reserved earliest callback or a guarantee
+across arbitrary library IDs, ports and firmware configurations.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
