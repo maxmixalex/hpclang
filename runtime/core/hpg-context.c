@@ -99,6 +99,24 @@ static int status_view(struct hpclang_surface *view)
     ++view->width;
     return 1;
 }
+int hpclang_hpg_console_present(void)
+{
+    if (!owns_display) {
+        errno = EPERM;
+        return -1;
+    }
+    if (!double_buffered)
+        return hpclang_display_publish();
+    struct hpclang_surface front, back;
+    if (!status_view(&front))
+        return -1;
+    if (hpclang_display_present(100000))
+        return -1;
+    if (!status_view(&back))
+        return -1;
+    hpclang_surface_blit(&back, 0, 0, &front, 0, 0, (int32_t)front.width, (int32_t)front.height);
+    return 0;
+}
 struct hpg_graphics *hpclang_hpg_acquire_screen(void)
 {
     hpg_init();

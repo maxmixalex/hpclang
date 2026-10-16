@@ -12,8 +12,15 @@ extern "C"
      * getchar blocks for a model-native text key without echo: Enter returns LF,
      * deletion returns BS, ON reports EOF/ferror with ECANCELED. Alpha/Shift state
      * persists across reads; physical event timings/queue are not reset.
-     * Line editing and numeric-format policy are not supplied by this group yet. */
+     * Legacy gets/_gets aliases and numeric-format policy are not supplied yet. */
     int hpclang_hpgcc_console_enable(void);
+    /* Edited calculator-byte line, capacity including NUL; initially empty.
+     * Echo/BS correction, CR/LF acceptance; excess input is ignored until edited.
+     * Returns buffer, or NULL on empty EOF/error/cancel. Partial text remains
+     * terminated. Invalid/unknown size: EINVAL before consuming input. Uses the
+     * selected standard streams; default-console editing owns a temporary image
+     * for scroll undo and publishes each edit even in HPG double-buffer mode. */
+    char *hpclang_hpgcc_gets(char *buffer, size_t capacity);
     void home(void);
     int getx(void);
     int gety(void);

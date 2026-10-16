@@ -21,14 +21,47 @@ uint32_t hpclang_font_height(const struct hpclang_font *font)
 {
     return font ? 6 : 0;
 }
+static const unsigned char *input_bytes;
+static int input_end = HPCLANG_STDIO_EOF, stream_error;
 int hpclang_hpgcc_console_read(void *context)
 {
     (void)context;
-    assert(0 && "graphics checks must not poll input");
-    return HPCLANG_STDIO_ERROR;
+    assert(input_bytes && "graphics checks must not poll input");
+    if (*input_bytes)
+        return *input_bytes++;
+    if (input_end == HPCLANG_STDIO_ERROR)
+        errno = ECANCELED;
+    return input_end;
 }
 void hpclang_stdio_clear_streams(void)
 {
+    stream_error = 0;
+}
+int hpg_test_getchar(void)
+{
+    int result = hpclang_stdio_route_read();
+    if (result == HPCLANG_STDIO_ERROR) {
+        stream_error = 1;
+        return EOF;
+    }
+    return result;
+}
+int hpg_test_putchar(int byte)
+{
+    return hpclang_stdio_route_write(1, (unsigned char)byte) ? EOF : (unsigned char)byte;
+}
+int hpg_test_fputs(const char *text, FILE *stream)
+{
+    assert(stream == stdout);
+    while (*text)
+        if (hpg_test_putchar((unsigned char)*text++) == EOF)
+            return EOF;
+    return 0;
+}
+int hpg_test_ferror(FILE *stream)
+{
+    assert(stream == stdin);
+    return stream_error;
 }
 static unsigned tones;
 int hpclang_sound_play(uint32_t frequency, uint32_t duration, hpclang_sound_cancel_fn cancel,
@@ -353,6 +386,58 @@ static void shared_screen(void)
     hpclang_display_end();
 }
 
+static char captured[32];
+static unsigned captured_length;
+static int capture_byte(void *context, unsigned stream, unsigned char byte)
+{
+    (void)context;
+    assert(stream == 1 && captured_length + 1 < sizeof captured);
+    captured[captured_length++] = (char)byte;
+    captured[captured_length] = 0;
+    return 0;
+}
+static void edited_lines(void)
+{
+    char text[16];
+    hpg_set_mode_mono(0);
+    _clear_screen();
+    struct hpclang_surface *s = hpclang_display_surface();
+    hpclang_surface_set_pixel(s, 7, 5, 255);
+    input_bytes = (const unsigned char *)"ABCDEFG\b\b\b\b\b\b\n";
+    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "A"));
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* restore pre-scroll graphics */
+    assert(getx() == 0 && gety() == 1);
+    hpg_set_mode_gray16(1);
+    _clear_screen();
+    input_bytes = (const unsigned char *)"ABC\b\n";
+    unsigned previous = flips;
+    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "AB"));
+    assert(flips == previous + 5);
+    for (unsigned i = 0; i < 2; ++i) {
+        assert(hpclang_surface_get_pixel(pages[i], 0, 0) == 255);
+        assert(hpclang_surface_get_pixel(pages[i], 4, 0) == 255);
+        assert(hpclang_surface_get_pixel(pages[i], 0, 6) == 0);
+    }
+    input_bytes = (const unsigned char *)"X";
+    input_end = HPCLANG_STDIO_ERROR;
+    assert(!hpclang_hpgcc_gets(text, sizeof text) && errno == ECANCELED && !strcmp(text, "X"));
+    input_end = HPCLANG_STDIO_EOF;
+    stream_error = 0;
+    hpg_cleanup();
+    unsigned before = borrowed;
+    const struct hpclang_stdio_callbacks io = {.read = hpclang_hpgcc_console_read,
+                                               .write = capture_byte};
+    assert(hpclang_stdio_bind(&io) == 0);
+    input_bytes = (const unsigned char *)"AB\bC\n";
+    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "AC"));
+    assert(!strcmp(captured, "AB\b \bC\n") && borrowed == before && !page_count);
+    assert(hpclang_stdio_unbind() == 0);
+    strcpy(text, "OK");
+    assert(!hpclang_hpgcc_gets(text, 0) && errno == EINVAL && !strcmp(text, "OK"));
+    assert(!hpclang_hpgcc_gets(text, SIZE_MAX) && errno == EINVAL && !strcmp(text, "OK"));
+    input_bytes = NULL;
+}
 static void historical_console(void)
 {
     struct hpclang_surface *saved_display = display;
@@ -409,6 +494,7 @@ static void historical_console(void)
     hpg_flip();
     assert(flips == previous_flips + 1);
     hpg_cleanup();
+    edited_lines();
     hpclang_surface_destroy(display);
     display = saved_display;
     display_height = 6;

@@ -6,6 +6,10 @@
 static struct hpclang_stdio_callbacks binding;
 static struct hpclang_stdio_callbacks fallback;
 static int bound, busy, default_set;
+int hpclang_stdio_default_active(void)
+{
+    return default_set && !bound;
+}
 
 int hpclang_stdio_set_default(const struct hpclang_stdio_callbacks *callbacks)
 {

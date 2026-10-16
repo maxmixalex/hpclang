@@ -753,8 +753,8 @@ graphics, and scrolling moves graphics together with text. Output wraps
 immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
-cleanup restores the borrowed display. The header does not yet implement the
-historical line editing or decimal-format policy; these remain
+cleanup restores the borrowed display. Historical `gets/_gets` spellings,
+numeric input and decimal-format policy remain
 M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
@@ -774,6 +774,20 @@ of this new input path are pending. HP39gs/HP48gII/HP49g+ Direct and HP48gII Sto
 also pass locally, as does the updated installed-SDK relocation/packaging gate.
 `fgets` can
 consume these bytes, but it does not implement an interactive line editor.
+
+`hpclang_hpgcc_gets(buffer, capacity)` adds a bounded interactive byte line.
+Capacity includes the terminating NUL. It starts empty, echoes accepted bytes,
+accepts CR/LF, permits backspace, and rejects excess input while still allowing
+correction. Cancellation/error returns NULL with terminated partial text;
+nonempty ordinary EOF returns that text. Invalid or unknown capacity fails
+before consuming input. The default console temporarily saves its visible
+image so deletion can undo scrolling and restore earlier graphics. Each edit
+is published even in an HPG double-buffer mode, synchronizing its back page.
+Allocation failure can occur before editing. With explicit standard-stream
+callbacks, it uses those streams and emits BS-space-BS for deletion without
+acquiring a display. Host sanitizer checks cover these paths; native and SDK
+acceptance of the editor remain pending. Old unbounded spellings are not yet
+redirected to this API.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,

@@ -134,6 +134,7 @@ hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-console.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c"
     "${HPCLANG_ROOT}/runtime/core/console.c"
     "${HPCLANG_ROOT}/runtime/core/stdio-routing.c"
     "${HPCLANG_ROOT}/runtime/core/hpg-context.c"
@@ -143,6 +144,8 @@ hpclang_unit(hpg_context test_hpg_context.c
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_hpg_context PRIVATE getchar=hpg_test_getchar
+    putchar=hpg_test_putchar fputs=hpg_test_fputs ferror=hpg_test_ferror)
 set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
     "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
     "${HPCLANG_ROOT}/runtime/core/ui-focus.c"

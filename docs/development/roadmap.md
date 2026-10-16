@@ -1823,6 +1823,13 @@ and the updated SDK relocation/packaging gate also pass locally. The remaining
 Stock/model checks are in progress. Interactive
 line editing and historical numeric-input/format policy remain open.
 
+The bounded `hpclang_hpgcc_gets` editor now integrates the tested byte-line core
+with standard streams and HPG rendering. Host sanitizers cover overflow/re-edit,
+partial-text cancellation, restoring graphics after scroll undo, synchronized
+double-buffer editing, and explicit stdio ownership without display acquisition.
+Native/SDK editor acceptance and the old unbounded-name compatibility policy
+remain pending; this does not close the historical line-input group.
+
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
 Tone duration overflow fails before playback; the old clock-assumption error

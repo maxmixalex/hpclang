@@ -83,6 +83,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-context.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-console.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-input.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-line.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-draw.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-font.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpg-xpm.c"

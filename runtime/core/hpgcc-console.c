@@ -8,6 +8,7 @@
 #include "console-internal.h"
 #include "hpg-internal.h"
 #include "stdio-routing.h"
+#include "hpgcc-line.h"
 
 static struct hpclang_console *console;
 static hpg_t *screen;
@@ -188,4 +189,81 @@ void _clear_screen(void)
 void beep(void)
 {
     (void)hpclang_sound_play(880, 100, NULL, NULL);
+}
+
+struct line_context
+{
+    struct hpclang_surface *original;
+    struct hpclang_console_state start;
+    const char *text;
+    size_t length;
+};
+static int line_read(void *context)
+{
+    (void)context;
+    int byte = getchar();
+    return byte == EOF && ferror(stdin) ? HPCLANG_STDIO_ERROR : byte;
+}
+static int line_echo(void *context, unsigned char byte)
+{
+    struct line_context *line = context;
+    if (putchar(byte) == EOF)
+        return -1;
+    if (byte >= 0x20)
+        ++line->length;
+    return line->original ? hpclang_hpg_console_present() : 0;
+}
+static int line_erase(void *context)
+{
+    struct line_context *line = context;
+    if (!line->original) {
+        if (fputs("\b \b", stdout) == EOF)
+            return -1;
+        --line->length;
+        return 0;
+    }
+    struct hpclang_surface *surface = prepare();
+    if (!surface)
+        return -1;
+    hpclang_surface_blit(surface, 0, 0, line->original, 0, 0,
+                         (int32_t)hpclang_surface_width(line->original),
+                         (int32_t)hpclang_surface_height(line->original));
+    (void)hpclang_console_clear(console);
+    (void)hpclang_console_move(console, line->start.column, line->start.row);
+    for (size_t i = 0; i + 1 < line->length; ++i)
+        printable(surface, (unsigned char)line->text[i]);
+    if (hpclang_hpg_console_present())
+        return -1;
+    --line->length;
+    return 0;
+}
+char *hpclang_hpgcc_gets(char *buffer, size_t capacity)
+{
+    if (!buffer || !capacity || capacity == SIZE_MAX) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (hpclang_hpgcc_console_enable())
+        return NULL;
+    struct line_context line = {.text = buffer};
+    if (hpclang_stdio_default_active()) {
+        struct hpclang_surface *surface = prepare();
+        if (!surface)
+            return NULL;
+        line.start = state();
+        line.original =
+            hpclang_surface_create(hpclang_surface_width(surface), hpclang_surface_height(surface),
+                                   hpclang_surface_levels(surface));
+        if (!line.original)
+            return NULL;
+        hpclang_surface_blit(line.original, 0, 0, surface, 0, 0,
+                             (int32_t)hpclang_surface_width(surface),
+                             (int32_t)hpclang_surface_height(surface));
+    }
+    const struct hpclang_hpgcc_line_io io = {line_read, line_echo, line_erase, NULL, &line};
+    char *result = hpclang_hpgcc_read_line(buffer, capacity, &io);
+    int error = errno;
+    hpclang_surface_destroy(line.original);
+    errno = error;
+    return result;
 }
