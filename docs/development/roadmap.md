@@ -1716,8 +1716,10 @@ below are retained.
   RTC control/divider and tick routing/mask. An HP50g `_Exit` variant passes,
   and deliberate missing cleanup is rejected. The relocated installed SDK
   also passes C/C++, six-model launcher/notebook and HP39 Aplet packaging with
-  the adapters used by its timer example. HP50g and HP39g+ Stock pass; remaining
-  Stock acceptance is running. This does not yet close the tick-adapter milestone.
+  the adapters used by its timer example. All six Stock targets now pass the
+  complete interface/timing payload, independent pixels and normal return.
+  Host/ARM analysis passes across 265 sources and 777 configurations. Formal CI
+  for this addition remains pending before closing the tick-adapter milestone.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.

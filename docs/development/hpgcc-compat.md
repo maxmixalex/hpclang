@@ -828,7 +828,10 @@ a missing release. All six Direct targets pass this gate. An HP50g `_Exit`
 variant also passes; a deliberate omission of cleanup is rejected with
 `rtc-tick-state`. The relocated installed SDK builds the timer example using
 all three adapters, C/C++ clients, six model-specific notebooks and three HP39
-Aplet families. HP39g+ Stock also passes; the remaining Stock matrix is pending.
+Aplet families. All six Stock models now pass the full interface/timing payload,
+independent report-pixel checks and normal return. Host/ARM Clang analysis passes
+across the batch's 265 sources and 777 distinct configurations. Formal CI for
+the RTC tick addition remains pending.
 
 ### SD media discovery and replacement
 
