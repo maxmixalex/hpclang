@@ -27,6 +27,31 @@ struct hpclang_rpl_entry
 int hpclang_rpl_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t address,
                               uint32_t limit, struct hpclang_rpl_entry *entry);
 
+struct hpclang_rpl_command_program
+{
+    struct hpclang_rpl_reader reader;
+    uint32_t address, limit, number, command;
+};
+
+struct hpclang_rpl_cached_program
+{
+    uint32_t number, command, address, span;
+};
+
+/* Match a complete caller-bounded TEMP allocation containing ROMP + DOCOL
+ * against the independently resolved native command program. Source number,
+ * command, mapping and address must come from validated catalog/bank/link
+ * resolution, not from scanning for equal bytes. Require an exact allocation
+ * extent and identical program nibbles; no trailing objects are accepted.
+ * Source limit is a maximum readable span. Readers/mappings remain stable.
+ * Output changes only on success (zero); errors are span results. No allocation
+ * or writes. This proves the cache's identity/content, not the pointer type of
+ * an arbitrary machine-stack value or completeness of execution roots. */
+int hpclang_rpl_cached_program_match(const struct hpclang_rpl_reader *cache, uint32_t address,
+                                     uint32_t extent,
+                                     const struct hpclang_rpl_command_program *source,
+                                     struct hpclang_rpl_cached_program *view);
+
 enum hpclang_rpl_reference_kind
 {
     HPCLANG_RPL_REFERENCE_INLINE,

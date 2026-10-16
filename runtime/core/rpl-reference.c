@@ -438,6 +438,53 @@ int hpclang_rpl_entry_inspect(const struct hpclang_rpl_reader *reader, uint32_t 
     return HPCLANG_RPL_SPAN_OK;
 }
 
+int hpclang_rpl_cached_program_match(const struct hpclang_rpl_reader *cache, uint32_t address,
+                                     uint32_t extent,
+                                     const struct hpclang_rpl_command_program *source,
+                                     struct hpclang_rpl_cached_program *view)
+{
+    if (!cache || !cache->read_nibble || !source || !source->reader.read_nibble || !view)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (address >= 0x100000u || extent < 21 || extent > 0x100000u - address ||
+        source->address >= 0x100000u || source->limit < 10 ||
+        source->limit > 0x100000u - source->address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (source->number > 0xfff || source->command > 0xfff)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t prologue, number, command;
+    int result = word(cache, address, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x2e92)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if ((result = word(cache, address + 5, 3, &number)) ||
+        (result = word(cache, address + 8, 3, &command)))
+        return result;
+    if (number != source->number || command != source->command)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(&source->reader, source->address, 5, &prologue);
+    if (result)
+        return result;
+    if (prologue != 0x2d9d)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    uint32_t span;
+    result = hpclang_rpl_object_span(&source->reader, source->address, source->limit, &span);
+    if (result)
+        return result;
+    if (span != extent - 11)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    for (uint32_t i = 0; i < span; ++i) {
+        uint8_t original, copied;
+        if (!source->reader.read_nibble(source->reader.context, source->address + i, &original) ||
+            !cache->read_nibble(cache->context, address + 11 + i, &copied))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (original > 15 || copied > 15 || original != copied)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+    }
+    *view = (struct hpclang_rpl_cached_program){number, command, address + 11, span};
+    return 0;
+}
+
 struct directory_reader
 {
     const struct hpclang_rpl_reader *source;

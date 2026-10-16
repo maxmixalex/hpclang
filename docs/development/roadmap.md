@@ -1380,6 +1380,22 @@ remove the need to analyze the outer Stock caller; replacing the historical
 runner is not treated as a shortcut to complete relocation safety or as an
 implicit change to the retained M8.6 evaluation scope.
 
+The remaining independent-entry TEMP candidate belongs to a cached library
+161 command 17 program. Catalog/bank/link resolution identifies its Flash source;
+the shared cached-program matcher accepts all 52 program nibbles and rejects
+incorrect identity or allocation extent on both captured model states. Host tests
+also reject changed content, unreadable nibbles and invalid bounds. This replaces
+command-offset assumptions with bounded cache identity validation, while leaving
+the machine-stack value's semantic classification and live relocation gate open.
+
+Instruction inspection distinguishes the retained caller cases: the independent
+entry's preceding Stock handler saves the RPL cursor with `CD0EX` / `RSTK=C`;
+the library-275 command-0 candidates lie on nested RPL boundaries, while the
+command-4 candidate follows a machine-code `GOSUB`. These are different root
+provenance paths. Cache matching alone must not collapse them into one generic
+address-range rule, and the diagnostic command offsets remain outside product
+code.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

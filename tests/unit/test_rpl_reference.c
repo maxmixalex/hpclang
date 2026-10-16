@@ -1092,8 +1092,85 @@ static void merge_reference_edits(void)
     assert(hpclang_rpl_reference_edits_add(NULL, &inputs[0]) == HPCLANG_RPL_SPAN_MALFORMED);
 }
 
+static void cached_command_program(void)
+{
+    struct image cache = {.size = 128, .fail = UINT32_MAX};
+    struct image rom = {.size = 128, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &cache};
+    struct hpclang_rpl_command_program source = {{read_nibble, &rom}, 0, 15, 161, 17};
+    const struct hpclang_rpl_cached_program sentinel = {1, 2, 3, 4};
+    struct hpclang_rpl_cached_program view = sentinel;
+    put(&rom, 0, 0x2d9d, 5);
+    put(&rom, 5, 0x395ac, 5);
+    put(&rom, 10, 0x312b, 5);
+    put(&cache, 32, 0x2e92, 5);
+    put(&cache, 37, 161, 3);
+    put(&cache, 40, 17, 3);
+    memcpy(cache.data + 43, rom.data, 15);
+    assert(!hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view));
+    assert(view.number == 161 && view.command == 17 && view.address == 43 && view.span == 15);
+    view = sentinel;
+    for (unsigned i = 32; i < 58; ++i) {
+        cache.fail = i;
+        assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!memcmp(&view, &sentinel, sizeof view));
+    }
+    cache.fail = UINT32_MAX;
+    for (unsigned i = 0; i < 15; ++i) {
+        rom.fail = i;
+        assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) != 0);
+        assert(!memcmp(&view, &sentinel, sizeof view));
+    }
+    rom.fail = UINT32_MAX;
+    for (unsigned i = 43; i < 58; ++i) {
+        cache.data[i] ^= 1;
+        assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        cache.data[i] ^= 1;
+        assert(!memcmp(&view, &sentinel, sizeof view));
+    }
+    for (unsigned i = 37; i < 43; ++i) {
+        cache.data[i] ^= 1;
+        assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        cache.data[i] ^= 1;
+    }
+    cache.data[43] = 16;
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    cache.data[43] = rom.data[0];
+    put(&cache, 32, 0x2d9d, 5);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put(&cache, 32, 0x2e92, 5);
+    put(&rom, 0, 0x2a74, 5);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    put(&rom, 0, 0x2d9d, 5);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 25, &source, &view) != 0);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 27, &source, &view) != 0);
+    assert(hpclang_rpl_cached_program_match(&reader, 0xffff0, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    source.limit = 14;
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) != 0);
+    source.limit = 15;
+    source.command = 0x1000;
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    source.command = 17;
+    assert(hpclang_rpl_cached_program_match(NULL, 32, 26, &source, &view) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, NULL, &view) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_cached_program_match(&reader, 32, 26, &source, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&view, &sentinel, sizeof view));
+}
+
 int main(void)
 {
+    cached_command_program();
     merge_reference_edits();
     nested_unresolved();
     compact_guard_observations();

@@ -465,6 +465,15 @@ HP49g+/HP50g captures through the independent recovery envelope, with library
 range. The surrounding Stock evaluation path therefore remains part of the
 execution-root analysis even when the ARM image and its stack are owned.
 
+`hpclang_rpl_cached_program_match` verifies a caller-bounded TEMP allocation
+containing a ROMP identity followed by a DOCOL program against an independently
+resolved catalog/bank/command source. It requires the complete allocation extent
+and identical program nibbles, and publishes its view only after all checks pass.
+The caller supplies stable mappings and the validated source identity; this is
+not a byte-pattern search. A matching cached program and an instruction boundary
+inside it still do not establish the pointer type of an arbitrary machine-stack
+value. Execution-root classification remains a separate requirement.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
