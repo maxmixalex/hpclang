@@ -474,6 +474,16 @@ not a byte-pattern search. A matching cached program and an instruction boundary
 inside it still do not establish the pointer type of an arbitrary machine-stack
 value. Execution-root classification remains a separate requirement.
 
+Live cache validation must retain the catalog binding's bank identity. A command
+installed in a user Flash bank cannot be compared through the main-RAM reader;
+resolve its switch through the native bank table, validate the physical reader,
+then expose that bank's logical window to the command parser. The cache and
+original use separate readers throughout comparison. A structural diagnostic
+can distinguish nested RPL boundaries from a machine-call return inside a CODE
+body, but neither reverse instruction matching nor a matching boundary proves
+that a saved scalar was produced by that call. The platform still owes the
+suspended caller's provenance contract before publishing relocation roots.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.

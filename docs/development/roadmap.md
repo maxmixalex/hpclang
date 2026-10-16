@@ -1396,6 +1396,20 @@ provenance paths. Cache matching alone must not collapse them into one generic
 address-range rule, and the diagnostic command offsets remain outside product
 code.
 
+A calculator-side HP49g+/HP50g diagnostic now resolves each candidate's containing TEMP
+allocation and native command source instead of using the three command-relative
+offsets. It validates the user Flash bank mapping and complete cached programs,
+then checks nested RPL boundaries or bounded machine-call return candidates.
+The model-specific test passes initial return, relaunch and data readback;
+independent checks confirm exact catalog/TEMP changes and unchanged Flash. Its
+universal build hits `ENOSPC` in the preceding Port 0 creation test, before any
+relocation, so application memory budget remains part of integration acceptance.
+The diagnostic still does not prove arbitrary machine-stack values' types and
+does not enable public reclamation. Both saved first-run states confirm five
+declared native roots, zero changed nested fields and ten opaque obligations;
+this smaller application therefore does not replace the earlier nested-field
+relocation evidence. The current host suite passes all 101 tests.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
