@@ -1,7 +1,8 @@
 # Historical console output
 
 This installed-package example combines C and C++17 output with HPG graphics,
-edits a bounded name and waits for a key before returning to the calculator.
+edits a bounded name, reads a count and a value, displays their product and
+waits for a key before returning to the calculator.
 Build it with the
 installed hpclang CMake package and ARMv4T toolchain, as described in the SDK
 getting-started guide. No generated font declaration is needed: the historical
@@ -19,3 +20,9 @@ supplies the separate final key wait. Historical number-format policy and old
 unbounded `gets` aliases are not supplied by this example. An application using
 a clean UI can explicitly bind
 its own standard streams; that binding takes precedence over this default.
+
+`hpstdio.h` supplies `readint/readdouble`. Both edit at most 31 bytes and accept
+a numeric prefix, following historical `atoi/atof` behavior. The example checks
+`errno` and stream flags after each call; ON returns normally, while invalid
+conversion or a range error exits with failure. Use the clean text-input parsers
+when a whole line must be valid or the user should be prompted to correct it.

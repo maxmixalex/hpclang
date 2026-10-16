@@ -96,6 +96,7 @@ set(HPCLANG_RUNTIME
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-keyboard.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-system.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-string.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-number.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/hpgcc-rtc.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rtc-tick.c"
     "${CMAKE_CURRENT_LIST_DIR}/../../runtime/core/rtc-tick-bus.c"

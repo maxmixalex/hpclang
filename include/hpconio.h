@@ -12,7 +12,8 @@ extern "C"
      * getchar blocks for a model-native text key without echo: Enter returns LF,
      * deletion returns BS, ON reports EOF/ferror with ECANCELED. Alpha/Shift state
      * persists across reads; physical event timings/queue are not reset.
-     * Legacy gets/_gets aliases and numeric-format policy are not supplied yet. */
+     * Legacy gets/_gets aliases and numeric-format policy are not supplied yet.
+     * hpstdio.h provides blocking readint/readdouble adapters. */
     int hpclang_hpgcc_console_enable(void);
     /* Edited calculator-byte line, capacity including NUL; initially empty.
      * Echo/BS correction, CR/LF acceptance; excess input is ignored until edited.

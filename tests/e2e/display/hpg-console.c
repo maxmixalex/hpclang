@@ -1,4 +1,5 @@
 #include <hpconio.h>
+#include <hpstdio.h>
 #include <hpgraphics.h>
 #include <hpclang/display.h>
 #include <limits.h>
@@ -92,6 +93,23 @@ static int input(void)
     return 0;
 }
 
+static int numeric_input(void)
+{
+    home();
+    scripted_index = 0;
+    scripted_read = 1;
+    errno = 0;
+    int integer = readint();
+    scripted_read = 0;
+    if (integer != 1234 || errno || scripted_index != 7)
+        return -1;
+    scripted_index = 0;
+    scripted_read = 1;
+    double real = readdouble();
+    scripted_read = 0;
+    return real == 1234.0 && !errno && scripted_index == 7 ? 0 : -1;
+}
+
 unsigned hpclang_hpg_console(int (*checkpoint)(unsigned))
 {
     unsigned failure = 1;
@@ -132,6 +150,9 @@ unsigned hpclang_hpg_console(int (*checkpoint)(unsigned))
         goto done;
     failure = 6;
     if (edited_input(checkpoint))
+        goto done;
+    failure = 7;
+    if (numeric_input())
         goto done;
     failure = 0;
 done:

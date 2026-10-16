@@ -367,7 +367,8 @@ responsibility of the individual service call.
 Bounded UTF-8 editing and length-bounded message rendering provide the clean
 primitives for historical line-input/error helpers. Buffer ownership, cancellation
 and errors are explicit. Historical modal screen policy and
-`readint`/`readline` spelling remain adapter/UI work. Model-native Alpha/Shift
+`readline` spelling remain adapter/UI work; `readint/readdouble` now have bounded
+console adapters described below. Model-native Alpha/Shift
 translation is implemented in the clean input layer. Explicit standard-stream
 routing is available through `hpclang/stdio.h`.
 
@@ -382,8 +383,8 @@ validation, cancellation or distinguishable conversion failures.
 
 | Historical capability | Clean equivalent / model and context | Source adapter | Validation |
 | --- | --- | --- | --- |
-| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Historical blocking `readint` and its narrower `int` range remain an adapter concern | Host exact-boundary/error/re-edit tests and ARM System Services probes; CI accepted on `b92e2a7d` |
-| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | `readdouble` spelling, modal rendering and console event loop remain adapter/UI work | Host and ARM finite-subnormal, range and correction probes; CI accepted on `b92e2a7d` |
+| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Blocking `readint` now uses the bounded compatibility editor with checked `int` range; acceptance below | Clean service: host exact-boundary/error/re-edit tests and ARM System Services probes; CI accepted on `b92e2a7d` |
+| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | Blocking `readdouble` now uses the bounded compatibility editor; acceptance below | Clean service: host and ARM finite-subnormal, range and correction probes; CI accepted on `b92e2a7d` |
 
 The clean functions preserve the line and output on errors rather than silently
 accepting a numeric prefix. They do not implement Alpha-lock, a blocking console,
@@ -397,8 +398,8 @@ output failures and ownership changes are separate tested cases. This supplies
 console primitives without importing historical global screen state or raw-key
 numbering. Applications can use the accepted model-native Alpha/Shift state and
 default keyboard editor; they supply the event source and rendering/presentation
-policy. Historical blocking `readint` and
-`readdouble` adapters remain to be built over these clean services. The existing
+policy. Historical blocking `readint` and `readdouble` now use the bounded
+compatibility editor described below. The existing
 file-backed stream implementation is not replaced.
 
 The owned console additionally exposes grid/cursor snapshots, zero-based cursor
@@ -753,8 +754,8 @@ graphics, and scrolling moves graphics together with text. Output wraps
 immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
-cleanup restores the borrowed display. Historical `gets/_gets` spellings,
-numeric input and decimal-format policy remain
+cleanup restores the borrowed display. Historical `gets/_gets` spellings
+and decimal-format policy remain
 M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
@@ -769,9 +770,8 @@ allows subsequent input. Unrepresentable Unicode reports `EILSEQ` instead of a
 silently substituted byte. This intentionally replaces the old hardcoded 49
 keyboard table. An explicit standard-stream binding bypasses the default read
 callback entirely. Six-model host mapping tests, font regressions, ARM analysis
-and HP39g+/HP50g Direct plus HP50g Stock physical-key checks pass; wider E2E acceptance
-of this new input path are pending. HP39gs/HP48gII/HP49g+ Direct and HP48gII Stock
-also pass locally, as does the updated installed-SDK relocation/packaging gate.
+and all six Direct and all six Stock physical-key checks pass locally,
+as does the updated installed-SDK relocation/packaging gate.
 `fgets` can
 consume these bytes, but it does not implement an interactive line editor.
 
@@ -786,10 +786,25 @@ is published even in an HPG double-buffer mode, synchronizing its back page.
 Allocation failure can occur before editing. With explicit standard-stream
 callbacks, it uses those streams and emits BS-space-BS for deletion without
 acquiring a display. Host sanitizers, installed-SDK relocation/packaging and
-HP39g+/HP50g Direct physical-key editing checks pass, including independent
-pixel comparison after overflow rejection, backspace and scrolling. Stock and
-wider native acceptance are pending. Old unbounded spellings are not yet
+HP39g+/HP50g Direct and Stock physical-key editing checks pass, including independent
+pixel comparison after overflow rejection, backspace and scrolling. Wider
+native acceptance is pending. Old unbounded spellings are not yet
 redirected to this API.
+
+`hpstdio.h` exposes `readint()` and `readdouble()` without enabling default
+stdio merely by including the header. Calling either uses the bounded editor
+and respects explicit stream ownership. Their 32-byte local storage admits 31
+input bytes; excess characters are rejected while backspace remains available.
+Both accept a numeric prefix, matching the historical `atoi/atof` use:
+`123tail` reads as 123. Integer conversion is decimal; double conversion uses
+C `strtod` syntax. No conversion returns zero with `EINVAL`. Integer overflow
+returns `INT_MIN/INT_MAX` with `ERANGE`; double range errors follow `strtod`.
+Input error/cancel returns zero with its error; empty EOF returns zero with
+stream EOF available to the caller. Successful conversion preserves errno.
+For full-line validation and separate result/status, use the clean text-input
+parsers. Host sanitizer acceptance covers prefix/boundary/range/error behavior;
+ARM build/analysis and HP39g+ Direct physical-key numeric input pass. Stock and
+installed-SDK acceptance of these two adapters remains pending.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,

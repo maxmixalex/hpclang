@@ -1817,11 +1817,10 @@ The default character-input callback now uses model-native Alpha/Shift state
 and the existing physical event stream, with shared HP-byte mapping for native
 and HPG fallback fonts. Six-model host checks cover ordinary input, single/held
 Alpha, classic locks and one-shot lowercase, Enter/backspace, cancellation and
-poll failures. Font/HPG sanitizers and ARM analysis pass. HP39g+/HP50g Direct
-physical-key checks pass. HP39gs, HP48gII and HP49g+ Direct, HP48gII/HP50g Stock,
-and the updated SDK relocation/packaging gate also pass locally. The remaining
-Stock/model checks are in progress. Interactive
-line editing and historical numeric-input/format policy remain open.
+poll failures. Font/HPG sanitizers and ARM analysis pass. All six Direct and
+all six Stock physical-key checks pass locally, as does the updated SDK
+relocation/packaging gate. Historical input aliases and numeric-format policy
+remain open.
 
 The bounded `hpclang_hpgcc_gets` editor now integrates the tested byte-line core
 with standard streams and HPG rendering. Host sanitizers cover overflow/re-edit,
@@ -1830,8 +1829,17 @@ double-buffer editing, and explicit stdio ownership without display acquisition.
 The installed interactive example passes the SDK relocation/packaging gate.
 HP39g+/HP50g Direct physical-key editing passes a full-buffer rejection/re-edit
 scenario, with the scrolled result matching an independently drawn reference
-frame pixel for pixel. Stock/wider native acceptance and the old unbounded-name
+frame pixel for pixel. Both models also pass Stock; the maintained Display
+verifier checks the edited/reference frames. Wider native acceptance and the old unbounded-name
 compatibility policy remain pending; this does not close the line-input group.
+
+`hpstdio.h` now provides blocking `readint/readdouble` over that bounded editor.
+They retain historical numeric-prefix conversion and the 31-byte line capacity;
+invalid conversion, integer overflow and input cancellation have defined results.
+Host sanitizers cover boundaries, prefix conversion, floating range errors and
+input failures. ARM build/analysis and HP39g+ Direct physical-key numeric input
+pass; Stock and installed-SDK acceptance of this addition remain pending.
+Decimal-format controls and other numeric spellings remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
