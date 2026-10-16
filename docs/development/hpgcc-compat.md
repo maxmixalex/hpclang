@@ -830,8 +830,9 @@ variant also passes; a deliberate omission of cleanup is rejected with
 all three adapters, C/C++ clients, six model-specific notebooks and three HP39
 Aplet families. All six Stock models now pass the full interface/timing payload,
 independent report-pixel checks and normal return. Host/ARM Clang analysis passes
-across the batch's 265 sources and 777 distinct configurations. Formal CI for
-the RTC tick addition remains pending.
+across the batch's 265 sources and 777 distinct configurations. Runtime and
+Quality CI are accepted on `413e5891`; the HPGCC system jobs pass in all three
+Direct families and all six Stock models.
 
 ### SD media discovery and replacement
 

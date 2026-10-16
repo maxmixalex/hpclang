@@ -96,6 +96,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
+
 jobs:
   runtime:
     name: Runtime and unit tests
@@ -121,17 +124,23 @@ jobs:
             stop_before_identity=OFF
             retire_journal=OFF
             restart_after_repair=OFF
+            bound_journal_slot=
             case "$mode" in
               interrupted) stop_before_identity=ON ;;
               retirement) retire_journal=ON ;;
-              configuration) retire_journal=ON; restart_after_repair=ON ;;
+              configuration)
+                retire_journal=ON
+                restart_after_repair=ON
+                bound_journal_slot="$HPCLANG_RECOVERY_JOURNAL_SLOT"
+                ;;
             esac
             cmake -S tests/e2e/port-recovery -B "build/port-recovery/$mode" \
               -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
               -DCMAKE_BUILD_TYPE=MinSizeRel \
               -DHPCLANG_RECOVERY_STOP_BEFORE_IDENTITY="$stop_before_identity" \
               -DHPCLANG_RECOVERY_RETIRE_JOURNAL="$retire_journal" \
-              -DHPCLANG_RECOVERY_RESTART_AFTER_REPAIR="$restart_after_repair"
+              -DHPCLANG_RECOVERY_RESTART_AFTER_REPAIR="$restart_after_repair" \
+              -DHPCLANG_RECOVERY_BOUND_JOURNAL_SLOT="$bound_journal_slot"
             cmake --build "build/port-recovery/$mode" -j2
           done
 
@@ -143,7 +152,7 @@ jobs:
           path: |
             build/port-recovery/*/recovery.elf
             build/port-recovery/*/recovery.bin
-            build/port-recovery/*/recovery.hp
+            build/port-recovery/*/recovery*.hp
           if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache
@@ -214,6 +223,7 @@ jobs:
             --interrupted-build build/port-recovery/interrupted \
             --retirement-build build/port-recovery/retirement \
             --configuration-build build/port-recovery/configuration \
+            --configuration-authority --slot "$HPCLANG_RECOVERY_JOURNAL_SLOT" \
             --flash-busy-reads 64 \
             --power-cut 2 16 0x5555 --power-cut 1 16 0x0101 \
             --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"

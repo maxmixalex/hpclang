@@ -6,6 +6,16 @@ option(HPCLANG_RECOVERY_RETIRE_JOURNAL
     "Retire the verified journal and check repeated retirement without writes" OFF)
 option(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR
     "Request Stock reinitialization after a successfully retired recovery" OFF)
+set(HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT "" CACHE STRING
+    "Optional injected journal address; its one-use authority immediately follows it")
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "" AND
+        NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT MATCHES "^(0[xX][0-9a-fA-F]+|[0-9]+)$")
+    message(FATAL_ERROR "Bound journal slot must be an integer address")
+endif()
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "" AND
+        (NOT HPCLANG_RECOVERY_RETIRE_JOURNAL OR NOT HPCLANG_RECOVERY_RESTART_AFTER_REPAIR))
+    message(FATAL_ERROR "Bound configuration witness requires retirement and restart")
+endif()
 if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR AND
         (NOT HPCLANG_RECOVERY_RETIRE_JOURNAL OR HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY))
     message(FATAL_ERROR "Recovery restart requires retirement without an interrupted witness")
@@ -36,6 +46,10 @@ foreach(module IN ITEMS rpl-flash-record rpl-flash-write rpl-flash-replay
 endforeach()
 target_include_directories(recovery PRIVATE "${CORE}" "${HPCLANG_ROOT}/include")
 target_compile_features(recovery PRIVATE c_std_11)
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
+    target_compile_definitions(recovery PRIVATE
+        HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})
+endif()
 if(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY)
     target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY=1)
 endif()

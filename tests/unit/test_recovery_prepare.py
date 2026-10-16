@@ -52,6 +52,25 @@ class RecoveryPrepareTests(unittest.TestCase):
             PREPARE.prepare(self.source, self.destination, 0x160105, 0x140000)
         self.assertEqual(retained.read_bytes(), b"previous state")
 
+    def test_bound_fixture_adds_exact_independent_authority_record(self):
+        slot, target = 0x160105, 0x140000
+        PREPARE.prepare(self.source, self.destination, slot, target, bound=True)
+        actual = (self.destination / "flash").read_bytes()
+        root = slot + 4124
+        record = actual[slot:root]
+        binding = actual[root : root + 32]
+        self.assertEqual(binding[:12], bytes.fromhex("7e3e0040") + b"HPCAUTH1")
+        self.assertEqual(
+            [int.from_bytes(binding[i : i + 4], "little") for i in (12, 16, 20, 24)],
+            [root, slot, target, zlib.crc32(record[1:-4])],
+        )
+        self.assertEqual(int.from_bytes(binding[28:], "little"), zlib.crc32(binding[1:28]))
+        expected = self.flash.copy()
+        expected[target : target + 4096] = b"\xff" * 4096
+        expected[slot : root + 32] = record + binding
+        self.assertEqual(actual, expected)
+        self.assertEqual((self.source / "flash").read_bytes(), self.flash)
+
     def test_invalid_bank_or_nonempty_journal_bank_rejected_before_copy(self):
         for offset in (0x140100, 0x160100, 0x160105, 0x17FFFF):
             with self.subTest(offset=offset):

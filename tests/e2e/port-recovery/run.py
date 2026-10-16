@@ -291,7 +291,9 @@ def configuration_recovery(args, clean):
     if not 0 < count < 128 or 1701 not in [read(0x86120 + 16 * i, 3) for i in range(count)]:
         raise RuntimeError("Configuration library is absent from the native catalog")
     damaged = args.output / "configuration-fault"
-    prepare(baseline, damaged, args.slot, args.target)
+    bound = getattr(args, "configuration_authority", False)
+    authority_slot = args.slot + 4124 if bound else None
+    prepare(baseline, damaged, args.slot, args.target, bound=bound)
     before = damaged
     for name in ("configuration-recovered", "configuration-rechecked"):
         after = warmstart(before, name)
@@ -302,6 +304,7 @@ def configuration_recovery(args, clean):
                 args.slot,
                 args.target,
                 retire=True,
+                authority_slot=authority_slot,
             )
             # The internal restart has already replaced the first invocation's
             # diagnostics with a clean invocation. Verify the durable transition
@@ -319,6 +322,7 @@ def configuration_recovery(args, clean):
                 target=args.target,
                 operation="check",
                 relocated_image=True,
+                authority_slot=authority_slot,
             )
         )
         verify_restart(baseline, before, after)
@@ -540,6 +544,7 @@ def run(args):
                 "journal_retirement": args.retirement_build is not None,
                 "startup_recovery": args.retirement_build is not None,
                 "configuration_recovery": args.configuration_build is not None,
+                "configuration_authority": args.configuration_authority,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,
@@ -580,6 +585,11 @@ def main():
         help="optional retirement witness with HPCLANG_RECOVERY_RESTART_AFTER_REPAIR",
     )
     parser.add_argument(
+        "--configuration-authority",
+        action="store_true",
+        help="configuration witness binds --slot to the immediately following authority record",
+    )
+    parser.add_argument(
         "--flash-busy-reads",
         type=int,
         default=0,
@@ -596,6 +606,8 @@ def main():
     )
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
     args = parser.parse_args()
+    if args.configuration_authority and args.configuration_build is None:
+        parser.error("--configuration-authority requires --configuration-build")
     if not 0 <= args.flash_busy_reads <= 0xFFFFFFFF:
         parser.error("--flash-busy-reads must fit an unsigned 32-bit counter")
     for operation, reads, bits in args.power_cut or []:

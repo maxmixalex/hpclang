@@ -1339,7 +1339,13 @@ occupy exact native allocation boundaries. Matching records nested in deleted
 payloads are rejected. Closed transactions validate current Flash without an
 old-image overlay, preserving later valid backups; corrupt current objects still
 fail preflight. Armed/retiring transactions and target-equal closure remain
-distinct from clean, closed transactions. Native fixture integration is pending.
+distinct from clean, closed transactions. The bound Flash-configuration fixture
+now passes locally on HP49g+ and HP50g: exact sector restoration, journal
+retirement and authority closure, automatic complete catalog rebuilding, HOME
+preservation, owned relocated CODE verification and a later unchanged warmstart.
+The fixture's compiled journal/authority pair is explicit test input, not a
+trusted production installation root. CI now selects this configuration mode
+and uploads its generated library package alongside the standalone program.
 An old binding
 must not be erased/reused while its journal can survive, because a partial erase
 can resurrect an armed status; root replacement needs its own protocol.
@@ -1714,7 +1720,7 @@ accepted on `c2fb66fe`.
 Separately, the emulator RTC divider now carries fractional microseconds across
 ticks: all 128 settings over 4096 expirations each, sanitizers, a pinned-source
 build and HP50g Direct/Stock regression pass. This fixes the test environment;
-the historical RTC tick adapter group remains open.
+the historical RTC tick adapter acceptance is recorded below.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
@@ -1732,7 +1738,7 @@ below are retained.
   groups. Expand the four-generation declaration/implementation/evidence ledger.
 - [ ] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
-- [ ] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
+- [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
   define ownership and exit restoration before claiming hardware equivalence.
@@ -1747,8 +1753,9 @@ below are retained.
   also passes C/C++, six-model launcher/notebook and HP39 Aplet packaging with
   the adapters used by its timer example. All six Stock targets now pass the
   complete interface/timing payload, independent pixels and normal return.
-  Host/ARM analysis passes across 265 sources and 777 configurations. Formal CI
-  for this addition remains pending before closing the tick-adapter milestone.
+  Host/ARM analysis passes across 265 sources and 777 configurations. Runtime
+  and Quality CI are accepted on `413e5891`, including the HPGCC system suite
+  in all three Direct families and all six Stock models.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.

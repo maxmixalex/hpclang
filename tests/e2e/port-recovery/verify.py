@@ -14,7 +14,27 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def verify_flash(before, after, slot, target, *, retire=False):
+def verify_authority(flash, authority_slot, slot, target, status):
+    require(authority_slot == slot + 4124, "Binding is not at the fixture allocation boundary")
+    binding = flash[authority_slot : authority_slot + 32]
+    require(len(binding) == 32 and binding[0] == status, "Unexpected transaction binding phase")
+    require(binding[1:12] == bytes.fromhex("3e0040") + b"HPCAUTH1", "Invalid binding envelope")
+    require(
+        struct.unpack_from("<4I", binding, 12)
+        == (
+            authority_slot,
+            slot,
+            target,
+            int.from_bytes(flash[slot + 4120 : slot + 4124], "little"),
+        ),
+        "Transaction binding identity mismatch",
+    )
+    require(
+        zlib.crc32(binding[1:28]) == int.from_bytes(binding[28:], "little"), "Binding CRC mismatch"
+    )
+
+
+def verify_flash(before, after, slot, target, *, retire=False, authority_slot=None):
     require(len(before) == len(after) == 0x200000, "Expected complete 2 MiB Flash images")
     require(0x140000 <= target <= 0x1FF000 and target % 4096 == 0, "Invalid target sector")
     require(0x140000 <= slot <= 0x200000 - 4124, "Invalid journal address")
@@ -44,6 +64,10 @@ def verify_flash(before, after, slot, target, *, retire=False):
     expected[target : target + 4096] = record[24:4120]
     if retire:
         expected[slot] = 0
+    if authority_slot is not None:
+        verify_authority(before, authority_slot, slot, target, 0x7E)
+        if retire:
+            expected[authority_slot] = 0
     require(after == expected, "Flash differs from authorized replay/journal retirement")
     return bytes(record), already_restored
 
@@ -124,11 +148,13 @@ def verify_retirement_cut(before_path, after_path, log_path, slot, target, cut):
     require(after == expected, "Retirement cut changed unrelated Flash bytes")
 
 
-def verify_retired(before, after, slot, target):
+def verify_retired(before, after, slot, target, *, authority_slot=None):
     """Verify a known retired transaction remains unchanged on a later launch."""
     require(len(before) == len(after) == 0x200000, "Expected complete 2 MiB Flash images")
     require(0 <= slot < len(before) and before[slot] == 0, "Expected a retired journal")
     require(before == after, "Clean recovery invocation changed Flash")
+    if authority_slot is not None:
+        verify_authority(before, authority_slot, slot, target, 0)
     # Normalize a private oracle copy; the durable record must remain retired.
     ready = bytearray(before)
     ready[slot] = 0x7E
@@ -350,12 +376,15 @@ def verify(args):
     operation = getattr(args, "operation", "replay")
     require(operation in ("replay", "retire", "check"), "Unknown recovery operation")
     retire = operation == "retire"
+    authority_slot = getattr(args, "authority_slot", None)
     if operation == "check":
-        record = verify_retired(before, after, args.slot, args.target)
+        record = verify_retired(
+            before, after, args.slot, args.target, authority_slot=authority_slot
+        )
         already_restored, phase = True, 0
     else:
         record, already_restored = verify_flash(
-            before, after, args.slot, args.target, retire=retire
+            before, after, args.slot, args.target, retire=retire, authority_slot=authority_slot
         )
         phase = 1 if before[args.slot] == 0x7E else 2
     ram = (args.after / "sram").read_bytes()
@@ -468,6 +497,7 @@ def main():
     parser.add_argument("--nm", default="llvm-nm")
     parser.add_argument("--slot", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--target", type=lambda value: int(value, 0), required=True)
+    parser.add_argument("--authority-slot", type=lambda value: int(value, 0))
     parser.add_argument(
         "--operation",
         choices=("replay", "retire", "check"),

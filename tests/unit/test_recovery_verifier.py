@@ -220,6 +220,62 @@ class RecoveryVerifierTests(unittest.TestCase):
                 VERIFY.verify_flash(before, after, slot, target)
 
 
+class RecoveryBindingTests(unittest.TestCase):
+    def setUp(self):
+        RecoveryVerifierTests.setUp(self)
+        self.root = self.slot + 4124
+        binding = bytearray.fromhex("7e3e0040") + b"HPCAUTH1"
+        binding += struct.pack(
+            "<4I", self.root, self.slot, self.target, int.from_bytes(self.record[-4:], "little")
+        )
+        binding += struct.pack("<I", zlib.crc32(binding[1:]))
+        self.before[self.root : self.root + 32] = binding
+        self.after[self.root : self.root + 32] = binding
+        self.after[self.root] = self.after[self.slot] = 0
+
+    def test_exact_closure_and_later_noop(self):
+        VERIFY.verify_flash(
+            self.before, self.after, self.slot, self.target, retire=True, authority_slot=self.root
+        )
+        VERIFY.verify_retired(
+            self.after, self.after, self.slot, self.target, authority_slot=self.root
+        )
+
+    def test_missing_closure_and_unrelated_changes_fail(self):
+        for offset in (self.root, self.root + 1, self.root + 31, self.root + 32):
+            changed = self.after.copy()
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_flash(
+                    self.before,
+                    changed,
+                    self.slot,
+                    self.target,
+                    retire=True,
+                    authority_slot=self.root,
+                )
+        unclosed = self.after.copy()
+        unclosed[self.root] = 0x7E
+        with self.assertRaises(ValueError):
+            VERIFY.verify_retired(
+                unclosed, unclosed, self.slot, self.target, authority_slot=self.root
+            )
+
+    def test_corrupt_binding_is_not_a_valid_oracle(self):
+        for offset in range(32):
+            changed = self.before.copy()
+            changed[self.root + offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_flash(
+                    changed,
+                    self.after,
+                    self.slot,
+                    self.target,
+                    retire=True,
+                    authority_slot=self.root,
+                )
+
+
 class RecoveryPowerCutTests(unittest.TestCase):
     def setUp(self):
         RecoveryVerifierTests.setUp(self)

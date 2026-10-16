@@ -12,7 +12,7 @@ import struct
 import zlib
 
 
-def prepare(source: Path, destination: Path, slot: int, target: int) -> None:
+def prepare(source: Path, destination: Path, slot: int, target: int, *, bound=False) -> None:
     flash = bytearray((source / "flash").read_bytes())
     if len(flash) != 0x200000:
         raise ValueError("Expected a complete hp4950 Flash image")
@@ -36,6 +36,14 @@ def prepare(source: Path, destination: Path, slot: int, target: int) -> None:
     record[24:4120] = flash[target : target + 4096]
     struct.pack_into("<I", record, 4120, zlib.crc32(record[1:4120]))
     flash[slot : slot + len(record)] = record
+    if bound:
+        authority_slot = slot + len(record)
+        authority = bytearray.fromhex("7e3e0040") + b"HPCAUTH1"
+        authority += struct.pack(
+            "<4I", authority_slot, slot, target, int.from_bytes(record[-4:], "little")
+        )
+        authority += struct.pack("<I", zlib.crc32(authority[1:]))
+        flash[authority_slot : authority_slot + len(authority)] = authority
     flash[target : target + 4096] = b"\xff" * 4096
     # Refuse an existing output so stale RAM/Flash cannot enter the scenario.
     shutil.copytree(source, destination)
@@ -48,8 +56,9 @@ def main():
     parser.add_argument("destination", type=Path)
     parser.add_argument("--slot", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--target", type=lambda value: int(value, 0), required=True)
+    parser.add_argument("--bound", action="store_true", help="append an armed transaction binding")
     args = parser.parse_args()
-    prepare(args.source, args.destination, args.slot, args.target)
+    prepare(args.source, args.destination, args.slot, args.target, bound=args.bound)
 
 
 if __name__ == "__main__":
