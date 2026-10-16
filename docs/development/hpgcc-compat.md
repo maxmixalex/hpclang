@@ -755,8 +755,10 @@ Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
 cleanup restores the borrowed display. The header does not yet implement the
 historical blocking input, integer-string or decimal-format groups; these remain
-M8 work. Host sanitizer coverage is available; native/installed-SDK acceptance
-of this output group is pending.
+M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
+HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
+example also passes relocation, six-model launchers and three HP39 Aplet
+packaging families. HP39gs/40gs Stock and CI acceptance are pending.
 
 ### Historical tones and packed BCD
 

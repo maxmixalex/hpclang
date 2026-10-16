@@ -96,11 +96,12 @@ def main():
         )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
-                "add_subdirectory(notebook)\n"
+                "add_subdirectory(notebook)\nadd_subdirectory(console)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
@@ -116,6 +117,7 @@ endforeach()
                 ("counter", "declarative_ui_cpp"),
                 ("objects", "object_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
             ):
                 with (application / directory / "CMakeLists.txt").open("a") as source:
@@ -166,6 +168,7 @@ endforeach()
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("hpgcc_console", build / "console"),
             ("notebook", build / "notebook"),
         ):
             elf = (output / f"{name}.elf").read_bytes()

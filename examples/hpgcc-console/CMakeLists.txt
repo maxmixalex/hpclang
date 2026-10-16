@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(hpclang_hpgcc_console LANGUAGES C CXX ASM)
+find_package(hpclang CONFIG REQUIRED)
+hpclang_add_application(hpgcc_console main.c status.cpp)
+target_compile_features(hpgcc_console PRIVATE c_std_11 cxx_std_17)
+hpclang_target_launchers(hpgcc_console)

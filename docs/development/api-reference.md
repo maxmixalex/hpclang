@@ -429,6 +429,14 @@ Bind/unbind reset EOF, errors and pushback so old input cannot leak to a new
 source. stdout and stderr have separate C stream status; the console adapters
 deliberately combine their bytes into one ordered UTF-8 output stream.
 
+The optional historical `hpconio.h` header selects a lazy default output backend
+for otherwise unbound streams. It uses calculator bytes and fixed HPG cells,
+shares HPG display ownership and preserves neighbouring graphics. Explicit
+bindings override the complete default, including any missing application
+callbacks; unbind resumes it. Header registration itself acquires no hardware.
+See [historical console output](hpgcc-compat.md#historical-console-output) for
+cursor/clear/tab calls and remaining input-adapter limitations.
+
 ## Display and surfaces
 
 The canonical coordinate system has a top-left origin. Rectangle APIs use `x, y, width, height`; this intentionally differs from historical HPG inclusive `x1, y1, x2, y2` rectangle calls.

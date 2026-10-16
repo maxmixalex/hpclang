@@ -1801,10 +1801,11 @@ The next local output adapter supplies `hpconio.h` registration, cursor/clear/ta
 spellings and calculator-byte standard output on HPG's shared display lease.
 It preserves surrounding graphics and scrolls them with text, honors explicit
 stdio owners, and keeps HPG double-buffer publication explicit. Host sanitizer
-tests, ARM static analysis and Direct LCD checks on HP39g+, HP48gII and HP50g
-pass. HP48gII and HP50g Stock LCD checks also pass; HP39g+ Stock and installed-SDK
-acceptance are pending. Historical input and
-numeric formatting remain open, so this does not close the console group.
+tests, ARM static analysis and all six Direct LCD checks pass. HP39g+, HP48gII,
+HP49g+ and HP50g Stock also pass. The installed C/C++ console example passes
+SDK relocation, six-model launchers and three HP39 Aplet packaging families.
+HP39gs/40gs Stock and CI acceptance are pending. Historical input and numeric
+formatting remain open, so this does not close the console group.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
