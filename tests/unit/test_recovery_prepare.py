@@ -29,6 +29,38 @@ class RecoveryPrepareTests(unittest.TestCase):
         (self.source / "flash").write_bytes(self.flash)
         (self.source / "sram").write_bytes(b"original RAM; requires hardware reset")
 
+    def test_installation_reservation_preserves_existing_records_and_other_banks(self):
+        first = 0x140105
+        self.flash[first : first + 8] = bytes.fromhex("000e000012345678")
+        (self.source / "flash").write_bytes(self.flash)
+        PREPARE.reserve_bank_tail(self.source, self.destination, 0x140000)
+        actual = (self.destination / "flash").read_bytes()
+        tail = first + 8
+        expected = self.flash.copy()
+        capacity = (0x160000 - tail - 1) & ~3
+        expected[tail : tail + 4] = b"\0" + (capacity * 2 - 2).to_bytes(3, "little")
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual[tail + capacity : 0x160000], b"\xff" * 3)
+        self.assertEqual((self.source / "flash").read_bytes(), self.flash)
+        self.assertEqual(
+            (self.destination / "sram").read_bytes(), (self.source / "sram").read_bytes()
+        )
+
+    def test_installation_reservation_rejects_unresolved_or_malformed_banks(self):
+        for header in (
+            bytes.fromhex("7e0e0030"),
+            bytes.fromhex("00000000"),
+            bytes.fromhex("00ffff0f"),
+            bytes.fromhex("ff000000"),
+        ):
+            with self.subTest(header=header):
+                malformed = self.flash.copy()
+                malformed[0x140105:0x140109] = header
+                (self.source / "flash").write_bytes(malformed)
+                with self.assertRaises(ValueError):
+                    PREPARE.reserve_bank_tail(self.source, self.destination, 0x140000)
+                self.assertFalse(self.destination.exists())
+
     def test_only_target_and_journal_change_and_source_is_preserved(self):
         PREPARE.prepare(self.source, self.destination, 0x160105, 0x140000)
         actual = (self.destination / "flash").read_bytes()

@@ -275,7 +275,11 @@ For a separately verified raw image, `--runtime-size SIZE` replaces `--elf`.
 `SIZE` is the eight-byte-aligned total runtime image size, including initialized
 bytes, BSS, workspace and the owned stack. The packager reserves those bytes
 inside the CODE object, copies initialized bytes to an eight-byte-aligned
-destination and returns to RPL without adding a stack result. The ARM payload
+destination and returns to RPL without adding a stack result. The source follows
+a protected 16-nibble alignment block; forward word copies move it downward
+in place, keeping the Saturn entry intact at every object alignment. Initialized
+bytes therefore share the runtime reservation instead of occupying a second
+image-sized buffer. BSS, workspace and stack capacity are unchanged. The ARM payload
 must initialize BSS, establish its stack, preserve hardware/native state and
 return through LR. Raw mode requires separate rejection of unsafe relocations; a raw
 binary cannot supply that proof. This envelope neither allocates MMU pages nor

@@ -437,8 +437,11 @@ def verify(args):
     require(package[:8] == b"HPHP49-C", "Invalid binary package header")
     program = nibbles(package[8:])
     code_end = 10 + int(program[10:15][::-1], 16)
-    reserve = size * 2 + 15
-    prefix = program[: code_end - reserve]
+    source = code_end - size * 2
+    require(source >= 31, "Recovery package has no protected alignment block")
+    # The forward copy can overwrite the source and up to 15 alignment nibbles.
+    # Only the Saturn entry is an immutable owner prefix after execution.
+    prefix = program[: source - 16]
     packed_ram = nibbles(ram)
     owners = [
         i
@@ -452,6 +455,10 @@ def verify(args):
     require(
         0 <= original_owner and original_owner + code_end <= 2 * len(ram),
         "Original owning CODE object is outside RAM",
+    )
+    require(
+        ((original_owner + source) & ~15) == 2 * (physical - 0x08000000),
+        "Recovery image does not occupy its aligned in-place destination",
     )
 
     d = struct.unpack_from("<32I", image, symbols["workspace"] + 8272)

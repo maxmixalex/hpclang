@@ -13,7 +13,7 @@ import sys
 import time
 from types import SimpleNamespace
 
-from prepare import prepare
+from prepare import prepare, reserve_bank_tail
 from verify import (
     verify,
     verify_interruption,
@@ -248,10 +248,13 @@ def configuration_recovery(args, clean):
     # Construct the fixture with Stock's own driver. The synthetic read-count
     # busy model exercises our recovery polling below, not Stock's installation driver.
     setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
+    installation_source = args.output / "configuration-install-source"
+    fault_bank = args.target & ~0x1FFFF
+    reserve_bank_tail(clean, installation_source, fault_bank)
     transfer(
         setup,
         installed,
-        clean,
+        installation_source,
         build,
         "RECOVERY",
         execute=False,
@@ -261,6 +264,11 @@ def configuration_recovery(args, clean):
             "\"hpclang recovery\" 'HPCKEEP' STO",
         ],
     )
+    protected = slice(fault_bank, fault_bank + 0x20000)
+    if (installed / "state/flash").read_bytes()[protected] != (
+        installation_source / "flash"
+    ).read_bytes()[protected]:
+        raise RuntimeError("Stock changed the protected fault bank during recovery installation")
 
     def boot(source, name, *, clear_ram=False, check_home=True):
         phase = args.output / name

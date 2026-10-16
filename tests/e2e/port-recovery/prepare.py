@@ -12,6 +12,36 @@ import struct
 import zlib
 
 
+def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
+    """Occupy a fixture bank's erased tail so Stock installs recovery elsewhere.
+
+    A native tombstone consumes capacity without introducing a library or a
+    callback. Existing allocations and the final erased marker are preserved.
+    This constructs test state; it is not an installation or reclamation API.
+    """
+    flash = bytearray((source / "flash").read_bytes())
+    if len(flash) != 0x200000 or not 0x140000 <= bank < 0x200000 or bank % 0x20000:
+        raise ValueError("Invalid fixture bank")
+    identity = int.from_bytes(flash[bank + 0x100 : bank + 0x105], "little")
+    if identity != 0xF0 + ((bank // 0x20000 - 2) << 8):
+        raise ValueError("Invalid fixture bank identity")
+    cursor, end = bank + 0x105, bank + 0x20000
+    while cursor < end and flash[cursor] != 0xFF:
+        if flash[cursor] not in (0, 0x53) or cursor + 4 > end:
+            raise ValueError("Unresolved allocation in fixture bank")
+        extent = (int.from_bytes(flash[cursor + 1 : cursor + 4], "little") & 0xFFFFF) + 2
+        if extent < 8 or extent % 8 or extent // 2 >= end - cursor:
+            raise ValueError("Invalid fixture allocation extent")
+        cursor += extent // 2
+    if cursor >= end or flash[cursor:end] != b"\xff" * (end - cursor):
+        raise ValueError("Fixture bank has no intact erased tail")
+    capacity = (end - cursor - 1) & ~3
+    if capacity >= 4:
+        flash[cursor : cursor + 4] = b"\0" + (capacity * 2 - 2).to_bytes(3, "little")
+    shutil.copytree(source, destination)
+    (destination / "flash").write_bytes(flash)
+
+
 def prepare(source: Path, destination: Path, slot: int, target: int, *, bound=False) -> None:
     flash = bytearray((source / "flash").read_bytes())
     if len(flash) != 0x200000:
