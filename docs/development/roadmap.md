@@ -1333,6 +1333,13 @@ before completing them, requires exact bodies once status publication starts,
 and never rearms a closing/closed binding. Host tests also interrupt resumption
 and retry again. Trusted installed-root discovery, startup exclusion and
 reference repair remain required; this is not production startup integration.
+The bound read-only preflight now accepts an explicitly trusted authority/journal
+pair, validates its phases and all restored bank chains, and proves both records
+occupy exact native allocation boundaries. Matching records nested in deleted
+payloads are rejected. Closed transactions validate current Flash without an
+old-image overlay, preserving later valid backups; corrupt current objects still
+fail preflight. Armed/retiring transactions and target-equal closure remain
+distinct from clean, closed transactions. Native fixture integration is pending.
 An old binding
 must not be erased/reused while its journal can survive, because a partial erase
 can resurrect an armed status; root replacement needs its own protocol.

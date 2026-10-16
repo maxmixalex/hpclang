@@ -360,6 +360,104 @@ static void transaction_test(void)
     assert(!programs && !erases && flash[123] == (uint8_t)(image[123] ^ 2));
 }
 
+static void prepare_native_port(uint8_t authority_status, uint8_t journal_status,
+                                uint32_t authority_slot, uint32_t journal_slot)
+{
+    prepare(0);
+    memset(flash, 255, sizeof flash);
+    for (unsigned bank = 0; bank < 6; ++bank) {
+        flash[bank * 0x20000 + 0x100] = 0xf0;
+        flash[bank * 0x20000 + 0x101] = (uint8_t)(8 + bank);
+    }
+    memcpy(image, flash, sizeof image);
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, journal_slot, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    assert(hpclang_rpl_flash_authority_encode(FIRST, END, authority_slot, journal_slot, journal,
+                                              sizeof journal, authority, sizeof authority) == 0);
+    memcpy(flash + journal_slot - FIRST, journal, sizeof journal);
+    memcpy(flash + authority_slot - FIRST, authority, sizeof authority);
+    flash[journal_slot - FIRST] = journal_status;
+    flash[authority_slot - FIRST] = authority_status;
+}
+
+static void tombstone(uint32_t slot, uint32_t bytes)
+{
+    uint32_t extent = 2 * bytes - 2;
+    flash[slot - FIRST] = 0;
+    flash[slot - FIRST + 1] = (uint8_t)extent;
+    flash[slot - FIRST + 2] = (uint8_t)(extent >> 8);
+    flash[slot - FIRST + 3] = (uint8_t)(extent >> 16);
+}
+
+static void bound_preflight_tests(void)
+{
+    uint8_t scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint32_t target = 123;
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    memset(flash, 255, sizeof image);
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_SECTOR_READY);
+    assert(target == FIRST && !programs && !erases);
+    assert(!memcmp(scratch, journal, sizeof journal) && flash[0x100] == 0xff);
+    const unsigned read_cuts[] = {1, 17, 18, 128, 2081};
+    for (unsigned i = 0; i < sizeof read_cuts / sizeof read_cuts[0]; ++i) {
+        prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+        target = 123;
+        fail_read = read_cuts[i];
+        assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                                 &target) < 0);
+        assert(target == 123 && !programs && !erases);
+    }
+    const uint8_t statuses[] = {0, 0x02, 0x7c, 0x7e, 0x7f, 0xfe, 0xff, 0x53};
+    for (unsigned i = 0; i < sizeof statuses; ++i) {
+        prepare_native_port(statuses[i], 0, ROOT, JOURNAL);
+        target = 123;
+        int result =
+            hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch, &target);
+        if (!statuses[i])
+            assert(result == 0 && target == 123);
+        else if (!(statuses[i] & ~0x7eu))
+            assert(result == HPCLANG_RPL_FLASH_SECTOR_RETIRING && target == FIRST);
+        else
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && target == 123);
+        assert(!programs && !erases);
+    }
+    prepare_native_port(0, 0x7e, ROOT, JOURNAL);
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0x7e, 0x7c, ROOT, JOURNAL);
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_SECTOR_RETIRING);
+    flash[123] ^= 1;
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_DIRTY);
+    /* Valid-looking bindings/journals nested in deleted payloads are not owned
+     * allocations, even when all checksums and their mutual binding agree. */
+    prepare_native_port(0x7e, 0x7e, ROOT + 8, JOURNAL);
+    tombstone(ROOT, sizeof authority + 8);
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT + 8, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0, 0, ROOT, JOURNAL + 8);
+    tombstone(JOURNAL, sizeof journal + 8);
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL + 8, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_DIRTY);
+    /* A closed transaction must validate today's port, without overlaying its
+     * historical sector image or dropping a later native backup. */
+    static const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03,
+                                     0x00, 0x08, 0x46, 0x4c, 0x41, 0x53, 0x48, 0x4f,
+                                     0x4e, 0x45, 0x08, 0x14, 0x26, 0x90, 0x00, 0x00,
+                                     0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
+    prepare_native_port(0, 0, ROOT, JOURNAL);
+    memcpy(flash + 0x105, backup, sizeof backup);
+    target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == 0);
+    assert(target == 123 && !programs && !erases && !memcmp(flash + 0x105, backup, sizeof backup));
+    flash[0x110] ^= 1;
+    assert(hpclang_rpl_flash_preflight_bound(&io, ROOT, JOURNAL, scratch, sizeof scratch,
+                                             &target) == HPCLANG_RPL_FLASH_DIRTY);
+}
+
 int main(void)
 {
     memset(initial, 255, sizeof initial);
@@ -376,5 +474,6 @@ int main(void)
     closure_tests();
     bound_replay_tests();
     transaction_test();
+    bound_preflight_tests();
     return 0;
 }

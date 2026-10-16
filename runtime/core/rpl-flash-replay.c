@@ -94,6 +94,140 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
     return phase;
 }
 
+struct bound_overlay
+{
+    const struct hpclang_rpl_flash_io *io;
+    uint32_t authority, journal, target, bank;
+    const uint8_t *image;
+    int hide_journal;
+};
+
+static int bound_read(void *context, uint32_t address, uint16_t *value)
+{
+    const struct bound_overlay *view = context;
+    if (view->image && address >= view->target &&
+        address - view->target < HPCLANG_RPL_FLASH_SECTOR_BYTES)
+        *value = image_word(view->image, address - view->target);
+    else if (!view->io->read16(view->io->context, address, value))
+        return 0;
+    if (address == (view->authority & ~1u))
+        *value &= (uint16_t)~(255u << (8u * (view->authority & 1u)));
+    if (view->hide_journal && address == (view->journal & ~1u))
+        *value &= (uint16_t)~(255u << (8u * (view->journal & 1u)));
+    return 1;
+}
+
+static int bound_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    struct bound_overlay *view = context;
+    uint32_t physical = view->bank + address / 2u;
+    uint16_t word;
+    if (address >= 0x40000u || !bound_read(view, physical & ~1u, &word))
+        return 0;
+    *value = (uint8_t)((word >> (4u * (address & 3u))) & 15u);
+    return 1;
+}
+
+static int load_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, uint8_t *data,
+                      uint32_t bytes)
+{
+    uint16_t word = 0;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        uint32_t at = address + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return 0;
+        data[i] = (uint8_t)(word >> (8u * (at & 1u)));
+    }
+    return 1;
+}
+
+int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
+                                      uint32_t authority_slot, uint32_t journal_slot,
+                                      uint8_t *scratch, uint32_t capacity, uint32_t *target)
+{
+    if (!io || !io->read16 || !scratch || !target ||
+        capacity < 2u * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES || (io->first & 0x1ffffu) ||
+        io->first > io->end || io->end - io->first != 6u * 0x20000u || authority_slot < io->first ||
+        authority_slot >= io->end ||
+        HPCLANG_RPL_FLASH_AUTHORITY_BYTES >= io->end - authority_slot || journal_slot < io->first ||
+        journal_slot >= io->end || HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES >= io->end - journal_slot)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    const uint32_t bytes = HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
+    if (!load_bytes(io, authority_slot, authority, sizeof authority) ||
+        !load_bytes(io, journal_slot, scratch, bytes))
+        return HPCLANG_RPL_FLASH_FAILED;
+    enum hpclang_rpl_flash_authority_phase phase;
+    enum hpclang_rpl_flash_sector_phase journal_phase;
+    uint32_t destination;
+    const uint8_t *image;
+    if (hpclang_rpl_flash_authority_inspect(io->first, io->end, authority_slot, authority,
+                                            sizeof authority, journal_slot, scratch, bytes,
+                                            &phase) ||
+        hpclang_rpl_flash_sector_inspect(io->first, io->end, journal_slot, scratch, bytes,
+                                         &destination, &image, &journal_phase) ||
+        phase == HPCLANG_RPL_FLASH_AUTHORITY_UNPUBLISHED ||
+        (phase != HPCLANG_RPL_FLASH_AUTHORITY_ARMED &&
+         journal_phase != HPCLANG_RPL_FLASH_SECTOR_RETIRED))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct bound_overlay view = {
+        io, authority_slot, journal_slot, destination, authority_slot & ~0x1ffffu, NULL, 0};
+    struct hpclang_rpl_flash_io masked = {&view, bound_read, NULL, io->first, io->end};
+    uint32_t found, restored;
+    int result = hpclang_rpl_flash_preflight_sector(&masked, scratch, capacity, &found, &restored);
+    if (result < 0)
+        return result;
+    if (journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED) {
+        if (result != 0)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    } else if (result <= 0 || result != (int)journal_phase || found != journal_slot ||
+               restored != destination) {
+        return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (!load_bytes(io, journal_slot, scratch, bytes))
+        return HPCLANG_RPL_FLASH_FAILED;
+    enum hpclang_rpl_flash_sector_phase reloaded_phase;
+    uint32_t reloaded_target;
+    if (hpclang_rpl_flash_authority_inspect(io->first, io->end, authority_slot, authority,
+                                            sizeof authority, journal_slot, scratch, bytes,
+                                            &phase) ||
+        hpclang_rpl_flash_sector_inspect(io->first, io->end, journal_slot, scratch, bytes,
+                                         &reloaded_target, &image, &reloaded_phase) ||
+        reloaded_phase != journal_phase || reloaded_target != destination)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* Resolve allocation membership on the restored view. Hide only the two
+     * already validated transaction statuses; payload bytes stay unchanged. */
+    view.hide_journal = 1;
+    view.image = journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED ? NULL : image;
+    const struct hpclang_rpl_reader reader = {bound_nibble, &view};
+    struct hpclang_rpl_flash_allocation allocation;
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t slot = index ? journal_slot : authority_slot;
+        uint32_t size = index ? bytes : HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+        view.bank = slot & ~0x1ffffu;
+        uint32_t address = (slot - view.bank) * 2u;
+        int membership =
+            hpclang_rpl_flash_allocation_find(&reader, 0x20au, 0x40000u, address, &allocation);
+        if (membership != 1 || allocation.address != address || allocation.nibbles != 2u * size)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (phase == HPCLANG_RPL_FLASH_AUTHORITY_CLOSED)
+        return 0;
+    if (journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED) {
+        for (uint32_t i = 0; i < HPCLANG_RPL_FLASH_SECTOR_BYTES; i += 2u) {
+            uint16_t word;
+            if (!io->read16(io->context, destination + i, &word))
+                return HPCLANG_RPL_FLASH_FAILED;
+            if (word != image_word(scratch + 24u, i))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+        result = HPCLANG_RPL_FLASH_SECTOR_RETIRING;
+    }
+    scratch[0] = 0x7e;
+    *target = destination;
+    return result;
+}
+
 static int sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
                          const uint8_t *expected_record, uint8_t *scratch, uint32_t capacity)
 {

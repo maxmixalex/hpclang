@@ -27,6 +27,20 @@ struct hpclang_rpl_flash_replay_io
 int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, uint8_t *scratch,
                                        uint32_t capacity, uint32_t *slot, uint32_t *target);
 
+/* Read-only preflight for a trusted installed authority/journal pair. Validate
+ * both durable records, all restored banks and the authority's exact allocation
+ * boundary (not a matching byte sequence inside another record). Return READY
+ * for an armed/ready transaction, RETIRING for target-equal cleanup only, or 0
+ * for a closed transaction with a retired journal and structurally clean port.
+ * Unpublished bindings and incompatible phases fail closed. A closed transaction
+ * never overlays its old image on later data. scratch needs two sector records;
+ * target changes only on positive results. Installation-root trust, exclusive
+ * ownership, startup ordering and reference safety remain caller obligations.
+ */
+int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
+                                      uint32_t authority_slot, uint32_t journal_slot,
+                                      uint8_t *scratch, uint32_t capacity, uint32_t *target);
+
 /* Replay a caller-authorized, fully published sector image from Flash. scratch
  * is caller-owned RAM of at least SECTOR_RECORD_BYTES, disjoint from IO state.
  * Read and validate the entire durable record before any target mutation.
