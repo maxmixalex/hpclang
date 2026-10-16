@@ -353,6 +353,22 @@ the launcher's read/write arena size, not measured peak heap consumption; the
 Direct launcher supplies a larger arena than Stock. The extended font/theme
 matrix also passes on all six Stock models.
 
+The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
+with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,
+layout, commit, rendering, surface copying and display publication at each
+captured update (loading/error/results, list reversal, waveform, theme and font
+changes). `INPUT` spans key interpretation, model update and any resulting
+declaration/layout/commit for each scripted key edge, including text edits.
+Host checkpoint waits and keyboard injection waits are excluded. These are
+separate sampled paths: adding their maxima would not establish an end-to-end
+latency bound. Renderer construction, asynchronous provider work and initial
+display acquisition are outside these measurements.
+The standalone C and C++ examples also deliberately sleep for 20 milliseconds
+per event-loop iteration. They process one keyboard event per iteration and
+draw an accepted model change on the following iteration. That scheduling and
+any queued input add latency beyond the E2E processing measurements; neither
+the initial-paint number nor `FRAME` alone describes key-to-display response.
+
 For the ARM ABI, the renderer with the example's two styles requests 188 bytes
 for its descriptors and copied styles, plus its two raster buffers:
 

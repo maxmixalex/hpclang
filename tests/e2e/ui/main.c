@@ -9,7 +9,18 @@
 extern const struct hpclang_font demo_font;
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_ui_witness[5];
+/* Maximum elapsed microseconds and sample counts, excluding host handshakes. */
+volatile uint32_t hpclang_ui_update_witness[4];
 static unsigned key_failure;
+
+static void elapsed(unsigned slot, uint64_t start)
+{
+    uint64_t duration = hpclang_time_monotonic_us() - start;
+    uint32_t sample = duration > UINT32_MAX ? UINT32_MAX : (uint32_t)duration;
+    if (sample > hpclang_ui_update_witness[slot])
+        hpclang_ui_update_witness[slot] = sample;
+    ++hpclang_ui_update_witness[slot + 2];
+}
 
 static int frame(unsigned id)
 {
@@ -52,6 +63,7 @@ static int press(struct demo_app *app, struct hpclang_ui_surface *r, struct hpcl
             return -1;
         }
         struct hpclang_ui_event event;
+        uint64_t update_start = hpclang_time_monotonic_us();
         int result = hpclang_ui_key(app->ui, mode, &key, &event);
         if (result < 0)
             return -1;
@@ -60,6 +72,7 @@ static int press(struct demo_app *app, struct hpclang_ui_surface *r, struct hpcl
             if (result < 0 || (result && view(app, r)))
                 return -1;
         }
+        elapsed(1, update_start);
     }
     return 0;
 }
@@ -78,9 +91,11 @@ static int activate(struct demo_app *app, struct hpclang_ui_surface *r,
 }
 static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned id)
 {
+    uint64_t start = hpclang_time_monotonic_us();
     if (view(app, r) || hpclang_ui_surface_render(r, app->ui) < 0 ||
         hpclang_ui_surface_copy(r, hpclang_display_surface()) || hpclang_display_present(100000))
         return -1;
+    elapsed(0, start);
     return frame(id);
 }
 static unsigned checks(void)
@@ -248,6 +263,12 @@ int main(void)
     snprintf(line, sizeof(line), "ERR %lu KEY %lx", (unsigned long)hpclang_ui_witness[4],
              (unsigned long)key_failure);
     hpclang_surface_draw_text(screen, &demo_font, 0, 16, line, 255);
+    snprintf(line, sizeof(line), "FRAME %lu INPUT %lu", (unsigned long)hpclang_ui_update_witness[0],
+             (unsigned long)hpclang_ui_update_witness[1]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 24, line, 255);
+    snprintf(line, sizeof(line), "SAMPLES %lu %lu", (unsigned long)hpclang_ui_update_witness[2],
+             (unsigned long)hpclang_ui_update_witness[3]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 40, line, 255);
     hpclang_surface_draw_text(screen, &demo_font, 20, 32, failure ? "UI FAIL" : "UI PASS", 255);
     hpclang_e2e_result = failure ? 0x46410000u | failure : 0x50415353u;
     if (failure)
