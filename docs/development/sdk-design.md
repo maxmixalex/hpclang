@@ -402,6 +402,8 @@ RAM bounds, stack/TLS diagnostics, complete immutable image/guards and the
 owning CODE envelope. Both paths pass; ordinary probes retain strict unmoved
 alignment by default. This verifies this owned witness, not arbitrary active
 ARM callers or complete native-reference repair.
+The direct configuration entry also passes exact replay/retirement and the full
+relocated-image checks on HP49g+, with the same 59-entry first-startup catalog.
 The first repaired startup retains only 59 of the original 62 catalog entries;
 a second warmstart rebuilds all 62 exact bindings without changing Flash.
 Production integration must therefore rebuild the catalog before allowing

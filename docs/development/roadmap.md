@@ -1318,6 +1318,9 @@ Both configuration variants pass these checks. Clearing all 512 KiB SRAM before
 HP50g reset also passes exact recovery, these ownership checks and Stock return
 after cold initialization finishes. Production catalog rebuilding, installation
 and transaction freshness remain open; this is not physical battery-loss testing.
+HP49g+ independently passes direct configuration-entry replay/retirement and
+the complete relocated-image checks, also retaining 59 entries on that first
+repaired startup. Its RAM-loss case has not yet been accepted.
 
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay
