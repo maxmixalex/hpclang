@@ -826,9 +826,10 @@ The relocated SDK builds and packages a C++ client using all six numeric entry
 points and the shared historical integer typedefs. The combined Display payload
 exhausted HP39g+ Stock memory in its 16-level display check before reaching
 console input. Console/input tests now form a separate `hpgcc-console` runtime
-suite; the split console passes HP50g Direct/Stock, including independent pixels
-and normal return. Remaining target acceptance is pending. Display keeps its
-original allocation and gray-level assertions.
+suite; the split console passes HP48gII/HP49g+/HP50g Direct/Stock and HP39g+
+Stock, including independent pixels and normal return. Split Display passes
+HP39g+ Stock with its original allocation and gray-level assertions. Remaining
+target and CI acceptance is pending.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
