@@ -1608,8 +1608,9 @@ The follow-up adds `sys_slowOn/Off` as owned ECONOMY/HOST profile selection,
 retaining slower host clocks and restoring the saved host configuration rather
 than historical fixed register values. Host error propagation, sanitizers and
 ARM analysis pass; native checks cover repeated selection, frequency bounds,
-monotonic continuity and restoration. All six Direct targets pass; Stock and
-the updated installed-package example are still being validated.
+monotonic continuity and restoration. All six Direct and all six Stock targets
+pass, as does the relocated SDK with the updated installed-package example,
+six-model launchers and three HP39 Aplet families. Formal CI remains pending.
 Separately, the emulator RTC divider now carries fractional microseconds across
 ticks: all 128 settings over 4096 expirations each, sanitizers, a pinned-source
 build and HP50g Direct/Stock regression pass. This fixes the test environment;

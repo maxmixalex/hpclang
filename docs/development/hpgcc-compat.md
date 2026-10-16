@@ -774,6 +774,11 @@ not nested scopes. The historical void signatures report service errors through
 `errno`, including `EBUSY` during sound playback. Runtime exit restores the
 borrowed profile even if the application omits `sys_slowOff`. This does not
 provide raw `sys_clksave/restore`, PLL control or overclocking adapters.
+All six Direct and all six Stock targets pass repeated profile selection,
+frequency bounds, monotonic continuity and host-frequency restoration, with
+independent report pixels and normal return. The relocated SDK also builds the
+updated example, six-model launchers and three HP39 Aplet families. Formal CI
+for this adapter addition is pending.
 
 ### RTC tick compatibility requirements
 
