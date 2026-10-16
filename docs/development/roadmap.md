@@ -1321,8 +1321,19 @@ and status-independent CRC. It distinguishes unpublished, armed, closing and
 closed states, rejects changed/moved journals and overlapping allocations, and
 supports inspecting journal retirement without granting replay permission.
 Host tests cover every status byte and single-bit corruption of the binding.
-This is not yet a durable publication or discovery protocol: a trusted installed
-root, startup exclusion and reference repair remain required. An old binding
+Caller-owned publication now verifies the durable journal and writes/verifies
+the binding body before arming it. Bound replay checks that entire armed record
+before the journal and target; closure requires a fully retired journal and an
+exact target image before clearing the binding. Host tests cut every publication
+and closure read/write, reject inactive bindings without erase/program commands,
+and exercise publication → replay → journal retirement → closure. Later target
+changes survive a replay attempt against that closed transaction. Resumption
+of the same reserved publication verifies NOR-compatible partial body bytes
+before completing them, requires exact bodies once status publication starts,
+and never rearms a closing/closed binding. Host tests also interrupt resumption
+and retry again. Trusted installed-root discovery, startup exclusion and
+reference repair remain required; this is not production startup integration.
+An old binding
 must not be erased/reused while its journal can survive, because a partial erase
 can resurrect an armed status; root replacement needs its own protocol.
 

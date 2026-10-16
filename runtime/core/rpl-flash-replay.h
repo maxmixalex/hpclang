@@ -57,4 +57,19 @@ int hpclang_rpl_flash_sector_replay_expected(const struct hpclang_rpl_flash_repl
                                              uint32_t expected_bytes, uint8_t *scratch,
                                              uint32_t capacity);
 
+/* Require an exact, durably ARMED one-use binding at authority_slot before
+ * entering expected-journal replay. Recheck the complete durable journal too.
+ * An unpublished, closing, closed, changed or unreadable binding causes no
+ * target mutation. The caller supplies the trusted root's allocation address;
+ * scanning for a convenient matching binding is not permitted. Keep exclusive
+ * ownership throughout; no other Stock writer may have run since arming.
+ * Native image/reference validation, startup ordering and root installation
+ * remain caller obligations. Success does not retire or close either record.
+ * Same expected/scratch separation and retry obligations as replay_expected.
+ */
+int hpclang_rpl_flash_sector_replay_bound(const struct hpclang_rpl_flash_replay_io *io,
+                                          uint32_t authority_slot, uint32_t journal_slot,
+                                          const uint8_t *expected, uint32_t expected_bytes,
+                                          uint8_t *scratch, uint32_t capacity);
+
 #endif

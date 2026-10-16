@@ -176,6 +176,47 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
 
+/* Bind one caller-reserved erased authority allocation to an already durable
+ * ready journal. Verify the complete journal, then publish/verify the binding
+ * body before its ARMED status. Neither journal nor target is modified.
+ * The expected ready journal remains stable in RAM. Caller owns the allocation
+ * boundary, trusted root and transaction exclusion, including after reset.
+ * FAILED/OCCUPIED/INVALID before writing change nothing. DIRTY retains ownership;
+ * no target operation may start unless publication succeeded. Partial binding
+ * publication uses finish_authority below; this entry requires erased storage.
+ * This is not an installer, root replacement or startup discovery. */
+int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        uint32_t journal_slot, const uint8_t *journal,
+                                        uint32_t journal_bytes);
+
+/* Resume this SAME reserved transaction after a publication cut, including a
+ * lost acknowledgement of ARMED. Requires the exact durable READY journal and
+ * trusted root reservation used for the original attempt, not a newly selected
+ * or previously closed allocation. FF may contain a NOR-compatible partial
+ * body; 7F/FE/7E require the entire body to match already. Verify the whole
+ * allocation and erased end marker before programming/verifying missing body
+ * bits, then publish/verify ARMED. CLOSING/CLOSED never become writable again.
+ * A DIRTY return retains ownership and prohibits starting the target mutation.
+ * Reconstructing the trusted reservation after reset remains the installer's
+ * responsibility; byte compatibility alone is not ownership or freshness.
+ */
+int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes);
+
+/* Close a known transaction only after its journal is fully retired and the
+ * target still equals its desired image. Compare the whole durable binding
+ * and journal against the original READY journal in RAM before clearing the
+ * authority status. Accept ARMED/CLOSING/CLOSED for an idempotent close retry;
+ * never accept unpublished or incompatible state. Only that status may change.
+ * DIRTY requires continued ownership even on read/preflight failure. The caller
+ * must separately finish reference repair and native return obligations.
+ * CLOSED prohibits replay; this does not authorize erasing/reusing the binding.
+ */
+int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes);
+
 /* Retire a caller-owned sector journal only after reference repair and all
  * transaction obligations have completed. record is the original committed
  * image retained in stable RAM. Verify its complete Flash body and the complete

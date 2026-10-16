@@ -177,3 +177,27 @@ int hpclang_rpl_flash_sector_replay_expected(const struct hpclang_rpl_flash_repl
         return HPCLANG_RPL_FLASH_INVALID;
     return sector_replay(io, slot, expected, scratch, capacity);
 }
+
+int hpclang_rpl_flash_sector_replay_bound(const struct hpclang_rpl_flash_replay_io *io,
+                                          uint32_t authority_slot, uint32_t journal_slot,
+                                          const uint8_t *expected, uint32_t expected_bytes,
+                                          uint8_t *scratch, uint32_t capacity)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->flash.read16 || !io->flash.program16 || !io->erase_sector || !scratch ||
+        capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES ||
+        hpclang_rpl_flash_authority_encode(io->flash.first, io->flash.end, authority_slot,
+                                           journal_slot, expected, expected_bytes, authority,
+                                           sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t word = 0;
+    for (uint32_t i = 0; i < sizeof authority; ++i) {
+        uint32_t at = authority_slot + i;
+        if ((!i || !(at & 1u)) && !io->flash.read16(io->flash.context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if ((uint8_t)(word >> (8u * (at & 1u))) != authority[i])
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return hpclang_rpl_flash_sector_replay_expected(io, journal_slot, expected, expected_bytes,
+                                                    scratch, capacity);
+}
