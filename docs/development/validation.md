@@ -175,7 +175,9 @@ pinned Ruff. It never rewrites sources in CI. Vendor and generated font sources
 are excluded because their upstream/generation tools own their formatting.
 
 Clang analysis reads CMake compilation databases, rather than inventing include
-paths, defines, or an ARM target. Host target detection comes from the compiler
+paths, defines, or an ARM target. Its source inventory includes tracked files
+and new non-ignored files, so a CMake source is analyzed before it is staged.
+Ignored local/generated files remain excluded. Host target detection comes from the compiler
 recorded by CMake. The toolchain's own `clang-check --analyze` supports ATfE's
 multilib layout; a generic clang-tidy package did not understand that layout even
 with a matching major version. Analysis findings fail the job. The fixed-address

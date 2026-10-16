@@ -43,12 +43,13 @@ new position after font-dependent measurement; Stock must expose its native
 eight-row font. These font/theme checks pass locally on all six Direct and all
 six Stock models, followed by further keyboard actions and normal system return.
 The installed SDK builds its ARM image and all six model launchers. The complete
-application flow also passes local Direct execution on all six models with
-electrical key injection, six display checkpoints and normal return. HP39g+
-Stock first-screen execution passes; complete Stock interaction and resource
-budgets are still pending. UI is included in the shared Runtime E2E suite matrix;
-its independent verifier checks captured states and waveform sample coordinates.
-The current batch has local evidence but has not yet been pushed to CI.
+application flow passes Direct and Stock execution on all six models with
+electrical key injection, display checkpoints and normal return. UI is included
+in the shared Runtime E2E suite matrix; its independent verifier checks captured
+states and waveform sample coordinates. These UI jobs passed in
+[Runtime CI on `a18302a3`](https://github.com/maxmixalex/hpclang/actions/runs/38410381089).
+The broader memory/update-cost acceptance remains open; the measured example
+pool and the limits of emulator timing evidence are documented below.
 
 An application owns its model and describes the current view with ordinary C
 functions, loops and conditions. Separate component instances scope their keys:
@@ -225,8 +226,9 @@ no physical state; commit its response and retry the same event. An `ENOSPC`
 edit still consumes native one-shot modifier state, matching the line editor.
 
 Host tests feed all six model layouts, including one-shot Alpha, release events,
-delimiter pairs and capacity recovery. Actual GPIO/display integration remains
-part of the interactive calculator example's acceptance.
+delimiter pairs and capacity recovery. The interactive calculator example also
+passes physical GPIO/display integration on all six Direct and Stock models;
+this does not replace the host matrix's exhaustive edit/error cases.
 
 ## Canvas and damaged regions
 
@@ -327,8 +329,9 @@ when switching back to a previously used renderer or after exposure. Destroy
 the renderer after callbacks finish; it does not own the UI or display session.
 Host pixel tests cover all three level counts, canvas confinement, partial
 updates, failed-frame retry, complete-page copying, input selection and an
-inverted theme. Six-model local execution and low-memory acceptance now pass;
-remote CI acceptance remains required before closing the renderer milestone.
+inverted theme. Six-model execution and low-memory acceptance pass, with the UI
+Runtime CI jobs accepted on `a18302a3`. Broader memory/update budgets remain
+part of the renderer milestone's outstanding acceptance work.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
 task for its complete eight-device view (46 live nodes). Its ARM declaration pool

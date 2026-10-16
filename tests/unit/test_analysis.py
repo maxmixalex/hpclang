@@ -60,6 +60,26 @@ class AnalysisCommands(unittest.TestCase):
 @unittest.skipUnless(os.name == "posix" and shutil.which("git"), "POSIX analysis runner")
 class AnalysisRunner(unittest.TestCase):
     def test_second_configuration_failure_and_duplicate_elimination(self):
+        for tracked in (True, False):
+            with self.subTest(tracked=tracked):
+                self.second_configuration_case(tracked)
+
+    def test_ignored_sources_are_excluded_but_unstaged_sources_are_owned(self):
+        owned_sources = runpy.run_path(
+            str(Path(__file__).resolve().parents[2] / "tools/analyze.py")
+        )["owned_sources"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / ".gitignore").write_text("ignored/\n")
+            (root / "tracked.c").write_text("int tracked;\n")
+            subprocess.run(["git", "-C", str(root), "add", "tracked.c"], check=True)
+            (root / "new source.c").write_text("int added;\n")
+            (root / "ignored").mkdir()
+            (root / "ignored/private.c").write_text("int ignored;\n")
+            self.assertEqual(owned_sources(root), {".gitignore", "tracked.c", "new source.c"})
+
+    def second_configuration_case(self, tracked):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "tools").mkdir()
@@ -68,7 +88,8 @@ class AnalysisRunner(unittest.TestCase):
             source = root / "sample.c"
             source.write_text("int sample(void) { return 0; }\n")
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            subprocess.run(["git", "-C", str(root), "add", "sample.c"], check=True)
+            if tracked:
+                subprocess.run(["git", "-C", str(root), "add", "sample.c"], check=True)
             checker = root / "check"
             checker.write_text(
                 f"#!{sys.executable}\n"

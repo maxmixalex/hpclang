@@ -1657,8 +1657,8 @@ gate; it demonstrates the five historical calls and documents their units.
 The follow-up calendar adapter adds `sys_tm_RTC`, the `hptime.h` include spelling
 and date output in the installed timer example. Calendar conversion/failure
 tests, all six Direct and all six Stock targets (including independent pixels
-and normal return), and the updated relocated SDK acceptance pass. Formal CI
-for this calendar addition is pending. The original void signature is retained with errno and unchanged
+and normal return), and the updated relocated SDK acceptance pass. Runtime and
+Quality CI are accepted on `c2fb66fe`. The original void signature is retained with errno and unchanged
 output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
@@ -1672,7 +1672,7 @@ behavior. Unit tests, sanitizers, ARM static analysis and all six Direct targets
 pass locally. The relocated SDK passes C/C++, six-model notebook/launcher builds
 and all three HP39 Aplet package families with the updated tone/BCD example.
 All six Stock targets also pass with independent pixels and normal return;
-formal CI for this addition is pending.
+Runtime and Quality CI are accepted on `c2fb66fe`.
 
 The follow-up adds `sys_slowOn/Off` as owned ECONOMY/HOST profile selection,
 retaining slower host clocks and restoring the saved host configuration rather
@@ -1680,7 +1680,8 @@ than historical fixed register values. Host error propagation, sanitizers and
 ARM analysis pass; native checks cover repeated selection, frequency bounds,
 monotonic continuity and restoration. All six Direct and all six Stock targets
 pass, as does the relocated SDK with the updated installed-package example,
-six-model launchers and three HP39 Aplet families. Formal CI remains pending.
+six-model launchers and three HP39 Aplet families. Runtime and Quality CI are
+accepted on `c2fb66fe`.
 Separately, the emulator RTC divider now carries fractional microseconds across
 ticks: all 128 settings over 4096 expirations each, sanitizers, a pinned-source
 build and HP50g Direct/Stock regression pass. This fixes the test environment;
