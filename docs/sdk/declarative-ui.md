@@ -343,11 +343,32 @@ Host allocation
 fault injection covers every renderer-construction allocation, checks cleanup
 and recovery, and proves declaration/layout/render/copy still work with further
 allocation disabled. Full Stock flows now pass on HP39g+ and HP39gs with this
-pool, physical keyboard handoff and normal return. An earlier HP39g+ emulator run,
-before the pool was reduced from 16,764 bytes,
-reports 36,864 total read/write bytes, 46 peak nodes and 9,585 microseconds for
-the initial paint. This is a single emulator observation, not a hardware timing
-guarantee. The extended font/theme matrix also passes on all six Stock models.
+pool, physical keyboard handoff and normal return. A local HP39g+ Stock rerun
+at `413e5891` reports the current 13,692-byte pool, 46 nodes and 5,614 microseconds
+for the initial paint; the paired Direct run reports 5,888 microseconds.
+These single emulator observations measure only the initial renderer call,
+excluding declaration, layout, commit and presentation. They are not hardware
+timing guarantees or worst-case interaction costs. The displayed `RW` value is
+the launcher's read/write arena size, not measured peak heap consumption; the
+Direct launcher supplies a larger arena than Stock. The extended font/theme
+matrix also passes on all six Stock models.
+
+For the ARM ABI, the renderer with the example's two styles requests 188 bytes
+for its descriptors and copied styles, plus its two raster buffers:
+
+| Viewport | 2 levels | 4 levels | 16 levels |
+| --- | ---: | ---: | ---: |
+| 131 × 64 | 2,364 bytes | 4,412 bytes | 8,636 bytes |
+| 131 × 80 | 2,908 bytes | 5,468 bytes | 10,748 bytes |
+
+These are requested heap bytes, excluding allocator bookkeeping and alignment
+overhead. Add the declaration pool, application state, stack and any owned LCD
+DMA pages to obtain an application budget. LCD pages use the hardware scan
+width and row count, which need not equal this renderer's logical viewport.
+Host allocation tests check the two-buffer cost at every size/level combination
+above, independently of host descriptor sizes, and retain allocation-failure
+and allocation-free frame checks. Peak whole-application memory and complete
+update-cost acceptance remain open.
 
 ## Vertical scrolling
 

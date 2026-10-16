@@ -10,6 +10,7 @@ void *__real_calloc(size_t count, size_t size);
 void __real_free(void *pointer);
 static int remaining = -1;
 static unsigned live;
+static size_t requested;
 static int reject(void)
 {
     if (!remaining)
@@ -23,8 +24,10 @@ void *__wrap_malloc(size_t size)
     if (reject())
         return NULL;
     void *p = __real_malloc(size);
-    if (p)
+    if (p) {
         ++live;
+        requested += size;
+    }
     return p;
 }
 void *__wrap_calloc(size_t count, size_t size)
@@ -32,8 +35,10 @@ void *__wrap_calloc(size_t count, size_t size)
     if (reject())
         return NULL;
     void *p = __real_calloc(count, size);
-    if (p)
+    if (p) {
         ++live;
+        requested += count * size;
+    }
     return p;
 }
 void __wrap_free(void *p)
@@ -60,8 +65,33 @@ static const struct hpclang_bitmap_font_data data = {.glyphs = glyphs,
                                                      .nominal_advance = 2};
 static const struct hpclang_font font = HPCLANG_BITMAP_FONT(data);
 
+static void raster_budget_tests(void)
+{
+    struct hpclang_ui_surface_style styles[2] = {{.font = &font, .foreground = 255},
+                                                 {.font = &font, .background = 255}};
+    requested = 0;
+    struct hpclang_ui_surface *renderer = hpclang_ui_surface_create(1, 1, 2, styles, 2, 0);
+    assert(renderer && requested >= 2);
+    /* Measure host descriptors independently of their target ABI sizes. */
+    size_t overhead = requested - 2;
+    hpclang_ui_surface_destroy(renderer);
+    assert(live == 0);
+    for (unsigned height = 64; height <= 80; height += 16) {
+        for (unsigned bits = 1; bits <= 4; bits *= 2) {
+            requested = 0;
+            renderer = hpclang_ui_surface_create(131, height, 1u << bits, styles, 2, 0);
+            assert(renderer);
+            size_t raster_bytes = 2 * height * ((131 * bits + 7) / 8);
+            assert(requested == overhead + raster_bytes);
+            hpclang_ui_surface_destroy(renderer);
+            assert(live == 0);
+        }
+    }
+}
+
 int main(void)
 {
+    raster_budget_tests();
     struct hpclang_ui_surface_style style = {.font = &font, .foreground = 255};
     struct hpclang_ui_surface *healthy = hpclang_ui_surface_create(8, 8, 2, &style, 1, 0);
     struct hpclang_surface *target = hpclang_surface_create(8, 8, 2);
