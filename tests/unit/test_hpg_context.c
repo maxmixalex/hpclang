@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <hpclang/font-package.h>
 #include "display-surface.h"
+#include "hpg-internal.h"
 
 /* Distinct font providers let this test observe adapter selection and HP-byte
  * translation independently of the clean font renderer's own raster tests. */
@@ -269,6 +270,57 @@ static void indicators(void)
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
 }
 
+static void shared_screen(void)
+{
+    unsigned previous_end = ended, previous_publish = published;
+    mode_failure = 1;
+    assert(!hpclang_hpg_acquire_screen() && errno == ENOMEM);
+    assert(!page_count && ended == previous_end && published == previous_publish);
+    assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
+    mode_failure = 0;
+    hpg_t *shared = hpclang_hpg_acquire_screen();
+    assert(shared && page_count == 1 && published == previous_publish);
+    assert(hpg_get_pixel(shared, 1, 1) == 255);
+    struct hpclang_surface *page = hpclang_hpg_surface(shared);
+    hpclang_surface_set_pixel(page, 2, 2, 255);
+    assert(hpclang_hpg_acquire_screen() == shared && hpclang_hpg_surface(shared) == page);
+    assert(hpclang_surface_get_pixel(page, 2, 2) == 255);
+    hpclang_hpg_finish(shared);
+    assert(published == previous_publish + 1);
+    hpg_cleanup();
+    assert(ended == previous_end + 1 && !page_count);
+    assert(hpclang_surface_get_pixel(display, 2, 2) == 0);
+
+    for (int dbuf = 0; dbuf <= 1; ++dbuf) {
+        hpg_set_mode_gray16(dbuf);
+        hpg_set_color(NULL, 119);
+        hpg_set_mode(NULL, HPG_MODE_XOR);
+        hpg_clip(NULL, 1, 1, 7, 5);
+        page = hpclang_display_surface();
+        hpclang_surface_set_pixel(page, 2, 2, 85);
+        previous_publish = published;
+        unsigned previous_flips = flips;
+        shared = hpclang_hpg_acquire_screen();
+        assert(shared && hpclang_hpg_surface(shared) == page);
+        assert(page_count == (unsigned)dbuf + 1 && hpclang_surface_levels(page) == 16);
+        assert(hpclang_surface_get_pixel(page, 2, 2) == 85);
+        assert(shared->color == 119 && shared->mode == HPG_MODE_XOR && shared->left == 1 &&
+               shared->top == 1 && shared->right == 7 && shared->bottom == 5);
+        hpclang_hpg_finish(shared);
+        assert(published == previous_publish + !dbuf && flips == previous_flips);
+        hpg_cleanup();
+    }
+    assert(hpclang_display_begin_pages(4, 2) == 0);
+    page = hpclang_display_surface();
+    hpclang_surface_set_pixel(page, 3, 3, 170);
+    previous_end = ended;
+    assert(!hpclang_hpg_acquire_screen() && errno == EBUSY);
+    hpg_cleanup();
+    assert(ended == previous_end && page_count == 2 && hpclang_display_surface() == page);
+    assert(hpclang_surface_get_pixel(page, 3, 3) == 170);
+    hpclang_display_end();
+}
+
 static void copies(void)
 {
     hpg_t *g = hpg_alloc_gray16_image(8, 6);
@@ -460,6 +512,7 @@ int main(void)
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
     modes();
     indicators();
+    shared_screen();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

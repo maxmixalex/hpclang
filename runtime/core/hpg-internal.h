@@ -27,6 +27,10 @@ struct hpg_graphics
 };
 struct hpg_graphics *hpclang_hpg_resolve(struct hpg_graphics *g);
 struct hpclang_surface *hpclang_hpg_surface(struct hpg_graphics *g);
+/* Share HPG's display lease with historical text output. First acquisition
+ * preserves Stock pixels/icons; an existing HPG mode and buffering policy stay
+ * intact. A separately owned clean display session fails with EBUSY. */
+struct hpg_graphics *hpclang_hpg_acquire_screen(void);
 void hpclang_hpg_finish(struct hpg_graphics *g);
 void hpclang_hpg_builtin_glyph(struct hpclang_surface *surface, hpg_font_t *font,
                                unsigned char code, int x, int y);

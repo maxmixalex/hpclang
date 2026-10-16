@@ -5,22 +5,25 @@
 #include <hpclang/console.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include "console-internal.h"
 
 struct hpclang_console
 {
     unsigned columns, rows, column, row, width, height;
     unsigned remaining, tab_width;
     uint32_t pending, minimum;
-    const struct hpclang_font *font;
+    hpclang_console_glyph_fn draw;
+    const void *context;
     struct hpclang_surface *canvas, *glyph;
     uint32_t cells[];
 };
 
-struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
-                                               const struct hpclang_font *font)
+struct hpclang_console *hpclang_console_create_cells(unsigned columns, unsigned rows,
+                                                     unsigned width, unsigned height,
+                                                     hpclang_console_glyph_fn draw,
+                                                     const void *context)
 {
-    unsigned width = hpclang_font_advance(font), height = hpclang_font_height(font);
-    if (!font || !columns || !rows || !width || !height || columns > INT32_MAX / width ||
+    if (!draw || !columns || !rows || !width || !height || columns > INT32_MAX / width ||
         rows > INT32_MAX / height ||
         (size_t)columns > (SIZE_MAX - sizeof(struct hpclang_console)) / sizeof(uint32_t) / rows) {
         errno = EINVAL;
@@ -35,7 +38,8 @@ struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
     c->rows = rows;
     c->width = width;
     c->height = height;
-    c->font = font;
+    c->draw = draw;
+    c->context = context;
     c->tab_width = 4;
     c->canvas = hpclang_surface_create_mono(columns * width, rows * height);
     c->glyph = hpclang_surface_create_mono(width, height);
@@ -46,6 +50,22 @@ struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
     }
     hpclang_console_clear(c);
     return c;
+}
+
+static void font_glyph(struct hpclang_surface *cell, const void *context, uint32_t codepoint)
+{
+    hpclang_surface_draw_codepoint(cell, context, 0, 0, codepoint, 255);
+}
+
+struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
+                                               const struct hpclang_font *font)
+{
+    if (!font) {
+        errno = EINVAL;
+        return NULL;
+    }
+    return hpclang_console_create_cells(columns, rows, hpclang_font_advance(font),
+                                        hpclang_font_height(font), font_glyph, font);
 }
 
 void hpclang_console_destroy(struct hpclang_console *c)
@@ -122,6 +142,13 @@ int hpclang_console_set_tab_width(struct hpclang_console *c, unsigned width)
     return 0;
 }
 
+static void glyph(struct hpclang_console *c, uint32_t cp)
+{
+    if (c->column == c->columns)
+        newline(c);
+    c->cells[(size_t)c->row * c->columns + c->column++] = cp;
+}
+
 static void put(struct hpclang_console *c, uint32_t cp)
 {
     if (cp == '\n') {
@@ -147,10 +174,19 @@ static void put(struct hpclang_console *c, uint32_t cp)
         while (spaces--)
             put(c, ' ');
     } else if (cp >= 0x20 && !(cp >= 0x7f && cp <= 0x9f)) {
-        if (c->column == c->columns)
-            newline(c);
-        c->cells[(size_t)c->row * c->columns + c->column++] = cp;
+        glyph(c, cp);
     }
+}
+
+int hpclang_console_write_byte(struct hpclang_console *c, unsigned char b)
+{
+    if (hpclang_console_flush(c))
+        return -1;
+    if (b >= 0x20)
+        glyph(c, b);
+    else
+        put(c, b);
+    return 0;
 }
 
 static void byte(struct hpclang_console *c, unsigned char b)
@@ -228,7 +264,7 @@ int hpclang_console_render(struct hpclang_console *c, struct hpclang_surface *de
             if (cp == ' ')
                 continue;
             hpclang_surface_clear(c->glyph, 0);
-            hpclang_surface_draw_codepoint(c->glyph, c->font, 0, 0, cp, 255);
+            c->draw(c->glyph, c->context, cp);
             hpclang_surface_blit(c->canvas, (int32_t)(col * c->width), (int32_t)(row * c->height),
                                  c->glyph, 0, 0, (int32_t)c->width, (int32_t)c->height);
         }

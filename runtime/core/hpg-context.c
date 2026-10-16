@@ -99,23 +99,19 @@ static int status_view(struct hpclang_surface *view)
     ++view->width;
     return 1;
 }
-void hpg_set_indicator(unsigned char indicator, unsigned char color)
+struct hpg_graphics *hpclang_hpg_acquire_screen(void)
 {
-    if (indicator >= 6) {
-        errno = EINVAL;
-        return;
-    }
     hpg_init();
     if (!initialized)
-        return;
-    struct hpclang_surface view;
-    if (!status_view(&view))
-        return;
+        return NULL;
     if (!owns_display) {
+        struct hpclang_surface view;
+        if (!status_view(&view))
+            return NULL;
         /* The Stock page remains valid during acquisition. Copy its visible
-         * pixels and six status segments before changing the selected icon. */
+         * pixels and six status segments before any adapter draws into it. */
         if (hpclang_display_begin_pages(view.levels, 1))
-            return;
+            return NULL;
         owns_display = 1;
         double_buffered = 0;
         screen.surface = hpclang_display_surface();
@@ -124,9 +120,20 @@ void hpg_set_indicator(unsigned char indicator, unsigned char color)
         for (unsigned i = 0; i < 6; ++i)
             (void)hpclang_display_indicator_set(
                 i, hpclang_surface_get_pixel(&view, (int)view.width - 1, (int)i));
-        if (!status_view(&view))
-            return;
     }
+    return &screen;
+}
+void hpg_set_indicator(unsigned char indicator, unsigned char color)
+{
+    if (indicator >= 6) {
+        errno = EINVAL;
+        return;
+    }
+    if (!hpclang_hpg_acquire_screen())
+        return;
+    struct hpclang_surface view;
+    if (!status_view(&view))
+        return;
     if (screen.mode == HPG_MODE_XOR)
         color ^= hpclang_surface_get_pixel(&view, (int)view.width - 1, indicator);
     if (!hpclang_display_indicator_set(indicator, color))

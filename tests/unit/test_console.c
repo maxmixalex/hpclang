@@ -5,6 +5,7 @@
 #include <hpclang/console.h>
 #include <hpclang/display.h>
 #include <hpclang/font-package.h>
+#include "console-internal.h"
 
 const struct hpclang_boot_info *hpclang_boot_info(void)
 {
@@ -106,8 +107,56 @@ static void tab_reference(void)
             hpclang_console_destroy(reference);
         }
 }
+static unsigned adapter_calls;
+static void adapter_glyph(struct hpclang_surface *s, const void *context, uint32_t cp)
+{
+    assert(context == &font && (cp == 'A' || cp == 0x3a9));
+    assert(hpclang_surface_width(s) == 4 && hpclang_surface_height(s) == 6);
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 0); /* cleared for every cell */
+    ++adapter_calls;
+    hpclang_surface_set_pixel(s, 0, 0, 255);
+    hpclang_surface_set_pixel(s, cp == 'A' ? 1 : 2, 1, 255);
+    hpclang_surface_set_pixel(s, 4, 0, 255); /* must not bleed into next cell */
+}
+static void adapter_cells(void)
+{
+    assert(!hpclang_console_create_cells(2, 1, 4, 6, NULL, &font) && errno == EINVAL);
+    assert(!hpclang_console_create_cells(2, 1, 0, 6, adapter_glyph, &font) && errno == EINVAL);
+    assert(!hpclang_console_create_cells(2, 1, UINT32_MAX, 6, adapter_glyph, &font) &&
+           errno == EINVAL);
+    struct hpclang_console *c = hpclang_console_create_cells(3, 1, 4, 6, adapter_glyph, &font);
+    struct hpclang_surface *s = hpclang_surface_create_mono(12, 6);
+    assert(c && s && adapter_calls == 0);
+    text(c, "A \xce\xa9");
+    assert(hpclang_console_render(c, s, 0, 0) == 0 && adapter_calls == 2);
+    for (int y = 0; y < 6; ++y)
+        for (int x = 0; x < 12; ++x) {
+            int ink = (y == 0 && (x == 0 || x == 8)) || (y == 1 && (x == 1 || x == 10));
+            assert(hpclang_surface_get_pixel(s, x, y) == (ink ? 255 : 0));
+        }
+    hpclang_console_move(c, 2, 0);
+    hpclang_console_clear_eol(c);
+    assert(hpclang_console_render(c, s, 0, 0) == 0 && adapter_calls == 3);
+    assert(hpclang_surface_get_pixel(s, 8, 0) == 0);
+    assert(hpclang_console_write_byte(NULL, 0x87) == -1 && errno == EINVAL);
+    for (unsigned code = 0x20; code <= 0xff; ++code) {
+        hpclang_console_clear(c);
+        assert(hpclang_console_write_byte(c, (unsigned char)code) == 0);
+        assert(cell(c, 0, 0) == code);
+    }
+    hpclang_console_clear(c);
+    text(c, "\xe2");
+    assert(hpclang_console_write_byte(c, 0x87) == 0);
+    assert(cell(c, 0, 0) == 0xfffd && cell(c, 1, 0) == 0x87);
+    assert(hpclang_console_write_byte(c, '\r') == 0);
+    assert(hpclang_console_write_byte(c, 'B') == 0 && cell(c, 0, 0) == 'B');
+    hpclang_surface_destroy(s);
+    hpclang_console_destroy(c);
+}
+
 int main(void)
 {
+    adapter_cells();
     controls();
     tab_reference();
     assert(!hpclang_console_create(0, 1, &font) && errno == EINVAL);
