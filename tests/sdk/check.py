@@ -84,6 +84,16 @@ def main():
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
+        counter_cmake = application / "counter/CMakeLists.txt"
+        counter_source = counter_cmake.read_text()
+        launcher_call = "hpclang_target_launchers(declarative_ui_cpp)"
+        if counter_source.count(launcher_call) != 1:
+            raise AssertionError("C++ counter launcher declaration changed")
+        counter_cmake.write_text(
+            counter_source.replace(
+                launcher_call, "hpclang_target_launchers(declarative_ui_cpp MAX_RW_BYTES 36864)"
+            )
+        )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
         shutil.copytree(package / "examples/notebook", application / "notebook")
@@ -139,6 +149,11 @@ endforeach()
             env=env,
         )
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
+        counter_args = (
+            (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
+        )
+        if counter_args[-2:] != ["--max-rw-bytes", "36864"]:
+            raise AssertionError("Relocated SDK lost the requested application RW limit")
         commands = json.loads((build / "compile_commands.json").read_text())
         for command in commands:
             serialized = json.dumps(command)

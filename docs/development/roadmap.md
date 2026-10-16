@@ -1729,23 +1729,30 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.3 — Components, rendering and themes
 
-- [ ] Provide reusable text, action, selection, scrolling/list and editing
+- [x] Provide reusable text, action, selection, scrolling/list and editing
   components with composable containers; confirm the initial component set
   through real example screens rather than application-specific dialogs.
-- [ ] Implement a usable default surface/font renderer and explicit theme
+- [x] Implement a usable default surface/font renderer and explicit theme
   inputs. Keep widget appearance, font choices and rasterization outside the
   state/layout engine. Measurement and drawing must agree across backends.
-- [ ] Demonstrate the same application tree with a second renderer/theme,
+- [x] Demonstrate the same application tree with a second renderer/theme,
   including focus and input behavior. Preserve the downstream 39gsX native
   appearance use case; a claim of faithful HP39 reproduction requires separate
   reverse-engineering and visual evidence.
-- [ ] Adapt the original sketch's illustrative native drawing/pointer boundary
+- [x] Adapt the original sketch's illustrative native drawing/pointer boundary
   to actual monochrome/grayscale surfaces and keyboard-only operation. Keep
   pointer support optional and test clipped drawing ownership/publication;
   RGB565 and device scanning in the sketch do not imply new target hardware.
 - [ ] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
   partial redraw and custom canvas, including low-memory failure and clean
   Stock return. Record frame/update and memory budgets.
+
+The first four items are covered by the reusable C/C++ interfaces, the installed
+device-manager example, independent theme/font/canvas LCD checks in the accepted
+six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
+`ui_demo` and `ui_surface_alloc` sanitizer tests. The final resource/low-memory
+acceptance remains open while the bounded six-model follow-up is being verified;
+this does not claim faithful HP39 native styling or complete M8.3.
 
 #### M8.4 — Historical source compatibility
 
