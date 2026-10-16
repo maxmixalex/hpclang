@@ -98,15 +98,19 @@ def main():
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
         shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
+        shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
                 "add_subdirectory(notebook)\nadd_subdirectory(console)\n"
+                "hpclang_add_application(numeric_input numeric-input.cpp)\n"
+                "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
+                "hpclang_target_launchers(numeric_input)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -165,6 +169,7 @@ endforeach()
         for name, output in (
             ("hello_c", build),
             ("hello_cpp", build),
+            ("numeric_input", build),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
