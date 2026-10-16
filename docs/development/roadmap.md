@@ -1751,7 +1751,7 @@ The first four items are covered by the reusable C/C++ interfaces, the installed
 device-manager example, independent theme/font/canvas LCD checks in the accepted
 six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
 `ui_demo` and `ui_surface_alloc` sanitizer tests. The final resource/low-memory
-acceptance remains open while the bounded six-model follow-up is being verified;
+acceptance remains open for the bounded follow-up's CI and whole-app analysis;
 this does not claim faithful HP39 native styling or complete M8.3.
 
 The maintained 36 KiB UI artifact now passes all six Direct and all six Stock
