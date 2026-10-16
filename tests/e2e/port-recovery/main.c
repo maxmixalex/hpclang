@@ -82,7 +82,11 @@ static struct hpclang_sst_bus bus_for(void *context)
 static int program_flash(void *context, unsigned address, unsigned short value)
 {
     struct workspace *out = context;
-    if ((address & ~4095u) != out->target)
+    if ((address & ~4095u) != out->target
+#ifdef HPCLANG_RECOVERY_RETIRE_JOURNAL
+        && address != (out->slot & ~1u)
+#endif
+    )
         return 0;
 #ifdef HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY
     /* Test-only command-boundary interruption. The caller retains ownership
@@ -160,7 +164,11 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
     out->result = hpclang_rpl_flash_preflight_sector(&io, out->scratch, sizeof(out->scratch),
                                                      &out->slot, &out->target);
     uint64_t clock;
-    if (out->result == 1 && hpclang_time_read_us(&clock) == 0) {
+    int recoverable = out->result == 1;
+#ifdef HPCLANG_RECOVERY_RETIRE_JOURNAL
+    recoverable = recoverable || out->result == 2;
+#endif
+    if (recoverable && hpclang_time_read_us(&clock) == 0) {
         struct hpclang_sst_bus bus = bus_for(out);
         struct hpclang_sst_device device;
         out->diagnostics[26] = hpclang_sst_identify(&bus, &device);
@@ -169,25 +177,50 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
             struct hpclang_rpl_flash_replay_io replay = {
                 {out, read_flash, program_flash, 0x140000, 0x200000}, erase_flash};
             const uint32_t record_bytes = HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
-            out->diagnostics[27] = hpclang_rpl_flash_sector_replay_expected(
-                &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
-                sizeof(out->scratch) - record_bytes);
-            if (out->diagnostics[27] != 0) {
-                out->marker = 0x48504641;
-                for (;;)
-                    __asm__ volatile("nop");
+            if (out->result == 1) {
+                out->diagnostics[27] = hpclang_rpl_flash_sector_replay_expected(
+                    &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
+                    sizeof(out->scratch) - record_bytes);
+                if (out->diagnostics[27] != 0) {
+                    out->marker = 0x48504641;
+                    for (;;)
+                        __asm__ volatile("nop");
+                }
+                unsigned erases = out->diagnostics[28], programs = out->diagnostics[29];
+                out->diagnostics[30] = hpclang_rpl_flash_sector_replay_expected(
+                    &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
+                    sizeof(out->scratch) - record_bytes);
+                out->diagnostics[31] =
+                    (out->diagnostics[28] - erases) + (out->diagnostics[29] - programs);
+                if (out->diagnostics[30] != 0 || out->diagnostics[31] != 0) {
+                    out->marker = 0x48504641;
+                    for (;;)
+                        __asm__ volatile("nop");
+                }
             }
-            unsigned erases = out->diagnostics[28], programs = out->diagnostics[29];
-            out->diagnostics[30] = hpclang_rpl_flash_sector_replay_expected(
-                &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
-                sizeof(out->scratch) - record_bytes);
-            out->diagnostics[31] =
-                (out->diagnostics[28] - erases) + (out->diagnostics[29] - programs);
+#ifdef HPCLANG_RECOVERY_RETIRE_JOURNAL
+            /* This witness owns the injected transaction. Production recovery
+             * still needs freshness and reference authority before retirement.
+             * Diagnostic 30 is the final operation result; 31 counts retirement
+             * writes, including the required write-free repeated invocation. */
+            unsigned retirement_programs = out->diagnostics[29];
+            out->diagnostics[30] = hpclang_rpl_flash_retire_sector(&replay.flash, out->slot,
+                                                                   out->scratch, record_bytes);
             if (out->diagnostics[30] != 0) {
                 out->marker = 0x48504641;
                 for (;;)
                     __asm__ volatile("nop");
             }
+            unsigned repeated_programs = out->diagnostics[29];
+            out->diagnostics[30] = hpclang_rpl_flash_retire_sector(&replay.flash, out->slot,
+                                                                   out->scratch, record_bytes);
+            out->diagnostics[31] = out->diagnostics[29] - retirement_programs;
+            if (out->diagnostics[30] != 0 || out->diagnostics[29] != repeated_programs) {
+                out->marker = 0x48504641;
+                for (;;)
+                    __asm__ volatile("nop");
+            }
+#endif
         }
     }
 

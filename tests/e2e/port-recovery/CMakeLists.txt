@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 project(hpclang_port_recovery_witness LANGUAGES C ASM)
 option(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY
     "Stop the witness before publishing a restored bank identity" OFF)
+option(HPCLANG_RECOVERY_RETIRE_JOURNAL
+    "Retire the verified journal and check repeated retirement without writes" OFF)
 
 get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -30,6 +32,9 @@ target_include_directories(recovery PRIVATE "${CORE}" "${HPCLANG_ROOT}/include")
 target_compile_features(recovery PRIVATE c_std_11)
 if(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY)
     target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY=1)
+endif()
+if(HPCLANG_RECOVERY_RETIRE_JOURNAL)
+    target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_RETIRE_JOURNAL=1)
 endif()
 target_compile_options(recovery PRIVATE -Oz -ffreestanding -fno-builtin -fpie
     -fvisibility=hidden -ffunction-sections -fdata-sections)

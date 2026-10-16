@@ -14,7 +14,13 @@ import time
 from types import SimpleNamespace
 
 from prepare import prepare
-from verify import verify, verify_interruption, verify_restart, verify_power_cut
+from verify import (
+    verify,
+    verify_interruption,
+    verify_restart,
+    verify_power_cut,
+    verify_retirement_cut,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -277,6 +283,63 @@ def run(args):
     ) as child:
         completed(child, 90)
     catalog_entries = verify_restart(clean / "state", recovery / "state", restarted / "state")
+    retirement_cut = None
+    if args.retirement_build is not None:
+        retirement_source = restarted / "state"
+        if args.flash_busy_reads > 1:
+            # Clear one live status bit only; the neighboring byte stays intact.
+            mask = 0x10 << (8 * (args.slot & 1))
+            retirement_cut = (1, args.flash_busy_reads // 2, mask)
+            interrupted = args.output / "retirement-cut"
+            transfer(
+                args,
+                interrupted,
+                retirement_source,
+                args.retirement_build,
+                "RETIRECUT",
+                retirement_cut,
+            )
+            verify_retirement_cut(
+                retirement_source / "flash",
+                interrupted / "state/flash",
+                interrupted / "emulator.log",
+                args.slot,
+                args.target,
+                retirement_cut,
+            )
+            resumed = args.output / "retirement-resume"
+            resumed.mkdir()
+            shutil.copytree(interrupted / "state", resumed / "state")
+            with emulator(
+                args, resumed, "10000 capture home\n12000 finish-install\n", ["--reset"]
+            ) as child:
+                completed(child, 90)
+            verify_restart(clean / "state", interrupted / "state", resumed / "state")
+            retirement_source = resumed / "state"
+        retired = args.output / "retired"
+        transfer(args, retired, retirement_source, args.retirement_build, "RECOVERYRETIRE")
+        verify(
+            SimpleNamespace(
+                before=retirement_source,
+                after=retired / "state",
+                elf=args.retirement_build / "recovery.elf",
+                binary=args.retirement_build / "recovery.bin",
+                package=args.retirement_build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                retire=True,
+            )
+        )
+        retired_restart = args.output / "retired-restarted"
+        retired_restart.mkdir()
+        shutil.copytree(retired / "state", retired_restart / "state")
+        with emulator(
+            args, retired_restart, "10000 capture home\n12000 finish-install\n", ["--reset"]
+        ) as child:
+            completed(child, 90)
+        verify_restart(clean / "state", retired / "state", retired_restart / "state")
+        print("Journal retirement and unchanged native catalog after reset verified", flush=True)
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -287,6 +350,8 @@ def run(args):
                 "target": args.target,
                 "restored_catalog_entries": catalog_entries,
                 "interrupted_before_identity": args.interrupted_build is not None,
+                "journal_retirement": args.retirement_build is not None,
+                "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,
             },
@@ -315,6 +380,11 @@ def main():
         help="optional witness built with HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY",
     )
     parser.add_argument("--nm", default="llvm-nm")
+    parser.add_argument(
+        "--retirement-build",
+        type=Path,
+        help="optional witness built with HPCLANG_RECOVERY_RETIRE_JOURNAL",
+    )
     parser.add_argument(
         "--flash-busy-reads",
         type=int,
@@ -349,6 +419,8 @@ def main():
     )
     if args.interrupted_build is not None:
         args.interrupted_build = args.interrupted_build.resolve()
+    if args.retirement_build is not None:
+        args.retirement_build = args.retirement_build.resolve()
     run(args)
 
 

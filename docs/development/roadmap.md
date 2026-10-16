@@ -1271,6 +1271,18 @@ The checked ELF packager is shared outside E2E and regenerates missing raw-image
 outputs. These changes are locally accepted; transaction freshness and complete
 native reference repair remain separate requirements.
 
+The independent recovery witness now also exercises journal retirement. Local
+HP49g+/HP50g runs interrupt the status write with one selected completed bit,
+restart Stock with the original 61-entry catalog, then finish retirement and
+verify a repeated call performs no writes. Whole-Flash comparisons require only
+the authorized status-byte change, preserving the neighboring byte and restored
+sector; owned image/stack/TLS, return and final catalog checks pass. Nineteen host
+verifier tests cover invalid statuses, unfinished targets, collateral changes
+and mismatched fault evidence. The maintained runner and Runtime workflow include
+the retirement build and cut/resume stage. Broader physical fault patterns,
+transaction freshness, reference authority and automatic startup integration
+remain required separately.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

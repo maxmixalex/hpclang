@@ -54,6 +54,41 @@ class RecoveryVerifierTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     VERIFY.verify_flash(self.before, changed, self.slot, self.target)
 
+    def test_retirement_and_interrupted_status(self):
+        retired = self.after.copy()
+        retired[self.slot] = 0
+        record, restored = VERIFY.verify_flash(
+            self.before, retired, self.slot, self.target, retire=True
+        )
+        self.assertEqual(record, self.record)
+        self.assertFalse(restored)
+        for status in range(256):
+            before = self.after.copy()
+            before[self.slot] = status
+            with self.subTest(status=status):
+                if status and status & 0x7E == status:
+                    record, restored = VERIFY.verify_flash(
+                        before, retired, self.slot, self.target, retire=True
+                    )
+                    self.assertEqual(record, self.record)
+                    self.assertTrue(restored)
+                else:
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_flash(before, retired, self.slot, self.target, retire=True)
+
+    def test_retirement_preserves_neighbor_and_requires_target(self):
+        retired = self.after.copy()
+        retired[self.slot] = 0
+        for address in (self.slot - 1, self.slot, self.slot + 1, self.target, self.target + 4096):
+            changed = retired.copy()
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                VERIFY.verify_flash(self.before, changed, self.slot, self.target, retire=True)
+        partial = self.before.copy()
+        partial[self.slot] = 0x3E
+        with self.assertRaises(ValueError):
+            VERIFY.verify_flash(partial, retired, self.slot, self.target, retire=True)
+
     def test_corrupt_journal_is_not_accepted_as_an_oracle(self):
         for offset in (0, 1, 3, 4, 12, 16, 20, 24, 4119, 4120):
             with self.subTest(offset=offset):
@@ -88,6 +123,30 @@ class RecoveryPowerCutTests(unittest.TestCase):
         self.paths[1].write_bytes(after)
         self.paths[2].write_text(event)
         return VERIFY.verify_power_cut(*self.paths, self.slot, self.target, cut)
+
+    def test_retirement_cut_preserves_target_and_neighbor(self):
+        before = self.after.copy()
+        before[self.slot - 1] = 0x35
+        after = before.copy()
+        after[self.slot] = 0x6E
+        event = (
+            f"hpclang-flash-cut operation=1 address={self.slot - 1} bytes=2 "
+            "value=53 mask=4096 reads=16\n"
+        )
+        self.paths[0].write_bytes(before)
+        self.paths[1].write_bytes(after)
+        self.paths[2].write_text(event)
+        VERIFY.verify_retirement_cut(*self.paths, self.slot, self.target, (1, 16, 0x1000))
+        for address in (self.slot - 1, self.target, self.slot + 1):
+            changed = after.copy()
+            changed[address] ^= 1
+            self.paths[1].write_bytes(changed)
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                VERIFY.verify_retirement_cut(*self.paths, self.slot, self.target, (1, 16, 0x1000))
+        self.paths[1].write_bytes(after)
+        self.paths[2].write_text(event + event)
+        with self.assertRaises(ValueError):
+            VERIFY.verify_retirement_cut(*self.paths, self.slot, self.target, (1, 16, 0x1000))
 
     def test_partial_first_program_and_evidence_rejections(self):
         # First requested word is 0x0100. Completing alternating bits leaves

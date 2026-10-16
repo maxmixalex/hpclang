@@ -339,6 +339,19 @@ uploads the normal witness under a different name and retries recovery, retainin
 both program objects. Core exercises this path on both supported models. This
 is interruption between completed Flash commands, not a simulated busy-chip
 power loss.
+
+`--retirement-build` accepts a witness built with
+`-DHPCLANG_RECOVERY_RETIRE_JOURNAL=ON`. After replay and catalog reconstruction,
+it verifies the journal and target again, clears only the journal status, and
+repeats retirement with no further writes. With more than one configured busy
+read, the runner first interrupts that status write after clearing one selected
+bit, verifies the entire Flash image and neighboring byte, resets Stock, then
+resumes retirement. A partially retired journal only authorizes finishing its
+status transition when the target already matches; it never authorizes another
+erase or replay. Both resets must retain the clean catalog. This is an owned
+transaction fixture, not transaction-freshness proof for arbitrary journals or
+an automatic startup-recovery implementation. CI builds all three witness modes.
+
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
 status and ignores command writes; the array changes only at completion. The
