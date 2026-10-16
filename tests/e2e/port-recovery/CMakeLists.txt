@@ -34,7 +34,7 @@ endif()
 target_compile_options(recovery PRIVATE -Oz -ffreestanding -fno-builtin -fpie
     -fvisibility=hidden -ffunction-sections -fdata-sections)
 target_link_options(recovery PRIVATE -nostdlib -Wl,--gc-sections -Wl,--emit-relocs
-    -Wl,--pic-veneer "-Wl,-T,${CMAKE_CURRENT_LIST_DIR}/link.ld")
+    -Wl,--pic-veneer -Wl,--orphan-handling=error "-Wl,-T,${CMAKE_CURRENT_LIST_DIR}/link.ld")
 target_link_libraries(recovery PRIVATE "${BUILTINS}")
 set_target_properties(recovery PROPERTIES SUFFIX ".elf"
     LINK_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/link.ld")

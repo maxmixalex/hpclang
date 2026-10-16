@@ -5,6 +5,10 @@ ENTRY(entry) SECTIONS {
  .tbss (NOLOAD) : { __zero_start = .; *(.tbss*) __tls_end = .; }
  . = ADDR(.tbss)+SIZEOF(.tbss);
  .bss (NOLOAD) : { *(.bss*) . = ALIGN(8); __image_end = .; }
+ .ARM.attributes 0 : { *(.ARM.attributes) }
+ .symtab 0 : { *(.symtab) }
+ .shstrtab 0 : { *(.shstrtab) }
+ .strtab 0 : { *(.strtab) }
  /DISCARD/ : { *(.ARM.exidx*) *(.comment) }
  ASSERT(entry == 0, "Recovery entry must be first")
  ASSERT((__zero_start & 3) == 0, "BSS clear requires word alignment")

@@ -283,7 +283,8 @@ cmake -S tests/e2e/port-recovery -B build/port-recovery \
 cmake --build build/port-recovery
 ```
 
-Core CI builds this witness and checks linked relocation kinds, image entry and
+The linker rejects unhandled sections rather than allowing the packaging step
+to silently omit newly introduced data. Core CI builds this witness and checks linked relocation kinds, image entry and
 BSS bounds before producing `recovery.hp`. The fixture records replay, mapping,
 TLS and clock diagnostics for independent saved-state verification; its marker
 alone is not acceptance. `tests/e2e/port-recovery/verify.py` compares complete
