@@ -354,13 +354,14 @@ Direct launcher supplies a larger arena than Stock. The extended font/theme
 matrix also passes on all six Stock models.
 
 The E2E `HEAP used/capacity` line measures the maximum heap extent requested
-through `sbrk()` during the complete C++ and C flows, including renderer and
-font changes. The test wraps the allocator boundary without changing the SDK
+through `sbrk()` during the C++ flow and C flow through renderer and font
+changes, before deliberate allocator exhaustion. The test wraps the allocator
+boundary without changing the SDK
 allocator. `used` includes allocator bookkeeping and retained free blocks;
 it is not the sum of live application allocations. `capacity` is the space
 between the end of static data and the reserved stack boundary. Neither value
 measures stack high-water usage or separately allocated LCD DMA pages. Local
-runs of the instrumented fixture report:
+runs of the instrumented fixture submitted at `19143951` report:
 
 | Target | Launcher RW arena | Peak heap extent | Heap capacity |
 | --- | ---: | ---: | ---: |
@@ -373,6 +374,16 @@ HP50g also exercises the 80-row renderer. The current HP39g+ fixture uses a
 52 KiB arena, so this run does not revalidate the earlier 36 KiB observation.
 These are observations of the scripted application flow, not upper bounds for
 arbitrary UI declarations or a minimum whole-application memory requirement.
+
+After the font checkpoint, the E2E program holds real allocator blocks until a
+4 KiB allocation fails. Creating an additional gray16 renderer must then fail
+with `ENOMEM`. The existing UI must still redeclare, render and publish exactly
+the same pixels while those blocks remain held. After releasing them, creating
+and destroying a normal monochrome renderer must succeed, and the application
+continues through cancellation and normal Stock return. This pressure phase is
+excluded from `HEAP`; it deliberately consumes the remaining arena and does not
+represent the application's ordinary memory requirement. Host tests separately
+inject failure at every renderer-construction allocation and check for leaks.
 
 The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
 with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,

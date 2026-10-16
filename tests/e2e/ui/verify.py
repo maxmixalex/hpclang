@@ -54,6 +54,8 @@ def verify(prefix: Path, height: int, stock: bool = False) -> None:
     assert not stock or line_height == 8, f"{prefix}: Stock native font unavailable"
     font_pixels = read_frame(Path(f"{prefix}-{100 + line_height}.pgm"), height)
     waveform(font_pixels, height - (28 + line_height), prefix)
+    pressure_pixels = read_frame(Path(f"{prefix}-121.pgm"), height)
+    assert pressure_pixels == font_pixels, f"{prefix}: allocator exhaustion changed the live UI"
     if line_height == 6:
         assert font_pixels == frames[6], f"{prefix}: packaged fallback changed the view"
     else:

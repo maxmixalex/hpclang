@@ -14,6 +14,8 @@ volatile uint32_t hpclang_ui_witness[5];
 volatile uint32_t hpclang_ui_update_witness[4];
 /* Allocator-reserved heap high-water bytes; excludes static data and stack. */
 volatile uint32_t hpclang_ui_heap_witness[2];
+/* Deliberate exhaustion is excluded from the ordinary UI budget observation. */
+static int heap_pressure;
 static unsigned key_failure;
 
 extern unsigned char __bss_end[];
@@ -25,7 +27,7 @@ void *__wrap_sbrk(intptr_t increment)
     if (previous != (void *)-1) {
         uintptr_t end = (uintptr_t)previous + (uintptr_t)increment;
         uint32_t used = (uint32_t)(end - (uintptr_t)__bss_end);
-        if (used > hpclang_ui_heap_witness[0])
+        if (!heap_pressure && used > hpclang_ui_heap_witness[0])
             hpclang_ui_heap_witness[0] = used;
         const struct hpclang_boot_info *boot = hpclang_boot_info();
         hpclang_ui_heap_witness[1] = (uint32_t)(HPCLANG_BOOT_BASE + boot->rw_bytes -
@@ -118,6 +120,33 @@ static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned 
         return -1;
     elapsed(0, start);
     return frame(id);
+}
+
+static int exhausted_renderer(struct demo_app *app, struct hpclang_ui_surface *r)
+{
+    void *blocks[256];
+    unsigned count = 0;
+    heap_pressure = 1;
+    while (count < 256 && (blocks[count] = malloc(4096)) != NULL)
+        ++count;
+    const struct hpclang_device_info *device = hpclang_device_info();
+    errno = 0;
+    /* Each gray16 raster exceeds the failed 4096-byte request on both heights. */
+    struct hpclang_ui_surface *attempt =
+        demo_renderer(device->display_width, device->display_height, 16, &demo_font, 0);
+    int error = errno;
+    int failed = count == 256 || attempt != NULL || error != ENOMEM;
+    hpclang_ui_surface_destroy(attempt);
+    /* Existing declarations and raster pages remain usable while still full. */
+    if (!failed && capture(app, r, 121))
+        failed = 1;
+    while (count)
+        free(blocks[--count]);
+    attempt = demo_renderer(device->display_width, device->display_height, 2, &demo_font, 0);
+    if (!attempt)
+        failed = 1;
+    hpclang_ui_surface_destroy(attempt);
+    return failed ? -1 : 0;
 }
 static unsigned checks(void)
 {
@@ -251,6 +280,9 @@ static unsigned checks(void)
      * independently checks the resulting canvas geometry and waveform. */
     if (!r || capture(&app, r, 100 + hpclang_font_height(font)) ||
         hpclang_ui_focused(ui) != focused)
+        goto done;
+    failure = 0x1703;
+    if (exhausted_renderer(&app, r))
         goto done;
     failure = 18;
     if (activate(&app, r, &mode, DEMO_SCAN) || demo_poll(&app) < 0 ||
