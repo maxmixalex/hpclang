@@ -821,8 +821,13 @@ initial zero only. These rules also correct the initial `readint` adapter's
 overly permissive use of `strtol`. All integer forms saturate at their type's
 limit with `ERANGE`, replacing historical overflow behavior. Host sanitizers
 cover signed/unsigned limits, invalid prefixes and read errors. ARM analysis
-and HP39g+/HP50g Direct physical-key acceptance pass locally. Expanded Stock
-acceptance is pending.
+and HP39g+/HP50g Direct plus HP50g Stock physical-key acceptance pass locally.
+The relocated SDK builds and packages a C++ client using all six numeric entry
+points and the shared historical integer typedefs. The combined Display payload
+exhausted HP39g+ Stock memory in its 16-level display check before reaching
+console input. Console/input tests now form a separate `hpgcc-console` runtime
+suite; native acceptance of the split programs is pending. Display keeps its
+original allocation and gray-level assertions.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,

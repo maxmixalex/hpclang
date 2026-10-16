@@ -1843,8 +1843,18 @@ native acceptance and CI acceptance of this addition remain pending.
 `readuint/readhex/readlonglong/readulonglong` now share a checked integer parser
 matching the reviewed historical sign, whitespace and bare-hex rules. Boundary
 and error cases pass host sanitizers; ARM analysis and HP39g+/HP50g Direct
-physical-key acceptance pass locally. Expanded Stock acceptance is pending.
+physical-key acceptance pass locally; HP50g Stock also passes. Installed-SDK
+acceptance compiles and packages a separate C++ client using all six numeric
+entry points and the historical integer typedefs.
 Decimal-format controls remain open.
+
+Adding numeric conversion to the combined Display payload exposed HP39g+ Stock
+memory exhaustion while opening the existing 16-level display, before console
+tests ran. Historical console/input acceptance now has its own `hpgcc-console`
+runtime suite and independent pixel verifier; Display retains its original
+allocation-exhaustion, gray-level and cleanup checks. The split ARM payloads are
+48,552 and 66,192 bytes, versus 75,616 bytes combined. Native acceptance of the
+split programs is in progress; the failed combined Stock run is not accepted.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
