@@ -43,5 +43,29 @@ int main(void)
     assert(!hpclang_flash_busy_start(&busy, sizeof(memory), sizeof(memory), 2, 0, 1));
     assert(!hpclang_flash_busy_start(&busy, sizeof(memory), 0, UINT32_MAX, 0, 1));
     assert(!hpclang_flash_busy_start(&busy, sizeof(memory), 8190, 4, 0, 1));
+
+    /* All masks for a program pulse, with adjacent bytes as independent guards.
+     * Bits outside the requested 1-to-0 transitions must never change. */
+    for (unsigned mask = 0; mask <= UINT16_MAX; ++mask) {
+        uint8_t word[] = {0x5a, 0xa5, 0xed, 0xb7, 0x69, 0x96};
+        assert(hpclang_flash_busy_start(&busy, sizeof(word), 2, 2, 0x1234, 8));
+        (void)hpclang_flash_busy_read(&busy, word, 2);
+        assert(hpclang_flash_busy_power_loss(&busy, word, (uint16_t)mask));
+        uint16_t actual = (uint16_t)(word[2] | (uint16_t)word[3] << 8u);
+        assert(actual == (uint16_t)(0xb7ed & ~(mask & ~0x1234u)));
+        assert(word[0] == 0x5a && word[1] == 0xa5 && word[4] == 0x69 && word[5] == 0x96);
+        assert(!busy.bytes && !busy.reads);
+        assert(!hpclang_flash_busy_power_loss(&busy, word, UINT16_MAX));
+    }
+    for (unsigned bit = 0; bit < 16; ++bit) {
+        memset(memory, 0, sizeof memory);
+        uint16_t mask = (uint16_t)(1u << bit);
+        assert(hpclang_flash_busy_start(&busy, sizeof memory, 4096, 4096, UINT16_MAX, 8));
+        assert(hpclang_flash_busy_power_loss(&busy, memory, mask));
+        for (unsigned i = 0; i < sizeof memory; i += 2) {
+            uint16_t word = (uint16_t)(memory[i] | (uint16_t)memory[i + 1] << 8u);
+            assert(word == (i < 4096 ? 0 : mask));
+        }
+    }
     return 0;
 }

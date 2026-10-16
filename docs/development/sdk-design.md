@@ -329,6 +329,12 @@ each transfer, so an emulator that ignores the option cannot pass silently.
 This deterministic polling model does not represent physical pulse duration
 or partially programmed cells after power loss. The default zero preserves
 the immediate-completion model for other scenarios.
+The fault helper also accepts a completed-bit mask for a pending operation:
+programming clears only selected requested bits, while erase sets only selected
+bits within the erase extent. Host tests exhaust all program masks and independently
+exercise shared replay after selected torn program/erase outcomes. This helper
+is not yet connected to a native power-cut scenario; neither these masks nor
+the host retry checks establish Stock startup behavior after a torn erase.
 Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child

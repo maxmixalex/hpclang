@@ -7,8 +7,8 @@
 /* Deterministic status-read latency, not a model of physical pulse duration.
  * DQ6 toggles and DQ7 complements programmed data (zero during erase), per
  * SST S71223, Write Operation Status Detection. Array changes are delayed until
- * completion. Cancellation currently retains the old array; partial pulses
- * require separate fault injection and must not be inferred from this model.
+ * completion. A power-loss fault selects completed bit transitions explicitly;
+ * its mask describes a test outcome, not a prediction of physical cell behavior.
  * https://ww1.microchip.com/downloads/en/DeviceDoc/S71223_.pdf
  */
 struct hpclang_flash_busy
@@ -51,6 +51,29 @@ static inline uint16_t hpclang_flash_busy_read(struct hpclang_flash_busy *busy, 
 static inline void hpclang_flash_busy_cancel(struct hpclang_flash_busy *busy)
 {
     *busy = (struct hpclang_flash_busy){0};
+}
+
+/* Apply one selected torn-operation outcome before discarding controller state.
+ * The same bit mask is repeated for each erase word. This deliberately does not
+ * claim to enumerate all possible spatial patterns or real silicon outcomes. */
+static inline int hpclang_flash_busy_power_loss(struct hpclang_flash_busy *busy, uint8_t *array,
+                                                uint16_t completed_bits)
+{
+    if (!busy->bytes)
+        return 0;
+    for (uint32_t offset = 0; offset < busy->bytes; offset += 2u) {
+        uint32_t at = busy->address + offset;
+        if (busy->bytes == 2u) {
+            uint16_t partial = (uint16_t)(busy->value | (uint16_t)~completed_bits);
+            array[at] &= (uint8_t)partial;
+            array[at + 1u] &= (uint8_t)(partial >> 8u);
+        } else {
+            array[at] |= (uint8_t)completed_bits;
+            array[at + 1u] |= (uint8_t)(completed_bits >> 8u);
+        }
+    }
+    hpclang_flash_busy_cancel(busy);
+    return 1;
 }
 
 #endif

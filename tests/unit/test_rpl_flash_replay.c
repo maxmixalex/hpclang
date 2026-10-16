@@ -13,6 +13,8 @@ static uint8_t flash[END - FIRST], original[END - FIRST];
 static uint8_t desired[SECTOR], scratch[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 static unsigned reads, programs, erases, fail_read, fail_program, erase_prefix;
 static int erase_error, silent_program;
+static uint16_t failed_program_bits, failed_erase_bits;
+static int masked_erase;
 static int publishing;
 static uint32_t sector_address = FIRST, last_program;
 
@@ -47,10 +49,14 @@ static int program16(void *context, uint32_t address, uint16_t value)
     if (silent_program)
         return 1;
     uint32_t offset = address - FIRST;
-    /* A failed pulse may clear only some of the intended bits. */
-    flash[offset] &= (uint8_t)value;
-    if (programs == fail_program)
+    /* Select completed bit transitions independently of byte boundaries. */
+    if (programs == fail_program) {
+        uint16_t partial = (uint16_t)(value | (uint16_t)~failed_program_bits);
+        flash[offset] &= (uint8_t)partial;
+        flash[offset + 1] &= (uint8_t)(partial >> 8u);
         return 0;
+    }
+    flash[offset] &= (uint8_t)value;
     flash[offset + 1] &= (uint8_t)(value >> 8u);
     return 1;
 }
@@ -59,6 +65,13 @@ static int erase(void *context, uint32_t address)
 {
     assert(context == flash && address == sector_address);
     ++erases;
+    if (masked_erase) {
+        for (unsigned i = 0; i < SECTOR; i += 2) {
+            flash[address - FIRST + i] |= (uint8_t)failed_erase_bits;
+            flash[address - FIRST + i + 1] |= (uint8_t)(failed_erase_bits >> 8u);
+        }
+        return 0;
+    }
     memset(flash + address - FIRST, 255, erase_prefix);
     return !erase_error;
 }
@@ -72,6 +85,9 @@ static void reset_counters(void)
     last_program = 0;
     erase_prefix = SECTOR;
     erase_error = silent_program = 0;
+    failed_program_bits = 0x00ff;
+    failed_erase_bits = 0;
+    masked_erase = 0;
     /* Retry must reconstruct its entire image from durable Flash. */
     memset(scratch, 0xa5, sizeof scratch);
 }
@@ -502,6 +518,30 @@ int main(void)
         prepare();
         erase_prefix = cut;
         erase_error = 1;
+        assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs);
+        retry();
+    }
+    /* Single completed/missing bits plus interleaved masks. Exercise early
+     * body writes, a middle write and the final identity publication. */
+    const unsigned positions[] = {1, total_programs / 2, total_programs};
+    for (unsigned pattern = 0; pattern < 36; ++pattern) {
+        uint16_t mask = pattern < 16    ? (uint16_t)(1u << pattern)
+                        : pattern < 32  ? (uint16_t)~(1u << (pattern - 16))
+                        : pattern == 32 ? 0
+                        : pattern == 33 ? UINT16_MAX
+                        : pattern == 34 ? 0x5555
+                                        : 0xaaaa;
+        for (unsigned i = 0; i < sizeof positions / sizeof positions[0]; ++i) {
+            prepare();
+            fail_program = positions[i];
+            failed_program_bits = mask;
+            assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
+            retry();
+        }
+        prepare();
+        masked_erase = 1;
+        failed_erase_bits = mask;
         assert(replay() == HPCLANG_RPL_FLASH_DIRTY);
         assert(!programs);
         retry();
