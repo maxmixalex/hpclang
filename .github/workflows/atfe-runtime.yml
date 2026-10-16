@@ -207,6 +207,7 @@ jobs:
             --dist build/x50ng/dist --build build/port-recovery/normal \
             --interrupted-build build/port-recovery/interrupted \
             --flash-busy-reads 64 \
+            --power-cut 2 16 0x5555 --power-cut 1 16 0x0101 \
             --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
       - name: Upload recovery evidence
         if: always()

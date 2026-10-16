@@ -1253,6 +1253,16 @@ cover status toggling, deferred writes/erases, cancellation and bounds. This
 checks native polling without claiming physical pulse timing or partial-cell
 power-loss coverage; that coverage remains open.
 
+Both HP49g+ and HP50g now pass selected native busy-operation faults: a partially
+programmed word, followed by a partially erased sector on the next retry.
+Each cut persists Flash and bypasses normal emulator teardown. Independent
+whole-Flash comparisons verify the selected bit transitions and retained journal;
+Stock restart keeps the partial bank hidden. Final recovery and another restart
+restore all 61 catalog entries. Core includes both cuts before the existing
+identity-publication interruption gate. This accepts these explicit fault
+outcomes locally, not all physical power-loss patterns or automatic startup
+recovery; remote acceptance remains pending.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

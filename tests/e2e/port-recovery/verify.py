@@ -82,6 +82,7 @@ def verify_power_cut(before_path, after_path, log_path, slot, target, cut):
         "Native cut does not match requested replay operation",
     )
     require(after == expected, "Power-cut Flash differs from selected torn operation")
+    return after[target : target + 4096] == image
 
 
 def native_words(ram, flash):

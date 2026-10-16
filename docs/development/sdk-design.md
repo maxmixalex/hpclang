@@ -337,9 +337,12 @@ exercise shared replay after selected torn program/erase outcomes.
 busy operation after the given number of status reads, applying the completed-bit
 mask and synchronously persisting Flash without normal emulator teardown.
 The runner requires the dedicated termination status, an exact operation record
-and an independent whole-Flash comparison before resetting Stock. It requires
-the partially restored bank to remain hidden, retries recovery and checks the
-final catalog as usual. The option can be repeated for consecutive failures;
+and an independent whole-Flash comparison before resetting Stock. A partially
+restored bank must remain hidden; if the selected outcome completed the entire
+sector, the original catalog must already be restored. Recovery is then retried
+and the final catalog checked as usual. An already completed recovery must make
+no further Flash writes; zero busy-operation counts are valid in that case.
+The option can be repeated for consecutive failures;
 for example `--power-cut 2 16 0x5555 --power-cut 1 16 0x0101` first tears a
 program word and then tears the retry's erase, so the latter acts on nonempty
 Flash. Use a busy-read budget larger than the selected read count. These are

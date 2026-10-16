@@ -87,7 +87,7 @@ class RecoveryPowerCutTests(unittest.TestCase):
         self.paths[0].write_bytes(before)
         self.paths[1].write_bytes(after)
         self.paths[2].write_text(event)
-        VERIFY.verify_power_cut(*self.paths, self.slot, self.target, cut)
+        return VERIFY.verify_power_cut(*self.paths, self.slot, self.target, cut)
 
     def test_partial_first_program_and_evidence_rejections(self):
         # First requested word is 0x0100. Completing alternating bits leaves
@@ -119,6 +119,15 @@ class RecoveryPowerCutTests(unittest.TestCase):
         self.check(before, after, event, (1, 16, 0x5555))
         with self.assertRaises(ValueError):
             self.check(before, self.before, event, (1, 16, 0x5555))
+
+    def test_identity_cut_distinguishes_partial_from_completed_write(self):
+        event = f"hpclang-flash-cut operation=2049 address={self.target + 0x100} bytes=2 value=256 mask=65535 reads=16\n"
+        self.assertTrue(self.check(self.before, self.after, event, (2049, 16, 65535)))
+        torn = self.after.copy()
+        torn[self.target + 0x100 : self.target + 0x102] = b"\x00\xff"
+        self.assertFalse(
+            self.check(self.before, torn, event.replace("mask=65535", "mask=255"), (2049, 16, 255))
+        )
 
 
 class RecoveryInterruptionTests(unittest.TestCase):

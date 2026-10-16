@@ -155,9 +155,10 @@ def transfer(args, recovery, source, build, name, power_cut=None):
         operations = evidence.getint("busy-operations")
         if (
             evidence.getint("busy-read-budget") != args.flash_busy_reads
-            or operations <= 0
+            or operations is None
+            or operations < 0
             or evidence.getint("busy-status-reads") != operations * args.flash_busy_reads
-            or evidence.getboolean("busy-active")
+            or evidence.getboolean("busy-active") is not False
         ):
             raise RuntimeError("Missing/incomplete Flash busy-state execution evidence")
 
@@ -198,7 +199,7 @@ def run(args):
     for cut_index, power_cut in enumerate(args.power_cut or []):
         interrupted = args.output / f"power-cut-{cut_index}"
         transfer(args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut)
-        verify_power_cut(
+        restored = verify_power_cut(
             reset / "state/flash",
             interrupted / "state/flash",
             interrupted / "emulator.log",
@@ -213,10 +214,11 @@ def run(args):
             args, resume, "10000 capture home\n12000 finish-install\n", ["--reset"]
         ) as child:
             completed(child, 90)
-        verify_restart(reset / "state", interrupted / "state", resume / "state")
+        baseline = clean / "state" if restored else reset / "state"
+        verify_restart(baseline, interrupted / "state", resume / "state")
         reset = resume
         print(
-            "Busy-operation power cut verified; Stock restarted with partial bank hidden",
+            "Busy-operation power cut verified; Stock restarted with expected catalog",
             flush=True,
         )
 
