@@ -94,6 +94,13 @@ hpclang_unit(hpgcc_system test_hpgcc_system.c
     "${HPCLANG_ROOT}/runtime/core/datetime.c")
 target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_rtc test_hpgcc_rtc.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-rtc.c"
+    "${HPCLANG_ROOT}/runtime/core/rtc-tick.c"
+    "${HPCLANG_ROOT}/runtime/core/exit-hooks.c")
+target_include_directories(test_hpgcc_rtc PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")

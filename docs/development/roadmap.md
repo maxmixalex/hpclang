@@ -1708,9 +1708,11 @@ below are retained.
   define ownership and exit restoration before claiming hardware equivalence.
   The internal RTC tick lease engine now passes host and sanitizer tests for
   selector validation, coalesced latch consumption, host configuration/pending
-  preservation and unrelated interrupt isolation. Public adapter wiring,
-  runtime cleanup and native six-model acceptance remain open; this does not
-  close the tick-adapter milestone.
+  preservation and unrelated interrupt isolation. The three public adapters
+  and optional normal-exit/`_Exit` cleanup are now wired into the SDK; interface
+  and exit-path sanitizer tests pass, and ARM applications/launchers build.
+  Native six-model acceptance remains in progress; this does not close the
+  tick-adapter milestone.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.

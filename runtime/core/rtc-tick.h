@@ -26,6 +26,8 @@ struct hpclang_rtc_tick_saved
     int owned, preserve_pending;
 };
 
+extern const struct hpclang_rtc_tick_bus hpclang_rtc_tick_bus;
+
 /* Internal polling lease for the physical RTC tick latch. The caller excludes
  * IRQs across each operation and owns the bus/state. No calendar/PWM registers
  * are changed. selector 1..127 means (selector+1)/128 seconds. FIQ routing and

@@ -783,7 +783,7 @@ Quality CI are accepted on `c2fb66fe`.
 
 ### RTC tick compatibility requirements
 
-The remaining `sys_setRTCTickPeriod`, `sys_isRTCTick` and `sys_waitRTCTicks`
+The `sys_setRTCTickPeriod`, `sys_isRTCTick` and `sys_waitRTCTicks`
 adapters form one stateful interface; `sys_waitRTCTicks` is not a fixed-unit
 delay. The reviewed four-generation implementations establish these contracts:
 
@@ -800,11 +800,12 @@ delay. The reviewed four-generation implementations establish these contracts:
   so multiplying count by the period is not equivalent.
 
 The historical implementation changes TICNT and clears the RTC bit in SRCPND.
-An hpclang implementation still needs explicit ownership, phase/pending-state
-semantics, error handling and exit restoration. An application-local timer
-would need to document its different relationship to the real interrupt latch;
-the existing cooperative timer's accumulated-expiration count alone is not a
-drop-in implementation. These three adapters remain unimplemented.
+The adapters now use the physical tick latch with an explicit polling lease.
+A query does not access hardware. A valid setter returns zero on failure with
+`errno`, leaving its software selector unchanged; polling returns -1 on error,
+and a failed poll terminates the void wait function. Unknown models report
+`ENOSYS`; conflicting RTC modes report `ENOTSUP` or `EBUSY`. The cooperative
+timer's accumulated-expiration count is not substituted for this latch.
 
 The internal physical-tick lease engine now saves the host divider/enable and
 tick interrupt mask, retains a pending indication across period changes, and
@@ -815,8 +816,13 @@ routing, RTC test/reset modes and an inconsistent selected interrupt are
 rejected before writes. Host tests cover all 256 selector byte values,
 coalescing, pending consumption/preservation, disabled host ticks, repeated
 release and conflicts, including ASan/UBSan. The previous sub-period hardware
-phase cannot be restored when reprogramming the divider. Public adapter wiring,
-runtime exit cleanup and six-model native acceptance remain to be completed.
+phase cannot be restored when reprogramming the divider. The three public
+adapters are wired into the SDK, with optional cleanup on normal exit and
+`_Exit`. Interface and both exit-path host tests pass under ASan/UBSan, and
+ARM applications/launchers build. All six Direct targets and HP50g Stock pass
+the pending-first-wait, coalescing and physical-period E2E checks; HP50g's final
+Stock state restores TICNT to its host value after the app leaves selector 127
+owned. The remaining Stock matrix and broader exit-register checks are pending.
 
 ### SD media discovery and replacement
 

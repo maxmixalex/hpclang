@@ -4,6 +4,12 @@
 
 struct hpclang_exit_hooks hpclang_exit_hooks;
 
+void hpclang_rtc_tick_restore(void)
+{
+    if (hpclang_exit_hooks.rtc_tick)
+        hpclang_exit_hooks.rtc_tick();
+}
+
 void hpclang_power_restore(void)
 {
     if (hpclang_exit_hooks.power)

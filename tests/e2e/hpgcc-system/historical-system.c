@@ -71,6 +71,36 @@ static int calendar(void)
                : 0;
 }
 
+static int rtc_ticks(void)
+{
+    if (sys_setRTCTickPeriod(0) != 15 || sys_setRTCTickPeriod(255) != 15)
+        return -1;
+    errno = 0;
+    sys_waitRTCTicks(0);
+    sys_waitRTCTicks(-1);
+    if (errno || sys_setRTCTickPeriod(31) != 15 || sys_setRTCTickPeriod(0) != 31)
+        return -1;
+    /* Several physical expirations coalesce into one already pending tick. */
+    sys_sleep(600);
+    uint64_t start, end;
+    if (hpclang_time_read_us(&start))
+        return -1;
+    sys_waitRTCTicks(1);
+    if (errno || hpclang_time_read_us(&end) || end < start || end - start > 100000u)
+        return -1;
+    if (sys_isRTCTick() != 0 || sys_setRTCTickPeriod(1) != 31)
+        return -1;
+    if (sys_isRTCTick() < 0 || hpclang_time_read_us(&start))
+        return -1;
+    /* Eight periods at selector 1 total 125 ms, independent of CPU speed. */
+    sys_waitRTCTicks(8);
+    if (errno || hpclang_time_read_us(&end) || end < start || end - start < 100000u ||
+        end - start > 350000u || sys_setRTCTickPeriod(127) != 1 || sys_setRTCTickPeriod(0) != 127)
+        return -1;
+    /* Leave a non-default period owned so runtime exit must restore Stock. */
+    return 0;
+}
+
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
     if (sys_bcd2bin_nibbles(0x12345678u, -8) != 12345678u ||
@@ -103,6 +133,8 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
         return 11;
     if (legacy_power())
         return 15;
+    if (rtc_ticks())
+        return 16;
     uint64_t delay_start, delay_end;
     sys_timer_t legacy_timer = SYS_TIMER_INITIALIZER;
     if (sys_updateTimer(&legacy_timer) != 0 || !legacy_timer.inited)
