@@ -39,9 +39,12 @@ target_link_libraries(recovery PRIVATE "${BUILTINS}")
 set_target_properties(recovery PROPERTIES SUFFIX ".elf"
     LINK_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/link.ld")
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/package.py"
+        "${CMAKE_CURRENT_BINARY_DIR}/recovery.bin"
+    COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
+        --elf --model hp50g --binary-output "${CMAKE_CURRENT_BINARY_DIR}/recovery.bin"
         --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
         "$<TARGET_FILE:recovery>" "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp"
-    DEPENDS recovery package.py "${HPCLANG_ROOT}/tools/package-recovery.py"
+    DEPENDS recovery "${HPCLANG_ROOT}/tools/package-recovery.py"
     VERBATIM)
-add_custom_target(package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp")
+add_custom_target(package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp"
+    "${CMAKE_CURRENT_BINARY_DIR}/recovery.bin")

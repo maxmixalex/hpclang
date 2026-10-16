@@ -259,15 +259,25 @@ HPC1 application launcher. Its current entry relies on the hp4950 main-RAM map;
 other models are rejected until their entry boundaries are validated.
 
 ```sh
-python3 tools/package-recovery.py --model hp50g --runtime-size SIZE recovery.bin recovery.hp
+python3 tools/package-recovery.py --model hp50g --elf \
+  --binary-output recovery.bin recovery.elf recovery.hp
 ```
 
+ELF mode uses `llvm-nm`, `llvm-readelf` and `llvm-objcopy` from PATH (or explicit
+`--nm`, `--readelf`, `--objcopy` paths). It checks the retained relocation kinds,
+entry symbol and BSS/image bounds, derives the runtime extent from the ELF, and
+extracts the initialized image into temporary storage before writing outputs.
+`--binary-output` is optional. E2E uses this same tool; there is no separate
+fixture-only packager. Its accepted ELF layout is the owned recovery layout,
+not an arbitrary ARM program.
+
+For a separately verified raw image, `--runtime-size SIZE` replaces `--elf`.
 `SIZE` is the eight-byte-aligned total runtime image size, including initialized
 bytes, BSS, workspace and the owned stack. The packager reserves those bytes
 inside the CODE object, copies initialized bytes to an eight-byte-aligned
 destination and returns to RPL without adding a stack result. The ARM payload
 must initialize BSS, establish its stack, preserve hardware/native state and
-return through LR. The build must separately reject unsafe relocations; a raw
+return through LR. Raw mode requires separate rejection of unsafe relocations; a raw
 binary cannot supply that proof. This envelope neither allocates MMU pages nor
 proves sufficient installation memory. Installation-space budgeting and a
 distributable recovery tool remain pending.

@@ -11,11 +11,25 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import subprocess
+import tempfile
 
 
 MAX_INITIALIZED = 32768
 MAX_NIBBLES = 0xFFFFF
 MODELS = ("hp49gplus", "hp50g")
+
+# The owned recovery image uses PC-relative calls/data and local-exec TLS.
+# LLD can retain relaxed TLS_IE32 entries in --emit-relocs output.
+PIC_RELOCATIONS = {
+    "R_ARM_ALU_PC_G0",
+    "R_ARM_CALL",
+    "R_ARM_JUMP24",
+    "R_ARM_REL32",
+    "R_ARM_THM_CALL",
+    "R_ARM_TLS_IE32",
+    "R_ARM_TLS_LE32",
+}
 
 
 def immediate(value: int, width: int = 5) -> str:
@@ -84,14 +98,76 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     )
 
 
+def package_elf(
+    elf: Path, *, model: str, nm: str, readelf: str, objcopy: str
+) -> tuple[bytes, bytes]:
+    """Check the owned recovery ELF contract and return envelope and raw image.
+
+    The linker must reject unhandled sections. This is the recovery entry's
+    layout, not a general-purpose ARM application or HPC1 packager.
+    """
+    if model not in MODELS:
+        raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
+    listing = subprocess.check_output([readelf, "-r", elf], text=True)
+    relocations = {word for word in listing.split() if word.startswith("R_ARM_")}
+    if not relocations or relocations - PIC_RELOCATIONS:
+        raise ValueError(
+            f"Unverified recovery relocations: {sorted(relocations - PIC_RELOCATIONS)}"
+        )
+    symbols = {}
+    for line in subprocess.check_output([nm, elf], text=True).splitlines():
+        fields = line.split()
+        if len(fields) == 3:
+            symbols[fields[2]] = int(fields[0], 16)
+    if not {"entry", "__zero_start", "__image_end"} <= symbols.keys():
+        raise ValueError("Recovery ELF is missing required entry/layout symbols")
+    if symbols["entry"] != 0:
+        raise ValueError("Recovery ARM entry must be at image offset zero")
+    with tempfile.TemporaryDirectory(prefix="hpclang-recovery-") as temporary:
+        binary = Path(temporary) / "recovery.bin"
+        subprocess.run(
+            [objcopy, "-O", "binary", "-j", ".text", "-j", ".tdata", elf, binary], check=True
+        )
+        initialized = binary.read_bytes()
+    zero, end = symbols["__zero_start"], symbols["__image_end"]
+    if not len(initialized) <= zero <= end or zero % 4 or end % 8:
+        raise ValueError(
+            "Recovery BSS clearing must preserve initialized data and stay in the image"
+        )
+    return package(initialized, end, model=model), initialized
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=MODELS)
-    parser.add_argument("--runtime-size", required=True, type=lambda value: int(value, 0))
-    parser.add_argument("input", type=Path, help="trusted PIC ARM-entry binary, not HPC1")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--runtime-size", type=lambda value: int(value, 0), help="trusted raw binary mode"
+    )
+    mode.add_argument(
+        "--elf", action="store_true", help="validate and package an owned recovery ELF"
+    )
+    parser.add_argument("--binary-output", type=Path, help="optional extracted image in ELF mode")
+    for tool in ("nm", "readelf", "objcopy"):
+        parser.add_argument("--" + tool, default="llvm-" + tool)
+    parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    result = package(args.input.read_bytes(), args.runtime_size, model=args.model)
+    if args.input.resolve() == args.output.resolve():
+        parser.error("input and output must be different files")
+    if args.binary_output is not None:
+        if not args.elf:
+            parser.error("--binary-output requires --elf")
+        if args.binary_output.resolve() in (args.input.resolve(), args.output.resolve()):
+            parser.error("binary output must differ from input and packaged output")
+    if args.elf:
+        result, initialized = package_elf(
+            args.input, model=args.model, nm=args.nm, readelf=args.readelf, objcopy=args.objcopy
+        )
+        if args.binary_output is not None:
+            args.binary_output.write_bytes(initialized)
+    else:
+        result = package(args.input.read_bytes(), args.runtime_size, model=args.model)
     args.output.write_bytes(result)
 
 
