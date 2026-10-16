@@ -375,6 +375,15 @@ establish ordering relative to library configuration and other startup work,
 and enforce transaction ownership/freshness before allowing native mutation.
 The fixture does not install a recovery service into an existing user's HOME.
 
+Native HP49g+/HP50g Stock 2.15 ordering probes install a temporary Port 0 library
+whose configuration appends `C` to a HOME string, while `STARTUP` appends `S`.
+After warmstart, independent RAM inspection finds `CS` on both models, the
+installed library in the rebuilt catalog and execution back in Stock. Thus HOME `STARTUP` alone
+cannot guarantee recovery before library configuration accesses a damaged bank.
+This probe does not establish ordering among multiple library configurations.
+Production recovery also needs an entry that survives loss of HOME RAM; the
+RAM-resident witness does not establish that property.
+
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
 status and ignores command writes; the array changes only at completion. The
