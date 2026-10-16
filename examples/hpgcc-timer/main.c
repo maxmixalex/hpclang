@@ -18,9 +18,15 @@ int main(void)
     if (start < 0)
         return 1;
 
+    sys_slowOn(); /* owned economy profile, at most 12 MHz */
+    if (errno)
+        return 1;
     sys_sleep(25);          /* milliseconds */
     sys_waitTicks(7500);    /* 10 ms at the historical 750 kHz rate */
     sys_playTone2(1000, 5); /* Hz, milliseconds */
+    if (errno)
+        return 1;
+    sys_slowOff(); /* restore the original host clock */
     if (errno)
         return 1;
     (void)sys_updateTimer(&timer);

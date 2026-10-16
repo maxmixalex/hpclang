@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <hpsys.h>
 #include <hpclang/datetime.h>
+#include <hpclang/power.h>
 #include <hpclang/sound.h>
 #include <hpclang/time.h>
 
@@ -49,6 +50,16 @@ void sys_waitTicks(unsigned int ticks)
 void sys_playTone2(unsigned int frequency_hz, unsigned int duration_ms)
 {
     (void)hpclang_sound_play(frequency_hz, duration_ms, NULL, NULL);
+}
+
+void sys_slowOn(void)
+{
+    (void)hpclang_power_set_profile(HPCLANG_POWER_ECONOMY);
+}
+
+void sys_slowOff(void)
+{
+    (void)hpclang_power_set_profile(HPCLANG_POWER_HOST);
 }
 
 void sys_playTone(unsigned int frequency_hz, unsigned int duration_cs)

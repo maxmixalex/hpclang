@@ -215,6 +215,9 @@ legacy timing, calendar, tone and packed-BCD calls. `sys_playTone2(hz, ms)` uses
 milliseconds; `sys_playTone(hz, cs)` uses hundredths of a second. Both block,
 restore borrowed sound hardware state and report failure through `errno`.
 `sys_bcd2str` returns borrowed text overwritten by its next call.
+`sys_slowOn/Off` select economy mode and restore the original host clock;
+monotonic timing continues across both transitions. These are profile selections,
+not nested scopes, and failures are reported through `errno`.
 The example's rendering uses the clean hpclang API;
 it demonstrates mixing compatible calls with new services rather than proving
 that an arbitrary historical application compiles unchanged.

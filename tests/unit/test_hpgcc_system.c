@@ -6,6 +6,7 @@
 #include <hpsys.h>
 #include <hptime.h>
 #include <hpclang/datetime.h>
+#include <hpclang/power.h>
 #include <hpclang/time.h>
 #include <hpclang/sound.h>
 
@@ -16,6 +17,8 @@ static int clock_error;
 static uint32_t tone_frequency, tone_duration;
 static int tone_error;
 static unsigned tone_calls;
+static enum hpclang_power_profile requested_profile;
+static int profile_error;
 static struct hpclang_datetime civil = {2026, 10, 14, 23, 59, 58};
 
 int hpclang_sound_play(uint32_t frequency, uint32_t duration, hpclang_sound_cancel_fn cancel,
@@ -34,6 +37,19 @@ int hpclang_sound_play(uint32_t frequency, uint32_t duration, hpclang_sound_canc
 
 static void tones_and_bcd(void)
 {
+    sys_slowOn();
+    assert(requested_profile == HPCLANG_POWER_ECONOMY);
+    sys_slowOff();
+    assert(requested_profile == HPCLANG_POWER_HOST);
+    const int profile_errors[] = {EBUSY, ENOTSUP, ENOSYS, EIO};
+    for (unsigned i = 0; i < sizeof profile_errors / sizeof profile_errors[0]; ++i) {
+        profile_error = profile_errors[i];
+        sys_slowOn();
+        assert(errno == profile_error && requested_profile == HPCLANG_POWER_ECONOMY);
+        sys_slowOff();
+        assert(errno == profile_error && requested_profile == HPCLANG_POWER_HOST);
+    }
+    profile_error = 0;
     sys_playTone2(1234, 17);
     assert(tone_frequency == 1234 && tone_duration == 17);
     sys_playTone2(UINT_MAX, UINT_MAX);
@@ -80,6 +96,16 @@ static void tones_and_bcd(void)
     assert(!strcmp(sys_bcd2str(0x00123450u), "123450"));
     assert(!strcmp(sys_bcd2str(0x99999999u), "99999999"));
     assert(!strcmp(sys_bcd2str(0xabcdefu), ":;<=>?"));
+}
+
+int hpclang_power_set_profile(enum hpclang_power_profile profile)
+{
+    requested_profile = profile;
+    if (profile_error) {
+        errno = profile_error;
+        return -1;
+    }
+    return 0;
 }
 
 void hpclang_delay_us(uint64_t microseconds)

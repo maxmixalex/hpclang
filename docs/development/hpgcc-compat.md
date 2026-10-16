@@ -758,6 +758,22 @@ Host tests cover conversion edges, borrowed text, tone units, overflow and error
 propagation. The HPGCC System E2E exercises both tone spellings with measured
 duration bounds, BCD results and independent report pixels. The separate sound
 service tests cover hardware ownership and restoration.
+Both tone spellings and BCD checks pass all six Direct and all six Stock targets
+locally, including normal Stock return. The relocated installed SDK builds the
+updated example for C/C++ launcher and Aplet acceptance. Formal CI is pending.
+
+### Historical slow-mode selection
+
+The `sys_slowOn` and `sys_slowOff` source adapters are separate from RTC ticks.
+They select the owned ECONOMY and HOST profiles respectively, matching the
+1.0/1.1/2.0 application's slow/normal-speed intent. ECONOMY uses at most 12 MHz
+and retains an already slower host clock. HOST restores the configuration
+saved when entering ECONOMY; it does not force the historical assumed normal
+speed or fixed LCD divider. Repeated calls are idempotent profile selection,
+not nested scopes. The historical void signatures report service errors through
+`errno`, including `EBUSY` during sound playback. Runtime exit restores the
+borrowed profile even if the application omits `sys_slowOff`. This does not
+provide raw `sys_clksave/restore`, PLL control or overclocking adapters.
 
 ### RTC tick compatibility requirements
 

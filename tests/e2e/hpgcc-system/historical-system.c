@@ -14,9 +14,32 @@
 #include <hpclang/datetime.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include <hpclang/power.h>
 #include <hpclang/time.h>
 
 extern const struct hpclang_font hpclang_benchmark_font;
+
+static int legacy_power(void)
+{
+    uint32_t host, slow, restored;
+    uint64_t before, after;
+    if (hpclang_power_cpu_frequency_hz(&host) || hpclang_time_read_us(&before))
+        return -1;
+    errno = 0;
+    sys_slowOn();
+    sys_slowOn();
+    if (errno || hpclang_power_get_profile() != HPCLANG_POWER_ECONOMY ||
+        hpclang_power_cpu_frequency_hz(&slow) || slow > host || slow > 12000000u)
+        return -1;
+    sys_sleep(1);
+    sys_slowOff();
+    sys_slowOff();
+    if (errno || hpclang_power_get_profile() != HPCLANG_POWER_HOST ||
+        hpclang_power_cpu_frequency_hz(&restored) || restored != host ||
+        hpclang_time_read_us(&after) || after < before || after - before < 1000u)
+        return -1;
+    return 0;
+}
 
 static int calendar(void)
 {
@@ -78,6 +101,8 @@ unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
         return 14;
     if (calendar())
         return 11;
+    if (legacy_power())
+        return 15;
     uint64_t delay_start, delay_end;
     sys_timer_t legacy_timer = SYS_TIMER_INITIALIZER;
     if (sys_updateTimer(&legacy_timer) != 0 || !legacy_timer.inited)

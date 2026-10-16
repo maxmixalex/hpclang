@@ -1601,7 +1601,19 @@ return contract and numeric bug instead of claiming identical four-version
 behavior. Unit tests, sanitizers, ARM static analysis and all six Direct targets
 pass locally. The relocated SDK passes C/C++, six-model notebook/launcher builds
 and all three HP39 Aplet package families with the updated tone/BCD example.
-Stock acceptance is in progress; formal CI for this addition is pending.
+All six Stock targets also pass with independent pixels and normal return;
+formal CI for this addition is pending.
+
+The follow-up adds `sys_slowOn/Off` as owned ECONOMY/HOST profile selection,
+retaining slower host clocks and restoring the saved host configuration rather
+than historical fixed register values. Host error propagation, sanitizers and
+ARM analysis pass; native checks cover repeated selection, frequency bounds,
+monotonic continuity and restoration. All six Direct targets pass; Stock and
+the updated installed-package example are still being validated.
+Separately, the emulator RTC divider now carries fractional microseconds across
+ticks: all 128 settings over 4096 expirations each, sanitizers, a pinned-source
+build and HP50g Direct/Stock regression pass. This fixes the test environment;
+the historical RTC tick adapter group remains open.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).

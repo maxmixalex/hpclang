@@ -43,6 +43,13 @@ extern "C"
      * Does not require slow mode or reconfigure PWM/interrupt registers. */
     void sys_waitTicks(unsigned int ticks);
 
+    /* Select the owned economy profile (at most 12 MHz), or restore the host
+     * profile saved on entry to economy. These are not nested scopes. Retain
+     * slower host settings; do not copy historical hardcoded LCD dividers or
+     * force a presumed host clock. Errors set errno; runtime exit restores HOST. */
+    void sys_slowOn(void);
+    void sys_slowOff(void);
+
     /* HPGCC 1.1's corrected tone interface: Hz and milliseconds. Blocks through
      * the owned sound service, restoring borrowed PWM/pin state on return.
      * A nonzero frequency with zero duration does nothing. The void return is retained;
