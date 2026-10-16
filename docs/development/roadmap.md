@@ -1341,6 +1341,14 @@ library 4 to restore the exact sector, retire/close the transaction and rebuild
 all 62 catalog entries. The key reference/CRC and owned recovery image/stack/TLS
 also pass. This accepts that explicit banked-key path; it does not prove every
 earlier callback or arbitrary user-key representation safe.
+The library 0 callback checks HOME's oldest, null-named directory entry. Its
+existing-directory path reads RAM directory geometry; the missing-directory
+path allocates a hidden directory and can call `GARBAGECOL` when `ROOM` reports
+less than 20 nibbles. The inspected HP49g+/HP50g callback code agrees, and clean,
+warm-repaired and cold-repaired saved states all have the expected RAM directory.
+Those final snapshots establish the existing-directory precondition, not that
+cold initialization never enters the allocation path. Installation and mutation
+preflight must account for this distinction before claiming early-callback safety.
 An explicit stale-journal host regression also demonstrates why structural
 preflight is insufficient: a later valid backup inside the target sector is
 hidden by the old image overlay. Public write preparation rejects ready and
