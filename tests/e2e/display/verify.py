@@ -125,6 +125,23 @@ def verify(prefix: Path, height: int) -> None:
     print(f"PASS: {prefix}: gray/DMA checks, historical clients and installed HPG adapter")
 
 
+def verify_editor(prefix: Path, height: int) -> None:
+    """Compare the physical-key editor result with an independently drawn frame."""
+    frames = {}
+    header = f"P5\n132 {height}\n255\n".encode()
+    for frame in (123, 124):
+        data = Path(f"{prefix}-{frame}.pgm").read_bytes()
+        assert data.startswith(header) and len(data) == len(header) + 132 * height, (
+            f"{prefix}-{frame}: invalid editor capture"
+        )
+        frames[frame] = data[len(header) :]
+    assert 0 in frames[124], f"{prefix}: empty editor reference"
+    assert frames[123] == frames[124], (
+        f"{prefix}: edited console differs from independently drawn expected frame"
+    )
+    print(f"PASS: {prefix}: physical-key line editing, bounded input and scroll undo")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("direct", "stock"))
@@ -132,6 +149,7 @@ def main() -> None:
     args = parser.parse_args()
     for target in Path(f"build/{args.mode}-{args.family}-targets.txt").read_text().splitlines():
         verify(Path(f"build/{target}-frame"), 80 if args.family == "hp4950" else 64)
+        verify_editor(Path(f"build/{target}-frame"), 80 if args.family == "hp4950" else 64)
 
 
 if __name__ == "__main__":
