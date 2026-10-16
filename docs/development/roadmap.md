@@ -1315,6 +1315,17 @@ hidden by the old image overlay. Public write preparation rejects ready and
 partially retired sector journals without any Flash mutation. Durable
 transaction authority remains required before production startup replay.
 
+An internal one-use transaction-binding codec (`HPCAUTH1`) now binds a known
+physical authority allocation to one validated sector journal's address, target
+and status-independent CRC. It distinguishes unpublished, armed, closing and
+closed states, rejects changed/moved journals and overlapping allocations, and
+supports inspecting journal retirement without granting replay permission.
+Host tests cover every status byte and single-bit corruption of the binding.
+This is not yet a durable publication or discovery protocol: a trusted installed
+root, startup exclusion and reference repair remain required. An old binding
+must not be erased/reused while its journal can survive, because a partial erase
+can resurrect an armed status; root replacement needs its own protocol.
+
 HP50g Flash-resident configuration prototypes now restore the injected header
 sector and retire its journal automatically, both through a hidden library
 command and with the recovery program directly in the configuration entry.

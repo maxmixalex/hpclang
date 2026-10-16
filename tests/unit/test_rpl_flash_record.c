@@ -296,8 +296,112 @@ static void test_discard(void)
     assert(plan.address == 123 && plan.extent == 456);
 }
 
+static void test_authority(void)
+{
+    enum
+    {
+        FIRST = 0x140000,
+        END = 0x200000,
+        JOURNAL = 0x160105,
+        ROOT = 0x180105
+    };
+    uint8_t image[HPCLANG_RPL_FLASH_SECTOR_BYTES] = {0};
+    uint8_t journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES], saved[sizeof authority];
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    assert(hpclang_rpl_flash_authority_encode(FIRST, END, ROOT, JOURNAL, journal, sizeof journal,
+                                              authority, sizeof authority) == 0);
+    /* Independently assembled little-endian fields and zlib CRC32 vector. */
+    static const uint8_t expected[] = {0x7e, 0x3e, 0x00, 0x40, 0x48, 0x50, 0x43, 0x41,
+                                       0x55, 0x54, 0x48, 0x31, 0x05, 0x01, 0x18, 0x00,
+                                       0x05, 0x01, 0x16, 0x00, 0x00, 0x00, 0x14, 0x00,
+                                       0x33, 0xdf, 0xbf, 0x4f, 0x41, 0xef, 0x8d, 0x93};
+    assert(sizeof expected == sizeof authority && !memcmp(authority, expected, sizeof expected));
+    memcpy(saved, authority, sizeof saved);
+    for (unsigned status = 0; status < 256; ++status) {
+        authority[0] = (uint8_t)status;
+        enum hpclang_rpl_flash_authority_phase phase = 99;
+        int result =
+            hpclang_rpl_flash_authority_inspect(FIRST, END, ROOT, authority, sizeof authority,
+                                                JOURNAL, journal, sizeof journal, &phase);
+        if (status == 0xff || status == 0x7f || status == 0xfe)
+            assert(result == 0 && phase == HPCLANG_RPL_FLASH_AUTHORITY_UNPUBLISHED);
+        else if (status == 0x7e)
+            assert(result == 0 && phase == HPCLANG_RPL_FLASH_AUTHORITY_ARMED);
+        else if (status == 0)
+            assert(result == 0 && phase == HPCLANG_RPL_FLASH_AUTHORITY_CLOSED);
+        else if (!(status & ~0x7eu))
+            assert(result == 0 && phase == HPCLANG_RPL_FLASH_AUTHORITY_CLOSING);
+        else
+            assert(result == HPCLANG_RPL_SPAN_MALFORMED && phase == 99);
+    }
+    memcpy(authority, saved, sizeof authority);
+    for (unsigned byte = 1; byte < sizeof authority; ++byte) {
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            authority[byte] ^= (uint8_t)(1u << bit);
+            enum hpclang_rpl_flash_authority_phase phase = 99;
+            assert(hpclang_rpl_flash_authority_inspect(
+                       FIRST, END, ROOT, authority, sizeof authority, JOURNAL, journal,
+                       sizeof journal, &phase) == HPCLANG_RPL_SPAN_MALFORMED);
+            assert(phase == 99);
+            authority[byte] ^= (uint8_t)(1u << bit);
+        }
+    }
+    const uint32_t invalid_roots[] = {FIRST,        FIRST + 0x105, JOURNAL,
+                                      JOURNAL + 40, END - 16,      UINT32_MAX};
+    for (unsigned i = 0; i < sizeof invalid_roots / sizeof invalid_roots[0]; ++i) {
+        assert(hpclang_rpl_flash_authority_encode(FIRST, END, invalid_roots[i], JOURNAL, journal,
+                                                  sizeof journal, authority,
+                                                  sizeof authority) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(authority, saved, sizeof saved));
+    }
+    /* A different but internally valid journal cannot borrow this binding. */
+    image[123] = 1;
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    enum hpclang_rpl_flash_authority_phase phase = 99;
+    assert(hpclang_rpl_flash_authority_inspect(FIRST, END, ROOT, authority, sizeof authority,
+                                               JOURNAL, journal, sizeof journal,
+                                               &phase) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(phase == 99);
+    image[123] = 0;
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    /* Journal retirement does not change transaction identity. It can be
+     * inspected to finish closure, but cannot be newly armed or replayed. */
+    const uint8_t retired_states[] = {0x7c, 0};
+    for (unsigned i = 0; i < sizeof retired_states; ++i) {
+        journal[0] = retired_states[i];
+        assert(hpclang_rpl_flash_authority_inspect(FIRST, END, ROOT, authority, sizeof authority,
+                                                   JOURNAL, journal, sizeof journal, &phase) == 0);
+        assert(hpclang_rpl_flash_authority_encode(FIRST, END, ROOT, JOURNAL, journal,
+                                                  sizeof journal, authority,
+                                                  sizeof authority) == HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(authority, saved, sizeof saved));
+    }
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL + 0x2000, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    phase = 99;
+    assert(hpclang_rpl_flash_authority_inspect(FIRST, END, ROOT, authority, sizeof authority,
+                                               JOURNAL + 0x2000, journal, sizeof journal,
+                                               &phase) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(phase == 99);
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    assert(hpclang_rpl_flash_authority_inspect(FIRST, END, ROOT + 32, authority, sizeof authority,
+                                               JOURNAL, journal, sizeof journal,
+                                               &phase) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(phase == 99);
+    assert(hpclang_rpl_flash_authority_encode(FIRST, END, ROOT, JOURNAL, journal, sizeof journal,
+                                              authority,
+                                              sizeof authority - 1) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!memcmp(authority, saved, sizeof saved));
+}
+
 int main(void)
 {
+    test_authority();
     test_native_library();
     test_native_word_padding();
     test_allocation_find();

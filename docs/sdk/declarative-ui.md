@@ -369,6 +369,18 @@ draw an accepted model change on the following iteration. That scheduling and
 any queued input add latency beyond the E2E processing measurements; neither
 the initial-paint number nor `FRAME` alone describes key-to-display response.
 
+Local HP39g+ measurements of the instrumented update fixture (7 captured updates
+and 34 input edges in each launch mode) are:
+
+| Launch mode | Maximum sampled frame | Maximum sampled input processing |
+| --- | ---: | ---: |
+| Direct | 10,038 µs | 368 µs |
+| Stock | 10,349 µs | 367 µs |
+
+Both runs pass independent pixel checks and normal return; HP50g Direct also
+passes with the instrumentation. These observations do not impose a hardware
+performance guarantee or complete the remaining whole-application budget work.
+
 For the ARM ABI, the renderer with the example's two styles requests 188 bytes
 for its descriptors and copied styles, plus its two raster buffers:
 
