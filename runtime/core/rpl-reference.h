@@ -168,6 +168,43 @@ struct hpclang_rpl_reference_guard
 {
     uint32_t mapping, field, expected, width;
 };
+
+struct hpclang_rpl_library_binding;
+/* Return zero with a normalized physical mapping identity, or an error.
+ * Resolve every binding, including those without a bank switch. Read-only;
+ * keep the resolution stable through validation/commit. */
+typedef int (*hpclang_rpl_catalog_mapping_fn)(void *context,
+                                              const struct hpclang_rpl_library_binding *binding,
+                                              uint32_t *mapping);
+
+struct hpclang_rpl_catalog_move
+{
+    uint32_t catalog_mapping, moving_mapping, first, end;
+    int32_t delta;
+};
+
+struct hpclang_rpl_catalog_reference_plan
+{
+    struct hpclang_rpl_reference_edit *edits;
+    uint32_t edit_capacity, edit_count;
+    struct hpclang_rpl_reference_guard *guards;
+    uint32_t guard_capacity, guard_count;
+};
+
+/* Assemble the catalog portion of a relocation plan without writing native
+ * data. For N records, supply 2*N edits (address and unchanged bank switch)
+ * and 1+2*N guards (count, IDs and flags). Arrays must be disjoint from each
+ * other and all input/IO state. On success counts describe the complete plan;
+ * on error both counts are zero and all partially filled entries are invalid.
+ * Duplicate IDs are preserved as distinct records. Fields retain old addresses.
+ * Keep mappings/catalog/buffers exclusively owned throughout later validation
+ * and commit. This does not discover other roots, repair references or authorize
+ * movement/Stock return. Zero is success; other results are span/resolver errors. */
+int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                        uint32_t limit, const struct hpclang_rpl_catalog_move *move,
+                                        hpclang_rpl_catalog_mapping_fn resolve, void *context,
+                                        struct hpclang_rpl_catalog_reference_plan *plan);
+
 int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
                                           const struct hpclang_rpl_reference_guard *guards,
                                           uint32_t count);

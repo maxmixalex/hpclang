@@ -501,3 +501,83 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *source, uint32_
                     address + (body_prologue ? 5 : 0), span - (body_prologue ? 5 : 0), prologue);
     }
 }
+
+struct catalog_plan_state
+{
+    const struct hpclang_rpl_catalog_move *move;
+    hpclang_rpl_catalog_mapping_fn resolve;
+    void *context;
+    struct hpclang_rpl_catalog_reference_plan *plan;
+    uint32_t count, visited;
+};
+
+static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
+                              const struct hpclang_rpl_library_binding *binding)
+{
+    struct catalog_plan_state *state = context;
+    if (state->visited >= state->count)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t mapping;
+    int result = state->resolve(state->context, binding, &mapping);
+    if (result)
+        return result;
+    const struct hpclang_rpl_catalog_move *move = state->move;
+    const struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, record + 3,
+                                               binding->address, 0, 0};
+    const struct hpclang_rpl_reference_mappings maps = {move->catalog_mapping, mapping,
+                                                        move->moving_mapping};
+    struct hpclang_rpl_reference_patch patch;
+    result = hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, move->first, move->end,
+                                                        move->delta, &patch);
+    if (result < 0)
+        return result;
+    uint32_t index = 2 * state->visited;
+    state->plan->edits[index] =
+        (struct hpclang_rpl_reference_edit){move->catalog_mapping, record + 3, binding->address,
+                                            result ? patch.value : binding->address};
+    state->plan->edits[index + 1] = (struct hpclang_rpl_reference_edit){
+        move->catalog_mapping, record + 8, binding->bank_switch, binding->bank_switch};
+    state->plan->guards[index + 1] =
+        (struct hpclang_rpl_reference_guard){move->catalog_mapping, record, number, 3};
+    state->plan->guards[index + 2] =
+        (struct hpclang_rpl_reference_guard){move->catalog_mapping, record + 13, binding->flags, 3};
+    ++state->visited;
+    return 0;
+}
+
+int hpclang_rpl_catalog_plan_relocation(const struct hpclang_rpl_reader *reader, uint32_t address,
+                                        uint32_t limit, const struct hpclang_rpl_catalog_move *move,
+                                        hpclang_rpl_catalog_mapping_fn resolve, void *context,
+                                        struct hpclang_rpl_catalog_reference_plan *plan)
+{
+    if (!plan)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    plan->edit_count = plan->guard_count = 0;
+    if (!reader || !reader->read_nibble)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!move || move->first >= move->end || move->end > 0x100000u ||
+        (int64_t)move->first + move->delta < 0 || (int64_t)move->end + move->delta > 0x100000)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (address >= 0x100000u || limit < 3 || limit > 0x100000u - address)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t count;
+    int result = word(reader, address, 3, &count);
+    if (result)
+        return result;
+    if (count > (limit - 3) / 16 || plan->edit_capacity < 2 * count ||
+        plan->guard_capacity < 1 + 2 * count)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (!plan->guards || (count && (!plan->edits || !resolve)))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct catalog_plan_state state = {move, resolve, context, plan, count, 0};
+    plan->guards[0] =
+        (struct hpclang_rpl_reference_guard){move->catalog_mapping, address, count, 3};
+    result = hpclang_rpl_catalog_visit(reader, address, limit, catalog_plan_visit, &state);
+    if (result)
+        return result;
+    if (state.visited != count)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    plan->edit_count = 2 * count;
+    plan->guard_count = 1 + 2 * count;
+    return 0;
+}

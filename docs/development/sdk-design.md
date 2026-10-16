@@ -386,6 +386,22 @@ their explicit erased-header-sector scenario. It does not provide user-facing
 installation/error handling, HP48/HP39 entry support or busy-chip power-loss
 coverage.
 
+### Catalog relocation plans
+
+The internal `hpclang_rpl_catalog_plan_relocation()` assembles the catalog part
+of a reference-repair plan. The caller supplies a stable reader, a resolver for
+physical mapping identities and bounded output buffers. Every binding is resolved,
+including unbanked entries. For N entries the plan contains 2*N edits (address
+and unchanged bank-switch fields) and 1+2*N guards (count, IDs and flags).
+Duplicate IDs remain distinct records. Identical addresses in different physical
+mappings do not imply the same target. On failure both output counts are zero;
+partially filled buffers must be discarded. Planning performs no native writes.
+
+The caller must retain exclusive ownership, validate the resulting guards and
+edits, and incorporate all other native roots before committing any relocation.
+The catalog plan alone establishes neither complete reference coverage nor
+permission to return to Stock after moving data.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.

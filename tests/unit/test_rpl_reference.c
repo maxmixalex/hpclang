@@ -808,8 +808,100 @@ static void rebuilt_catalog_replay(void)
     }
 }
 
+struct catalog_resolver
+{
+    unsigned calls, fail;
+};
+
+static int catalog_mapping(void *context, const struct hpclang_rpl_library_binding *binding,
+                           uint32_t *mapping)
+{
+    struct catalog_resolver *resolver = context;
+    if (++resolver->calls == resolver->fail)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (binding->bank_switch == 0x10)
+        *mapping = 1;
+    else if (binding->bank_switch == 0x20)
+        *mapping = 2;
+    else if (!binding->bank_switch)
+        *mapping = 0;
+    else
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    return 0;
+}
+
+static void catalog_relocation_plan(void)
+{
+    struct image image = {.size = 51, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put(&image, 0, 3, 3);
+    for (unsigned i = 0; i < 3; ++i) {
+        put(&image, 3 + 16 * i, i < 2 ? 7 : 8, 3); /* Duplicate ID, distinct bindings. */
+        put(&image, 6 + 16 * i, 0x60020, 5);
+        put(&image, 11 + 16 * i, i < 2 ? 0x10 + 0x10 * i : 0, 5);
+        put(&image, 16 + 16 * i, i + 1, 3);
+    }
+    struct image original = image;
+    struct hpclang_rpl_reference_edit edits[6];
+    struct hpclang_rpl_reference_guard guards[7];
+    struct hpclang_rpl_catalog_reference_plan plan = {edits, 6, 99, guards, 7, 99};
+    const struct hpclang_rpl_catalog_move move = {0, 1, 0x60000, 0x60100, -16};
+    struct catalog_resolver resolver = {0};
+    assert(!hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                                &resolver, &plan));
+    assert(plan.edit_count == 6 && plan.guard_count == 7 && resolver.calls == 3);
+    assert(guards[0].field == 0 && guards[0].expected == 3 && guards[0].width == 3);
+    for (unsigned i = 0; i < 3; ++i) {
+        assert(edits[2 * i].mapping == 0 && edits[2 * i].field == 6 + 16 * i);
+        assert(edits[2 * i].expected == 0x60020);
+        assert(edits[2 * i].value == (i ? 0x60020 : 0x60010));
+        assert(edits[2 * i + 1].field == 11 + 16 * i);
+        assert(edits[2 * i + 1].expected == (i < 2 ? 0x10 + 0x10 * i : 0));
+        assert(edits[2 * i + 1].value == edits[2 * i + 1].expected);
+        assert(guards[2 * i + 1].field == 3 + 16 * i);
+        assert(guards[2 * i + 1].expected == (i < 2 ? 7 : 8));
+        assert(guards[2 * i + 2].field == 16 + 16 * i);
+        assert(guards[2 * i + 2].expected == i + 1);
+    }
+    for (unsigned at = 0; at < image.size; ++at) {
+        image.fail = at;
+        assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                                   &resolver,
+                                                   &plan) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(!plan.edit_count && !plan.guard_count);
+    }
+    image = original;
+    resolver = (struct catalog_resolver){0, 2};
+    assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                               &resolver, &plan) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!plan.edit_count && !plan.guard_count);
+    resolver = (struct catalog_resolver){0};
+    plan.edit_capacity = 5;
+    assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                               &resolver, &plan) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!resolver.calls && !plan.edit_count && !plan.guard_count);
+    plan.edit_capacity = 6;
+    plan.guard_capacity = 6;
+    assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                               &resolver, &plan) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!resolver.calls && !plan.edit_count && !plan.guard_count);
+    plan.guard_capacity = 7;
+    image.data[20] = 16;
+    assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move, catalog_mapping,
+                                               &resolver, &plan) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!plan.edit_count && !plan.guard_count);
+    image.data[20] = original.data[20];
+    assert(!memcmp(&image, &original, sizeof image)); /* No native mutation. */
+    put(&image, 0, 0, 3);
+    plan.edits = NULL;
+    plan.edit_capacity = 0;
+    assert(!hpclang_rpl_catalog_plan_relocation(&reader, 0, 3, &move, NULL, NULL, &plan));
+    assert(!plan.edit_count && plan.guard_count == 1 && !guards[0].expected);
+}
+
 int main(void)
 {
+    catalog_relocation_plan();
     rebuilt_catalog_replay();
     batch_replay();
     metadata_guards();

@@ -1289,6 +1289,14 @@ These checks require exclusive ownership through commit; they do not provide
 synchronization. Full root discovery, assembly of a complete qualified batch and live
 commit remain required before reclamation is enabled.
 
+Catalog-plan assembly is now shared C code: it resolves each binding's physical
+mapping and produces bounded address/switch edits plus count/ID/flag guards.
+Errors invalidate both output counts. Host failure/alias/capacity cases,
+sanitizers and ARM analysis pass. Against the saved native PACK capture it
+reproduces all 124 edits and 125 guards; only library 275 changes address.
+This completes the catalog portion of plan assembly, without native writes or
+claiming coverage of the other root classes.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
