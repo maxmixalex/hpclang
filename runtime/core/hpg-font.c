@@ -1,4 +1,5 @@
 #include "hpg-internal.h"
+#include "hp-character.h"
 #include <hpclang/font-package.h>
 #include <limits.h>
 
@@ -21,19 +22,11 @@ hpg_font_t *hpg_get_bigfont(void)
  * and beta in place of sharp s. Native fonts already understand these bytes. */
 static uint32_t unicode(unsigned char code)
 {
-    static const uint16_t symbols[] = {
-        0x2220, 0x0078, 0x2207, 0x221a, 0x222b, 0x03a3, 0x25b6, 0x03c0, 0x2202, 0x2264, 0x2265,
-        0x2260, 0x03b1, 0x2192, 0x2190, 0x2193, 0x2191, 0x03b3, 0x03b4, 0x03b5, 0x03b7, 0x03b8,
-        0x03bb, 0x03c1, 0x03c3, 0x03c4, 0x03c9, 0x0394, 0x03a0, 0x03a9, 0x25a0, 0x221e, 0x20ac};
-    if (code >= 0x80 && code <= 0xa0)
-        return symbols[code - 0x80];
-    if (code == 0xdf)
-        return 0x03b2;
     if (code < 32)
         return 0x25a0;
     if (code == 127)
         return 0x2592;
-    return code;
+    return hpclang_hp_unicode_from_byte(code);
 }
 
 /* Map every source ink pixel into the fixed legacy cell. Only oversized faces

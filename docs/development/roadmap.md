@@ -1804,13 +1804,22 @@ stdio owners, and keeps HPG double-buffer publication explicit. Host sanitizer
 tests, ARM static analysis and all six Direct LCD checks pass. HP39g+, HP48gII,
 HP49g+ and HP50g Stock also pass. The installed C/C++ console example passes
 SDK relocation, six-model launchers and three HP39 Aplet packaging families.
-HP39gs/40gs Stock and CI acceptance are pending. Historical input and numeric
+HP39gs/40gs Stock also pass; CI acceptance is pending. Historical input and numeric
 formatting remain open, so this does not close the console group.
 
 The follow-up `hpstring.h` group implements `ints/uints` using the verified
 1.0/1.1/2.0 base, sign and borrowed-buffer contracts, including defined `INT_MIN`
 handling. All bases and boundary values pass host sanitizers; ARM analysis and
-HP39g+/HP50g Direct conversion checks pass. Updated Stock/SDK checks are pending.
+HP39g+/HP50g Direct conversion checks pass. HP50g Stock and updated installed-SDK
+relocation/packaging also pass locally; CI acceptance is pending.
+
+The default character-input callback now uses model-native Alpha/Shift state
+and the existing physical event stream, with shared HP-byte mapping for native
+and HPG fallback fonts. Six-model host checks cover ordinary input, single/held
+Alpha, classic locks and one-shot lowercase, Enter/backspace, cancellation and
+poll failures. Font/HPG sanitizers and ARM analysis pass. HP39g+/HP50g Direct
+physical-key checks pass; Stock and wider E2E acceptance are pending. Interactive
+line editing and historical numeric-input/format policy remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.

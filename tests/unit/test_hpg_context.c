@@ -21,6 +21,12 @@ uint32_t hpclang_font_height(const struct hpclang_font *font)
 {
     return font ? 6 : 0;
 }
+int hpclang_hpgcc_console_read(void *context)
+{
+    (void)context;
+    assert(0 && "graphics checks must not poll input");
+    return HPCLANG_STDIO_ERROR;
+}
 void hpclang_stdio_clear_streams(void)
 {
 }

@@ -118,7 +118,8 @@ int hpclang_hpgcc_console_enable(void)
 {
     if (enabled)
         return 0;
-    const struct hpclang_stdio_callbacks callbacks = {.write = write_byte};
+    const struct hpclang_stdio_callbacks callbacks = {.write = write_byte,
+                                                      .read = hpclang_hpgcc_console_read};
     if (hpclang_stdio_set_default(&callbacks))
         return -1;
     enabled = 1;

@@ -12,7 +12,7 @@ including it in multiple translation units is supported. `printf`, `puts` and
 UTF-8. The visible screen holds complete 4×6 cells; it does not expose the old
 partial cell overlapping the status column.
 
-`hpkeyb49.h` supplies the separate historical key wait. Blocking console input,
+`hpkeyb49.h` supplies the separate historical key wait. Interactive line editing,
 historical number-format policy and unsafe unbounded `gets` are not implemented
 by this output example. An application using a clean UI can explicitly bind
 its own standard streams; that binding takes precedence over this default.

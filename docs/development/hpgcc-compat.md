@@ -754,11 +754,24 @@ immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
 cleanup restores the borrowed display. The header does not yet implement the
-historical blocking input or decimal-format policy; these remain
+historical line editing or decimal-format policy; these remain
 M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
-packaging families. HP39gs/40gs Stock and CI acceptance are pending.
+packaging families. HP39gs/40gs Stock also pass; CI acceptance is pending.
+
+The default read callback now supplies blocking `getchar` input without echo.
+It consumes the existing physical event stream and applies the current model's
+Alpha/Shift rules, retaining text mode across calls without resetting keyboard
+timings or its queue. Enter returns LF and deletion returns BS. ON cancellation
+reports `EOF` with `ferror`, errno `ECANCELED`, and no `feof`; `clearerr(stdin)`
+allows subsequent input. Unrepresentable Unicode reports `EILSEQ` instead of a
+silently substituted byte. This intentionally replaces the old hardcoded 49
+keyboard table. An explicit standard-stream binding bypasses the default read
+callback entirely. Six-model host mapping tests, font regressions, ARM analysis
+and HP39g+/HP50g Direct physical-key checks pass; Stock and wider E2E acceptance
+of this new input path are pending. `fgets` can
+consume these bytes, but it does not implement an interactive line editor.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
@@ -766,8 +779,9 @@ with a minus sign for negative signed input. Returned text is borrowed static
 storage: `uints` and nonnegative `ints` share a buffer; negative `ints` has its
 own buffer. Copy text before another call can overwrite it. Calls allocate
 nothing and preserve errno. `INT_MIN` is handled without the old signed-negation
-overflow. All bases and signed/unsigned boundaries pass host sanitizers; native
-and installed-example acceptance of this additional conversion group is pending.
+overflow. All bases and signed/unsigned boundaries pass host sanitizers and ARM
+analysis; HP39g+/HP50g Direct, HP50g Stock and updated installed-example
+relocation/packaging checks pass locally.
 The reviewed HPGCC3 source does not provide these same helpers.
 
 ### Historical tones and packed BCD

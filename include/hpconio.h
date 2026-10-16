@@ -9,7 +9,10 @@ extern "C"
     /* Including this compatibility header selects lazy calculator-byte output for
      * unbound standard streams. Explicit hpclang_stdio_bind owners take priority.
      * HPG's mode/buffering policy is shared; its double-buffered modes require flip.
-     * Input/numeric-format adapters are not supplied by this output group yet. */
+     * getchar blocks for a model-native text key without echo: Enter returns LF,
+     * deletion returns BS, ON reports EOF/ferror with ECANCELED. Alpha/Shift state
+     * persists across reads; physical event timings/queue are not reset.
+     * Line editing and numeric-format policy are not supplied by this group yet. */
     int hpclang_hpgcc_console_enable(void);
     void home(void);
     int getx(void);

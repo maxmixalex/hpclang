@@ -86,7 +86,7 @@ graphics, then waits for a key before returning. Including `hpconio.h` enables
 lazy calculator-byte output without replacing standard C/C++ function names.
 The same header can appear in multiple translation units. Explicit
 `hpclang_stdio_bind` callbacks take priority over the historical default.
-Blocking console input and historical numeric-format adapters remain separate
+Interactive line editing and historical numeric-format adapters remain separate
 work; this example demonstrates the output group.
 
 An application CMake file uses:

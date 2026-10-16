@@ -429,13 +429,14 @@ Bind/unbind reset EOF, errors and pushback so old input cannot leak to a new
 source. stdout and stderr have separate C stream status; the console adapters
 deliberately combine their bytes into one ordered UTF-8 output stream.
 
-The optional historical `hpconio.h` header selects a lazy default output backend
+The optional historical `hpconio.h` header selects a lazy default console backend
 for otherwise unbound streams. It uses calculator bytes and fixed HPG cells,
 shares HPG display ownership and preserves neighbouring graphics. Explicit
 bindings override the complete default, including any missing application
 callbacks; unbind resumes it. Header registration itself acquires no hardware.
 See [historical console output](hpgcc-compat.md#historical-console-output) for
-cursor/clear/tab calls and remaining input-adapter limitations.
+cursor/clear/tab calls, model-native blocking character input and remaining
+line-editor limitations.
 
 ## Display and surfaces
 
