@@ -1754,6 +1754,13 @@ six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
 acceptance remains open while the bounded six-model follow-up is being verified;
 this does not claim faithful HP39 native styling or complete M8.3.
 
+The maintained 36 KiB UI artifact now passes all six Direct and all six Stock
+targets locally, including exhausted-allocator rendering, reconstruction pixels,
+native/fallback font geometry and normal return. SDK relocation also passes with
+an external C++ application's RW limit, all six launcher/notebook builds and
+three HP39 Aplet package families. CI acceptance and the remaining whole-app
+resource analysis are still pending.
+
 #### M8.4 — Historical source compatibility
 
 The system adapter now includes five `hpsys.h` entry points for millisecond delays,

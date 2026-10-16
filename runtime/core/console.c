@@ -9,7 +9,7 @@
 struct hpclang_console
 {
     unsigned columns, rows, column, row, width, height;
-    unsigned remaining;
+    unsigned remaining, tab_width;
     uint32_t pending, minimum;
     const struct hpclang_font *font;
     struct hpclang_surface *canvas, *glyph;
@@ -36,6 +36,7 @@ struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
     c->width = width;
     c->height = height;
     c->font = font;
+    c->tab_width = 4;
     c->canvas = hpclang_surface_create_mono(columns * width, rows * height);
     c->glyph = hpclang_surface_create_mono(width, height);
     if (!c->canvas || !c->glyph) {
@@ -80,6 +81,47 @@ static void newline(struct hpclang_console *c)
         c->cells[retained + i] = ' ';
 }
 
+int hpclang_console_get_state(const struct hpclang_console *c, struct hpclang_console_state *state)
+{
+    if (!c || !state) {
+        errno = EINVAL;
+        return -1;
+    }
+    *state = (struct hpclang_console_state){c->columns, c->rows, c->column, c->row, c->tab_width};
+    return 0;
+}
+
+int hpclang_console_move(struct hpclang_console *c, unsigned column, unsigned row)
+{
+    if (!c || column > c->columns || row >= c->rows) {
+        errno = EINVAL;
+        return -1;
+    }
+    hpclang_console_flush(c);
+    c->column = column;
+    c->row = row;
+    return 0;
+}
+
+int hpclang_console_clear_eol(struct hpclang_console *c)
+{
+    if (hpclang_console_flush(c))
+        return -1;
+    for (unsigned x = c->column; x < c->columns; ++x)
+        c->cells[(size_t)c->row * c->columns + x] = ' ';
+    return 0;
+}
+
+int hpclang_console_set_tab_width(struct hpclang_console *c, unsigned width)
+{
+    if (!c || !width) {
+        errno = EINVAL;
+        return -1;
+    }
+    c->tab_width = width;
+    return 0;
+}
+
 static void put(struct hpclang_console *c, uint32_t cp)
 {
     if (cp == '\n') {
@@ -94,7 +136,14 @@ static void put(struct hpclang_console *c, uint32_t cp)
     } else if (cp == '\t') {
         if (c->column == c->columns)
             newline(c);
-        unsigned spaces = 4 - c->column % 4;
+        unsigned spaces = c->tab_width - c->column % c->tab_width;
+        if ((uint64_t)spaces > (uint64_t)c->columns * c->rows) {
+            unsigned column = (unsigned)(((uint64_t)c->column + spaces - 1) % c->columns) + 1;
+            hpclang_console_clear(c);
+            c->row = c->rows - 1;
+            c->column = column;
+            return;
+        }
         while (spaces--)
             put(c, ' ');
     } else if (cp >= 0x20 && !(cp >= 0x7f && cp <= 0x9f)) {

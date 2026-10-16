@@ -379,6 +379,9 @@ The numeric-input, console and stream-binding extensions passed CI on `b92e2a7d`
 | `hpclang_console_create/destroy()` | Own a fixed-cell Unicode grid and drawing buffers; borrow the selected font; no display session or hardware acquisition |
 | `hpclang_console_write/flush/clear()` | Incremental UTF-8, wrapping, scrolling, LF/CR/BS/TAB/FF; flush replaces an unfinished sequence; clear resets text and decoder |
 | `hpclang_console_cell()` | Inspect a visible cell as a Unicode scalar; scrolled-away text is not retained |
+| `hpclang_console_get_state()` | Snapshot grid size, cursor and tab width without flushing pending UTF-8; a column equal to the width denotes deferred wrapping |
+| `hpclang_console_move/clear_eol()` | Finish incomplete UTF-8 before moving or erasing the remainder of the row; invalid moves leave text and decoder unchanged; no allocation |
+| `hpclang_console_set_tab_width()` | Choose a positive cell width, initially four and retained by clear; even very large tabs take work bounded by the grid size |
 | `hpclang_console_render()` | Opaque black-on-white viewport, each glyph clipped to its cell; clip to destination; caller chooses when to draw and present |
 | `hpclang_stdio_bind/unbind()` | One explicit binding for the C standard streams; callbacks are copied and context is borrowed; file-backed streams and raw file descriptors are unaffected |
 
