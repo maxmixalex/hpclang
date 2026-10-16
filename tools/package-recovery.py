@@ -98,6 +98,46 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     )
 
 
+def configuration_library(program: bytes, library_id: int) -> bytes:
+    """Wrap an owned recovery program in a configuration-only native library.
+
+    No compiler on the calculator or exported commands are needed. The caller
+    must establish that the ID is available and the installed startup ordering
+    is safe; encoding a library does not reserve an ID or install recovery.
+    """
+    if type(library_id) is not int or not 769 <= library_id <= 1791:
+        raise ValueError("recovery library ID must be in the user-library range 769..1791")
+    if program[:8] != b"HPHP49-C":
+        raise ValueError("expected an HP49 binary recovery program")
+    code = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in program[8:])
+    if len(code) < 20 or code[:10] != immediate(0x2D9D) + immediate(0x2DCC):
+        raise ValueError("recovery configuration must contain one CODE object")
+    extent = int(code[10:15][::-1], 16)
+    end = 10 + extent
+    if extent < 5 or code[end : end + 5] != immediate(0x312B) or code[end + 5 :] not in ("", "0"):
+        raise ValueError("invalid recovery CODE extent or program tail")
+    title = b"HPCRecovery"
+    header = (
+        immediate(len(title), 2)
+        + "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in title)
+        + immediate(len(title), 2)
+        + immediate(library_id, 3)
+        + immediate(0) * 3  # No hash, message or command-link tables.
+        + immediate(5)  # Configuration starts immediately after this offset.
+    )
+    payload = header + code[: end + 5]
+    length = 5 + len(payload) + 4
+    if length > MAX_NIBBLES:
+        raise ValueError("recovery library exceeds Saturn length capacity")
+    body = immediate(length) + payload
+    crc = 0
+    for nibble in body:
+        crc = (crc >> 4) ^ (((crc ^ int(nibble, 16)) & 15) * 0x1081)
+    encoded = immediate(0x2B40) + body + immediate(crc, 4)
+    encoded += "0" * (len(encoded) % 2)
+    return b"HPHP49-C" + bytes(int(encoded[i : i + 2][::-1], 16) for i in range(0, len(encoded), 2))
+
+
 def package_elf(
     elf: Path, *, model: str, nm: str, readelf: str, objcopy: str
 ) -> tuple[bytes, bytes]:
@@ -148,6 +188,11 @@ def main() -> None:
         "--elf", action="store_true", help="validate and package an owned recovery ELF"
     )
     parser.add_argument("--binary-output", type=Path, help="optional extracted image in ELF mode")
+    parser.add_argument(
+        "--library-id",
+        type=int,
+        help="wrap the recovery program in a native configuration library (does not install it)",
+    )
     for tool in ("nm", "readelf", "objcopy"):
         parser.add_argument("--" + tool, default="llvm-" + tool)
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
@@ -168,6 +213,8 @@ def main() -> None:
             args.binary_output.write_bytes(initialized)
     else:
         result = package(args.input.read_bytes(), args.runtime_size, model=args.model)
+    if args.library_id is not None:
+        result = configuration_library(result, args.library_id)
     args.output.write_bytes(result)
 
 

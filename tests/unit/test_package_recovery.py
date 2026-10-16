@@ -12,6 +12,57 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_configuration_library_fields_payload_and_crc(self):
+        program = PACK.package(bytes(range(8)), 32, model="hp50g")
+        raw = PACK.configuration_library(program, 1701)
+        data = [n for byte in raw[8:] for n in (byte & 15, byte >> 4)]
+
+        def word(at, width=5):
+            return sum(data[at + i] << (4 * i) for i in range(width))
+
+        self.assertEqual(raw[:8], b"HPHP49-C")
+        self.assertEqual(word(0), 0x2B40)
+        end = 5 + word(5)
+        title_length = word(10, 2)
+        title = bytes(word(12 + 2 * i, 2) for i in range(title_length))
+        self.assertEqual(title, b"HPCRecovery")
+        suffix = 12 + title_length * 2
+        self.assertEqual(word(suffix, 2), title_length)
+        self.assertEqual(word(suffix + 2, 3), 1701)
+        fields = suffix + 5
+        self.assertEqual([word(fields + 5 * i) for i in range(3)], [0, 0, 0])
+        configuration = fields + 15 + word(fields + 15)
+        original = [n for byte in program[8:] for n in (byte & 15, byte >> 4)]
+        extent = sum(original[10 + i] << (4 * i) for i in range(5))
+        self.assertEqual(data[configuration : end - 4], original[: 15 + extent])
+        # Independent bit-at-a-time reflected CRC-16, rather than the nibble formula.
+        crc = 0
+        for value in data[5 : end - 4]:
+            for bit in range(4):
+                carry = (crc ^ (value >> bit)) & 1
+                crc >>= 1
+                if carry:
+                    crc ^= 0x8408
+        self.assertEqual(word(end - 4, 4), crc)
+        self.assertIn(data[end:], ([], [0]))
+
+    def test_configuration_library_rejects_invalid_ids_and_programs(self):
+        program = PACK.package(bytes(range(8)), 32, model="hp50g")
+        for library_id in (0, 768, 1792, 4095, True):
+            with self.assertRaises(ValueError):
+                PACK.configuration_library(program, library_id)
+        for malformed in (
+            b"",
+            program[:10],
+            b"HPHP48-C" + program[8:],
+            program[:-2],
+            program + b"\0",
+        ):
+            with self.assertRaises(ValueError):
+                PACK.configuration_library(malformed, 1701)
+        for library_id in (769, 1791):
+            self.assertTrue(PACK.configuration_library(program, library_id))
+
     def test_object_extent_payload_and_owned_storage(self):
         for size in (1, 8, 9, 24, 4096, 32768):
             with self.subTest(size=size):

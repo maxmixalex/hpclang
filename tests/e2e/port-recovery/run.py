@@ -108,13 +108,14 @@ def transfer(
     installed=False,
     execute=True,
     remote_commands=None,
+    package_name="recovery.hp",
 ):
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
     send.mkdir()
     if not installed:
-        shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
+        shutil.copyfile(build / package_name, send / "RECOVERY.HP")
     if remote_commands is None:
         remote_commands = [f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME"]
     prefix = []
@@ -254,18 +255,9 @@ def configuration_recovery(args, clean):
         build,
         "RECOVERY",
         execute=False,
+        package_name="recovery-library.hp",
         remote_commands=[
-            "-95 CF HOME 256 ATTACH",
-            "'CFPROBE' CRDIR 'RECOVERY' RCL CFPROBE 'DORUN' STO",
-            "1701 '$ROMID' STO \"HPCRecovery\" '$TITLE' STO",
-            "'DORUN' RCL '$CONFIG' STO",
-            # Kermit character escapes produce Stock's actual program delimiters.
-            r"\{171} \{187} 'PING' STO { PING } '$VISIBLE' STO { } '$HIDDEN' STO",
-            "CRLIB HOME 2 STO",
-            "'RECOVERY' PURGE CFPROBE",
-            "{ DORUN PING '$ROMID' '$TITLE' } PURGE",
-            "{ '$CONFIG' '$VISIBLE' '$HIDDEN' } PURGE",
-            "HOME 'CFPROBE' PURGE",
+            "-95 CF HOME 'RECOVERY' RCL 2 STO 'RECOVERY' PURGE",
             "\"hpclang recovery\" 'HPCKEEP' STO",
         ],
     )

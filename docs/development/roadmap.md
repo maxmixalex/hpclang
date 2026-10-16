@@ -1303,6 +1303,12 @@ code can access damaged Flash, as well as survival after loss of HOME RAM.
 On HP50g, two Port 2 probe libraries (1701 and 1702) configure in ascending ID
 order with either installation order, before `STARTUP`. Ordering across arbitrary
 libraries/ports and an available earliest recovery callback remain unverified.
+Additional HP50g cross-port probes place Flash library 769 before RAM library
+1702 but after RAM library 768. With a real HOME-appending configuration callback,
+the earlier library runs twice across fault recovery and its internal restart;
+the later library runs once. Both finish with exact recovery and all 63 catalog
+entries. Selecting the lowest documented user ID is therefore insufficient to
+guarantee safe production startup ordering.
 
 HP50g Flash-resident configuration prototypes now restore the injected header
 sector and retire its journal automatically, both through a hidden library
@@ -1331,6 +1337,11 @@ catalog bindings before a second host reset. Both models pass this maintained
 automatic path, preserve the HOME string and end with a verified no-op invocation. The workflow
 builds this mode with `HPCLANG_RECOVERY_RESTART_AFTER_REPAIR` and supplies it with
 `--configuration-build`; ordinary retirement still returns to its caller.
+A host-generated configuration-only library now replaces calculator-side
+library compilation in this fixture. The packager validates the CODE envelope,
+native length and CRC; its explicit user-library ID does not reserve a number
+or guarantee priority. The original program artifact remains available for
+independent owned-image verification.
 A persistent HOME string also checks preservation of user RAM. Synthetic busy
 reads apply to the recovery stages; Stock constructs
 the fixture with the normal emulator Flash model because its installation

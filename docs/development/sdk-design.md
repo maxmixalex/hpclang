@@ -385,6 +385,15 @@ a damaged bank. A separate HP50g probe puts libraries 1701 and 1702 in Port 2:
 both installation orders run 1701's configuration before 1702's, then `STARTUP`.
 This is evidence for that pair, not a reserved earliest callback or a guarantee
 across arbitrary library IDs, ports and firmware configurations.
+Two further HP50g probes compare a Port 2 library numbered 769 with Port 0
+libraries: 769 runs before 1702 but after 768. Stock accepts the latter even
+though it is below the documented user-library range. A callback that appends
+to a HOME string demonstrates the consequence of recovery's internal restart:
+the earlier 768 callback executes twice during fault recovery, whereas the
+later 1702 callback executes once. Both runs finish with the complete 63-entry
+catalog and exact Flash repair/retirement. Choosing 769 alone therefore cannot
+establish a safe production entry; earlier callbacks may have side effects or
+access the damaged bank before recovery runs.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
@@ -426,9 +435,13 @@ resuming an incomplete catalog. CMake rejects restart mode without retirement
 or together with the interrupted witness. This is an internal recovery mode;
 the general reset API remains deferred.
 
-Stock's built-in library compiler installs
-the owned CODE program as a temporary library configuration, then removes the
-source variables from HOME. A clean restart establishes its catalog baseline;
+The host packager wraps the owned CODE program in a configuration-only native
+library with no exported commands, hash table or command-link table. It checks
+the program envelope and emits the native library length and CRC. The optional
+`--library-id` accepts the documented user range 769..1791; it does not reserve
+the ID, install recovery or establish callback priority. Stock stores the
+packaged fixture in Port 2 and the transfer variable is removed from HOME;
+calculator-side library compilation is unnecessary. A clean restart establishes its catalog baseline;
 after fault injection, one host reset must finish with exact replay/retirement,
 the complete catalog and a verified final no-op recovery image. No second host
 reset may be needed to obtain the complete catalog. A later independent reset
