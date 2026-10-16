@@ -1837,8 +1837,9 @@ compatibility policy remain pending; this does not close the line-input group.
 They retain historical numeric-prefix conversion and the 31-byte line capacity;
 invalid conversion, integer overflow and input cancellation have defined results.
 Host sanitizers cover boundaries, prefix conversion, floating range errors and
-input failures. ARM build/analysis and HP39g+ Direct physical-key numeric input
-pass; Stock and installed-SDK acceptance of this addition remain pending.
+input failures. ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key
+numeric input, and installed-SDK relocation/packaging pass locally. Wider
+native acceptance and CI acceptance of this addition remain pending.
 Decimal-format controls and other numeric spellings remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),

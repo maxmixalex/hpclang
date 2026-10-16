@@ -803,8 +803,9 @@ Input error/cancel returns zero with its error; empty EOF returns zero with
 stream EOF available to the caller. Successful conversion preserves errno.
 For full-line validation and separate result/status, use the clean text-input
 parsers. Host sanitizer acceptance covers prefix/boundary/range/error behavior;
-ARM build/analysis and HP39g+ Direct physical-key numeric input pass. Stock and
-installed-SDK acceptance of these two adapters remains pending.
+ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key numeric input,
+and installed-SDK relocation/packaging pass locally. Wider native and CI
+acceptance of these two adapters remains pending.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
