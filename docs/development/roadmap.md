@@ -1854,7 +1854,9 @@ tests ran. Historical console/input acceptance now has its own `hpgcc-console`
 runtime suite and independent pixel verifier; Display retains its original
 allocation-exhaustion, gray-level and cleanup checks. The split ARM payloads are
 48,552 and 66,192 bytes, versus 75,616 bytes combined. Native acceptance of the
-split programs is in progress; the failed combined Stock run is not accepted.
+split programs passes HP50g Direct/Stock, including physical input, independent
+pixels and normal return. Remaining targets are in progress; the failed
+combined Stock run is not accepted.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
