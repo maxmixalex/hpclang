@@ -44,13 +44,13 @@ def entry(initialized_size: int, source_offset: int) -> str:
     Offsets and lengths are in nibbles except initialized_size (bytes).
     The counted copy transfers complete 16-nibble blocks. Clearing the low
     four destination bits aligns the ARM image to eight bytes at every CODE
-    nibble alignment. Copy toward lower addresses, allowing the initialized
-    payload and destination to overlap without a second image reservation.
+    nibble alignment. Fifteen extra reserved nibbles cover the rounding.
     """
     if not 8 <= initialized_size <= MAX_INITIALIZED or initialized_size % 8:
         raise ValueError("initialized image must contain 1..4096 eight-byte blocks")
     code = "8f" + immediate(0x679B) + "20" + "81b5"  # SAVE, P=0, C=PC
     code += "da" + "34" + immediate(source_offset) + "c2" + "134"
+    code += "da" + "34" + immediate(initialized_size * 2 + 15) + "c2"
     code += "80880" + "80881" + "80882" + "80883" + "135" + "d5"
     code += "34" + immediate(initialized_size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
@@ -77,16 +77,13 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
         raise ValueError("runtime size must be eight-byte aligned and contain initialized image")
     code = entry(len(initialized), 0)
     # C=PC captures the address 13 nibbles after the start of this entry.
-    # A full alignment block separates the source from the Saturn instructions.
-    # Rounding its address down cannot overwrite the still-running entry, even
-    # when the containing CODE object begins on an odd nibble.
-    code = entry(len(initialized), len(code) + 16 - 13)
-    reserve = (runtime_size - len(initialized)) * 2
-    body_size = len(code) + 16 + runtime_size * 2
+    code = entry(len(initialized), len(code) - 13)
+    reserve = runtime_size * 2 + 15
+    body_size = len(code) + len(initialized) * 2 + reserve
     if body_size + 5 > MAX_NIBBLES:
         raise ValueError("recovery CODE object exceeds Saturn length capacity")
     payload = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in initialized)
-    body = code + "0" * 16 + payload + "0" * reserve
+    body = code + payload + "0" * reserve
     program = (
         immediate(0x2D9D)  # DOCOL
         + immediate(0x2DCC)  # CODE

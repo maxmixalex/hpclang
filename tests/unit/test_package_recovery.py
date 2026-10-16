@@ -1,5 +1,4 @@
 import importlib.util
-from itertools import product
 from pathlib import Path
 import unittest
 
@@ -65,11 +64,11 @@ class RecoveryPackageTests(unittest.TestCase):
             self.assertTrue(PACK.configuration_library(program, library_id))
 
     def test_object_extent_payload_and_owned_storage(self):
-        for size, extra in product((1, 8, 9, 24, 4096, 32768), (0, 8192)):
-            with self.subTest(size=size, extra=extra):
+        for size in (1, 8, 9, 24, 4096, 32768):
+            with self.subTest(size=size):
                 payload = bytes(i % 251 for i in range(size))
                 initialized = (size + 7) & ~7
-                runtime = initialized + extra
+                runtime = initialized + 8192
                 raw = PACK.package(payload, runtime, model="hp50g")
                 self.assertEqual(raw[:8], b"HPHP49-C")
                 nibbles = [n for byte in raw[8:] for n in (byte & 15, byte >> 4)]
@@ -83,29 +82,32 @@ class RecoveryPackageTests(unittest.TestCase):
                 self.assertEqual(word(end), 0x312B)
                 self.assertLessEqual(len(nibbles) - end - 5, 1)
                 # Extract from the tail independently of encoded instruction length.
-                reserve = (runtime - initialized) * 2
-                source = end - runtime * 2
+                reserve = runtime * 2 + 15
+                source = end - reserve - initialized * 2
                 copied = bytes(
                     nibbles[i] | (nibbles[i + 1] << 4)
                     for i in range(source, source + initialized * 2, 2)
                 )
                 self.assertEqual(copied, payload + bytes(initialized - size))
                 self.assertEqual(nibbles[end - reserve : end], [0] * reserve)
-                self.assertEqual(nibbles[source - 16 : source], [0] * 16)
                 for phase in range(16):
-                    absolute_source = phase + source
-                    aligned = absolute_source & ~15
-                    self.assertGreater(aligned, phase + source - 16)
+                    reserved_start = phase + end - reserve
+                    aligned = (reserved_start + 15) & ~15
+                    self.assertGreaterEqual(aligned, reserved_start)
                     self.assertLessEqual(aligned + runtime * 2, phase + end)
                     memory = [15] * phase + nibbles[:]
-                    prefix = memory[: phase + source - 16]
+                    absolute_source = phase + source
+                    prefix = memory[:reserved_start]
                     expected = memory[absolute_source : absolute_source + initialized * 2]
-                    # Model the Saturn W-field load before each overlapping store.
-                    for offset in range(0, initialized * 2, 16):
-                        chunk = memory[absolute_source + offset : absolute_source + offset + 16]
-                        memory[aligned + offset : aligned + offset + 16] = chunk
-                    self.assertEqual(memory[aligned : aligned + initialized * 2], expected)
-                    self.assertEqual(memory[: phase + source - 16], prefix)
+                    # Reusing a saved CODE object must reload the original image,
+                    # even after its previous invocation changed all runtime data.
+                    for _ in range(2):
+                        for offset in range(0, initialized * 2, 16):
+                            chunk = memory[absolute_source + offset : absolute_source + offset + 16]
+                            memory[aligned + offset : aligned + offset + 16] = chunk
+                        self.assertEqual(memory[aligned : aligned + initialized * 2], expected)
+                        self.assertEqual(memory[:reserved_start], prefix)
+                        memory[aligned : aligned + runtime * 2] = [15] * (runtime * 2)
 
     def test_invalid_inputs(self):
         for payload, runtime, model in (

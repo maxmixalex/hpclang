@@ -1396,18 +1396,13 @@ both the standard library 1701 and research-only library 4 pass bound cold repai
 and catalog reconstruction locally. This tests simulated RAM loss with an intact
 installed recovery library, not physical battery loss or safe ordering against
 arbitrary earlier library callbacks.
-The recovery envelope now aligns the initialized image downward in place,
-with a protected alignment block after the Saturn entry. This removes the
-second initialized-image reservation without reducing workspace or stack.
-The bound configuration library shrinks from 46,729 to 29,708 bytes. All 16
-nibble-alignment phases pass host overlap/bounds checks; HP49g+ and HP50g pass
-native installation, warm repair, RAM-loss repair, full catalog reconstruction,
-owned-image verification and later unchanged starts locally. An HP50g fixture
-retaining 192 KiB of HOME strings also passes exact recovery and ownership
-checks; its final free gap is 18,565 bytes (the earlier envelope's separate
-fixture has 1,325 bytes). This is not a peak-memory admission guarantee.
-The smaller library exposed an installation-fixture assumption: Stock could
-place it in the bank whose header the test erases. The configuration fixture
+The recovery envelope retains an immutable initialized image and a separate
+aligned runtime reservation so saved HOME programs can be executed repeatedly.
+An in-place alignment experiment passed fresh Flash configuration starts but
+overwrote its own source in HOME; that layout is not retained. Memory admission
+and reducing the recovery footprint remain open requirements.
+Installation must also remain independent of package size: Stock could
+place a smaller library in the bank whose header the test erases. The configuration fixture
 now occupies that bank's remaining tail with a native tombstone before Stock
 installation and verifies that installation leaves the protected bank unchanged.
 Recovery availability consequently no longer depends on package size forcing
