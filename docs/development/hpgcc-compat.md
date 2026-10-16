@@ -785,8 +785,10 @@ image so deletion can undo scrolling and restore earlier graphics. Each edit
 is published even in an HPG double-buffer mode, synchronizing its back page.
 Allocation failure can occur before editing. With explicit standard-stream
 callbacks, it uses those streams and emits BS-space-BS for deletion without
-acquiring a display. Host sanitizer checks cover these paths; native and SDK
-acceptance of the editor remain pending. Old unbounded spellings are not yet
+acquiring a display. Host sanitizers, installed-SDK relocation/packaging and
+HP39g+/HP50g Direct physical-key editing checks pass, including independent
+pixel comparison after overflow rejection, backspace and scrolling. Stock and
+wider native acceptance are pending. Old unbounded spellings are not yet
 redirected to this API.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.

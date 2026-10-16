@@ -1827,8 +1827,11 @@ The bounded `hpclang_hpgcc_gets` editor now integrates the tested byte-line core
 with standard streams and HPG rendering. Host sanitizers cover overflow/re-edit,
 partial-text cancellation, restoring graphics after scroll undo, synchronized
 double-buffer editing, and explicit stdio ownership without display acquisition.
-Native/SDK editor acceptance and the old unbounded-name compatibility policy
-remain pending; this does not close the historical line-input group.
+The installed interactive example passes the SDK relocation/packaging gate.
+HP39g+/HP50g Direct physical-key editing passes a full-buffer rejection/re-edit
+scenario, with the scrolled result matching an independently drawn reference
+frame pixel for pixel. Stock/wider native acceptance and the old unbounded-name
+compatibility policy remain pending; this does not close the line-input group.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.

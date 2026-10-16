@@ -82,12 +82,14 @@ the units and the boundary between historical timer calls and hpclang rendering;
 it does not imply complete HPGCC compatibility.
 
 `examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
-graphics, then waits for a key before returning. Including `hpconio.h` enables
+graphics, edits a name in a 16-byte buffer, then waits for a key before returning.
+Including `hpconio.h` enables
 lazy calculator-byte output without replacing standard C/C++ function names.
 The same header can appear in multiple translation units. Explicit
 `hpclang_stdio_bind` callbacks take priority over the historical default.
-Interactive line editing and historical numeric-format adapters remain separate
-work; this example demonstrates the output group.
+The bounded editor takes an explicit capacity and supports backspace and ON
+cancellation. Old unbounded `gets` aliases and historical numeric-format
+adapters remain separate work.
 
 An application CMake file uses:
 

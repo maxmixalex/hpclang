@@ -25,8 +25,9 @@ target_compile_features(hpclang_display_e2e PRIVATE c_std_11)
 target_compile_options(hpclang_display_e2e PRIVATE
     -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
     -fno-pic -fno-pie -ffunction-sections -fdata-sections)
+# Picolibc inlines getchar as getc(stdin); wrap the actual byte-read boundary.
 target_link_options(hpclang_display_e2e PRIVATE
-    -nostartfiles -Wl,--gc-sections "-Wl,-T,${HPCLANG_LINKER_SCRIPT}")
+    -nostartfiles -Wl,--gc-sections -Wl,--wrap=getc "-Wl,-T,${HPCLANG_LINKER_SCRIPT}")
 set_target_properties(
     hpclang_display_e2e
     PROPERTIES OUTPUT_NAME hpclang-display-e2e SUFFIX ".elf")

@@ -195,6 +195,7 @@ static unsigned borrowed;
 static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
+static int present_failure;
 static unsigned display_height = 6;
 static int configure(unsigned levels, unsigned count)
 {
@@ -243,6 +244,10 @@ int hpclang_display_indicator_set(unsigned segment, uint8_t color)
 int hpclang_display_present(uint32_t timeout)
 {
     assert(timeout && page_count == 2);
+    if (present_failure) {
+        errno = ETIMEDOUT;
+        return -1;
+    }
     back ^= 1;
     ++flips;
     return 0;
@@ -424,6 +429,12 @@ static void edited_lines(void)
     assert(!hpclang_hpgcc_gets(text, sizeof text) && errno == ECANCELED && !strcmp(text, "X"));
     input_end = HPCLANG_STDIO_EOF;
     stream_error = 0;
+    input_bytes = (const unsigned char *)"A\n";
+    present_failure = 1;
+    unsigned before_flips = flips;
+    assert(!hpclang_hpgcc_gets(text, sizeof text) && errno == ETIMEDOUT && !text[0]);
+    assert(flips == before_flips && page_count == 2);
+    present_failure = 0;
     hpg_cleanup();
     unsigned before = borrowed;
     const struct hpclang_stdio_callbacks io = {.read = hpclang_hpgcc_console_read,

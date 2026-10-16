@@ -18,6 +18,55 @@ static int key(unsigned scan, unsigned down)
             return -1;
     return 0;
 }
+static unsigned scripted_read, scripted_index;
+int __real_getc(FILE *stream);
+int __wrap_getc(FILE *stream)
+{
+    if (!scripted_read || stream != stdin)
+        return __real_getc(stream);
+    /* Only schedule electrical switches; decoding, stdio and editing are real.
+     * 123 fills a three-byte line, 9 must be rejected, BS/4 correct it to 124. */
+    static const unsigned scans[] = {26, 19, 12, 10, 0, 25, 6};
+    if (scripted_index >= sizeof scans / sizeof scans[0]) {
+        errno = EIO;
+        return EOF;
+    }
+    unsigned scan = scans[scripted_index++];
+    if (key(scan, 1))
+        return EOF;
+    int result = __real_getc(stream);
+    if (key(scan, 0))
+        return EOF;
+    hpclang_delay_us(30000);
+    return result;
+}
+static int edited_input(int (*checkpoint)(unsigned))
+{
+    _clear_screen();
+    hpg_draw_line(100, 20, 100, 24);
+    gotoxy(screen_width() - 2, screen_height() - 1);
+    hpclang_keyboard_events_reset();
+    struct
+    {
+        char before;
+        char text[4];
+        char after;
+    } buffer = {'x', "", 'y'};
+    scripted_read = 1;
+    char *result = hpclang_hpgcc_gets(buffer.text, sizeof buffer.text);
+    scripted_read = 0;
+    if (result != buffer.text || strcmp(buffer.text, "124") || buffer.before != 'x' ||
+        buffer.after != 'y' || scripted_index != 7 || getx() || gety() != screen_height() - 1 ||
+        checkpoint(123))
+        return -1;
+    /* Independent HPG drawing builds the expected final frame after two scrolls. */
+    hpg_clear();
+    hpg_draw_text("12", (screen_width() - 2) * 4, (screen_height() - 3) * 6);
+    hpg_draw_text("4", 0, (screen_height() - 2) * 6);
+    hpg_draw_line(100, 8, 100, 12);
+    hpg_flip();
+    return checkpoint(124);
+}
 static int input(void)
 {
     hpclang_keyboard_events_set_timing(20000, 0, 0);
@@ -80,6 +129,9 @@ unsigned hpclang_hpg_console(int (*checkpoint)(unsigned))
         goto done;
     failure = 5;
     if (input())
+        goto done;
+    failure = 6;
+    if (edited_input(checkpoint))
         goto done;
     failure = 0;
 done:
