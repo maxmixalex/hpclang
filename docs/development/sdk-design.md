@@ -442,6 +442,15 @@ when root, catalog and object visitors identify the same native field, while
 retaining conflicts as errors. It performs no IO and does not replace complete
 reference discovery or later expected-value validation.
 
+Native execution context is a separate root source from the calculator's RPL
+return-stack cells. During a live ARM invocation the original runner can retain
+continuation addresses into movable RPL code outside the two roots currently
+registered by stage1. A successful payload marker therefore cannot establish
+return safety; acceptance must include the return to Stock and a subsequent
+invocation. Platform integration must establish the types, ownership and layout
+of these saved execution fields rather than infer roots from address-looking
+integers or command-specific offsets.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
