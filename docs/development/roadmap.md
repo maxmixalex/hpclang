@@ -1283,6 +1283,17 @@ the retirement build and cut/resume stage. Broader physical fault patterns,
 transaction freshness, reference authority and automatic startup integration
 remain required separately.
 
+An automatic-entry slice now passes locally on HP49g+/HP50g: install the owned
+retirement witness as `STARTUP` without evaluating it, verify unchanged damaged
+Flash, then warmstart into replay/retirement. A second warmstart reports no
+pending journal and zero erase/program commands, preserving complete Flash,
+the empty stack and all 61 clean catalog entries. Both runs use 64-read Flash
+busy intervals and the independent image/stack/TLS/mapping verifier. The maintained
+runner includes this separate fresh-fixture branch whenever the retirement build
+is supplied. Production preservation of user startup programs, ordering against
+library configuration, durable ownership/freshness and complete reference repair
+remain open; this is not a general installed startup-recovery service.
+
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay
 zero, the complete Flash image stays unchanged, and a subsequent reset retains

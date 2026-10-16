@@ -52,7 +52,7 @@ def wait_for(predicate, children, timeout, description):
         time.sleep(0.1)
 
 
-def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None):
+def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None, *, flash_busy=False):
     phase.mkdir(parents=True, exist_ok=True)
     seq = phase / "sequence.seq"
     seq.write_text(sequence)
@@ -73,11 +73,11 @@ def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None):
     if usb is not None:
         env["HPCLANG_X50NG_USB0"] = str(usb)
         env["HPCLANG_E2E_HOST_GATE_FILE"] = str(phase / "complete")
-        if args.flash_busy_reads:
-            env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
         if power_cut is not None:
             operation, reads, mask = power_cut
             env["HPCLANG_X50NG_FLASH_POWER_CUT"] = f"{operation}:{reads}:{mask:x}"
+    if args.flash_busy_reads and (usb is not None or flash_busy):
+        env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
     command = [
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),
@@ -93,7 +93,7 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
-def transfer(args, recovery, source, build, name, power_cut=None, *, installed=False):
+def transfer(args, recovery, source, build, name, power_cut=None, *, installed=False, execute=True):
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
@@ -112,7 +112,9 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
         raise ValueError("Stock USB sequence has no host gate")
     sequence = (
         "\n".join(prefix)
-        + "\n500 capture deposited\n1000 tap eval\n15000 capture checkpoint\n17000 finish-install\n"
+        + "\n500 capture deposited\n"
+        + ("1000 tap eval\n" if execute else "")
+        + "15000 capture checkpoint\n17000 finish-install\n"
     )
     xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
     with process(
@@ -141,7 +143,7 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
                     str(send),
                     str(log),
                     "--remote-host",
-                    f"-95 CF HOME '{name}' RCL",
+                    f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME",
                     *([] if installed else [f"RECOVERY.HP={name}"]),
                 ],
                 os.environ,
@@ -155,9 +157,14 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
             elif child.wait(timeout=90) != 86:
                 raise RuntimeError("Emulator did not terminate at the requested Flash power cut")
 
-    if args.flash_busy_reads and power_cut is None:
+    if power_cut is None:
+        verify_busy_reads(args, recovery)
+
+
+def verify_busy_reads(args, phase):
+    if args.flash_busy_reads:
         state = configparser.ConfigParser()
-        state.read(recovery / "state/state")
+        state.read(phase / "state/state")
         evidence = state["flash"]
         operations = evidence.getint("busy-operations")
         if (
@@ -168,6 +175,46 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
             or evidence.getboolean("busy-active") is not False
         ):
             raise RuntimeError("Missing/incomplete Flash busy-state execution evidence")
+
+
+def startup_recovery(args, clean, damaged):
+    """Exercise Stock's STARTUP hook in a fresh fixture, never an existing user HOME."""
+    build = args.retirement_build
+    installed = args.output / "startup-installed"
+    transfer(args, installed, damaged, build, "STARTUP", execute=False)
+    if (installed / "state/flash").read_bytes() != (damaged / "flash").read_bytes():
+        raise RuntimeError("STARTUP installation changed Flash before warmstart")
+    before = installed / "state"
+    for name, operation in (("startup-recovered", "retire"), ("startup-rechecked", "check")):
+        phase = args.output / name
+        phase.mkdir()
+        shutil.copytree(before, phase / "state")
+        with emulator(
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+        ) as child:
+            completed(child, 90)
+        verify_busy_reads(args, phase)
+        verify(
+            SimpleNamespace(
+                before=before,
+                after=phase / "state",
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation=operation,
+            )
+        )
+        if operation == "check":
+            verify_restart(clean, before, phase / "state")
+        before = phase / "state"
+    print("Automatic STARTUP replay/retirement and clean second warmstart verified", flush=True)
 
 
 def run(args):
@@ -202,6 +249,7 @@ def run(args):
     if (reset / "state/flash").read_bytes() != damaged:
         raise RuntimeError("Hardware reset changed the injected Flash state")
     print("Fault prepared and hardware reset complete", flush=True)
+    startup_source = reset / "state"
 
     for cut_index, power_cut in enumerate(args.power_cut or []):
         interrupted = args.output / f"power-cut-{cut_index}"
@@ -364,6 +412,7 @@ def run(args):
         )
         verify_restart(clean / "state", retired_restart / "state", checked / "state")
         print("Journal retirement and unchanged native catalog after reset verified", flush=True)
+        startup_recovery(args, clean / "state", startup_source)
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -375,6 +424,7 @@ def run(args):
                 "restored_catalog_entries": catalog_entries,
                 "interrupted_before_identity": args.interrupted_build is not None,
                 "journal_retirement": args.retirement_build is not None,
+                "startup_recovery": args.retirement_build is not None,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,

@@ -358,6 +358,23 @@ This is an owned
 transaction fixture, not transaction-freshness proof for arbitrary journals or
 an automatic startup-recovery implementation. CI builds all three witness modes.
 
+The retirement witness also exercises the documented
+[`STARTUP` warmstart entry](https://hpcc.org/calculators/hp50g/hp50g_aur.pdf#page=617)
+in a separate copy of the fresh damaged fixture. USB installation stores the
+program without recalling or evaluating it; the complete Flash image must stay
+unchanged before reset. The first warmstart must execute the owned recovery
+entry, restore the sector and retire its journal. A second warmstart must find
+no pending journal, perform zero erase/program commands, leave Flash unchanged
+and retain the clean native library catalog and empty stack. Both invocations
+use the same image/TLS/stack/mapping verifier and the configured Flash busy-read
+model. This path passes locally on HP49g+ and HP50g.
+
+This establishes automatic invocation for the fresh fixture, without Library
+275. Production installation must still preserve an existing user `STARTUP`,
+establish ordering relative to library configuration and other startup work,
+and enforce transaction ownership/freshness before allowing native mutation.
+The fixture does not install a recovery service into an existing user's HOME.
+
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
 status and ignores command writes; the array changes only at completion. The
