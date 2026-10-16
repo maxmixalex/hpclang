@@ -1302,8 +1302,14 @@ roots, including structural table fields. Host checks match the complete backend
 read trace and preserve callback failures without writes; sanitizers and ARM
 analysis pass. On HP49g+/HP50g saved registration states it preserves 457/458
 roots and records all 2,666/2,676 reads before/after registration. Bounded guard
-assembly, ARM-side root ownership and complete object-body traversal remain
-required before using this evidence for live relocation.
+assembly now coalesces repeated/adjacent observations without covering unread
+cells, and invalidates partial output on conflicts or capacity exhaustion.
+Host ordering/failure tests, sanitizers and ARM analysis pass. The same saved
+states produce 527/529 guards (8,432/8,464 bytes), exactly covering all
+2,631/2,641 distinct observed cells; changing the catalog count rejects validation.
+These are sample storage measurements, not a fixed workspace guarantee.
+ARM-side root ownership and complete object-body traversal remain required
+before using this evidence for live relocation.
 
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and

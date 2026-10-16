@@ -899,8 +899,65 @@ static void catalog_relocation_plan(void)
     assert(!plan.edit_count && plan.guard_count == 1 && !guards[0].expected);
 }
 
+static void compact_guard_observations(void)
+{
+    struct hpclang_rpl_reference_guard storage[6];
+    struct hpclang_rpl_reference_guard_builder builder;
+    /* Every order of five contiguous observations must preserve the complete
+     * nibble sequence. Include duplicates while the builder is populated. */
+    for (unsigned permutation = 0; permutation < 120; ++permutation) {
+        assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 5));
+        unsigned remaining[] = {0, 1, 2, 3, 4}, code = permutation;
+        uint32_t expected = 0;
+        for (unsigned i = 0; i < 5; ++i)
+            expected |= ((i * 7 + 3) & 15u) << (4 * i);
+        for (unsigned left = 5; left; --left) {
+            unsigned chosen = code % left, at = remaining[chosen];
+            code /= left;
+            uint8_t value = (uint8_t)((at * 7 + 3) & 15);
+            assert(!hpclang_rpl_reference_guards_observe(&builder, 9, 100 + at, value));
+            unsigned count = builder.count;
+            assert(!hpclang_rpl_reference_guards_observe(&builder, 9, 100 + at, value));
+            assert(builder.count == count);
+            for (unsigned i = chosen; i + 1 < left; ++i)
+                remaining[i] = remaining[i + 1];
+        }
+        assert(builder.count == 1 && !builder.error);
+        assert(storage[0].mapping == 9 && storage[0].field == 100 && storage[0].width == 5);
+        assert(storage[0].expected == expected);
+    }
+    assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 2));
+    storage[2] = (struct hpclang_rpl_reference_guard){123, 456, 789, 1};
+    assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 2, 2));
+    assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 0, 0));
+    assert(builder.count == 2 && storage[0].width == 1 && storage[1].width == 1);
+    assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 1, 1));
+    assert(builder.count == 1 && storage[0].expected == 0x210 && storage[0].width == 3);
+    assert(storage[2].mapping == 123 && storage[2].field == 456 && storage[2].expected == 789);
+    assert(!hpclang_rpl_reference_guards_observe(&builder, UINT32_MAX, 0, 15));
+    assert(builder.count == 2 && storage[1].mapping == UINT32_MAX && storage[1].expected == 15);
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 1, 2) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(!builder.count && builder.error == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 1, 1) == builder.error);
+    assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 1));
+    assert(!hpclang_rpl_reference_guards_observe(&builder, 0, 0xfffff, 15));
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 0, 1) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!builder.count && builder.error == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 1));
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 0x100000, 0) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!hpclang_rpl_reference_guards_begin(&builder, storage, 1));
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 0, 16) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!hpclang_rpl_reference_guards_begin(&builder, NULL, 0));
+    assert(hpclang_rpl_reference_guards_observe(&builder, 0, 0, 0) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_guards_begin(&builder, NULL, 1) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_guards_begin(NULL, storage, 1) == HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_guards_observe(NULL, 0, 0, 0) == HPCLANG_RPL_SPAN_MALFORMED);
+}
+
 int main(void)
 {
+    compact_guard_observations();
     catalog_relocation_plan();
     rebuilt_catalog_replay();
     batch_replay();

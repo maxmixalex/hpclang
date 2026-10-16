@@ -411,6 +411,17 @@ mapping identity and ARM-side root values still require caller-owned stability;
 they are not native-memory read dependencies. This traversal does not replace
 catalog bank resolution or object-body reference discovery.
 
+`hpclang_rpl_reference_guards_begin()` and `guards_observe()` collect those
+observations in caller-owned storage, sorted by physical mapping and address.
+Repeated identical reads consume no additional space; adjacent observed cells
+merge into fields of up to five nibbles, without covering unobserved gaps.
+Conflicting observations, invalid input or capacity exhaustion latch an error
+and invalidate the output count. Restart collection after any failure and use
+the guards only after the entire traversal succeeds. Storage demand depends on
+the observed addresses and their order; callers must handle exhaustion rather
+than assume a fixed catalog or root count. The builder allocates no memory and
+performs no native reads or writes.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.

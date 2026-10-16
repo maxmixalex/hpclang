@@ -83,6 +83,84 @@ static int emit(struct traversal *walk, enum hpclang_rpl_reference_kind kind, ui
     return walk->visit(walk->context, &edge);
 }
 
+static int guard_builder_error(struct hpclang_rpl_reference_guard_builder *builder, int error)
+{
+    builder->count = 0;
+    builder->error = error;
+    return error;
+}
+
+int hpclang_rpl_reference_guards_begin(struct hpclang_rpl_reference_guard_builder *builder,
+                                       struct hpclang_rpl_reference_guard *guards,
+                                       uint32_t capacity)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *builder = (struct hpclang_rpl_reference_guard_builder){guards, capacity, 0, 0};
+    if (capacity && !guards)
+        return guard_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    return 0;
+}
+
+int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_builder *builder,
+                                         uint32_t mapping, uint32_t address, uint8_t value)
+{
+    if (!builder)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (builder->error)
+        return builder->error;
+    if (builder->count > builder->capacity || (builder->capacity && !builder->guards))
+        return guard_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+    if (address >= 0x100000u || value > 15)
+        return guard_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    struct hpclang_rpl_reference_guard *guards = builder->guards;
+    uint32_t first = 0, end = builder->count;
+    while (first < end) {
+        uint32_t middle = first + (end - first) / 2;
+        if (guards[middle].mapping < mapping ||
+            (guards[middle].mapping == mapping && guards[middle].field <= address))
+            first = middle + 1;
+        else
+            end = middle;
+    }
+    uint32_t index = first;
+    if (index && guards[index - 1].mapping == mapping &&
+        address - guards[index - 1].field < guards[index - 1].width) {
+        const struct hpclang_rpl_reference_guard *old = &guards[index - 1];
+        if (((old->expected >> (4 * (address - old->field))) & 15u) != value)
+            return guard_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
+        return 0;
+    }
+    if (index && guards[index - 1].mapping == mapping && guards[index - 1].width < 5 &&
+        guards[index - 1].field + guards[index - 1].width == address) {
+        --index;
+        guards[index].expected |= (uint32_t)value << (4 * guards[index].width);
+        ++guards[index].width;
+    } else if (index < builder->count && guards[index].mapping == mapping &&
+               guards[index].field == address + 1 && guards[index].width < 5) {
+        --guards[index].field;
+        guards[index].expected = (guards[index].expected << 4) | value;
+        ++guards[index].width;
+    } else {
+        if (builder->count == builder->capacity)
+            return guard_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+        for (uint32_t i = builder->count; i > index; --i)
+            guards[i] = guards[i - 1];
+        guards[index] = (struct hpclang_rpl_reference_guard){mapping, address, value, 1};
+        ++builder->count;
+    }
+    if (index + 1 < builder->count && guards[index].mapping == guards[index + 1].mapping &&
+        guards[index].field + guards[index].width == guards[index + 1].field &&
+        guards[index].width + guards[index + 1].width <= 5) {
+        guards[index].expected |= guards[index + 1].expected << (4 * guards[index].width);
+        guards[index].width += guards[index + 1].width;
+        for (uint32_t i = index + 1; i + 1 < builder->count; ++i)
+            guards[i] = guards[i + 1];
+        --builder->count;
+    }
+    return 0;
+}
+
 int hpclang_rpl_reference_guards_validate(const struct hpclang_rpl_reference_reader *reader,
                                           const struct hpclang_rpl_reference_guard *guards,
                                           uint32_t count)

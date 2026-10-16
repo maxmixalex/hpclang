@@ -169,6 +169,27 @@ struct hpclang_rpl_reference_guard
     uint32_t mapping, field, expected, width;
 };
 
+struct hpclang_rpl_reference_guard_builder
+{
+    struct hpclang_rpl_reference_guard *guards;
+    uint32_t capacity, count;
+    int error;
+};
+
+/* Bounded accumulation of observed nibbles into sorted, nonoverlapping guards.
+ * Merge adjacent observations up to five nibbles; never include an unobserved
+ * cell. Repeated identical observations use no extra space. Conflicting values,
+ * invalid input or insufficient capacity latch an error and invalidate count.
+ * Start a new stream with begin after any failure. Only successful complete
+ * traversal permits using the array; this does not prove traversal completeness.
+ * Caller owns builder/storage exclusively and normalizes physical mapping IDs.
+ * No allocation, native reads or native writes are performed here. */
+int hpclang_rpl_reference_guards_begin(struct hpclang_rpl_reference_guard_builder *builder,
+                                       struct hpclang_rpl_reference_guard *guards,
+                                       uint32_t capacity);
+int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_builder *builder,
+                                         uint32_t mapping, uint32_t address, uint8_t value);
+
 struct hpclang_rpl_library_binding;
 /* Return zero with a normalized physical mapping identity, or an error.
  * Resolve every binding, including those without a bank switch. Read-only;
