@@ -1788,6 +1788,15 @@ output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
 
+The clean console now supplies cursor/state queries, cursor movement, erase to
+end of line and configurable tab stops. Tab expansion is bounded by the grid
+size even for `UINT_MAX`; controls preserve the documented incremental UTF-8
+behavior. Sanitizer tests and ARM analysis pass. Direct and Stock acceptance
+passes locally on HP39g+, HP48gII and HP50g, including independent LCD checks
+and normal return. These are prerequisites for historical console adapters;
+implicit standard-stream binding, byte encoding and shared HPG display
+ownership still need implementation and acceptance.
+
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
 Tone duration overflow fails before playback; the old clock-assumption error
