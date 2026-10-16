@@ -822,7 +822,13 @@ adapters are wired into the SDK, with optional cleanup on normal exit and
 ARM applications/launchers build. All six Direct targets and HP50g Stock pass
 the pending-first-wait, coalescing and physical-period E2E checks; HP50g's final
 Stock state restores TICNT to its host value after the app leaves selector 127
-owned. The remaining Stock matrix and broader exit-register checks are pending.
+owned. A maintained Direct return gate now compares RTCCON, TICNT and the tick
+source's routing/mask before frontend restoration or resumed Stock can conceal
+a missing release. All six Direct targets pass this gate. An HP50g `_Exit`
+variant also passes; a deliberate omission of cleanup is rejected with
+`rtc-tick-state`. The relocated installed SDK builds the timer example using
+all three adapters, C/C++ clients, six model-specific notebooks and three HP39
+Aplet families. HP39g+ Stock also passes; the remaining Stock matrix is pending.
 
 ### SD media discovery and replacement
 

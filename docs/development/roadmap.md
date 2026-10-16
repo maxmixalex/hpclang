@@ -1711,8 +1711,12 @@ below are retained.
   preservation and unrelated interrupt isolation. The three public adapters
   and optional normal-exit/`_Exit` cleanup are now wired into the SDK; interface
   and exit-path sanitizer tests pass, and ARM applications/launchers build.
-  Native six-model acceptance remains in progress; this does not close the
-  tick-adapter milestone.
+  Six-model Direct acceptance now includes a pre-Stock-restoration check of
+  RTC control/divider and tick routing/mask. An HP50g `_Exit` variant passes,
+  and deliberate missing cleanup is rejected. The relocated installed SDK
+  also passes C/C++, six-model launcher/notebook and HP39 Aplet packaging with
+  the adapters used by its timer example. HP50g and HP39g+ Stock pass; remaining
+  Stock acceptance is running. This does not yet close the tick-adapter milestone.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.

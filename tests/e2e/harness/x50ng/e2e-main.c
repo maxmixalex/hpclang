@@ -59,6 +59,10 @@
 #define TIMER_TCFG1_VA 0x07600004u
 #define TIMER_TCON_VA 0x07600008u
 #define TIMER_TCNTB0_VA 0x0760000cu
+#define RTC_CONTROL_VA 0x07b00040u
+#define RTC_TICK_VA 0x07b00044u
+#define IRQ_MODE_VA 0x07100004u
+#define IRQ_MASK_VA 0x07100008u
 
 #define COARSE_FLAGS 0x11u
 #define SMALL_FLAGS 0x0ffeu
@@ -151,6 +155,7 @@ struct e2e
     uint32_t stock_tcfg1;
     uint32_t stock_tcon;
     uint32_t stock_tcntb0;
+    uint32_t stock_rtc_control, stock_rtc_tick, stock_tick_mode, stock_tick_mask;
 
     uint32_t result;
     int saw_pass;
@@ -538,6 +543,11 @@ static int snapshot_stock(struct e2e *s)
     (void)guest_read32(s->hdw, TIMER_TCFG1_VA, &s->stock_tcfg1);
     (void)guest_read32(s->hdw, TIMER_TCON_VA, &s->stock_tcon);
     (void)guest_read32(s->hdw, TIMER_TCNTB0_VA, &s->stock_tcntb0);
+    if (!guest_read32(s->hdw, RTC_CONTROL_VA, &s->stock_rtc_control) ||
+        !guest_read32(s->hdw, RTC_TICK_VA, &s->stock_rtc_tick) ||
+        !guest_read32(s->hdw, IRQ_MODE_VA, &s->stock_tick_mode) ||
+        !guest_read32(s->hdw, IRQ_MASK_VA, &s->stock_tick_mask))
+        return 0;
 
     /*
      * HP's stock 49/50 layout stores the LCD framebuffer in the same 4 KiB
@@ -784,6 +794,19 @@ static void monitor(void *arg)
             return;
         }
         s->lcd_state_diff = check_lcd_state(s);
+        /* Check before frontend restoration or resumed Stock can conceal an
+         * omitted runtime release. Pending events and divider phase are live
+         * state, not writable configuration that can be restored exactly. */
+        uint32_t rtc_control, rtc_tick, tick_mode, tick_mask;
+        if (!guest_read32(s->hdw, RTC_CONTROL_VA, &rtc_control) ||
+            !guest_read32(s->hdw, RTC_TICK_VA, &rtc_tick) ||
+            !guest_read32(s->hdw, IRQ_MODE_VA, &tick_mode) ||
+            !guest_read32(s->hdw, IRQ_MASK_VA, &tick_mask) || rtc_control != s->stock_rtc_control ||
+            rtc_tick != s->stock_rtc_tick || ((tick_mode ^ s->stock_tick_mode) & 0x100u) ||
+            ((tick_mask ^ s->stock_tick_mask) & 0x100u)) {
+            fail(s, "rtc-tick-state");
+            return;
+        }
         if (s->lcd_state_diff != 0u) {
             fail(s, "lcd-state");
             return;
