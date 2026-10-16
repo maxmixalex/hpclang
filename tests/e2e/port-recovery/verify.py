@@ -277,6 +277,46 @@ def verify_restart(clean, repaired, restarted):
     return len(catalogs[0])
 
 
+def nibbles(data):
+    return "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in data)
+
+
+def executed_image(ram, initialized, symbols, *, relocated=False):
+    """Locate a saved image, optionally moved by Saturn GC after ARM return.
+
+    GC can move whole CODE objects by an odd nibble. Runtime addresses in the
+    diagnostics remain the original addresses; never infer execution alignment
+    from the final object's position. The caller still verifies the complete
+    image, owning CODE envelope, stack, TLS and hardware-state diagnostics.
+    """
+    packed = nibbles(ram)
+    marker = nibbles(struct.pack("<I", 0x48505046))
+    prefix = nibbles(initialized[:32])
+    candidates = []
+    hit = packed.find(marker)
+    while hit >= 0:
+        start = hit - 2 * symbols["workspace"]
+        if start >= 0 and packed.startswith(prefix, start):
+            candidates.append(start)
+        hit = packed.find(marker, hit + 1)
+    require(len(candidates) == 1, "Executed recovery image is missing or ambiguous")
+    start = candidates[0]
+    size = symbols["__image_end"]
+    require(start + 2 * size <= len(packed), "Recovery image bounds/alignment")
+    image = bytes(int(packed[i : i + 2][::-1], 16) for i in range(start, start + 2 * size, 2))
+    if relocated:
+        errno_address = struct.unpack_from("<I", image, symbols["workspace"] + 8272 + 22 * 4)[0]
+        physical = errno_address - symbols["__tls_base"] - symbols["errno"]
+    else:
+        require(start % 16 == 0, "Recovery image bounds/alignment")
+        physical = 0x08000000 + start // 2
+    require(
+        physical % 8 == 0 and 0x08000000 <= physical <= 0x08000000 + len(ram) - size,
+        "Original recovery image bounds/alignment",
+    )
+    return image, start, physical
+
+
 def verify(args):
     before = (args.before / "flash").read_bytes()
     after = (args.after / "flash").read_bytes()
@@ -306,18 +346,10 @@ def verify(args):
     expected = bytearray(initialized + bytes(size - len(initialized)))
     struct.pack_into("<2I", expected, symbols["guard_low"], 0x13579BDF, 0x2468ACE0)
     struct.pack_into("<2I", expected, symbols["guard_high"], 0x89ABCDEF, 0xFEDCBA98)
-    candidates = []
-    for hit in range(len(ram) - 3):
-        if ram[hit : hit + 4] != struct.pack("<I", 0x48505046):
-            continue
-        start = hit - symbols["workspace"]
-        if start >= 0 and ram[start : start + 32] == initialized[:32]:
-            candidates.append(start)
-    require(len(candidates) == 1, "Executed recovery image is missing or ambiguous")
-    start = candidates[0]
-    require(start % 8 == 0 and start + size <= len(ram), "Recovery image bounds/alignment")
-    physical = 0x08000000 + start
-    result = struct.unpack_from("<Ii4I", ram, start + symbols["workspace"])
+    image, start, physical = executed_image(
+        ram, initialized, symbols, relocated=getattr(args, "relocated_image", False)
+    )
+    result = struct.unpack_from("<Ii4I", image, symbols["workspace"])
     discovery = (phase, args.slot, args.target) if phase else (0, 0, 0)
     require(result[1:4] == discovery and result[4] > 0, "Preflight/discovery failed")
     require(
@@ -325,12 +357,14 @@ def verify(args):
         and result[5] % 8 == 0,
         "C stack escaped its owned reservation",
     )
-    scratch = start + symbols["workspace"] + 24
+    scratch = symbols["workspace"] + 24
     if phase:
-        require(ram[scratch : scratch + 4124] == record, "RAM journal differs from durable journal")
+        require(
+            image[scratch : scratch + 4124] == record, "RAM journal differs from durable journal"
+        )
     if phase == 1:
         require(
-            ram[scratch + 4124 : scratch + 8248] == record,
+            image[scratch + 4124 : scratch + 8248] == record,
             "Replay did not retain a separate journal reload",
         )
     mutable = [
@@ -341,10 +375,7 @@ def verify(args):
     ]
     for i, value in enumerate(expected):
         if not any(first <= i < last for first, last in mutable):
-            require(ram[start + i] == value, f"Code/guard corruption at image offset {i:#x}")
-
-    def nibbles(data):
-        return "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in data)
+            require(image[i] == value, f"Code/guard corruption at image offset {i:#x}")
 
     package = args.package.read_bytes()
     require(package[:8] == b"HPHP49-C", "Invalid binary package header")
@@ -357,12 +388,17 @@ def verify(args):
         i
         for i in range(len(packed_ram))
         if packed_ram.startswith(prefix, i)
-        and i + len(prefix) <= start * 2
-        and start * 2 + size * 2 <= i + code_end
+        and i + len(prefix) <= start
+        and start + size * 2 <= i + code_end
     ]
     require(len(owners) == 1, "Execution image is not inside one owning CODE object")
+    original_owner = 2 * (physical - 0x08000000) - (start - owners[0])
+    require(
+        0 <= original_owner and original_owner + code_end <= 2 * len(ram),
+        "Original owning CODE object is outside RAM",
+    )
 
-    d = struct.unpack_from("<32I", ram, start + symbols["workspace"] + 8272)
+    d = struct.unpack_from("<32I", image, symbols["workspace"] + 8272)
     require(d[1] & 0xC0 == 0xC0 and d[0] & 0xFF == d[7] & 0xFF, "IRQ state not restored")
     require(d[2] == d[10] and d[3:5] == d[8:10], "Mapping/vector not restored")
     require(
@@ -395,6 +431,11 @@ def verify(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--relocated-image",
+        action="store_true",
+        help="verify a CODE image moved by Stock GC after return",
+    )
     for name in ("before", "after", "elf", "binary", "package"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--nm", default="llvm-nm")

@@ -394,13 +394,25 @@ from the installed library through a RAM-owned CODE copy. Configuration-time
 probes both through that hidden command and with the program directly in the
 configuration entry restore an injected damaged sector and retire its journal:
 complete Flash images match the independent replay oracle with 64-read busy
-intervals. The final warmstart RAM snapshot does not retain the executed image,
-so it cannot establish the transient image/stack/TLS invariants for this path.
+intervals. Stock GC moves the containing CODE object, sometimes by an odd
+nibble, before the final warmstart snapshot. The verifier's explicit
+`--relocated-image` mode reconstructs its bytes and original execution address
+from the saved errno pointer and ELF TLS layout, then checks original alignment,
+RAM bounds, stack/TLS diagnostics, complete immutable image/guards and the
+owning CODE envelope. Both paths pass; ordinary probes retain strict unmoved
+alignment by default. This verifies this owned witness, not arbitrary active
+ARM callers or complete native-reference repair.
 The first repaired startup retains only 59 of the original 62 catalog entries;
 a second warmstart rebuilds all 62 exact bindings without changing Flash.
 Production integration must therefore rebuild the catalog before allowing
-dependent library/application code to continue, as well as verify transient
-execution state and recovery after RAM loss.
+dependent library/application code to continue. An HP50g test also clears the
+complete 512 KiB external SRAM before reset, leaving the installed Flash library
+and fault journal unchanged. After cold initialization completes, exact replay/retirement,
+the relocated-image checks and Stock return pass. The initial 16-second capture
+was still in firmware initialization; continuing that same state establishes
+completion without reintroducing saved HOME data. This remains an isolated
+fixture, not complete loss of every peripheral/on-chip state, production
+installation, transaction freshness or physical battery removal acceptance.
 
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7

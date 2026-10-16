@@ -16,6 +16,47 @@ VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
 
 
+class ExecutedImageTests(unittest.TestCase):
+    def setUp(self):
+        self.symbols = {"workspace": 64, "__image_end": 9000, "__tls_base": 40, "errno": 4}
+        self.image = bytearray(9000)
+        self.image[:32] = bytes(range(32))
+        struct.pack_into("<I", self.image, 64, 0x48505046)
+        self.address = 0x08001000
+        struct.pack_into("<I", self.image, 64 + 8272 + 22 * 4, self.address + 44)
+
+    def ram(self, offset):
+        packed = "0" * offset + VERIFY.nibbles(self.image)
+        packed += "0" * (40000 - len(packed))
+        return bytes(int(packed[i : i + 2][::-1], 16) for i in range(0, len(packed), 2))
+
+    def test_unmoved_image_keeps_strict_alignment(self):
+        image, offset, address = VERIFY.executed_image(self.ram(8192), self.image, self.symbols)
+        self.assertEqual((image, offset, address), (self.image, 8192, self.address))
+        with self.assertRaisesRegex(ValueError, "alignment"):
+            VERIFY.executed_image(self.ram(8193), self.image, self.symbols)
+
+    def test_gc_move_preserves_original_execution_address(self):
+        for offset in (8193, 10000):
+            image, actual, address = VERIFY.executed_image(
+                self.ram(offset), self.image, self.symbols, relocated=True
+            )
+            self.assertEqual((image, actual, address), (self.image, offset, self.address))
+
+    def test_invalid_original_address_is_rejected(self):
+        for address in (0x08001001, 0x07FFFFF8, 0x08004FF8):
+            struct.pack_into("<I", self.image, 64 + 8272 + 22 * 4, address + 44)
+            with self.assertRaisesRegex(ValueError, "Original.*bounds/alignment"):
+                VERIFY.executed_image(self.ram(8193), self.image, self.symbols, relocated=True)
+
+    def test_duplicate_and_truncated_images_are_rejected(self):
+        ram = self.ram(8193)
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            VERIFY.executed_image(ram + ram, self.image, self.symbols, relocated=True)
+        with self.assertRaisesRegex(ValueError, "bounds"):
+            VERIFY.executed_image(ram[:5000], self.image, self.symbols, relocated=True)
+
+
 class RecoveryVerifierTests(unittest.TestCase):
     def setUp(self):
         self.slot, self.target = 0x160105, 0x140000

@@ -1310,9 +1310,14 @@ command and with the recovery program directly in the configuration entry.
 Full Flash comparison and 64-read busy-operation evidence pass. The first
 repaired startup still exposes 59 of 62 catalog entries; another warmstart
 restores all exact bindings without Flash changes. A post-startup invocation
-also passes the owned RAM image/stack/TLS checks, but final startup snapshots
-do not retain that transient image. Production catalog rebuilding, transient
-startup-state verification and RAM-loss recovery remain open.
+also passes the owned RAM image/stack/TLS checks. The startup image survives as
+a CODE object moved by native GC, including odd-nibble moves: the verifier now
+explicitly supports reconstruction while checking original execution alignment,
+RAM bounds, stack/TLS and the complete immutable image/guards and envelope.
+Both configuration variants pass these checks. Clearing all 512 KiB SRAM before
+HP50g reset also passes exact recovery, these ownership checks and Stock return
+after cold initialization finishes. Production catalog rebuilding, installation
+and transaction freshness remain open; this is not physical battery-loss testing.
 
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay
