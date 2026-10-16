@@ -359,9 +359,20 @@ font changes. The test wraps the allocator boundary without changing the SDK
 allocator. `used` includes allocator bookkeeping and retained free blocks;
 it is not the sum of live application allocations. `capacity` is the space
 between the end of static data and the reserved stack boundary. Neither value
-measures stack high-water usage or separately allocated LCD DMA pages. A local
-HP39g+ Direct run reports 18,892 bytes used out of 293,320; that larger Direct
-arena does not establish the smallest Stock memory budget.
+measures stack high-water usage or separately allocated LCD DMA pages. Local
+runs of the instrumented fixture report:
+
+| Target | Launcher RW arena | Peak heap extent | Heap capacity |
+| --- | ---: | ---: | ---: |
+| HP39g+ Direct | 307,200 | 18,892 | 293,320 |
+| HP39g+ Stock | 53,248 | 18,892 | 39,368 |
+| HP50g Stock | 303,104 | 20,076 | 289,224 |
+
+All sizes are bytes. Both Stock flows include native fonts and normal return;
+HP50g also exercises the 80-row renderer. The current HP39g+ fixture uses a
+52 KiB arena, so this run does not revalidate the earlier 36 KiB observation.
+These are observations of the scripted application flow, not upper bounds for
+arbitrary UI declarations or a minimum whole-application memory requirement.
 
 The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
 with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,

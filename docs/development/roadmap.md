@@ -1407,7 +1407,12 @@ now occupies that bank's remaining tail with a native tombstone before Stock
 installation and verifies that installation leaves the protected bank unchanged.
 Recovery availability consequently no longer depends on package size forcing
 Stock to choose a different bank. The tombstone is test setup, not a production
-installer or space-reservation protocol; broader interruption gates remain pending.
+installer or space-reservation protocol. With the immutable-source envelope,
+the complete maintained runner passes locally on HP49g+ and HP50g: both busy
+power-cut masks, interrupted repair, journal retirement, saved-program reuse,
+automatic STARTUP, bound Flash configuration, SRAM loss and unchanged later
+warmstarts. All four build variants and their 16 Clang analysis configurations
+pass. Remote acceptance of this follow-up remains pending.
 An old binding
 must not be erased/reused while its journal can survive, because a partial erase
 can resurrect an armed status; root replacement needs its own protocol.
