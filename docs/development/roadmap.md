@@ -1322,6 +1322,25 @@ dependency once. This establishes the need for recovery before dependent
 configuration, not a production allocation of ID 4: factory IDs 0, 1 and 2 also
 have configuration callbacks, and their safety before recovery remains unproven.
 The public packager continues to restrict recovery IDs to 769..1791.
+Inspection of the HP50g Stock callback bodies narrows the earlier-callback
+question: library 1 recalls hidden `UserKeys.CRC` and `UserKeys`, checks the
+object checksum and restores key assignments; library 2 attaches itself to HOME.
+The primitive names are cross-checked against the authors' [entry database](https://www.hpcalc.org/details/5146).
+Assigning the EQLIB object to a user key copies that object into RAM in the
+observed Stock fixture, so its successful recovery does not establish safety
+for banked references in user-key data. Library 0 and reachable banked data
+still need validation. ID 4 also has a historical configuration-suppressor use,
+described by its [author](https://files.mpoli.fi/pub/unpacked/software/hp48/hp48cojh.zip/_horn8.zip/cnflib.doc);
+an installer must not assume that this ID is available on an existing calculator.
+A further HP50g native fixture stores the actual user-key list in a Flash backup
+and uses `StoHiddenVar` to retain an ACPTR in hidden `UserKeys`. Stock's `OCRC`
+calculates the checksum of this pointer object, rather than the original list;
+updating `UserKeys.CRC` with that result makes the clean warmstart preserve both.
+Erasing the referenced backup's bank-header sector then still permits recovery
+library 4 to restore the exact sector, retire/close the transaction and rebuild
+all 62 catalog entries. The key reference/CRC and owned recovery image/stack/TLS
+also pass. This accepts that explicit banked-key path; it does not prove every
+earlier callback or arbitrary user-key representation safe.
 An explicit stale-journal host regression also demonstrates why structural
 preflight is insufficient: a later valid backup inside the target sector is
 hidden by the old image overlay. Public write preparation rejects ready and
