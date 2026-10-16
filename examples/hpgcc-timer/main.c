@@ -18,8 +18,9 @@ int main(void)
     if (start < 0)
         return 1;
 
-    sys_sleep(25);       /* milliseconds */
-    sys_waitTicks(7500); /* 10 ms at the historical 750 kHz rate */
+    sys_sleep(25);          /* milliseconds */
+    sys_waitTicks(7500);    /* 10 ms at the historical 750 kHz rate */
+    sys_playTone2(1000, 5); /* Hz, milliseconds */
     if (errno)
         return 1;
     (void)sys_updateTimer(&timer);
@@ -49,5 +50,7 @@ int main(void)
     if (length < 0 || (size_t)length >= sizeof report)
         return 1;
     hpclang_surface_draw_text_n(screen, &report_font, 0, 12, report, (size_t)length, 255);
+    const char *digits = sys_bcd2str(0x12345678u);
+    hpclang_surface_draw_text_n(screen, &report_font, 0, 24, digits, 8, 255);
     return 0;
 }

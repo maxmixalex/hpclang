@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <hpsys.h>
 #include <hpclang/datetime.h>
+#include <hpclang/sound.h>
 #include <hpclang/time.h>
 
 ULONGLONG sys_updateTimer(sys_timer_t *timer)
@@ -43,6 +44,50 @@ void sys_sleep(unsigned int millis)
 void sys_waitTicks(unsigned int ticks)
 {
     hpclang_delay_us(((uint64_t)ticks * 4u + 2u) / 3u);
+}
+
+void sys_playTone2(unsigned int frequency_hz, unsigned int duration_ms)
+{
+    (void)hpclang_sound_play(frequency_hz, duration_ms, NULL, NULL);
+}
+
+void sys_playTone(unsigned int frequency_hz, unsigned int duration_cs)
+{
+    if (duration_cs > UINT32_MAX / 10u) {
+        errno = ERANGE;
+        return;
+    }
+    sys_playTone2(frequency_hz, duration_cs * 10u);
+}
+
+unsigned int sys_bcd2bin_nibbles(unsigned int packed, int nibbles)
+{
+    unsigned width = nibbles < 0 ? 0u - (unsigned)nibbles : (unsigned)nibbles;
+    if (width > 8u)
+        width = 8u;
+    unsigned value = 0;
+    while (width) {
+        --width;
+        value = value * 10u + ((packed >> (4u * width)) & 15u);
+    }
+    return value;
+}
+
+unsigned int(sys_bcd2bin)(unsigned int packed)
+{
+    return sys_bcd2bin_nibbles(packed, 2);
+}
+
+char *sys_bcd2str(unsigned int packed)
+{
+    static char text[9];
+    for (unsigned index = 0; index < 8u; ++index)
+        text[index] = (char)('0' + ((packed >> (4u * (7u - index))) & 15u));
+    text[8] = '\0';
+    unsigned first = 0;
+    while (first < 7u && text[first] == '0')
+        ++first;
+    return text + first;
 }
 
 int sys_RTC_seconds(void)

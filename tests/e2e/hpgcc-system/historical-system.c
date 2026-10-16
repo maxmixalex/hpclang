@@ -50,6 +50,32 @@ static int calendar(void)
 
 unsigned hpclang_historical_system(int (*checkpoint)(uint32_t, uint32_t))
 {
+    if (sys_bcd2bin_nibbles(0x12345678u, -8) != 12345678u ||
+        sys_bcd2bin_nibbles(0x12345678u, 2) != 78u ||
+        strcmp(sys_bcd2str(0x12345678u), "12345678") || strcmp(sys_bcd2str(0), "0"))
+        return 12;
+    errno = 0;
+    sys_playTone2(1000, 0);
+    if (errno)
+        return 13;
+    sys_playTone2(0, 1);
+    if (errno != EINVAL)
+        return 13;
+    uint64_t tone_start, tone_end;
+    if (hpclang_time_read_us(&tone_start))
+        return 13;
+    errno = 0;
+    sys_playTone2(1000, 5);
+    if (errno || hpclang_time_read_us(&tone_end) || tone_end < tone_start ||
+        tone_end - tone_start < 5000u || tone_end - tone_start > 250000u)
+        return 13;
+    if (hpclang_time_read_us(&tone_start))
+        return 14;
+    errno = 0;
+    sys_playTone(1000, 1);
+    if (errno || hpclang_time_read_us(&tone_end) || tone_end < tone_start ||
+        tone_end - tone_start < 10000u || tone_end - tone_start > 250000u)
+        return 14;
     if (calendar())
         return 11;
     uint64_t delay_start, delay_end;

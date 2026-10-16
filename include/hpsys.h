@@ -43,6 +43,33 @@ extern "C"
      * Does not require slow mode or reconfigure PWM/interrupt registers. */
     void sys_waitTicks(unsigned int ticks);
 
+    /* HPGCC 1.1's corrected tone interface: Hz and milliseconds. Blocks through
+     * the owned sound service, restoring borrowed PWM/pin state on return.
+     * A nonzero frequency with zero duration does nothing. The void return is retained;
+     * failures set errno (EINVAL, ERANGE, EBUSY, EIO, ENOSYS, EOVERFLOW).
+     * No timer setup or slow CPU mode is needed. */
+    void sys_playTone2(unsigned int frequency_hz, unsigned int duration_ms);
+    /* Earlier interface: Hz and hundredths of a second, following its nominal
+     * cycle-count duration. Does not reproduce the historical wrong clock
+     * assumption. Same ownership/error contract as sys_playTone2; durations
+     * exceeding UINT32_MAX milliseconds fail with ERANGE before playback. */
+    void sys_playTone(unsigned int frequency_hz, unsigned int duration_cs);
+
+    /* Convert the low min(abs(nibbles),8) packed digits, including the historical
+     * negative-width convention. Zero width returns zero. Each four-bit digit
+     * is accumulated in base ten without checking that it is <=9. */
+    unsigned int sys_bcd2bin_nibbles(unsigned int packed, int nibbles);
+    /* Byte-sized convenience, deliberately only two digits. Also has a callable
+     * symbol for applications taking the old function's address. */
+    unsigned int sys_bcd2bin(unsigned int packed);
+#define sys_bcd2bin(packed) sys_bcd2bin_nibbles((packed), 2)
+
+    /* Borrowed static text, replaced by later calls; omit leading zero digits.
+     * Zero yields "0". Historical digit mapping is preserved: nibbles 10..15
+     * become ':' through '?', rather than validating or formatting hexadecimal.
+     * Not reentrant; copy the result before another call. */
+    char *sys_bcd2str(unsigned int packed);
+
     /* Civil seconds since midnight, or -1 with the clean RTC service's errno. */
     int sys_RTC_seconds(void);
 

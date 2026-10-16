@@ -790,7 +790,8 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
 | virtual/physical mapping | `sys_map_*` | ✕ canonical application API. |
 | physical allocation/cache | `sys_phys_malloc`, `sys_flush_cache` | ✕ raw application API; display sessions own and publish validated DMA buffers internally. |
-| tone/beep | `sys_playTone*`, `kos_beep` | ✅ Clean PWM playback and cancellation, accepted on `6a7f9a28`; source adapters absent. |
+| tone/beep | `sys_playTone*`, `kos_beep` | ✅ Clean PWM playback and cancellation, accepted on `6a7f9a28`; `hpsys.h` now adapts `sys_playTone2` (Hz/ms) and `sys_playTone` (Hz/hundredths of a second), with owned hardware restoration and errno failures. The old clock error is not reproduced. `kos_beep` remains pending. |
+| packed BCD | `sys_bcd2bin`, `sys_bcd2bin_nibbles`, `sys_bcd2str` | ✅ Adapters follow 1.1/2.0: low-two-digit convenience, bounded nibble count and borrowed static text. Nondecimal nibbles retain historical behavior. See the compatibility guide for the different 1.0 ABI and numeric bug. |
 
 ## Files, stdio and storage
 

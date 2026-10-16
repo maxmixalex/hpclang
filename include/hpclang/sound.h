@@ -13,7 +13,8 @@ extern "C"
     /* Play a square-wave tone using an idle PWM channel. Frequency is rounded to
      * the nearest available timer period without changing the shared prescaler.
      * This call blocks and polls cancellation until duration_ms has elapsed.
-     * Zero duration is a no-op. Returns 0 when complete, 1 when cancelled, or -1:
+     * With nonzero frequency, zero duration is a no-op. Returns 0 when complete,
+     * 1 when cancelled, or -1:
      * EINVAL (zero frequency), ERANGE (unrepresentable frequency), EBUSY (channel
      * in use), EIO (clock failure), ENOSYS (unknown device), EOVERFLOW (deadline).
      * Completion, cancellation and errors after acquisition all restore the pin

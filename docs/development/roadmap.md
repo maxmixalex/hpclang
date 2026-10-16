@@ -1593,6 +1593,16 @@ output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
 
+The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
+`sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
+Tone duration overflow fails before playback; the old clock-assumption error
+is not reproduced. The compatibility guide records the different 1.0 register
+return contract and numeric bug instead of claiming identical four-version
+behavior. Unit tests, sanitizers, ARM static analysis and all six Direct targets
+pass locally. The relocated SDK passes C/C++, six-model notebook/launcher builds
+and all three HP39 Aplet package families with the updated tone/BCD example.
+Stock acceptance is in progress; formal CI for this addition is pending.
+
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
 The integrated Display suite passes all six models in Direct and Stock,

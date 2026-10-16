@@ -43,7 +43,7 @@ ports to public hpclang APIs, not claims that unchanged HPGCC binaries run.
 | Drawing, gray pages and animated presentation | HPGCC 1.1 `hpgraphics.h` and `sources/hpg/examples/testdoublebuf.c`; HPGCC3 `hpgraphics.h` mixed-font example | Owned surfaces, display sessions and frame synchronization; all six models D/S | Installed HPG names remain M8; the existing HPG prototype covers clip/style/pattern/XPM composition | `display/historical-clients.c` preserves five animation cycles and the mixed-font/shape layout. Direct and Stock pass on all six models; formal CI is accepted on `7303a3d6`. Busy loops become frame synchronization; captures replace manual pauses |
 | Native or packaged text | Four releases' native-font helpers and HPG examples; HP39 ROM tables independently verified | Native font accessors plus `hpclang_font_available`, packaged fallback selected explicitly by the caller | Historical font-role/global selection stays in adapters | Gallery acceptance `8f79c156`, native symbols `41d75dec`; mixed-font application additionally detects missing native fonts in Direct classic launches. Availability-query acceptance is complete on `7303a3d6` |
 | Physical keyboard and bounded console input | HPGCC 1.0.3 `examples/libtests/keyboard.c`; 1.1/2.0 `hpkeyb49.h` implementations | Physical snapshots/events, separate native text mode, editor and owned console; all six models D/S | Historical modal/blocking spellings remain M8 | Text/input acceptance `c7451364` and `41d75dec`; `system-services/console.c` additionally ports the eight-column matrix/ON display and Alpha exit, with real GPIO transitions. Direct and Stock six-model checks and formal CI pass on `7303a3d6` |
-| Civil time, elapsed time, deadlines and sound | 1.1/2.0 `hpsys.h` implementations; HPGCC3 RTC/timer sources; benchmark and game examples | Stable civil snapshots, explicit conversion/set, monotonic time, polling timers and owned PWM; all six models D/S | Ordinary callback dispatch belongs to the application loop; historical names remain M8 | M7.4 System Services covers forward/backward clock adjustment without deadline drift, cancellation and shared-register restoration. The HPGCC 1.1/2.0 sieve client passes six-model Direct/Stock locally; its additional formal CI is accepted on `2988e1de` |
+| Civil time, elapsed time, deadlines and sound | 1.1/2.0 `hpsys.h` implementations; HPGCC3 RTC/timer sources; benchmark and game examples | Stable civil snapshots, explicit conversion/set, monotonic time, polling timers and owned PWM; all six models D/S | Ordinary callback dispatch belongs to the application loop; selected delay, stopwatch, RTC, tone and BCD names now have adapters, with raw timer setup still open | M7.4 System Services covers forward/backward clock adjustment without deadline drift, cancellation and shared-register restoration. The HPGCC 1.1/2.0 sieve client passes six-model Direct/Stock locally; its additional formal CI is accepted on `2988e1de` |
 | Files, directories, metadata and partition selection | HPGCC2 `fsystem/examples/example2.c`/`example3.c`; HPGCC3 `fsinit.c` implements four primary volumes | libc streams, owned directory snapshots, masked FAT metadata and explicit volume paths; HP49g+/HP50g D/S, other models `ENOSYS` | Bounded `fsystem.h` adapter, local cwd and historical MBR-slot aliases | `historical-files.c` ports the create/append/modify/move/read/enumerate/delete flow on all four FAT volumes. HP49g+/HP50g D/S and formal CI pass on `7303a3d6`. The original example's excessive literal write length is corrected |
 | Media removal and card identity | HPGCC3 `FSVolumePresent` compares CID after reinitialization; GPIO/SD driver sources | Removal latch, remount and stale-object rejection accepted on `cada0f2e`; `hpclang_stream_media_identity_query` now exposes stable CID (accepted on `7303a3d6`) | `FSVolumeInserted` currently reports presence/volume errors, not the full historical `FS_CHANGED` distinction | Raw A→B→A image replacement covers old dirty streams and directory handles. CID comparison now distinguishes another card from a returning card in HP49g+/HP50g Direct/Stock raw-image tests; formal CI is accepted on `7303a3d6`. Physical SD test is a maintainer-approved nonblocking follow-up |
 | Calculator arguments, composite values and stack results | 1.0.3 `examples/libtests/stack.c`, 1.1 `examples/stack/rplstk.c`, 2.0 `examples/stack.c`, HPGCC3 `sat3.h` list example | Owned typed objects, explicit numeric precision and transactional stack operations; classic Stock with capability checks | Bounded `saturn.h`/`satdir.h` adapters; raw pointers and remaining names are not public clean APIs | Accepted on `6a7f9a28`: `object-composite/historical.c` ports all four generations' representative flows; nested directories, numerical composites and reorder have additional focused tests |
@@ -718,6 +718,46 @@ tests cover leap/century dates and failure preservation. The calendar check
 passes all six Direct and all six Stock targets with independent report pixel
 verification and normal Stock return. The relocated installed-SDK build also
 passes with the calendar example; formal CI for this addition remains pending.
+
+### Historical tones and packed BCD
+
+`hpsys.h` supplies `sys_playTone2(frequency_hz, duration_ms)` and
+`sys_playTone(frequency_hz, duration_cs)`, where `cs` means hundredths of a
+second. Both use the owned sound service, block until completion and restore
+borrowed PWM/pin state. Their historical void signatures report errors through
+`errno`; no raw timer setup or slow CPU mode is required. A nonzero frequency
+with zero duration is a no-op. Zero frequency is invalid. Centisecond values
+that cannot fit in the service's 32-bit millisecond duration fail with `ERANGE`
+before playing.
+
+The reviewed 1.1 `sys_playTone2` implementation establishes Hz and milliseconds.
+The older `sys_playTone` headers warn that parameter interpretation may be
+wrong: its cycle count implies hundredths of a second, but its delay assumes
+600 kHz while the historical tick service uses 750 kHz. The adapter implements
+the nominal units, not that clock error, arithmetic overflow or raw pin writes.
+
+Packed-BCD adapters follow the 1.1/2.0 contracts:
+
+- `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the
+  argument once; a callable symbol is also available for function pointers.
+- `sys_bcd2bin_nibbles(value, count)` uses the absolute count, capped at eight.
+  Zero count returns zero; even `INT_MIN` is handled without signed overflow.
+- `sys_bcd2str(value)` formats up to eight digits without leading zeros and
+  returns a borrowed static buffer; zero produces `"0"`. Copy the text before
+  another call. The function is not reentrant.
+
+These helpers preserve historical nonvalidating nibble behavior: values 10..15
+contribute their numeric value to base-ten accumulation, and string conversion
+maps them to `:` through `?`. They are not hexadecimal formatting routines.
+HPGCC 1.0's `sys_bcd2str` instead returns character values in ARM registers;
+that ABI requires migration to the string interface. Its `sys_bcd2bin` also
+omits the high-nibble shift; the adapter does not reproduce this numeric bug.
+HPGCC3 declares the nibble conversion but comments out the string declaration.
+
+Host tests cover conversion edges, borrowed text, tone units, overflow and error
+propagation. The HPGCC System E2E exercises both tone spellings with measured
+duration bounds, BCD results and independent report pixels. The separate sound
+service tests cover hardware ownership and restoration.
 
 ### SD media discovery and replacement
 
