@@ -1263,6 +1263,14 @@ identity-publication interruption gate. This accepts these explicit fault
 outcomes locally, not all physical power-loss patterns or automatic startup
 recovery; remote acceptance remains pending.
 
+Recovery now retains the inspected journal and a separate reload in the existing
+workspace. Shared replay rejects any mismatch before target mutation, including
+a different CRC-valid record, and rejects overlapping buffers. Both models pass
+the full native fault sequence with independent checks of both RAM copies.
+The checked ELF packager is shared outside E2E and regenerates missing raw-image
+outputs. These changes are locally accepted; transaction freshness and complete
+native reference repair remain separate requirements.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the
