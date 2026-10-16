@@ -1340,6 +1340,17 @@ preflight passes and a contradictory duplicate is rejected. This read-only
 experiment uses unchanged values to verify assembly, not relocation semantics
 or complete reference coverage.
 
+A stopped-state HP50g integration experiment now combines shared root/nested
+enumeration, qualified shift planning, edit merging and RAM replay. Its 738
+unique fields include 44 changed values. After host-side relocation and catalog
+insertion in an isolated snapshot, the unchanged ARM test application relaunches,
+reads back its native library witness and returns normally, as does the unmodified
+control. Independent state checks confirm exactly one added library-123 binding,
+the expected 16-nibble TEMP-bottom shift and unchanged Flash. This establishes
+the combined plan on that fixture, not calculator-side commit: stopped-state
+host mutation bypasses active ARM-root ownership, and ten opaque objects remain
+unclassified. Public reclamation remains gated on those retained obligations.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
