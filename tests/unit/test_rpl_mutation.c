@@ -1795,6 +1795,73 @@ static void test_display_root_relocation(void)
     hpclang_object_release(object);
 }
 
+static uint8_t root_reads[NIBBLES], root_dependencies[NIBBLES];
+struct dependency_visit_state
+{
+    struct source_visit_state roots;
+    unsigned calls, stop_at;
+};
+
+static int track_root_read(void *context, uint32_t address, uint8_t *value)
+{
+    if (!read_nibble(context, address, value))
+        return 0;
+    root_reads[address] = 1;
+    return 1;
+}
+
+static int visit_root_dependency(void *context, uint32_t address, uint8_t value)
+{
+    struct dependency_visit_state *state = context;
+    assert(address < NIBBLES && value == (memory[address] & 15));
+    root_dependencies[address] = 1;
+    return ++state->calls == state->stop_at ? 83 : 0;
+}
+
+static void check_guarded_roots(const struct hpclang_rpl_mutation_io *io,
+                                const struct source_visit_state *baseline)
+{
+    struct hpclang_rpl_mutation_io tracked = *io;
+    tracked.read_nibble = track_root_read;
+    struct dependency_visit_state state = {.roots = *baseline};
+    state.roots.index = 0;
+    memset(root_reads, 0, sizeof root_reads);
+    memset(root_dependencies, 0, sizeof root_dependencies);
+    assert(!hpclang_rpl_mutation_visit_guarded_roots(&tracked, visit_source_root,
+                                                     visit_root_dependency, &state));
+    assert(state.roots.index == baseline->count && state.calls > 0);
+    assert(!memcmp(root_reads, root_dependencies, sizeof root_reads));
+    /* Structural fields as well as the pointers themselves must be guarded. */
+    const uint32_t metadata[] = {DSKTOP,     EDITLINE, RSKTOP,  TEMPENV, TOUCHTAB,
+                                 FSTVGERPTR, 0x84400,  0x8611d, 0x86128};
+    for (unsigned i = 0; i < sizeof metadata / sizeof metadata[0]; ++i)
+        assert(root_dependencies[metadata[i]]);
+    unsigned total = state.calls;
+    const unsigned stops[] = {1, total / 2, total};
+    for (unsigned i = 0; i < sizeof stops / sizeof stops[0]; ++i) {
+        state = (struct dependency_visit_state){.roots = *baseline, .stop_at = stops[i]};
+        state.roots.index = 0;
+        assert(hpclang_rpl_mutation_visit_guarded_roots(&tracked, visit_source_root,
+                                                        visit_root_dependency, &state) == 83);
+        assert(state.calls == stops[i]);
+    }
+    state = (struct dependency_visit_state){.roots = *baseline};
+    state.roots.index = 0;
+    state.roots.stop = 73;
+    assert(hpclang_rpl_mutation_visit_guarded_roots(&tracked, visit_source_root,
+                                                    visit_root_dependency, &state) == 73);
+    state.roots.index = 0;
+    state.roots.stop = 0;
+    rejected_read = 0x86128;
+    assert(hpclang_rpl_mutation_visit_guarded_roots(&tracked, visit_source_root,
+                                                    visit_root_dependency,
+                                                    &state) == HPCLANG_RPL_MUTATION_IO);
+    rejected_read = UINT32_MAX;
+    assert(hpclang_rpl_mutation_visit_guarded_roots(&tracked, visit_source_root, NULL, &state) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
+    assert(!writes);
+}
+
 static void test_root_sources(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1);
@@ -1824,6 +1891,7 @@ static void test_root_sources(void)
     assert(state.index == state.count);
     const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4, 0};
     assert(memcmp(counts, state.counts, sizeof counts) == 0);
+    check_guarded_roots(&io, &state);
     state.index = 0;
     state.stop = 73;
     assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 73);

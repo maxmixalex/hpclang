@@ -1297,6 +1297,14 @@ reproduces all 124 edits and 125 guards; only library 275 changes address.
 This completes the catalog portion of plan assembly, without native writes or
 claiming coverage of the other root classes.
 
+The native root enumerator now exposes read dependencies alongside source-tagged
+roots, including structural table fields. Host checks match the complete backend
+read trace and preserve callback failures without writes; sanitizers and ARM
+analysis pass. On HP49g+/HP50g saved registration states it preserves 457/458
+roots and records all 2,666/2,676 reads before/after registration. Bounded guard
+assembly, ARM-side root ownership and complete object-body traversal remain
+required before using this evidence for live relocation.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

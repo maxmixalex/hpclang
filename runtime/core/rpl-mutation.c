@@ -682,6 +682,51 @@ int hpclang_rpl_mutation_visit_root_sources(const struct hpclang_rpl_mutation_io
     return scan_all_references(io, &request);
 }
 
+struct guarded_root_scan
+{
+    const struct hpclang_rpl_mutation_io *io;
+    hpclang_rpl_root_dependency_fn dependency;
+    void *context;
+    int error;
+};
+
+static int guarded_root_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct guarded_root_scan *scan = context;
+    if (scan->error || !scan->io->read_nibble(scan->io->context, address, value))
+        return 0;
+    if (*value <= 15) {
+        scan->error = scan->dependency(scan->context, address, *value);
+        if (scan->error)
+            return 0;
+    }
+    return 1;
+}
+
+static int guarded_root_write(void *context, uint32_t address, uint8_t value)
+{
+    (void)context;
+    (void)address;
+    (void)value;
+    return 0;
+}
+
+int hpclang_rpl_mutation_visit_guarded_roots(const struct hpclang_rpl_mutation_io *io,
+                                             hpclang_rpl_root_source_visit_fn visit,
+                                             hpclang_rpl_root_dependency_fn dependency,
+                                             void *context)
+{
+    if (!io_ready(io) || !visit || !dependency)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    struct guarded_root_scan scan = {io, dependency, context, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.read_nibble = guarded_root_read;
+    observed.write_nibble = guarded_root_write;
+    observed.context = &scan;
+    int result = hpclang_rpl_mutation_visit_root_sources(&observed, visit, context);
+    return scan.error ? scan.error : result;
+}
+
 int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
                                      hpclang_rpl_root_visit_fn visit, void *context)
 {

@@ -102,6 +102,22 @@ extern "C"
                                                 hpclang_rpl_root_source_visit_fn visit,
                                                 void *context);
 
+    /* Report every valid native nibble read while enumerating the same roots,
+     * including table heads, lengths and traversal metadata. Repeated reads may
+     * repeat dependencies; the caller may coalesce them into bounded guards.
+     * Both callbacks are read-only and return zero to continue. Any error
+     * invalidates all partial roots/dependencies. No native write callback is
+     * forwarded. Keep mappings, IO configuration and ARM-side native_roots
+     * unchanged: those host values are not native nibble dependencies. Slot-zero
+     * roots still appear through visit and need caller-owned lifetime/guards.
+     * This supplies scan dependencies, not complete object-body references or
+     * permission to relocate data. */
+    typedef int (*hpclang_rpl_root_dependency_fn)(void *context, uint32_t address, uint8_t value);
+    int hpclang_rpl_mutation_visit_guarded_roots(const struct hpclang_rpl_mutation_io *io,
+                                                 hpclang_rpl_root_source_visit_fn visit,
+                                                 hpclang_rpl_root_dependency_fn dependency,
+                                                 void *context);
+
     /* Enumerate TEMP allocation payloads, newest first, after validating the
      * complete footer chain. Payloads can contain private execution data beyond
      * the first typed object's span; these are allocation bounds, not proof of

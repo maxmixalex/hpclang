@@ -402,6 +402,15 @@ edits, and incorporate all other native roots before committing any relocation.
 The catalog plan alone establishes neither complete reference coverage nor
 permission to return to Stock after moving data.
 
+`hpclang_rpl_mutation_visit_guarded_roots()` also reports every native nibble
+read during root enumeration, including stack/table boundaries and traversal
+metadata. Root provenance and order remain unchanged. The caller can coalesce
+these read dependencies into bounded guards; either callback failing invalidates
+all partial output. The adapter does not forward native writes. IO configuration,
+mapping identity and ARM-side root values still require caller-owned stability;
+they are not native-memory read dependencies. This traversal does not replace
+catalog bank resolution or object-body reference discovery.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
