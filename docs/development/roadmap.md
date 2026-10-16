@@ -1818,7 +1818,7 @@ and the existing physical event stream, with shared HP-byte mapping for native
 and HPG fallback fonts. Six-model host checks cover ordinary input, single/held
 Alpha, classic locks and one-shot lowercase, Enter/backspace, cancellation and
 poll failures. Font/HPG sanitizers and ARM analysis pass. HP39g+/HP50g Direct
-physical-key checks pass; Stock and wider E2E acceptance are pending. Interactive
+physical-key checks and HP50g Stock pass; wider E2E acceptance is pending. Interactive
 line editing and historical numeric-input/format policy remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),

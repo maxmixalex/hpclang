@@ -769,7 +769,7 @@ allows subsequent input. Unrepresentable Unicode reports `EILSEQ` instead of a
 silently substituted byte. This intentionally replaces the old hardcoded 49
 keyboard table. An explicit standard-stream binding bypasses the default read
 callback entirely. Six-model host mapping tests, font regressions, ARM analysis
-and HP39g+/HP50g Direct physical-key checks pass; Stock and wider E2E acceptance
+and HP39g+/HP50g Direct plus HP50g Stock physical-key checks pass; wider E2E acceptance
 of this new input path are pending. `fgets` can
 consume these bytes, but it does not implement an interactive line editor.
 

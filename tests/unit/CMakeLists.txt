@@ -109,6 +109,10 @@ target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
 target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_line test_hpgcc_line.c "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c")
+target_include_directories(test_hpgcc_line PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpgcc_input test_hpgcc_input.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-input.c"
     "${HPCLANG_ROOT}/runtime/core/input-mode.c"
