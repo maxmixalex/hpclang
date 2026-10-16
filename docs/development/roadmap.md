@@ -1320,6 +1320,16 @@ saved registration states, HOME plus 73/75 TEMP blocks produce exactly the same
 Read guards exactly cover observed cells. The ten opaque edges and external
 targets remain unresolved; these results do not close reference completeness.
 
+A controlled HP50g comparison now separates native library registration from
+ordinary application activity. Identical ARM payloads pass both lifecycle runs
+and return normally in both cases. Only the registration case adds library 123
+to the catalog and advances TEMP bottom by 16 nibbles. The 50- and 798-nibble
+hex-string objects change in the control case as well; the 50-nibble object's
+final contents are identical in both cases despite different native addresses.
+Thus paired payload differences alone do not identify relocation fields. These
+objects still require semantic classification; no raw-address scanning or
+reference-free assumption is accepted from this experiment.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
