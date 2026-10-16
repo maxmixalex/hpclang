@@ -770,7 +770,9 @@ silently substituted byte. This intentionally replaces the old hardcoded 49
 keyboard table. An explicit standard-stream binding bypasses the default read
 callback entirely. Six-model host mapping tests, font regressions, ARM analysis
 and HP39g+/HP50g Direct plus HP50g Stock physical-key checks pass; wider E2E acceptance
-of this new input path are pending. `fgets` can
+of this new input path are pending. HP39gs/HP48gII/HP49g+ Direct and HP48gII Stock
+also pass locally, as does the updated installed-SDK relocation/packaging gate.
+`fgets` can
 consume these bytes, but it does not implement an interactive line editor.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
