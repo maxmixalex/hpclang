@@ -205,8 +205,8 @@ Do not add an old HPGCC include directory ahead of the SDK headers or link its
 precompiled runtime libraries. This is source compatibility, not compatibility
 with the old library binaries, startup code or internal structure layouts.
 
-The SDK currently installs `hpgraphics.h`, `hpkeyb49.h`, `hpstdio.h`, `hpsys.h`,
-`hptime.h`, `saturn.h`, `satdir.h` and `fsystem.h`. Each exposes its implemented
+The SDK currently installs `hpgraphics.h`, `hpkeyb49.h`, `hpstdio.h`, `hpconio.h`,
+`hpstring.h`, `hpsys.h`, `hptime.h`, `saturn.h`, `satdir.h` and `fsystem.h`. Each exposes its implemented
 subset; the presence of a header does not promise every function from every
 HPGCC version. An umbrella `hpgcc49.h` is not provided. Replace that include
 with the individual headers needed by the application, then resolve remaining

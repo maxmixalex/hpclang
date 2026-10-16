@@ -187,9 +187,10 @@ through explicit Unicode insertion. It does not introduce a global terminal or c
 stdin/stdout behavior. The application chooses rendering, event polling and
 whether to retain a cancelled working line.
 
-The default `stdin` returns EOF and `stdout`/`stderr` discard output until an
-application explicitly binds them. The console/standard-stream extension below
-supplies that routing. Native text-plane mapping and the bounded keyboard
+Without a selected historical backend, `stdin` returns EOF and `stdout`/`stderr`
+discard output until an application explicitly binds them. Including `hpconio.h`
+selects the optional historical console; explicit bindings take precedence.
+The console/standard-stream extension below supplies that routing. Native text-plane mapping and the bounded keyboard
 line-input loop are accepted on `c7451364` and `41d75dec` respectively.
 File-backed `FILE *` support is unaffected.
 

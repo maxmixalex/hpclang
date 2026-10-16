@@ -403,8 +403,8 @@ file-backed stream implementation is not replaced.
 
 The owned console additionally exposes grid/cursor snapshots, zero-based cursor
 movement, row-tail erasure and configurable tab widths. These are prerequisites
-for historical `getx/gety`, `gotoxy/home`, `clreol` and tab controls, not yet their
-source aliases. Movement validates the destination before finishing pending
+for the historical `getx/gety`, `gotoxy/home`, `clreol` and tab controls now
+provided by `hpconio.h`. Movement validates the destination before finishing pending
 UTF-8; erasure does not wrap or scroll merely to erase the last column. Very
 large tab widths use work bounded by the visible grid. Historical global console
 selection, byte encoding and automatic presentation remain adapter responsibilities.
