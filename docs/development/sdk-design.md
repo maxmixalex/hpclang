@@ -332,9 +332,18 @@ the immediate-completion model for other scenarios.
 The fault helper also accepts a completed-bit mask for a pending operation:
 programming clears only selected requested bits, while erase sets only selected
 bits within the erase extent. Host tests exhaust all program masks and independently
-exercise shared replay after selected torn program/erase outcomes. This helper
-is not yet connected to a native power-cut scenario; neither these masks nor
-the host retry checks establish Stock startup behavior after a torn erase.
+exercise shared replay after selected torn program/erase outcomes.
+`--power-cut OPERATION READS BITS` terminates the emulator during the selected
+busy operation after the given number of status reads, applying the completed-bit
+mask and synchronously persisting Flash without normal emulator teardown.
+The runner requires the dedicated termination status, an exact operation record
+and an independent whole-Flash comparison before resetting Stock. It requires
+the partially restored bank to remain hidden, retries recovery and checks the
+final catalog as usual. The option can be repeated for consecutive failures;
+for example `--power-cut 2 16 0x5555 --power-cut 1 16 0x0101` first tears a
+program word and then tears the retry's erase, so the latter acts on nonempty
+Flash. Use a busy-read budget larger than the selected read count. These are
+explicit fault outcomes, not an exhaustive model of physical power loss.
 Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child

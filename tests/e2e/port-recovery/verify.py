@@ -2,6 +2,7 @@
 
 import argparse
 import configparser
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -35,6 +36,52 @@ def verify_flash(before, after, slot, target):
     expected[target : target + 4096] = record[24:4120]
     require(after == expected, "Flash differs from exactly the authorized sector replay")
     return record, before[target : target + 4096] == record[24:4120]
+
+
+def verify_power_cut(before_path, after_path, log_path, slot, target, cut):
+    before, after = before_path.read_bytes(), after_path.read_bytes()
+    record = before[slot : slot + 4124]
+    repaired = bytearray(before)
+    repaired[target : target + 4096] = record[24:4120]
+    verify_flash(before, repaired, slot, target)  # Validate journal independently first.
+    operation, reads, mask = cut
+    image = record[24:4120]
+    identity_offset = 0x100 if target % 0x20000 == 0 else 4096
+    writes = [
+        (target + i, int.from_bytes(image[i : i + 2], "little"))
+        for i in range(0, 4096, 2)
+        if i != identity_offset and image[i : i + 2] != b"\xff\xff"
+    ]
+    if identity_offset < 4096:
+        identity = int.from_bytes(image[identity_offset : identity_offset + 2], "little")
+        if identity != 0xFFFF:
+            writes.append((target + identity_offset, identity))
+    require(1 <= operation <= len(writes) + 1, "Cut operation outside replay")
+    expected = bytearray(before)
+    if operation == 1:
+        address, size, value = target, 4096, 0xFFFF
+        for i in range(4096):
+            expected[target + i] |= (mask >> (8 * (i % 2))) & 255
+    else:
+        expected[target : target + 4096] = b"\xff" * 4096
+        for address, value in writes[: operation - 2]:
+            expected[address : address + 2] = value.to_bytes(2, "little")
+        address, value = writes[operation - 2]
+        size = 2
+        partial = value | (mask ^ 0xFFFF)
+        expected[address : address + 2] = partial.to_bytes(2, "little")
+    events = re.findall(
+        r"^hpclang-flash-cut operation=(\d+) address=(\d+) bytes=(\d+) "
+        r"value=(\d+) mask=(\d+) reads=(\d+)$",
+        log_path.read_text(),
+        re.M,
+    )
+    require(len(events) == 1, "Expected exactly one native busy-operation cut")
+    require(
+        tuple(map(int, events[0])) == (operation, address, size, value, mask, reads),
+        "Native cut does not match requested replay operation",
+    )
+    require(after == expected, "Power-cut Flash differs from selected torn operation")
 
 
 def native_words(ram, flash):

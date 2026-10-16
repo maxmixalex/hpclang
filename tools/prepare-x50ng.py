@@ -117,7 +117,7 @@ def patch_flash_busy(root: Path) -> None:
     replace_once(
         path,
         "    uint32_t offset;",
-        "    uint32_t offset;\n    uint32_t busy_reads;\n    uint64_t busy_operations, busy_status_reads;\n    struct hpclang_flash_busy pending;",
+        "    uint32_t offset;\n    uint32_t busy_reads, cut_after_reads;\n    uint16_t cut_bits;\n    uint64_t cut_operation, busy_operations, busy_status_reads;\n    struct hpclang_flash_busy pending;",
         "Flash pending operation",
     )
     replace_once(
@@ -139,6 +139,21 @@ static uint32_t flash_get_halfword""",
         path,
         "    switch ( flash->state ) {",
         """    if ( flash->state == FLASH_STATE_BUSY ) {
+        if ( flash->cut_operation == flash->busy_operations &&
+             flash->busy_reads - flash->pending.reads == flash->cut_after_reads ) {
+            struct hpclang_flash_busy interrupted = flash->pending;
+            hpclang_flash_busy_power_loss( &flash->pending, datap, flash->cut_bits );
+            if ( msync( flash->data, flash->size, MS_SYNC ) || fsync( flash->fd ) ) {
+                perror( "persist interrupted Flash" );
+                _exit( 85 );
+            }
+            fprintf( stderr, "hpclang-flash-cut operation=%llu address=%u bytes=%u value=%u mask=%u reads=%u\\n",
+                     (unsigned long long)flash->busy_operations, interrupted.address,
+                     interrupted.bytes, interrupted.value, flash->cut_bits, flash->cut_after_reads );
+            fflush( stderr );
+            /* Deliberately bypass normal emulator teardown/state saving. */
+            _exit( 86 );
+        }
         if ( flash->pending.reads )
             ++flash->busy_status_reads;
         data = hpclang_flash_busy_read( &flash->pending, datap, offset );
@@ -195,6 +210,29 @@ static uint32_t flash_get_halfword""",
             return -1;
         }
         flash->busy_reads = (uint32_t)reads;
+    }
+    const char* cut_text = getenv( "HPCLANG_X50NG_FLASH_POWER_CUT" );
+    if ( cut_text ) {
+        char* end;
+        errno = 0;
+        unsigned long long operation = strtoull( cut_text, &end, 10 );
+        int valid = !errno && *cut_text >= '1' && *cut_text <= '9' && *end == ':';
+        const char* reads_text = valid ? end + 1 : "";
+        errno = 0;
+        unsigned long reads = strtoul( reads_text, &end, 10 );
+        valid = valid && !errno && *reads_text >= '0' && *reads_text <= '9' && *end == ':';
+        const char* bits_text = valid ? end + 1 : "";
+        errno = 0;
+        unsigned long bits = strtoul( bits_text, &end, 16 );
+        valid = valid && !errno && end != bits_text && *bits_text != '-' && *end == 0;
+        if ( !valid || !operation || !reads || reads >= flash->busy_reads || bits > 0xffff ) {
+            fprintf( stderr, "invalid HPCLANG_X50NG_FLASH_POWER_CUT\\n" );
+            free( flash );
+            return -1;
+        }
+        flash->cut_operation = operation;
+        flash->cut_after_reads = reads;
+        flash->cut_bits = (uint16_t)bits;
     }
     flash->vendor_ID = SST29VF160_VENDOR_ID;""",
         "Flash busy latency selection",

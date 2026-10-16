@@ -75,6 +75,52 @@ class RecoveryVerifierTests(unittest.TestCase):
                 VERIFY.verify_flash(before, after, slot, target)
 
 
+class RecoveryPowerCutTests(unittest.TestCase):
+    def setUp(self):
+        RecoveryVerifierTests.setUp(self)
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.paths = [root / name for name in ("before", "after", "log")]
+
+    def check(self, before, after, event, cut):
+        self.paths[0].write_bytes(before)
+        self.paths[1].write_bytes(after)
+        self.paths[2].write_text(event)
+        VERIFY.verify_power_cut(*self.paths, self.slot, self.target, cut)
+
+    def test_partial_first_program_and_evidence_rejections(self):
+        # First requested word is 0x0100. Completing alternating bits leaves
+        # 0xABAA; the identity and every other sector byte remain erased.
+        torn = self.before.copy()
+        torn[self.target : self.target + 2] = bytes.fromhex("aaab")
+        event = f"hpclang-flash-cut operation=2 address={self.target} bytes=2 value=256 mask=21845 reads=16\n"
+        self.check(self.before, torn, event, (2, 16, 0x5555))
+        for invalid in (
+            "",
+            event + event,
+            event.replace("reads=16", "reads=15"),
+            event.replace("value=256", "value=257"),
+        ):
+            with self.assertRaises(ValueError):
+                self.check(self.before, torn, invalid, (2, 16, 0x5555))
+        for address in (0, self.target, self.target + 0x100, self.slot, len(torn) - 1):
+            changed = torn.copy()
+            changed[address] ^= 1
+            with self.assertRaises(ValueError):
+                self.check(self.before, changed, event, (2, 16, 0x5555))
+
+    def test_partial_erase_preserves_unselected_bits(self):
+        before = self.before.copy()
+        before[self.target : self.target + 4096] = b"\x10\x20" * 2048
+        after = before.copy()
+        after[self.target : self.target + 4096] = b"\x55\x75" * 2048
+        event = f"hpclang-flash-cut operation=1 address={self.target} bytes=4096 value=65535 mask=21845 reads=16\n"
+        self.check(before, after, event, (1, 16, 0x5555))
+        with self.assertRaises(ValueError):
+            self.check(before, self.before, event, (1, 16, 0x5555))
+
+
 class RecoveryInterruptionTests(unittest.TestCase):
     def setUp(self):
         RecoveryVerifierTests.setUp(self)

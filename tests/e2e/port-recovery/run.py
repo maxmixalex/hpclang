@@ -14,7 +14,7 @@ import time
 from types import SimpleNamespace
 
 from prepare import prepare
-from verify import verify, verify_interruption, verify_restart
+from verify import verify, verify_interruption, verify_restart, verify_power_cut
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -46,7 +46,7 @@ def wait_for(predicate, children, timeout, description):
         time.sleep(0.1)
 
 
-def emulator(args, phase, sequence, extra=(), usb=None):
+def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None):
     phase.mkdir(parents=True, exist_ok=True)
     seq = phase / "sequence.seq"
     seq.write_text(sequence)
@@ -69,6 +69,9 @@ def emulator(args, phase, sequence, extra=(), usb=None):
         env["HPCLANG_E2E_HOST_GATE_FILE"] = str(phase / "complete")
         if args.flash_busy_reads:
             env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
+        if power_cut is not None:
+            operation, reads, mask = power_cut
+            env["HPCLANG_X50NG_FLASH_POWER_CUT"] = f"{operation}:{reads}:{mask:x}"
     command = [
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),
@@ -84,7 +87,7 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
-def transfer(args, recovery, source, build, name):
+def transfer(args, recovery, source, build, name, power_cut=None):
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
@@ -111,7 +114,7 @@ def transfer(args, recovery, source, build, name):
         recovery / "socat.log",
     ) as bridge:
         wait_for(lambda: xtty.exists() and ktty.exists(), [bridge], 10, "PTY creation")
-        with emulator(args, recovery, sequence, usb=xtty) as child:
+        with emulator(args, recovery, sequence, usb=xtty, power_cut=power_cut) as child:
             wait_for(
                 lambda: (recovery / "stock-server-usb.pgm").exists(),
                 [bridge, child],
@@ -140,9 +143,12 @@ def transfer(args, recovery, source, build, name):
                 if sender.wait():
                     raise RuntimeError("Recovery transfer failed; inspect transfer.log")
             (recovery / "complete").touch()
-            completed(child, 90)
+            if power_cut is None:
+                completed(child, 90)
+            elif child.wait(timeout=90) != 86:
+                raise RuntimeError("Emulator did not terminate at the requested Flash power cut")
 
-    if args.flash_busy_reads:
+    if args.flash_busy_reads and power_cut is None:
         state = configparser.ConfigParser()
         state.read(recovery / "state/state")
         evidence = state["flash"]
@@ -188,6 +194,31 @@ def run(args):
     if (reset / "state/flash").read_bytes() != damaged:
         raise RuntimeError("Hardware reset changed the injected Flash state")
     print("Fault prepared and hardware reset complete", flush=True)
+
+    for cut_index, power_cut in enumerate(args.power_cut or []):
+        interrupted = args.output / f"power-cut-{cut_index}"
+        transfer(args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut)
+        verify_power_cut(
+            reset / "state/flash",
+            interrupted / "state/flash",
+            interrupted / "emulator.log",
+            args.slot,
+            args.target,
+            power_cut,
+        )
+        resume = args.output / f"power-resume-{cut_index}"
+        resume.mkdir()
+        shutil.copytree(interrupted / "state", resume / "state")
+        with emulator(
+            args, resume, "10000 capture home\n12000 finish-install\n", ["--reset"]
+        ) as child:
+            completed(child, 90)
+        verify_restart(reset / "state", interrupted / "state", resume / "state")
+        reset = resume
+        print(
+            "Busy-operation power cut verified; Stock restarted with partial bank hidden",
+            flush=True,
+        )
 
     if args.interrupted_build is not None:
         interrupted = args.output / "interrupted"
@@ -255,6 +286,7 @@ def run(args):
                 "restored_catalog_entries": catalog_entries,
                 "interrupted_before_identity": args.interrupted_build is not None,
                 "flash_busy_reads": args.flash_busy_reads,
+                "power_cut": args.power_cut,
             },
             indent=2,
         )
@@ -288,10 +320,27 @@ def main():
         help="deterministic status reads per Flash operation; zero disables",
     )
     parser.add_argument("--slot", type=lambda value: int(value, 0), default=0x160105)
+    parser.add_argument(
+        "--power-cut",
+        action="append",
+        nargs=3,
+        type=lambda value: int(value, 0),
+        metavar=("OPERATION", "READS", "BITS"),
+        help="terminate during a busy operation with selected completed bits; repeat for consecutive cuts",
+    )
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
     args = parser.parse_args()
     if not 0 <= args.flash_busy_reads <= 0xFFFFFFFF:
         parser.error("--flash-busy-reads must fit an unsigned 32-bit counter")
+    for operation, reads, bits in args.power_cut or []:
+        if not (
+            1 <= operation <= 0xFFFFFFFFFFFFFFFF
+            and 0 < reads < args.flash_busy_reads
+            and 0 <= bits <= 0xFFFF
+        ):
+            parser.error(
+                "power cut needs a positive operation, reads within the busy interval and 16-bit mask"
+            )
     args.profile = json.loads((ROOT / "tests/e2e/targets" / (args.model + ".json")).read_text())
     args.dist, args.build, args.output = (
         path.resolve() for path in (args.dist, args.build, args.output)
