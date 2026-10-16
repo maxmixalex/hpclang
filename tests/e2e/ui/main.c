@@ -1,4 +1,5 @@
 #include "app.h"
+#include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/time.h>
@@ -11,7 +12,27 @@ volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_ui_witness[5];
 /* Maximum elapsed microseconds and sample counts, excluding host handshakes. */
 volatile uint32_t hpclang_ui_update_witness[4];
+/* Allocator-reserved heap high-water bytes; excludes static data and stack. */
+volatile uint32_t hpclang_ui_heap_witness[2];
 static unsigned key_failure;
+
+extern unsigned char __bss_end[];
+extern void *__real_sbrk(intptr_t increment);
+
+void *__wrap_sbrk(intptr_t increment)
+{
+    void *previous = __real_sbrk(increment);
+    if (previous != (void *)-1) {
+        uintptr_t end = (uintptr_t)previous + (uintptr_t)increment;
+        uint32_t used = (uint32_t)(end - (uintptr_t)__bss_end);
+        if (used > hpclang_ui_heap_witness[0])
+            hpclang_ui_heap_witness[0] = used;
+        const struct hpclang_boot_info *boot = hpclang_boot_info();
+        hpclang_ui_heap_witness[1] = (uint32_t)(HPCLANG_BOOT_BASE + boot->rw_bytes -
+                                                HPCLANG_STACK_MIN - (uintptr_t)__bss_end);
+    }
+    return previous;
+}
 
 static void elapsed(unsigned slot, uint64_t start)
 {
@@ -251,6 +272,9 @@ int main(void)
     unsigned failure = hpclang_cpp_ui_test();
     if (!failure)
         failure = checks();
+    if (!failure &&
+        (!hpclang_ui_heap_witness[0] || hpclang_ui_heap_witness[0] > hpclang_ui_heap_witness[1]))
+        failure = 0x1901;
     struct hpclang_surface *screen = hpclang_display_surface();
     hpclang_surface_clear(screen, 0);
     char line[48];
@@ -269,6 +293,9 @@ int main(void)
     snprintf(line, sizeof(line), "SAMPLES %lu %lu", (unsigned long)hpclang_ui_update_witness[2],
              (unsigned long)hpclang_ui_update_witness[3]);
     hpclang_surface_draw_text(screen, &demo_font, 0, 40, line, 255);
+    snprintf(line, sizeof(line), "HEAP %lu/%lu", (unsigned long)hpclang_ui_heap_witness[0],
+             (unsigned long)hpclang_ui_heap_witness[1]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 48, line, 255);
     hpclang_surface_draw_text(screen, &demo_font, 20, 32, failure ? "UI FAIL" : "UI PASS", 255);
     hpclang_e2e_result = failure ? 0x46410000u | failure : 0x50415353u;
     if (failure)

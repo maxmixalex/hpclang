@@ -353,6 +353,16 @@ the launcher's read/write arena size, not measured peak heap consumption; the
 Direct launcher supplies a larger arena than Stock. The extended font/theme
 matrix also passes on all six Stock models.
 
+The E2E `HEAP used/capacity` line measures the maximum heap extent requested
+through `sbrk()` during the complete C++ and C flows, including renderer and
+font changes. The test wraps the allocator boundary without changing the SDK
+allocator. `used` includes allocator bookkeeping and retained free blocks;
+it is not the sum of live application allocations. `capacity` is the space
+between the end of static data and the reserved stack boundary. Neither value
+measures stack high-water usage or separately allocated LCD DMA pages. A local
+HP39g+ Direct run reports 18,892 bytes used out of 293,320; that larger Direct
+arena does not establish the smallest Stock memory budget.
+
 The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
 with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,
 layout, commit, rendering, surface copying and display publication at each
