@@ -1246,6 +1246,13 @@ static analysis pass. Core builds normal/interrupted packages and runs this
 scenario for both models; remote acceptance is pending. This covers a command
 boundary, not power loss during an erase/program pulse.
 
+The recovery matrix additionally enables deterministic Flash busy intervals:
+each program/erase requires 64 status reads before changing the array. Saved
+operation/read counts must prove the busy path ran and completed. Unit tests
+cover status toggling, deferred writes/erases, cancellation and bounds. This
+checks native polling without claiming physical pulse timing or partial-cell
+power-loss coverage; that coverage remains open.
+
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn
 fields; sanitizers and ARM analysis pass. Against the native PACK capture, the

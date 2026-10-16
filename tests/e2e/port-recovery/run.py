@@ -1,6 +1,7 @@
 """Run independent HP49g+/HP50g recovery from fresh Stock and explicit fault injection."""
 
 import argparse
+import configparser
 from contextlib import contextmanager
 import json
 import os
@@ -66,6 +67,8 @@ def emulator(args, phase, sequence, extra=(), usb=None):
     if usb is not None:
         env["HPCLANG_X50NG_USB0"] = str(usb)
         env["HPCLANG_E2E_HOST_GATE_FILE"] = str(phase / "complete")
+        if args.flash_busy_reads:
+            env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
     command = [
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),
@@ -138,6 +141,19 @@ def transfer(args, recovery, source, build, name):
                     raise RuntimeError("Recovery transfer failed; inspect transfer.log")
             (recovery / "complete").touch()
             completed(child, 90)
+
+    if args.flash_busy_reads:
+        state = configparser.ConfigParser()
+        state.read(recovery / "state/state")
+        evidence = state["flash"]
+        operations = evidence.getint("busy-operations")
+        if (
+            evidence.getint("busy-read-budget") != args.flash_busy_reads
+            or operations <= 0
+            or evidence.getint("busy-status-reads") != operations * args.flash_busy_reads
+            or evidence.getboolean("busy-active")
+        ):
+            raise RuntimeError("Missing/incomplete Flash busy-state execution evidence")
 
 
 def run(args):
@@ -238,6 +254,7 @@ def run(args):
                 "target": args.target,
                 "restored_catalog_entries": catalog_entries,
                 "interrupted_before_identity": args.interrupted_build is not None,
+                "flash_busy_reads": args.flash_busy_reads,
             },
             indent=2,
         )
@@ -264,9 +281,17 @@ def main():
         help="optional witness built with HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY",
     )
     parser.add_argument("--nm", default="llvm-nm")
+    parser.add_argument(
+        "--flash-busy-reads",
+        type=int,
+        default=0,
+        help="deterministic status reads per Flash operation; zero disables",
+    )
     parser.add_argument("--slot", type=lambda value: int(value, 0), default=0x160105)
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
     args = parser.parse_args()
+    if not 0 <= args.flash_busy_reads <= 0xFFFFFFFF:
+        parser.error("--flash-busy-reads must fit an unsigned 32-bit counter")
     args.profile = json.loads((ROOT / "tests/e2e/targets" / (args.model + ".json")).read_text())
     args.dist, args.build, args.output = (
         path.resolve() for path in (args.dist, args.build, args.output)

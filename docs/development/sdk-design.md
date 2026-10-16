@@ -321,6 +321,14 @@ uploads the normal witness under a different name and retries recovery, retainin
 both program objects. Core exercises this path on both supported models. This
 is interruption between completed Flash commands, not a simulated busy-chip
 power loss.
+The optional `--flash-busy-reads N` delays each program/erase operation by
+`N` status reads. During that interval the emulator toggles DQ6, reports DQ7
+status and ignores command writes; the array changes only at completion. The
+runner requires saved operation/read counters and no pending operation after
+each transfer, so an emulator that ignores the option cannot pass silently.
+This deterministic polling model does not represent physical pulse duration
+or partially programmed cells after power loss. The default zero preserves
+the immediate-completion model for other scenarios.
 Core's **Stock recovery** matrix uses the shared portable x50ng setup and
 Kermit watchdog, and retains phase logs, screenshots and saved states. The runner
 requires a new output directory to prevent stale evidence, reaps its child

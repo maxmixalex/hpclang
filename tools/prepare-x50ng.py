@@ -98,6 +98,127 @@ def patch_universal_flash(root: Path) -> None:
     )
 
 
+def patch_flash_busy(root: Path) -> None:
+    support = Path(__file__).resolve().parents[1] / "tests/e2e/harness/x50ng/flash-busy.h"
+    shutil.copyfile(support, root / "src/flash-busy.h")
+    path = root / "src/flash.c"
+    replace_once(
+        path,
+        '#include "options.h"',
+        '#include "options.h"\n#include "flash-busy.h"\n#include <limits.h>',
+        "Flash busy helper",
+    )
+    replace_once(
+        path,
+        "#define FLASH_STATE_WORD_PROG 12",
+        "#define FLASH_STATE_WORD_PROG 12\n#define FLASH_STATE_BUSY 13",
+        "Flash busy state",
+    )
+    replace_once(
+        path,
+        "    uint32_t offset;",
+        "    uint32_t offset;\n    uint32_t busy_reads;\n    uint64_t busy_operations, busy_status_reads;\n    struct hpclang_flash_busy pending;",
+        "Flash pending operation",
+    )
+    replace_once(
+        path,
+        "static uint32_t flash_get_halfword",
+        """static int flash_start_busy( hdw_flash_t* flash, uint32_t address, uint32_t bytes, uint16_t value )
+{
+    if ( !hpclang_flash_busy_start( &flash->pending, SST29VF160_SIZE, address, bytes, value, flash->busy_reads ) )
+        return 0;
+    flash->state = FLASH_STATE_BUSY;
+    ++flash->busy_operations;
+    return 1;
+}
+
+static uint32_t flash_get_halfword""",
+        "Flash busy scheduling",
+    )
+    replace_once(
+        path,
+        "    switch ( flash->state ) {",
+        """    if ( flash->state == FLASH_STATE_BUSY ) {
+        if ( flash->pending.reads )
+            ++flash->busy_status_reads;
+        data = hpclang_flash_busy_read( &flash->pending, datap, offset );
+        if ( !flash->pending.bytes )
+            flash_state_reset( flash );
+        return data;
+    }
+
+    switch ( flash->state ) {""",
+        "Flash busy status reads",
+    )
+    replace_once(
+        path,
+        "    data &= 0xffff;",
+        "    if ( flash->state == FLASH_STATE_BUSY )\n        return; /* Commands cannot abort an active program/erase. */\n\n    data &= 0xffff;",
+        "Flash busy command exclusion",
+    )
+    replace_once(
+        path,
+        "        case FLASH_STATE_WORD_PROG:\n",
+        "        case FLASH_STATE_WORD_PROG:\n            if ( flash_start_busy( flash, offset, 2, (uint16_t)data ) )\n                return;\n",
+        "Deferred Flash programming",
+    )
+    for command, address, size in (
+        ("0x10: /* Chip Erase */", "0", "SST29VF160_SIZE"),
+        ("0x30: /* Sector Erase */", "offset & ~( flash->sector_size - 1 )", "flash->sector_size"),
+        ("0x50: /* Block Erase */", "offset & ~( flash->block_size - 1 )", "flash->block_size"),
+    ):
+        anchor = "                case " + command + "\n"
+        replace_once(
+            path,
+            anchor,
+            anchor
+            + f"                    if ( flash_start_busy( flash, {address}, {size}, 0xffff ) )\n                        return;\n",
+            "Deferred Flash erase",
+        )
+    replace_once(
+        path,
+        "    flash_state_reset( flash );\n    return 0;\n}\n\nstatic CPUReadMemoryFunc*",
+        "    hpclang_flash_busy_cancel( &flash->pending );\n    flash_state_reset( flash );\n    return 0;\n}\n\nstatic CPUReadMemoryFunc*",
+        "Reset pending Flash controller state",
+    )
+    replace_once(
+        path,
+        "    flash->vendor_ID = SST29VF160_VENDOR_ID;",
+        """    const char* busy_text = getenv( "HPCLANG_X50NG_FLASH_BUSY_READS" );
+    if ( busy_text ) {
+        char* end;
+        errno = 0;
+        unsigned long reads = strtoul( busy_text, &end, 10 );
+        if ( errno || end == busy_text || *end || *busy_text == '-' || reads > UINT_MAX ) {
+            fprintf( stderr, "invalid HPCLANG_X50NG_FLASH_BUSY_READS\\n" );
+            free( flash );
+            return -1;
+        }
+        flash->busy_reads = (uint32_t)reads;
+    }
+    flash->vendor_ID = SST29VF160_VENDOR_ID;""",
+        "Flash busy latency selection",
+    )
+    replace_once(
+        root / "Makefile",
+        "%.o: %.c",
+        "src/flash.o: src/flash-busy.h\n\n%.o: %.c",
+        "Flash busy helper dependency",
+    )
+    replace_once(
+        path,
+        '    module_set_filename( module, key, "filename", flash->filename );',
+        """    module_set_filename( module, key, "filename", flash->filename );
+    if ( flash->busy_reads ) {
+        g_key_file_set_uint64( key, module->name, "busy-read-budget", flash->busy_reads );
+        g_key_file_set_uint64( key, module->name, "busy-operations", flash->busy_operations );
+        g_key_file_set_uint64( key, module->name, "busy-status-reads", flash->busy_status_reads );
+        g_key_file_set_boolean( key, module->name, "busy-active", flash->pending.bytes != 0 );
+    }""",
+        "Flash busy execution evidence",
+    )
+
+
 def patch_runtime_sram(root: Path) -> None:
     path = root / "src" / "sram.c"
 
@@ -1131,6 +1252,7 @@ def main() -> None:
     patch_execution_clock(root, args)
     verify_ui_build_inheritance(root)
     patch_universal_flash(root)
+    patch_flash_busy(root)
     patch_directory_order(root, args)
     patch_runtime_sram(root)
     patch_host_usbdev(root, args)
