@@ -7,6 +7,31 @@
 #include <hpclang/font-package.h>
 #include "display-surface.h"
 #include "hpg-internal.h"
+#define HPCLANG_HPCONIO_NO_AUTOINIT
+#include <hpconio.h>
+#include <hpclang/sound.h>
+#include <hpclang/stdio.h>
+#include "stdio-routing.h"
+
+uint32_t hpclang_font_advance(const struct hpclang_font *font)
+{
+    return font ? 4 : 0;
+}
+uint32_t hpclang_font_height(const struct hpclang_font *font)
+{
+    return font ? 6 : 0;
+}
+void hpclang_stdio_clear_streams(void)
+{
+}
+static unsigned tones;
+int hpclang_sound_play(uint32_t frequency, uint32_t duration, hpclang_sound_cancel_fn cancel,
+                       void *context)
+{
+    assert(frequency == 880 && duration == 100 && !cancel && !context);
+    ++tones;
+    return 0;
+}
 
 /* Distinct font providers let this test observe adapter selection and HP-byte
  * translation independently of the clean font renderer's own raster tests. */
@@ -131,6 +156,7 @@ static unsigned borrowed;
 static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
+static unsigned display_height = 6;
 static int configure(unsigned levels, unsigned count)
 {
     if (mode_failure) {
@@ -139,7 +165,7 @@ static int configure(unsigned levels, unsigned count)
     }
     for (unsigned i = 0; i < 2; ++i) {
         hpclang_surface_destroy(pages[i]);
-        pages[i] = i < count ? hpclang_surface_create(9, 6, levels) : NULL;
+        pages[i] = i < count ? hpclang_surface_create(9, display_height, levels) : NULL;
         assert(i >= count || pages[i]);
         if (pages[i])
             pages[i]->width = 8;
@@ -319,6 +345,67 @@ static void shared_screen(void)
     assert(ended == previous_end && page_count == 2 && hpclang_display_surface() == page);
     assert(hpclang_surface_get_pixel(page, 3, 3) == 170);
     hpclang_display_end();
+}
+
+static void historical_console(void)
+{
+    struct hpclang_surface *saved_display = display;
+    display_height = 18;
+    display = hpclang_surface_create_mono(9, display_height);
+    assert(display);
+    display->width = 8;
+    unsigned previous_borrowed = borrowed;
+    assert(hpclang_hpgcc_console_enable() == 0);
+    assert(hpclang_hpgcc_console_enable() == 0 && borrowed == previous_borrowed && !page_count);
+    assert(hpclang_stdio_route_flush(1) == 0 && borrowed == previous_borrowed);
+    assert(hpclang_display_begin_pages(2, 2) == 0);
+    assert(hpclang_stdio_route_write(1, 'A') == -1 && errno == EBUSY);
+    hpg_cleanup();
+    assert(page_count == 2);
+    hpclang_display_end();
+    assert(screen_width() == 2 && screen_height() == 3);
+    _clear_screen();
+    struct hpclang_surface *s = hpclang_display_surface();
+    hpclang_surface_set_pixel(s, 7, 5, 255);
+    assert(hpclang_stdio_route_write(1, 'A') == 0);
+    assert(getx() == 1 && gety() == 0);
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* unrelated graphics preserved */
+    home();
+    assert(hpclang_stdio_route_write(2, 0x87) == 0 && drawn_code == 0x3c0);
+    clreol();
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 0);
+    gotoxy(-1, 0);
+    assert(errno == EINVAL && getx() == 1);
+    gotoxy(2, 0);
+    assert(errno == EINVAL && getx() == 1);
+    gotoxy(1, 2);
+    hpclang_surface_set_pixel(s, 7, 11, 255);
+    assert(hpclang_stdio_route_write(1, 'B') == 0); /* immediate wrap/scroll */
+    assert(getx() == 0 && gety() == 2 && hpclang_surface_get_pixel(s, 0, 0) == 0);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* graphics scroll with text */
+    set_tabsize(INT_MAX);
+    assert(get_tabsize() == INT_MAX);
+    assert(hpclang_stdio_route_write(1, '\t') == 0 && getx() == 1);
+    set_tabsize(0);
+    assert(errno == EINVAL && get_tabsize() == INT_MAX);
+    set_tabsize(4);
+    assert(hpclang_stdio_route_write(1, '\t') == 0 && getx() == 0);
+    assert(hpclang_stdio_route_write(1, 7) == 0 && tones == 1);
+    beep();
+    assert(tones == 2);
+    hpg_set_mode_gray16(1);
+    unsigned previous_publish = published, previous_flips = flips;
+    assert(hpclang_stdio_route_write(1, 'A') == 0);
+    assert(published == previous_publish && flips == previous_flips);
+    assert(hpclang_surface_levels(hpclang_display_surface()) == 16);
+    hpg_flip();
+    assert(flips == previous_flips + 1);
+    hpg_cleanup();
+    hpclang_surface_destroy(display);
+    display = saved_display;
+    display_height = 6;
 }
 
 static void copies(void)
@@ -513,6 +600,7 @@ int main(void)
     modes();
     indicators();
     shared_screen();
+    historical_console();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

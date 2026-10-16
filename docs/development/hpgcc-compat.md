@@ -727,6 +727,37 @@ passes all six Direct and all six Stock targets with independent report pixel
 verification and normal Stock return. The relocated installed-SDK build also
 passes with the calendar example; Runtime and Quality CI are accepted on `c2fb66fe`.
 
+### Historical console output
+
+Including `hpconio.h` selects a lazy default output backend for `printf`, `puts`,
+`putchar` and other standard-stream writes. Header initialization registers the
+backend without allocating a console or acquiring the LCD. An explicit
+`hpclang_stdio_bind` takes precedence as a whole; unbinding resumes the default.
+`hpstdio.h` alone retains its existing file/standard-C interface and does not
+select a display backend. Define `HPCLANG_HPCONIO_NO_AUTOINIT` before including
+`hpconio.h` to opt out of automatic registration, then call
+`hpclang_hpgcc_console_enable()` when appropriate.
+
+The output group adds `home`, `getx/gety`, `gotoxy`, `clreol`, `_clear_screen`,
+`screen_width/height`, `get/set_tabsize` and `beep`. Coordinates are zero-based;
+queries return `-1` on failure, and void calls report errors through errno.
+Invalid coordinates and nonpositive tab widths are rejected. Tabs advance to
+the next configured stop without reproducing the historical modulo bug; very
+large widths take bounded work. Output uses calculator byte glyph IDs, including
+0x80–0x9f, with the existing HPG 4×6 native/fallback font policy. It is not UTF-8.
+Geometry fits complete cells within the visible display (32 columns on the
+current 131-pixel targets), avoiding the old partial cell/status-column overlap.
+
+Text and HPG share a display lease. Individual characters preserve surrounding
+graphics, and scrolling moves graphics together with text. Output wraps
+immediately at the final column, including scrolling after the last screen cell.
+Single-buffer output publishes immediately; HPG double-buffer modes still need
+`hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
+cleanup restores the borrowed display. The header does not yet implement the
+historical blocking input, integer-string or decimal-format groups; these remain
+M8 work. Host sanitizer coverage is available; native/installed-SDK acceptance
+of this output group is pending.
+
 ### Historical tones and packed BCD
 
 `hpsys.h` supplies `sys_playTone2(frequency_hz, duration_ms)` and

@@ -27,11 +27,15 @@ extern "C"
      * then, or unbind before leaving its scope. _Exit skips this flushing.
      * One binding at a time: EBUSY rather than silently replacing another owner.
      * Clears standard-stream EOF/error flags and pushback on success. Single-threaded/IRQ-unsafe.
-     * Default streams discard output and return EOF. Return 0 or -1/errno. */
+     * Default streams discard output and return EOF unless an optional historical
+     * console backend was selected by hpconio.h. An explicit binding overrides
+     * that entire backend, including callbacks omitted by the application.
+     * Return 0 or -1/errno. */
     int hpclang_stdio_bind(const struct hpclang_stdio_callbacks *callbacks);
     /* Flush both outputs, always detach, then clear EOF/errors. Returns first flush
      * failure, or 0; idempotent when unbound. Reentrant unbind fails with EBUSY and
-     * leaves the binding intact. Unbind before freeing context or a bound console. */
+     * leaves the binding intact. Unbind resumes any selected historical default.
+     * Unbind before freeing context or a bound console. */
     int hpclang_stdio_unbind(void);
 #ifdef __cplusplus
 }

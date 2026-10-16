@@ -15,4 +15,7 @@ struct hpclang_console *hpclang_console_create_cells(unsigned columns, unsigned 
 /* Historical calculator-byte text: 0x20..0xff are glyph IDs, including C1
  * bytes; lower controls use the console policy. Finish pending UTF-8 first. */
 int hpclang_console_write_byte(struct hpclang_console *console, unsigned char byte);
+/* Paint one cell at its grid position without repainting neighbouring graphics. */
+int hpclang_console_render_cell(struct hpclang_console *console,
+                                struct hpclang_surface *destination, unsigned column, unsigned row);
 #endif

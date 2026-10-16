@@ -1793,9 +1793,18 @@ end of line and configurable tab stops. Tab expansion is bounded by the grid
 size even for `UINT_MAX`; controls preserve the documented incremental UTF-8
 behavior. Sanitizer tests and ARM analysis pass. Direct and Stock acceptance
 passes locally on HP39g+, HP48gII and HP50g, including independent LCD checks
-and normal return. These are prerequisites for historical console adapters;
-implicit standard-stream binding, byte encoding and shared HPG display
-ownership still need implementation and acceptance.
+and normal return. These are prerequisites for the historical console adapter
+below, whose default streams, byte encoding and HPG ownership need their own
+integration acceptance.
+
+The next local output adapter supplies `hpconio.h` registration, cursor/clear/tab
+spellings and calculator-byte standard output on HPG's shared display lease.
+It preserves surrounding graphics and scrolls them with text, honors explicit
+stdio owners, and keeps HPG double-buffer publication explicit. Host sanitizer
+tests, ARM static analysis and Direct LCD checks on HP39g+, HP48gII and HP50g
+pass. HP48gII and HP50g Stock LCD checks also pass; HP39g+ Stock and installed-SDK
+acceptance are pending. Historical input and
+numeric formatting remain open, so this does not close the console group.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.

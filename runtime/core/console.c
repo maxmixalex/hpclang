@@ -250,6 +250,22 @@ int hpclang_console_cell(const struct hpclang_console *c, unsigned column, unsig
     return 0;
 }
 
+int hpclang_console_render_cell(struct hpclang_console *c, struct hpclang_surface *destination,
+                                unsigned column, unsigned row)
+{
+    uint32_t cp;
+    if (!destination || hpclang_console_cell(c, column, row, &cp)) {
+        errno = EINVAL;
+        return -1;
+    }
+    hpclang_surface_clear(c->glyph, 0);
+    if (cp != ' ')
+        c->draw(c->glyph, c->context, cp);
+    hpclang_surface_blit(destination, (int32_t)(column * c->width), (int32_t)(row * c->height),
+                         c->glyph, 0, 0, (int32_t)c->width, (int32_t)c->height);
+    return 0;
+}
+
 int hpclang_console_render(struct hpclang_console *c, struct hpclang_surface *destination,
                            int32_t x, int32_t y)
 {
