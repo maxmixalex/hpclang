@@ -1309,6 +1309,19 @@ the earlier library runs twice across fault recovery and its internal restart;
 the later library runs once. Both finish with exact recovery and all 63 catalog
 entries. Selecting the lowest documented user ID is therefore insufficient to
 guarantee safe production startup ordering.
+HP49g+ and HP50g Stock dependency probes make that ordering failure observable: a RAM
+library 768 configuration appends a marker, recalls the real Port 2 EQLIB library
+226 and then appends a completion marker. After erasing the journaled bank-header
+sector, recovery library 769 is never reached: the dependent configuration
+repeatedly enters without completing (54 entries in each observation), Flash
+remains byte-for-byte unchanged and both journal and authority remain armed.
+With research-only recovery ID 4, the same dependency completes after
+exact sector repair; all 63 catalog entries, owned recovery CODE state and both
+closed transaction records pass verification. Both clean baselines complete the
+dependency once. This establishes the need for recovery before dependent
+configuration, not a production allocation of ID 4: factory IDs 0, 1 and 2 also
+have configuration callbacks, and their safety before recovery remains unproven.
+The public packager continues to restrict recovery IDs to 769..1791.
 An explicit stale-journal host regression also demonstrates why structural
 preflight is insufficient: a later valid backup inside the target sector is
 hidden by the old image overlay. Public write preparation rejects ready and
