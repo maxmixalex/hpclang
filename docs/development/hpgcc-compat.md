@@ -754,11 +754,21 @@ immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
 cleanup restores the borrowed display. The header does not yet implement the
-historical blocking input, integer-string or decimal-format groups; these remain
+historical blocking input or decimal-format policy; these remain
 M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
 packaging families. HP39gs/40gs Stock and CI acceptance are pending.
+
+`hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
+Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
+with a minus sign for negative signed input. Returned text is borrowed static
+storage: `uints` and nonnegative `ints` share a buffer; negative `ints` has its
+own buffer. Copy text before another call can overwrite it. Calls allocate
+nothing and preserve errno. `INT_MIN` is handled without the old signed-negation
+overflow. All bases and signed/unsigned boundaries pass host sanitizers; native
+and installed-example acceptance of this additional conversion group is pending.
+The reviewed HPGCC3 source does not provide these same helpers.
 
 ### Historical tones and packed BCD
 

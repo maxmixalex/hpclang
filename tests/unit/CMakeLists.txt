@@ -106,6 +106,9 @@ hpclang_unit(hpgcc_system test_hpgcc_system.c
     "${HPCLANG_ROOT}/runtime/core/datetime.c")
 target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
+target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(hpgcc_rtc test_hpgcc_rtc.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-rtc.c"
     "${HPCLANG_ROOT}/runtime/core/rtc-tick.c"

@@ -5,5 +5,5 @@
  * C++ stdio names remain intact; registration is process-wide and idempotent. */
 extern "C" int print_status(void)
 {
-    return std::printf("C and C++ share this screen\n");
+    return std::printf("C++ hexadecimal: %s\n", uints(255, 16));
 }

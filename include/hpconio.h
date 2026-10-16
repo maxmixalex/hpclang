@@ -1,6 +1,7 @@
 #ifndef HPCLANG_HPGCC_HPCONIO_H
 #define HPCLANG_HPGCC_HPCONIO_H
 #include <stdio.h>
+#include <hpstring.h>
 #ifdef __cplusplus
 extern "C"
 {

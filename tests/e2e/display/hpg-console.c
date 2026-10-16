@@ -1,10 +1,14 @@
 #include <hpconio.h>
 #include <hpgraphics.h>
 #include <hpclang/display.h>
+#include <limits.h>
 
 unsigned hpclang_hpg_console(int (*checkpoint)(unsigned))
 {
     unsigned failure = 1;
+    if (strcmp(ints(INT_MIN, 10), "-2147483648") || strcmp(uints(UINT_MAX, 36), "1z141z3") ||
+        strcmp(ints(-255, 16), "-ff"))
+        goto done;
     _clear_screen();
     if (screen_width() != 32 || screen_height() < 10 || getx() != 0 || gety() != 0)
         goto done;

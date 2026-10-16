@@ -1807,6 +1807,11 @@ SDK relocation, six-model launchers and three HP39 Aplet packaging families.
 HP39gs/40gs Stock and CI acceptance are pending. Historical input and numeric
 formatting remain open, so this does not close the console group.
 
+The follow-up `hpstring.h` group implements `ints/uints` using the verified
+1.0/1.1/2.0 base, sign and borrowed-buffer contracts, including defined `INT_MIN`
+handling. All bases and boundary values pass host sanitizers; ARM analysis and
+HP39g+/HP50g Direct conversion checks pass. Updated Stock/SDK checks are pending.
+
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
 Tone duration overflow fails before playback; the old clock-assumption error
