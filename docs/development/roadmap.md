@@ -1362,6 +1362,15 @@ a general root ABI: its fixed offsets and command-body signatures remain outside
 the product. A validated platform execution-root interface and broader caller/
 model coverage are required before calculator-side relocation can be accepted.
 
+ROM instruction and caller inspection confirms the eight-cell machine-stack
+layout, 20-bit push values, modulo-eight cursor and clear-on-pop behavior. It
+also confirms the numeric `RSTK=C` / `C=RSTK` path, so layout validation alone
+cannot classify all cells as pointers. A diagnostic whole-stack variant passes
+initial return, relaunch, library readback and independent catalog/TEMP/Flash
+checks on both HP49g+ and HP50g for the tested launcher path. This broadens the
+native integration evidence without accepting unconditional stack repair; caller
+classification or independently owned entry/return roots remain required.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

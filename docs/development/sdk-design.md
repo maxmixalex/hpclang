@@ -451,6 +451,14 @@ invocation. Platform integration must establish the types, ownership and layout
 of these saved execution fields rather than infer roots from address-looking
 integers or command-specific offsets.
 
+The classic ROM's machine stack has eight 20-bit cells and a modulo-eight
+cursor; its pop helper clears the consumed cell. This layout is not a type
+guarantee: the interpreter also calls these helpers for `RSTK=C` / `C=RSTK`,
+which can store ordinary numbers. Publishing all eight cells as unconditional
+relocation roots would corrupt such values. A platform contract must classify
+the suspended caller's entries, or use an entry/return path whose root ownership
+is established independently.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.
