@@ -378,12 +378,21 @@ arbitrary UI declarations or a minimum whole-application memory requirement.
 After the font checkpoint, the E2E program holds real allocator blocks until a
 4 KiB allocation fails. Creating an additional gray16 renderer must then fail
 with `ENOMEM`. The existing UI must still redeclare, render and publish exactly
-the same pixels while those blocks remain held. After releasing them, creating
-and destroying a normal monochrome renderer must succeed, and the application
+the same pixels while those blocks remain held. After releasing them, replacing
+the live renderer with the same font/theme must reproduce those pixels, and the application
 continues through cancellation and normal Stock return. This pressure phase is
 excluded from `HEAP`; it deliberately consumes the remaining arena and does not
 represent the application's ordinary memory requirement. Host tests separately
 inject failure at every renderer-construction allocation and check for leaks.
+
+With `MAX_RW_BYTES 36864`, the current pressure/reconstruction fixture also
+passes locally on HP39g+ and HP50g Stock. Both report a 36,864-byte mapped RW
+arena and 22,976-byte heap capacity; ordinary peak heap extents are 18,892 and
+20,076 bytes respectively. Native-font geometry, the two pressure/reconstruction
+pixel checkpoints and normal system return pass. This is an application mapping
+budget: the legacy launcher still reserves its original Stock page pool, and
+the observation does not measure peak stack use or prove an installation-space
+minimum. CI acceptance of this follow-up is pending.
 
 The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
 with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,

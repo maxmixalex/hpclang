@@ -12,6 +12,28 @@ import zlib
 
 # Stable model numbers from the public hpclang target ABI.
 MODELS = {"hp39gplus": 1, "hp39gs": 2, "hp40gs": 3, "hp48gii": 4, "hp49gplus": 5, "hp50g": 6}
+# HPC1 execution ABI; test_launcher_memory checks these against the SDK headers.
+PAGE_BYTES = 4096
+STACK_BYTES = 8192
+MAX_RW_PAGES = 256
+
+
+def validate_rw_limit(payload: bytes, limit: int | None) -> None:
+    if len(payload) < 16 or payload[:4] != b"HPC1":
+        raise ValueError("expected an HPC1 application header")
+    if limit is None:
+        return
+    if (
+        type(limit) is not int
+        or limit <= 0
+        or limit % PAGE_BYTES
+        or limit > MAX_RW_PAGES * PAGE_BYTES
+    ):
+        raise ValueError("maximum RW bytes must be a positive page-aligned size up to 1 MiB")
+    static = int.from_bytes(payload[12:16], "little")
+    minimum = PAGE_BYTES + ((static + PAGE_BYTES - 1) // PAGE_BYTES) * PAGE_BYTES + STACK_BYTES
+    if limit < minimum:
+        raise ValueError("maximum RW bytes cannot contain the boot page, static data and stack")
 
 
 def run(*args: str | Path) -> str:
@@ -30,9 +52,9 @@ def build(
     *,
     wrap: bool = True,
     hp39_armsys_probe: bool = False,
+    max_rw_bytes: int | None = None,
 ) -> None:
-    if payload.read_bytes()[:4] != b"HPC1":
-        raise ValueError("expected an HPC1 application")
+    validate_rw_limit(payload.read_bytes(), max_rw_bytes)
     output.mkdir(parents=True, exist_ok=True)
     scratch = output / "objects"
     scratch.mkdir(exist_ok=True)
@@ -74,7 +96,15 @@ def build(
     ]
     platform = root / "platform/armtoolbox"
     objects = [
-        compile_source(platform / source, name)
+        compile_source(
+            platform / source,
+            name,
+            *(
+                [f"-DHPCLANG_MAX_RW_BYTES={max_rw_bytes}"]
+                if source == "stage1.c" and max_rw_bytes is not None
+                else []
+            ),
+        )
         for source, name in (
             ("stage1-entry.S", "stage1-entry"),
             ("stage1.c", "stage1"),
@@ -158,6 +188,11 @@ def main() -> None:
     parser.add_argument("--tool-bin", type=Path, required=True)
     parser.add_argument("--models", choices=MODELS, nargs="+", default=list(MODELS))
     parser.add_argument("--raw-only", action="store_true")
+    parser.add_argument(
+        "--max-rw-bytes",
+        type=lambda value: int(value, 0),
+        help="cap application-visible RW bytes (page aligned); does not reduce the Stock reservation",
+    )
     parser.add_argument("--hp39-armsys-probe", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     build(
@@ -168,6 +203,7 @@ def main() -> None:
         args.models,
         wrap=not args.raw_only,
         hp39_armsys_probe=args.hp39_armsys_probe,
+        max_rw_bytes=args.max_rw_bytes,
     )
 
 

@@ -1680,6 +1680,15 @@ on the preceding implementation; the text-node enum/scanner correction did not
 change Gallery inputs. The remaining milestone checklist below is retained;
 integration alone does not close M8.2/M8.3.
 
+The UI allocator-pressure fixture now keeps the live view while an additional
+gray16 renderer fails with `ENOMEM`, then releases the pressure blocks and
+reconstructs the original renderer. Independent LCD checks require unchanged
+pixels during pressure and after reconstruction. HP39g+ and HP50g Stock pass
+locally with application-visible RW capped at 36 KiB; the shared launcher builder
+and CMake API expose that page-aligned ceiling. The legacy Stock reservation is
+not reduced, and stack peaks/whole-application admission remain open. This local
+follow-up has not yet received CI acceptance.
+
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
 preserve node identity when that view is declared again. C functions suffice

@@ -122,7 +122,8 @@ static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned 
     return frame(id);
 }
 
-static int exhausted_renderer(struct demo_app *app, struct hpclang_ui_surface *r)
+static int exhausted_renderer(struct demo_app *app, struct hpclang_ui_surface **renderer,
+                              const struct hpclang_font *font)
 {
     void *blocks[256];
     unsigned count = 0;
@@ -138,14 +139,16 @@ static int exhausted_renderer(struct demo_app *app, struct hpclang_ui_surface *r
     int failed = count == 256 || attempt != NULL || error != ENOMEM;
     hpclang_ui_surface_destroy(attempt);
     /* Existing declarations and raster pages remain usable while still full. */
-    if (!failed && capture(app, r, 121))
+    if (!failed && capture(app, *renderer, 121))
         failed = 1;
     while (count)
         free(blocks[--count]);
-    attempt = demo_renderer(device->display_width, device->display_height, 2, &demo_font, 0);
-    if (!attempt)
+    /* Replace the live renderer as a normal theme/font change would; requiring
+     * two live renderers would inflate the application's minimum heap budget. */
+    hpclang_ui_surface_destroy(*renderer);
+    *renderer = demo_renderer(device->display_width, device->display_height, 2, font, 1);
+    if (!*renderer || capture(app, *renderer, 122))
         failed = 1;
-    hpclang_ui_surface_destroy(attempt);
     return failed ? -1 : 0;
 }
 static unsigned checks(void)
@@ -282,7 +285,7 @@ static unsigned checks(void)
         hpclang_ui_focused(ui) != focused)
         goto done;
     failure = 0x1703;
-    if (exhausted_renderer(&app, r))
+    if (exhausted_renderer(&app, &r, font))
         goto done;
     failure = 18;
     if (activate(&app, r, &mode, DEMO_SCAN) || demo_poll(&app) < 0 ||

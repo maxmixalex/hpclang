@@ -1480,6 +1480,13 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         return -3;
 
     uint32_t rw_count = total_pages - STAGE_STACK_PAGES - rw_first;
+#ifdef HPCLANG_MAX_RW_BYTES
+    _Static_assert(HPCLANG_MAX_RW_BYTES > 0 && HPCLANG_MAX_RW_BYTES % HPCLANG_PAGE_SIZE == 0 &&
+                       HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE <= HPCLANG_RW_PAGE_CAPACITY,
+                   "invalid application RW limit");
+    if (rw_count > HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE)
+        rw_count = HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE;
+#endif
     uint32_t rw_needed = 1u + (hpc1->rw_static_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE +
                          HPCLANG_STACK_MIN / HPCLANG_PAGE_SIZE;
 

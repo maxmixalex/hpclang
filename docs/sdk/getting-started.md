@@ -104,6 +104,16 @@ LLVM linker and binary tools and shares its bootstrap builder with repository
 E2E. Changing the payload or bootstrap sources, or removing an output file,
 causes CMake to regenerate the launchers.
 
+For a reproducible application memory ceiling, use
+`hpclang_target_launchers(my_application MAX_RW_BYTES 36864)` (36 KiB).
+The command-line builder exposes the same option as `--max-rw-bytes 36864`.
+The ceiling must be a positive multiple of 4096, at most 1 MiB, and must fit
+the boot page, page-rounded static data and the reserved 8 KiB stack. A launcher
+with fewer available pages still exposes only those available pages. This caps
+the application's mapped read/write arena and moves its stack top accordingly;
+it does not reduce the legacy launcher's Stock reservation or guarantee enough
+heap for a particular application. Omitting the option keeps all available pages.
+
 ## Own calculator objects in C++
 
 `<hpclang/object.hpp>` provides the C++17 `hpclang::owned_object` for independent

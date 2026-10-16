@@ -56,6 +56,8 @@ def verify(prefix: Path, height: int, stock: bool = False) -> None:
     waveform(font_pixels, height - (28 + line_height), prefix)
     pressure_pixels = read_frame(Path(f"{prefix}-121.pgm"), height)
     assert pressure_pixels == font_pixels, f"{prefix}: allocator exhaustion changed the live UI"
+    rebuilt_pixels = read_frame(Path(f"{prefix}-122.pgm"), height)
+    assert rebuilt_pixels == font_pixels, f"{prefix}: renderer reconstruction changed the live UI"
     if line_height == 6:
         assert font_pixels == frames[6], f"{prefix}: packaged fallback changed the view"
     else:

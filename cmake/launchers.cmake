@@ -1,8 +1,8 @@
 # Package an application through the production ARMToolbox bootstrap.
 function(hpclang_target_launchers target)
-    cmake_parse_arguments(PARSE_ARGV 1 launcher "" "" "MODELS")
+    cmake_parse_arguments(PARSE_ARGV 1 launcher "" "MAX_RW_BYTES" "MODELS")
     if(launcher_UNPARSED_ARGUMENTS OR launcher_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR "hpclang_target_launchers expects MODELS followed by model names")
+        message(FATAL_ERROR "hpclang_target_launchers expects MODELS and/or MAX_RW_BYTES")
     endif()
     if(NOT TARGET ${target}_hpc)
         message(FATAL_ERROR "Create ${target} with hpclang_add_application first")
@@ -15,6 +15,10 @@ function(hpclang_target_launchers target)
         endif()
     endif()
     set(supported hp39gplus hp39gs hp40gs hp48gii hp49gplus hp50g)
+    set(memory_args)
+    if(DEFINED launcher_MAX_RW_BYTES)
+        list(APPEND memory_args --max-rw-bytes "${launcher_MAX_RW_BYTES}")
+    endif()
     set_property(TARGET ${target} PROPERTY HPCLANG_LAUNCHER_MODELS "${launcher_MODELS}")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers")
     set(outputs)
@@ -38,7 +42,7 @@ function(hpclang_target_launchers target)
     add_custom_command(OUTPUT ${outputs}
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/build-launchers.py"
             "${CMAKE_CURRENT_BINARY_DIR}/${target}.hpc" "${output}"
-            --tool-bin "${tool_bin}" --models ${launcher_MODELS}
+            --tool-bin "${tool_bin}" --models ${launcher_MODELS} ${memory_args}
         DEPENDS ${target}_hpc "${CMAKE_CURRENT_BINARY_DIR}/${target}.hpc"
             "${HPCLANG_ROOT}/tools/build-launchers.py"
             "${HPCLANG_ROOT}/tools/armtoolbox-wrap.py" ${bootstrap_sources}
