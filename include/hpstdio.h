@@ -10,6 +10,12 @@
  */
 #include <stdio.h>
 
+#ifndef HPCLANG_HPGCC_LONG_TYPES_DEFINED
+#define HPCLANG_HPGCC_LONG_TYPES_DEFINED
+typedef unsigned long long ULONGLONG;
+typedef long long LONGLONG;
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -24,6 +30,13 @@ extern "C"
      * Successful conversion preserves errno. */
     int readint(void);
     double readdouble(void);
+    /* Historical integers do not skip whitespace or accept '+'. Signed forms
+     * accept a leading '-'; unsigned forms do not. readhex accepts bare hex
+     * digits, not a 0x prefix. Range errors saturate with ERANGE. */
+    unsigned readuint(void);
+    unsigned readhex(void);
+    LONGLONG readlonglong(void);
+    ULONGLONG readulonglong(void);
 
 #ifdef __cplusplus
 }

@@ -24,7 +24,7 @@ char *hpclang_hpgcc_gets(char *buffer, size_t capacity)
 
 int main(void)
 {
-    input = " \t-123tail";
+    input = "-123tail";
     errno = EDOM;
     assert(readint() == -123 && errno == EDOM);
     input = "0x10";
@@ -37,6 +37,39 @@ int main(void)
     assert(readint() == INT_MAX && errno == EDOM);
     input = "9999999999999999999999999999999";
     assert(readint() == INT_MAX && errno == ERANGE);
+    input = "-9223372036854775808";
+    errno = EDOM;
+    assert(readlonglong() == LLONG_MIN && errno == EDOM);
+    input = "9223372036854775807";
+    assert(readlonglong() == LLONG_MAX && errno == EDOM);
+    input = "9223372036854775808";
+    assert(readlonglong() == LLONG_MAX && errno == ERANGE);
+    input = "-9223372036854775809";
+    assert(readlonglong() == LLONG_MIN && errno == ERANGE);
+    input = "18446744073709551615";
+    errno = EDOM;
+    assert(readulonglong() == ULLONG_MAX && errno == EDOM);
+    input = "18446744073709551616";
+    assert(readulonglong() == ULLONG_MAX && errno == ERANGE);
+    input = "-1";
+    assert(readuint() == 0 && errno == EINVAL);
+    assert(readulonglong() == 0 && errno == EINVAL);
+    input = "12tail";
+    errno = EDOM;
+    assert(readuint() == 12 && errno == EDOM);
+    input = "aBcDtail";
+    assert(readhex() == 0xabcd && errno == EDOM);
+    input = "0xff";
+    assert(readhex() == 0 && errno == EDOM);
+    snprintf(text, sizeof text, "%u", UINT_MAX);
+    input = text;
+    assert(readuint() == UINT_MAX && errno == EDOM);
+    snprintf(text, sizeof text, "%llu", (unsigned long long)UINT_MAX + 1);
+    assert(readuint() == UINT_MAX && errno == ERANGE);
+    input = "+12";
+    assert(readint() == 0 && errno == EINVAL);
+    input = " 12";
+    assert(readint() == 0 && errno == EINVAL);
     input = "-999999999999999999999999999999";
     assert(readint() == INT_MIN && errno == ERANGE);
     /* Exercise the narrower int boundary even on hosts with 64-bit long. */
@@ -70,6 +103,10 @@ int main(void)
         input_error = errors[i];
         assert(readint() == 0 && errno == input_error);
         assert(readdouble() == 0 && errno == input_error);
+        assert(readuint() == 0 && errno == input_error);
+        assert(readhex() == 0 && errno == input_error);
+        assert(readlonglong() == 0 && errno == input_error);
+        assert(readulonglong() == 0 && errno == input_error);
     }
     return 0;
 }

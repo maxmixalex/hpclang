@@ -1840,7 +1840,10 @@ Host sanitizers cover boundaries, prefix conversion, floating range errors and
 input failures. ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key
 numeric input, and installed-SDK relocation/packaging pass locally. Wider
 native acceptance and CI acceptance of this addition remain pending.
-Decimal-format controls and other numeric spellings remain open.
+`readuint/readhex/readlonglong/readulonglong` now share a checked integer parser
+matching the reviewed historical sign, whitespace and bare-hex rules. Boundary
+and error cases pass host sanitizers; native acceptance of this expanded family
+is pending. Decimal-format controls remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.

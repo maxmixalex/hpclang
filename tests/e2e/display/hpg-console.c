@@ -107,7 +107,20 @@ static int numeric_input(void)
     scripted_read = 1;
     double real = readdouble();
     scripted_read = 0;
-    return real == 1234.0 && !errno && scripted_index == 7 ? 0 : -1;
+    if (real != 1234.0 || errno || scripted_index != 7)
+        return -1;
+    for (unsigned kind = 0; kind < 4; ++kind) {
+        scripted_index = 0;
+        scripted_read = 1;
+        unsigned long long value = kind == 0   ? readuint()
+                                   : kind == 1 ? readhex()
+                                   : kind == 2 ? (unsigned long long)readlonglong()
+                                               : readulonglong();
+        scripted_read = 0;
+        if (value != (kind == 1 ? 0x1234u : 1234u) || errno || scripted_index != 7)
+            return -1;
+    }
+    return 0;
 }
 
 unsigned hpclang_hpg_console(int (*checkpoint)(unsigned))

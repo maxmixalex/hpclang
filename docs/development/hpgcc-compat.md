@@ -797,7 +797,11 @@ and respects explicit stream ownership. Their 32-byte local storage admits 31
 input bytes; excess characters are rejected while backspace remains available.
 Both accept a numeric prefix, matching the historical `atoi/atof` use:
 `123tail` reads as 123. Integer conversion is decimal; double conversion uses
-C `strtod` syntax. No conversion returns zero with `EINVAL`. Integer overflow
+C `strtod` syntax. Unlike the reviewed historical floating parser, this accepts
+leading whitespace and standard C hexadecimal/infinity/NaN forms, and applies
+the exponent of a valid prefix even when trailing text follows it. Historical
+floating-parser arithmetic and malformed-exponent quirks are not reproduced.
+No conversion returns zero with `EINVAL`. Integer overflow
 returns `INT_MIN/INT_MAX` with `ERANGE`; double range errors follow `strtod`.
 Input error/cancel returns zero with its error; empty EOF returns zero with
 stream EOF available to the caller. Successful conversion preserves errno.
@@ -806,6 +810,18 @@ parsers. Host sanitizer acceptance covers prefix/boundary/range/error behavior;
 ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key numeric input,
 and installed-SDK relocation/packaging pass locally. Wider native and CI
 acceptance of these two adapters remains pending.
+
+The integer family also supplies `readuint`, `readhex`, `readlonglong` and
+`readulonglong`, with the shared `LONGLONG/ULONGLONG` typedefs. Source review of
+HPGCC 2.0's `atoui_base/atoull_base/atoi_base/atoll_base` establishes digit-prefix
+parsing from the first byte, without skipping whitespace or accepting `+`.
+Signed decimal forms accept a leading `-`; unsigned forms do not. `readhex`
+accepts mixed-case bare hexadecimal digits: `0xff` therefore converts the
+initial zero only. These rules also correct the initial `readint` adapter's
+overly permissive use of `strtol`. All integer forms saturate at their type's
+limit with `ERANGE`, replacing historical overflow behavior. Host sanitizers
+cover signed/unsigned limits, invalid prefixes and read errors. Native
+acceptance of this expanded family is pending.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
