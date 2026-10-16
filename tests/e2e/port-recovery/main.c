@@ -17,6 +17,7 @@ struct workspace
     unsigned diagnostics[32];
 };
 _Static_assert(sizeof(struct workspace) == 8400, "entry.S workspace reservation");
+_Static_assert(offsetof(struct workspace, slot) == 8, "entry.S recovery restart condition");
 _Static_assert(offsetof(struct workspace, diagnostics[7]) == 8300,
                "entry.S restored CPSR diagnostic offset");
 static int read_flash(void *context, unsigned address, unsigned short *value)

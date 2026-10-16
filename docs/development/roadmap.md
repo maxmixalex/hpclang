@@ -1316,20 +1316,26 @@ explicitly supports reconstruction while checking original execution alignment,
 RAM bounds, stack/TLS and the complete immutable image/guards and envelope.
 Both configuration variants pass these checks. Clearing all 512 KiB SRAM before
 HP50g reset also passes exact recovery, these ownership checks and Stock return
-after cold initialization finishes. Production catalog rebuilding, installation
+after cold initialization finishes. Production startup integration, installation
 and transaction freshness remain open; this is not physical battery-loss testing.
 HP49g+ independently passes direct configuration-entry replay/retirement and
 the complete relocated-image checks, also retaining 59 entries on that first
 repaired startup. Its RAM-loss case has not yet been accepted.
 
-Both models now pass the maintained runner's Flash-configuration branch: native
+Both models pass the return-only Flash-configuration branch: native
 library installation, clean catalog baseline, injected fault, automatic repair
 and retirement, relocated CODE verification, then exact catalog rebuilding on
-the second warmstart. It reuses the retirement build and existing workflow
-arguments. Synthetic busy reads apply to the recovery stages; Stock constructs
+the second warmstart. The configuration mode now requests Stock reinitialization
+after successful retirement, so the maintained runner requires all original
+catalog bindings before a second host reset. Both models pass this maintained
+automatic path, preserve the HOME string and end with a verified no-op invocation. The workflow
+builds this mode with `HPCLANG_RECOVERY_RESTART_AFTER_REPAIR` and supplies it with
+`--configuration-build`; ordinary retirement still returns to its caller.
+A persistent HOME string also checks preservation of user RAM. Synthetic busy
+reads apply to the recovery stages; Stock constructs
 the fixture with the normal emulator Flash model because its installation
-driver does not pass the synthetic read-count timing model. Production automatic
-catalog rebuilding and safe ordering before dependent libraries remain open.
+driver does not pass the synthetic read-count timing model. Production
+installation/freshness and safe ordering before dependent libraries remain open.
 
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay

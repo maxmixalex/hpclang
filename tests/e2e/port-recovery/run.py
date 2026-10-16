@@ -22,6 +22,8 @@ from verify import (
     verify_retirement_cut,
     native_words,
     require_stock_pc,
+    verify_flash,
+    home_string,
 )
 
 
@@ -235,12 +237,12 @@ def startup_recovery(args, clean, damaged):
 
 
 def configuration_recovery(args, clean):
-    """Install an isolated Flash fixture and prove automatic replay, then catalog rebuild.
+    """Prove automatic replay and complete catalog rebuilding without a second host reset.
 
     The library number and HOME names belong only to this fresh-firmware fixture.
     This is not an installer for a user's existing calculator.
     """
-    build = args.retirement_build
+    build = args.configuration_build
     installed = args.output / "configuration-installed"
     # Construct the fixture with Stock's own driver. The synthetic read-count
     # busy model exercises our recovery polling below, not Stock's installation driver.
@@ -264,6 +266,7 @@ def configuration_recovery(args, clean):
             "{ DORUN PING '$ROMID' '$TITLE' } PURGE",
             "{ '$CONFIG' '$VISIBLE' '$HIDDEN' } PURGE",
             "HOME 'CFPROBE' PURGE",
+            "\"hpclang recovery\" 'HPCKEEP' STO",
         ],
     )
 
@@ -281,6 +284,11 @@ def configuration_recovery(args, clean):
             completed(child, 90)
         verify_busy_reads(args, phase)
         require_stock_pc(phase / "state")
+        read = native_words(
+            (phase / "state/sram").read_bytes(), (phase / "state/flash").read_bytes()
+        )
+        if home_string(read, b"HPCKEEP") != b"hpclang recovery":
+            raise RuntimeError("Configuration recovery changed the HOME fixture string")
         return phase / "state"
 
     baseline = warmstart(installed / "state", "configuration-clean")
@@ -293,11 +301,20 @@ def configuration_recovery(args, clean):
     damaged = args.output / "configuration-fault"
     prepare(baseline, damaged, args.slot, args.target)
     before = damaged
-    for name, operation in (
-        ("configuration-recovered", "retire"),
-        ("configuration-rechecked", "check"),
-    ):
+    for name in ("configuration-recovered", "configuration-rechecked"):
         after = warmstart(before, name)
+        if before == damaged:
+            verify_flash(
+                (before / "flash").read_bytes(),
+                (after / "flash").read_bytes(),
+                args.slot,
+                args.target,
+                retire=True,
+            )
+            # The internal restart has already replaced the first invocation's
+            # diagnostics with a clean invocation. Verify the durable transition
+            # above, then verify this final no-op image and the complete catalog.
+            before = after
         verify(
             SimpleNamespace(
                 before=before,
@@ -308,16 +325,16 @@ def configuration_recovery(args, clean):
                 nm=args.nm,
                 slot=args.slot,
                 target=args.target,
-                operation=operation,
+                operation="check",
                 relocated_image=True,
             )
         )
-        if operation == "check":
-            # Recovery currently needs this second warmstart to rebuild every
-            # binding. Do not claim the first startup has a complete catalog.
-            verify_restart(baseline, before, after)
+        verify_restart(baseline, before, after)
         before = after
-    print("Flash configuration replay/retirement and second-warmstart catalog verified", flush=True)
+    print(
+        "Flash configuration recovery rebuilt the catalog automatically; later warmstart unchanged",
+        flush=True,
+    )
 
 
 def run(args):
@@ -516,6 +533,7 @@ def run(args):
         verify_restart(clean / "state", retired_restart / "state", checked / "state")
         print("Journal retirement and unchanged native catalog after reset verified", flush=True)
         startup_recovery(args, clean / "state", startup_source)
+    if args.configuration_build is not None:
         configuration_recovery(args, clean / "state")
     (args.output / "result.json").write_text(
         json.dumps(
@@ -529,7 +547,7 @@ def run(args):
                 "interrupted_before_identity": args.interrupted_build is not None,
                 "journal_retirement": args.retirement_build is not None,
                 "startup_recovery": args.retirement_build is not None,
-                "configuration_recovery": args.retirement_build is not None,
+                "configuration_recovery": args.configuration_build is not None,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,
@@ -563,6 +581,11 @@ def main():
         "--retirement-build",
         type=Path,
         help="optional witness built with HPCLANG_RECOVERY_RETIRE_JOURNAL",
+    )
+    parser.add_argument(
+        "--configuration-build",
+        type=Path,
+        help="optional retirement witness with HPCLANG_RECOVERY_RESTART_AFTER_REPAIR",
     )
     parser.add_argument(
         "--flash-busy-reads",
@@ -600,6 +623,8 @@ def main():
         args.interrupted_build = args.interrupted_build.resolve()
     if args.retirement_build is not None:
         args.retirement_build = args.retirement_build.resolve()
+    if args.configuration_build is not None:
+        args.configuration_build = args.configuration_build.resolve()
     run(args)
 
 

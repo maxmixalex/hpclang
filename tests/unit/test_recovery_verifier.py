@@ -57,6 +57,50 @@ class ExecutedImageTests(unittest.TestCase):
             VERIFY.executed_image(ram[:5000], self.image, self.symbols, relocated=True)
 
 
+class HomeStringTests(unittest.TestCase):
+    def setUp(self):
+        self.memory = bytearray(0x100000)
+        self.home, self.item = 0x90000, 0x90100
+        self.put(0x80711, self.home)
+        self.put(self.home, 0x2A96)
+        self.put(self.home + 8, self.item - self.home - 8)
+        self.put(self.item, 7, 2)
+        for i, value in enumerate(b"HPCKEEP"):
+            self.put(self.item + 2 + 2 * i, value, 2)
+        self.obj = self.item + 18
+        self.put(self.obj, 0x2A2C)
+        self.put(self.obj + 5, 5 + 2 * len(b"kept"))
+        for i, value in enumerate(b"kept"):
+            self.put(self.obj + 10 + 2 * i, value, 2)
+
+    def put(self, address, value, width=5):
+        for i in range(width):
+            self.memory[address + i] = (value >> (4 * i)) & 15
+
+    def read(self, address, width=5):
+        if not 0 <= address <= len(self.memory) - width:
+            raise ValueError("Test read outside Saturn memory")
+        return sum(self.memory[address + i] << (4 * i) for i in range(width))
+
+    def test_value_and_changed_value_are_observed(self):
+        self.assertEqual(VERIFY.home_string(self.read, b"HPCKEEP"), b"kept")
+        self.put(self.obj + 10, ord("x"), 2)
+        self.assertEqual(VERIFY.home_string(self.read, b"HPCKEEP"), b"xept")
+
+    def test_missing_or_wrong_type_cannot_pass_as_empty(self):
+        with self.assertRaisesRegex(ValueError, "missing"):
+            VERIFY.home_string(self.read, b"ABSENT")
+        self.put(self.obj, 0x2D9D)
+        with self.assertRaisesRegex(ValueError, "not a string"):
+            VERIFY.home_string(self.read, b"HPCKEEP")
+
+    def test_malformed_string_extent_is_rejected(self):
+        for extent in (4, 6, 0xFFFFF):
+            self.put(self.obj + 5, extent)
+            with self.assertRaisesRegex(ValueError, "extent"):
+                VERIFY.home_string(self.read, b"HPCKEEP")
+
+
 class RecoveryVerifierTests(unittest.TestCase):
     def setUp(self):
         self.slot, self.target = 0x160105, 0x140000

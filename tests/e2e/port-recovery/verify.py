@@ -169,6 +169,33 @@ def native_words(ram, flash):
     raise ValueError("Native Saturn map not found")
 
 
+def home_string(read, name):
+    """Read an owned fixture string independently of the recovery diagnostics."""
+    home = read(0x80711)
+    require(0x80000 <= home < 0x100000 and read(home) == 0x2A96, "Invalid HOME directory")
+    link = home + 8 + 13 * read(home + 5, 3)
+    offset = read(link)
+    item = link + offset
+    seen = set()
+    while offset:
+        require(0x80005 <= item < 0x100000 and item not in seen, "Invalid HOME variable chain")
+        seen.add(item)
+        length = read(item, 2)
+        variable = bytes(read(item + 2 + 2 * i, 2) for i in range(length))
+        if variable == name:
+            obj = item + (4 + 2 * length if length else 2)
+            require(read(obj) == 0x2A2C, "HOME fixture value is not a string")
+            extent = read(obj + 5)
+            require(
+                extent >= 5 and (extent - 5) % 2 == 0 and obj + 5 + extent <= 0x100000,
+                "Invalid HOME fixture string extent",
+            )
+            return bytes(read(obj + 10 + i, 2) for i in range(0, extent - 5, 2))
+        offset = read(item - 5)
+        item = item - 5 - offset
+    raise ValueError("HOME fixture string is missing")
+
+
 def require_stock_pc(state_directory):
     state = configparser.ConfigParser()
     state.read(state_directory / "state")

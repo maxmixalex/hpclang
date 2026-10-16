@@ -117,18 +117,21 @@ jobs:
       - name: Build independent recovery witnesses
         run: |
           export PATH="$ATFE/bin:$PATH"
-          for mode in normal interrupted retirement; do
+          for mode in normal interrupted retirement configuration; do
             stop_before_identity=OFF
             retire_journal=OFF
+            restart_after_repair=OFF
             case "$mode" in
               interrupted) stop_before_identity=ON ;;
               retirement) retire_journal=ON ;;
+              configuration) retire_journal=ON; restart_after_repair=ON ;;
             esac
             cmake -S tests/e2e/port-recovery -B "build/port-recovery/$mode" \
               -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
               -DCMAKE_BUILD_TYPE=MinSizeRel \
               -DHPCLANG_RECOVERY_STOP_BEFORE_IDENTITY="$stop_before_identity" \
-              -DHPCLANG_RECOVERY_RETIRE_JOURNAL="$retire_journal"
+              -DHPCLANG_RECOVERY_RETIRE_JOURNAL="$retire_journal" \
+              -DHPCLANG_RECOVERY_RESTART_AFTER_REPAIR="$restart_after_repair"
             cmake --build "build/port-recovery/$mode" -j2
           done
 
@@ -210,6 +213,7 @@ jobs:
             --dist build/x50ng/dist --build build/port-recovery/normal \
             --interrupted-build build/port-recovery/interrupted \
             --retirement-build build/port-recovery/retirement \
+            --configuration-build build/port-recovery/configuration \
             --flash-busy-reads 64 \
             --power-cut 2 16 0x5555 --power-cut 1 16 0x0101 \
             --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"

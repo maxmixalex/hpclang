@@ -356,7 +356,8 @@ The verifier selects `--operation replay`, `retire` or `check`; `check` validate
 the known retired record and its target as well as the no-write invocation.
 This is an owned
 transaction fixture, not transaction-freshness proof for arbitrary journals or
-an automatic startup-recovery implementation. CI builds all three witness modes.
+an automatic startup-recovery implementation. CI also builds the configuration
+mode described below alongside these three witness modes.
 
 The retirement witness also exercises the documented
 [`STARTUP` warmstart entry](https://hpcc.org/calculators/hp50g/hp50g_aur.pdf#page=617)
@@ -402,12 +403,11 @@ RAM bounds, stack/TLS diagnostics, complete immutable image/guards and the
 owning CODE envelope. Both paths pass; ordinary probes retain strict unmoved
 alignment by default. This verifies this owned witness, not arbitrary active
 ARM callers or complete native-reference repair.
-The direct configuration entry also passes exact replay/retirement and the full
-relocated-image checks on HP49g+, with the same 59-entry first-startup catalog.
-The first repaired startup retains only 59 of the original 62 catalog entries;
-a second warmstart rebuilds all 62 exact bindings without changing Flash.
-Production integration must therefore rebuild the catalog before allowing
-dependent library/application code to continue. An HP50g test also clears the
+The return-only configuration entry also passes these checks on HP49g+, but
+leaves only 59 of the original 62 catalog entries on both models. A subsequent
+warmstart restores all exact bindings. Production recovery must therefore
+rebuild the catalog before dependent library/application code continues.
+An HP50g test with that entry also clears the
 complete 512 KiB external SRAM before reset, leaving the installed Flash library
 and fault journal unchanged. After cold initialization completes, exact replay/retirement,
 the relocated-image checks and Stock return pass. The initial 16-second capture
@@ -416,12 +416,28 @@ completion without reintroducing saved HOME data. This remains an isolated
 fixture, not complete loss of every peripheral/on-chip state, production
 installation, transaction freshness or physical battery removal acceptance.
 
-The maintained runner now includes a fresh Flash-configuration fixture whenever
-the retirement build is supplied. Stock's built-in library compiler installs
+The maintained runner includes a fresh Flash-configuration fixture with
+`--configuration-build`. This witness enables retirement and
+`HPCLANG_RECOVERY_RESTART_AFTER_REPAIR`: after successful retirement and Flash
+mapping/interrupt restoration, a nonzero discovered journal slot requests Stock's reset
+service. The resulting startup finds no pending journal and returns normally.
+An unexpected return from the reset service stops the witness instead of
+resuming an incomplete catalog. CMake rejects restart mode without retirement
+or together with the interrupted witness. This is an internal recovery mode;
+the general reset API remains deferred.
+
+Stock's built-in library compiler installs
 the owned CODE program as a temporary library configuration, then removes the
 source variables from HOME. A clean restart establishes its catalog baseline;
-offline injection and two further warmstarts verify replay/retirement, relocated
-CODE ownership and the exact final catalog. The library ID and temporary names
+after fault injection, one host reset must finish with exact replay/retirement,
+the complete catalog and a verified final no-op recovery image. No second host
+reset may be needed to obtain the complete catalog. A later independent reset
+then checks unchanged Flash/catalog and no repeated recovery. A HOME string
+must survive every phase, distinguishing reinitialization from loss of user RAM.
+Both HP49g+ and HP50g pass this maintained path locally, including the HOME value,
+complete catalog, exact Flash transition and final no-op image verification.
+The workflow builds this configuration mode alongside normal, interrupted and
+returning-retirement witnesses. The library ID and temporary names
 are fixture-local, not a production reservation or existing-user installation.
 The synthetic busy-read model is enabled for the recovery warmstarts, after
 Stock constructs the fixture: applying it to Stock's installation driver fails

@@ -4,6 +4,12 @@ option(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY
     "Stop the witness before publishing a restored bank identity" OFF)
 option(HPCLANG_RECOVERY_RETIRE_JOURNAL
     "Retire the verified journal and check repeated retirement without writes" OFF)
+option(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR
+    "Request Stock reinitialization after a successfully retired recovery" OFF)
+if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR AND
+        (NOT HPCLANG_RECOVERY_RETIRE_JOURNAL OR HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY))
+    message(FATAL_ERROR "Recovery restart requires retirement without an interrupted witness")
+endif()
 
 get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -35,6 +41,9 @@ if(HPCLANG_RECOVERY_STOP_BEFORE_IDENTITY)
 endif()
 if(HPCLANG_RECOVERY_RETIRE_JOURNAL)
     target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_RETIRE_JOURNAL=1)
+endif()
+if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR)
+    target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_RESTART_AFTER_REPAIR=1)
 endif()
 target_compile_options(recovery PRIVATE -Oz -ffreestanding -fno-builtin -fpie
     -fvisibility=hidden -ffunction-sections -fdata-sections)
