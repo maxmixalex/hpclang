@@ -422,6 +422,16 @@ the observed addresses and their order; callers must handle exhaustion rather
 than assume a fixed catalog or root count. The builder allocates no memory and
 performs no native reads or writes.
 
+`hpclang_rpl_reference_visit_nested()` uses a caller-owned work array and node
+budget to enumerate INLINE/COMPACT descendants in a stable mapping. Immediate
+edges retain native order; queued children are visited last-in first-out.
+Repeated array aliases are visited again and consume budget. Workspace or budget
+exhaustion invalidates partial results. The scheduler is iterative; underlying
+object parsers retain their bounded recursion, and the node budget does not
+bound their reads. External targets remain for bank-qualified resolution, and
+opaque/execution entries remain explicit unresolved obligations. A successful
+structural walk therefore does not certify a complete relocation graph.
+
 ## Capabilities
 
 Capabilities describe genuine model/platform differences such as display geometry, stream storage, object services, or transfer mechanisms. They must not become a substitute for clean platform implementations.

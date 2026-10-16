@@ -1311,6 +1311,15 @@ These are sample storage measurements, not a fixed workspace guarantee.
 ARM-side root ownership and complete object-body traversal remain required
 before using this evidence for live relocation.
 
+Nested INLINE/COMPACT enumeration now runs in shared C with caller-owned work
+storage and a node budget. Host tests cover compact bodies, repeated array
+aliases, workspace/budget exhaustion, read/callback failures and retained opaque
+contents; sanitizers and ARM compilation/analysis pass. On both HP49g+/HP50g
+saved registration states, HOME plus 73/75 TEMP blocks produce exactly the same
+151/154 nodes and 288/289 edges as the independent immediate-edge scheduler.
+Read guards exactly cover observed cells. The ten opaque edges and external
+targets remain unresolved; these results do not close reference completeness.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

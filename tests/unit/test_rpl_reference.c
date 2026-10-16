@@ -98,6 +98,29 @@ static void nested_array(void)
            HPCLANG_RPL_SPAN_BOUNDS);
     assert(hpclang_rpl_reference_visit(&reader, 30, 10, 0x2a96, collect, &edges) ==
            HPCLANG_RPL_SPAN_UNSUPPORTED);
+
+    struct hpclang_rpl_reference_node root = {0, 45, 0}, workspace[1];
+    edges = (struct edges){0};
+    assert(!hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect, &edges));
+    assert(edges.count == 3 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_INLINE &&
+           edges.items[1].kind == HPCLANG_RPL_REFERENCE_COMPACT &&
+           edges.items[2].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+    assert(edges.items[2].field == 30 && edges.items[2].target == 0x4001c &&
+           edges.items[2].auxiliary == 0x23c21);
+    assert(!memcmp(&image, &original, sizeof image));
+    edges = (struct edges){0};
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    edges = (struct edges){.stop = 73};
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect, &edges) ==
+           73);
+    assert(edges.count == 1);
+    for (uint32_t at = 30; at < 40; ++at) {
+        image.fail = at;
+        edges = (struct edges){0};
+        assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect,
+                                                  &edges) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    }
 }
 
 static void indices_and_opaque(void)
@@ -174,10 +197,57 @@ static void linked_aliases(void)
         assert(edges.items[i].target == 35 && edges.items[i].extent == 10 &&
                edges.items[i].auxiliary == 0x2baa);
     }
+    struct hpclang_rpl_reference_node root = {0, 45, 0};
+    struct hpclang_rpl_reference_node workspace[3] = {{0}, {0}, {123, 456, 789}};
+    edges.count = 0;
+    assert(!hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 2, 3, collect, &edges));
+    assert(edges.count == 4 && edges.items[2].kind == HPCLANG_RPL_REFERENCE_ACPTR &&
+           edges.items[3].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+    assert(edges.items[2].target == 0x7327e && edges.items[3].target == 0x7327e);
+    assert(workspace[2].address == 123 && workspace[2].limit == 456 &&
+           workspace[2].body_prologue == 789);
+    edges.count = 0;
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    edges.count = 0;
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 2, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
     edges.count = 0;
     put(&image, 30, 4, 5); // Link into the table is not an independent body.
     assert(hpclang_rpl_reference_visit(&reader, 0, 45, 0, collect, &edges) < 0);
     assert(edges.count == 1); // Earlier events must be discarded on error.
+}
+
+static void nested_unresolved(void)
+{
+    struct image image = {.size = 30, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put(&image, 0, 0x2a74, 5);
+    put(&image, 5, 0x2dcc, 5); // Opaque code remains visible inside the list.
+    put(&image, 10, 10, 5);
+    put(&image, 15, 0x81234, 5);
+    put(&image, 20, 0x8abcd, 5); // External reference must not be dereferenced.
+    put(&image, 25, 0x312b, 5);
+    struct hpclang_rpl_reference_node root = {0, 30, 0}, workspace[1];
+    struct edges edges = {0};
+    assert(!hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 2, collect, &edges));
+    assert(edges.count == 3 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_INLINE &&
+           edges.items[1].kind == HPCLANG_RPL_REFERENCE_DIRECT &&
+           edges.items[2].kind == HPCLANG_RPL_REFERENCE_OPAQUE);
+    assert(edges.items[1].target == 0x8abcd && edges.items[2].target == 5 &&
+           edges.items[2].extent == 15);
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 0, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 0, collect, &edges) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_reference_visit_nested(&reader, NULL, workspace, 1, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, NULL, 1, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_reference_visit_nested(NULL, &root, workspace, 1, 2, collect, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 2, NULL, &edges) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
 }
 
 static void native_envelopes(void)
@@ -957,6 +1027,7 @@ static void compact_guard_observations(void)
 
 int main(void)
 {
+    nested_unresolved();
     compact_guard_observations();
     catalog_relocation_plan();
     rebuilt_catalog_replay();

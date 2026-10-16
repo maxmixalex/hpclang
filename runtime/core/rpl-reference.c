@@ -580,6 +580,53 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *source, uint32_
     }
 }
 
+struct nested_traversal
+{
+    struct hpclang_rpl_reference_node *workspace;
+    uint32_t capacity, count, remaining;
+    hpclang_rpl_reference_visit_fn visit;
+    void *context;
+};
+
+static int nested_reference(void *context, const struct hpclang_rpl_reference *edge)
+{
+    struct nested_traversal *walk = context;
+    int result = walk->visit(walk->context, edge);
+    if (result)
+        return result;
+    if (edge->kind != HPCLANG_RPL_REFERENCE_INLINE && edge->kind != HPCLANG_RPL_REFERENCE_COMPACT)
+        return 0;
+    if (walk->count == walk->capacity || walk->count == walk->remaining)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    walk->workspace[walk->count++] = (struct hpclang_rpl_reference_node){
+        edge->target, edge->extent,
+        edge->kind == HPCLANG_RPL_REFERENCE_COMPACT ? edge->auxiliary : 0};
+    return 0;
+}
+
+int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
+                                       const struct hpclang_rpl_reference_node *root,
+                                       struct hpclang_rpl_reference_node *workspace,
+                                       uint32_t capacity, uint32_t node_budget,
+                                       hpclang_rpl_reference_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit || !root || !workspace)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!capacity || !node_budget)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct nested_traversal walk = {workspace, capacity, 1, node_budget, visit, context};
+    workspace[0] = *root;
+    while (walk.count) {
+        struct hpclang_rpl_reference_node node = workspace[--walk.count];
+        --walk.remaining;
+        int result = hpclang_rpl_reference_visit(reader, node.address, node.limit,
+                                                 node.body_prologue, nested_reference, &walk);
+        if (result)
+            return result;
+    }
+    return 0;
+}
+
 struct catalog_plan_state
 {
     const struct hpclang_rpl_catalog_move *move;

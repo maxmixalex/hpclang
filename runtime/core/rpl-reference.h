@@ -85,6 +85,30 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t limit, uint32_t body_prologue,
                                 hpclang_rpl_reference_visit_fn visit, void *context);
 
+struct hpclang_rpl_reference_node
+{
+    uint32_t address, limit, body_prologue;
+};
+
+/* Enumerate structural edges through all INLINE/COMPACT descendants in one
+ * stable mapping. Caller supplies an exclusive, disjoint work array and a
+ * positive node budget. The scheduler allocates no memory and uses no recursion;
+ * underlying object parsers retain their own bounded recursion. The node budget
+ * limits scheduled visits, not parser reads or callback count. Immediate edges are
+ * delivered in native order; queued children are processed last-in first-out.
+ * Aliased children are visited again and consume budget; this is not a visited
+ * set. Capacity/budget exhaustion returns BOUNDS and invalidates partial output.
+ * DIRECT/ACPTR/ROMP/FLASHP/ATTACHMENT targets are reported but not followed;
+ * OPAQUE/EXECUTION/EMBEDDED_ENTRY remain explicit unresolved obligations.
+ * Success only establishes structural enumeration, not graph completeness or
+ * relocation safety. Callback failures propagate unchanged. Keep reader,
+ * callback and workspace stable; discard all output on any failure. */
+int hpclang_rpl_reference_visit_nested(const struct hpclang_rpl_reader *reader,
+                                       const struct hpclang_rpl_reference_node *root,
+                                       struct hpclang_rpl_reference_node *workspace,
+                                       uint32_t capacity, uint32_t node_budget,
+                                       hpclang_rpl_reference_visit_fn visit, void *context);
+
 enum hpclang_rpl_dispatch_schema
 {
     HPCLANG_RPL_DISPATCH_DUPLICATE_THEN_ENTRY,
