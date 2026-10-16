@@ -820,8 +820,9 @@ accepts mixed-case bare hexadecimal digits: `0xff` therefore converts the
 initial zero only. These rules also correct the initial `readint` adapter's
 overly permissive use of `strtol`. All integer forms saturate at their type's
 limit with `ERANGE`, replacing historical overflow behavior. Host sanitizers
-cover signed/unsigned limits, invalid prefixes and read errors. Native
-acceptance of this expanded family is pending.
+cover signed/unsigned limits, invalid prefixes and read errors. ARM analysis
+and HP39g+/HP50g Direct physical-key acceptance pass locally. Expanded Stock
+acceptance is pending.
 
 `hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
 Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,

@@ -1842,8 +1842,9 @@ numeric input, and installed-SDK relocation/packaging pass locally. Wider
 native acceptance and CI acceptance of this addition remain pending.
 `readuint/readhex/readlonglong/readulonglong` now share a checked integer parser
 matching the reviewed historical sign, whitespace and bare-hex rules. Boundary
-and error cases pass host sanitizers; native acceptance of this expanded family
-is pending. Decimal-format controls remain open.
+and error cases pass host sanitizers; ARM analysis and HP39g+/HP50g Direct
+physical-key acceptance pass locally. Expanded Stock acceptance is pending.
+Decimal-format controls remain open.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
