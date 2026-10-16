@@ -394,6 +394,11 @@ budget: the legacy launcher still reserves its original Stock page pool, and
 the observation does not measure peak stack use or prove an installation-space
 minimum. CI acceptance of this follow-up is pending.
 
+The maintained UI E2E target declares that 36 KiB ceiling in CMake. Its ordinary
+repository build consumes the same generated launcher arguments as SDK builds,
+and the guest rejects a larger arena. Direct and Stock runs therefore exercise
+the stated limit rather than merely printing the launcher's available memory.
+
 The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
 with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,
 layout, commit, rendering, surface copying and display publication at each

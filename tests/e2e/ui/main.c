@@ -304,7 +304,9 @@ done:
 int main(void)
 {
     extern unsigned hpclang_cpp_ui_test(void);
-    unsigned failure = hpclang_cpp_ui_test();
+    unsigned failure = hpclang_boot_info()->rw_bytes > HPCLANG_UI_RW_LIMIT ? 0x190b : 0;
+    if (!failure)
+        failure = hpclang_cpp_ui_test();
     if (!failure)
         failure = checks();
     if (!failure &&

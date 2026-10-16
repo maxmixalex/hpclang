@@ -182,7 +182,7 @@ __hpc1_blob_end:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, fromfile_prefix_chars="@")
     parser.add_argument("payload", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--tool-bin", type=Path, required=True)

@@ -169,6 +169,9 @@ if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
 fi
 
 LAUNCHER_ARGS=()
+if [[ -f "$OUT/cmake/$E2E_TARGET-launchers.args" ]]; then
+    LAUNCHER_ARGS+=("@$OUT/cmake/$E2E_TARGET-launchers.args")
+fi
 if (( ! WRAP_LAUNCHERS )); then
     LAUNCHER_ARGS+=(--raw-only)
 fi
@@ -190,7 +193,7 @@ for path in sorted(Path(sys.argv[1]).glob("*.json")):
 PY
 )
 python3 "$ROOT/tools/build-launchers.py" "$OUT/e2e.hpc" "$OUT/launchers" \
-    --tool-bin "$ATFE/bin" --models "${LAUNCHER_MODELS[@]}" "${LAUNCHER_ARGS[@]}"
+    --tool-bin "$ATFE/bin" "${LAUNCHER_ARGS[@]}" --models "${LAUNCHER_MODELS[@]}"
 
 if [[ "$MODE" == font-gallery ]]; then
     # The Gallery frontend provides a synthetic injection mapping of 224
