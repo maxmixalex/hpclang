@@ -26,6 +26,7 @@ static int write_byte(void *context, unsigned stream, unsigned char byte)
         assert(hpclang_stdio_route_read() == HPCLANG_STDIO_ERROR && errno == EBUSY);
         assert(hpclang_stdio_unbind() == -1 && errno == EBUSY);
         assert(hpclang_stdio_bind(NULL) == -1 && errno == EBUSY);
+        assert(hpclang_stdio_set_default(NULL) == -1 && errno == EBUSY);
     }
     return 0;
 }
@@ -72,5 +73,46 @@ int main(void)
     assert(hpclang_stdio_route_read() == 0);
     assert(hpclang_stdio_route_write(1, 0xff) == 0 && writes == 1);
     assert(hpclang_stdio_unbind() == 0);
+
+    /* A compatibility default is dormant until used and never supplements an
+     * explicit binding's missing callbacks. Installing it must not clear the
+     * current owner's stream state. */
+    assert(hpclang_stdio_set_default(NULL) == -1 && errno == EINVAL);
+    struct hpclang_stdio_callbacks empty = {0};
+    assert(hpclang_stdio_set_default(&empty) == -1 && errno == EINVAL);
+    assert(hpclang_stdio_bind(&callbacks) == 0); /* read-only application */
+    int saved_resets = resets, saved_writes = writes, saved_reads = reads;
+    int saved_flushes = flushes;
+    struct hpclang_stdio_callbacks defaults = {write_byte, read_byte, flush, &result};
+    assert(hpclang_stdio_set_default(&defaults) == 0);
+    assert(resets == saved_resets && writes == saved_writes && reads == saved_reads &&
+           flushes == saved_flushes);
+    defaults = empty; /* registration copies the descriptor */
+    assert(hpclang_stdio_set_default(&defaults) == -1 && errno == EBUSY);
+    assert(hpclang_stdio_route_write(1, 0xff) == 0 && writes == saved_writes);
+    assert(hpclang_stdio_route_flush(1) == 0 && flushes == saved_flushes);
+    assert(hpclang_stdio_unbind() == 0 && flushes == saved_flushes);
+
+    assert(hpclang_stdio_unbind() == 0 && flushes == saved_flushes);
+
+    /* Releasing the application resumes the default; reentrancy protection is
+     * identical for a default callback and an explicit callback. */
+    fail_flush = 0;
+    errno = EDOM;
+    assert(hpclang_stdio_route_write(1, 0xff) == 0 && writes == saved_writes + 1 && errno == EDOM);
+    result = 42;
+    assert(hpclang_stdio_route_read() == 42);
+    result = HPCLANG_STDIO_ERROR;
+    assert(hpclang_stdio_route_read() == HPCLANG_STDIO_ERROR && errno == ECANCELED);
+    fail_flush = 1;
+    assert(hpclang_stdio_route_flush(2) == -1 && errno == EIO);
+    fail_flush = 0;
+    callbacks = (struct hpclang_stdio_callbacks){.write = write_byte, .context = &result};
+    assert(hpclang_stdio_bind(&callbacks) == 0);
+    saved_reads = reads;
+    assert(hpclang_stdio_route_read() == HPCLANG_STDIO_EOF && reads == saved_reads);
+    assert(hpclang_stdio_unbind() == 0);
+    result = 99;
+    assert(hpclang_stdio_route_read() == 99);
     return 0;
 }
