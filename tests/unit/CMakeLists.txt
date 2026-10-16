@@ -20,6 +20,9 @@ target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/ha
 hpclang_unit(sst_flash test_sst_flash.c "${HPCLANG_ROOT}/runtime/core/sst-flash.c")
 target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rtc_tick test_rtc_tick.c "${HPCLANG_ROOT}/runtime/core/rtc-tick.c")
+target_include_directories(test_rtc_tick PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_flash_record test_rpl_flash_record.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"

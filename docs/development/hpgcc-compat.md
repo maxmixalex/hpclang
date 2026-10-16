@@ -806,6 +806,18 @@ would need to document its different relationship to the real interrupt latch;
 the existing cooperative timer's accumulated-expiration count alone is not a
 drop-in implementation. These three adapters remain unimplemented.
 
+The internal physical-tick lease engine now saves the host divider/enable and
+tick interrupt mask, retains a pending indication across period changes, and
+consumes one indication per poll. Release restores the saved configuration;
+an initial indication survives only if the application never consumed it.
+Unrelated source/selected-pending bits and mask changes are preserved. FIQ
+routing, RTC test/reset modes and an inconsistent selected interrupt are
+rejected before writes. Host tests cover all 256 selector byte values,
+coalescing, pending consumption/preservation, disabled host ticks, repeated
+release and conflicts, including ASan/UBSan. The previous sub-period hardware
+phase cannot be restored when reprogramming the divider. Public adapter wiring,
+runtime exit cleanup and six-model native acceptance remain to be completed.
+
 ### SD media discovery and replacement
 
 Historical HPGCC 2.0 `sources/fsystem/fsystem.h` and HPGCC3
