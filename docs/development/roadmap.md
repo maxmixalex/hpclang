@@ -1276,12 +1276,20 @@ HP49g+/HP50g runs interrupt the status write with one selected completed bit,
 restart Stock with the original 61-entry catalog, then finish retirement and
 verify a repeated call performs no writes. Whole-Flash comparisons require only
 the authorized status-byte change, preserving the neighboring byte and restored
-sector; owned image/stack/TLS, return and final catalog checks pass. Nineteen host
+sector; owned image/stack/TLS, return and final catalog checks pass. Twenty-one host
 verifier tests cover invalid statuses, unfinished targets, collateral changes
 and mismatched fault evidence. The maintained runner and Runtime workflow include
 the retirement build and cut/resume stage. Broader physical fault patterns,
 transaction freshness, reference authority and automatic startup integration
 remain required separately.
+
+Both models also accept a later invocation of the already installed recovery
+program: discovery reports no pending journal, all erase/program counters stay
+zero, the complete Flash image stays unchanged, and a subsequent reset retains
+the same catalog. Reusing the installed program avoids the insufficient-memory
+failure caused by accumulating another identical recovery package. The shared
+Kermit transport now supports remote-command-only sessions; three host transport
+tests cover this path, preserved upload ordering and malformed requests.
 
 Qualified reference planning now separates source and target mappings before
 adjusting absolute or relative fields. Host tests cover bank aliasing and torn

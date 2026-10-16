@@ -89,6 +89,31 @@ class RecoveryVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             VERIFY.verify_flash(partial, retired, self.slot, self.target, retire=True)
 
+    def test_clean_invocation_keeps_retired_transaction(self):
+        retired = self.after.copy()
+        retired[self.slot] = 0
+        self.assertEqual(
+            VERIFY.verify_retired(retired, retired, self.slot, self.target), self.record
+        )
+        for address in (0, self.slot - 1, self.slot, self.slot + 1, self.target, 0x1FFFFF):
+            changed = retired.copy()
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                VERIFY.verify_retired(retired, changed, self.slot, self.target)
+
+    def test_clean_invocation_rejects_stale_or_malformed_evidence(self):
+        retired = self.after.copy()
+        retired[self.slot] = 0
+        for address in (self.slot, self.slot + 12, self.slot + 24, self.slot + 4120, self.target):
+            changed = retired.copy()
+            changed[address] ^= 1
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                VERIFY.verify_retired(changed, changed, self.slot, self.target)
+        with self.assertRaises(ValueError):
+            VERIFY.verify_retired(retired[:-1], retired[:-1], self.slot, self.target)
+        with self.assertRaises(ValueError):
+            VERIFY.verify_retired(retired, retired, -1, self.target)
+
     def test_corrupt_journal_is_not_accepted_as_an_oracle(self):
         for offset in (0, 1, 3, 4, 12, 16, 20, 24, 4119, 4120):
             with self.subTest(offset=offset):

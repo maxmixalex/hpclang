@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-    echo "usage: $0 <tty> <send-directory> <debug-log> [--remote-host <RPL> | --remote-host-file <setup.json>] <file> [file ...]" >&2
+    echo "usage: $0 <tty> <send-directory> <debug-log> [--remote-host <RPL> | --remote-host-file <setup.json>] [file ...]" >&2
     exit 2
 fi
 
@@ -14,8 +14,8 @@ shift 3
 
 remote_commands=()
 while [[ "${1:-}" == --remote-host || "${1:-}" == --remote-host-file ]]; do
-    [[ $# -ge 3 && -n "$2" && "$2" != *,* ]] || {
-        echo "remote setup requires a nonempty comma-free argument and at least one file" >&2
+    [[ $# -ge 2 && -n "$2" && "$2" != *,* ]] || {
+        echo "remote setup requires a nonempty comma-free argument" >&2
         exit 2
     }
     if [[ "$1" == --remote-host-file ]]; then

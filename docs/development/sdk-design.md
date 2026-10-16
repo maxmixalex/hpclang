@@ -348,7 +348,13 @@ read, the runner first interrupts that status write after clearing one selected
 bit, verifies the entire Flash image and neighboring byte, resets Stock, then
 resumes retirement. A partially retired journal only authorizes finishing its
 status transition when the target already matches; it never authorizes another
-erase or replay. Both resets must retain the clean catalog. This is an owned
+erase or replay. Both resets must retain the clean catalog. A final invocation
+reuses the installed witness and must report no pending journal, zero erase/
+program calls and an unchanged complete Flash image. The Kermit helper supports
+remote commands without uploading another copy, avoiding fixture memory growth.
+The verifier selects `--operation replay`, `retire` or `check`; `check` validates
+the known retired record and its target as well as the no-write invocation.
+This is an owned
 transaction fixture, not transaction-freshness proof for arbitrary journals or
 an automatic startup-recovery implementation. CI builds all three witness modes.
 

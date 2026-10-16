@@ -93,12 +93,13 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
-def transfer(args, recovery, source, build, name, power_cut=None):
+def transfer(args, recovery, source, build, name, power_cut=None, *, installed=False):
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
     send.mkdir()
-    shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
+    if not installed:
+        shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
     prefix = []
     for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
         tokens = line.split()
@@ -141,7 +142,7 @@ def transfer(args, recovery, source, build, name, power_cut=None):
                     str(log),
                     "--remote-host",
                     f"-95 CF HOME '{name}' RCL",
-                    f"RECOVERY.HP={name}",
+                    *([] if installed else [f"RECOVERY.HP={name}"]),
                 ],
                 os.environ,
                 recovery / "transfer.log",
@@ -328,7 +329,7 @@ def run(args):
                 nm=args.nm,
                 slot=args.slot,
                 target=args.target,
-                retire=True,
+                operation="retire",
             )
         )
         retired_restart = args.output / "retired-restarted"
@@ -339,6 +340,29 @@ def run(args):
         ) as child:
             completed(child, 90)
         verify_restart(clean / "state", retired / "state", retired_restart / "state")
+        checked = args.output / "retired-check"
+        transfer(
+            args,
+            checked,
+            retired_restart / "state",
+            args.retirement_build,
+            "RECOVERYRETIRE",
+            installed=True,
+        )
+        verify(
+            SimpleNamespace(
+                before=retired_restart / "state",
+                after=checked / "state",
+                elf=args.retirement_build / "recovery.elf",
+                binary=args.retirement_build / "recovery.bin",
+                package=args.retirement_build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation="check",
+            )
+        )
+        verify_restart(clean / "state", retired_restart / "state", checked / "state")
         print("Journal retirement and unchanged native catalog after reset verified", flush=True)
     (args.output / "result.json").write_text(
         json.dumps(

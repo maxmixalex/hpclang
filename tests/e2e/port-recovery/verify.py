@@ -124,6 +124,19 @@ def verify_retirement_cut(before_path, after_path, log_path, slot, target, cut):
     require(after == expected, "Retirement cut changed unrelated Flash bytes")
 
 
+def verify_retired(before, after, slot, target):
+    """Verify a known retired transaction remains unchanged on a later launch."""
+    require(len(before) == len(after) == 0x200000, "Expected complete 2 MiB Flash images")
+    require(0 <= slot < len(before) and before[slot] == 0, "Expected a retired journal")
+    require(before == after, "Clean recovery invocation changed Flash")
+    # Normalize a private oracle copy; the durable record must remain retired.
+    ready = bytearray(before)
+    ready[slot] = 0x7E
+    record, restored = verify_flash(ready, ready, slot, target)
+    require(restored, "Retired transaction target no longer matches")
+    return record
+
+
 def native_words(ram, flash):
     require(len(ram) == 0x80000, "Expected hp4950 SRAM")
     words = struct.unpack("<" + "I" * (len(ram) // 4), ram)
@@ -267,9 +280,17 @@ def verify_restart(clean, repaired, restarted):
 def verify(args):
     before = (args.before / "flash").read_bytes()
     after = (args.after / "flash").read_bytes()
-    retire = getattr(args, "retire", False)
-    record, already_restored = verify_flash(before, after, args.slot, args.target, retire=retire)
-    phase = 1 if before[args.slot] == 0x7E else 2
+    operation = getattr(args, "operation", "replay")
+    require(operation in ("replay", "retire", "check"), "Unknown recovery operation")
+    retire = operation == "retire"
+    if operation == "check":
+        record = verify_retired(before, after, args.slot, args.target)
+        already_restored, phase = True, 0
+    else:
+        record, already_restored = verify_flash(
+            before, after, args.slot, args.target, retire=retire
+        )
+        phase = 1 if before[args.slot] == 0x7E else 2
     ram = (args.after / "sram").read_bytes()
     read = native_words(ram, after)
     require(read(0x806FD) - read(0x806F8) == 5, "Recovery did not preserve the empty stack")
@@ -297,17 +318,16 @@ def verify(args):
     require(start % 8 == 0 and start + size <= len(ram), "Recovery image bounds/alignment")
     physical = 0x08000000 + start
     result = struct.unpack_from("<Ii4I", ram, start + symbols["workspace"])
-    require(
-        result[1:4] == (phase, args.slot, args.target) and result[4] > 0,
-        "Preflight/discovery failed",
-    )
+    discovery = (phase, args.slot, args.target) if phase else (0, 0, 0)
+    require(result[1:4] == discovery and result[4] > 0, "Preflight/discovery failed")
     require(
         physical + symbols["stack_start"] <= result[5] < physical + symbols["stack_end"]
         and result[5] % 8 == 0,
         "C stack escaped its owned reservation",
     )
     scratch = start + symbols["workspace"] + 24
-    require(ram[scratch : scratch + 4124] == record, "RAM journal differs from durable journal")
+    if phase:
+        require(ram[scratch : scratch + 4124] == record, "RAM journal differs from durable journal")
     if phase == 1:
         require(
             ram[scratch + 4124 : scratch + 8248] == record,
@@ -380,7 +400,12 @@ def main():
     parser.add_argument("--nm", default="llvm-nm")
     parser.add_argument("--slot", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--target", type=lambda value: int(value, 0), required=True)
-    parser.add_argument("--retire", action="store_true", help="expect verified journal retirement")
+    parser.add_argument(
+        "--operation",
+        choices=("replay", "retire", "check"),
+        default="replay",
+        help="expected operation; check requires a previously retired transaction",
+    )
     verify(parser.parse_args())
     print("PASS: independent recovery, exact Flash changes, owned memory and Stock return")
 
