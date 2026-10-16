@@ -5,7 +5,6 @@ if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 endif()
 include("${HPCLANG_ROOT}/cmake/profiles/hpclang-v1.cmake")
-include("${HPCLANG_ROOT}/cmake/fonts.cmake")
 
 add_executable(hpclang_hpgcc_console_e2e
     ${HPCLANG_RUNTIME_START}
