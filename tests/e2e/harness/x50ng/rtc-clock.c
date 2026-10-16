@@ -67,6 +67,13 @@ void hpclang_rtc_clock_write(struct hpclang_rtc_clock *clock, unsigned index, ui
     clock->weekday = raw[4];
 }
 
+uint32_t hpclang_rtc_tick_interval(uint8_t selector, unsigned *remainder)
+{
+    unsigned numerator = ((unsigned)(selector & 127u) + 1u) * 1000000u + *remainder;
+    *remainder = numerator % 128u;
+    return numerator / 128u;
+}
+
 void hpclang_rtc_clock_stop(struct hpclang_rtc_clock *clock, int stopped, int64_t now_us)
 {
     if (!!stopped == clock->stopped)

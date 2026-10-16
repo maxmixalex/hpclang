@@ -20,4 +20,8 @@ void hpclang_rtc_clock_read(struct hpclang_rtc_clock *clock, int64_t now_us, uin
 void hpclang_rtc_clock_write(struct hpclang_rtc_clock *clock, unsigned index, uint8_t value,
                              int64_t now_us);
 void hpclang_rtc_clock_stop(struct hpclang_rtc_clock *clock, int stopped, int64_t now_us);
+/* RTC tick divider: period=(selector+1)/128 seconds. Initialize remainder to
+ * 127 when starting/reprogramming the divider to round deadlines upward.
+ * Preserve it across expirations so fractional microseconds do not drift. */
+uint32_t hpclang_rtc_tick_interval(uint8_t selector, unsigned *remainder);
 #endif

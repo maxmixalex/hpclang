@@ -677,6 +677,33 @@ def patch_rtc_clock(root: Path) -> None:
     path = root / "src/s3c2410/s3c2410_rtc.c"
     replace_once(
         path,
+        "    int64_t interval; /* us */",
+        "    unsigned tick_fraction; /* fractional microseconds, denominator 128 */",
+        "RTC tick fractional state",
+    )
+    replace_once(
+        path,
+        "        rtc->expires += rtc->interval;",
+        "        rtc->expires += hpclang_rtc_tick_interval(rtc->ticnt, &rtc->tick_fraction);",
+        "RTC tick fractional accumulation",
+    )
+    replace_once(
+        path,
+        """    us = ( ( ( rtc->ticnt & 0x7f ) + 1 ) * 1000000 ) / 128;
+
+    rtc->interval = us;
+    if ( rtc->interval < 1000 )
+        rtc->interval = 1000;
+
+    now = timer_get_clock();
+    rtc->expires = now + rtc->interval;""",
+        """    rtc->tick_fraction = 127;
+    now = timer_get_clock();
+    rtc->expires = now + hpclang_rtc_tick_interval(rtc->ticnt, &rtc->tick_fraction);""",
+        "RTC tick initial phase",
+    )
+    replace_once(
+        path,
         '#include "../module.h"',
         '#include "../module.h"\n#include "../rtc-clock.h"',
         "RTC clock include",

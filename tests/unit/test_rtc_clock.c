@@ -3,6 +3,16 @@
 
 int main(void)
 {
+    for (unsigned selector = 0; selector < 128; ++selector) {
+        unsigned remainder = 127;
+        uint64_t deadline = 0;
+        for (unsigned tick = 1; tick <= 4096; ++tick) {
+            deadline += hpclang_rtc_tick_interval((uint8_t)selector, &remainder);
+            uint64_t numerator = (uint64_t)tick * (selector + 1u) * 1000000u;
+            assert(deadline == (numerator + 127u) / 128u);
+            assert(remainder < 128);
+        }
+    }
     struct hpclang_rtc_clock clock;
     struct hpclang_datetime leap = {2024, 2, 28, 23, 59, 59};
     uint8_t raw[7];
