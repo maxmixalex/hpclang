@@ -387,6 +387,21 @@ across arbitrary library IDs, ports and firmware configurations.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+An HP50g prototype stores the owned recovery program as a hidden Port 2 library
+command. Calling its ROMPTR after Stock startup passes the image/stack/TLS and
+return checks with unchanged Flash and no journal. This establishes execution
+from the installed library through a RAM-owned CODE copy. Configuration-time
+probes both through that hidden command and with the program directly in the
+configuration entry restore an injected damaged sector and retire its journal:
+complete Flash images match the independent replay oracle with 64-read busy
+intervals. The final warmstart RAM snapshot does not retain the executed image,
+so it cannot establish the transient image/stack/TLS invariants for this path.
+The first repaired startup retains only 59 of the original 62 catalog entries;
+a second warmstart rebuilds all 62 exact bindings without changing Flash.
+Production integration must therefore rebuild the catalog before allowing
+dependent library/application code to continue, as well as verify transient
+execution state and recovery after RAM loss.
+
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
 status and ignores command writes; the array changes only at completion. The
