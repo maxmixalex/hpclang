@@ -1349,6 +1349,15 @@ warm-repaired and cold-repaired saved states all have the expected RAM directory
 Those final snapshots establish the existing-directory precondition, not that
 cold initialization never enters the allocation path. Installation and mutation
 preflight must account for this distinction before claiming early-callback safety.
+The maintained configuration fixture now also locates library 229's configuration
+program from its catalog/header and erases that body's sector while preserving
+the bank and library headers. Offline HP49g+/HP50g runs restore the exact sector,
+close both transaction records and reconstruct all 62 baseline catalog entries.
+The full maintained sequence additionally checks owned recovery state and an
+unchanged later warmstart; acceptance of that expanded sequence is pending.
+This case does not prove that every earlier callback executed safely: Stock may
+skip damaged library contents, and the earlier dependent-library counterexample
+still requires a production startup design.
 An explicit stale-journal host regression also demonstrates why structural
 preflight is insufficient: a later valid backup inside the target sector is
 hidden by the old image overlay. Public write preparation rejects ready and

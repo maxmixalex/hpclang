@@ -321,6 +321,14 @@ existing destination are preserved. The copied state must undergo hardware
 reset before transfer so Stock rebuilds its catalog from the damaged Flash.
 This is explicit offline fault injection, not a model of an erase/program pulse
 interrupted while the chip is busy.
+Targets may be aligned sectors anywhere inside the first user bank; the journal
+must remain in a separate empty bank. This permits body-only faults that leave
+the bank identity and earlier library headers intact. The configuration fixture
+derives its Stock 2.15 library-229 callback sector from the saved catalog and
+Flash header, verifies the expected bank mapping and rejects a target sharing
+the bank/library header sector. It checks exact recovery, the complete catalog,
+owned recovery state and an unchanged subsequent warmstart. Successful repair
+does not by itself prove which earlier factory callbacks executed or were skipped.
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.

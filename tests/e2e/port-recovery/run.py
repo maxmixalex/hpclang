@@ -13,7 +13,7 @@ import sys
 import time
 from types import SimpleNamespace
 
-from prepare import prepare, reserve_bank_tail
+from prepare import configuration_body_sector, prepare, reserve_bank_tail
 from verify import (
     verify,
     verify_interruption,
@@ -348,8 +348,40 @@ def configuration_recovery(args, clean):
             )
             verify_restart(baseline, before, after)
             before = after
+    # A missing bank header can suppress callbacks entirely. Also damage a
+    # factory callback's body while retaining its library header and pointer.
+    body_target = configuration_body_sector((baseline / "flash").read_bytes(), read)
+    body_fault = args.output / "configuration-body-fault"
+    prepare(baseline, body_fault, args.slot, body_target, bound=bound)
+    repaired = boot(body_fault, "configuration-body-recovered")
+    verify_flash(
+        (body_fault / "flash").read_bytes(),
+        (repaired / "flash").read_bytes(),
+        args.slot,
+        body_target,
+        retire=True,
+        authority_slot=authority_slot,
+    )
+    for state in (repaired, boot(repaired, "configuration-body-rechecked")):
+        verify_restart(baseline, repaired, state)
+        verify(
+            SimpleNamespace(
+                before=repaired,
+                after=state,
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=body_target,
+                operation="check",
+                relocated_image=True,
+                authority_slot=authority_slot,
+            )
+        )
     print(
-        "Flash configuration recovery rebuilt the catalog with retained RAM and RAM loss; "
+        "Flash configuration recovery rebuilt the catalog after bank-header and callback-body "
+        "faults, including retained RAM and bank-header RAM loss; "
         "later warmstarts unchanged",
         flush=True,
     )
