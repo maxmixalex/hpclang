@@ -46,4 +46,15 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
 int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
                                     uint8_t *scratch, uint32_t capacity);
 
+/* Replay only the exact ready journal previously inspected/authorized by the
+ * caller. Reload and compare all durable bytes before any target mutation.
+ * expected is a stable SECTOR_RECORD_BYTES RAM snapshot, disjoint from scratch
+ * and IO state. A changed journal returns DIRTY without target writes. This
+ * binds replay to the inspected image; it does not establish transaction
+ * freshness or authority, nor relax any ownership/return rules above. */
+int hpclang_rpl_flash_sector_replay_expected(const struct hpclang_rpl_flash_replay_io *io,
+                                             uint32_t slot, const uint8_t *expected,
+                                             uint32_t expected_bytes, uint8_t *scratch,
+                                             uint32_t capacity);
+
 #endif

@@ -1,5 +1,6 @@
 #include "rpl-flash-replay.h"
 #include <stddef.h>
+#include <string.h>
 
 static uint16_t image_word(const uint8_t *image, uint32_t offset)
 {
@@ -93,8 +94,8 @@ int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, ui
     return phase;
 }
 
-int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
-                                    uint8_t *scratch, uint32_t capacity)
+static int sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
+                         const uint8_t *expected_record, uint8_t *scratch, uint32_t capacity)
 {
     if (!io || !io->flash.read16 || !io->flash.program16 || !io->erase_sector || !scratch ||
         capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
@@ -111,6 +112,8 @@ int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io
             return HPCLANG_RPL_FLASH_DIRTY;
         scratch[i] = (uint8_t)(word >> (8u * (at & 1u)));
     }
+    if (expected_record && memcmp(expected_record, scratch, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES))
+        return HPCLANG_RPL_FLASH_DIRTY;
     uint32_t target;
     const uint8_t *image;
     if (hpclang_rpl_flash_sector_decode(flash->first, flash->end, slot, scratch,
@@ -154,4 +157,23 @@ int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io
             return HPCLANG_RPL_FLASH_DIRTY;
     }
     return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
+                                    uint8_t *scratch, uint32_t capacity)
+{
+    return sector_replay(io, slot, NULL, scratch, capacity);
+}
+
+int hpclang_rpl_flash_sector_replay_expected(const struct hpclang_rpl_flash_replay_io *io,
+                                             uint32_t slot, const uint8_t *expected,
+                                             uint32_t expected_bytes, uint8_t *scratch,
+                                             uint32_t capacity)
+{
+    if (!expected || expected_bytes != HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uintptr_t a = (uintptr_t)expected, b = (uintptr_t)scratch;
+    if ((a >= b ? a - b : b - a) < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return sector_replay(io, slot, expected, scratch, capacity);
 }

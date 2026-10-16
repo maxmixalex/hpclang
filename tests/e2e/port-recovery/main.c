@@ -168,16 +168,19 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
             device.sector_bytes == 4096) {
             struct hpclang_rpl_flash_replay_io replay = {
                 {out, read_flash, program_flash, 0x140000, 0x200000}, erase_flash};
-            out->diagnostics[27] = hpclang_rpl_flash_sector_replay(&replay, out->slot, out->scratch,
-                                                                   sizeof(out->scratch));
+            const uint32_t record_bytes = HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
+            out->diagnostics[27] = hpclang_rpl_flash_sector_replay_expected(
+                &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
+                sizeof(out->scratch) - record_bytes);
             if (out->diagnostics[27] != 0) {
                 out->marker = 0x48504641;
                 for (;;)
                     __asm__ volatile("nop");
             }
             unsigned erases = out->diagnostics[28], programs = out->diagnostics[29];
-            out->diagnostics[30] = hpclang_rpl_flash_sector_replay(&replay, out->slot, out->scratch,
-                                                                   sizeof(out->scratch));
+            out->diagnostics[30] = hpclang_rpl_flash_sector_replay_expected(
+                &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
+                sizeof(out->scratch) - record_bytes);
             out->diagnostics[31] =
                 (out->diagnostics[28] - erases) + (out->diagnostics[29] - programs);
             if (out->diagnostics[30] != 0) {

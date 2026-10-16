@@ -116,6 +116,60 @@ static void retry(void)
     assert(!programs && !erases);
 }
 
+static void expected_replay_tests(void)
+{
+    uint8_t expected[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    memcpy(expected, original + SLOT - FIRST, sizeof expected);
+    prepare();
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, expected, sizeof expected, scratch,
+                                                    sizeof scratch) == 0);
+    assert(!memcmp(flash, desired, SECTOR));
+    assert(!memcmp(flash + SECTOR, original + SECTOR, sizeof flash - SECTOR));
+    assert(!memcmp(expected, original + SLOT - FIRST, sizeof expected));
+    reset_counters();
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, expected, sizeof expected, scratch,
+                                                    sizeof scratch) == 0);
+    assert(!programs && !erases);
+    for (unsigned i = 0; i < sizeof expected; ++i) {
+        prepare();
+        expected[i] ^= 1;
+        assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, expected, sizeof expected,
+                                                        scratch,
+                                                        sizeof scratch) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases && !memcmp(flash, original, sizeof flash));
+        expected[i] ^= 1;
+    }
+    /* A replacement record may be perfectly CRC-valid but is still not the
+     * snapshot this caller inspected. Do not silently adopt its new image. */
+    uint8_t changed[SECTOR];
+    memcpy(changed, desired, sizeof changed);
+    changed[10] ^= 1;
+    prepare();
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, SLOT, FIRST, changed, flash + SLOT - FIRST,
+                                            sizeof expected));
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, expected, sizeof expected, scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(!programs && !erases && !memcmp(flash, original, SECTOR));
+    prepare();
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, NULL, sizeof expected, scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, expected, sizeof expected - 1,
+                                                    scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, scratch, sizeof scratch, scratch,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_INVALID);
+    uint8_t buffers[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_sector_replay_expected(&io, SLOT, buffers, sizeof expected,
+                                                    buffers + sizeof expected - 1,
+                                                    sizeof scratch) == HPCLANG_RPL_FLASH_INVALID);
+    assert(!reads && !programs && !erases);
+    memcpy(buffers, expected, sizeof expected);
+    assert(!hpclang_rpl_flash_sector_replay_expected(&io, SLOT, buffers, sizeof expected,
+                                                     buffers + sizeof expected, sizeof scratch));
+    assert(!memcmp(buffers, expected, sizeof expected));
+    assert(!memcmp(flash, desired, SECTOR));
+}
+
 static void prepare_publication(void)
 {
     prepare();
@@ -577,6 +631,7 @@ int main(void)
     assert(hpclang_rpl_flash_sector_replay(&io, SLOT, scratch, sizeof scratch - 1) ==
            HPCLANG_RPL_FLASH_INVALID);
     assert(!reads && !programs && !erases);
+    expected_replay_tests();
     non_header_sector_test();
     publication_tests();
     retirement_tests();

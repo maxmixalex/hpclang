@@ -177,6 +177,7 @@ class RecoveryInterruptionTests(unittest.TestCase):
             self.physical + self.symbols["stack_start"] + 32,
         )
         self.ram[workspace + 24 : workspace + 24 + 4124] = self.record
+        self.ram[workspace + 24 + 4124 : workspace + 24 + 8248] = self.record
         struct.pack_into(
             "<2I", self.ram, self.start + self.symbols["guard_low"], 0x13579BDF, 0x2468ACE0
         )
@@ -199,6 +200,13 @@ class RecoveryInterruptionTests(unittest.TestCase):
 
     def test_owned_interruption_is_accepted(self):
         VERIFY.verify_interruption(self.args)
+
+    def test_separate_reload_must_match_inspected_journal(self):
+        offset = self.start + self.symbols["workspace"] + 24 + 4124
+        self.ram[offset + 24] ^= 1
+        (self.args.after / "sram").write_bytes(self.ram)
+        with self.assertRaisesRegex(ValueError, "separate journal reload"):
+            VERIFY.verify_interruption(self.args)
 
     def test_early_identity_or_incomplete_body_is_rejected(self):
         for offset in (0, 0x100, 4095):

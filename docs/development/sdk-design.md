@@ -297,7 +297,14 @@ The linker rejects unhandled sections rather than allowing the packaging step
 to silently omit newly introduced data. Core CI builds this witness and checks linked relocation kinds, image entry and
 BSS bounds before producing `recovery.hp`. The fixture records replay, mapping,
 TLS and clock diagnostics for independent saved-state verification; its marker
-alone is not acceptance. `tests/e2e/port-recovery/verify.py` compares complete
+alone is not acceptance. It keeps the preflight journal snapshot separate from
+the replay read buffer, using the existing two-record workspace.
+`hpclang_rpl_flash_sector_replay_expected()` requires the complete durable
+journal to match that snapshot before touching the target; overlapping buffers
+are rejected. This binds replay to the inspected image, without establishing
+transaction freshness, reference safety or authority to reclaim native data.
+The saved-state verifier checks both copies independently.
+`tests/e2e/port-recovery/verify.py` compares complete
 before/after Flash images against the CRC-checked sector journal, checks the
 native empty stack and absence of Library 275, and verifies owned image/stack,
 guards, TLS, mapping restoration, clock progression, repeat-write counts and

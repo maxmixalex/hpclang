@@ -166,6 +166,10 @@ def verify_interruption(args):
     require(result[1:4] == (1, args.slot, args.target), "Interrupted preflight/discovery failed")
     scratch = start + symbols["workspace"] + 24
     require(ram[scratch : scratch + 4124] == record, "Interrupted RAM journal changed")
+    require(
+        ram[scratch + 4124 : scratch + 8248] == record,
+        "Interrupted replay did not retain a separate journal reload",
+    )
     for symbol, values in (
         ("guard_low", (0x13579BDF, 0x2468ACE0)),
         ("guard_high", (0x89ABCDEF, 0xFEDCBA98)),
@@ -262,6 +266,10 @@ def verify(args):
     )
     scratch = start + symbols["workspace"] + 24
     require(ram[scratch : scratch + 4124] == record, "RAM journal differs from durable journal")
+    require(
+        ram[scratch + 4124 : scratch + 8248] == record,
+        "Replay did not retain a separate journal reload",
+    )
     mutable = [
         (symbols["workspace"], symbols["workspace"] + 8400),
         (symbols["stack_start"], symbols["stack_end"]),
