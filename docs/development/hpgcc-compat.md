@@ -704,7 +704,7 @@ access, with both lower and upper delay bounds to catch unit mismatches.
 All six Direct and all six Stock targets pass locally with the corrected
 milliseconds conversion and stopwatch checks, including independent report
 pixel verification. The separate System Services payload also passes that
-full matrix. Formal CI is pending.
+full matrix. Runtime and Quality CI are accepted on `c2fb66fe`.
 The relocated installed SDK also builds its C/C++ examples, all six native
 launchers and three HP39 Aplet families, including `examples/hpgcc-timer`. Historical
 integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
@@ -717,7 +717,7 @@ adapter; it does not promise the historical time library's binary ABI. Host
 tests cover leap/century dates and failure preservation. The calendar check
 passes all six Direct and all six Stock targets with independent report pixel
 verification and normal Stock return. The relocated installed-SDK build also
-passes with the calendar example; formal CI for this addition remains pending.
+passes with the calendar example; Runtime and Quality CI are accepted on `c2fb66fe`.
 
 ### Historical tones and packed BCD
 
@@ -760,7 +760,8 @@ duration bounds, BCD results and independent report pixels. The separate sound
 service tests cover hardware ownership and restoration.
 Both tone spellings and BCD checks pass all six Direct and all six Stock targets
 locally, including normal Stock return. The relocated installed SDK builds the
-updated example for C/C++ launcher and Aplet acceptance. Formal CI is pending.
+updated example for C/C++ launcher and Aplet acceptance. Runtime and Quality CI
+are accepted on `c2fb66fe`.
 
 ### Historical slow-mode selection
 
@@ -777,8 +778,8 @@ provide raw `sys_clksave/restore`, PLL control or overclocking adapters.
 All six Direct and all six Stock targets pass repeated profile selection,
 frequency bounds, monotonic continuity and host-frequency restoration, with
 independent report pixels and normal return. The relocated SDK also builds the
-updated example, six-model launchers and three HP39 Aplet families. Formal CI
-for this adapter addition is pending.
+updated example, six-model launchers and three HP39 Aplet families. Runtime and
+Quality CI are accepted on `c2fb66fe`.
 
 ### RTC tick compatibility requirements
 

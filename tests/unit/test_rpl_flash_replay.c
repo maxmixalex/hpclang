@@ -17,6 +17,9 @@ static uint16_t failed_program_bits, failed_erase_bits;
 static int masked_erase;
 static int publishing;
 static uint32_t sector_address = FIRST, last_program;
+static const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46,
+                                 0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
+                                 0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
 
 static int read16(void *context, uint32_t address, uint16_t *value)
 {
@@ -327,9 +330,6 @@ static void discovery_image(uint32_t address)
 
 static void discovery_tests(void)
 {
-    const uint8_t backup[] = {0x53, 0x3e, 0x00, 0x10, 0x62, 0x2b, 0x10, 0x03, 0x00, 0x08, 0x46,
-                              0x4c, 0x41, 0x53, 0x48, 0x4f, 0x4e, 0x45, 0x08, 0x14, 0x26, 0x90,
-                              0x00, 0x00, 0x87, 0x09, 0x11, 0x29, 0x00, 0xc8, 0xd1, 0xff};
     uint32_t slot = 17, target = 19;
     prepare_discovery();
     assert(!hpclang_rpl_flash_find_sector(&io.flash, 0x160000, scratch, sizeof scratch, &slot,
@@ -473,6 +473,38 @@ static void preflight_tests(void)
     assert(slot == 17 && target == 19 && !programs && !erases);
     assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace - 1, &slot,
                                               &target) == HPCLANG_RPL_FLASH_INVALID);
+}
+
+static void stale_journal_tests(void)
+{
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint32_t slot = 17, target = 19;
+    prepare_preflight();
+    discovery_image(SLOT);
+    /* A later, valid allocation can fit entirely inside the journal's target.
+     * Overlay validation sees the old empty tail, hiding the later object.
+     * Neither a valid journal CRC nor exact journal-byte pinning proves that
+     * replay is still authorized. Do not feed this result to the raw replayer. */
+    memcpy(flash + 0x105, backup, sizeof backup);
+    memcpy(original, flash, sizeof flash);
+    assert(
+        !hpclang_rpl_flash_find_sector(&io.flash, FIRST, scratch, sizeof scratch, &slot, &target));
+    assert(hpclang_rpl_flash_preflight_sector(&io.flash, workspace, sizeof workspace, &slot,
+                                              &target) == HPCLANG_RPL_FLASH_SECTOR_READY);
+    assert(slot == SLOT && target == FIRST);
+    assert(memcmp(flash, workspace + 24, SECTOR));
+    assert(!programs && !erases && !memcmp(flash, original, sizeof flash));
+
+    /* Public write preparation must not treat structural preflight as erase
+     * authority, nor clean up an unowned sector journal as a failed append. */
+    const uint8_t pending[] = {0x7e, 0x7c, 0x02};
+    for (unsigned i = 0; i < sizeof pending; ++i) {
+        flash[SLOT - FIRST] = pending[i];
+        memcpy(original, flash, sizeof flash);
+        reset_counters();
+        assert(hpclang_rpl_flash_prepare_write(&io.flash) == HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases && !memcmp(flash, original, sizeof flash));
+    }
 }
 
 static void restart_retirement_tests(void)
@@ -637,6 +669,7 @@ int main(void)
     retirement_tests();
     discovery_tests();
     preflight_tests();
+    stale_journal_tests();
     restart_retirement_tests();
     return 0;
 }

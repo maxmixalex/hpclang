@@ -1309,6 +1309,11 @@ the earlier library runs twice across fault recovery and its internal restart;
 the later library runs once. Both finish with exact recovery and all 63 catalog
 entries. Selecting the lowest documented user ID is therefore insufficient to
 guarantee safe production startup ordering.
+An explicit stale-journal host regression also demonstrates why structural
+preflight is insufficient: a later valid backup inside the target sector is
+hidden by the old image overlay. Public write preparation rejects ready and
+partially retired sector journals without any Flash mutation. Durable
+transaction authority remains required before production startup replay.
 
 HP50g Flash-resident configuration prototypes now restore the injected header
 sector and retire its journal automatically, both through a hidden library

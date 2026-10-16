@@ -397,6 +397,15 @@ access the damaged bank before recovery runs.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+Journal integrity is separate from transaction authority. A host regression
+keeps a valid ready journal and adds a valid backup inside its target sector.
+Whole-port overlay preflight still accepts the old image, because that image
+hides the later allocation. No erase is attempted: public write preparation
+rejects the ready or partially retired journal without modifying any Flash byte.
+Pinning the journal bytes alone cannot detect this stale-target case. Production
+startup replay requires a durable transaction ownership protocol before this
+internal recovery primitive can authorize writes outside a controlled fixture.
+
 An HP50g prototype stores the owned recovery program as a hidden Port 2 library
 command. Calling its ROMPTR after Stock startup passes the image/stack/TLS and
 return checks with unchanged Flash and no journal. This establishes execution

@@ -55,8 +55,9 @@ int hpclang_rpl_flash_sector_inspect(uint32_t first, uint32_t end, uint32_t slot
                                      const uint8_t **image,
                                      enum hpclang_rpl_flash_sector_phase *phase);
 
-/* Internal redo-image allocation (metadata 3, HPCSECT1), not yet
- * used by public mutations or recognized by whole-port recovery. It holds a
+/* Internal redo-image allocation (metadata 3, HPCSECT1), recognized by the
+ * read-only sector preflight but not authorized by public write preparation.
+ * It is not yet used by public mutations. It holds a
  * complete 4 KiB desired sector image, its target/self addresses and a status-independent
  * CRC32. The journal allocation must be outside the target sector and native
  * bank headers, with an erased end-marker position remaining in its bank.
