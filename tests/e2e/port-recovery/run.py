@@ -238,7 +238,7 @@ def startup_recovery(args, clean, damaged):
 
 
 def configuration_recovery(args, clean):
-    """Prove automatic replay and complete catalog rebuilding without a second host reset.
+    """Prove automatic replay and catalog rebuilding, with retained RAM and RAM loss.
 
     The library number and HOME names belong only to this fresh-firmware fixture.
     This is not an installer for a user's existing calculator.
@@ -262,14 +262,21 @@ def configuration_recovery(args, clean):
         ],
     )
 
-    def warmstart(source, name):
+    def boot(source, name, *, clear_ram=False, check_home=True):
         phase = args.output / name
         phase.mkdir()
         shutil.copytree(source, phase / "state")
+        sequence = "10000 capture home\n12000 finish-install\n"
+        if clear_ram:
+            ram = phase / "state/sram"
+            ram.write_bytes(bytes(ram.stat().st_size))
+            # Stock asks whether to recover memory after RAM loss. Decline it;
+            # recovery must come from the installed Flash library alone.
+            sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"
         with emulator(
             args,
             phase,
-            "10000 capture home\n12000 finish-install\n",
+            sequence,
             ["--reset"],
             flash_busy=True,
         ) as child:
@@ -279,11 +286,11 @@ def configuration_recovery(args, clean):
         read = native_words(
             (phase / "state/sram").read_bytes(), (phase / "state/flash").read_bytes()
         )
-        if home_string(read, b"HPCKEEP") != b"hpclang recovery":
+        if check_home and home_string(read, b"HPCKEEP") != b"hpclang recovery":
             raise RuntimeError("Configuration recovery changed the HOME fixture string")
         return phase / "state"
 
-    baseline = warmstart(installed / "state", "configuration-clean")
+    baseline = boot(installed / "state", "configuration-clean")
     if (baseline / "flash").read_bytes() != (installed / "state/flash").read_bytes():
         raise RuntimeError("Clean library configuration changed Flash")
     read = native_words((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())
@@ -294,41 +301,48 @@ def configuration_recovery(args, clean):
     bound = getattr(args, "configuration_authority", False)
     authority_slot = args.slot + 4124 if bound else None
     prepare(baseline, damaged, args.slot, args.target, bound=bound)
-    before = damaged
-    for name in ("configuration-recovered", "configuration-rechecked"):
-        after = warmstart(before, name)
-        if before == damaged:
-            verify_flash(
-                (before / "flash").read_bytes(),
-                (after / "flash").read_bytes(),
-                args.slot,
-                args.target,
-                retire=True,
-                authority_slot=authority_slot,
+    for lost_ram, names in (
+        (False, ("configuration-recovered", "configuration-rechecked")),
+        (True, ("configuration-ram-loss", "configuration-ram-loss-rechecked")),
+    ):
+        before = damaged
+        for name in names:
+            after = boot(
+                before, name, clear_ram=lost_ram and before == damaged, check_home=not lost_ram
             )
-            # The internal restart has already replaced the first invocation's
-            # diagnostics with a clean invocation. Verify the durable transition
-            # above, then verify this final no-op image and the complete catalog.
+            if before == damaged:
+                verify_flash(
+                    (before / "flash").read_bytes(),
+                    (after / "flash").read_bytes(),
+                    args.slot,
+                    args.target,
+                    retire=True,
+                    authority_slot=authority_slot,
+                )
+                # The internal restart has already replaced the first invocation's
+                # diagnostics with a clean invocation. Verify the durable transition
+                # above, then verify this final no-op image and the complete catalog.
+                before = after
+            verify(
+                SimpleNamespace(
+                    before=before,
+                    after=after,
+                    elf=build / "recovery.elf",
+                    binary=build / "recovery.bin",
+                    package=build / "recovery.hp",
+                    nm=args.nm,
+                    slot=args.slot,
+                    target=args.target,
+                    operation="check",
+                    relocated_image=True,
+                    authority_slot=authority_slot,
+                )
+            )
+            verify_restart(baseline, before, after)
             before = after
-        verify(
-            SimpleNamespace(
-                before=before,
-                after=after,
-                elf=build / "recovery.elf",
-                binary=build / "recovery.bin",
-                package=build / "recovery.hp",
-                nm=args.nm,
-                slot=args.slot,
-                target=args.target,
-                operation="check",
-                relocated_image=True,
-                authority_slot=authority_slot,
-            )
-        )
-        verify_restart(baseline, before, after)
-        before = after
     print(
-        "Flash configuration recovery rebuilt the catalog automatically; later warmstart unchanged",
+        "Flash configuration recovery rebuilt the catalog with retained RAM and RAM loss; "
+        "later warmstarts unchanged",
         flush=True,
     )
 

@@ -1359,6 +1359,16 @@ preservation, owned relocated CODE verification and a later unchanged warmstart.
 The fixture's compiled journal/authority pair is explicit test input, not a
 trusted production installation root. CI now selects this configuration mode
 and uploads its generated library package alongside the standalone program.
+The bound configuration runner also covers loss of all SRAM before the damaged
+Flash boot. It declines Stock's memory-recovery prompt, then requires exact
+sector restoration, retired journal and closed authority, the original complete
+Flash library catalog, owned relocated CODE/stack/TLS and an unchanged later
+warmstart. HOME preservation is checked only in the retained-RAM scenario.
+Separate HP49g+ and HP50g cold baselines reconstruct all 62 Flash catalog entries;
+both the standard library 1701 and research-only library 4 pass bound cold repair
+and catalog reconstruction locally. This tests simulated RAM loss with an intact
+installed recovery library, not physical battery loss or safe ordering against
+arbitrary earlier library callbacks.
 An old binding
 must not be erased/reused while its journal can survive, because a partial erase
 can resurrect an armed status; root replacement needs its own protocol.
