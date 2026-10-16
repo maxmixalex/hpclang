@@ -416,6 +416,17 @@ completion without reintroducing saved HOME data. This remains an isolated
 fixture, not complete loss of every peripheral/on-chip state, production
 installation, transaction freshness or physical battery removal acceptance.
 
+The maintained runner now includes a fresh Flash-configuration fixture whenever
+the retirement build is supplied. Stock's built-in library compiler installs
+the owned CODE program as a temporary library configuration, then removes the
+source variables from HOME. A clean restart establishes its catalog baseline;
+offline injection and two further warmstarts verify replay/retirement, relocated
+CODE ownership and the exact final catalog. The library ID and temporary names
+are fixture-local, not a production reservation or existing-user installation.
+The synthetic busy-read model is enabled for the recovery warmstarts, after
+Stock constructs the fixture: applying it to Stock's installation driver fails
+in the emulator and is not an accepted hardware-timing model for that driver.
+
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
 status and ignores command writes; the array changes only at completion. The

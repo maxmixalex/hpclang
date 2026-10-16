@@ -1322,6 +1322,15 @@ HP49g+ independently passes direct configuration-entry replay/retirement and
 the complete relocated-image checks, also retaining 59 entries on that first
 repaired startup. Its RAM-loss case has not yet been accepted.
 
+Both models now pass the maintained runner's Flash-configuration branch: native
+library installation, clean catalog baseline, injected fault, automatic repair
+and retirement, relocated CODE verification, then exact catalog rebuilding on
+the second warmstart. It reuses the retirement build and existing workflow
+arguments. Synthetic busy reads apply to the recovery stages; Stock constructs
+the fixture with the normal emulator Flash model because its installation
+driver does not pass the synthetic read-count timing model. Production automatic
+catalog rebuilding and safe ordering before dependent libraries remain open.
+
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay
 zero, the complete Flash image stays unchanged, and a subsequent reset retains

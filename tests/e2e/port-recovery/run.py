@@ -20,6 +20,8 @@ from verify import (
     verify_restart,
     verify_power_cut,
     verify_retirement_cut,
+    native_words,
+    require_stock_pc,
 )
 
 
@@ -93,13 +95,26 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
-def transfer(args, recovery, source, build, name, power_cut=None, *, installed=False, execute=True):
+def transfer(
+    args,
+    recovery,
+    source,
+    build,
+    name,
+    power_cut=None,
+    *,
+    installed=False,
+    execute=True,
+    remote_commands=None,
+):
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
     send.mkdir()
     if not installed:
         shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
+    if remote_commands is None:
+        remote_commands = [f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME"]
     prefix = []
     for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
         tokens = line.split()
@@ -142,8 +157,7 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
                     str(ktty),
                     str(send),
                     str(log),
-                    "--remote-host",
-                    f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME",
+                    *[token for command in remote_commands for token in ("--remote-host", command)],
                     *([] if installed else [f"RECOVERY.HP={name}"]),
                 ],
                 os.environ,
@@ -151,6 +165,9 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
             ) as sender:
                 if sender.wait():
                     raise RuntimeError("Recovery transfer failed; inspect transfer.log")
+            # Stock can report an RPL error in a successful Kermit response.
+            if "Error:" in (recovery / "transfer.log").read_text(errors="replace"):
+                raise RuntimeError("Stock rejected recovery setup; inspect transfer.log")
             (recovery / "complete").touch()
             if power_cut is None:
                 completed(child, 90)
@@ -215,6 +232,92 @@ def startup_recovery(args, clean, damaged):
             verify_restart(clean, before, phase / "state")
         before = phase / "state"
     print("Automatic STARTUP replay/retirement and clean second warmstart verified", flush=True)
+
+
+def configuration_recovery(args, clean):
+    """Install an isolated Flash fixture and prove automatic replay, then catalog rebuild.
+
+    The library number and HOME names belong only to this fresh-firmware fixture.
+    This is not an installer for a user's existing calculator.
+    """
+    build = args.retirement_build
+    installed = args.output / "configuration-installed"
+    # Construct the fixture with Stock's own driver. The synthetic read-count
+    # busy model exercises our recovery polling below, not Stock's installation driver.
+    setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
+    transfer(
+        setup,
+        installed,
+        clean,
+        build,
+        "RECOVERY",
+        execute=False,
+        remote_commands=[
+            "-95 CF HOME 256 ATTACH",
+            "'CFPROBE' CRDIR 'RECOVERY' RCL CFPROBE 'DORUN' STO",
+            "1701 '$ROMID' STO \"HPCRecovery\" '$TITLE' STO",
+            "'DORUN' RCL '$CONFIG' STO",
+            # Kermit character escapes produce Stock's actual program delimiters.
+            r"\{171} \{187} 'PING' STO { PING } '$VISIBLE' STO { } '$HIDDEN' STO",
+            "CRLIB HOME 2 STO",
+            "'RECOVERY' PURGE CFPROBE",
+            "{ DORUN PING '$ROMID' '$TITLE' } PURGE",
+            "{ '$CONFIG' '$VISIBLE' '$HIDDEN' } PURGE",
+            "HOME 'CFPROBE' PURGE",
+        ],
+    )
+
+    def warmstart(source, name):
+        phase = args.output / name
+        phase.mkdir()
+        shutil.copytree(source, phase / "state")
+        with emulator(
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+        ) as child:
+            completed(child, 90)
+        verify_busy_reads(args, phase)
+        require_stock_pc(phase / "state")
+        return phase / "state"
+
+    baseline = warmstart(installed / "state", "configuration-clean")
+    if (baseline / "flash").read_bytes() != (installed / "state/flash").read_bytes():
+        raise RuntimeError("Clean library configuration changed Flash")
+    read = native_words((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())
+    count = read(0x8611D, 3)
+    if not 0 < count < 128 or 1701 not in [read(0x86120 + 16 * i, 3) for i in range(count)]:
+        raise RuntimeError("Configuration library is absent from the native catalog")
+    damaged = args.output / "configuration-fault"
+    prepare(baseline, damaged, args.slot, args.target)
+    before = damaged
+    for name, operation in (
+        ("configuration-recovered", "retire"),
+        ("configuration-rechecked", "check"),
+    ):
+        after = warmstart(before, name)
+        verify(
+            SimpleNamespace(
+                before=before,
+                after=after,
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation=operation,
+                relocated_image=True,
+            )
+        )
+        if operation == "check":
+            # Recovery currently needs this second warmstart to rebuild every
+            # binding. Do not claim the first startup has a complete catalog.
+            verify_restart(baseline, before, after)
+        before = after
+    print("Flash configuration replay/retirement and second-warmstart catalog verified", flush=True)
 
 
 def run(args):
@@ -413,6 +516,7 @@ def run(args):
         verify_restart(clean / "state", retired_restart / "state", checked / "state")
         print("Journal retirement and unchanged native catalog after reset verified", flush=True)
         startup_recovery(args, clean / "state", startup_source)
+        configuration_recovery(args, clean / "state")
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -425,6 +529,7 @@ def run(args):
                 "interrupted_before_identity": args.interrupted_build is not None,
                 "journal_retirement": args.retirement_build is not None,
                 "startup_recovery": args.retirement_build is not None,
+                "configuration_recovery": args.retirement_build is not None,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,
