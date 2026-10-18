@@ -419,6 +419,12 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Latest submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
+Quality failed because the code-relocation fixture header was unavailable after
+configuration; Runtime failed at PWM4 lease admission in all six Stock System
+Services jobs. Both defects are under local correction, so this batch is not
+accepted. Earlier HP39 reject-return failures did not recur in this batch.
+
 | Stage | Current state | Remaining acceptance |
 | --- | --- | --- |
 | M8.0 | Native port reads and substantial mutation support exist. Port 2 backup create/replace/remove and library creation have native evidence. | Complete library registration/attachment and execution-reference safety; Port 1 replacement/removal; trusted Port 2 recovery installation and authority lifecycle, safe startup ordering, reclamation and retained per-port gates. |
@@ -615,6 +621,19 @@ through GETPTR and reach the outer RPL error-handler marker after catalog growth
 with unchanged Flash. The first 400 observed register accesses contain no R0–R4
 use; later consumers and other exceptional paths remain unclassified. Remote
 acceptance and complete production reference coverage are still pending.
+
+The internal instruction framer now walks an independently established
+instruction-only interval, including variable-length literals and combined
+predicate/GOYES operands. It supports documented Saturn and selected Saturn+
+encodings, rejecting unknown extensions rather than treating `80B` as a short
+classic BUSCC. Truncation, invalid nibbles, read faults, maximum-length literals,
+callback failure and 20-bit bounds pass focused ASan/UBSan tests; ARM compilation
+and analysis pass. In the HP50g native snapshot, all 1,229 boundaries across three
+distinct cached library commands and the three SETUP CODE bodies match independent
+disassembly. This is local framing evidence, not a proof of instruction semantics,
+inline-data ownership, complete references or safe arbitrary program movement.
+Opcode references are the [Saturn instruction reference](https://literature.hpcalc.org/community/intro-saturn-asm.pdf)
+and [Rechlin's Saturn+ opcode observations](https://www.hpcalc.org/hp49/docs/programming/newopcodes.zip).
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>

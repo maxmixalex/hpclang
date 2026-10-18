@@ -3,6 +3,27 @@
 
 #include "rpl-reference.h"
 
+/* Frame one Saturn/Saturn+ instruction at a caller-proven boundary. limit is
+ * the available nibble count, not an end address. Validate every consumed nibble
+ * and stop at unsupported encodings; never fall back to treating 80B as the
+ * classic three-nibble BUSCC. Includes the GOYES/RTNYES operand in predicates.
+ * This is framing only, not a proof of legal execution, register/address
+ * semantics, reachability, ownership or absence of embedded references. In
+ * particular, inline data must be excluded by independent code provenance.
+ * No writes; length changes only on success. */
+int hpclang_rpl_code_extent(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                            uint32_t limit, uint32_t *length);
+
+typedef int (*hpclang_rpl_code_visit_fn)(void *context, uint32_t instruction, uint32_t length);
+
+/* Walk an independently established instruction-only interval, without following
+ * branches. Propagate the first decoder/callback error; callbacks preceding an
+ * error have already run and must not mutate the input or commit relocation.
+ * Input mapping must remain stable throughout. Zero means exact framing of the
+ * interval, not complete reference coverage or permission to move its contents. */
+int hpclang_rpl_code_visit(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t length,
+                           hpclang_rpl_code_visit_fn visit, void *context);
+
 struct hpclang_rpl_code_branch
 {
     uint32_t instruction, length, field, width, base, target, encoded;
