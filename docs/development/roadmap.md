@@ -1354,7 +1354,7 @@ program from its catalog/header and erases that body's sector while preserving
 the bank and library headers. Offline HP49g+/HP50g runs restore the exact sector,
 close both transaction records and reconstruct all 62 baseline catalog entries.
 The full maintained sequence additionally checks owned recovery state and an
-unchanged later warmstart; acceptance of that expanded sequence is pending.
+unchanged later warmstart; that expanded sequence passes locally on both models.
 This case does not prove that every earlier callback executed safely: Stock may
 skip damaged library contents, and the earlier dependent-library counterexample
 still requires a production startup design.
@@ -1769,6 +1769,19 @@ native/fallback font geometry and normal return. SDK relocation also passes with
 an external C++ application's RW limit, all six launcher/notebook builds and
 three HP39 Aplet package families. CI acceptance and the remaining whole-app
 resource analysis are still pending.
+
+UI acceptance now records touched stack words at entry, before main returns and
+after libc/runtime cleanup, using a test-only startup wrapper. A bounded memory
+checkpoint saves the final measurements before launcher unmapping; Direct and
+Stock artifacts include the versioned JSON. HP39g+ Direct reports 2,416/8,192
+stack bytes and 18,892/22,920 heap bytes; HP50g Stock reports 2,424/8,192 and
+20,076/22,920. Both retain the 36 KiB RW ceiling and pass independent UI pixels
+and normal return. HP39g+ Stock, HP48gII Direct/Stock, HP49g+ Direct/Stock and
+HP50g Direct also pass with the same memory-report gate; HP39gs/40gs acceptance
+is in progress. A watermark
+measures touched words, includes instrumentation overhead, and does not bound
+untouched stack reservations or establish a minimum physical Stock allocation;
+those distinctions remain part of whole-application resource analysis.
 
 #### M8.4 — Historical source compatibility
 

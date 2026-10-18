@@ -19,6 +19,7 @@
 #include "s3c2410/s3c2410_lcd.h"
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
+#include "memory-checkpoint.h"
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 
@@ -735,6 +736,13 @@ static void monitor(void *arg)
     }
 
     if (readable) {
+        int memory = memory_checkpoint(s->hdw, s->result_addr, value);
+        if (memory < 0) {
+            fail(s, "memory-checkpoint");
+            return;
+        }
+        if (memory > 0)
+            s->payload_started = 1;
         int media = media_checkpoint(s->hdw, s->result_addr, value, &s->media_phase);
         if (media < 0) {
             fail(s, "media-checkpoint");

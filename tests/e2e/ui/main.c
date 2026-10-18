@@ -14,6 +14,8 @@ volatile uint32_t hpclang_ui_witness[5];
 volatile uint32_t hpclang_ui_update_witness[4];
 /* Allocator-reserved heap high-water bytes; excludes static data and stack. */
 volatile uint32_t hpclang_ui_heap_witness[2];
+extern volatile uint32_t hpclang_ui_stack_witness[3];
+uint32_t hpclang_ui_stack_sample(void);
 /* Deliberate exhaustion is excluded from the ordinary UI budget observation. */
 static int heap_pressure;
 static unsigned key_failure;
@@ -333,6 +335,14 @@ int main(void)
     snprintf(line, sizeof(line), "HEAP %lu/%lu", (unsigned long)hpclang_ui_heap_witness[0],
              (unsigned long)hpclang_ui_heap_witness[1]);
     hpclang_surface_draw_text(screen, &demo_font, 0, 48, line, 255);
+    hpclang_ui_stack_witness[1] = hpclang_ui_stack_sample();
+    if (!failure && (!hpclang_ui_stack_witness[0] ||
+                     hpclang_ui_stack_witness[1] < hpclang_ui_stack_witness[0] ||
+                     hpclang_ui_stack_witness[1] >= HPCLANG_STACK_MIN))
+        failure = 0x190c;
+    snprintf(line, sizeof(line), "STACK %lu/%u", (unsigned long)hpclang_ui_stack_witness[1],
+             HPCLANG_STACK_MIN);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 56, line, 255);
     hpclang_surface_draw_text(screen, &demo_font, 20, 32, failure ? "UI FAIL" : "UI PASS", 255);
     hpclang_e2e_result = failure ? 0x46410000u | failure : 0x50415353u;
     if (failure)

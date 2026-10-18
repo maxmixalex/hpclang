@@ -1012,6 +1012,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "direct-boot.h",
         "lcd-stability.h",
         "frame-checkpoint.h",
+        "memory-checkpoint.h",
         "input-checkpoint.h",
         "media-checkpoint.h",
     ):

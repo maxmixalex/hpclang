@@ -697,6 +697,32 @@ provider can exercise effect transitions, alongside real calculator input and
 display verification. This fixture preserves the original application model
 while fitting each target's screen and input capabilities.
 
+### UI resource measurements
+
+The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only
+startup wrapper fills the unused reserved stack with a pattern before C/C++
+initialization, then samples the lowest changed word during main and after
+libc finalizers and runtime resource cleanup. The entry frame is retained. This
+measures touched stack words including instrumentation overhead, not a bound on
+stack-pointer excursions through unwritten storage. Heap observations count
+allocator-reserved bytes; deliberate exhaustion is excluded from the normal
+workload high-water observation.
+
+Before the launcher removes the mappings, the test requests a memory checkpoint.
+The shared Direct/Stock harness accepts a word-aligned descriptor within the
+reported application RW arena: `{id, count, words[count]}` with 1–64 words.
+The request is `0x4d100000 | offset`, where `offset` is relative to the boot page;
+the acknowledgement is `0x4d200000 | offset`. Invalid geometry, inaccessible
+memory or output failure rejects the checkpoint. Each ID produces one immutable
+`*-frame-memory-ID.json` artifact with `version`, `id` and `words` fields.
+
+UI report ID 1 contains eight words: schema version 1, entry stack use, main
+watermark, post-cleanup watermark, reserved stack bytes, normal heap high-water
+bytes, heap capacity and mapped RW bytes. The verifier requires the final sample,
+monotonic stack observations below the 8 KiB reservation, valid heap bounds and
+the unchanged 36 KiB RW limit. These test measurements do not reduce or measure
+the Stock launcher's physical reservation and do not change the public ABI.
+
 ## Modern C++ profile
 
 hpclang uses Clang/LLVM, libc++, libc++abi, compiler-rt, and picolibc with `-fno-exceptions` and `-fno-rtti`. This is a modern embedded C++ profile, not unrestricted hosted C++.

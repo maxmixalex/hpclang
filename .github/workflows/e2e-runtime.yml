@@ -313,6 +313,7 @@ jobs:
             build/*-*.pgm
             build/*-*.pgm.png
             build/*-e2e.json
+            build/*-frame-memory-*.json
             build/*-frame-*.lcd
             build/*-summary.png
             build/direct-${{ matrix.family }}-targets.txt

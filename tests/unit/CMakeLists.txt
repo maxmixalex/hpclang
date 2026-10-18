@@ -17,6 +17,9 @@ endfunction()
 hpclang_unit(flash_busy test_flash_busy.c)
 target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
+hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
+target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
 hpclang_unit(libc_sbrk test_libc_sbrk.c)
 target_include_directories(test_libc_sbrk PRIVATE "${HPCLANG_ROOT}/include")
 

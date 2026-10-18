@@ -19,6 +19,7 @@
 #include "s3c2410/s3c2410_lcd.h"
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
+#include "memory-checkpoint.h"
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 #include "qemu/cpu-common.h"
@@ -730,6 +731,10 @@ static void monitor(void *arg)
     }
 
     if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (memory_checkpoint(s->hdw, s->result_addr, v) < 0) {
+            fail(s, "memory-checkpoint");
+            return;
+        }
         if (media_checkpoint(s->hdw, s->result_addr, v, &s->media_phase) < 0) {
             fail(s, "media-checkpoint");
             return;
