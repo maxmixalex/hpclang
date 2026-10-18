@@ -1,4 +1,7 @@
 .syntax unified
+#ifndef HPCLANG_PREDICATE_STACK_BYTES
+#define HPCLANG_PREDICATE_STACK_BYTES 2048
+#endif
 .arm
 .section .entry,"ax",%progbits
 .global entry
@@ -64,5 +67,5 @@ guard: .word 0x51a7b09d
 .balign 8
 .global admission_stack_low, admission_stack_high
 admission_stack_low: .space 8
-.space 2048
+.space HPCLANG_PREDICATE_STACK_BYTES
 admission_stack_high: .space 8

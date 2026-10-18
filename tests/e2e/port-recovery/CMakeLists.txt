@@ -96,7 +96,7 @@ if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR)
 endif()
 
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
-    add_executable(admission admission-entry.S admission.c "${CORE}/flash-mapping.S"
+    add_executable(admission admission-entry.S admission.c predicate.c "${CORE}/flash-mapping.S"
         "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-replay rpl-port rpl-backup rpl-object-span)
@@ -115,4 +115,35 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
         VERBATIM)
     add_custom_target(admission-package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
         "${CMAKE_CURRENT_BINARY_DIR}/admission.bin")
+endif()
+
+# Generate at configuration time so Clang analysis can read the fixture even
+# when this optional execution target has not been built.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/installation.py"
+    "${CMAKE_CURRENT_LIST_DIR}/reservation.py"
+    "${CMAKE_CURRENT_LIST_DIR}/verify.py"
+    "${HPCLANG_ROOT}/tools/package-recovery.py")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
+    "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
+add_executable(installation EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
+    "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
+foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
+        rpl-flash-write rpl-port rpl-backup rpl-object-span)
+    target_sources(installation PRIVATE "${CORE}/${module}.c")
+endforeach()
+configure_recovery_image(installation)
+target_include_directories(installation PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_compile_definitions(installation PRIVATE HPCLANG_PREDICATE_STACK_BYTES=4096)
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/installation.hp"
+        "${CMAKE_CURRENT_BINARY_DIR}/installation.bin"
+    COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
+        --elf --model hp50g --binary-output "${CMAKE_CURRENT_BINARY_DIR}/installation.bin"
+        --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
+        "$<TARGET_FILE:installation>" "${CMAKE_CURRENT_BINARY_DIR}/installation.hp"
+    DEPENDS installation "${HPCLANG_ROOT}/tools/package-recovery.py"
+    VERBATIM)
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
+    add_custom_target(installation-package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/installation.hp"
+        "${CMAKE_CURRENT_BINARY_DIR}/installation.bin")
 endif()

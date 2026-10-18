@@ -197,7 +197,7 @@ jobs:
           if-no-files-found: error
 
   port-recovery:
-    name: Stock recovery / ${{ matrix.target }}
+    name: Stock ports / ${{ matrix.target }} / ${{ matrix.suite.name }}
     needs: runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -205,6 +205,11 @@ jobs:
       fail-fast: false
       matrix:
         target: [hp49gplus, hp50g]
+        suite:
+          - name: recovery
+            build: normal
+          - name: installation
+            build: configuration
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-atfe
@@ -215,23 +220,29 @@ jobs:
           path: build/port-recovery
       - name: Prepare Stock runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock hp4950
-      - name: Execute independent recovery
+      - name: Execute native port suite
+        env:
+          TEST_SUITE: ${{ matrix.suite.name }}
         run: |
+          extra=()
+          if [[ "$TEST_SUITE" == recovery ]]; then
+            extra=(--interrupted-build build/port-recovery/interrupted
+              --retirement-build build/port-recovery/retirement
+              --configuration-build build/port-recovery/configuration
+              --configuration-authority --slot "$HPCLANG_RECOVERY_JOURNAL_SLOT"
+              --power-cut 2 16 0x5555 --power-cut 1 16 0x0101)
+          fi
           python3 tests/e2e/port-recovery/run.py \
             --model "${{ matrix.target }}" \
-            --dist build/x50ng/dist --build build/port-recovery/normal \
-            --interrupted-build build/port-recovery/interrupted \
-            --retirement-build build/port-recovery/retirement \
-            --configuration-build build/port-recovery/configuration \
-            --configuration-authority --slot "$HPCLANG_RECOVERY_JOURNAL_SLOT" \
+            --suite "$TEST_SUITE" \
+            --dist build/x50ng/dist --build "build/port-recovery/${{ matrix.suite.build }}" \
             --flash-busy-reads 64 \
-            --power-cut 2 16 0x5555 --power-cut 1 16 0x0101 \
-            --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
+            --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm" "${extra[@]}"
       - name: Upload recovery evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.target }}-independent-recovery
+          name: ${{ matrix.target }}-port-${{ matrix.suite.name }}
           retention-days: 14
           path: |
             build/port-recovery-evidence/**/*.json

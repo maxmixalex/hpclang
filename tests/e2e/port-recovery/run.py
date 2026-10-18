@@ -491,6 +491,19 @@ def run(args):
         raise RuntimeError("Clean Stock state does not contain the selected model's bootloader")
     print(f"Clean {args.model} Stock boot complete", flush=True)
 
+    if args.suite == "installation":
+        from installation import run_installation
+
+        run_installation(
+            args,
+            clean / "state",
+            transfer=transfer,
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
+        return
+
     reset = args.output / "reset"
     reset.mkdir()
     prepare(clean / "state", reset / "state", args.slot, args.target)
@@ -710,6 +723,7 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--suite", choices=("recovery", "installation"), default="recovery")
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")
     parser.add_argument(
         "--build", type=Path, required=True, help="built recovery witness directory"

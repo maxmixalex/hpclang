@@ -111,6 +111,11 @@ class InstalledRecoveryTests(unittest.TestCase):
     def test_exact_live_installation(self):
         self.assertEqual(self.verify(), (self.slot, self.size))
 
+    def test_read_only_installation_has_no_erase_target(self):
+        self.assertEqual(self.verify(None), (self.slot, self.size))
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            self.verify(0x1E0000)
+
     def test_deleted_copy_is_not_installation(self):
         self.flash[self.slot] = 0
         with self.assertRaisesRegex(ValueError, "exactly one live"):

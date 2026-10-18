@@ -186,7 +186,7 @@ def installed_recovery(flash, package, library_id, target, *, read):
 
     An installation witness, not transaction-root authorization. In particular,
     a matching payload inside a deleted allocation is not an installed library.
-    The recovery allocation must survive erasing the proposed target sector.
+    When a target sector is supplied, its erase must preserve this allocation.
     """
     require(len(flash) == 0x200000, "Expected complete hp4950 Flash")
     require(package[:8] == b"HPHP49-C", "Invalid recovery library envelope")
@@ -207,7 +207,11 @@ def installed_recovery(flash, package, library_id, target, *, read):
     for value in expected[5 : length - 4]:
         crc = (crc >> 4) ^ (((crc ^ int(value, 16)) & 15) * 0x1081)
     require(word(expected, length - 4, 4) == crc, "Invalid packaged library CRC")
-    require(0x140000 <= target < 0x200000 and target % 4096 == 0, "Invalid recovery target sector")
+    if target is not None:
+        require(
+            0x140000 <= target < 0x200000 and target % 4096 == 0,
+            "Invalid recovery target sector",
+        )
     matches = []
     for bank in range(0x140000, 0x200000, 0x20000):
         identity = int.from_bytes(flash[bank + 0x100 : bank + 0x105], "little")
@@ -235,7 +239,7 @@ def installed_recovery(flash, package, library_id, target, *, read):
                             "Installed recovery differs from package",
                         )
                         require(
-                            target + 4096 <= cursor or target >= cursor + size,
+                            target is None or target + 4096 <= cursor or target >= cursor + size,
                             "Recovery target overlaps installed recovery",
                         )
                         matches.append((cursor, size))
