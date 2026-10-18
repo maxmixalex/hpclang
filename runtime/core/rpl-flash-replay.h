@@ -27,6 +27,19 @@ struct hpclang_rpl_flash_replay_io
 int hpclang_rpl_flash_preflight_sector(const struct hpclang_rpl_flash_io *io, uint8_t *scratch,
                                        uint32_t capacity, uint32_t *slot, uint32_t *target);
 
+/* Validate the exact native allocation boundaries of an already loaded bound
+ * pair, including their bank identities, allocation chains and erased tails.
+ * Snapshots and IO must remain stable and describe the same durable bytes.
+ * A pending journal overlays its target only for this read-only structural
+ * check; a retired journal never overlays later data. Returns 0 on success.
+ * No extra sector buffer or Flash writes. This is suitable before releasing
+ * recovery storage, but does not prove installed identity, freshness, RAM
+ * ownership, global port consistency or permission to replay/return to Stock. */
+int hpclang_rpl_flash_bound_membership(const struct hpclang_rpl_flash_io *io,
+                                       uint32_t authority_slot, const uint8_t *authority,
+                                       uint32_t authority_bytes, uint32_t journal_slot,
+                                       const uint8_t *journal, uint32_t journal_bytes);
+
 /* Read-only preflight for a trusted installed authority/journal pair. Validate
  * both durable records, all restored banks and the authority's exact allocation
  * boundary (not a matching byte sequence inside another record). Return READY

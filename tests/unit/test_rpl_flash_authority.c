@@ -458,8 +458,47 @@ static void bound_preflight_tests(void)
                                              &target) == HPCLANG_RPL_FLASH_DIRTY);
 }
 
+static int membership(uint32_t root, uint32_t slot)
+{
+    return hpclang_rpl_flash_bound_membership(&io, root, flash + root - FIRST, sizeof authority,
+                                              slot, flash + slot - FIRST, sizeof journal);
+}
+
+static void bound_membership_tests(void)
+{
+    /* Check the loaded pair without allocating another sector buffer. */
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    memset(flash, 255, sizeof image);
+    memcpy(initial, flash, sizeof flash);
+    assert(membership(ROOT, JOURNAL) == 0);
+    assert(!programs && !erases && !memcmp(initial, flash, sizeof flash));
+    prepare_native_port(0x7e, 0x7e, JOURNAL + sizeof journal, JOURNAL);
+    assert(membership(JOURNAL + sizeof journal, JOURNAL) == 0);
+    prepare_native_port(0x7e, 0x7e, ROOT + 8, JOURNAL);
+    tombstone(ROOT, sizeof authority + 8);
+    assert(membership(ROOT + 8, JOURNAL) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0, 0, ROOT, JOURNAL + 8);
+    tombstone(JOURNAL, sizeof journal + 8);
+    assert(membership(ROOT, JOURNAL + 8) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    flash[ROOT - FIRST - 4] ^= 1; /* Wrong authority-bank identity. */
+    assert(membership(ROOT, JOURNAL) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    flash[ROOT - FIRST + sizeof authority + 4] = 0;
+    assert(membership(ROOT, JOURNAL) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0x7f, 0x7e, ROOT, JOURNAL);
+    assert(membership(ROOT, JOURNAL) == HPCLANG_RPL_FLASH_DIRTY);
+    prepare_native_port(0, 0, ROOT, JOURNAL);
+    flash[123] ^= 1; /* Closed records do not impose their historical image. */
+    assert(membership(ROOT, JOURNAL) == 0);
+    fail_read = reads + 1;
+    assert(membership(ROOT, JOURNAL) == HPCLANG_RPL_FLASH_FAILED);
+    assert(!programs && !erases);
+}
+
 int main(void)
 {
+    bound_membership_tests();
     memset(initial, 255, sizeof initial);
     memset(image, 0x42, sizeof image);
     assert(hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,

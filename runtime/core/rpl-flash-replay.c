@@ -141,6 +141,60 @@ static int load_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, u
     return 1;
 }
 
+static int bound_membership(struct bound_overlay *view)
+{
+    const struct hpclang_rpl_reader reader = {bound_nibble, view};
+    struct hpclang_rpl_flash_allocation allocation;
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t slot = index ? view->journal : view->authority;
+        uint32_t size =
+            index ? HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES : HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+        view->bank = slot & ~0x1ffffu;
+        uint16_t identity;
+        if (!bound_read(view, view->bank + 0x100u, &identity))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (identity != (0xf0u | ((8u + (view->bank - view->io->first) / 0x20000u) << 8u)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint32_t address = (slot - view->bank) * 2u;
+        int membership =
+            hpclang_rpl_flash_allocation_find(&reader, 0x20au, 0x40000u, address, &allocation);
+        if (membership != 1 || allocation.address != address || allocation.nibbles != 2u * size)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return 0;
+}
+
+int hpclang_rpl_flash_bound_membership(const struct hpclang_rpl_flash_io *io,
+                                       uint32_t authority_slot, const uint8_t *authority,
+                                       uint32_t authority_bytes, uint32_t journal_slot,
+                                       const uint8_t *journal, uint32_t journal_bytes)
+{
+    if (!io || !io->read16 || (io->first & 0x1ffffu) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    enum hpclang_rpl_flash_authority_phase phase;
+    enum hpclang_rpl_flash_sector_phase journal_phase;
+    uint32_t target;
+    const uint8_t *image;
+    if (hpclang_rpl_flash_authority_inspect(io->first, io->end, authority_slot, authority,
+                                            authority_bytes, journal_slot, journal, journal_bytes,
+                                            &phase) ||
+        hpclang_rpl_flash_sector_inspect(io->first, io->end, journal_slot, journal, journal_bytes,
+                                         &target, &image, &journal_phase) ||
+        phase == HPCLANG_RPL_FLASH_AUTHORITY_UNPUBLISHED ||
+        (phase != HPCLANG_RPL_FLASH_AUTHORITY_ARMED &&
+         journal_phase != HPCLANG_RPL_FLASH_SECTOR_RETIRED))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct bound_overlay view = {io,
+                                 authority_slot,
+                                 journal_slot,
+                                 target,
+                                 0,
+                                 journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED ? NULL : image,
+                                 1};
+    return bound_membership(&view);
+}
+
 int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
                                       uint32_t authority_slot, uint32_t journal_slot,
                                       uint8_t *scratch, uint32_t capacity, uint32_t *target)
@@ -199,18 +253,9 @@ int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
      * already validated transaction statuses; payload bytes stay unchanged. */
     view.hide_journal = 1;
     view.image = journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED ? NULL : image;
-    const struct hpclang_rpl_reader reader = {bound_nibble, &view};
-    struct hpclang_rpl_flash_allocation allocation;
-    for (unsigned index = 0; index < 2; ++index) {
-        uint32_t slot = index ? journal_slot : authority_slot;
-        uint32_t size = index ? bytes : HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
-        view.bank = slot & ~0x1ffffu;
-        uint32_t address = (slot - view.bank) * 2u;
-        int membership =
-            hpclang_rpl_flash_allocation_find(&reader, 0x20au, 0x40000u, address, &allocation);
-        if (membership != 1 || allocation.address != address || allocation.nibbles != 2u * size)
-            return HPCLANG_RPL_FLASH_DIRTY;
-    }
+    int membership = bound_membership(&view);
+    if (membership)
+        return membership;
     if (phase == HPCLANG_RPL_FLASH_AUTHORITY_CLOSED)
         return 0;
     if (journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED) {
