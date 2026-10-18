@@ -58,7 +58,9 @@ def verify(target, build, dist, state_root, output_root):
             case["repair"],
             hex(value),
         )
-        results.append(dict(name=case["name"], repaired=case["repair"], value=value))
+        results.append(
+            dict(name=case["name"], repaired=case["repair"], moved=case["move"], value=value)
+        )
     (output / "result.json").write_text(
         json.dumps(
             dict(target=target, cases=results, flash_unchanged=True, returned=True),

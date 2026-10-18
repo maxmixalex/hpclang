@@ -59,6 +59,7 @@ static int run(void)
     struct hpclang_rpl_reference_edit edits[CASE_COUNT];
     struct hpclang_rpl_reference_edit_builder builder;
     struct hpclang_rpl_reference_guard guards[CASE_COUNT * 2];
+    uint32_t addresses[CASE_COUNT];
     unsigned count = 0;
     if (hpclang_rpl_reference_edits_begin(&builder, edits, CASE_COUNT))
         return 7;
@@ -72,6 +73,7 @@ static int run(void)
             span != cases[i].body + 10)
             return 9;
         uint32_t body = cursor + 10, at = body + cases[i].at;
+        addresses[i] = at;
         for (unsigned n = 0; n < cases[i].length;) {
             unsigned width = cases[i].length - n;
             if (width > 5)
@@ -84,9 +86,10 @@ static int run(void)
         }
         struct hpclang_rpl_reference_mappings maps = {1, 1, 1};
         struct hpclang_rpl_code_patch patch;
-        if (hpclang_rpl_code_branch_plan_shift(&reader, at, cases[i].length, &maps,
-                                               body + cases[i].old, body + cases[i].old + 16, 16,
-                                               &patch) != 1)
+        if (hpclang_rpl_code_branch_plan_shift(
+                &reader, at, cases[i].length, &maps, body + cases[i].old,
+                body + cases[i].old + (cases[i].move ? cases[i].length : 16),
+                cases[i].move ? 32 : 16, &patch) != 1)
             return 11;
         if (cases[i].repair) {
             struct hpclang_rpl_reference_edit edit = {1, patch.field, patch.expected, patch.value,
@@ -102,6 +105,19 @@ static int run(void)
         return 13;
     if (hpclang_rpl_reference_edits_replay(&writer, edits, builder.count))
         return 14;
+    for (unsigned i = 0; i < CASE_COUNT; ++i) {
+        if (!cases[i].move)
+            continue;
+        for (unsigned n = 0; n < cases[i].length; ++n) {
+            uint32_t value, copied;
+            uint32_t source = addresses[i] + n, destination = source + 32;
+            if (!word(&io, source, 1, &value) ||
+                !io.write_nibble(io.context, destination, (uint8_t)value) ||
+                !word(&io, destination, 1, &copied) || copied != value ||
+                !io.write_nibble(io.context, source, 0) || !word(&io, source, 1, &copied) || copied)
+                return 15;
+        }
+    }
     return 0;
 }
 int main(void)

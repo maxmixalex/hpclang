@@ -566,6 +566,15 @@ Stock installation flow and a required native-result verifier. Fresh local runs
 pass on HP49g+ and HP50g, including all 38 cases, the final RPL marker and unchanged
 Flash. CI integration is implemented; remote CI acceptance remains pending.
 
+The maintained suite additionally passes 38 source-movement cases per model
+(76 total). ARM repairs the original operand, copies the instruction 32 nibbles
+forward, verifies the copy and clears its old bytes. Stock enters the copied
+instruction and reaches the fixed success target; unrepaired controls reach a
+distinct failure target. Both HP49g+ and HP50g pass all cases, the final RPL marker
+and unchanged Flash locally. This establishes actual instruction movement within
+controlled CODE fixtures; it does not establish whole-library movement, live
+register/indirect-reference classification or remote CI acceptance.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
