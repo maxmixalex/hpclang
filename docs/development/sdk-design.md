@@ -630,17 +630,21 @@ that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
-GOTO/GOSUB and GOLONG/GOSUBL instruction boundaries. Its relocation planner
+GOTO/GOSUB, GOLONG/GOSUBL and the GOYES operands of register, HST, ST, P and
+A/C bit-test instruction boundaries. Its relocation planner
 qualifies source and target mappings separately, preserves signed 2/3/4-nibble
 displacements and 20-bit address wrap, and rejects split instructions, range
 overflow or conversion into a conditional return. Cross-CODE calls are allowed:
 the stored native `SETUP` program contains such calls, so an individual CODE
 object is not a sufficient ownership boundary. Returned patches retain their
-short operand width and old address; they cannot use the existing five-nibble
-object-edit writer. Complete instruction guards and ownership must remain valid
-through commit. This read-only planner neither discovers all instructions nor
-classifies opaque payloads or authorizes catalog movement. Compound tests with
-GOYES operands, indirect transfers and complete execution coverage remain open.
+short operand width and old address. The shared reference-edit builder,
+validator and RAM replay accept explicit widths of 1–5 nibbles, including mixed
+code operands and object pointers. Duplicate identity includes width; overlap
+and value bounds use each record's extent. Complete instruction guards and
+ownership must remain valid through commit. Predicate operands are checked even
+when they do not change. The read-only planner neither discovers all
+instructions nor classifies opaque payloads or authorizes catalog movement.
+Indirect transfers and complete execution coverage remain open.
 
 ## Capabilities
 

@@ -4,7 +4,7 @@
 
 struct image
 {
-    uint8_t data[6];
+    uint8_t data[7];
     uint32_t address, size, fail;
 };
 
@@ -148,7 +148,7 @@ static void failures_and_wrap(void)
     }
     image.address = 0x80000;
     for (unsigned op = 0; op < 16; ++op) {
-        if (op >= 4 && op <= 8)
+        if (op >= 4 && op <= 9)
             continue;
         image.data[0] = op;
         assert(hpclang_rpl_code_branch_inspect(&reader, image.address, 6, &branch) ==
@@ -156,10 +156,102 @@ static void failures_and_wrap(void)
     }
     image.data[0] = 8;
     for (unsigned op = 0; op < 16; ++op) {
-        if (op == 12 || op == 14)
+        if (op == 0 || op == 3 || (op >= 6 && op <= 12) || op == 14)
             continue;
         image.data[1] = op;
         assert(hpclang_rpl_code_branch_inspect(&reader, image.address, 6, &branch) ==
+               HPCLANG_RPL_SPAN_UNSUPPORTED);
+    }
+}
+
+static void predicate_case(struct image *image, unsigned prefix)
+{
+    image->address = 0x80000;
+    image->size = prefix + 2;
+    image->fail = UINT32_MAX;
+    struct hpclang_rpl_reader reader = {read_nibble, image};
+    struct hpclang_rpl_reference_mappings maps = {1, 2, 1};
+    for (unsigned operand = 0; operand < 256; ++operand) {
+        encode(image, prefix, 2, operand);
+        struct hpclang_rpl_code_branch branch;
+        int result = hpclang_rpl_code_branch_inspect(&reader, image->address, image->size, &branch);
+        if (!operand) {
+            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+            continue;
+        }
+        assert(result == 0 && branch.conditional && !branch.call);
+        int32_t displacement = operand < 128 ? (int32_t)operand : (int32_t)operand - 256;
+        uint32_t target = image->address + prefix + displacement;
+        assert(branch.target == target && branch.width == 2 && branch.length == image->size);
+        struct hpclang_rpl_code_patch patch = sentinel;
+        result = hpclang_rpl_code_branch_plan_shift(&reader, image->address, image->size, &maps,
+                                                    image->address, image->address + image->size,
+                                                    16, &patch);
+        if (displacement < -112)
+            assert(result == HPCLANG_RPL_SPAN_BOUNDS);
+        else if (displacement == 16)
+            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        else {
+            assert(result == 1 && patch.width == 2 && patch.field == image->address + prefix);
+            int32_t repaired =
+                patch.value < 128 ? (int32_t)patch.value : (int32_t)patch.value - 256;
+            assert(image->address + 16 + prefix + repaired == target);
+        }
+    }
+    for (unsigned i = 0; i < image->size; ++i) {
+        struct hpclang_rpl_code_branch branch = {0}, before = branch;
+        image->fail = image->address + i;
+        assert(hpclang_rpl_code_branch_inspect(&reader, image->address, image->size, &branch) ==
+               HPCLANG_RPL_SPAN_UNAVAILABLE);
+        assert(memcmp(&branch, &before, sizeof branch) == 0);
+        image->fail = UINT32_MAX;
+        uint8_t saved = image->data[i];
+        image->data[i] = 16;
+        assert(hpclang_rpl_code_branch_inspect(&reader, image->address, image->size, &branch) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        image->data[i] = saved;
+        assert(hpclang_rpl_code_branch_inspect(&reader, image->address, i, &branch) ==
+               HPCLANG_RPL_SPAN_BOUNDS);
+    }
+}
+
+static void predicates(void)
+{
+    struct image image = {0};
+    image.data[0] = 9;
+    for (unsigned field = 0; field < 16; ++field) {
+        image.data[1] = field;
+        for (unsigned comparison = 0; comparison < 16; ++comparison) {
+            image.data[2] = comparison;
+            predicate_case(&image, 3);
+        }
+    }
+    image.data[0] = 8;
+    const unsigned kinds[] = {3, 6, 7, 8, 9, 10, 11};
+    for (unsigned k = 0; k < sizeof kinds / sizeof kinds[0]; ++k) {
+        image.data[1] = kinds[k];
+        for (unsigned operand = 0; operand < 16; ++operand) {
+            image.data[2] = operand;
+            predicate_case(&image, 3);
+        }
+    }
+    image.data[1] = 0;
+    image.data[2] = 8;
+    const unsigned bit_tests[] = {6, 7, 10, 11};
+    for (unsigned k = 0; k < 4; ++k) {
+        image.data[3] = bit_tests[k];
+        for (unsigned bit = 0; bit < 16; ++bit) {
+            image.data[4] = bit;
+            predicate_case(&image, 5);
+        }
+    }
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_code_branch branch;
+    for (unsigned sub = 0; sub < 16; ++sub) {
+        if (sub == 6 || sub == 7 || sub == 10 || sub == 11)
+            continue;
+        image.data[3] = sub;
+        assert(hpclang_rpl_code_branch_inspect(&reader, image.address, image.size, &branch) ==
                HPCLANG_RPL_SPAN_UNSUPPORTED);
     }
 }
@@ -169,5 +261,6 @@ int main(void)
     exhaustive();
     native_cross_object_call();
     failures_and_wrap();
+    predicates();
     return 0;
 }

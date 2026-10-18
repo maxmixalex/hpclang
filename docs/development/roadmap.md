@@ -527,16 +527,21 @@ use Saturn+ decoding: older Saturn-only output misdecodes extended operations
 and cannot establish these call paths.
 
 An internal relative-branch inspector and relocation planner now cover proven
-GOC/GONC, GOTO/GOSUB and GOLONG/GOSUBL boundaries, including cross-CODE targets.
+GOC/GONC, GOTO/GOSUB, GOLONG/GOSUBL and GOYES predicate boundaries, including
+cross-CODE targets.
 They preserve operand widths and qualified mappings, rejecting split
 instructions, unencodable distances and branch-to-return conversions. Exhaustive
 displacement tests pass with ASan/UBSan, ARM compilation/analysis and pinned
-formatting. Host checks against each HP49g+/HP50g snapshot match 140 native
-branch sites; 269 proposed rewrites per model independently decode to the
-intended target, while 11 invalid transitions are rejected. These are snapshot
-and host checks, not native execution or CI acceptance. Complete instruction
-coverage, guarded short-operand replay and production integration remain open;
-opaque preflight is not bypassed.
+formatting. Host checks against each HP49g+/HP50g snapshot match 211 native
+branch sites; 408 proposed rewrites per model independently decode to the
+intended target, while 14 invalid transitions are rejected. Shared reference
+edits now carry explicit 1–5-nibble widths; the existing builder, validation and
+retryable RAM replay handle mixed widths without overwriting adjacent bytes.
+All 25 width pairs pass read/write-failure injection and retry tests, alongside
+overlap checks and branch-plan/guard/replay integration. These are snapshot and
+host checks, not native execution or CI acceptance. Complete instruction and
+live-reference coverage plus production integration remain open; opaque
+preflight is not bypassed.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>

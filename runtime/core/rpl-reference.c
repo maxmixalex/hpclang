@@ -90,6 +90,16 @@ static int edit_builder_error(struct hpclang_rpl_reference_edit_builder *builder
     return error;
 }
 
+static int edit_metadata(const struct hpclang_rpl_reference_edit *edit)
+{
+    if (!edit->width || edit->width > 5)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t limit = 1u << (4 * edit->width);
+    if (edit->field > 0x100000u - edit->width || edit->expected >= limit || edit->value >= limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    return 0;
+}
+
 int hpclang_rpl_reference_edits_begin(struct hpclang_rpl_reference_edit_builder *builder,
                                       struct hpclang_rpl_reference_edit *edits, uint32_t capacity)
 {
@@ -111,8 +121,9 @@ int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *b
     if (!edit || builder->count > builder->capacity || (builder->capacity && !builder->edits))
         return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
     const struct hpclang_rpl_reference_edit next = *edit;
-    if (next.field > 0xffffbu || next.expected > 0xfffffu || next.value > 0xfffffu)
-        return edit_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
+    int result = edit_metadata(&next);
+    if (result)
+        return edit_builder_error(builder, result);
     struct hpclang_rpl_reference_edit *edits = builder->edits;
     uint32_t first = 0, end = builder->count;
     while (first < end) {
@@ -125,15 +136,16 @@ int hpclang_rpl_reference_edits_add(struct hpclang_rpl_reference_edit_builder *b
     }
     if (first < builder->count && edits[first].mapping == next.mapping) {
         if (edits[first].field == next.field) {
-            if (edits[first].expected != next.expected || edits[first].value != next.value)
+            if (edits[first].expected != next.expected || edits[first].value != next.value ||
+                edits[first].width != next.width)
                 return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
             return 0;
         }
-        if (edits[first].field - next.field < 5)
+        if (edits[first].field - next.field < next.width)
             return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
     }
     if (first && edits[first - 1].mapping == next.mapping &&
-        next.field - edits[first - 1].field < 5)
+        next.field - edits[first - 1].field < edits[first - 1].width)
         return edit_builder_error(builder, HPCLANG_RPL_SPAN_MALFORMED);
     if (builder->count == builder->capacity)
         return edit_builder_error(builder, HPCLANG_RPL_SPAN_BOUNDS);
@@ -259,11 +271,13 @@ static int edits_metadata(const struct hpclang_rpl_reference_edit *edits, uint32
 {
     for (uint32_t i = 0; i < count; ++i) {
         const struct hpclang_rpl_reference_edit *edit = &edits[i];
-        if (edit->field > 0xffffbu || edit->expected > 0xfffffu || edit->value > 0xfffffu)
-            return HPCLANG_RPL_SPAN_BOUNDS;
+        int result = edit_metadata(edit);
+        if (result)
+            return result;
         for (uint32_t j = 0; j < i; ++j)
-            if (edit->mapping == edits[j].mapping && edit->field < edits[j].field + 5u &&
-                edits[j].field < edit->field + 5u)
+            if (edit->mapping == edits[j].mapping &&
+                edit->field < edits[j].field + edits[j].width &&
+                edits[j].field < edit->field + edit->width)
                 return HPCLANG_RPL_SPAN_MALFORMED;
     }
     return HPCLANG_RPL_SPAN_OK;
@@ -282,7 +296,7 @@ int hpclang_rpl_reference_edits_validate(const struct hpclang_rpl_reference_read
         return result;
     for (uint32_t i = 0; i < count; ++i) {
         uint32_t actual = 0;
-        for (unsigned j = 0; j < 5; ++j) {
+        for (unsigned j = 0; j < edits[i].width; ++j) {
             uint8_t nibble;
             if (!reader->read_nibble(reader->context, edits[i].mapping, edits[i].field + j,
                                      &nibble))
@@ -312,7 +326,7 @@ int hpclang_rpl_reference_edits_replay(const struct hpclang_rpl_reference_writer
     /* Pass zero preflights the complete batch before any mutation. */
     for (unsigned pass = 0; pass < 2; ++pass) {
         for (uint32_t i = 0; i < count; ++i) {
-            for (unsigned j = 0; j < 5; ++j) {
+            for (unsigned j = 0; j < edits[i].width; ++j) {
                 uint8_t actual, expected = (uint8_t)((edits[i].expected >> (4u * j)) & 15u);
                 uint8_t value = (uint8_t)((edits[i].value >> (4u * j)) & 15u);
                 uint32_t at = edits[i].field + j;
@@ -767,9 +781,9 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
     uint32_t index = 2 * state->visited;
     state->plan->edits[index] =
         (struct hpclang_rpl_reference_edit){move->catalog_mapping, record + 3, binding->address,
-                                            result ? patch.value : binding->address};
+                                            result ? patch.value : binding->address, 5};
     state->plan->edits[index + 1] = (struct hpclang_rpl_reference_edit){
-        move->catalog_mapping, record + 8, binding->bank_switch, binding->bank_switch};
+        move->catalog_mapping, record + 8, binding->bank_switch, binding->bank_switch, 5};
     state->plan->guards[index + 1] =
         (struct hpclang_rpl_reference_guard){move->catalog_mapping, record, number, 3};
     state->plan->guards[index + 2] =

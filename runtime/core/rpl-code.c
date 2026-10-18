@@ -35,23 +35,50 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
     } else if (opcode == 6 || opcode == 7) {
         next.width = 3;
         next.call = opcode == 7;
+    } else if (opcode == 9) {
+        next.field = instruction + 3;
+        next.width = 2;
+        next.conditional = 1;
     } else if (opcode == 8) {
         if (limit < 2)
             return HPCLANG_RPL_SPAN_BOUNDS;
         result = read_word(reader, instruction + 1, 1, &opcode);
         if (result)
             return result;
-        if (opcode != 12 && opcode != 14)
+        if (opcode == 12 || opcode == 14) {
+            ++next.field;
+            next.width = 4;
+            next.call = opcode == 14;
+        } else if (opcode == 3 || (opcode >= 6 && opcode <= 11)) {
+            next.field = instruction + 3;
+            next.width = 2;
+            next.conditional = 1;
+        } else if (opcode == 0) {
+            if (limit < 4)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = read_word(reader, instruction + 2, 2, &opcode);
+            if (result)
+                return result;
+            if (opcode != 0x68 && opcode != 0x78 && opcode != 0xa8 && opcode != 0xb8)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            next.field = instruction + 5;
+            next.width = 2;
+            next.conditional = 1;
+        } else {
             return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        ++next.field;
-        next.width = 4;
-        next.call = opcode == 14;
+        }
     } else {
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     }
     next.length = next.field - instruction + next.width;
     if (next.length > limit)
         return HPCLANG_RPL_SPAN_BOUNDS;
+    /* Predicate operands are part of the proven instruction, including fields
+     * and bit indices. Validate them even though relocation preserves them. */
+    uint32_t prefix;
+    result = read_word(reader, instruction, next.field - instruction, &prefix);
+    if (result)
+        return result;
     result = read_word(reader, next.field, next.width, &next.encoded);
     if (result)
         return result;

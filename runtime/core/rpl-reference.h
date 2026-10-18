@@ -202,7 +202,7 @@ int hpclang_rpl_reference_plan_qualified_shift(
 
 struct hpclang_rpl_reference_edit
 {
-    uint32_t mapping, field, expected, value;
+    uint32_t mapping, field, expected, value, width; /* Explicit 1..5 nibbles. */
 };
 
 struct hpclang_rpl_reference_edit_builder
@@ -212,7 +212,7 @@ struct hpclang_rpl_reference_edit_builder
     int error;
 };
 
-/* Merge independently discovered edits into a sorted, nonoverlapping batch.
+/* Merge independently discovered 1..5-nibble edits into a sorted, nonoverlapping batch.
  * Exact duplicates (including unchanged fields) consume no extra capacity.
  * Conflicting duplicates and partial overlaps are malformed. Any error latches
  * and invalidates count; begin is required to restart. Caller owns storage and
