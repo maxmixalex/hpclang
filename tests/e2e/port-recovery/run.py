@@ -58,7 +58,17 @@ def wait_for(predicate, children, timeout, description):
         time.sleep(0.1)
 
 
-def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None, *, flash_busy=False):
+def emulator(
+    args,
+    phase,
+    sequence,
+    extra=(),
+    usb=None,
+    power_cut=None,
+    *,
+    flash_busy=False,
+    reset_checkpoint=False,
+):
     phase.mkdir(parents=True, exist_ok=True)
     seq = phase / "sequence.seq"
     seq.write_text(sequence)
@@ -84,6 +94,8 @@ def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None, *, flash
             env["HPCLANG_X50NG_FLASH_POWER_CUT"] = f"{operation}:{reads}:{mask:x}"
     if args.flash_busy_reads and (usb is not None or flash_busy):
         env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
+    if reset_checkpoint:
+        env["HPCLANG_X50NG_RESET_CHECKPOINT"] = str(phase / "before-reset")
     command = [
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),

@@ -959,6 +959,26 @@ static uint32_t s3c2410_uart_read( void* opaque, target_phys_addr_t offset )
     )
 
 
+def patch_reset_checkpoint(root: Path) -> None:
+    helper = root / "src/qemu/target-arm/helper.c"
+    replace_once(
+        helper,
+        '#include "host-utils.h"',
+        '#include "host-utils.h"\n#include "../../reset-checkpoint.h"',
+        "native reset checkpoint include",
+    )
+    replace_once(
+        helper,
+        "    case EXCP_SWI:\n        if (semihosting_enabled) {",
+        "    case EXCP_SWI:\n"
+        "        if (hpclang_reset_checkpoint(env) < 0) {\n"
+        '            fprintf(stderr, "native reset checkpoint failed\\n");\n'
+        "            abort();\n        }\n"
+        "        if (semihosting_enabled) {",
+        "native reset checkpoint",
+    )
+
+
 def patch_reserved_ram(root: Path) -> None:
     replace_once(
         root / "src" / "module.c",
@@ -1013,6 +1033,7 @@ def patch_frontends(root: Path, args: argparse.Namespace) -> None:
         "lcd-stability.h",
         "frame-checkpoint.h",
         "memory-checkpoint.h",
+        "reset-checkpoint.h",
         "input-checkpoint.h",
         "media-checkpoint.h",
     ):
@@ -1325,6 +1346,7 @@ def main() -> None:
     patch_host_uart0(root)
     patch_rtc_clock(root)
     patch_reserved_ram(root)
+    patch_reset_checkpoint(root)
     patch_optional_state_logging(root)
     patch_key_observation(root)
     patch_lcd_scanout(root)

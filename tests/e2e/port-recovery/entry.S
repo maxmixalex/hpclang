@@ -58,6 +58,8 @@ entry:
  beq .Lrecovery_return
  mov r0, #1
  adr lr, .Lrestart_failed
+.global recovery_reset
+recovery_reset:
  swi 0
 .Lrestart_failed:
  /* Reset must not return into a startup with an incomplete library catalog. */

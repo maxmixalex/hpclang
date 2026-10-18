@@ -2,6 +2,7 @@
 
 import argparse
 import configparser
+import json
 import re
 from pathlib import Path
 import struct
@@ -12,6 +13,23 @@ import zlib
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def verify_tls(image, symbols, physical, diagnostics):
+    """Check the live TLS cells as well as the witness's recorded observations."""
+    require(
+        diagnostics[20:22] == (0xFFFFFFFF, 22) and diagnostics[23:25] == (0x12345678, 0x12345679),
+        "TLS initialization failed",
+    )
+    first, end = symbols["__tls_base"], symbols["__tls_end"]
+    require(0 <= first < end <= len(image), "TLS extent is outside the execution image")
+    for name, expected in (("errno", 22), ("tls_probe", 0x12345679)):
+        # ELF TLS symbol values are offsets within the TLS block.
+        offset = first + symbols[name]
+        require(first <= offset <= end - 4 and offset % 4 == 0, "Invalid TLS cell extent")
+        if name == "errno":
+            require(diagnostics[22] == physical + offset, "errno is not its owned TLS cell")
+        require(struct.unpack_from("<I", image, offset)[0] == expected, f"TLS {name} corrupted")
 
 
 def verify_authority(flash, authority_slot, slot, target, status):
@@ -477,6 +495,32 @@ def executed_image(ram, initialized, symbols, *, relocated=False):
     return image, start, physical
 
 
+def reset_snapshot(prefix):
+    metadata = json.loads(prefix.with_suffix(".json").read_text())
+    require(
+        isinstance(metadata, dict) and set(metadata) == {"version", "pc", "cpsr", "r0", "bytes"},
+        "Invalid reset checkpoint schema",
+    )
+    require(
+        all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in metadata.values()),
+        "Invalid reset checkpoint values",
+    )
+    require(
+        metadata["version"] == 1 and metadata["bytes"] == 0x80000 and metadata["r0"] == 1,
+        "Invalid reset checkpoint request",
+    )
+    require(
+        0x08000004 <= metadata["pc"] <= 0x08080000
+        and metadata["pc"] % 4 == 0
+        and not metadata["cpsr"] & 0x20
+        and metadata["cpsr"] & 0x1F not in (0x17, 0x1B),
+        "Invalid reset checkpoint CPU state",
+    )
+    ram = prefix.with_suffix(".sram").read_bytes()
+    require(len(ram) == 0x80000, "Incomplete reset checkpoint SRAM")
+    return ram, metadata
+
+
 def verify(args):
     before = (args.before / "flash").read_bytes()
     after = (args.after / "flash").read_bytes()
@@ -505,12 +549,17 @@ def verify(args):
 
     symbols = symbol_offsets(args.elf, args.nm)
     initialized = args.binary.read_bytes()
+    checkpoint = getattr(args, "reset_checkpoint", None)
+    execution_ram, reset = reset_snapshot(checkpoint) if checkpoint is not None else (ram, None)
     size = symbols["__image_end"]
     expected = bytearray(initialized + bytes(size - len(initialized)))
     struct.pack_into("<2I", expected, symbols["guard_low"], 0x13579BDF, 0x2468ACE0)
     struct.pack_into("<2I", expected, symbols["guard_high"], 0x89ABCDEF, 0xFEDCBA98)
     image, start, physical = executed_image(
-        ram, initialized, symbols, relocated=getattr(args, "relocated_image", False)
+        execution_ram,
+        initialized,
+        symbols,
+        relocated=False if reset is not None else getattr(args, "relocated_image", False),
     )
     result = struct.unpack_from("<Ii4I", image, symbols["workspace"])
     discovery = (phase, args.slot, args.target) if phase else (0, 0, 0)
@@ -546,7 +595,7 @@ def verify(args):
     code_end = 10 + int(program[10:15][::-1], 16)
     reserve = size * 2 + 15
     prefix = program[: code_end - reserve]
-    packed_ram = nibbles(ram)
+    packed_ram = nibbles(execution_ram)
     owners = [
         i
         for i in range(len(packed_ram))
@@ -557,11 +606,20 @@ def verify(args):
     require(len(owners) == 1, "Execution image is not inside one owning CODE object")
     original_owner = 2 * (physical - 0x08000000) - (start - owners[0])
     require(
-        0 <= original_owner and original_owner + code_end <= 2 * len(ram),
+        0 <= original_owner and original_owner + code_end <= 2 * len(execution_ram),
         "Original owning CODE object is outside RAM",
     )
 
     d = struct.unpack_from("<32I", image, symbols["workspace"] + 8272)
+    if reset is not None:
+        require(
+            "recovery_reset" in symbols and reset["pc"] == physical + symbols["recovery_reset"] + 4,
+            "Reset checkpoint came from another instruction",
+        )
+        require(
+            reset["cpsr"] & 0xFF == d[7] & 0xFF,
+            "Reset checkpoint did not preserve caller CPU state",
+        )
     require(d[1] & 0xC0 == 0xC0 and d[0] & 0xFF == d[7] & 0xFF, "IRQ state not restored")
     require(d[2] == d[10] and d[3:5] == d[8:10], "Mapping/vector not restored")
     require(
@@ -572,14 +630,7 @@ def verify(args):
         d[16] == 0 and 1000 <= (d[18] - d[17]) & 0xFFFFFFFF < 100000 and d[19] < 100000,
         "Recovery monotonic clock failed",
     )
-    require(
-        d[20:22] == (0xFFFFFFFF, 22) and d[23:25] == (0x12345678, 0x12345679),
-        "TLS initialization failed",
-    )
-    require(
-        physical + symbols["__tls_base"] <= d[22] < physical + symbols["__tls_end"],
-        "errno is outside owned TLS",
-    )
+    verify_tls(image, symbols, physical, d)
     require(
         d[26:28] == (0, 0) and d[30:32] == (0, int(retire)),
         "Replay/retirement failed or repeated operation wrote Flash",
@@ -605,6 +656,11 @@ def main():
     parser.add_argument("--slot", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--target", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--authority-slot", type=lambda value: int(value, 0))
+    parser.add_argument(
+        "--reset-checkpoint",
+        type=Path,
+        help="prefix of execution SRAM/CPU evidence captured before Stock reset",
+    )
     parser.add_argument(
         "--operation",
         choices=("replay", "retire", "check"),

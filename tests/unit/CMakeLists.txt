@@ -20,6 +20,11 @@ target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/ha
 hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
 target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
+if(UNIX)
+    hpclang_unit(reset_checkpoint test_reset_checkpoint.c)
+    target_include_directories(test_reset_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+endif()
+
 hpclang_unit(libc_sbrk test_libc_sbrk.c)
 target_include_directories(test_libc_sbrk PRIVATE "${HPCLANG_ROOT}/include")
 

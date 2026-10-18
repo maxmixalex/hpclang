@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import struct
 import tempfile
@@ -14,6 +15,56 @@ SPEC = importlib.util.spec_from_file_location(
 )
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
+
+
+class LiveTlsTests(unittest.TestCase):
+    def test_live_cells_must_match_even_when_diagnostics_are_intact(self):
+        image = bytes(16) + struct.pack("<2I", 0x12345679, 22)
+        symbols = {"__tls_base": 16, "__tls_end": 24, "tls_probe": 0, "errno": 4}
+        diagnostics = tuple([0] * 20 + [0xFFFFFFFF, 22, 0x08000014, 0x12345678, 0x12345679])
+        VERIFY.verify_tls(image, symbols, 0x08000000, diagnostics)
+        for offset in (16, 20):
+            changed = bytearray(image)
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaisesRegex(ValueError, "corrupted"):
+                VERIFY.verify_tls(changed, symbols, 0x08000000, diagnostics)
+        changed = list(diagnostics)
+        changed[22] -= 4  # Still inside TLS, but it names the other cell.
+        with self.assertRaisesRegex(ValueError, "owned TLS cell"):
+            VERIFY.verify_tls(image, symbols, 0x08000000, tuple(changed))
+        for changes in ({"errno": 8}, {"tls_probe": 1}, {"__tls_end": 28}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                VERIFY.verify_tls(image, symbols | changes, 0x08000000, diagnostics)
+
+
+class ResetSnapshotTests(unittest.TestCase):
+    def test_snapshot_requires_complete_sram_and_reset_cpu_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            prefix = Path(temporary) / "before-reset"
+            ram = bytes(0x80000)
+            valid = dict(version=1, pc=0x08001000, cpsr=0x13, r0=1, bytes=len(ram))
+            prefix.with_suffix(".sram").write_bytes(ram)
+            prefix.with_suffix(".json").write_text(json.dumps(valid))
+            self.assertEqual(VERIFY.reset_snapshot(prefix), (ram, valid))
+            for change in (
+                dict(version=2),
+                dict(r0=0),
+                dict(r0=True),
+                dict(pc=0x08001002),
+                dict(pc=0x100),
+                dict(cpsr=0x33),
+                dict(cpsr=0x17),
+                dict(cpsr=0x1B),
+                dict(bytes=0),
+                dict(extra=0),
+            ):
+                prefix.with_suffix(".json").write_text(json.dumps(valid | change))
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    VERIFY.reset_snapshot(prefix)
+            prefix.with_suffix(".json").write_text(json.dumps(valid))
+            prefix.with_suffix(".sram").write_bytes(ram[:-1])
+            with self.assertRaisesRegex(ValueError, "Incomplete"):
+                VERIFY.reset_snapshot(prefix)
 
 
 class InstalledRecoveryTests(unittest.TestCase):
