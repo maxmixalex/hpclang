@@ -532,6 +532,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
@@ -541,6 +542,7 @@ hpclang_unit(rpl_mutation
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_mutation PRIVATE
+    "${HPCLANG_ROOT}/platform/armtoolbox"
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
 

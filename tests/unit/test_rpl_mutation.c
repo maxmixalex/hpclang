@@ -9,6 +9,7 @@
 #include "rpl-port-mutation.h"
 #include "rpl-port.h"
 #include "rpl-backup.h"
+#include "stage-stack.h"
 
 enum
 {
@@ -2036,6 +2037,54 @@ static struct hpclang_rpl_mutation_io setup_catalog_growth(void)
     return io;
 }
 
+static int stage_read_word(void *context, uint32_t address, unsigned width, uint32_t *value)
+{
+    *value = 0;
+    for (unsigned i = 0; i < width; ++i) {
+        uint8_t nibble;
+        if (!read_nibble(context, address + i, &nibble))
+            return 0;
+        *value |= (uint32_t)nibble << (4 * i);
+    }
+    return 1;
+}
+
+static void test_immediate_return_relocation(void)
+{
+    const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
+    for (uint32_t instruction = 0x10; instruction <= 0x30; instruction += 0x10) {
+        for (uint32_t cursor = 0; cursor < 8; ++cursor) {
+            for (int fail = 0; fail < 2; ++fail) {
+                struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+                uint32_t pc = 0x82500, stack[8];
+                /* Equal numbers below the top deliberately look like roots. */
+                for (unsigned i = 0; i < 8; ++i)
+                    stack[i] = 0x82555;
+                put_word(pc, 2, instruction);
+                uint32_t *root = hpclang_stage_immediate_return_root(&stage, pc, stack, cursor);
+                assert(root == &stack[(cursor + 7) & 7]);
+                /* Independent callers may register the same cell again. */
+                uint32_t *roots[] = {&pc, root, root};
+                io.native_roots = roots;
+                io.native_root_count = 3;
+                if (fail)
+                    rejected_read = 0x90000;
+                int result = hpclang_rpl_mutation_catalog_grow(&io, 0x82013);
+                assert(fail ? result < 0 : result == 0);
+                uint32_t delta = fail ? 0 : 16;
+                assert(pc == 0x82500 + delta && get_word(pc, 2) == instruction);
+                for (unsigned i = 0; i < 8; ++i)
+                    assert(stack[i] == 0x82555 + (i == ((cursor + 7) & 7) ? delta : 0));
+                assert(memory[*root] == 11);
+                if (fail)
+                    assert(!writes);
+                else
+                    assert(hpclang_stage_immediate_return_root(&stage, pc, stack, cursor) == root);
+            }
+        }
+    }
+}
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2113,6 +2162,7 @@ static void test_catalog_growth(void)
 
 int main(void)
 {
+    test_immediate_return_relocation();
     test_catalog_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();
