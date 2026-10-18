@@ -486,6 +486,14 @@ Their opaque-code coverage remains a fixture limitation. This is local work,
 not CI acceptance or complete execution-reference coverage; the next task remains
 classification of unresolved live execution references before public registration.
 
+Catalog commit failures now return a distinct `INCOMPLETE` result, preventing
+confusion with preflight rejection. Host ASan/UBSan failure injection covers the
+first write, movement, every geometry-publication field and a read failure after
+writing starts. It also verifies allocation failure leaves memory/ARM roots
+unchanged and that temporary plan storage is released on success, preflight
+rejection and incomplete commit. ARM static analysis passes. These checks do not
+provide rollback, replay or missing execution-reference classification.
+
 Before each work session, read this roadmap and issue #1, reconcile their current
 state with implementation and verification evidence, and identify the selected
 stage, dependency and completion condition. After verified progress, commits,

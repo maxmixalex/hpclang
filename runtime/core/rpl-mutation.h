@@ -63,7 +63,10 @@ extern "C"
         HPCLANG_RPL_MUTATION_EXISTS = -10,
         HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
         HPCLANG_RPL_MUTATION_NOT_EMPTY = -12,
-        HPCLANG_RPL_MUTATION_NOMEM = -13
+        HPCLANG_RPL_MUTATION_NOMEM = -13,
+        /* Catalog commit started and did not finish. Native/ARM state may be
+         * partially changed; retain ownership, never resume Stock or retry. */
+        HPCLANG_RPL_MUTATION_INCOMPLETE = -14
     };
 
     /* Read-only enumeration of the pointer cells already covered by native
@@ -276,8 +279,9 @@ extern "C"
      * Guards describe unchanged preconditions, not permissions to relocate.
      * Keep input arrays, ARM roots, mappings and memory stable throughout.
      * Allocates temporary ARM heap storage; allocation/preflight failure makes
-     * no writes. Commit IO failure requires retaining ownership, not returning
-     * to Stock or retrying this non-replayable geometry operation. Complete
+     * no writes. INCOMPLETE distinguishes a commit failure from those preflight
+     * errors: retain ownership, do not return to Stock or retry this non-replayable
+     * geometry operation. Complete
      * reference coverage remains the caller's obligation; not public registration. */
     int
     hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,

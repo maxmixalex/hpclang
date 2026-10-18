@@ -551,6 +551,10 @@ target_include_directories(test_rpl_mutation PRIVATE
     "${HPCLANG_ROOT}/platform/armtoolbox"
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
+if(UNIX)
+    target_compile_definitions(test_rpl_mutation PRIVATE HPCLANG_TEST_WRAP_ALLOC=1)
+    target_link_options(test_rpl_mutation PRIVATE "LINKER:--wrap=malloc,--wrap=free")
+endif()
 
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")

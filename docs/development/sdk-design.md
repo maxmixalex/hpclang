@@ -553,8 +553,12 @@ without additional edits.
 The operation allocates temporary ARM heap storage for the root snapshot; an
 allocation or preflight error leaves native memory and ARM roots unchanged.
 Callers retain exclusive ownership and stable mappings/inputs throughout.
-Commit IO failure is not rollback or permission to resume Stock, and this
-geometry operation cannot simply be replayed. Other physical banks, complete
+`HPCLANG_RPL_MUTATION_INCOMPLETE` distinguishes commit failure from preflight
+rejection: even the first failed native nibble write may follow an ARM-root
+update. This status is not rollback or permission to resume Stock, and this
+geometry operation cannot simply be replayed. Temporary plan storage is released
+on success and on either failure path; this is not recovery of changed native
+state. Other physical banks, complete
 object/code coverage and registration publication remain separate obligations.
 
 `hpclang_rpl_mutation_visit_guarded_roots()` also reports every native nibble

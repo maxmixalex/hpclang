@@ -895,6 +895,7 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
                                  position, rstk};
     if (!plan.items)
         return HPCLANG_RPL_MUTATION_NOMEM;
+    int committing = 0;
     const struct catalog_edit boundaries[] = {
         {RPL_TEMPBOTTOM, bottom, bottom + 16, 5, NULL},
         {RPL_TEMPTOP, top, top + 16, 5, NULL},
@@ -956,6 +957,7 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
     }
     /* No discovery or semantic validation after the first write. Keep geometry
      * publication last; all field edits name their original, pre-move locations. */
+    committing = 1;
     for (size_t i = 4; i < plan.count; ++i) {
         const struct catalog_edit *edit = &plan.items[i];
         if (edit->expected == edit->value)
@@ -970,7 +972,7 @@ int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation
         result = write_word(io, boundaries[i].field, 5, boundaries[i].value);
 done:
     free(plan.items);
-    return result;
+    return result && committing ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
 }
 
 int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, uint32_t position)

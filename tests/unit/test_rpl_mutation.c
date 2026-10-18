@@ -32,11 +32,44 @@ static uint8_t memory[NIBBLES];
 static uint32_t rejected_read;
 static uint32_t writes;
 static uint32_t watched_field, watched_writes;
+static uint32_t rejected_write, rejected_commit_read;
+static uint32_t write_trace[8192];
+
+#ifdef HPCLANG_TEST_WRAP_ALLOC
+void *__real_malloc(size_t size);
+void __real_free(void *pointer);
+static int track_allocation, reject_allocation;
+static unsigned allocation_attempts, allocation_frees;
+static void *tracked_allocation;
+
+void *__wrap_malloc(size_t size)
+{
+    if (track_allocation) {
+        ++allocation_attempts;
+        if (reject_allocation)
+            return NULL;
+    }
+    void *pointer = __real_malloc(size);
+    if (track_allocation)
+        tracked_allocation = pointer;
+    return pointer;
+}
+
+void __wrap_free(void *pointer)
+{
+    if (pointer && pointer == tracked_allocation) {
+        ++allocation_frees;
+        tracked_allocation = NULL;
+    }
+    __real_free(pointer);
+}
+#endif
 
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
     (void)context;
-    if (value == NULL || address >= NIBBLES || address == rejected_read)
+    if (value == NULL || address >= NIBBLES || address == rejected_read ||
+        (writes && address == rejected_commit_read))
         return 0;
     *value = memory[address] & 0x0fu;
     return 1;
@@ -45,9 +78,11 @@ static int read_nibble(void *context, uint32_t address, uint8_t *value)
 static int write_nibble(void *context, uint32_t address, uint8_t value)
 {
     (void)context;
-    if (address >= NIBBLES || value > 0x0fu)
+    if (address >= NIBBLES || value > 0x0fu || writes == rejected_write)
         return 0;
     memory[address] = value;
+    if (writes < sizeof write_trace / sizeof write_trace[0])
+        write_trace[writes] = address;
     ++writes;
     if (address == watched_field)
         ++watched_writes;
@@ -129,6 +164,7 @@ static struct hpclang_rpl_mutation_io setup(uint32_t depth)
 {
     memset(memory, 0, sizeof(memory));
     rejected_read = UINT32_MAX;
+    rejected_write = rejected_commit_read = UINT32_MAX;
     writes = 0;
 
     const uint32_t ttop = 0x84000u;
@@ -2273,6 +2309,81 @@ static void test_catalog_merged_repairs(void)
     }
 }
 
+static void test_catalog_commit_failures(void)
+{
+    struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+    uint32_t native = 0x82555, *roots[] = {&native};
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    assert(!hpclang_rpl_mutation_catalog_grow(&io, 0x82013));
+    uint32_t total = writes;
+    assert(total && total <= sizeof write_trace / sizeof write_trace[0]);
+    uint32_t failures[7] = {0, total / 2, total - 1};
+    const uint32_t publications[] = {0x806e9, TEMPTOP, RSKTOP, AVMEM};
+    for (unsigned i = 0; i < 4; ++i) {
+        unsigned at = 0;
+        while (at < total && write_trace[at] != publications[i])
+            ++at;
+        assert(at < total);
+        failures[3 + i] = at;
+    }
+    for (unsigned i = 0; i < sizeof failures / sizeof failures[0]; ++i) {
+        io = setup_catalog_growth();
+        native = 0x82555;
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        rejected_write = failures[i];
+        assert(hpclang_rpl_mutation_catalog_grow(&io, 0x82013) == HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(writes == rejected_write);
+        /* Even failing the first nibble write can follow an ARM-root update. */
+        assert(native == 0x82565);
+    }
+    io = setup_catalog_growth();
+    native = 0x82555;
+    io.native_roots = roots;
+    io.native_root_count = 1;
+    rejected_commit_read = 0x82555;
+    assert(hpclang_rpl_mutation_catalog_grow(&io, 0x82013) == HPCLANG_RPL_MUTATION_INCOMPLETE);
+    assert(writes && native == 0x82565);
+}
+
+#ifdef HPCLANG_TEST_WRAP_ALLOC
+static void test_catalog_allocation_lifetime(void)
+{
+    for (unsigned failure = 0; failure < 4; ++failure) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t native = 0x82555, *roots[] = {&native};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        struct hpclang_rpl_reference_guard guard = {1, io.library_table, 2, 3};
+        const struct hpclang_rpl_catalog_repairs repairs = {1, NULL, 0, &guard, 1};
+        if (failure == 1)
+            ++guard.expected;
+        if (failure == 3)
+            rejected_write = 0;
+        uint8_t *before = malloc(sizeof memory);
+        assert(before);
+        memcpy(before, memory, sizeof memory);
+        assert(!tracked_allocation);
+        reject_allocation = failure == 0;
+        allocation_attempts = allocation_frees = 0;
+        track_allocation = 1;
+        int result = hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs);
+        track_allocation = reject_allocation = 0;
+        const int expected[] = {HPCLANG_RPL_MUTATION_NOMEM, HPCLANG_RPL_MUTATION_MALFORMED,
+                                HPCLANG_RPL_MUTATION_OK, HPCLANG_RPL_MUTATION_INCOMPLETE};
+        assert(result == expected[failure]);
+        assert(allocation_attempts == 1 && allocation_frees == (failure != 0));
+        assert(!tracked_allocation);
+        if (failure < 2)
+            assert(!writes && native == 0x82555 && !memcmp(before, memory, sizeof memory));
+        else
+            assert(native == 0x82565);
+        free(before);
+    }
+}
+#endif
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2350,6 +2461,10 @@ static void test_catalog_growth(void)
 
 int main(void)
 {
+    test_catalog_commit_failures();
+#ifdef HPCLANG_TEST_WRAP_ALLOC
+    test_catalog_allocation_lifetime();
+#endif
     test_catalog_merged_repairs();
     test_immediate_return_relocation();
     test_return_chain_relocation();
