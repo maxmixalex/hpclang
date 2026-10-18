@@ -14,6 +14,7 @@ import time
 from types import SimpleNamespace
 
 from prepare import configuration_body_sector, prepare, reserve_bank_tail
+from reservation import run_reservation
 from verify import (
     verify,
     verify_interruption,
@@ -183,6 +184,7 @@ def transfer(
 
 
 def verify_busy_reads(args, phase):
+    """Validate saved busy-state evidence and return the observed operation count."""
     if args.flash_busy_reads:
         state = configparser.ConfigParser()
         state.read(phase / "state/state")
@@ -196,6 +198,8 @@ def verify_busy_reads(args, phase):
             or evidence.getboolean("busy-active") is not False
         ):
             raise RuntimeError("Missing/incomplete Flash busy-state execution evidence")
+        return operations
+    return 0
 
 
 def startup_recovery(args, clean, damaged):
@@ -652,6 +656,15 @@ def run(args):
         startup_recovery(args, clean / "state", startup_source)
     if args.configuration_build is not None:
         configuration_recovery(args, clean / "state")
+        if args.configuration_authority:
+            run_reservation(
+                args,
+                clean / "state",
+                transfer=transfer,
+                emulator=emulator,
+                completed=completed,
+                verify_busy_reads=verify_busy_reads,
+            )
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -666,6 +679,7 @@ def run(args):
                 "startup_recovery": args.retirement_build is not None,
                 "configuration_recovery": args.configuration_build is not None,
                 "configuration_authority": args.configuration_authority,
+                "guarded_reservation": args.configuration_authority,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,

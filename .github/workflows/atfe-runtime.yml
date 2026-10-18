@@ -235,6 +235,7 @@ jobs:
           retention-days: 14
           path: |
             build/port-recovery-evidence/**/*.json
+            build/port-recovery-evidence/**/*.hp
             build/port-recovery-evidence/**/*.log
             build/port-recovery-evidence/**/*.seq
             build/port-recovery-evidence/**/*.pgm

@@ -341,8 +341,11 @@ later unchanged restart. Comparable HP50g pressure without releasable storage
 leaves the transaction armed and Flash unrepaired.
 Instrumented native rejection checks on both models preserve wrong-type,
 wrong-capacity and wrong-prefix objects with unchanged Flash; an independently
-cleared/recreated completion marker proves the guard ran. These are local
-checks; guarded-scenario CI integration and acceptance remain pending.
+cleared/recreated completion marker proves the guard ran. The maintained
+bound-configuration flow runs these scenarios in the existing Stock recovery
+jobs and saves both generated packages. Synthetic busy reads exercise SDK
+recovery, with a required nonzero operation count and exact read budget; Stock
+uses its normal installation driver to construct the fixture first.
 
 This is an internal packaging mechanism, not a trusted installer. Production
 admission must bind the expected name/header, capacity and lifetime to the actual

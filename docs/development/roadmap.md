@@ -421,13 +421,14 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **CI accepted:** `d94580b4`, the latest fully accepted batch recorded here.
-- **Submitted:** `62f7ece4`, including compact Flash recovery packaging and
-  maintained low-memory/repeated-restart tests; its CI has not been checked.
-- **Local evidence:** controlled recovery-memory release on both models;
-  reservation ownership and safe startup admission are still unproven.
-- **Active M8.0 work:** establish a reservation guard that safely handles absent,
-  valid and unrelated objects during native startup, then bind it to the trusted
+- **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
+  maintained low-memory/repeated-restart tests. All four triggered workflows pass;
+  the preceding `9d015660` batch also passes all six triggered workflows.
+- **Follow-up:** guarded recovery packaging and maintained two-model E2E pass
+  locally; remote acceptance is pending. Reservation ownership and safe startup
+  admission are still unproven.
+- **Active M8.0 work:** integrate and accept the maintained guarded-reservation E2E
+  flow, then bind the reservation to the trusted
   root and current transaction. Preserve the execution-reference requirements
   while their scope clarification is pending. M8.1 remains the only accepted
   complete M8 stage.
@@ -435,15 +436,14 @@ Current delivery checkpoints:
 The entries below preserve earlier batch evidence and check times; their older
 pending-CI descriptions do not supersede these delivery checkpoints.
 
-Latest CI-accepted batch: `d94580b4`; all four triggered workflows passed:
-Quality, Core, Objects and Runtime. Runtime includes both native code-relocation
-jobs and all six Stock System Services jobs. Follow-ups through `626fe53a`
-were submitted in `9d015660`. A single CI check on 2026-10-18 found Quality,
-Objects and Storage passed, Core and Font Gallery running, and Runtime queued.
-The batch therefore still awaits full CI acceptance. These
-follow-ups add conditional SETUP dispatch evidence, native bank-switch execution
-roots, explicit execution-address repair planning and merged catalog repairs.
-They also extend direct-jump return-root discovery; they do not close library registration.
+The accepted `d94580b4` batch was followed by `9d015660`, whose Quality, Core,
+Objects, Storage, Font Gallery and Runtime workflows all passed. The latest
+submitted `62f7ece4` additionally passes Quality, Core, Objects and Runtime,
+including both Stock recovery jobs. These batches add conditional SETUP dispatch
+evidence, native bank-switch execution roots, explicit execution-address repair
+planning, merged catalog repairs, direct-jump return-root discovery and compact
+recovery packaging. They do not close library registration or the other retained
+M8.0 gates.
 
 Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
 Quality failed because the code-relocation fixture header was unavailable after
@@ -529,7 +529,7 @@ configuration sequence now includes low-memory recovery and repeated startup;
 the expanded local run passes on both HP49g+ and HP50g, including native catalog,
 complete Flash, code/stack/TLS/guard and full real-array checks. All 49 focused
 host tests, a fresh ARM build, pinned Python lint/format and strict docs pass.
-This batch was submitted at `62f7ece4`; its CI has not been polled. Trusted
+This batch is CI-accepted at `62f7ece4`. Trusted
 installation, recovery-memory guarantees and all other M8.0 gates remain open.
 
 Local guarded reservation release now passes on both models: one Flash library's
@@ -548,9 +548,15 @@ the two-model positive sequence above. Instrumented rejection checks preserve
 wrong-type, wrong-capacity and wrong-header objects with unchanged Flash on both
 models; a completion marker is cleared before each case and recreated after the
 unchanged guard command bodies run. All 54 focused recovery host tests, pinned
-Python checks and the real ELF CLI packaging path pass locally. Integration of
-these guarded scenarios into the maintained CI E2E flow remains the next step;
-this implementation has not been pushed or accepted by CI.
+Python checks and the real ELF CLI packaging path pass locally. The maintained
+bound-configuration E2E flow now includes these scenarios in the existing Stock
+recovery jobs and preserves generated library packages as evidence. Both models
+pass the maintained flow locally with 64 synthetic busy reads per operation:
+1,923 recovery operations and 123,072 status reads, with no active operation at
+return. Each added model run takes approximately 489 seconds. Stock's fixture
+installation retains its existing non-injected setup; SDK recovery and all
+subsequent checks use the configured busy model. Local validation is complete;
+remote acceptance of this follow-up is pending.
 
 This is a controlled resource mechanism, not a production installer or a proven
 general explanation of the earlier startup failures. Admission must bind the
