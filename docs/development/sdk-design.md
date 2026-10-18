@@ -628,6 +628,23 @@ invocation. Platform integration must establish the types, ownership and layout
 of these saved execution fields rather than infer roots from address-looking
 integers or command-specific offsets.
 
+Historical relocation routines do not establish a general machine-code safety
+contract. HPGCC 1.0.3's `examples/libtests/stack.c` demonstrates stack inspection;
+the 1.1/2.0 `sat_createtemp.c` allocates by moving the RPL return-stack area and
+adjusting boundaries. HPGCC3's `sat3_garbcol.c` calls `__sat3_fixptrs` in
+`sat3_free.c`; that helper repairs enumerated system roots, rather than decoding
+arbitrary object bodies or saved CPU registers. Its directory counterpart
+`__sat3_fixptrs2` has the same limited role. These are implementation observations,
+not proof that omitted references are safe to ignore in hpclang.
+
+Chapter 8 of [HP 49 Assembly Language Examples](https://literature.hpcalc.org/community/hp49-asm-examples.pdf)
+explicitly distinguishes collecting while machine code is running from a movable
+region from returning to SysRPL and restarting code after collection. This is
+evidence that the native execution boundary matters, not that a CODE prologue
+alone guarantees safe relocation. The proposed distinction between native-contract
+compatibility and arbitrary hidden-address repair awaits maintainer confirmation;
+existing preflight and M8 completion requirements remain in force meanwhile.
+
 The classic ROM's machine stack has eight 20-bit cells and a modulo-eight
 cursor; its pop helper clears the consumed cell. This layout is not a type
 guarantee: the interpreter also calls these helpers for `RSTK=C` / `C=RSTK`,

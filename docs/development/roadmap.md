@@ -508,6 +508,14 @@ jump-to-return path among 47 direct-jump sites per model, in SETUP CODE; that
 establishes an existing code pattern, not its liveness in every caller. ARM
 analysis passes. This local expansion does not close full execution coverage.
 
+Historical-source review distinguishes enumerated native roots from arbitrary
+addresses embedded in machine code: HPGCC3's GC helpers repair the former, and
+HP49 assembly documentation warns against collecting while executing from a
+movable code region, describing a SysRPL restart boundary instead. Clarification
+is pending on whether M8 acceptance follows that native relocation contract while
+retaining broader hidden-address analysis as future work. No scope reduction or
+preflight relaxation has been applied; all current gates remain open as above.
+
 Before each work session, read this roadmap and issue #1, reconcile their current
 state with implementation and verification evidence, and identify the selected
 stage, dependency and completion condition. After verified progress, commits,
