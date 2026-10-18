@@ -37,8 +37,9 @@ void hpclang_stdio_clear_streams(void)
 {
     stream_error = 0;
 }
-int hpg_test_getchar(void)
+int hpg_test_getc(FILE *stream)
 {
+    assert(stream == stdin);
     int result = hpclang_stdio_route_read();
     if (result == HPCLANG_STDIO_ERROR) {
         stream_error = 1;
@@ -46,9 +47,20 @@ int hpg_test_getchar(void)
     }
     return result;
 }
+int hpg_test_getchar(void)
+{
+    /* Optimized libc headers may inline getchar as getc(stdin). Both entry
+     * points must consume the scripted stream rather than the host terminal. */
+    return hpg_test_getc(stdin);
+}
+int hpg_test_putc(int byte, FILE *stream)
+{
+    assert(stream == stdout);
+    return hpclang_stdio_route_write(1, (unsigned char)byte) ? EOF : (unsigned char)byte;
+}
 int hpg_test_putchar(int byte)
 {
-    return hpclang_stdio_route_write(1, (unsigned char)byte) ? EOF : (unsigned char)byte;
+    return hpg_test_putc(byte, stdout);
 }
 int hpg_test_fputs(const char *text, FILE *stream)
 {
@@ -401,6 +413,13 @@ static int capture_byte(void *context, unsigned stream, unsigned char byte)
     captured[captured_length] = 0;
     return 0;
 }
+static unsigned buffer_calls;
+static char dynamic_buffer[8];
+static char *next_buffer(void)
+{
+    ++buffer_calls;
+    return dynamic_buffer;
+}
 static void edited_lines(void)
 {
     char text[16];
@@ -409,7 +428,7 @@ static void edited_lines(void)
     struct hpclang_surface *s = hpclang_display_surface();
     hpclang_surface_set_pixel(s, 7, 5, 255);
     input_bytes = (const unsigned char *)"ABCDEFG\b\b\b\b\b\b\n";
-    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "A"));
+    assert(gets(text) == text && !strcmp(text, "A"));
     assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
     assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* restore pre-scroll graphics */
     assert(getx() == 0 && gety() == 1);
@@ -417,7 +436,7 @@ static void edited_lines(void)
     _clear_screen();
     input_bytes = (const unsigned char *)"ABC\b\n";
     unsigned previous = flips;
-    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "AB"));
+    assert(_gets(text) == text && !strcmp(text, "AB"));
     assert(flips == previous + 5);
     for (unsigned i = 0; i < 2; ++i) {
         assert(hpclang_surface_get_pixel(pages[i], 0, 0) == 255);
@@ -443,6 +462,39 @@ static void edited_lines(void)
     input_bytes = (const unsigned char *)"AB\bC\n";
     assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "AC"));
     assert(!strcmp(captured, "AB\b \bC\n") && borrowed == before && !page_count);
+    struct
+    {
+        char before;
+        char text[4];
+        char after;
+    } bounded = {'x', "", 'y'};
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"ABCDE\bZ\n";
+    assert(gets(bounded.text) == bounded.text && !strcmp(bounded.text, "ABZ"));
+    assert(bounded.before == 'x' && bounded.after == 'y');
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"123\n";
+    assert(!_gets(&bounded.text[2]) && errno == EINVAL && !strcmp(bounded.text, "ABZ"));
+    assert(bounded.after == 'y');
+    char larger[12];
+    volatile int choose_small = 1;
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"123456\n";
+    char *choice = choose_small ? bounded.text : larger;
+    char *chosen = gets(choice);
+    /* A pointer choice has no declared array bound. */
+    assert(!chosen && errno == EINVAL);
+    assert(bounded.before == 'x' && bounded.after == 'y');
+    input_bytes = (const unsigned char *)"untouched\n";
+    const unsigned char *unread = input_bytes;
+    strcpy(dynamic_buffer, "saved");
+    assert(!gets(next_buffer()) && errno == EINVAL);
+    assert(buffer_calls == 1 && input_bytes == unread && !strcmp(dynamic_buffer, "saved"));
+    volatile unsigned dynamic_size = 4;
+    char variable[dynamic_size];
+    memcpy(variable, "old", 4);
+    assert(!gets(variable) && errno == EINVAL && !memcmp(variable, "old", 4));
+    assert(input_bytes == unread);
     assert(hpclang_stdio_unbind() == 0);
     strcpy(text, "OK");
     assert(!hpclang_hpgcc_gets(text, 0) && errno == EINVAL && !strcmp(text, "OK"));

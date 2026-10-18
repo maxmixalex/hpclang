@@ -754,8 +754,8 @@ graphics, and scrolling moves graphics together with text. Output wraps
 immediately at the final column, including scrolling after the last screen cell.
 Single-buffer output publishes immediately; HPG double-buffer modes still need
 `hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
-cleanup restores the borrowed display. Historical `gets/_gets` spellings
-and decimal-format policy remain
+cleanup restores the borrowed display. Historical `gets/_gets` spellings use
+the bounded adapters described below; decimal-format policy remains
 M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
 HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
 example also passes relocation, six-model launchers and three HP39 Aplet
@@ -788,8 +788,21 @@ callbacks, it uses those streams and emits BS-space-BS for deletion without
 acquiring a display. Host sanitizers, installed-SDK relocation/packaging and
 HP39g+/HP50g Direct and Stock physical-key editing checks pass, including independent
 pixel comparison after overflow rejection, backspace and scrolling. Wider
-native acceptance is pending. Old unbounded spellings are not yet
-redirected to this API.
+native acceptance is pending.
+
+Including `hpconio.h` supplies `gets(array)` and `_gets(array)` call macros for
+fixed `char` arrays, including struct members, in C and C++. Their declared
+array extent becomes the editor capacity; the argument is evaluated once.
+Pointer expressions (including interior pointers, function results and a choice
+between buffers) have no declared array extent and fail with `EINVAL` before
+consuming input or changing the buffer. Use `hpclang_hpgcc_gets(pointer, capacity)`
+for those cases and variable-length arrays. This avoids relying on compiler
+object-size inference, which can lose member bounds through pointer expressions.
+These aliases do not export an unbounded function symbol or support taking its
+address. Define `HPCLANG_HPCONIO_NO_GETS_ALIASES` before including the header to
+disable both macros. The maintained console E2E now calls the historical name
+for its guarded four-byte buffer, overflow rejection, backspace and scroll-undo
+checks; the installed-SDK C++ input client exercises both spellings.
 
 `hpstdio.h` exposes `readint()` and `readdouble()` without enabling default
 stdio merely by including the header. Calling either uses the bounded editor
@@ -858,6 +871,16 @@ The older `sys_playTone` headers warn that parameter interpretation may be
 wrong: its cycle count implies hundredths of a second, but its delay assumes
 600 kHz while the historical tick service uses 750 kHz. The adapter implements
 the nominal units, not that clock error, arithmetic overflow or raw pin writes.
+
+`kos_beep` remains a separate compatibility requirement. HPGCC's wrapper waits
+on `kos_CheckBeepEnd`, whose result is affected by the supplied mode flags.
+HP50g ROM inspection indicates that bit 1 selects completion waiting, while
+bit 0 permits a later request to replace the active tone. The admission check
+uses the active request's flags, so treating `override` as an ignored Boolean
+would change overlapping-call behavior. This still needs cross-model and
+runtime verification. An adapter requires owned asynchronous playback and
+completion/preemption state; the current blocking `hpclang_sound_play` alone
+does not implement that contract.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 

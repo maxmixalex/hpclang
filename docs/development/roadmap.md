@@ -1919,8 +1919,8 @@ and HPG fallback fonts. Six-model host checks cover ordinary input, single/held
 Alpha, classic locks and one-shot lowercase, Enter/backspace, cancellation and
 poll failures. Font/HPG sanitizers and ARM analysis pass. All six Direct and
 all six Stock physical-key checks pass locally, as does the updated SDK
-relocation/packaging gate. Historical input aliases and numeric-format policy
-remain open.
+relocation/packaging gate. Historical input aliases are covered below;
+numeric-format policy remains open.
 
 The bounded `hpclang_hpgcc_gets` editor now integrates the tested byte-line core
 with standard streams and HPG rendering. Host sanitizers cover overflow/re-edit,
@@ -1931,8 +1931,18 @@ HP39g+/HP50g Direct physical-key editing passes a full-buffer rejection/re-edit
 scenario, with the scrolled result matching an independently drawn reference
 frame pixel for pixel. Both models also pass Stock. The maintained independent
 console verifier now checks edited/reference frames on all six Direct and all
-six Stock targets, as recorded below. The old unbounded-name compatibility
-policy remains pending; this does not close the line-input group.
+six Stock targets, as recorded below.
+
+`hpconio.h` now adapts historical `gets/_gets` calls on fixed `char` arrays to
+the bounded editor in both C and C++. Pointer expressions and variable-length
+arrays require the explicit-capacity entry point; they fail before consuming
+input through the aliases. Host regressions check struct-member bounds,
+overflow/re-edit, single argument evaluation and unknown-capacity rejection.
+Both GCC ASan/UBSan and optimized Clang checks pass. The host stream fixture
+also covers libc's optimized `getc/putc` paths. The maintained ARM console
+witness uses `gets` and passes HP39g+ Direct and HP50g Stock return and independent
+pixel checks locally. All six Direct aliases and the updated installed-SDK C++
+client now pass locally; remaining Stock targets and CI remain pending.
 
 `hpstdio.h` now provides blocking `readint/readdouble` over that bounded editor.
 They retain historical numeric-prefix conversion and the 31-byte line capacity;

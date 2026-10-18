@@ -150,8 +150,8 @@ hpclang_unit(hpg_context test_hpg_context.c
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
-target_compile_definitions(test_hpg_context PRIVATE getchar=hpg_test_getchar
-    putchar=hpg_test_putchar fputs=hpg_test_fputs ferror=hpg_test_ferror)
+target_compile_definitions(test_hpg_context PRIVATE getchar=hpg_test_getchar getc=hpg_test_getc
+    putchar=hpg_test_putchar putc=hpg_test_putc fputs=hpg_test_fputs ferror=hpg_test_ferror)
 set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
     "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
     "${HPCLANG_ROOT}/runtime/core/ui-focus.c"

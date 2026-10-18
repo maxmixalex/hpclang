@@ -54,7 +54,7 @@ static int edited_input(int (*checkpoint)(unsigned))
         char after;
     } buffer = {'x', "", 'y'};
     scripted_read = 1;
-    char *result = hpclang_hpgcc_gets(buffer.text, sizeof buffer.text);
+    char *result = gets(buffer.text);
     scripted_read = 0;
     if (result != buffer.text || strcmp(buffer.text, "124") || buffer.before != 'x' ||
         buffer.after != 'y' || scripted_index != 7 || getx() || gety() != screen_height() - 1 ||
