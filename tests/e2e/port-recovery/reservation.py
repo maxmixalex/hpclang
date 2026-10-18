@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 from types import SimpleNamespace
 
 from prepare import prepare, reserve_bank_tail
@@ -97,30 +99,50 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     authority = args.slot + 4124
     prefix = f"HPCMEM1:{LIBRARY_ID:04d}:{authority:06X}:00000001".encode("ascii")
     pack = packager()
-    program = (build / "recovery-configuration.hp").read_bytes()
-    # This hidden command is copied from the immutable installed library on
-    # every call. Keep the ordinary admission.hp reusable; compact only the
-    # copy embedded here, after checking its ELF relocation contract.
-    tool_bin = Path(args.nm).parent
-    admission, _ = pack.package_elf(
-        build / "admission.elf",
-        model=args.model,
-        nm=args.nm,
-        readelf=str(tool_bin / "llvm-readelf"),
-        objcopy=str(tool_bin / "llvm-objcopy"),
-        fresh_copy=True,
-    )
-    library = pack.guarded_configuration_library(
-        program,
-        LIBRARY_ID,
-        name=NAME.decode(),
-        capacity=RESERVE_BYTES,
-        prefix=prefix,
-        admission=admission,
-    )
     package = root / "package"
     package.mkdir()
-    (package / "recovery-guarded.hp").write_bytes(library)
+    # Bind recovery and admission together through the maintained CLI. Keep
+    # ordinary admission.hp reusable; only the library's hidden copy is compact.
+    tool_bin = Path(args.nm).parent
+    subprocess.run(
+        [
+            sys.executable,
+            str(Path(pack.__file__)),
+            "--elf",
+            "--model",
+            args.model,
+            "--flash-copy",
+            "--journal-slot",
+            str(args.slot),
+            "--authority-slot",
+            str(authority),
+            "--library-id",
+            str(LIBRARY_ID),
+            "--reservation-name",
+            NAME.decode(),
+            "--reservation-bytes",
+            str(RESERVE_BYTES),
+            "--reservation-prefix",
+            prefix.decode(),
+            "--admission-elf",
+            str(build / "admission.elf"),
+            "--program-output",
+            str(package / "recovery-configuration.hp"),
+            "--nm",
+            args.nm,
+            "--readelf",
+            str(tool_bin / "llvm-readelf"),
+            "--objcopy",
+            str(tool_bin / "llvm-objcopy"),
+            str(build / "recovery.elf"),
+            str(package / "recovery-guarded.hp"),
+        ],
+        check=True,
+    )
+    program = (package / "recovery-configuration.hp").read_bytes()
+    if program != (build / "recovery-configuration.hp").read_bytes():
+        raise ValueError("Recovery build binding differs from the requested transaction")
+    library = (package / "recovery-guarded.hp").read_bytes()
     (package / "recovery-observed.hp").write_bytes(observed_library(pack, library))
     source = root / "install-source"
     bank = args.target & ~0x1FFFF

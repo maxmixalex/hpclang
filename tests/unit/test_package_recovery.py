@@ -16,6 +16,98 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_bound_cli_packages_both_elfs_before_publishing_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            recovery, predicate = root / "recovery.elf", root / "admission.elf"
+            output, binary, program = (
+                root / name for name in ("library.hp", "image.bin", "code.hp")
+            )
+            image = PACK.bind_image(bytes(32) + b"HPCBIND1" + bytes(24), 32, 0x160105, 0x161121)
+            predicate_image = PACK.bind_image(b"HPCBIND1" + bytes(56), 0, 0x1A0105, 0x1A1121)
+            valid_predicate = True
+
+            def listing(command, **kwargs):
+                if command[0] == "readelf":
+                    return "R_ARM_REL32"
+                offset = 32 if command[-1] == recovery else (0 if valid_predicate else 64)
+                return (
+                    "00000000 T entry\n00000040 B __zero_start\n00000080 B __image_end\n"
+                    f"{offset:08x} D hpclang_recovery_binding\n"
+                )
+
+            def extract(command, **kwargs):
+                Path(command[-1]).write_bytes(image if command[-2] == recovery else predicate_image)
+
+            argv = [
+                "pack",
+                "--elf",
+                "--model",
+                "hp50g",
+                "--flash-copy",
+                "--library-id",
+                "1701",
+                "--journal-slot",
+                "0x180105",
+                "--authority-slot",
+                "0x181121",
+                "--reservation-name",
+                "RESERVE",
+                "--reservation-bytes",
+                "8192",
+                "--reservation-prefix",
+                "owned",
+                "--admission-elf",
+                str(predicate),
+                "--binary-output",
+                str(binary),
+                "--program-output",
+                str(program),
+                "--nm",
+                "nm",
+                "--readelf",
+                "readelf",
+                "--objcopy",
+                "objcopy",
+                str(recovery),
+                str(output),
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(PACK.subprocess, "check_output", side_effect=listing),
+                patch.object(PACK.subprocess, "run", side_effect=extract),
+            ):
+                PACK.main()
+                expected = PACK.bind_image(image, 32, 0x180105, 0x181121)
+                self.assertEqual(binary.read_bytes(), expected)
+                recovery_program = PACK.package(expected, 128, model="hp50g", fresh_copy=True)
+                self.assertEqual(program.read_bytes(), recovery_program)
+                admission = PACK.package(
+                    PACK.bind_image(predicate_image, 0, 0x180105, 0x181121),
+                    128,
+                    model="hp50g",
+                    fresh_copy=True,
+                )
+                self.assertEqual(
+                    output.read_bytes(),
+                    PACK.guarded_configuration_library(
+                        recovery_program,
+                        1701,
+                        name="RESERVE",
+                        capacity=8192,
+                        prefix=b"owned",
+                        admission=admission,
+                    ),
+                )
+                for path in (output, binary, program):
+                    path.write_bytes(b"retained")
+                valid_predicate = False
+                with self.assertRaisesRegex(ValueError, "outside initialized"):
+                    PACK.main()
+                self.assertTrue(
+                    all(path.read_bytes() == b"retained" for path in (output, binary, program))
+                )
+
     def test_admission_precedes_the_complete_reservation_guard(self):
         recovery = PACK.package(bytes(range(64)), 4096, model="hp50g")
         admission = PACK.package(bytes(range(8)), 64, model="hp50g")

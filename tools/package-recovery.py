@@ -455,10 +455,16 @@ def main() -> None:
     parser.add_argument(
         "--reservation-prefix", help="expected opaque header, encoded as UTF-8 bytes"
     )
-    parser.add_argument(
+    admission_source = parser.add_mutually_exclusive_group()
+    admission_source.add_argument(
         "--admission-program",
         type=Path,
         help="small real-valued predicate to run before guarded RAM release",
+    )
+    admission_source.add_argument(
+        "--admission-elf",
+        type=Path,
+        help="predicate ELF bound to the same explicit journal/authority pair as recovery",
     )
     for tool in ("nm", "readelf", "objcopy"):
         parser.add_argument("--" + tool, default="llvm-" + tool)
@@ -483,12 +489,19 @@ def main() -> None:
         parser.error("all three --reservation-* options and --library-id are required together")
     if args.admission_program is not None and not guarded:
         parser.error("--admission-program requires a guarded reservation")
+    if args.admission_elf is not None and (not guarded or binding is None):
+        parser.error("--admission-elf requires a guarded reservation and both binding slots")
+    if args.admission_program is not None and binding is not None:
+        parser.error(
+            "explicit recovery binding requires --admission-elf, not a prepacked predicate"
+        )
     paths = [
         args.input,
         args.output,
         args.binary_output,
         args.program_output,
         args.admission_program,
+        args.admission_elf,
     ]
     resolved = [path.resolve() for path in paths if path is not None]
     if len(set(resolved)) != len(resolved):
@@ -514,6 +527,19 @@ def main() -> None:
             fresh_copy=args.flash_copy,
         )
     program = result
+    admission = args.admission_program.read_bytes() if args.admission_program else None
+    if args.admission_elf is not None:
+        # A hidden command always starts with a fresh immutable Flash copy.
+        # Validate both ELFs and bind both before writing any output file.
+        admission, _ = package_elf(
+            args.admission_elf,
+            model=args.model,
+            nm=args.nm,
+            readelf=args.readelf,
+            objcopy=args.objcopy,
+            fresh_copy=True,
+            binding=binding,
+        )
     if guarded:
         result = guarded_configuration_library(
             result,
@@ -521,7 +547,7 @@ def main() -> None:
             name=args.reservation_name,
             capacity=args.reservation_bytes,
             prefix=args.reservation_prefix.encode("utf-8"),
-            admission=args.admission_program.read_bytes() if args.admission_program else None,
+            admission=admission,
         )
     elif args.library_id is not None:
         result = configuration_library(result, args.library_id)
