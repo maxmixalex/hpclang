@@ -517,7 +517,14 @@ on both captures. This establishes provenance, not relocation safety: source
 identity does not classify embedded addresses, live continuations or workspace
 contents. The next step is to establish those semantics and the remaining
 execution paths before relaxing mutation preflight. These are local snapshot
-results, not CI acceptance or a completed port-service gate.
+results, not CI acceptance or a completed port-service gate. The three HOME
+CODE objects belong to the stored `SETUP` program; the short binary object is
+`UserKeys.CRC` in the hidden directory. `SETUP` includes relative calls between
+separate CODE objects, so validating each CODE interval in isolation would reject
+valid native code. Relocation analysis must preserve the enclosing program's
+relationships as well as classify live references. Instruction-boundary checks
+use Saturn+ decoding: older Saturn-only output misdecodes extended operations
+and cannot establish these call paths.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
