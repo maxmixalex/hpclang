@@ -293,6 +293,8 @@ target_include_directories(test_sound_api PRIVATE "${HPCLANG_ROOT}/include" "${H
 
 hpclang_unit(sound test_sound.c "${HPCLANG_ROOT}/runtime/core/sound-engine.c")
 target_include_directories(test_sound PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(sound_alarm test_sound_alarm.c "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
+target_include_directories(test_sound_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(time test_time.c "${HPCLANG_ROOT}/runtime/core/time-math.c")
 target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")

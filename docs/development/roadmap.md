@@ -2018,6 +2018,9 @@ below are retained.
   busy, overlapping requests, cancellation and normal/immediate-exit restoration.
   Keep Stock interrupt handlers out of the temporary application mapping; the
   existing blocking tone service alone does not satisfy this adapter group.
+  The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
+  expiry/rearm/restoration probes with the interrupt masked. Owned IRQ dispatch,
+  absolute-deadline handling and autonomous audio shutdown remain unfinished.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;

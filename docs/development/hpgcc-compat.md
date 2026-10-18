@@ -887,6 +887,15 @@ requires owned asynchronous playback and
 completion/preemption state; the current blocking `hpclang_sound_play` alone
 does not implement that contract.
 
+The internal PWM4 one-shot lease now provides a separate deadline timer without
+changing PWM2 audio output or the shared prescaler. It rejects an existing
+running, update, DMA or pending owner before modifying registers. Host sanitizer
+tests cover delay rounding, overflow and resource restoration; native Direct
+probes on all six model emulators pass expiry, rearm and stopped-state restoration.
+Those probes keep the interrupt masked and poll its pending bit. An owned IRQ
+entry and stack, absolute-deadline dispatch and autonomous audio shutdown remain
+required before this becomes a public asynchronous sound adapter.
+
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
 - `sys_bcd2bin(value)` converts the low **two** nibbles. Its macro evaluates the
