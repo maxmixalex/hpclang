@@ -513,8 +513,18 @@ configuration sequence now includes low-memory recovery and repeated startup;
 the expanded local run passes on both HP49g+ and HP50g, including native catalog,
 complete Flash, code/stack/TLS/guard and full real-array checks. All 49 focused
 host tests, a fresh ARM build, pinned Python lint/format and strict docs pass.
-This batch is ready for CI submission; it does not establish CI acceptance. Trusted
+This batch was submitted at `62f7ece4`; its CI has not been polled. Trusted
 installation, recovery-memory guarantees and all other M8.0 gates remain open.
+
+Local reservation experiments now pass on both models: one Flash library's
+configuration releases a controlled 32 KiB RAM placeholder before invoking its
+own hidden recovery command. With only 20,964 bytes initially free, recovery and
+the subsequent unchanged restart preserve all 24,000 user real-array elements
+and pass complete Flash/catalog/image/stack/TLS checks. An HP50g control without
+releasable storage remains unrecovered at comparable pressure. This proves a
+resource mechanism, not a production installer: admission must bind the reserved
+object to the trusted root/current transaction and establish safe global startup
+ordering before destructive work. Fixed fixture names are not ownership proof.
 
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can

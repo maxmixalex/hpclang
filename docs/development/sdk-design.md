@@ -322,6 +322,17 @@ library and its companion program and checks low-memory recovery plus a later
 unchanged restart, preserving the full real array. The existing Runtime artifact
 glob includes the companion; no separate workflow or resource exception is needed.
 
+A local reservation experiment uses a single Flash-library configuration to
+release a controlled 32 KiB placeholder before calling its hidden recovery
+command. HP49g+ and HP50g both recover with a 20,964-byte initial RPL gap, preserve
+a 24,000-element user real array and pass a later unchanged restart. Comparable
+HP50g pressure without releasable storage leaves the transaction armed and Flash
+unrepaired. Production admission must validate ownership, capacity and lifetime
+of the reservation against the installed root and current transaction; a fixed
+HOME name or a successful `PURGE` is insufficient. Release and recovery must
+share one configuration invocation, while ordering against earlier system
+callbacks remains a separate unresolved requirement.
+
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from
 repository sources. With ATfE's `bin` on PATH:
