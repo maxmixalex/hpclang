@@ -553,6 +553,16 @@ cover qualified target movement, and 51 native ROM-call sites per snapshot
 retain their targets when only their containing code moves. Production
 integration and the remaining live-reference/opaque coverage are still open.
 
+The same 38-case relative-branch matrix also passes with planning and replay
+performed by the actual ARM application on both Stock models. The application
+locates its stored test program, validates complete instruction guards, merges
+19 operand repairs and applies the shared RAM replay before returning. Native
+execution distinguishes repaired cases from unrepaired controls and reaches
+the final RPL marker; Flash stays unchanged. All six launchers compile. These
+controlled target-placement probes establish ARM-to-Stock execution handoff,
+not arbitrary library movement or complete reference classification. A maintained
+CI reproduction of this on-device probe remains to be integrated.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
