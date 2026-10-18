@@ -117,6 +117,20 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
 int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, uint32_t *attempted_slot);
 
+/* Resolve one installed library against the complete expected native record.
+ * Validate all six bank identities, live records and erased tails, then require
+ * a unique matching library ID, exact allocation length/header and complete
+ * library object. Padding outside the object's extent is not identity: native
+ * STO may zero the unused high nibble where the SDK encoder writes F. Deleted or
+ * nested copies do not count. Returns WRITTEN (0) with slot only on success,
+ * NOT_FOUND when absent, DIRTY for ambiguity or changed content, and the usual
+ * INVALID/FAILED results. program16 may be NULL: this never writes or recovers.
+ * Keep the expected record and mapped port stable throughout. The returned
+ * physical address is an installation witness, not a persistent ownership
+ * token, catalog/attachment check or authorization to erase/replay anything. */
+int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes, uint32_t *slot);
+
 /* Validate all six banks before deleting one uniquely named backup. Only its
  * status byte changes; payload, references and allocation extents stay put.
  * No erase/reclamation. Missing names return NOT_FOUND; ambiguous names DIRTY.

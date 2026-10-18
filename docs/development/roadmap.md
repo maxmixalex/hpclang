@@ -421,6 +421,10 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
+- **Latest submission:** `235d8ccf` contains the installation witness, ELF
+  binding and guarded transaction-admission follow-ups described below. Both
+  native model flows and the extra boundary-rejection probes pass locally;
+  new CI has not been queried.
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
@@ -483,10 +487,24 @@ Current delivery checkpoints:
   request and intact reservation, user array and catalog. A fresh ARM rebuild
   produces identical binaries; maintained ELF packaging produces byte-identical
   guarded and observed libraries to those used by the native runs.
-  This follow-up batch is ready for CI submission; no new CI acceptance or
+  This follow-up batch is submitted as `235d8ccf`; no new CI acceptance or
   milestone completion is claimed. Structural membership does not establish installed
   identity, transaction freshness or RAM ownership; full recovery preflight and
   the remaining installation gates are retained.
+- **Local installation follow-up:** a read-only native library matcher now
+  reuses the existing full-port scanner. It validates the expected record,
+  requires a unique live library ID and exact allocation header/length and
+  library object, and publishes the physical slot only after every bank and
+  erased tail passes. Deleted/nested copies, duplicates, changed valid libraries
+  and later-bank damage are rejected without writes or output changes. Native
+  STO's unused high padding nibble may be zero while the SDK encoder uses F;
+  this non-object padding is excluded from identity, while the entire library
+  and CRC remain checked. The extended creation/mutation suite and ARM Clang
+  analysis pass. The host-compiled C matcher agrees with the independent
+  package/catalog oracle on all four saved guarded/observed installations from
+  HP49g+/HP50g. This is saved-state evidence, not execution of the new function
+  on ARM or an installed persistent trust root. Catalog/lifetime and
+  reservation/transaction ownership integration remain open; not pushed.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
   reservation to the current transaction. The maintained guarded-reservation E2E
   is already integrated; its remote acceptance remains a separate gate. Preserve

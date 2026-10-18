@@ -747,14 +747,13 @@ struct erased_tail
     uint32_t slot, bytes;
 };
 
-static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
-                         uint32_t name_length, uint32_t prologue, uint32_t library_number,
-                         uint32_t bytes, struct record_selection *selection,
-                         struct erased_tail *tails)
+static int scan_records(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                        uint32_t name_length, uint32_t prologue, uint32_t library_number,
+                        uint32_t bytes, struct record_selection *selection,
+                        struct erased_tail *tails)
 {
-    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
-        io->first > io->end || io->end - io->first != 6u * 0x20000u || (!name && name_length) ||
-        name_length > 255u)
+    if (!io || !io->read16 || ((io->first | io->end) & 1u) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u || (!name && name_length) || name_length > 255u)
         return HPCLANG_RPL_FLASH_INVALID;
     *selection = (struct record_selection){io->end, io->end, 0, 0};
     for (uint32_t index = 0; index < 6u; ++index) {
@@ -797,6 +796,51 @@ static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *n
             tails[index] = (struct erased_tail){bank + space.address / 2u, space.nibbles / 2u};
     }
     return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                         uint32_t name_length, uint32_t prologue, uint32_t library_number,
+                         uint32_t bytes, struct record_selection *selection,
+                         struct erased_tail *tails)
+{
+    if (!io || !io->program16)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return scan_records(io, name, name_length, prologue, library_number, bytes, selection, tails);
+}
+
+int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes, uint32_t *slot)
+{
+    if (!slot || !valid_record(record, bytes))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1 || wanted.prologue != 0x02b40u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct record_selection selection;
+    int result =
+        scan_records(io, NULL, 0, wanted.prologue, wanted.library_number, bytes, &selection, NULL);
+    if (result)
+        return result;
+    if (!selection.matches)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (selection.matches != 1 || selection.match_bytes != bytes)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t nibbles = 8u + wanted.span;
+    result = matching_record(io, selection.match_slot, record, nibbles / 2u, 0, 0x53u);
+    if (!result && (nibbles & 1u)) {
+        uint32_t last = selection.match_slot + nibbles / 2u;
+        uint16_t word;
+        if (!io->read16(io->context, last & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (((word >> (8u * (last & 1u))) & 15u) != (record[nibbles / 2u] & 15u))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (!result)
+        *slot = selection.match_slot;
+    return result;
 }
 
 static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
