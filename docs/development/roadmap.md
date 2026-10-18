@@ -500,6 +500,15 @@ must guarantee recovery-time storage before destructive mutation; a fresh-state
 success or installation-time free-memory check alone is insufficient. This is local
 negative evidence, not a completed installer or a relaxation of any startup gate.
 
+A local compact Flash-configuration prototype now passes that same low-memory
+fault on both models, reducing the package from 46,698 to 29,682 bytes. Independent
+verification preserves all 26,000 real elements and checks the complete Flash
+transition, catalog, image, stack/TLS and guards. Both models also pass retained-RAM,
+RAM-loss, callback-body and repeated-warmstart checks. The next integration step
+is to preserve its fresh-Flash-copy lifetime contract in maintained packaging and
+tests; ordinary reusable RAM programs must retain their immutable source. Trusted
+installation, recovery-memory guarantees and all other M8.0 gates remain open.
+
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
 describe the same bank-switch field; their repairs must not be applied twice.
