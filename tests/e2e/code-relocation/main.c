@@ -15,6 +15,14 @@ static int word(struct hpclang_rpl_mutation_io *io, uint32_t at, unsigned width,
     }
     return 1;
 }
+static int bind_word(struct hpclang_rpl_mutation_io *io, uint32_t at, uint32_t value)
+{
+    for (unsigned n = 0; n < 5; ++n)
+        if (!io->write_nibble(io->context, at + n, (value >> (4 * n)) & 15))
+            return 0;
+    uint32_t actual;
+    return word(io, at, 5, &actual) && actual == value;
+}
 static int mapped_read(void *ctx, uint32_t mapping, uint32_t at, uint8_t *out)
 {
     struct hpclang_rpl_mutation_io *io = ctx;
@@ -58,7 +66,7 @@ static int run(void)
     cursor += 11; /* library 275 command 0 */
     struct hpclang_rpl_reference_edit edits[CASE_COUNT];
     struct hpclang_rpl_reference_edit_builder builder;
-    struct hpclang_rpl_reference_guard guards[CASE_COUNT * 2];
+    struct hpclang_rpl_reference_guard guards[CASE_COUNT * 3];
     uint32_t addresses[CASE_COUNT];
     unsigned count = 0;
     if (hpclang_rpl_reference_edits_begin(&builder, edits, CASE_COUNT))
@@ -77,9 +85,16 @@ static int run(void)
         if (cases[i].pointer) {
             /* Bind the fixture's absolute address after Stock allocation. */
             uint32_t target = body + cases[i].old;
-            for (unsigned n = 0; n < 5; ++n)
-                if (!io.write_nibble(io.context, at + 2 + n, (target >> (4 * n)) & 15))
-                    return 16;
+            if (!bind_word(&io, at + 2, target))
+                return 16;
+        }
+        if (cases[i].indirect) {
+            uint32_t cell = body + cases[i].cell, target = body + cases[i].old;
+            int via_memory = cases[i].indirect >= 3;
+            if (!bind_word(&io, body + cases[i].load, cell) ||
+                !bind_word(&io, cell, via_memory ? cell + 5 : target) ||
+                (via_memory && !bind_word(&io, cell + 5, target)))
+                return 17;
         }
         for (unsigned n = 0; n < cases[i].length;) {
             unsigned width = cases[i].length - n;
@@ -98,9 +113,38 @@ static int run(void)
                     struct hpclang_rpl_code_patch *) = cases[i].pointer
                                                            ? hpclang_rpl_code_pointer_plan_shift
                                                            : hpclang_rpl_code_branch_plan_shift;
-        if (plan(&reader, at, cases[i].length, &maps, body + cases[i].old,
-                 body + cases[i].old + (cases[i].move ? cases[i].length : 16),
-                 cases[i].move ? 32 : 16, &patch) != 1)
+        int planned;
+        if (cases[i].indirect) {
+            uint32_t source = body + cases[i].cell, value;
+            unsigned register_c = !(cases[i].indirect & 1);
+            struct hpclang_rpl_code_indirect transfer;
+            if (!word(&io, source, 5, &value) ||
+                hpclang_rpl_code_indirect_inspect(&reader, &reader, at, cases[i].length,
+                                                  register_c ? 0 : value, register_c ? value : 0,
+                                                  &transfer) ||
+                transfer.register_c != register_c ||
+                transfer.via_memory != (cases[i].indirect >= 3) ||
+                transfer.target != body + cases[i].old)
+                return 18;
+            guards[count++] = (struct hpclang_rpl_reference_guard){1, source, value, 5};
+            uint32_t field = transfer.via_memory ? transfer.register_value : source;
+            if (transfer.via_memory)
+                guards[count++] =
+                    (struct hpclang_rpl_reference_guard){1, field, transfer.target, 5};
+            struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, field,
+                                                 transfer.target, 0, 0};
+            struct hpclang_rpl_reference_patch resolved;
+            planned = hpclang_rpl_reference_plan_qualified_shift(
+                &edge, &maps, body + cases[i].old, body + cases[i].old + 16, 16, &resolved);
+            if (planned == 1)
+                patch = (struct hpclang_rpl_code_patch){resolved.field, 5, transfer.target,
+                                                        resolved.value};
+        } else {
+            planned = plan(&reader, at, cases[i].length, &maps, body + cases[i].old,
+                           body + cases[i].old + (cases[i].move ? cases[i].length : 16),
+                           cases[i].move ? 32 : 16, &patch);
+        }
+        if (planned != 1)
             return 11;
         if (cases[i].repair) {
             struct hpclang_rpl_reference_edit edit = {1, patch.field, patch.expected, patch.value,

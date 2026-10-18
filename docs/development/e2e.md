@@ -112,10 +112,13 @@ focused payloads through the shared Direct/Stock family harness:
   RCL witnesses. HP48gII skips absent ports through capability discovery.
   This verifies record storage and persistence, not registration or execution.
 - `code-relocation`: HP49g+/HP50g Stock-only ARM-side branch planning and guarded
-  RAM replay, followed by 80 native repaired/control cases. 38 cases also copy the
+  RAM replay, followed by 88 native repaired/control cases. 38 cases also copy the
   repaired instruction to a new address and clear its original bytes before
   native execution; another 38 vary the branch target address. Four D0/D1 cases
-  move data and distinguish repaired pointers from stale-pointer controls. The standard install
+  move data and distinguish repaired pointers from stale-pointer controls. Eight
+  register-transfer cases exercise PC=A/C and PC=(A/C), with explicit guarded
+  source cells distinguishing register provenance from indirect pointer fields.
+  The standard install
   phase is followed by a required verifier checking every case, a final RPL
   return marker and unchanged Flash. Controlled target placement tests instruction
   behavior and the ARM-to-Stock handoff, not arbitrary library movement.

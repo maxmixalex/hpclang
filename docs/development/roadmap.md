@@ -602,6 +602,20 @@ and Stock return checks. This is bounded normal-path evidence and host
 resolution of native observations, not complete exceptional-path or register
 liveness coverage; production opaque checks remain unchanged.
 
+The maintained Stock suite now exercises those four register-transfer forms
+through the actual ARM resolver and shared qualified reference planning/replay.
+Eight new cases use explicit register-source cells and, for PC=(A/C), a separate
+guarded pointer cell. Repaired and unrepaired controls reach distinct native
+markers. Both HP49g+ and HP50g pass all 88 cases, the final RPL marker and unchanged
+Flash locally. These controlled sources do not prove arbitrary live-register
+provenance. Separately, error-return watchpoints are now gated on entry into the
+specific ARM application, avoiding a matching numeric error code during earlier
+Stock allocation. Both models copy the injected error code, restore RPL pointers
+through GETPTR and reach the outer RPL error-handler marker after catalog growth,
+with unchanged Flash. The first 400 observed register accesses contain no R0–R4
+use; later consumers and other exceptional paths remain unclassified. Remote
+acceptance and complete production reference coverage are still pending.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
