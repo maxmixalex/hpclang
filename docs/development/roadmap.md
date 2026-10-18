@@ -1940,9 +1940,9 @@ input through the aliases. Host regressions check struct-member bounds,
 overflow/re-edit, single argument evaluation and unknown-capacity rejection.
 Both GCC ASan/UBSan and optimized Clang checks pass. The host stream fixture
 also covers libc's optimized `getc/putc` paths. The maintained ARM console
-witness uses `gets` and passes HP39g+ Direct and HP50g Stock return and independent
-pixel checks locally. All six Direct aliases and the updated installed-SDK C++
-client now pass locally; remaining Stock targets and CI remain pending.
+witness uses `gets` and passes all six Direct and all six Stock targets with
+normal return and independent console/editor pixel checks locally. The updated
+installed-SDK C++ client also passes; formal CI for this batch remains pending.
 
 `hpstdio.h` now provides blocking `readint/readdouble` over that bounded editor.
 They retain historical numeric-prefix conversion and the 31-byte line capacity;
@@ -2019,7 +2019,10 @@ below are retained.
   Keep Stock interrupt handlers out of the temporary application mapping; the
   existing blocking tone service alone does not satisfy this adapter group.
   The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
-  expiry/rearm/restoration probes with the interrupt masked. Owned IRQ dispatch,
+  expiry/rearm/restoration probes with the interrupt masked. Banked IRQ stack
+  exchange/restoration also passes six-model Direct probes with actual delivery
+  during a busy loop; System Services E2E now maintains this check and passes all
+  six Direct targets locally. Owned dispatch,
   absolute-deadline handling and autonomous audio shutdown remain unfinished.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.

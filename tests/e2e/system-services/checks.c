@@ -16,6 +16,7 @@
 
 unsigned hpclang_e2e_console_test(void);
 unsigned hpclang_e2e_power_test(void);
+unsigned hpclang_e2e_irq_test(void);
 
 /* Exercise Stock's transfer decoding independently of incidental machine-code
  * bytes. Both nibble alignments contain CRLF after HP39 Aplet packaging.
@@ -276,6 +277,9 @@ uint32_t hpclang_e2e_system_test(void)
         if (settings[i] != *(volatile uint8_t *)rtc_settings[i])
             return 0x7a33;
 
+    unsigned irq_failure = hpclang_e2e_irq_test();
+    if (irq_failure)
+        return 0x7b00u + irq_failure;
     int sound_result = sound_test();
     if (sound_result)
         return 0x7600u + (uint32_t)sound_result;

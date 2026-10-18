@@ -802,7 +802,9 @@ These aliases do not export an unbounded function symbol or support taking its
 address. Define `HPCLANG_HPCONIO_NO_GETS_ALIASES` before including the header to
 disable both macros. The maintained console E2E now calls the historical name
 for its guarded four-byte buffer, overflow rejection, backspace and scroll-undo
-checks; the installed-SDK C++ input client exercises both spellings.
+checks; all six Direct and all six Stock targets pass locally with independent
+console/editor pixels and normal return. The installed-SDK C++ input client
+exercises both spellings and passes relocation/packaging validation.
 
 `hpstdio.h` exposes `readint()` and `readdouble()` without enabling default
 stdio merely by including the header. Calling either uses the bounded editor
@@ -892,9 +894,15 @@ changing PWM2 audio output or the shared prescaler. It rejects an existing
 running, update, DMA or pending owner before modifying registers. Host sanitizer
 tests cover delay rounding, overflow and resource restoration; native Direct
 probes on all six model emulators pass expiry, rearm and stopped-state restoration.
-Those probes keep the interrupt masked and poll its pending bit. An owned IRQ
-entry and stack, absolute-deadline dispatch and autonomous audio shutdown remain
-required before this becomes a public asynchronous sound adapter.
+Those probes keep the interrupt masked and poll its pending bit. A separate
+supervisor helper now exchanges and restores the banked IRQ stack, link and
+status registers. Six-model Direct probes verify actual interrupt delivery
+while application code runs a busy loop and independently compare the restored
+bank. System Services E2E maintains this test, including the SWI vector, stack
+boundary and retained Stock source latches, and passes all six Direct targets
+locally. The production IRQ dispatcher,
+absolute-deadline handling and autonomous audio shutdown remain required before
+this becomes a public asynchronous sound adapter.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 

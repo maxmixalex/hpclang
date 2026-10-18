@@ -185,3 +185,42 @@ hpclang_irq_restore:
     msr     spsr_cxsf, r0
     movs    pc, lr
 .size hpclang_irq_restore, .-hpclang_irq_restore
+
+/* Exchange the IRQ bank without using its stack. Stock's vector trampoline
+ * uses SP_irq before reaching the application handler, so an owned stack must
+ * already be installed when IRQ is enabled. The caller masks IRQ/FIQ and must
+ * not call this from IRQ context. r0 addresses three words: SP, LR, SPSR.
+ */
+.section .text.hpclang_irq_bank_exchange,"ax",%progbits
+.align 2
+.global hpclang_irq_bank_exchange
+.type hpclang_irq_bank_exchange,%function
+hpclang_irq_bank_exchange:
+    stmfd   sp!, {r1-r7, lr}
+    ldr     r4, =0x08000008
+    adr     r5, .Lirq_bank_supervisor
+    swp     r5, r5, [r4]
+    swi     0
+    ldmfd   sp!, {r1-r7, lr}
+    bx      lr
+
+.Lirq_bank_supervisor:
+    str     r5, [r4]
+    mrs     r6, cpsr
+    bic     r5, r6, #0x1f
+    orr     r5, r5, #0xd2
+    msr     cpsr_c, r5
+
+    ldmia   r0, {r1-r3}
+    str     sp, [r0]
+    str     lr, [r0, #4]
+    mrs     r4, spsr
+    str     r4, [r0, #8]
+    mov     sp, r1
+    mov     lr, r2
+    msr     spsr_cxsf, r3
+
+    /* SVC LR/SPSR are banked independently and still hold the SWI return. */
+    msr     cpsr_c, r6
+    movs    pc, lr
+.size hpclang_irq_bank_exchange, .-hpclang_irq_bank_exchange
