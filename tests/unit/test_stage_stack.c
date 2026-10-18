@@ -53,8 +53,61 @@ static void setup(void)
     put(0x90022, 0x08012340, 8);
     put(0x807ed, 0x12345, 5); /* An unrelated field must remain unchanged. */
 }
+
+static int oversized_instruction(void *context, uint32_t at, unsigned width, uint32_t *value)
+{
+    (void)context;
+    (void)at;
+    (void)width;
+    *value = 0x130;
+    return 1;
+}
+
+static void test_immediate_return_root(void)
+{
+    setup();
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    uint32_t stack[8] = {0x80001, 0x81002, 0x82003, 0x83004, 0x84005, 0x85006, 0x86007, 0x87008};
+    uint32_t before[8];
+    memcpy(before, stack, sizeof stack);
+    for (uint32_t instruction = 0; instruction < 256; ++instruction) {
+        put(0x88800, instruction, 2);
+        for (uint32_t cursor = 0; cursor < 8; ++cursor) {
+            uint32_t *root = hpclang_stage_immediate_return_root(&io, 0x88800, stack, cursor);
+            int returns = instruction == 0x10 || instruction == 0x20 || instruction == 0x30;
+            assert(root == (returns ? stack + ((cursor + 7) & 7) : NULL));
+        }
+    }
+    assert(!writes && !memcmp(before, stack, sizeof stack));
+    put(0xffffe, 0x30, 2);
+    assert(hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 0) == &stack[7]);
+    for (uint32_t at = 0xffffe; at < 0x100000; ++at) {
+        fault = at;
+        assert(!hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 0));
+    }
+    fault = UINT32_MAX;
+    assert(!hpclang_stage_immediate_return_root(&io, 0xfffff, stack, 0));
+    assert(!hpclang_stage_immediate_return_root(&io, UINT32_MAX, stack, 0));
+    assert(!hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 8));
+    assert(!hpclang_stage_immediate_return_root(&io, 0xffffe, stack, UINT32_MAX));
+    assert(!hpclang_stage_immediate_return_root(NULL, 0xffffe, stack, 0));
+    assert(!hpclang_stage_immediate_return_root(&io, 0xffffe, NULL, 0));
+    const struct hpclang_stage_stack_io missing = {0};
+    const struct hpclang_stage_stack_io malformed = {NULL, oversized_instruction, NULL};
+    assert(!hpclang_stage_immediate_return_root(&missing, 0xffffe, stack, 0));
+    assert(!hpclang_stage_immediate_return_root(&malformed, 0xffffe, stack, 0));
+    stack[7] = 0x100000;
+    assert(!hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 0));
+    stack[7] = 0xfffff;
+    assert(hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 0) == &stack[7]);
+    stack[7] = 0;
+    assert(hpclang_stage_immediate_return_root(&io, 0xffffe, stack, 0) == &stack[7]);
+    assert(!writes);
+}
+
 int main(void)
 {
+    test_immediate_return_root();
     struct hpclang_stage_stack_io io = {NULL, read_word, write_word};
     struct stage_launcher_bias bias;
     setup();

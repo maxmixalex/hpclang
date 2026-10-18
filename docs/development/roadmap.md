@@ -1665,6 +1665,16 @@ declared native roots, zero changed nested fields and ten opaque obligations;
 this smaller application therefore does not replace the earlier nested-field
 relocation evidence. The current host suite passes all 101 tests.
 
+Stage1 now recognizes an immediate execution root on HP49g+/HP50g: a saved
+post-ARMSYS PC naming `RTN`, `RTNSC` or `RTNCC` proves that the circular
+machine-stack top will be consumed as an address. Only that cell is added;
+lower slots remain unclassified. Local original-system diagnostics on both
+models use only stage1's three roots, grow the catalog and reach an independent
+post-call RPL marker with unchanged Flash. Exhaustive opcode/cursor unit tests
+pass with ASan/UBSan; all six launchers build, and HP39g+/HP48gII Direct UI
+regressions pass return, independent pixels and memory checks. This closes one
+root-discovery case, not complete execution coverage, registration or reclamation.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with

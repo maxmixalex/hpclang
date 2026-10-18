@@ -29,4 +29,14 @@ int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t 
 int hpclang_stage_stack_restore(const struct hpclang_stage_stack_io *io,
                                 const struct stage_launcher_bias *bias);
 
+/* A proven suspended Saturn PC names the next instruction, not arbitrary data.
+ * RTN, RTNSC and RTNCC unconditionally consume the circular machine-stack top
+ * as their next execution address. Return that cell, or NULL for unreadable /
+ * unsupported instructions or invalid state. No writes, allocation or scan
+ * of lower slots. The caller supplies eight stable cells and a next-push cursor;
+ * this does not classify other execution roots or certify a complete call chain. */
+uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_io *io,
+                                              uint32_t continuation, uint32_t *machine_stack,
+                                              uint32_t cursor);
+
 #endif

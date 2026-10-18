@@ -578,8 +578,8 @@ reference discovery or later expected-value validation.
 
 Native execution context is a separate root source from the calculator's RPL
 return-stack cells. During a live ARM invocation the original runner can retain
-continuation addresses into movable RPL code outside the two roots currently
-registered by stage1. A successful payload marker therefore cannot establish
+continuation addresses into movable RPL code outside the roots registered by
+stage1. A successful payload marker therefore cannot establish
 return safety; acceptance must include the return to Stock and a subsequent
 invocation. Platform integration must establish the types, ownership and layout
 of these saved execution fields rather than infer roots from address-looking
@@ -598,6 +598,16 @@ HP49g+/HP50g captures through the independent recovery envelope, with library
 275 absent, still contain one machine-stack value inside the movable TEMP
 range. The surrounding Stock evaluation path therefore remains part of the
 execution-root analysis even when the ARM image and its stack are owned.
+
+For HP49g+/HP50g, stage1 additionally recognizes a bounded immediate-return
+case: when the saved post-ARMSYS PC points to `RTN`, `RTNSC` or `RTNCC`, the next
+instruction consumes the circular machine-stack top as an execution address.
+It publishes that cell as an invocation-local relocation root alongside the
+hidden launcher object and saved PC. Recognition reads the instruction at the
+proven continuation, validates the next-push cursor and 20-bit top value, and
+does not scan lower slots or infer past calls from nearby instruction bytes.
+Unsupported or unreadable instructions add no root; this does not certify
+complete execution-reference coverage or permit public reclamation.
 
 `hpclang_rpl_cached_program_match` verifies a caller-bounded TEMP allocation
 containing a ROMP identity followed by a DOCOL program against an independently

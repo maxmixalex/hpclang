@@ -16,6 +16,21 @@ static int read_byte(const struct hpclang_stage_stack_io *io, uint32_t at, uint8
     *value = (uint8_t)word;
     return 1;
 }
+
+uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_io *io,
+                                              uint32_t continuation, uint32_t *machine_stack,
+                                              uint32_t cursor)
+{
+    if (!io || !io->read || !machine_stack || cursor >= 8u || continuation > RPL_MAIN_END - 2u)
+        return NULL;
+    uint8_t instruction;
+    if (!read_byte(io, continuation, &instruction) ||
+        (instruction != 0x10u && instruction != 0x20u && instruction != 0x30u))
+        return NULL;
+    uint32_t *root = &machine_stack[(cursor + 7u) & 7u];
+    return *root < RPL_MAIN_END ? root : NULL;
+}
+
 int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t stage0_code,
                              struct stage_launcher_bias *bias)
 {
