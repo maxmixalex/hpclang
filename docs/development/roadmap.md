@@ -419,6 +419,22 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Current delivery checkpoints:
+
+- **CI accepted:** `d94580b4`, the latest fully accepted batch recorded here.
+- **Submitted:** `62f7ece4`, including compact Flash recovery packaging and
+  maintained low-memory/repeated-restart tests; its CI has not been checked.
+- **Local evidence:** controlled recovery-memory release on both models;
+  reservation ownership and safe startup admission are still unproven.
+- **Active M8.0 work:** establish a reservation guard that safely handles absent,
+  valid and unrelated objects during native startup, then bind it to the trusted
+  root and current transaction. Preserve the execution-reference requirements
+  while their scope clarification is pending. M8.1 remains the only accepted
+  complete M8 stage.
+
+The entries below preserve earlier batch evidence and check times; their older
+pending-CI descriptions do not supersede these delivery checkpoints.
+
 Latest CI-accepted batch: `d94580b4`; all four triggered workflows passed:
 Quality, Core, Objects and Runtime. Runtime includes both native code-relocation
 jobs and all six Stock System Services jobs. Follow-ups through `626fe53a`
@@ -525,6 +541,17 @@ releasable storage remains unrecovered at comparable pressure. This proves a
 resource mechanism, not a production installer: admission must bind the reserved
 object to the trusted root/current transaction and establish safe global startup
 ordering before destructive work. Fixed fixture names are not ownership proof.
+
+The reservation guard is not yet validated. A configuration that invokes only
+the recovery command boots in the controlled native fixture, but adding the
+experimental reservation lookup/conditional guard fails the healthy-startup
+checks, including a guard-only control without an ARM call. Explicit arithmetic
+mode initialization has not established a working guarded entry. Diagnose the
+startup and command context before adopting this guard. Acceptance must cover
+absent/valid reservations and wrong type, capacity or binding without deleting
+unrelated user data, in addition to low-memory recovery and repeated restart.
+These are unresolved local experiments, not regressions demonstrated in the
+submitted compact-recovery configuration or a completed ownership mechanism.
 
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
