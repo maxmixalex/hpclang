@@ -424,7 +424,7 @@ Current delivery checkpoints:
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
-- **Submitted:** `eb81d433` includes guarded recovery packaging and maintained
+- **Previously submitted:** `eb81d433` includes guarded recovery packaging and maintained
   two-model E2E, both verified locally; remote acceptance is pending and the new
   CI has not been queried. Reservation ownership and safe startup admission are
   still unproven.
@@ -474,17 +474,17 @@ Current delivery checkpoints:
   analysis pass, including nested records, wrong bank identity, dirty tail and
   failed reads. Connecting this check increases the ordinary reusable predicate
   to 25,002 bytes, above the low-memory fixture's gap. Its Flash-only fresh-copy
-  form is 15,658 bytes; both models pass low-memory repair, repeated restart and
-  closed/unpublished/corrupt-transaction rejection. Wrong-object cases are still
-  running. Maintained
-  packaging now applies that lifetime only when embedding the hidden command in
+  form is 15,658 bytes. Integration commit `727b7464` passes the complete native
+  flow on both models (609/612 seconds), including low-memory repair, repeated
+  restart, closed/unpublished/corrupt-transaction rejection and all three
+  wrong-object cases. Maintained packaging applies that lifetime only when embedding the hidden command in
   the immutable library. Separate native probes on both models also pass the
   bank-identity/dirty-tail rejection cases with zero Flash operations, no reset
   request and intact reservation, user array and catalog. A fresh ARM rebuild
   produces identical binaries; maintained ELF packaging produces byte-identical
   guarded and observed libraries to those used by the native runs.
-  No accepted CI or milestone
-  completion is claimed. Structural membership does not establish installed
+  This follow-up batch is ready for CI submission; no new CI acceptance or
+  milestone completion is claimed. Structural membership does not establish installed
   identity, transaction freshness or RAM ownership; full recovery preflight and
   the remaining installation gates are retained.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
