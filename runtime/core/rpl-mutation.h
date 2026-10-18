@@ -256,6 +256,34 @@ extern "C"
     int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io,
                                           uint32_t position);
 
+    struct hpclang_rpl_reference_edit;
+    struct hpclang_rpl_reference_guard;
+    struct hpclang_rpl_catalog_repairs
+    {
+        uint32_t main_mapping;
+        const struct hpclang_rpl_reference_edit *edits;
+        uint32_t edit_count;
+        const struct hpclang_rpl_reference_guard *guards;
+        uint32_t guard_count;
+    };
+
+    /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
+     * object/code repairs with an immutable snapshot of native root repairs.
+     * Exact duplicates coalesce; conflicting/partial overlaps reject before
+     * writes, including conflicts with unchanged roots. Fields are ORIGINAL
+     * pre-move addresses, wholly in main RAM; normalized mappings must equal
+     * main_mapping. Other physical banks require separate transaction work.
+     * Guards describe unchanged preconditions, not permissions to relocate.
+     * Keep input arrays, ARM roots, mappings and memory stable throughout.
+     * Allocates temporary ARM heap storage; allocation/preflight failure makes
+     * no writes. Commit IO failure requires retaining ownership, not returning
+     * to Stock or retrying this non-replayable geometry operation. Complete
+     * reference coverage remains the caller's obligation; not public registration. */
+    int
+    hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t position,
+                                               const struct hpclang_rpl_catalog_repairs *repairs);
+
 #ifdef __cplusplus
 }
 #endif

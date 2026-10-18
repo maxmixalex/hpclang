@@ -5,6 +5,7 @@
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
+#include "rpl-reference.h"
 #include "rpl-object-store.h"
 #include "rpl-port-mutation.h"
 #include "rpl-port.h"
@@ -30,6 +31,7 @@ enum
 static uint8_t memory[NIBBLES];
 static uint32_t rejected_read;
 static uint32_t writes;
+static uint32_t watched_field, watched_writes;
 
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
@@ -47,6 +49,8 @@ static int write_nibble(void *context, uint32_t address, uint8_t value)
         return 0;
     memory[address] = value;
     ++writes;
+    if (address == watched_field)
+        ++watched_writes;
     return 1;
 }
 
@@ -2164,6 +2168,111 @@ static void test_catalog_switch_growth(void)
     }
 }
 
+static void test_catalog_merged_repairs(void)
+{
+    for (unsigned width = 1; width <= 5; ++width) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t first = 0x82555, second = first;
+        uint32_t *roots[] = {&first, &second, &first};
+        io.native_roots = roots;
+        io.native_root_count = 3;
+        put_word(0x8200b, 5, 0x82555);
+        put_word(0x82500, width, 3);
+        /* Two native discovery paths plus two caller discoveries name one cell. */
+        put_word(TOUCHTAB, 5, 0x806d7);
+        put_word(0x806da, 5, 0x82555);
+        watched_field = 0x806da;
+        watched_writes = 0;
+        const struct hpclang_rpl_reference_edit edits[] = {
+            {7, 0x8200b, 0x82555, 0x82565, 5},
+            {7, 0x82500, 3, 4, width},
+            {7, 0x806da, 0x82555, 0x82565, 5},
+            {7, 0x806da, 0x82555, 0x82565, 5},
+        };
+        const struct hpclang_rpl_reference_guard guards[] = {{7, 0x82000, 2, 3},
+                                                             {7, 0x82500, 3, width}};
+        const struct hpclang_rpl_catalog_repairs repairs = {7, edits, 4, guards, 2};
+        assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
+        assert(get_word(0x8200b, 5) == 0x82565);
+        assert(get_word(0x806da, 5) == 0x82565 && watched_writes == 1);
+        assert(get_word(0x82510, width) == 4);
+        assert(first == 0x82565 && second == first);
+        assert(get_word(RSKTOP, 5) == 0x8301f);
+    }
+    watched_field = UINT32_MAX;
+    /* All faults must reject the complete operation, including native roots and
+     * memory that would otherwise have been moved before the extra repair. */
+    for (unsigned fault = 0; fault < 16; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t native = 0x82555, *roots[] = {&native};
+        io.native_roots = roots;
+        io.native_root_count = 1;
+        put_word(0x8200b, 5, 0x82555);
+        put_word(0x82500, 3, 3);
+        struct hpclang_rpl_reference_edit edits[] = {{7, 0x8200b, 0x82555, 0x82565, 5},
+                                                     {7, 0x82500, 3, 4, 3}};
+        struct hpclang_rpl_reference_guard guard = {7, 0x82000, 2, 3};
+        struct hpclang_rpl_catalog_repairs repairs = {7, edits, 2, &guard, 1};
+        switch (fault) {
+        case 0:
+            ++edits[0].value;
+            break; /* Conflicting native switch repair. */
+        case 1:
+            --edits[0].width;
+            break; /* Partial root overlap. */
+        case 2:
+            ++edits[1].expected;
+            break;
+        case 3:
+            ++edits[1].mapping;
+            break;
+        case 4:
+            ++guard.expected;
+            break;
+        case 5:
+            ++guard.mapping;
+            break;
+        case 6:
+            rejected_read = 0x82501;
+            break;
+        case 7:
+            edits[1].field = 0x82012;
+            break; /* Split by insertion. */
+        case 8:
+            edits[1].field = 0x8300f;
+            break; /* Overwritten destination. */
+        case 9:
+            edits[1].field = 0x8300e;
+            break; /* Split by movement end. */
+        case 10:
+            edits[1].field = 0x82000;
+            break; /* Catalog count belongs to caller. */
+        case 11:
+            edits[1] = (struct hpclang_rpl_reference_edit){7, 0x806df, 0, 1, 5};
+            break;
+        case 12:
+            edits[1] = (struct hpclang_rpl_reference_edit){7, RSKTOP, 0x8300f, 1, 5};
+            break;
+        case 13:
+            repairs.edits = NULL;
+            break;
+        case 14:
+            guard.width = 6;
+            break;
+        case 15:
+            guard.field = rejected_read = 0x95000; /* Late guard outside the move. */
+            guard.expected = 0;
+            break;
+        }
+        uint8_t *before = malloc(sizeof memory);
+        assert(before);
+        memcpy(before, memory, sizeof memory);
+        assert(hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs) < 0);
+        assert(!writes && native == 0x82555 && !memcmp(before, memory, sizeof memory));
+        free(before);
+    }
+}
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2241,6 +2350,7 @@ static void test_catalog_growth(void)
 
 int main(void)
 {
+    test_catalog_merged_repairs();
     test_immediate_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();

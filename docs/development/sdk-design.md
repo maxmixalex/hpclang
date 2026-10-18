@@ -540,6 +540,23 @@ edits, and incorporate all other native roots before committing any relocation.
 The catalog plan alone establishes neither complete reference coverage nor
 permission to return to Stock after moving data.
 
+`hpclang_rpl_mutation_catalog_grow_repaired()` combines caller-proven main-RAM
+edits/guards with a snapshot of native root repairs. Every edit names its original
+field before movement. Exact duplicate repairs coalesce, including discoveries
+shared with native traversal; conflicting repairs, partial overlaps and edits
+that split across movement boundaries reject before writes. Unchanged native
+roots also constrain caller edits. ARM-held roots are identified by their cell
+addresses, independently of native nibble addresses. Geometry publication follows
+field repairs and movement. The legacy internal grow entry uses the same path
+without additional edits.
+
+The operation allocates temporary ARM heap storage for the root snapshot; an
+allocation or preflight error leaves native memory and ARM roots unchanged.
+Callers retain exclusive ownership and stable mappings/inputs throughout.
+Commit IO failure is not rollback or permission to resume Stock, and this
+geometry operation cannot simply be replayed. Other physical banks, complete
+object/code coverage and registration publication remain separate obligations.
+
 `hpclang_rpl_mutation_visit_guarded_roots()` also reports every native nibble
 read during root enumeration, including stack/table boundaries and traversal
 metadata. Root provenance and order remain unchanged. The caller can coalesce

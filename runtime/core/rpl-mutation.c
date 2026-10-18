@@ -1,8 +1,10 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "rpl-mutation.h"
 #include "rpl-object-store.h"
+#include "rpl-reference.h"
 #include "rpl-stack-view.h"
 
 enum
@@ -223,6 +225,7 @@ struct pointer_scan_request
     hpclang_rpl_root_source_visit_fn source_visit;
     enum hpclang_rpl_root_source source;
     void *visit_context;
+    int (*capture)(void *context, uint32_t slot, uint32_t value, uint32_t *native_slot);
 };
 
 static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint32_t slot,
@@ -233,6 +236,8 @@ static int inspect_pointer_value(const struct hpclang_rpl_mutation_io *io, uint3
         return HPCLANG_RPL_MUTATION_MALFORMED;
 
     if (request->mode == POINTER_SCAN_VISIT) {
+        if (request->capture)
+            return request->capture(request->visit_context, slot, value, native_slot);
         if (request->source_visit)
             return request->source_visit(request->visit_context, request->source, slot, value);
         return request->visit(request->visit_context, slot, value);
@@ -759,7 +764,83 @@ int hpclang_rpl_mutation_visit_roots(const struct hpclang_rpl_mutation_io *io,
     return scan_all_references(io, &request);
 }
 
-int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, uint32_t position)
+struct catalog_edit
+{
+    uint32_t field, expected, value, width;
+    uint32_t *native;
+};
+
+struct catalog_edits
+{
+    struct catalog_edit *items;
+    size_t count, capacity;
+    uint32_t first, end;
+};
+
+static int catalog_count_root(void *context, uint32_t slot, uint32_t value, uint32_t *native)
+{
+    (void)slot;
+    (void)value;
+    (void)native;
+    size_t *count = context;
+    if (*count == SIZE_MAX)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    ++*count;
+    return 0;
+}
+
+static int catalog_add_edit(struct catalog_edits *plan, const struct catalog_edit *edit)
+{
+    if (!edit->native) {
+        if (!edit->width || edit->width > 5 || edit->field < RPL_MAIN_FIRST ||
+            edit->field > RPL_MAIN_END - edit->width || edit->expected >> (4 * edit->width) ||
+            edit->value >> (4 * edit->width))
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+        uint32_t end = edit->field + edit->width;
+        /* A field must move intact, and destination-only storage is overwritten. */
+        if ((edit->field < plan->first && end > plan->first) ||
+            (edit->field < plan->end && end > plan->end) ||
+            (edit->field >= plan->end && edit->field < plan->end + 16))
+            return HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    for (size_t i = 0; i < plan->count; ++i) {
+        const struct catalog_edit *old = &plan->items[i];
+        if (edit->native || old->native) {
+            if (!edit->native || edit->native != old->native)
+                continue;
+        } else if (edit->field >= old->field + old->width ||
+                   old->field >= edit->field + edit->width) {
+            continue;
+        }
+        return old->field == edit->field && old->width == edit->width &&
+                       old->expected == edit->expected && old->value == edit->value
+                   ? 0
+                   : HPCLANG_RPL_MUTATION_MALFORMED;
+    }
+    if (plan->count == plan->capacity)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    plan->items[plan->count++] = *edit;
+    return 0;
+}
+
+static int catalog_capture_root(void *context, uint32_t slot, uint32_t value, uint32_t *native)
+{
+    struct catalog_edits *plan = context;
+    /* These boundaries have independently computed publication values, including
+     * the exclusive movement end and AVMEM's reserved-cell accounting. */
+    if (!native &&
+        (slot == RPL_TEMPBOTTOM || slot == RPL_TEMPTOP || slot == RPL_RSKTOP || slot == RPL_AVMEM))
+        return 0;
+    uint32_t replacement = value;
+    if (value >= plan->first && value < plan->end)
+        replacement += 16;
+    const struct catalog_edit edit = {slot, value, replacement, 5, native};
+    return catalog_add_edit(plan, &edit);
+}
+
+int hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t position,
+                                               const struct hpclang_rpl_catalog_repairs *repairs)
 {
     if (!io_ready(io) || io->library_table < RPL_MAIN_FIRST ||
         io->library_table > RPL_MAIN_END - 3u)
@@ -796,26 +877,105 @@ int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, 
         if (nibble > 15u)
             return HPCLANG_RPL_MUTATION_MALFORMED;
     }
+    if (position < RPL_AVMEM + 5 || (repairs && ((repairs->edit_count && !repairs->edits) ||
+                                                 (repairs->guard_count && !repairs->guards))))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    size_t capacity = 4;
     struct pointer_scan_request request = {
-        .move_start = position,
-        .move_end = rstk,
-        .offset = 16,
-        .mode = POINTER_SCAN_VALIDATE_SHIFT,
-    };
+        .mode = POINTER_SCAN_VISIT, .capture = catalog_count_root, .visit_context = &capacity};
     result = scan_all_references(io, &request);
     if (result)
         return result;
-    request.mode = POINTER_SCAN_APPLY_SHIFT;
+    size_t extra = repairs ? repairs->edit_count : 0;
+    if (capacity > SIZE_MAX / sizeof(struct catalog_edit) ||
+        extra > SIZE_MAX / sizeof(struct catalog_edit) - capacity)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    capacity += extra;
+    struct catalog_edits plan = {malloc(capacity * sizeof(struct catalog_edit)), 0, capacity,
+                                 position, rstk};
+    if (!plan.items)
+        return HPCLANG_RPL_MUTATION_NOMEM;
+    const struct catalog_edit boundaries[] = {
+        {RPL_TEMPBOTTOM, bottom, bottom + 16, 5, NULL},
+        {RPL_TEMPTOP, top, top + 16, 5, NULL},
+        {RPL_RSKTOP, rstk, rstk + 16, 5, NULL},
+        {RPL_AVMEM, avmem, new_avmem, 5, NULL},
+    };
+    for (unsigned i = 0; i < 4; ++i) {
+        result = catalog_add_edit(&plan, &boundaries[i]);
+        if (result)
+            goto done;
+    }
+    request.capture = catalog_capture_root;
+    request.visit_context = &plan;
     result = scan_all_references(io, &request);
-    if (result || (result = move_nibbles(io, position + 16u, position, rstk - position)))
-        return result;
-    /* Boundary values can equal the exclusive movement end. Publish each from
-     * its original value, independently of the general reference scan. */
-    if ((result = write_word(io, RPL_TEMPBOTTOM, 5u, bottom + 16u)) ||
-        (result = write_word(io, RPL_TEMPTOP, 5u, top + 16u)) ||
-        (result = write_word(io, RPL_RSKTOP, 5u, rstk + 16u)))
-        return result;
-    return write_word(io, RPL_AVMEM, 5u, new_avmem);
+    if (result)
+        goto done;
+    for (size_t i = 0; i < extra; ++i) {
+        const struct hpclang_rpl_reference_edit *source = &repairs->edits[i];
+        if (source->mapping != repairs->main_mapping ||
+            (source->field < io->library_table + 3 &&
+             source->field + source->width > io->library_table)) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+        const struct catalog_edit edit = {source->field, source->expected, source->value,
+                                          source->width, NULL};
+        result = catalog_add_edit(&plan, &edit);
+        if (result)
+            goto done;
+    }
+    for (uint32_t i = 0; repairs && i < repairs->guard_count; ++i) {
+        const struct hpclang_rpl_reference_guard *guard = &repairs->guards[i];
+        uint32_t value;
+        if (guard->mapping != repairs->main_mapping || !guard->width || guard->width > 5 ||
+            guard->field < RPL_MAIN_FIRST || guard->field > RPL_MAIN_END - guard->width ||
+            guard->expected >> (4 * guard->width)) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+        result = read_word(io, guard->field, guard->width, &value);
+        if (result)
+            goto done;
+        if (value != guard->expected) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+    }
+    for (size_t i = 0; i < plan.count; ++i) {
+        const struct catalog_edit *edit = &plan.items[i];
+        uint32_t value;
+        if (edit->native)
+            value = *edit->native;
+        else if ((result = read_word(io, edit->field, edit->width, &value)))
+            goto done;
+        if (value != edit->expected) {
+            result = HPCLANG_RPL_MUTATION_MALFORMED;
+            goto done;
+        }
+    }
+    /* No discovery or semantic validation after the first write. Keep geometry
+     * publication last; all field edits name their original, pre-move locations. */
+    for (size_t i = 4; i < plan.count; ++i) {
+        const struct catalog_edit *edit = &plan.items[i];
+        if (edit->expected == edit->value)
+            continue;
+        if (edit->native)
+            *edit->native = edit->value;
+        else if ((result = write_word(io, edit->field, edit->width, edit->value)))
+            goto done;
+    }
+    result = move_nibbles(io, position + 16, position, rstk - position);
+    for (unsigned i = 0; !result && i < 4; ++i)
+        result = write_word(io, boundaries[i].field, 5, boundaries[i].value);
+done:
+    free(plan.items);
+    return result;
+}
+
+int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io, uint32_t position)
+{
+    return hpclang_rpl_mutation_catalog_grow_repaired(io, position, NULL);
 }
 
 static int object_reference_state_with_boundary(const struct hpclang_rpl_mutation_io *io,

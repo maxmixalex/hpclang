@@ -419,9 +419,10 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
-Latest submitted head: `d94580b4`; remote acceptance remains pending. Local
-follow-ups through `71a23da3` add conditional SETUP dispatch evidence, native
-bank-switch execution roots and explicit execution-address repair planning.
+Latest submitted head: `d94580b4`; Quality and Objects passed. Core and Runtime
+were still running at the latest check; full remote acceptance remains pending. Local
+follow-ups add conditional SETUP dispatch evidence, native bank-switch execution
+roots, explicit execution-address repair planning and merged catalog repairs.
 They are not yet submitted and do not close library registration.
 
 Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
@@ -460,8 +461,8 @@ later continuation. UI/resource and other adapter work may proceed independently
 when the native-port track has a concrete external wait; this does not silently
 replace that track or close its remaining requirements.
 
-The immediate integration task is to unify catalog-growth preflight and repair
-ordering. Native root scanning and the separate catalog/reference planners can
+Catalog-growth integration requires unified preflight and repair ordering.
+Native root scanning and the separate catalog/reference planners can
 describe the same bank-switch field; their repairs must not be applied twice.
 All geometry, mapping, reference and instruction guards must be checked before
 the first write. Acceptance requires overlapping-root deduplication, conflicting
@@ -470,6 +471,20 @@ after movement. ARM-held root cells retain their separate identity. These are
 integration requirements, not evidence that complete opaque/live-code coverage
 has already been established; that coverage remains required before public
 registration can be enabled.
+
+Catalog growth now snapshots native repairs and merges additional main-RAM
+object/code edits before writing. Duplicate repairs coalesce by field or ARM
+cell identity; conflicting repairs, partial overlaps, split fields and changed
+guards reject before mutation. Geometry is published after repairs and movement.
+Focused sanitizer tests cover all five edit widths, duplicate native/caller
+discovery and sixteen rejection cases with unchanged memory/ARM roots. Existing
+object, port and reference regressions pass, as do ARM analysis and six-launcher
+builds. Controlled HP49g+/HP50g Stock probes require actual duplicate discoveries,
+merge them with native repairs, grow the catalog and reach the independent RPL
+continuation marker. Both preserve the sorted unique catalog and unchanged Flash.
+Their opaque-code coverage remains a fixture limitation. This is local work,
+not CI acceptance or complete execution-reference coverage; the next task remains
+classification of unresolved live execution references before public registration.
 
 Before each work session, read this roadmap and issue #1, reconcile their current
 state with implementation and verification evidence, and identify the selected
