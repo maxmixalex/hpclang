@@ -642,12 +642,19 @@ HP49g+/HP50g captures through the independent recovery envelope, with library
 range. The surrounding Stock evaluation path therefore remains part of the
 execution-root analysis even when the ARM image and its stack are owned.
 
-For HP49g+/HP50g, stage1 recognizes a bounded prefix of consecutive returns:
+For HP49g+/HP50g, stage1 recognizes a bounded return path:
 when the saved post-ARMSYS PC points to `RTN`, `RTNSC` or `RTNCC`, the next
 instruction consumes the circular machine-stack top as an execution address.
 It publishes that cell as an invocation-local relocation root alongside the
 hidden launcher object and saved PC. If the consumed target names another
-proven return, discovery continues, up to eight distinct cells. Recognition
+proven return, discovery continues, up to eight distinct cells. Direct
+`GOTO`, `GOLONG` and `GOVLNG` may lead to that return without consuming a cell.
+The path is bounded to 64 instructions, including jumps and returns; conditional
+branches, calls and register-mediated jumps require separate analysis and stop
+this walker. Jump semantics follow chapters 41–42 of
+[Introduction to Saturn Assembly Language](https://literature.hpcalc.org/community/intro-saturn-asm.pdf).
+Identifying consumed stack cells does not repair embedded jump operands.
+Recognition
 validates the next-push cursor and each 20-bit target; it does not scan arbitrary
 lower slots or infer past calls from nearby instruction bytes. Unsupported or
 unreadable instructions stop discovery; this does not certify

@@ -39,10 +39,12 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
                                               uint32_t continuation, uint32_t *machine_stack,
                                               uint32_t cursor);
 
-/* Follow a prefix of consecutive unconditional returns, up to eight distinct
- * original machine-stack cells. Each consumed target must itself name a proven
- * return instruction before the next cell is included. Stop at an unreadable,
- * unsupported or invalid continuation; previously proven cells remain valid.
+/* Follow unconditional returns and direct GOTO/GOLONG/GOVLNG jumps, up to eight
+ * distinct original machine-stack cells and 64 total instructions. A direct jump
+ * does not consume a cell; each reported cell requires reaching a proven return.
+ * Stop at the step limit or an unreadable, unsupported or invalid continuation;
+ * previously proven cells remain valid. Instruction mappings must remain stable.
+ * This identifies consumed cells, not relocation repairs for the jump operands.
  * No inference about the unvisited suffix or complete execution-root coverage.
  * The caller provides eight output slots disjoint from the stable stack and
  * instruction storage. Only the returned number of output slots is written. */

@@ -2204,6 +2204,50 @@ static void test_catalog_switch_growth(void)
     }
 }
 
+static void test_jump_return_relocation(void)
+{
+    const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        uint32_t pc = 0x82400, stack[8];
+        for (unsigned i = 0; i < 8; ++i)
+            stack[i] = 0x82700;
+        stack[(cursor + 7) & 7] = 0x82500;
+        stack[(cursor + 6) & 7] = 0x82600;
+        put_word(pc, 1, 6); /* GOTO back to RTN. */
+        put_word(pc + 1, 3, (0x823e0 - pc - 1) & 0xfff);
+        put_word(0x823e0, 2, 0x10);
+        put_word(0x82500, 2, 0xc8); /* GOLONG back to RTNCC. */
+        put_word(0x82502, 4, (0x824e0 - 0x82502) & 0xffff);
+        put_word(0x824e0, 2, 0x30);
+        put_word(0x82600, 2, 0xd8); /* GOVLNG to RTNSC needs an operand repair. */
+        put_word(0x82602, 5, 0x82620);
+        put_word(0x82620, 2, 0x20);
+        put_word(0x82700, 2, 0xab);
+        uint32_t *roots[9] = {&pc};
+        assert(hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1) == 3);
+        io.native_roots = roots;
+        io.native_root_count = 4;
+        const struct hpclang_rpl_reference_edit edit = {1, 0x82602, 0x82620, 0x82630, 5};
+        const struct hpclang_rpl_catalog_repairs repairs = {1, &edit, 1, NULL, 0};
+        assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
+        assert(pc == 0x82410);
+        for (unsigned depth = 0; depth < 8; ++depth) {
+            uint32_t expected = depth == 0   ? 0x82510
+                                : depth == 1 ? 0x82610
+                                : depth == 2 ? 0x82710
+                                             : 0x82700;
+            assert(stack[(cursor + 7 - depth) & 7] == expected);
+        }
+        assert(get_word(pc + 1, 3) == ((0x823f0 - pc - 1) & 0xfff));
+        assert(get_word(0x82512, 4) == ((0x824f0 - 0x82512) & 0xffff));
+        assert(get_word(0x82612, 5) == 0x82630);
+        assert(get_word(0x823f0, 2) == 0x10 && get_word(0x824f0, 2) == 0x30 &&
+               get_word(0x82630, 2) == 0x20 && get_word(0x82710, 2) == 0xab);
+        assert(hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1) == 3);
+    }
+}
+
 static void test_catalog_merged_repairs(void)
 {
     for (unsigned width = 1; width <= 5; ++width) {
@@ -2461,6 +2505,7 @@ static void test_catalog_growth(void)
 
 int main(void)
 {
+    test_jump_return_relocation();
     test_catalog_commit_failures();
 #ifdef HPCLANG_TEST_WRAP_ALLOC
     test_catalog_allocation_lifetime();

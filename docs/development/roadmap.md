@@ -494,6 +494,18 @@ unchanged and that temporary plan storage is released on success, preflight
 rejection and incomplete commit. ARM static analysis passes. These checks do not
 provide rollback, replay or missing execution-reference classification.
 
+Stage return-root discovery now follows direct GOTO/GOLONG/GOVLNG paths to
+unconditional returns, bounded to 64 instructions and eight consumed cells.
+Conditional/call/register-mediated paths still stop discovery. Sanitizers cover
+signed relative ranges, mixed jump/return chains, all stack cursors, cycles,
+instruction faults and boundaries. Catalog-movement integration verifies relative
+offsets, absolute operand repair and preservation of unconsumed cells. All six
+launchers build; controlled HP49g+/HP50g catalog-growth/native-return regressions
+pass with unchanged Flash. A read-only snapshot check finds one pure
+jump-to-return path among 47 direct-jump sites per model, in SETUP CODE; that
+establishes an existing code pattern, not its liveness in every caller. ARM
+analysis passes. This local expansion does not close full execution coverage.
+
 Before each work session, read this roadmap and issue #1, reconcile their current
 state with implementation and verification evidence, and identify the selected
 stage, dependency and completion condition. After verified progress, commits,
@@ -543,10 +555,11 @@ The current backlog is summarized above and in the retained checklist after the
 history. In particular, Port 2 backup writes and library creation already exist;
 early statements that all Port 2 writes are unfinished describe earlier states.
 
-The HP49g+/HP50g stage now follows a prefix of consecutive `RTN`, `RTNSC` and
-`RTNCC` instructions, retaining up to eight distinct consumed machine-stack
-cells as execution roots. Each next cell requires its preceding target to name
-another proven return; unreadable or unsupported instructions stop discovery.
+The HP49g+/HP50g stage now follows `RTN`, `RTNSC` and `RTNCC`, including direct
+unconditional jumps to those returns, retaining up to eight distinct consumed
+machine-stack cells as execution roots within 64 instructions. Each next cell
+requires reaching another proven return; unreadable or unsupported instructions
+stop discovery.
 Host sanitizer tests cover all cursor positions, one to eight returns, opcode
 boundaries, equal-valued unconsumed cells and failed preflight. Catalog-growth
 integration independently consumes the relocated instruction/stack chain to its

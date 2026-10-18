@@ -156,8 +156,100 @@ static void test_return_chain(void)
     assert(!writes);
 }
 
+static unsigned put_jump(uint32_t at, uint32_t target, unsigned kind)
+{
+    unsigned width = kind == 0 ? 3 : kind == 1 ? 4 : 5;
+    unsigned prefix = kind == 0 ? 1 : 2;
+    put(at, kind == 0 ? 6 : kind == 1 ? 0xc8 : 0xd8, prefix);
+    put(at + prefix, kind == 2 ? target : target - at - prefix, width);
+    return prefix + width;
+}
+
+static void test_jump_return_chain(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        setup();
+        uint32_t stack[8], before[8];
+        uint32_t *roots[8] = {0};
+        put_jump(0x88000, 0x88020, 0);
+        put(0x88020, 0x10, 2);
+        for (unsigned depth = 0; depth < 8; ++depth) {
+            uint32_t at = 0x88100 + depth * 0x100;
+            stack[(cursor + 7 - depth) & 7] = at;
+            if (depth < 7) {
+                put_jump(at, at - 0x20, depth % 3);
+                put(at - 0x20, 0x10 * (1 + depth % 3), 2);
+            }
+        }
+        memcpy(before, stack, sizeof stack);
+        assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == 8);
+        for (unsigned depth = 0; depth < 8; ++depth)
+            assert(roots[depth] == stack + ((cursor + 7 - depth) & 7));
+        for (unsigned depth = 0; depth < 7; ++depth) {
+            uint32_t at = 0x88100 + depth * 0x100;
+            unsigned size = depth % 3 == 0 ? 4 : depth % 3 == 1 ? 6 : 7;
+            for (unsigned nibble = 0; nibble < size; ++nibble) {
+                fault = at + nibble;
+                assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == depth + 1);
+            }
+            fault = at - 0x20;
+            assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == depth + 1);
+        }
+        assert(!writes && !memcmp(before, stack, sizeof stack));
+    }
+    /* Every relative encoding is tested against its independently selected
+     * destination. Exclude overlap with the source instruction itself. */
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        setup();
+        uint32_t stack[8] = {0}, *roots[8];
+        unsigned bits = kind ? 16 : 12;
+        unsigned prefix = kind ? 2 : 1;
+        for (int32_t offset = -(1 << (bits - 1)); offset < (1 << (bits - 1)); ++offset) {
+            uint32_t target = 0x90000 + prefix + offset;
+            if (target + 2 > 0x90000 && target < 0x90006)
+                continue;
+            put_jump(0x90000, target, kind);
+            put(target, 0x10, 2);
+            assert(hpclang_stage_return_roots(&io, 0x90000, stack, 0, roots) == 1);
+            assert(roots[0] == &stack[7]);
+            put(target, 0, 2);
+        }
+        assert(!writes);
+    }
+    setup();
+    uint32_t stack[8] = {0}, *roots[8] = {0};
+    put_jump(0x88000, 0x88000, 0); /* No return in a cycle. */
+    assert(!hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots));
+    for (unsigned jumps = 63; jumps <= 64; ++jumps) {
+        setup();
+        for (unsigned i = 0; i < jumps; ++i)
+            put_jump(0x88000 + 8 * i, 0x88008 + 8 * i, 2);
+        put(0x88000 + 8 * jumps, 0x10, 2);
+        assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == (jumps == 63));
+    }
+    /* Calls, conditionals and register jumps require separate state analysis. */
+    const uint32_t unsupported[] = {0x107, 0x10e8, 0x10f8, 0x14, 0x15, 0x2b18, 0x3b18};
+    for (unsigned i = 0; i < sizeof unsupported / sizeof unsupported[0]; ++i) {
+        setup();
+        put(0x88000, unsupported[i], 7);
+        assert(!hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots));
+    }
+    for (unsigned kind = 0; kind < 3; ++kind) {
+        unsigned size = kind == 0 ? 4 : kind == 1 ? 6 : 7;
+        setup();
+        uint32_t at = 0x100000 - size;
+        put_jump(at, 0xffff0, kind);
+        put(0xffff0, 0x10, 2);
+        assert(hpclang_stage_return_roots(&io, at, stack, 0, roots) == 1);
+        put(at + 1, kind == 0 ? 6 : kind == 1 ? 0xc8 : 0xd8, kind ? 2 : 1);
+        assert(!hpclang_stage_return_roots(&io, at + 1, stack, 0, roots));
+    }
+}
+
 int main(void)
 {
+    test_jump_return_chain();
     test_immediate_return_root();
     test_return_chain();
     struct hpclang_stage_stack_io io = {NULL, read_word, write_word};
