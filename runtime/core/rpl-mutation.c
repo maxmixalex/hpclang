@@ -2432,7 +2432,8 @@ int hpclang_rpl_mutation_drop(const struct hpclang_rpl_mutation_io *io, uint32_t
     return write_word(io, RPL_AVMEM, 5u, new_avmem);
 }
 
-int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value)
+static int push_boolean_reference(const struct hpclang_rpl_mutation_io *io, int value,
+                                  uint32_t false_reference, uint32_t true_reference)
 {
     if (!io_ready(io))
         return HPCLANG_RPL_MUTATION_UNAVAILABLE;
@@ -2442,10 +2443,7 @@ int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, 
     int result = stack_depth(io, &depth);
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
-    /* HPGCC's SAT_TRUE/SAT_FALSE retain ROM identity. The public service checks
-     * the ROM ABI
-     * through the full reader; this commit interface maps RAM only. */
-    uint32_t reference = value ? 0x03a81u : 0x03ac0u;
+    uint32_t reference = value ? true_reference : false_reference;
     uint32_t top = 0u, rstk = 0u, avmem = 0u;
     if ((result = read_word(io, RPL_DSKTOP, 5u, &top)) != HPCLANG_RPL_MUTATION_OK ||
         (result = read_word(io, RPL_RSKTOP, 5u, &rstk)) != HPCLANG_RPL_MUTATION_OK ||
@@ -2468,6 +2466,18 @@ int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, 
     if (result != HPCLANG_RPL_MUTATION_OK)
         return result;
     return write_word(io, RPL_AVMEM, 5u, updated);
+}
+
+int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value)
+{
+    /* HPGCC's SAT_TRUE/SAT_FALSE retain ROM identity. The public service checks
+     * the ROM ABI through the full reader; this commit interface maps RAM only. */
+    return push_boolean_reference(io, value, 0x03ac0u, 0x03a81u);
+}
+
+int hpclang_rpl_mutation_push_real_boolean(const struct hpclang_rpl_mutation_io *io, int value)
+{
+    return push_boolean_reference(io, value, 0x2f937u, 0x2f94cu);
 }
 
 int hpclang_rpl_mutation_reorder(const struct hpclang_rpl_mutation_io *io, int nip)

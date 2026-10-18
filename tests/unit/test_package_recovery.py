@@ -16,6 +16,41 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_admission_precedes_the_complete_reservation_guard(self):
+        recovery = PACK.package(bytes(range(64)), 4096, model="hp50g")
+        admission = PACK.package(bytes(range(8)), 64, model="hp50g")
+        options = dict(name="RESERVE", capacity=8192, prefix=b"bound")
+        plain = PACK.guarded_configuration_library(recovery, 1701, **options)
+        guarded = PACK.guarded_configuration_library(recovery, 1701, **options, admission=admission)
+
+        def parts(package):
+            data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in package[8:])
+
+            def word(at, width=5):
+                return int(data[at : at + width][::-1], 16)
+
+            fields = 17 + 2 * word(10, 2)
+            links = fields + 10 + word(fields + 10)
+            count = (word(links + 5) - 5) // 5
+            config = fields + 15 + word(fields + 15)
+            starts = [links + 10 + 5 * i + word(links + 10 + 5 * i) for i in range(count)]
+            return [data[a:b] for a, b in zip(starts, starts[1:] + [config])], data[
+                config : 5 + word(5) - 4
+            ]
+
+        original, configuration = parts(plain)
+        commands, conditional = parts(guarded)
+        self.assertEqual(commands[:-1], original)
+        self.assertEqual(commands[-1], PACK._recovery_program(admission))
+        op = PACK.immediate
+        prefix = op(0x2D9D) + op(0x389B9) + op(0x37F48)
+        prefix += op(0x2E92) + op(1701, 3) + op(6, 3) + op(0x37F7F)
+        self.assertEqual(
+            conditional, prefix + configuration + op(0x3807D) + op(0x389D4) + op(0x312B)
+        )
+        with self.assertRaises(ValueError):
+            PACK.guarded_configuration_library(recovery, 1701, **options, admission=b"not code")
+
     def test_elf_validates_compiled_binding_and_preserves_unbound_images(self):
         with tempfile.TemporaryDirectory() as temporary:
             elf = Path(temporary) / "recovery.elf"

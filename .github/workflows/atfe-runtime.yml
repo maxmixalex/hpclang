@@ -150,9 +150,9 @@ jobs:
           name: port-recovery-build
           retention-days: 1
           path: |
-            build/port-recovery/*/recovery.elf
-            build/port-recovery/*/recovery.bin
-            build/port-recovery/*/recovery*.hp
+            build/port-recovery/*/*.elf
+            build/port-recovery/*/*.bin
+            build/port-recovery/*/*.hp
           if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache
@@ -238,6 +238,7 @@ jobs:
             build/port-recovery-evidence/**/*.hp
             build/port-recovery-evidence/**/*.log
             build/port-recovery-evidence/**/*.seq
+            build/port-recovery-evidence/**/*.sram
             build/port-recovery-evidence/**/*.pgm
             build/port-recovery-evidence/**/state
             build/port-recovery-evidence/**/sram

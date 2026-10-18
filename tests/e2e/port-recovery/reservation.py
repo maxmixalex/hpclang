@@ -15,6 +15,7 @@ from verify import (
     require_stock_pc,
     verify,
     verify_flash,
+    verify_retired,
     verify_restart,
     verify_zero_real_array,
 )
@@ -53,8 +54,9 @@ def observed_library(pack, library):
     assert word(header, 3) == LIBRARY_ID
     links = fields + 10 + word(fields + 10)
     configuration_at = fields + 15 + word(fields + 15)
-    assert word(links) == 0x2A4E and word(links + 5) == 35
-    starts = [links + 10 + 5 * i + word(links + 10 + 5 * i) for i in range(6)]
+    assert word(links) == 0x2A4E and word(links + 5) in (35, 40)
+    count = (word(links + 5) - 5) // 5
+    starts = [links + 10 + 5 * i + word(links + 10 + 5 * i) for i in range(count)]
     commands = [data[first:last] for first, last in zip(starts, starts[1:] + [configuration_at])]
     configuration = data[configuration_at : 5 + word(5) - 4]
     assert configuration[-10:] == pack.immediate(0x389D4) + pack.immediate(0x312B)
@@ -96,8 +98,25 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     prefix = f"HPCMEM1:{LIBRARY_ID:04d}:{authority:06X}:00000001".encode("ascii")
     pack = packager()
     program = (build / "recovery-configuration.hp").read_bytes()
+    # This hidden command is copied from the immutable installed library on
+    # every call. Keep the ordinary admission.hp reusable; compact only the
+    # copy embedded here, after checking its ELF relocation contract.
+    tool_bin = Path(args.nm).parent
+    admission, _ = pack.package_elf(
+        build / "admission.elf",
+        model=args.model,
+        nm=args.nm,
+        readelf=str(tool_bin / "llvm-readelf"),
+        objcopy=str(tool_bin / "llvm-objcopy"),
+        fresh_copy=True,
+    )
     library = pack.guarded_configuration_library(
-        program, LIBRARY_ID, name=NAME.decode(), capacity=RESERVE_BYTES, prefix=prefix
+        program,
+        LIBRARY_ID,
+        name=NAME.decode(),
+        capacity=RESERVE_BYTES,
+        prefix=prefix,
+        admission=admission,
     )
     package = root / "package"
     package.mkdir()
@@ -121,7 +140,12 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         phase.mkdir()
         shutil.copytree(before, phase / "state")
         with emulator(
-            args, phase, "10000 capture home\n12000 finish-install\n", ["--reset"], flash_busy=True
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+            reset_checkpoint=True,
         ) as child:
             completed(child, 90)
         verify_busy_reads(args, phase)
@@ -174,6 +198,17 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         return baseline
 
     baseline = install("guarded", "recovery-guarded.hp")
+    fill_commands = [
+        "-95 CF HOME CLEAR",
+        rf'\{{171}} 1 "{prefix.decode()}" REPL \'HPCRES\' STO \{{187}} \'RMARK\' STO'.replace(
+            "\\'", "'"
+        ),
+        rf'\{{171}} "x" 1 {RESERVE_POWER} START DUP + NEXT RMARK \{{187}} \'RESMAKE\' STO'.replace(
+            "\\'", "'"
+        ),
+        rf"\{{171}} {{ {USER_ELEMENTS} }} 0. CON 'HPCFILL' STO \{{187}} 'FILLMAKE' STO",
+        r"\{171} RESMAKE FILLMAKE \{187} 'HPCPAD' STO 'HPCPAD' RCL",
+    ]
     filled = root / "filled"
     transfer(
         args,
@@ -183,17 +218,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         "UNUSED",
         installed=True,
         execute=True,
-        remote_commands=[
-            "-95 CF HOME CLEAR",
-            rf'\{{171}} 1 "{prefix.decode()}" REPL \'HPCRES\' STO \{{187}} \'RMARK\' STO'.replace(
-                "\\'", "'"
-            ),
-            rf'\{{171}} "x" 1 {RESERVE_POWER} START DUP + NEXT RMARK \{{187}} \'RESMAKE\' STO'.replace(
-                "\\'", "'"
-            ),
-            rf"\{{171}} {{ {USER_ELEMENTS} }} 0. CON 'HPCFILL' STO \{{187}} 'FILLMAKE' STO",
-            r"\{171} RESMAKE FILLMAKE \{187} 'HPCPAD' STO 'HPCPAD' RCL",
-        ],
+        remote_commands=fill_commands,
     )
     before = filled / "state"
     read = reader(before)
@@ -217,29 +242,100 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         retire=True,
         authority_slot=authority,
     )
-    for state in (repaired, boot(repaired, "rechecked")):
+    verify(
+        SimpleNamespace(
+            before=fault,
+            after=repaired,
+            elf=build / "recovery.elf",
+            binary=build / "recovery.bin",
+            package=build / "recovery-configuration.hp",
+            nm=args.nm,
+            slot=args.slot,
+            target=args.target,
+            operation="retire",
+            relocated_image=True,
+            authority_slot=authority,
+            reset_checkpoint=root / "recovered/before-reset",
+        )
+    )
+    rechecked = boot(repaired, "rechecked")
+    if verify_busy_reads(args, root / "rechecked"):
+        raise ValueError("Closed transaction triggered another Flash operation")
+    if (root / "rechecked/before-reset.json").exists():
+        raise ValueError("Closed transaction requested another reset")
+    for state in (repaired, rechecked):
         verify_restart(baseline, repaired, state)
         verify_zero_real_array(reader(state), b"HPCFILL", USER_ELEMENTS)
         require_absent(reader(state), NAME)
-        verify(
-            SimpleNamespace(
-                before=repaired,
-                after=state,
-                elf=build / "recovery.elf",
-                binary=build / "recovery.bin",
-                package=build / "recovery-configuration.hp",
-                nm=args.nm,
-                slot=args.slot,
-                target=args.target,
-                operation="check",
-                relocated_image=True,
-                authority_slot=authority,
-            )
+        verify_retired(
+            (repaired / "flash").read_bytes(),
+            (state / "flash").read_bytes(),
+            args.slot,
+            args.target,
+            authority_slot=authority,
         )
     print("Guarded low-memory recovery and repeated restart verified", flush=True)
 
     observed = install("observed", "recovery-observed.hp")
     require_marker(reader(observed))
+    admission_filled = root / "admission-filled"
+    transfer(
+        args,
+        admission_filled,
+        observed,
+        None,
+        "UNUSED",
+        installed=True,
+        execute=True,
+        remote_commands=["-95 CF HOME CLEAR 'RCDONE' PURGE", *fill_commands[1:]],
+    )
+    admission_before = admission_filled / "state"
+    require_absent(reader(admission_before), MARKER)
+    expected_reservation = prefix + b"x" * (RESERVE_BYTES - len(prefix))
+    if home_string(reader(admission_before), NAME) != expected_reservation:
+        raise ValueError("Admission fixture has the wrong reservation")
+    verify_zero_real_array(reader(admission_before), b"HPCFILL", USER_ELEMENTS)
+    admission_read = reader(admission_before)
+    admission_gap = (admission_read(0x806F8) - admission_read(0x806F3)) // 2
+    if not 0 < admission_gap < len(program) - 8:
+        raise ValueError("Admission rejection fixture did not retain low-memory pressure")
+    admission_rejected = []
+    for label in ("closed", "unpublished", "bad-crc", "bank-identity", "dirty-tail"):
+        fault = root / ("admission-" + label + "-fault")
+        prepare(admission_before, fault, args.slot, args.target, bound=True)
+        flash = bytearray((fault / "flash").read_bytes())
+        # No authorized target mutation is pending in these rejection cases.
+        # Keep the target intact so Stock startup can finish without recovery.
+        flash[args.target : args.target + 4096] = (admission_before / "flash").read_bytes()[
+            args.target : args.target + 4096
+        ]
+        if label == "closed":
+            flash[args.slot] = flash[authority] = 0
+        elif label == "unpublished":
+            flash[authority] = 0x7F
+        elif label == "bad-crc":
+            flash[authority + 28] ^= 1
+        elif label == "bank-identity":
+            flash[(args.slot & ~0x1FFFF) + 0x100] ^= 1
+        else:
+            flash[authority + 32 + 4] = 0
+        (fault / "flash").write_bytes(flash)
+        phase_name = "admission-" + label + "-rejected"
+        after = boot(fault, phase_name)
+        read = reader(after)
+        require_marker(read)
+        if (after / "flash").read_bytes() != bytes(flash):
+            raise ValueError("Rejected admission changed Flash")
+        if verify_busy_reads(args, root / phase_name):
+            raise ValueError("Rejected admission issued a Flash operation")
+        if (root / phase_name / "before-reset.json").exists():
+            raise ValueError("Rejected admission requested a reset")
+        if home_string(read, NAME) != expected_reservation:
+            raise ValueError("Rejected admission released the matching reservation")
+        verify_zero_real_array(read, b"HPCFILL", USER_ELEMENTS)
+        verify_restart(admission_before, after, after)
+        admission_rejected.append(label)
+        print(f"Admission rejected {label} without deletion or replay", flush=True)
     cases = {
         "type": "{ 3 } 0. CON 'HPCRES' STO",
         "capacity": f"\"{prefix.decode()}\" 'HPCRES' STO",
@@ -285,6 +381,8 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
                 "reservation_bytes": RESERVE_BYTES,
                 "user_elements": USER_ELEMENTS,
                 "busy_operations": operations,
+                "admission_rejected": admission_rejected,
+                "admission_gap": admission_gap,
                 "rejected": rejected,
             },
             indent=2,

@@ -3,6 +3,7 @@
  * Diagnostics retain the entry/mapping/TLS/clock and first/repeated replay results.
  */
 #include "rpl-flash-replay.h"
+#include "binding.h"
 #include <stddef.h>
 #include "sst-flash.h"
 #include <hpclang/time.h>
@@ -12,14 +13,8 @@ __thread unsigned tls_probe = 0x12345678;
 /* Packaging may bind this image to another reserved pair without recompiling.
  * Volatile prevents embedding the build defaults in instructions. These fields
  * identify allocations; they do not establish installation trust or freshness. */
-const volatile struct
-{
-    unsigned magic[2], journal_slot, authority_slot;
-} hpclang_recovery_binding = {{0x42435048u, 0x31444e49u},
-                              HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT,
-                              HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT +
-                                  HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES};
-_Static_assert(sizeof hpclang_recovery_binding == 16, "Recovery packager binding ABI");
+const volatile struct hpclang_recovery_binding hpclang_recovery_binding =
+    HPCLANG_RECOVERY_BINDING_INITIALIZER;
 #define AUTHORITY_SLOT hpclang_recovery_binding.authority_slot
 #endif
 

@@ -444,6 +444,49 @@ Current delivery checkpoints:
   all 24,000 user-array elements and all three reservation-rejection cases, with
   1,923 busy Flash operations each. This parameter path does not itself authorize
   those addresses or establish reservation ownership.
+- **Startup admission research:** a small ARM predicate returns both real-valued
+  outcomes correctly through the native library configuration on HP49g+/HP50g,
+  preserving the empty stack, retained user string and complete Flash image.
+  A follow-up using the existing authority/journal validators fits in an 11,946-byte
+  configuration program. Both models pass armed, retiring, closing, closed,
+  unpublished and corrupt-record decisions from a 20,935-byte free gap, preserving
+  a 32 KiB string, all 24,000 user-array elements, the full catalog and Flash.
+  Post-predicate ordinary arithmetic/variable-store controls also pass. The local
+  maintained integration now uses the internal real-valued return helper, guarded
+  stack and ROM-constant checks before RAM release. Its package is 15,722 bytes;
+  71 focused host tests and the mutation/object suites pass. Initial native flows
+  repaired Flash but lacked execution evidence after reset skipped the closed
+  transaction. Local commit `a8f6e889` adds an opt-in pre-reset SRAM/CPU checkpoint
+  and verifier support; the pinned emulator builds and the checkpoint unit test
+  passes. Fresh native
+  runs from both saved fault states pass pre-reset code/stack/TLS verification
+  and final recovery checks, with 1,923 Flash operations each. The 15,722-byte
+  maintained predicate passes complete fresh HP49g+/HP50g flows in approximately
+  611 seconds/model: low-memory repair, repeated restart, matching-reservation
+  rejection for closed/unpublished/corrupt records and all three wrong-object
+  cases, preserving Flash, catalog and 24,000 user-array elements.
+  Both original execution snapshots pass live TLS-cell checks, and 14 injected
+  corruptions across CPU state, code, guards and TLS are rejected. The previous
+  TLS check only validated recorded diagnostics and could miss later corruption;
+  the verifier now checks the actual cells and exact errno address as well.
+  Local follow-up `204b9572` extracts exact bound-allocation membership checks
+  for use before reservation release. Authority/replay host suites and ARM Clang
+  analysis pass, including nested records, wrong bank identity, dirty tail and
+  failed reads. Connecting this check increases the ordinary reusable predicate
+  to 25,002 bytes, above the low-memory fixture's gap. Its Flash-only fresh-copy
+  form is 15,658 bytes; both models pass low-memory repair, repeated restart and
+  closed/unpublished/corrupt-transaction rejection. Wrong-object cases are still
+  running. Maintained
+  packaging now applies that lifetime only when embedding the hidden command in
+  the immutable library. Separate native probes on both models also pass the
+  bank-identity/dirty-tail rejection cases with zero Flash operations, no reset
+  request and intact reservation, user array and catalog. A fresh ARM rebuild
+  produces identical binaries; maintained ELF packaging produces byte-identical
+  guarded and observed libraries to those used by the native runs.
+  No accepted CI or milestone
+  completion is claimed. Structural membership does not establish installed
+  identity, transaction freshness or RAM ownership; full recovery preflight and
+  the remaining installation gates are retained.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
   reservation to the current transaction. The maintained guarded-reservation E2E
   is already integrated; its remote acceptance remains a separate gate. Preserve

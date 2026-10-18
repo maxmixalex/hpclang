@@ -178,7 +178,13 @@ def configuration_library(program: bytes, library_id: int) -> bytes:
 
 
 def guarded_configuration_library(
-    program: bytes, library_id: int, *, name: str, capacity: int, prefix: bytes
+    program: bytes,
+    library_id: int,
+    *,
+    name: str,
+    capacity: int,
+    prefix: bytes,
+    admission: bytes | None = None,
 ) -> bytes:
     """Release a matching HOME string before loading the hidden recovery command.
 
@@ -187,6 +193,9 @@ def guarded_configuration_library(
     preserve recovery-time capacity, and establish global startup ordering.
     A matching header alone does not prove ownership. An absent object permits
     ordinary recovery; a wrong type, size or prefix preserves it and skips replay.
+    Optional admission is a small program returning real 0/1 before the HOME
+    object is inspected or released. Its own RAM requirement must be admitted
+    separately; a false result skips both release and recovery.
     The configuration remains small: the ARM program is a separate hidden command
     so its RAM copy is not needed before releasing the reservation.
     """
@@ -308,6 +317,12 @@ def guarded_configuration_library(
     configuration = user(
         op("home"), op("if"), call(present), op("then"), call(recover), op("endif")
     )
+    if admission is not None:
+        admission_code = _recovery_program(admission)
+        # The full recovery command stays at index zero; all existing guard
+        # commands retain their identities. Admission executes before present.
+        configuration = user(op("if"), call(len(commands)), op("then"), configuration, op("endif"))
+        commands += (admission_code,)
     return _configuration_library(configuration, library_id, commands)
 
 
@@ -440,6 +455,11 @@ def main() -> None:
     parser.add_argument(
         "--reservation-prefix", help="expected opaque header, encoded as UTF-8 bytes"
     )
+    parser.add_argument(
+        "--admission-program",
+        type=Path,
+        help="small real-valued predicate to run before guarded RAM release",
+    )
     for tool in ("nm", "readelf", "objcopy"):
         parser.add_argument("--" + tool, default="llvm-" + tool)
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
@@ -461,7 +481,15 @@ def main() -> None:
     guarded = any(value is not None for value in reservation)
     if guarded and (any(value is None for value in reservation) or args.library_id is None):
         parser.error("all three --reservation-* options and --library-id are required together")
-    paths = [args.input, args.output, args.binary_output, args.program_output]
+    if args.admission_program is not None and not guarded:
+        parser.error("--admission-program requires a guarded reservation")
+    paths = [
+        args.input,
+        args.output,
+        args.binary_output,
+        args.program_output,
+        args.admission_program,
+    ]
     resolved = [path.resolve() for path in paths if path is not None]
     if len(set(resolved)) != len(resolved):
         parser.error("input and all output paths must be different files")
@@ -493,6 +521,7 @@ def main() -> None:
             name=args.reservation_name,
             capacity=args.reservation_bytes,
             prefix=args.reservation_prefix.encode("utf-8"),
+            admission=args.admission_program.read_bytes() if args.admission_program else None,
         )
     elif args.library_id is not None:
         result = configuration_library(result, args.library_id)

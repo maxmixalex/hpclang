@@ -164,6 +164,11 @@ extern "C"
     /* Push the immutable supported-entry Boolean reference without allocating. */
     int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value);
 
+    /* Return real 0/1 to a UserRPL condition without allocating a TEMPOB object.
+     * Caller validates the HP49g+/HP50g Stock ROM real constants and owns the
+     * captured RAM mapping throughout. Does not change the public Boolean ABI. */
+    int hpclang_rpl_mutation_push_real_boolean(const struct hpclang_rpl_mutation_io *io, int value);
+
     /*
      * Allocate/copy first, then replace one existing pointer cell. A failure before
      * pointer commit leaves the visible stack unchanged; an unreferenced TEMPOB

@@ -2503,8 +2503,41 @@ static void test_catalog_growth(void)
     assert(get_word(0x82026, 5) == 0x83002 && get_word(0x8202b, 5) == 1);
 }
 
+static void test_boolean_return_formats(void)
+{
+    int (*push[])(const struct hpclang_rpl_mutation_io *, int) = {
+        hpclang_rpl_mutation_push_boolean, hpclang_rpl_mutation_push_real_boolean};
+    const uint32_t references[2][2] = {{0x3ac0, 0x3a81}, {0x2f937, 0x2f94c}};
+    for (unsigned format = 0; format < 2; ++format) {
+        for (int value = 0; value <= 1; ++value) {
+            struct hpclang_rpl_mutation_io io = setup(2);
+            uint32_t top = get_word(DSKTOP, 5), free_cells = get_word(AVMEM, 5);
+            uint32_t old_first = get_word(top, 5), old_second = get_word(top + 5, 5);
+            uint32_t temp = get_word(TEMPTOP, 5);
+            assert(push[format](&io, value) == HPCLANG_RPL_MUTATION_OK);
+            assert(get_word(DSKTOP, 5) == top - 5);
+            assert(get_word(top - 5, 5) == references[format][value]);
+            assert(get_word(AVMEM, 5) == free_cells - 1);
+            assert(get_word(top, 5) == old_first && get_word(top + 5, 5) == old_second);
+            assert(get_word(TEMPTOP, 5) == temp && writes == 15);
+        }
+        for (int invalid = -1; invalid <= 2; invalid += 3) {
+            struct hpclang_rpl_mutation_io io = setup(0);
+            assert(push[format](&io, invalid) == HPCLANG_RPL_MUTATION_MALFORMED);
+            assert(!writes);
+        }
+        struct hpclang_rpl_mutation_io io = setup(0);
+        io.user_limit = get_word(DSKTOP, 5);
+        assert(push[format](&io, 1) == HPCLANG_RPL_MUTATION_NOSPACE && !writes);
+        io = setup(0);
+        rejected_read = DSKTOP;
+        assert(push[format](&io, 1) != HPCLANG_RPL_MUTATION_OK && !writes);
+    }
+}
+
 int main(void)
 {
+    test_boolean_return_formats();
     test_jump_return_relocation();
     test_catalog_commit_failures();
 #ifdef HPCLANG_TEST_WRAP_ALLOC

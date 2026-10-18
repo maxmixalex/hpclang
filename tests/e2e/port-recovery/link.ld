@@ -1,6 +1,7 @@
 /* This image is copied into CODE-owned RAM at an address chosen by Stock. */
 ENTRY(entry) SECTIONS {
  . = 0; .text : { *(.entry) *(.text*) *(.rodata*) *(.data*) *(.got*) }
+ . = ALIGN(8);
  .tdata : { __tls_base = .; *(.tdata*) }
  .tbss (NOLOAD) : { __zero_start = .; *(.tbss*) __tls_end = .; }
  . = ADDR(.tbss)+SIZEOF(.tbss);

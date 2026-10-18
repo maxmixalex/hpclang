@@ -37,6 +37,17 @@ if(NOT EXISTS "${BUILTINS}")
 endif()
 
 set(CORE "${HPCLANG_ROOT}/runtime/core")
+function(configure_recovery_image target)
+    target_include_directories(${target} PRIVATE "${CORE}" "${HPCLANG_ROOT}/include")
+    target_compile_features(${target} PRIVATE c_std_11)
+    target_compile_options(${target} PRIVATE -Oz -ffreestanding -fno-builtin -fpie
+        -fvisibility=hidden -ffunction-sections -fdata-sections)
+    target_link_options(${target} PRIVATE -nostdlib -Wl,--gc-sections -Wl,--emit-relocs
+        -Wl,--pic-veneer -Wl,--orphan-handling=error "-Wl,-T,${CMAKE_CURRENT_LIST_DIR}/link.ld")
+    target_link_libraries(${target} PRIVATE "${BUILTINS}")
+    set_target_properties(${target} PROPERTIES SUFFIX ".elf"
+        LINK_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/link.ld")
+endfunction()
 add_executable(recovery
     entry.S main.c "${CORE}/flash-mapping.S"
     "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
@@ -44,8 +55,7 @@ foreach(module IN ITEMS rpl-flash-record rpl-flash-write rpl-flash-replay
         rpl-backup rpl-port rpl-object-span time time-math rtc rtc-decode datetime sst-flash)
     target_sources(recovery PRIVATE "${CORE}/${module}.c")
 endforeach()
-target_include_directories(recovery PRIVATE "${CORE}" "${HPCLANG_ROOT}/include")
-target_compile_features(recovery PRIVATE c_std_11)
+configure_recovery_image(recovery)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     target_compile_definitions(recovery PRIVATE
         HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})
@@ -59,13 +69,6 @@ endif()
 if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR)
     target_compile_definitions(recovery PRIVATE HPCLANG_RECOVERY_RESTART_AFTER_REPAIR=1)
 endif()
-target_compile_options(recovery PRIVATE -Oz -ffreestanding -fno-builtin -fpie
-    -fvisibility=hidden -ffunction-sections -fdata-sections)
-target_link_options(recovery PRIVATE -nostdlib -Wl,--gc-sections -Wl,--emit-relocs
-    -Wl,--pic-veneer -Wl,--orphan-handling=error "-Wl,-T,${CMAKE_CURRENT_LIST_DIR}/link.ld")
-target_link_libraries(recovery PRIVATE "${BUILTINS}")
-set_target_properties(recovery PROPERTIES SUFFIX ".elf"
-    LINK_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/link.ld")
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp"
         "${CMAKE_CURRENT_BINARY_DIR}/recovery.bin"
     COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
@@ -90,4 +93,26 @@ if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR)
     add_custom_target(configuration-package ALL
         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery-library.hp"
             "${CMAKE_CURRENT_BINARY_DIR}/recovery-configuration.hp")
+endif()
+
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
+    add_executable(admission admission-entry.S admission.c "${CORE}/flash-mapping.S"
+        "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
+    foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
+            rpl-flash-replay rpl-port rpl-backup rpl-object-span)
+        target_sources(admission PRIVATE "${CORE}/${module}.c")
+    endforeach()
+    configure_recovery_image(admission)
+    target_compile_definitions(admission PRIVATE
+        HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
+            "${CMAKE_CURRENT_BINARY_DIR}/admission.bin"
+        COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
+            --elf --model hp50g --binary-output "${CMAKE_CURRENT_BINARY_DIR}/admission.bin"
+            --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
+            "$<TARGET_FILE:admission>" "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
+        DEPENDS admission "${HPCLANG_ROOT}/tools/package-recovery.py"
+        VERBATIM)
+    add_custom_target(admission-package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
+        "${CMAKE_CURRENT_BINARY_DIR}/admission.bin")
 endif()
