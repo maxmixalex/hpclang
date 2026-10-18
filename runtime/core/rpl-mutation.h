@@ -88,14 +88,17 @@ extern "C"
         HPCLANG_RPL_ROOT_SYSTEM,
         HPCLANG_RPL_ROOT_LIBRARY,
         HPCLANG_RPL_ROOT_DISPLAY,
-        HPCLANG_RPL_ROOT_ATTACHMENT
+        HPCLANG_RPL_ROOT_ATTACHMENT,
+        HPCLANG_RPL_ROOT_LIBRARY_SWITCH
     };
 
     /* The same cells as visit_roots, with their source preserved. Source is
      * provenance, not a type assertion: system/support tables may mix metadata
      * and references, native roots may include saved execution positions, and
      * return-stack values need not point at object prologues. Library cells
-     * here are main-RAM bindings only; enumerate banked catalogs separately.
+     * tagged LIBRARY are main-RAM bindings only; enumerate banked payloads
+     * separately. LIBRARY_SWITCH is the nonzero executable switch pointer in
+     * the current mapping, before that function selects the payload bank.
      * No source is automatically safe to skip. Same read-only/error contract. */
     typedef int (*hpclang_rpl_root_source_visit_fn)(void *context,
                                                     enum hpclang_rpl_root_source source,

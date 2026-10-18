@@ -39,6 +39,7 @@ struct edges
     struct hpclang_rpl_reference items[8];
     unsigned count;
     int stop;
+    unsigned stop_at;
 };
 
 static int collect(void *context, const struct hpclang_rpl_reference *edge)
@@ -46,7 +47,7 @@ static int collect(void *context, const struct hpclang_rpl_reference *edge)
     struct edges *edges = context;
     assert(edges->count < 8);
     edges->items[edges->count++] = *edge;
-    return edges->stop;
+    return !edges->stop_at || edges->count == edges->stop_at ? edges->stop : 0;
 }
 
 static void nested_array(void)
@@ -76,7 +77,7 @@ static void nested_array(void)
     edges.count = 0;
     assert(hpclang_rpl_reference_visit(&reader, edge.target, edge.extent, edge.auxiliary, collect,
                                        &edges) == 0);
-    assert(edges.count == 1 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+    assert(edges.count == 2 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_ACPTR);
     assert(edges.items[0].field == 30 && edges.items[0].target == 0x4001c &&
            edges.items[0].auxiliary == 0x23c21);
     assert(memcmp(&image, &original, sizeof image) == 0);
@@ -103,11 +104,13 @@ static void nested_array(void)
     struct hpclang_rpl_reference_node root = {0, 45, 0}, workspace[1];
     edges = (struct edges){0};
     assert(!hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect, &edges));
-    assert(edges.count == 3 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_INLINE &&
+    assert(edges.count == 4 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_INLINE &&
            edges.items[1].kind == HPCLANG_RPL_REFERENCE_COMPACT &&
            edges.items[2].kind == HPCLANG_RPL_REFERENCE_ACPTR);
     assert(edges.items[2].field == 30 && edges.items[2].target == 0x4001c &&
            edges.items[2].auxiliary == 0x23c21);
+    assert(edges.items[3].kind == HPCLANG_RPL_REFERENCE_EXECUTION && edges.items[3].field == 35 &&
+           edges.items[3].target == 0x23c21);
     assert(!memcmp(&image, &original, sizeof image));
     edges = (struct edges){0};
     assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 2, collect, &edges) ==
@@ -122,6 +125,42 @@ static void nested_array(void)
         assert(hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 1, 3, collect,
                                                   &edges) == HPCLANG_RPL_SPAN_UNAVAILABLE);
     }
+}
+
+static void acptr_switch_execution(void)
+{
+    struct image image = {.size = 15, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put(&image, 0, 0x2baa, 5);
+    put(&image, 5, 0x4001c, 5);
+    put(&image, 10, 0x22f5a, 5);
+    struct image original = image;
+    for (unsigned compact = 0; compact < 2; ++compact) {
+        struct edges edges = {0};
+        uint32_t start = compact ? 5 : 0;
+        uint32_t prologue = compact ? 0x2baa : 0;
+        assert(!hpclang_rpl_reference_visit(&reader, start, 15 - start, prologue, collect, &edges));
+        assert(edges.count == 2 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+        const struct hpclang_rpl_reference *execution = &edges.items[1];
+        assert(execution->kind == HPCLANG_RPL_REFERENCE_EXECUTION && execution->field == 10 &&
+               execution->target == 0x22f5a && !execution->extent && !execution->auxiliary);
+        struct hpclang_rpl_reference_mappings mappings = {1, 2, 2};
+        struct hpclang_rpl_reference_patch patch = {123, 456};
+        assert(hpclang_rpl_reference_plan_qualified_shift(execution, &mappings, 0x22000, 0x23000,
+                                                          16,
+                                                          &patch) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(patch.field == 123 && patch.value == 456);
+        edges = (struct edges){.stop = 73, .stop_at = 2};
+        assert(hpclang_rpl_reference_visit(&reader, start, 15 - start, prologue, collect, &edges) ==
+               73);
+        assert(edges.count == 2);
+        assert(!memcmp(&image, &original, sizeof image));
+    }
+    put(&image, 10, 0, 5);
+    struct edges edges = {0};
+    assert(!hpclang_rpl_reference_visit(&reader, 0, 15, 0, collect, &edges));
+    assert(edges.count == 1 && edges.items[0].kind == HPCLANG_RPL_REFERENCE_ACPTR &&
+           !edges.items[0].auxiliary);
 }
 
 static void indices_and_opaque(void)
@@ -202,9 +241,12 @@ static void linked_aliases(void)
     struct hpclang_rpl_reference_node workspace[3] = {{0}, {0}, {123, 456, 789}};
     edges.count = 0;
     assert(!hpclang_rpl_reference_visit_nested(&reader, &root, workspace, 2, 3, collect, &edges));
-    assert(edges.count == 4 && edges.items[2].kind == HPCLANG_RPL_REFERENCE_ACPTR &&
-           edges.items[3].kind == HPCLANG_RPL_REFERENCE_ACPTR);
-    assert(edges.items[2].target == 0x7327e && edges.items[3].target == 0x7327e);
+    assert(edges.count == 6 && edges.items[2].kind == HPCLANG_RPL_REFERENCE_ACPTR &&
+           edges.items[4].kind == HPCLANG_RPL_REFERENCE_ACPTR);
+    assert(edges.items[2].target == 0x7327e && edges.items[4].target == 0x7327e);
+    for (unsigned i = 3; i < 6; i += 2)
+        assert(edges.items[i].kind == HPCLANG_RPL_REFERENCE_EXECUTION &&
+               edges.items[i].field == 40 && edges.items[i].target == 0x22f5a);
     assert(workspace[2].address == 123 && workspace[2].limit == 456 &&
            workspace[2].body_prologue == 789);
     edges.count = 0;
@@ -1324,6 +1366,7 @@ int main(void)
     execution_entries();
     relocation_patches();
     nested_array();
+    acptr_switch_execution();
     indices_and_opaque();
     linked_aliases();
     native_envelopes();

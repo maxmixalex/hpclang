@@ -677,7 +677,12 @@ int hpclang_rpl_reference_visit(const struct hpclang_rpl_reader *source, uint32_
         enum hpclang_rpl_reference_kind kind = prologue == 0x2baa   ? HPCLANG_RPL_REFERENCE_ACPTR
                                                : prologue == 0x2e92 ? HPCLANG_RPL_REFERENCE_ROMP
                                                                     : HPCLANG_RPL_REFERENCE_FLASHP;
-        return emit(&walk, kind, address + 5, target, 0, auxiliary);
+        result = emit(&walk, kind, address + 5, target, 0, auxiliary);
+        if (result || kind != HPCLANG_RPL_REFERENCE_ACPTR || !auxiliary)
+            return result;
+        /* The second ACPTR word is an executable switch function, not merely
+         * a bank label. Its mapping and code semantics need independent proof. */
+        return emit(&walk, HPCLANG_RPL_REFERENCE_EXECUTION, address + 10, auxiliary, 0, 0);
     }
     case 0x2614: /* integer */
     case 0x263a: /* long real */

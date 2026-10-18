@@ -512,9 +512,16 @@ static int scan_library_references(const struct hpclang_rpl_mutation_io *io,
         result = read_word(io, record + 8u, 5u, &bank);
         if (result)
             return result;
-        /* A nonzero bank-switch entry denotes Flash/ERAM. Its address belongs
-         * to another mapping even when its number overlaps main RAM. */
-        if (!bank) {
+        /* A switch function executes in the current mapping. Its payload is
+         * selected only after the call and must not be treated as a main-RAM
+         * reference merely because its numeric address overlaps that region. */
+        if (bank) {
+            struct pointer_scan_request executable = *request;
+            executable.source = HPCLANG_RPL_ROOT_LIBRARY_SWITCH;
+            result = inspect_pointer_value(io, record + 8u, bank, &executable, NULL);
+            if (result)
+                return result;
+        } else {
             result = scan_pointer_slot(io, record + 3u, request);
             if (result)
                 return result;

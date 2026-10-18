@@ -1678,7 +1678,7 @@ struct root_visit_state
 struct source_visit_state
 {
     uint32_t slots[512], values[512], count, index;
-    unsigned counts[10];
+    unsigned counts[11];
     int stop;
 };
 
@@ -1713,6 +1713,8 @@ static int visit_source_root(void *context, enum hpclang_rpl_root_source source,
         expected = HPCLANG_RPL_ROOT_VGER;
     else if (slot == 0x86123)
         expected = HPCLANG_RPL_ROOT_LIBRARY;
+    else if (slot == 0x86138)
+        expected = HPCLANG_RPL_ROOT_LIBRARY_SWITCH;
     else if (slot == 0x8068d || slot == 0x80695 || slot == 0x806d0 || slot == 0x806d5)
         expected = HPCLANG_RPL_ROOT_DISPLAY;
     else {
@@ -1890,7 +1892,7 @@ static void test_root_sources(void)
     assert(hpclang_rpl_mutation_visit_roots(&io, collect_flat_root, &state) == 0);
     assert(hpclang_rpl_mutation_visit_root_sources(&io, visit_source_root, &state) == 0);
     assert(state.index == state.count);
-    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4, 0};
+    const unsigned counts[] = {1, 2, 1, 2, 2, 3, 396, 1, 4, 0, 1};
     assert(memcmp(counts, state.counts, sizeof counts) == 0);
     check_guarded_roots(&io, &state);
     state.index = 0;
@@ -2135,6 +2137,33 @@ static void test_return_chain_relocation(void)
     }
 }
 
+static void test_catalog_switch_growth(void)
+{
+    for (unsigned fail = 0; fail < 3; ++fail) {
+        struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+        put_word(0x8200b, 5, 0x82555); /* Main-RAM executable switch. */
+        put_word(0x8201b, 5, 0x22f5a); /* Fixed ROM executable switch. */
+        put_word(0x82555, 2, 0x10);    /* RTN at the RAM function entry. */
+        if (fail)
+            rejected_read = fail == 1 ? 0x8200b : 0x8201b;
+        int result = hpclang_rpl_mutation_catalog_grow(&io, 0x82013);
+        if (fail) {
+            assert(result == HPCLANG_RPL_MUTATION_IO && !writes);
+            assert(get_word(0x8200b, 5) == 0x82555);
+            assert(get_word(0x8201b, 5) == 0x22f5a);
+            continue;
+        }
+        assert(!result);
+        assert(get_word(0x8200b, 5) == 0x82565);
+        assert(get_word(get_word(0x8200b, 5), 2) == 0x10);
+        assert(get_word(0x8202b, 5) == 0x22f5a);
+        /* Equal-looking payload addresses refer to the selected bank. Neither
+         * follows the main-RAM move of the executable function or the record. */
+        assert(get_word(0x82006, 5) == 0x83001);
+        assert(get_word(0x82026, 5) == 0x83002);
+    }
+}
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2215,6 +2244,7 @@ int main(void)
     test_immediate_return_relocation();
     test_return_chain_relocation();
     test_catalog_growth();
+    test_catalog_switch_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();
     test_root_sources();

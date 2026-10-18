@@ -549,6 +549,16 @@ mapping identity and ARM-side root values still require caller-owned stability;
 they are not native-memory read dependencies. This traversal does not replace
 catalog bank resolution or object-body reference discovery.
 
+Catalog root traversal distinguishes `LIBRARY` (an unbanked payload binding)
+from `LIBRARY_SWITCH` (a nonzero executable switch address in the current
+mapping). RAM switch functions participate in reference preservation and
+relocation; their bank-selected payload addresses do not inherit that mapping.
+Zero/no-switch fields do not produce executable roots. The structural object
+visitor likewise emits a separate `EXECUTION` event for a nonzero ACPTR switch
+field, in addition to the ACPTR payload event. Compact and nested objects retain
+the true native field address. These execution events still require code and
+mapping analysis; the ordinary reference planner does not certify them safe.
+
 `hpclang_rpl_reference_guards_begin()` and `guards_observe()` collect those
 observations in caller-owned storage, sorted by physical mapping and address.
 Repeated identical reads consume no additional space; adjacent observed cells

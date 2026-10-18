@@ -677,6 +677,20 @@ input consumption and verify P restoration. All 16 targets are below moving RAM.
 This is a conditional block-level result, not native execution of every selector
 or proof that every possible entry reaches the block under those conditions.
 
+The switch-function distinction now reaches native root enumeration and the
+catalog geometry primitive. Nonzero catalog switch pointers have their own
+execution-root provenance; RAM function pointers follow a move while banked
+payload addresses remain in their selected mapping. ACPTR traversal also emits
+the switch field as an unresolved execution reference, including compact and
+nested array bodies. Focused sanitizer tests cover catalog movement, preflight
+read failure without writes, root dependencies, zero sentinels, linked aliases
+and callback failure. On both before/after native snapshots, all 56 nonzero
+switch-function roots match their catalog fields; existing display-root
+relocation checks still pass. Both HP49g+ and HP50g pass the controlled native
+catalog-growth regression, post-call RPL marker and unchanged Flash; all six
+launchers build. These fixtures retain their explicit bounded-probe scope:
+complete execution coverage and public registration remain open.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 

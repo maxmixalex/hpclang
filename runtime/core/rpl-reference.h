@@ -82,6 +82,8 @@ struct hpclang_rpl_reference
  * or the available bound from a library table. Library edges use auxiliary =
  * library_reference_kind + 1; runstream edges use zero. This is not a type claim.
  * ACPTR: target is the stored Saturn address; auxiliary is its bank switch.
+ * A nonzero switch additionally emits EXECUTION for its own five-nibble field;
+ * resolving the payload bank does not resolve the switch's executable reference.
  * ROMP: target/auxiliary are library/command indices.
  * FLASHP: target/auxiliary are logical selector/index (not physical banks).
  * ATTACHMENT: target is a HOME attached-library pointer, auxiliary its library
