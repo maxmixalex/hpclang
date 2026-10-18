@@ -418,6 +418,7 @@ jobs:
             build/*-send/*
             build/stock-${{ matrix.model.family }}-targets.txt
             build/*-stock-media.img
+            build/*-code-relocation/**
             build/e2e/${{ matrix.suite.artifact }}/e2e.hpc
             build/e2e/${{ matrix.suite.artifact }}/e2e.stock-*.json
           if-no-files-found: warn

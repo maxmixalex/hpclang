@@ -20,6 +20,9 @@
    "contexts": ["stock"], "families": ["hp4950"]},
   {"mode": "port-flash-replace", "keyboard": false,
    "contexts": ["stock"], "families": ["hp4950"]},
+  {"mode": "code-relocation", "keyboard": false,
+   "verifier": "tests/e2e/code-relocation/verify.py",
+   "contexts": ["stock"], "families": ["hp4950"]},
   {"mode": "port-library", "keyboard": false,
    "contexts": ["stock"], "families": ["hp48", "hp4950"]}
 ]

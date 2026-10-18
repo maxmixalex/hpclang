@@ -560,8 +560,11 @@ locates its stored test program, validates complete instruction guards, merges
 execution distinguishes repaired cases from unrepaired controls and reaches
 the final RPL marker; Flash stays unchanged. All six launchers compile. These
 controlled target-placement probes establish ARM-to-Stock execution handoff,
-not arbitrary library movement or complete reference classification. A maintained
-CI reproduction of this on-device probe remains to be integrated.
+not arbitrary library movement or complete reference classification. The maintained
+`code-relocation` Runtime suite now reproduces this probe through the standard
+Stock installation flow and a required native-result verifier. Fresh local runs
+pass on HP49g+ and HP50g, including all 38 cases, the final RPL marker and unchanged
+Flash. CI integration is implemented; remote CI acceptance remains pending.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
