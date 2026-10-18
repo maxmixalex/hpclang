@@ -156,7 +156,7 @@ static void failures_and_wrap(void)
     }
     image.data[0] = 8;
     for (unsigned op = 0; op < 16; ++op) {
-        if (op == 0 || op == 3 || (op >= 6 && op <= 12) || op == 14)
+        if (op == 0 || op == 3 || op >= 6)
             continue;
         image.data[1] = op;
         assert(hpclang_rpl_code_branch_inspect(&reader, image.address, 6, &branch) ==
@@ -256,11 +256,53 @@ static void predicates(void)
     }
 }
 
+static void absolute_branches(void)
+{
+    struct image image = {{8, 13}, 0x80000, 7, UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    const uint32_t targets[] = {0,       1,       0x7ffff, 0x80000, 0x80001,
+                                0x80006, 0x80007, 0xfffef, 0xffff0, 0xfffff};
+    for (unsigned opcode = 13; opcode <= 15; opcode += 2) {
+        image.data[1] = opcode;
+        for (unsigned t = 0; t < sizeof targets / sizeof targets[0]; ++t) {
+            encode(&image, 2, 5, targets[t]);
+            struct hpclang_rpl_code_branch branch;
+            assert(!hpclang_rpl_code_branch_inspect(&reader, image.address, 7, &branch));
+            assert(branch.base == 0 && branch.width == 5 && branch.length == 7 &&
+                   branch.target == targets[t] && branch.call == (opcode == 15) &&
+                   !branch.conditional);
+            for (unsigned mapping = 0; mapping < 2; ++mapping) {
+                struct hpclang_rpl_reference_mappings maps = {0, mapping, 0};
+                struct hpclang_rpl_code_patch patch = sentinel;
+                int moves = !mapping && targets[t] >= 0x80000 && targets[t] < 0xffff0;
+                int result = hpclang_rpl_code_branch_plan_shift(&reader, image.address, 7, &maps,
+                                                                0x80000, 0xffff0, 16, &patch);
+                assert(result == moves);
+                if (moves)
+                    assert(patch.field == 0x80002 && patch.width == 5 &&
+                           patch.expected == targets[t] && patch.value == targets[t] + 16);
+                else
+                    assert(!memcmp(&patch, &sentinel, sizeof patch));
+            }
+        }
+        for (unsigned at = 0; at < 7; ++at) {
+            struct hpclang_rpl_code_branch branch;
+            image.fail = image.address + at;
+            assert(hpclang_rpl_code_branch_inspect(&reader, image.address, 7, &branch) ==
+                   HPCLANG_RPL_SPAN_UNAVAILABLE);
+            image.fail = UINT32_MAX;
+            assert(hpclang_rpl_code_branch_inspect(&reader, image.address, at, &branch) ==
+                   HPCLANG_RPL_SPAN_BOUNDS);
+        }
+    }
+}
+
 int main(void)
 {
     exhaustive();
     native_cross_object_call();
     failures_and_wrap();
     predicates();
+    absolute_branches();
     return 0;
 }

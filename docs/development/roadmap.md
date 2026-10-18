@@ -527,7 +527,7 @@ use Saturn+ decoding: older Saturn-only output misdecodes extended operations
 and cannot establish these call paths.
 
 An internal relative-branch inspector and relocation planner now cover proven
-GOC/GONC, GOTO/GOSUB, GOLONG/GOSUBL and GOYES predicate boundaries, including
+GOC/GONC, GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and GOYES predicate boundaries, including
 cross-CODE targets.
 They preserve operand widths and qualified mappings, rejecting split
 instructions, unencodable distances and branch-to-return conversions. Exhaustive
@@ -542,6 +542,16 @@ overlap checks and branch-plan/guard/replay integration. These are snapshot and
 host checks, not native execution or CI acceptance. Complete instruction and
 live-reference coverage plus production integration remain open; opaque
 preflight is not bypassed.
+
+Controlled HP49g+/HP50g Stock programs now execute 38 relative-branch cases per
+model: the host C planner and shared replay generate repaired operands; each
+repaired case reaches its success marker and its unrepaired control reaches a
+distinct failure marker. Both models reach an independent final RPL marker with
+unchanged Flash. This validates emitted instruction behavior, not in-calculator
+relocation planning or complete library movement. Absolute-transfer host tests
+cover qualified target movement, and 51 native ROM-call sites per snapshot
+retain their targets when only their containing code moves. Production
+integration and the remaining live-reference/opaque coverage are still open.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>

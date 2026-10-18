@@ -630,7 +630,7 @@ that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
 
 The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
-GOTO/GOSUB, GOLONG/GOSUBL and the GOYES operands of register, HST, ST, P and
+GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
 A/C bit-test instruction boundaries. Its relocation planner
 qualifies source and target mappings separately, preserves signed 2/3/4-nibble
 displacements and 20-bit address wrap, and rejects split instructions, range
@@ -644,6 +644,9 @@ and value bounds use each record's extent. Complete instruction guards and
 ownership must remain valid through commit. Predicate operands are checked even
 when they do not change. The read-only planner neither discovers all
 instructions nor classifies opaque payloads or authorizes catalog movement.
+Absolute transfers use five-nibble operands and do not change when only the
+instruction moves; target relocation still requires independently qualified
+mapping identity.
 Indirect transfers and complete execution coverage remain open.
 
 ## Capabilities

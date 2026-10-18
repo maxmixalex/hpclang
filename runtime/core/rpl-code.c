@@ -45,10 +45,10 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
         result = read_word(reader, instruction + 1, 1, &opcode);
         if (result)
             return result;
-        if (opcode == 12 || opcode == 14) {
+        if (opcode >= 12) {
             ++next.field;
-            next.width = 4;
-            next.call = opcode == 14;
+            next.width = (opcode & 1) ? 5 : 4;
+            next.call = opcode >= 14;
         } else if (opcode == 3 || (opcode >= 6 && opcode <= 11)) {
             next.field = instruction + 3;
             next.width = 2;
@@ -84,6 +84,11 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
         return result;
     if (next.conditional && !next.encoded)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (next.width == 5) {
+        next.target = next.encoded;
+        *branch = next;
+        return 0;
+    }
     next.base = (next.field + (next.call ? next.width : 0)) & 0xfffffu;
     uint32_t range = 1u << (4 * next.width);
     int32_t displacement = (int32_t)next.encoded;
@@ -120,6 +125,12 @@ int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
         mappings->target == mappings->moving && branch.target >= first && branch.target < end;
     uint32_t base = (uint32_t)((int64_t)branch.base + (source_moves ? delta : 0)) & 0xfffffu;
     uint32_t target = (uint32_t)((int64_t)branch.target + (target_moves ? delta : 0));
+    if (branch.width == 5) {
+        if (target == branch.encoded)
+            return 0;
+        *patch = (struct hpclang_rpl_code_patch){branch.field, 5, branch.encoded, target};
+        return 1;
+    }
     uint32_t distance = (target - base) & 0xfffffu;
     uint32_t range = 1u << (4 * branch.width);
     if (distance >= range / 2 && distance < 0x100000u - range / 2)

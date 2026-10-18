@@ -15,7 +15,8 @@ struct hpclang_rpl_code_patch
 };
 
 /* Decode only a caller-proven instruction boundary: GOC/GONC, GOTO/GOSUB,
- * GOLONG/GOSUBL and GOYES operands of register, HST, ST, P and A/C bit tests.
+ * GOLONG/GOSUBL, absolute GOVLNG/GOSBVL, and GOYES operands of register, HST,
+ * ST, P and A/C bit tests. Absolute operands have width 5 and base zero.
  * Zero-displacement conditional returns are UNSUPPORTED, not
  * address operands. Addresses wrap at 20 bits; instruction bytes must fit in
  * the supplied stable mapping and limit. No scanning or target dereference.
