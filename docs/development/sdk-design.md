@@ -322,16 +322,35 @@ library and its companion program and checks low-memory recovery plus a later
 unchanged restart, preserving the full real array. The existing Runtime artifact
 glob includes the companion; no separate workflow or resource exception is needed.
 
-A local reservation experiment uses a single Flash-library configuration to
-release a controlled 32 KiB placeholder before calling its hidden recovery
-command. HP49g+ and HP50g both recover with a 20,964-byte initial RPL gap, preserve
-a 24,000-element user real array and pass a later unchanged restart. Comparable
-HP50g pressure without releasable storage leaves the transaction armed and Flash
-unrepaired. Production admission must validate ownership, capacity and lifetime
-of the reservation against the installed root and current transaction; a fixed
-HOME name or a successful `PURGE` is insufficient. Release and recovery must
-share one configuration invocation, while ordering against earlier system
-callbacks remains a separate unresolved requirement.
+The internal packager also accepts `--reservation-name NAME`,
+`--reservation-bytes SIZE` and `--reservation-prefix TEXT`, supplied together
+with `--library-id`. It generates a small configuration and six hidden commands;
+the large recovery program is copied to RAM only after checking/releasing the
+reservation. No calculator-side compiler or exported command names are needed.
+The name is a non-space ASCII identifier, the prefix is opaque UTF-8 bytes, and
+the exact string capacity must cover the recovery program while remaining below
+the Stock main-RAM ceiling. The library keeps ordinary and compact program
+lifetimes unchanged.
+
+The guard checks the HOME object's string type, exact capacity and prefix using
+real literals and `SAME`. A mismatch preserves the object and skips recovery;
+an absent object permits normal recovery. The generated library passes local
+HP49g+/HP50g low-memory recovery with a controlled 32 KiB string and a 20,898-byte
+initial RPL gap, preserving all 24,000 user real-array elements and passing a
+later unchanged restart. Comparable HP50g pressure without releasable storage
+leaves the transaction armed and Flash unrepaired.
+Instrumented native rejection checks on both models preserve wrong-type,
+wrong-capacity and wrong-prefix objects with unchanged Flash; an independently
+cleared/recreated completion marker proves the guard ran. These are local
+checks; guarded-scenario CI integration and acceptance remain pending.
+
+This is an internal packaging mechanism, not a trusted installer. Production
+admission must bind the expected name/header, capacity and lifetime to the actual
+installation root and current transaction before destructive writes. A fixed
+name or matching header alone is insufficient. Release and recovery share one
+configuration invocation; ordering against earlier system callbacks remains a
+separate unresolved requirement. Capacity validation alone is not a guarantee
+of all startup allocation requirements.
 
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from

@@ -116,15 +116,7 @@ def package(
     )
 
 
-def configuration_library(program: bytes, library_id: int) -> bytes:
-    """Wrap an owned recovery program in a configuration-only native library.
-
-    No compiler on the calculator or exported commands are needed. The caller
-    must establish that the ID is available and the installed startup ordering
-    is safe; encoding a library does not reserve an ID or install recovery.
-    """
-    if type(library_id) is not int or not 769 <= library_id <= 1791:
-        raise ValueError("recovery library ID must be in the user-library range 769..1791")
+def _recovery_program(program: bytes) -> str:
     if program[:8] != b"HPHP49-C":
         raise ValueError("expected an HP49 binary recovery program")
     code = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in program[8:])
@@ -134,16 +126,36 @@ def configuration_library(program: bytes, library_id: int) -> bytes:
     end = 10 + extent
     if extent < 5 or code[end : end + 5] != immediate(0x312B) or code[end + 5 :] not in ("", "0"):
         raise ValueError("invalid recovery CODE extent or program tail")
+    return code[: end + 5]
+
+
+def _configuration_library(configuration: str, library_id: int, commands=()) -> bytes:
+    if type(library_id) is not int or not 769 <= library_id <= 1791:
+        raise ValueError("recovery library ID must be in the user-library range 769..1791")
     title = b"HPCRecovery"
     header = (
         immediate(len(title), 2)
         + "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in title)
         + immediate(len(title), 2)
         + immediate(library_id, 3)
-        + immediate(0) * 3  # No hash, message or command-link tables.
-        + immediate(5)  # Configuration starts immediately after this offset.
     )
-    payload = header + code[: end + 5]
+    # All offsets are relative to their own fields. No command names or message
+    # table are exported; internal ROMPTR calls use only the command-link table.
+    fields = 5 + len(header)
+    links_at = fields + 20
+    links = ""
+    command_data = "".join(commands)
+    if commands:
+        cursor = links_at + 10 + 5 * len(commands)
+        offsets = []
+        for index, command in enumerate(commands):
+            offsets.append(immediate(cursor - (links_at + 10 + 5 * index)))
+            cursor += len(command)
+        links = immediate(0x2A4E) + immediate(5 + 5 * len(commands)) + "".join(offsets)
+    configuration_at = links_at + len(links) + len(command_data)
+    header += immediate(0) * 2 + immediate(10 if commands else 0)
+    header += immediate(configuration_at - (fields + 15))
+    payload = header + links + command_data + configuration
     length = 5 + len(payload) + 4
     if length > MAX_NIBBLES:
         raise ValueError("recovery library exceeds Saturn length capacity")
@@ -154,6 +166,149 @@ def configuration_library(program: bytes, library_id: int) -> bytes:
     encoded = immediate(0x2B40) + body + immediate(crc, 4)
     encoded += "0" * (len(encoded) % 2)
     return b"HPHP49-C" + bytes(int(encoded[i : i + 2][::-1], 16) for i in range(0, len(encoded), 2))
+
+
+def configuration_library(program: bytes, library_id: int) -> bytes:
+    """Wrap recovery without exported commands or a calculator-side compiler.
+
+    The caller establishes ID availability and safe startup ordering. Encoding
+    a library does not reserve an ID or install recovery.
+    """
+    return _configuration_library(_recovery_program(program), library_id)
+
+
+def guarded_configuration_library(
+    program: bytes, library_id: int, *, name: str, capacity: int, prefix: bytes
+) -> bytes:
+    """Release a matching HOME string before loading the hidden recovery command.
+
+    Internal HP49g+/HP50g Stock guard, not a trusted installer. The caller must
+    bind the expected name/capacity/prefix to its installation and transaction,
+    preserve recovery-time capacity, and establish global startup ordering.
+    A matching header alone does not prove ownership. An absent object permits
+    ordinary recovery; a wrong type, size or prefix preserves it and skips replay.
+    The configuration remains small: the ARM program is a separate hidden command
+    so its RAM copy is not needed before releasing the reservation.
+    """
+    code = _recovery_program(program)
+    encoded_name = name.encode("ascii")
+    if not encoded_name or len(encoded_name) > 127 or any(b < 33 or b > 126 for b in encoded_name):
+        raise ValueError("reservation name must contain 1..127 printable non-space ASCII bytes")
+    if type(capacity) is not int or not (len(code) + 1) // 2 <= capacity < MAIN_RAM_NIBBLES // 2:
+        raise ValueError("reservation capacity must fit the recovery program and Stock RAM")
+    if not isinstance(prefix, bytes) or not 1 <= len(prefix) <= capacity:
+        raise ValueError("reservation prefix must be nonempty bytes within its capacity")
+
+    # Stock UserRPL entries shared by the validated HP49g+/HP50g fixtures.
+    # Real constants and SAME deliberately avoid mixed exact-integer comparison
+    # during startup. These programs are independently encoded from their RPL
+    # structure, not copied from a historical library or calculator-state blob.
+    entries = {
+        "begin": 0x389B9,
+        "end": 0x389D4,
+        "if": 0x37F48,
+        "then": 0x37F7F,
+        "else": 0x3805D,
+        "endif": 0x3807D,
+        "dup": 0x3DBEA,
+        "drop": 0x3DC3B,
+        "type": 0x3BC39,
+        "size": 0x3BB1F,
+        "same": 0x3C9E5,
+        "sub": 0x3B8D7,
+        "quote": 0x389EF,
+        "endquote": 0x38A14,
+        "purge": 0x3E87C,
+        "vtype": 0x3BDB2,
+        "rcl": 0x3E6F1,
+        "home": 0x39405,
+    }
+
+    def op(name):
+        return immediate(entries[name])
+
+    def sequence(*parts):
+        return immediate(0x2D9D) + "".join(parts) + immediate(0x312B)
+
+    def user(*parts):
+        return sequence(op("begin"), *parts, op("end"))
+
+    def real(value):
+        constants = {-1: 0x2FA09, 0: 0x2F937, 1: 0x2F94C, 2: 0x2F961}
+        if value in constants:
+            return immediate(constants[value])
+        digits = str(value)
+        # All callers supply positive integral metadata below the RAM ceiling.
+        return (
+            immediate(0x2933)
+            + str(len(digits) - 1).zfill(3)[::-1]
+            + digits.ljust(12, "0")[::-1]
+            + "0"
+        )
+
+    def text(data):
+        return "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in data)
+
+    def call(index):
+        return immediate(0x2E92) + immediate(library_id, 3) + immediate(index, 3)
+
+    recover, check_type, check_size, check_header, release, present = range(6)
+    variable = op("quote") + immediate(0x2E48) + immediate(len(encoded_name), 2)
+    variable += text(encoded_name) + op("endquote")
+    header = immediate(0x2A2C) + immediate(5 + len(prefix) * 2) + text(prefix)
+    commands = (
+        code,
+        user(
+            op("if"),
+            op("dup"),
+            op("type"),
+            real(2),
+            op("same"),
+            op("then"),
+            call(check_size),
+            op("else"),
+            sequence(op("drop"), real(0)),
+            op("endif"),
+        ),
+        user(
+            op("if"),
+            op("dup"),
+            op("size"),
+            real(capacity),
+            op("same"),
+            op("then"),
+            call(check_header),
+            op("else"),
+            sequence(op("drop"), real(0)),
+            op("endif"),
+        ),
+        user(real(1), real(len(prefix)), op("sub"), header, op("same")),
+        user(
+            op("if"),
+            call(check_type),
+            op("then"),
+            sequence(variable, op("purge"), real(1)),
+            op("else"),
+            real(0),
+            op("endif"),
+        ),
+        user(
+            op("if"),
+            variable,
+            op("vtype"),
+            real(-1),
+            op("same"),
+            op("then"),
+            real(1),
+            op("else"),
+            sequence(variable, op("rcl"), call(release)),
+            op("endif"),
+        ),
+    )
+    configuration = user(
+        op("home"), op("if"), call(present), op("then"), call(recover), op("endif")
+    )
+    return _configuration_library(configuration, library_id, commands)
 
 
 def package_elf(
@@ -230,6 +385,15 @@ def main() -> None:
         type=int,
         help="wrap the recovery program in a native configuration library (does not install it)",
     )
+    parser.add_argument(
+        "--reservation-name", help="HOME string expected by the internal recovery guard"
+    )
+    parser.add_argument(
+        "--reservation-bytes", type=int, help="exact reserved string capacity in bytes"
+    )
+    parser.add_argument(
+        "--reservation-prefix", help="expected opaque header, encoded as UTF-8 bytes"
+    )
     for tool in ("nm", "readelf", "objcopy"):
         parser.add_argument("--" + tool, default="llvm-" + tool)
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
@@ -237,6 +401,10 @@ def main() -> None:
     args = parser.parse_args()
     if (args.flash_copy or args.program_output is not None) and args.library_id is None:
         parser.error("--flash-copy and --program-output require --library-id")
+    reservation = (args.reservation_name, args.reservation_bytes, args.reservation_prefix)
+    guarded = any(value is not None for value in reservation)
+    if guarded and (any(value is None for value in reservation) or args.library_id is None):
+        parser.error("all three --reservation-* options and --library-id are required together")
     paths = [args.input, args.output, args.binary_output, args.program_output]
     resolved = [path.resolve() for path in paths if path is not None]
     if len(set(resolved)) != len(resolved):
@@ -261,7 +429,15 @@ def main() -> None:
             fresh_copy=args.flash_copy,
         )
     program = result
-    if args.library_id is not None:
+    if guarded:
+        result = guarded_configuration_library(
+            result,
+            args.library_id,
+            name=args.reservation_name,
+            capacity=args.reservation_bytes,
+            prefix=args.reservation_prefix.encode("utf-8"),
+        )
+    elif args.library_id is not None:
         result = configuration_library(result, args.library_id)
     if args.binary_output is not None:
         args.binary_output.write_bytes(initialized)

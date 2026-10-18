@@ -542,10 +542,19 @@ pass complete Flash/catalog/image/stack/TLS checks. Normal startup without a
 reservation also passes. An HP50g control without releasable storage remains
 unrecovered at comparable pressure.
 
+The internal packager now generates this guarded library directly, with six
+hidden commands and no calculator-side compiler. Its generated package passes
+the two-model positive sequence above. Instrumented rejection checks preserve
+wrong-type, wrong-capacity and wrong-header objects with unchanged Flash on both
+models; a completion marker is cleared before each case and recreated after the
+unchanged guard command bodies run. All 54 focused recovery host tests, pinned
+Python checks and the real ELF CLI packaging path pass locally. Integration of
+these guarded scenarios into the maintained CI E2E flow remains the next step;
+this implementation has not been pushed or accepted by CI.
+
 This is a controlled resource mechanism, not a production installer or a proven
-general explanation of the earlier startup failures. Rejection tests must prove
-the guard ran and preserved wrong-type, wrong-capacity and wrong-header objects
-without replay. Admission must bind the reservation to the trusted installation
+general explanation of the earlier startup failures. Admission must bind the
+reservation to the trusted installation
 root/current transaction and establish safe global startup ordering before
 destructive work. A fixed fixture name or matching header alone is not ownership
 proof. All retained installation, authority-lifecycle and reclamation gates remain.

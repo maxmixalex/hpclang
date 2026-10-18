@@ -15,6 +15,112 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_guarded_library_keeps_recovery_outside_small_configuration(self):
+        program = PACK.package(bytes(range(64)), 4096, model="hp50g", fresh_copy=True)
+        for library_id, name, prefix in ((769, "R", b"\x00\xffroot"), (1791, "HPCRES", b"owned:1")):
+            with self.subTest(library_id=library_id):
+                raw = PACK.guarded_configuration_library(
+                    program, library_id, name=name, capacity=8192, prefix=prefix
+                )
+                data = [n for byte in raw[8:] for n in (byte & 15, byte >> 4)]
+
+                def word(at, width=5):
+                    return sum(data[at + i] << (4 * i) for i in range(width))
+
+                self.assertEqual(word(0), 0x2B40)
+                end = 5 + word(5)
+                title = word(10, 2)
+                header = 14 + 2 * title
+                self.assertEqual(word(header, 3), library_id)
+                fields = header + 3
+                self.assertEqual((word(fields), word(fields + 5)), (0, 0))
+                links = fields + 10 + word(fields + 10)
+                configuration = fields + 15 + word(fields + 15)
+                self.assertEqual(word(links), 0x2A4E)
+                self.assertEqual(word(links + 5), 5 + 6 * 5)
+                starts = [links + 10 + 5 * i + word(links + 10 + 5 * i) for i in range(6)]
+                self.assertEqual(starts, sorted(set(starts)))
+                self.assertEqual(starts[0], links + 10 + 6 * 5)
+                self.assertLess(starts[-1], configuration)
+                self.assertLess(end - 4 - configuration, 256)
+                original = [n for byte in program[8:] for n in (byte & 15, byte >> 4)]
+                extent = sum(original[10 + i] << (4 * i) for i in range(5))
+                self.assertEqual(data[starts[0] : starts[1]], original[: 15 + extent])
+                for start, stop in zip(starts, starts[1:] + [configuration]):
+                    self.assertEqual(word(start), 0x2D9D)
+                    self.assertEqual(word(stop - 5), 0x312B)
+                # Configuration has its own program boundary; the full image
+                # occupies a distinct command instead of inflating this body.
+                self.assertEqual(word(configuration), 0x2D9D)
+                self.assertEqual(word(end - 9), 0x312B)
+                crc = 0
+                for value in data[5 : end - 4]:
+                    for bit in range(4):
+                        carry = (crc ^ (value >> bit)) & 1
+                        crc >>= 1
+                        if carry:
+                            crc ^= 0x8408
+                self.assertEqual(word(end - 4, 4), crc)
+                self.assertIn(data[end:], ([], [0]))
+
+    def test_guard_rejects_invalid_reservation_metadata(self):
+        program = PACK.package(bytes(range(8)), 64, model="hp50g", fresh_copy=True)
+        defaults = dict(name="HPCRES", capacity=4096, prefix=b"owned")
+        cases = [dict(name=n) for n in ("", "has space", "\0", "R" * 128, "\u00e9")]
+        cases += [dict(capacity=n) for n in (0, 1, -1, True, 4096.0, 262144)]
+        cases += [dict(prefix=p) for p in (b"", "owned", b"x" * 4097)]
+        for change in cases:
+            with self.subTest(change=change):
+                with self.assertRaises(ValueError):
+                    PACK.guarded_configuration_library(program, 1701, **(defaults | change))
+
+    def test_guard_cli_requires_complete_metadata_without_partial_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, output, companion = (root / name for name in ("in.bin", "out.hp", "program.hp"))
+            source.write_bytes(bytes(range(8)))
+            output.write_bytes(b"old output")
+            companion.write_bytes(b"old program")
+            command = [
+                sys.executable,
+                str(ROOT / "tools/package-recovery.py"),
+                "--model",
+                "hp50g",
+                "--runtime-size",
+                "64",
+                "--program-output",
+                str(companion),
+            ]
+            options = [
+                "--reservation-name",
+                "HPCRES",
+                "--reservation-bytes",
+                "4096",
+                "--reservation-prefix",
+                "owned",
+            ]
+            too_small = options[:]
+            too_small[3] = "1"
+            for invalid in (
+                options,
+                ["--library-id", "1701", *options[:-2]],
+                ["--library-id", "1701", *too_small],
+            ):
+                result = subprocess.run(
+                    command + invalid + [str(source), str(output)], capture_output=True
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(output.read_bytes(), b"old output")
+                self.assertEqual(companion.read_bytes(), b"old program")
+            subprocess.run(
+                command
+                + ["--library-id", "1701", "--flash-copy", *options, str(source), str(output)],
+                check=True,
+                capture_output=True,
+            )
+            self.assertTrue(output.read_bytes().startswith(b"HPHP49-C"))
+            self.assertGreater(len(output.read_bytes()), len(companion.read_bytes()))
+
     def test_fresh_flash_copy_alignment_and_lifetime(self):
         for model in ("hp49gplus", "hp50g"):
             for size in (1, 8, 9, 24, 4096, 32768):
