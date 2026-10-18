@@ -507,6 +507,18 @@ preserves the catalog and returns normally. Other instruction paths, opaque
 contents and complete execution-reference coverage remain open; public
 reclamation is not enabled.
 
+Ownership tracing of the captured HP49g+/HP50g registration states identifies
+ten remaining opaque intervals per model: four temporary library-command CODE
+copies, three HOME CODE objects, one short HOME binary object, a launcher
+descriptor and a system workspace. Native catalog and bank-table resolution
+maps all four cached programs to library 275 commands 2, 3 and 4 (command 3
+appears twice); complete cached-program matching and CODE-body comparison pass
+on both captures. This establishes provenance, not relocation safety: source
+identity does not classify embedded addresses, live continuations or workspace
+contents. The next step is to establish those semantics and the remaining
+execution paths before relaxing mutation preflight. These are local snapshot
+results, not CI acceptance or a completed port-service gate.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
