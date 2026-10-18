@@ -9,8 +9,18 @@
 __thread int errno;
 __thread unsigned tls_probe = 0x12345678;
 #ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
-/* This pair belongs to the injected fixture. It is not an installation root. */
-#define AUTHORITY_SLOT (HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES)
+/* Packaging may bind this image to another reserved pair without recompiling.
+ * Volatile prevents embedding the build defaults in instructions. These fields
+ * identify allocations; they do not establish installation trust or freshness. */
+const volatile struct
+{
+    unsigned magic[2], journal_slot, authority_slot;
+} hpclang_recovery_binding = {{0x42435048u, 0x31444e49u},
+                              HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT,
+                              HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT +
+                                  HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES};
+_Static_assert(sizeof hpclang_recovery_binding == 16, "Recovery packager binding ABI");
+#define AUTHORITY_SLOT hpclang_recovery_binding.authority_slot
 #endif
 
 static int replay_snapshot(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
@@ -182,11 +192,14 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
     out->diagnostics[6] = l1[1];
     struct hpclang_rpl_flash_io io = {out, read_flash, 0, 0x140000, 0x200000};
 #ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
-    out->result =
-        hpclang_rpl_flash_preflight_bound(&io, AUTHORITY_SLOT, HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT,
-                                          out->scratch, sizeof(out->scratch), &out->target);
+    out->result = HPCLANG_RPL_FLASH_INVALID;
+    if (hpclang_recovery_binding.magic[0] == 0x42435048u &&
+        hpclang_recovery_binding.magic[1] == 0x31444e49u)
+        out->result = hpclang_rpl_flash_preflight_bound(
+            &io, AUTHORITY_SLOT, hpclang_recovery_binding.journal_slot, out->scratch,
+            sizeof(out->scratch), &out->target);
     if (out->result > 0)
-        out->slot = HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT;
+        out->slot = hpclang_recovery_binding.journal_slot;
 #else
     out->result = hpclang_rpl_flash_preflight_sector(&io, out->scratch, sizeof(out->scratch),
                                                      &out->slot, &out->target);

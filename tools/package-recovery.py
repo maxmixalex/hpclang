@@ -311,6 +311,32 @@ def guarded_configuration_library(
     return _configuration_library(configuration, library_id, commands)
 
 
+def bind_image(initialized: bytes, offset: int, journal: int, authority: int) -> bytes:
+    """Bind an owned ELF descriptor, not a trusted installation or reservation.
+
+    The installer must own both allocations and their durable lifetime. Geometry
+    checks here cannot prove allocation boundaries, freshness or startup safety.
+    """
+    if type(offset) is not int or offset < 0 or offset % 4 or offset + 16 > len(initialized):
+        raise ValueError("Recovery binding is outside initialized aligned storage")
+    if initialized[offset : offset + 8] != b"HPCBIND1":
+        raise ValueError("Recovery binding has an unsupported format")
+    for address, size in ((journal, 4124), (authority, 32)):
+        if type(address) is not int or not 0x140000 <= address < 0x200000:
+            raise ValueError("Recovery binding leaves user Flash")
+        within = address & 0x1FFFF
+        if within < 0x105 or within % 4 != 1 or within + size >= 0x20000:
+            raise ValueError("Recovery binding overlaps a bank header or end marker")
+    if journal < authority + 32 and authority < journal + 4124:
+        raise ValueError("Recovery binding allocations overlap")
+    return (
+        initialized[: offset + 8]
+        + journal.to_bytes(4, "little")
+        + authority.to_bytes(4, "little")
+        + initialized[offset + 16 :]
+    )
+
+
 def package_elf(
     elf: Path,
     *,
@@ -319,6 +345,7 @@ def package_elf(
     readelf: str,
     objcopy: str,
     fresh_copy: bool = False,
+    binding: tuple[int, int] | None = None,
 ) -> tuple[bytes, bytes]:
     """Check the owned recovery ELF contract and return envelope and raw image.
 
@@ -354,6 +381,15 @@ def package_elf(
         raise ValueError(
             "Recovery BSS clearing must preserve initialized data and stay in the image"
         )
+    offset = symbols.get("hpclang_recovery_binding")
+    if binding is not None and offset is None:
+        raise ValueError("Recovery ELF has no installation binding descriptor")
+    if offset is not None:
+        if binding is None:
+            binding = tuple(
+                int.from_bytes(initialized[offset + i : offset + i + 4], "little") for i in (8, 12)
+            )
+        initialized = bind_image(initialized, offset, *binding)
     return package(initialized, end, model=model, fresh_copy=fresh_copy), initialized
 
 
@@ -370,6 +406,16 @@ def main() -> None:
         "--elf", action="store_true", help="validate and package an owned recovery ELF"
     )
     parser.add_argument("--binary-output", type=Path, help="optional extracted image in ELF mode")
+    parser.add_argument(
+        "--journal-slot",
+        type=lambda value: int(value, 0),
+        help="caller-reserved physical journal address (ELF library only)",
+    )
+    parser.add_argument(
+        "--authority-slot",
+        type=lambda value: int(value, 0),
+        help="caller-reserved physical authority address (ELF library only)",
+    )
     parser.add_argument(
         "--flash-copy",
         action="store_true",
@@ -399,6 +445,16 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
+    binding = None
+    if args.journal_slot is not None or args.authority_slot is not None:
+        if (
+            args.journal_slot is None
+            or args.authority_slot is None
+            or not args.elf
+            or args.library_id is None
+        ):
+            parser.error("both binding slots require --elf and --library-id")
+        binding = (args.journal_slot, args.authority_slot)
     if (args.flash_copy or args.program_output is not None) and args.library_id is None:
         parser.error("--flash-copy and --program-output require --library-id")
     reservation = (args.reservation_name, args.reservation_bytes, args.reservation_prefix)
@@ -420,6 +476,7 @@ def main() -> None:
             readelf=args.readelf,
             objcopy=args.objcopy,
             fresh_copy=args.flash_copy,
+            binding=binding,
         )
     else:
         result = package(

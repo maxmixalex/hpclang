@@ -435,6 +435,15 @@ Current delivery checkpoints:
   Both models' saved guarded/observed installations pass; 64 focused host tests
   pass. This strengthens installation evidence without establishing transaction
   ownership, a production installer or startup ordering.
+- **Locally verified, not pushed:** the recovery witness accepts a versioned ELF
+  binding descriptor, allowing the packager to set journal/authority addresses
+  without recompiling ARM code. Descriptor/storage/overlap checks, validation of
+  compiled defaults and 68 focused host tests pass. Fresh HP49g+/HP50g runs move
+  the journal from `0x160105` to `0x180105` using the same ELF; only its packaged
+  address fields differ. Both complete low-memory recovery, unchanged restart,
+  all 24,000 user-array elements and all three reservation-rejection cases, with
+  1,923 busy Flash operations each. This parameter path does not itself authorize
+  those addresses or establish reservation ownership.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
   reservation to the current transaction. The maintained guarded-reservation E2E
   is already integrated; its remote acceptance remains a separate gate. Preserve

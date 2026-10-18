@@ -4,6 +4,7 @@ import unittest
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +16,103 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_elf_validates_compiled_binding_and_preserves_unbound_images(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            elf = Path(temporary) / "recovery.elf"
+            options = dict(model="hp50g", nm="nm", readelf="readelf", objcopy="objcopy")
+            symbols = "00000000 T entry\n00000040 B __zero_start\n00000080 B __image_end\n"
+            descriptor = "00000020 D hpclang_recovery_binding\n"
+            image = bytes(32) + b"HPCBIND1" + bytes(8) + bytes(16)
+
+            def extract(command, **kwargs):
+                Path(command[-1]).write_bytes(image)
+
+            def package(binding_symbols, **kwargs):
+                with (
+                    patch.object(
+                        PACK.subprocess,
+                        "check_output",
+                        side_effect=["R_ARM_REL32", symbols + binding_symbols],
+                    ),
+                    patch.object(PACK.subprocess, "run", side_effect=extract),
+                ):
+                    return PACK.package_elf(elf, **options, **kwargs)
+
+            with self.assertRaisesRegex(ValueError, "user Flash"):
+                package(descriptor)
+            image = PACK.bind_image(image, 32, 0x160105, 0x181005)
+            self.assertEqual(package(descriptor)[1], image)
+            rebound = package(descriptor, binding=(0x180105, 0x181121))[1]
+            self.assertEqual(int.from_bytes(rebound[40:44], "little"), 0x180105)
+            self.assertEqual(package("")[1], image)
+            with self.assertRaisesRegex(ValueError, "no installation binding"):
+                package("", binding=(0x180105, 0x181121))
+            with self.assertRaisesRegex(ValueError, "outside initialized"):
+                package("00000040 D hpclang_recovery_binding\n")
+
+    def test_binding_changes_only_reserved_address_fields(self):
+        image = bytes(range(32)) + b"HPCBIND1" + bytes(8) + bytes(range(64))
+        patched = PACK.bind_image(image, 32, 0x160105, 0x181005)
+        self.assertEqual(patched[:40], image[:40])
+        self.assertEqual(patched[48:], image[48:])
+        self.assertEqual(int.from_bytes(patched[40:44], "little"), 0x160105)
+        self.assertEqual(int.from_bytes(patched[44:48], "little"), 0x181005)
+        self.assertEqual(image[40:48], bytes(8))
+
+    def test_binding_rejects_unowned_layout_and_invalid_geometry(self):
+        image = b"HPCBIND1" + bytes(8)
+        for offset in (-4, 1, 4, True, 0.0):
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                PACK.bind_image(image, offset, 0x160105, 0x181005)
+        with self.assertRaisesRegex(ValueError, "format"):
+            PACK.bind_image(b"notowned" + bytes(8), 0, 0x160105, 0x181005)
+        for journal, authority in (
+            (0x140000, 0x181005),
+            (0x161105, 0x161105),
+            (0x17FFF1, 0x181005),
+            (0x160105, 0x180101),
+            (0x160105, 0x1FFFF1),
+            (0x160106, 0x181005),
+            (True, 0x181005),
+            (0x160105, 0x200105),
+        ):
+            with self.subTest(journal=journal, authority=authority), self.assertRaises(ValueError):
+                PACK.bind_image(image, 0, journal, authority)
+
+    def test_binding_cli_rejects_partial_or_raw_mode_without_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source, output = Path(temporary) / "input", Path(temporary) / "output"
+            source.write_bytes(b"HPCBIND1" + bytes(8))
+            output.write_bytes(b"retained")
+            for options in (
+                ("--elf", "--journal-slot", "0x160105"),
+                ("--elf", "--authority-slot", "0x161121"),
+                (
+                    "--runtime-size",
+                    "64",
+                    "--journal-slot",
+                    "0x160105",
+                    "--authority-slot",
+                    "0x161121",
+                ),
+            ):
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(ROOT / "tools/package-recovery.py"),
+                        "--model",
+                        "hp50g",
+                        "--library-id",
+                        "1701",
+                        *options,
+                        str(source),
+                        str(output),
+                    ],
+                    capture_output=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(output.read_bytes(), b"retained")
+
     def test_guarded_library_keeps_recovery_outside_small_configuration(self):
         program = PACK.package(bytes(range(64)), 4096, model="hp50g", fresh_copy=True)
         for library_id, name, prefix in ((769, "R", b"\x00\xffroot"), (1791, "HPCRES", b"owned:1")):
