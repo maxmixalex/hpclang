@@ -491,7 +491,7 @@ class RecoveryRestartTests(unittest.TestCase):
             (directory / "flash").write_bytes(b"\xff" * 0x200000)
             self.write_native(directory, self.catalog)
 
-    def write_native(self, directory, catalog, *, depth=0, pc=0x8428):
+    def write_native(self, directory, catalog, *, depth=0, pc=0x8428, cpsr=0x13):
         ram = bytearray(0x80000)
         # A contiguous native main-RAM read map, independently populated with
         # the HOME prologue, empty stack and catalog records used by the oracle.
@@ -513,7 +513,7 @@ class RecoveryRestartTests(unittest.TestCase):
             for value, (offset, width) in zip(record, ((0, 3), (3, 5), (8, 5), (13, 3))):
                 write(0x86120 + 16 * index + offset, value, width)
         (directory / "sram").write_bytes(ram)
-        (directory / "state").write_text(f"[s3c2410-arm]\nreg-15={pc:#x}\n")
+        (directory / "state").write_text(f"[s3c2410-arm]\nreg-15={pc:#x}\ncpsr={cpsr:#x}\n")
 
     def test_native_catalog_reordering_is_allowed(self):
         self.write_native(self.restarted, self.catalog[::-1])
@@ -544,6 +544,24 @@ class RecoveryRestartTests(unittest.TestCase):
                 self.write_native(self.restarted, self.catalog, depth=depth, pc=pc)
                 with self.assertRaises(ValueError):
                     VERIFY.verify_restart(self.clean, self.repaired, self.restarted)
+
+    def test_rom_exception_handlers_are_not_successful_stock_return(self):
+        # Native failed-startup witnesses can sit inside ROM at 0x140 in abort
+        # mode. A ROM-range PC and intact catalog are insufficient evidence.
+        for pc in (0x0C, 0x140, 0x8428):
+            for cpsr in (0x17, 0x197, 0x1B, 0x600000DB):
+                with self.subTest(pc=pc, cpsr=cpsr):
+                    self.write_native(self.restarted, self.catalog, pc=pc, cpsr=cpsr)
+                    with self.assertRaisesRegex(ValueError, "abort/undefined"):
+                        VERIFY.verify_restart(self.clean, self.repaired, self.restarted)
+
+    def test_normal_rom_modes_and_condition_flags_are_allowed(self):
+        for cpsr in (0x10, 0x11, 0x12, 0x13, 0x1F, 0xA00000D3):
+            with self.subTest(cpsr=cpsr):
+                self.write_native(self.restarted, self.catalog, cpsr=cpsr)
+                self.assertEqual(
+                    VERIFY.verify_restart(self.clean, self.repaired, self.restarted), 2
+                )
 
 
 if __name__ == "__main__":

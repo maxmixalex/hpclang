@@ -245,10 +245,17 @@ def verify_zero_real_array(read, name, count):
 
 
 def require_stock_pc(state_directory):
+    """Reject unfinished ARM entry and CPU exceptions, even inside the ROM range.
+
+    This is only a processor-state check; callers must also validate the native
+    memory, catalog, stack and retained objects appropriate to their scenario.
+    """
     state = configparser.ConfigParser()
     state.read(state_directory / "state")
     pc = int(state["s3c2410-arm"]["reg-15"], 0)
     require(0 <= pc < 0x140000, "Execution has not returned to Stock ROM")
+    mode = int(state["s3c2410-arm"]["cpsr"], 0) & 0x1F
+    require(mode not in (0x17, 0x1B), "Stock return stopped in ARM abort/undefined mode")
 
 
 def symbol_offsets(elf, nm):

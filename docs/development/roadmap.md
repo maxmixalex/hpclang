@@ -553,6 +553,16 @@ unrelated user data, in addition to low-memory recovery and repeated restart.
 These are unresolved local experiments, not regressions demonstrated in the
 submitted compact-recovery configuration or a completed ownership mechanism.
 
+The recovery verifier now rejects ARM abort/undefined processor modes even when
+the saved PC lies inside ROM. Both captured failed-startup states are rejected;
+all 22 previously passing configuration-state snapshots across HP49g+/HP50g
+still pass this processor-state check. The 34 focused verifier tests and pinned
+Python checks pass. This strengthens one return check, not full startup proof.
+An isolated startup lookup of an absent reservation correctly stores `-1` and
+returns with valid native state; lookup plus a conditional and a helper-only
+conditional still fail before ownership acceptance. Continue isolating comparison
+and control-flow behavior before integrating the reservation guard.
+
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
 describe the same bank-switch field; their repairs must not be applied twice.
