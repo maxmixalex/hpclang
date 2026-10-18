@@ -428,6 +428,28 @@ Current delivery checkpoints:
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
+- **Local integration, not submitted:** native installation matching now has a
+  maintained E2E suite, generated library fixture and shared ARM predicate entry.
+  HP49g+ and HP50g both pass absent-library rejection and fresh Stock installation
+  matching, with exact initialized code and enclosing CODE-object checks, stack
+  guards, restored mappings, unchanged Flash/catalog and zero Flash operations.
+  The Runtime workflow reuses its existing setup for separate recovery and
+  installation matrix jobs. Default-build Clang analysis and workflow validation
+  pass. Full low-memory recovery regression after the shared-entry extraction
+  remains running; this integration has no CI acceptance yet.
+- **Current scope:** M8.1 remains the only accepted complete M8 stage. M8.0
+  installation identity, reservation/transaction ownership, safe startup,
+  authority reuse and reclamation remain open, together with the retained Port 1
+  and execution-reference/library-registration requirements. Sound compatibility
+  remains M8.4 work, not a prerequisite for Port 2.
+
+#### Earlier batch evidence
+
+The following records preserve the evidence at each implementation step. Work
+through `235d8ccf` is submitted, regardless of an earlier local-only checkpoint;
+only `62f7ece4` has accepted CI evidence recorded above. Later matcher commits
+`9e679dd5`, `f7fa0f9a` and their maintained-suite integration remain local.
+
 - **Previously submitted:** `eb81d433` includes guarded recovery packaging and maintained
   two-model E2E, both verified locally; remote acceptance is pending and the new
   CI has not been queried. Reservation ownership and safe startup admission are
@@ -439,7 +461,7 @@ Current delivery checkpoints:
   Both models' saved guarded/observed installations pass; 64 focused host tests
   pass. This strengthens installation evidence without establishing transaction
   ownership, a production installer or startup ordering.
-- **Locally verified, not pushed:** the recovery witness accepts a versioned ELF
+- **Locally verified, now included in `235d8ccf`:** the recovery witness accepts a versioned ELF
   binding descriptor, allowing the packager to set journal/authority addresses
   without recompiling ARM code. Descriptor/storage/overlap checks, validation of
   compiled defaults and 68 focused host tests pass. Fresh HP49g+/HP50g runs move
@@ -513,16 +535,19 @@ Current delivery checkpoints:
   absent library and a fresh Stock-installed library after reset. Independent
   checks verify the real-valued result, matched physical allocation, complete
   initialized code, stack guards, restored mappings, unchanged catalog and Flash,
-  and zero Flash operations. This probe still needs maintained E2E integration;
-  the read-only identity check is not a persistent installation trust root.
+  and zero Flash operations. Maintained E2E integration now passes both models
+  locally as recorded above; CI acceptance remains pending.
+  The read-only identity check is not a persistent installation trust root.
   Persistent installation lifetime, reservation/transaction ownership and recovery
   startup integration remain open; these follow-ups are not pushed.
-- **Active M8.0 work:** establish the trusted installation/root and bind the
-  reservation to the current transaction. The maintained guarded-reservation E2E
-  is already integrated; its remote acceptance remains a separate gate. Preserve
-  the execution-reference requirements
-  while their scope clarification is pending. M8.1 remains the only accepted
-  complete M8 stage.
+
+#### Next M8.0 acceptance
+
+Establish the trusted installation/root and bind the reservation to the current
+transaction. The maintained guarded-reservation E2E is already integrated; its
+remote acceptance remains a separate gate. Preserve the execution-reference
+requirements while their scope clarification is pending. M8.1 remains the only
+accepted complete M8 stage.
 
 The next installation slice must connect the existing recovery pieces rather
 than treat fixture addresses as installed state. Its acceptance requires:
