@@ -419,6 +419,11 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Latest submitted head: `d94580b4`; remote acceptance remains pending. Local
+follow-ups through `71a23da3` add conditional SETUP dispatch evidence, native
+bank-switch execution roots and explicit execution-address repair planning.
+They are not yet submitted and do not close library registration.
+
 Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
 Quality failed because the code-relocation fixture header was unavailable after
 configuration; Runtime failed at PWM4 lease admission in all six Stock System
@@ -454,6 +459,17 @@ dependency of Port 2. Its verified timer/IRQ foundations remain available for
 later continuation. UI/resource and other adapter work may proceed independently
 when the native-port track has a concrete external wait; this does not silently
 replace that track or close its remaining requirements.
+
+The immediate integration task is to unify catalog-growth preflight and repair
+ordering. Native root scanning and the separate catalog/reference planners can
+describe the same bank-switch field; their repairs must not be applied twice.
+All geometry, mapping, reference and instruction guards must be checked before
+the first write. Acceptance requires overlapping-root deduplication, conflicting
+repair rejection, unchanged memory on preflight failure, and native continuation
+after movement. ARM-held root cells retain their separate identity. These are
+integration requirements, not evidence that complete opaque/live-code coverage
+has already been established; that coverage remains required before public
+registration can be enabled.
 
 Before each work session, read this roadmap and issue #1, reconcile their current
 state with implementation and verification evidence, and identify the selected
