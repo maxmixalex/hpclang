@@ -491,6 +491,15 @@ RPL framing. Boundary tests cover both target models and small/maximum initializ
 images. This is a necessary physical bound, not proof of available installation
 memory, Flash-bank fit or trusted installation; those acceptance steps remain open.
 
+Local retained-RAM fault experiments now expose a concrete recovery resource gap:
+on HP49g+ and HP50g, a verified 26,000-element real array leaves 37,823 bytes between
+the RPL stacks, and the existing 46,698-byte bound recovery package does not repair
+the injected erased sector during the observed startup. Flash and both armed
+transaction statuses remain unchanged. Wider-memory controls recover. Installation
+must guarantee recovery-time storage before destructive mutation; a fresh-state
+success or installation-time free-memory check alone is insufficient. This is local
+negative evidence, not a completed installer or a relaxation of any startup gate.
+
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
 describe the same bank-switch field; their repairs must not be applied twice.

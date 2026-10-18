@@ -285,6 +285,18 @@ This physical ceiling does not deduct OS/other-object use. This envelope neither
 allocates MMU pages nor proves sufficient installation memory. Installation-space budgeting and a
 distributable recovery tool remain pending.
 
+Recovery-time memory is a separate installation requirement. A local retained-RAM
+fault experiment on both HP49g+ and HP50g stores a verified 26,000-element DOREAL
+array after leaving USB transfer, leaving a 37,823-byte RPL stack/heap gap. The
+existing bound configuration witness has a 46,698-byte transfer package (including
+its eight-byte header). Following reset with an erased target sector, the observed
+startup does not repair Flash or retire the armed journal/authority. A Stock-ROM
+program counter alone does not establish successful startup. Less constrained
+states recover, so successful fresh-state installation is insufficient admission
+evidence. Before destructive work, the installed protocol must ensure recovery
+execution storage remains available across restart, including retained user RAM;
+passing the packager's physical ceiling does not provide that guarantee.
+
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from
 repository sources. With ATfE's `bin` on PATH:
