@@ -29,6 +29,7 @@ hpclang_armtoolbox_stage0:
      * instruction is replayed, then continue through the ordinary stage0.
      * The normal SDK/hardware/storage launchers never define this probe.
      */
+    stmfd   sp!, {r2}              /* Preserve the caller on the Direct skip edge. */
     ldr     r2, [r1, #0x1f0]        /* Read[0x7c]: HP39 main-font page */
     cmp     r2, #0
     beq     .Larmsys_probe_skip
@@ -38,6 +39,7 @@ hpclang_armtoolbox_stage0:
     adr     r2, .Larmsys_probe_resume
     str     r2, [r1, #0x91c]        /* Saturn C low 32 bits / ARMSYS target */
     sub     r0, r0, #5              /* replay NIBHEX 80BFE */
+    ldmfd   sp!, {r2}
     bx      lr
 
 .Larmsys_probe_resume:
@@ -51,6 +53,7 @@ hpclang_armtoolbox_stage0:
     b       .Lstage0_entry_saved
 
 .Larmsys_probe_skip:
+    ldmfd   sp!, {r2}
 #endif
     stmfd   sp!, {r0-r12, lr}
 

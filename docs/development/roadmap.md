@@ -1992,6 +1992,14 @@ three HP39 Aplet package families pass. This closes an early startup overwrite
 hazard, not the remaining
 whole-application memory-admission or physical-reservation work.
 
+The previous Runtime CI batch exposed a separate test-launcher defect: the
+HP39gs/40gs ARMSYS probe clobbered `r2` before saving registers when skipping
+its Stock-only path in Direct mode. The probe now preserves that register on
+both its skip and replay edges. All three HP39 Direct Runtime targets locally
+pass the three rejected launches, keyboard progression and normal return; the
+downloaded failing CI launcher reproduces the old rejection failure on HP39gs.
+Stock replay regression and remote acceptance are still pending.
+
 #### M8.4 — Historical source compatibility
 
 The system adapter now includes five `hpsys.h` entry points for millisecond delays,
