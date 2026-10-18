@@ -150,6 +150,9 @@ static void acptr_switch_execution(void)
                                                           16,
                                                           &patch) == HPCLANG_RPL_SPAN_UNSUPPORTED);
         assert(patch.field == 123 && patch.value == 456);
+        assert(hpclang_rpl_reference_plan_execution_shift(execution, &mappings, 0x22000, 0x23000,
+                                                          16, &patch) == 1);
+        assert(patch.field == 10 && patch.value == 0x22f6a);
         edges = (struct edges){.stop = 73, .stop_at = 2};
         assert(hpclang_rpl_reference_visit(&reader, start, 15 - start, prologue, collect, &edges) ==
                73);
@@ -1031,6 +1034,61 @@ static int catalog_independent_mappings(void *context,
     return 0;
 }
 
+static void execution_address_planning(void)
+{
+    const struct hpclang_rpl_reference_patch unchanged = {123, 456};
+    for (unsigned source = 0; source < 2; ++source) {
+        for (unsigned target = 0; target < 2; ++target) {
+            struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_EXECUTION, 0x100, 0x160, 0,
+                                                 0};
+            const struct hpclang_rpl_reference_mappings maps = {source, target, 1};
+            for (int delta = -16; delta <= 16; delta += 32) {
+                struct hpclang_rpl_reference_patch patch = unchanged;
+                assert(hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, 0x100, 0x200, delta,
+                                                                  &patch) ==
+                       HPCLANG_RPL_SPAN_UNSUPPORTED);
+                assert(!memcmp(&patch, &unchanged, sizeof patch));
+                assert(hpclang_rpl_reference_plan_execution_shift(&edge, &maps, 0x100, 0x200, delta,
+                                                                  &patch) == (int)target);
+                if (target)
+                    assert(patch.field == 0x100 && patch.value == (uint32_t)(0x160 + delta));
+                else
+                    assert(!memcmp(&patch, &unchanged, sizeof patch));
+            }
+        }
+    }
+    struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_EXECUTION, 0x100, 1, 0, 0};
+    struct hpclang_rpl_reference_mappings maps = {1, 1, 1};
+    struct hpclang_rpl_reference_patch patch = unchanged;
+    assert(hpclang_rpl_reference_plan_execution_shift(&edge, &maps, 1, 2, -1, &patch) ==
+           HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!memcmp(&patch, &unchanged, sizeof patch));
+    for (unsigned invalid = 0; invalid < 4; ++invalid) {
+        struct hpclang_rpl_reference bad = edge;
+        if (invalid == 0)
+            bad.kind = HPCLANG_RPL_REFERENCE_OPAQUE;
+        if (invalid == 1)
+            bad.target = 0;
+        if (invalid == 2)
+            bad.extent = 1;
+        if (invalid == 3)
+            bad.auxiliary = 1;
+        assert(hpclang_rpl_reference_plan_execution_shift(&bad, &maps, 1, 2, 1, &patch) ==
+               HPCLANG_RPL_SPAN_MALFORMED);
+        assert(!memcmp(&patch, &unchanged, sizeof patch));
+    }
+    assert(hpclang_rpl_reference_plan_execution_shift(NULL, &maps, 1, 2, 1, &patch) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_plan_execution_shift(&edge, NULL, 1, 2, 1, &patch) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_reference_plan_execution_shift(&edge, &maps, 1, 2, 1, NULL) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    edge.target = 0x160;
+    assert(hpclang_rpl_reference_plan_execution_shift(&edge, &maps, 0x103, 0x200, 16, &patch) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(!memcmp(&patch, &unchanged, sizeof patch));
+}
+
 static void catalog_executable_switches(void)
 {
     struct image image = {.size = 19, .fail = UINT32_MAX};
@@ -1355,6 +1413,7 @@ int main(void)
     compact_guard_observations();
     catalog_relocation_plan();
     catalog_executable_switches();
+    execution_address_planning();
     rebuilt_catalog_replay();
     for (unsigned first = 1; first <= 5; ++first)
         for (unsigned second = 1; second <= 5; ++second)

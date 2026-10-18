@@ -202,6 +202,19 @@ int hpclang_rpl_reference_plan_qualified_shift(
     const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
     int32_t delta, struct hpclang_rpl_reference_patch *patch);
 
+/* Explicitly plan the stored five-nibble address of an EXECUTION event after
+ * independently resolving its field and target mappings. Accept only that event
+ * kind, with zero extent/auxiliary and a nonzero target; reject a move to the
+ * zero/no-function sentinel. The ordinary planners still reject EXECUTION.
+ * This plans the address field only: retain the separate obligation to inspect
+ * the target code, its embedded references and live execution state before any
+ * mutation. It neither discovers an execution entry nor certifies code safety.
+ * Same return/output/old-field contract as plan_qualified_shift; no writes. */
+int hpclang_rpl_reference_plan_execution_shift(
+    const struct hpclang_rpl_reference *reference,
+    const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
+    int32_t delta, struct hpclang_rpl_reference_patch *patch);
+
 struct hpclang_rpl_reference_edit
 {
     uint32_t mapping, field, expected, value, width; /* Explicit 1..5 nibbles. */

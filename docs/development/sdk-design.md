@@ -559,6 +559,14 @@ field, in addition to the ACPTR payload event. Compact and nested objects retain
 the true native field address. These execution events still require code and
 mapping analysis; the ordinary reference planner does not certify them safe.
 
+`hpclang_rpl_reference_plan_execution_shift()` explicitly plans the stored
+address of a validated EXECUTION event with separately qualified field/target
+mappings. It accepts only a nonzero five-nibble execution target with zero
+extent/auxiliary; a move to the no-function sentinel is rejected. Catalog switch
+planning uses this entry instead of reclassifying executable pointers as data.
+The ordinary planners continue rejecting EXECUTION. Planning an address does not
+resolve the target's code body or prove complete execution-reference coverage.
+
 `hpclang_rpl_reference_guards_begin()` and `guards_observe()` collect those
 observations in caller-owned storage, sorted by physical mapping and address.
 Repeated identical reads consume no additional space; adjacent observed cells

@@ -691,6 +691,15 @@ catalog-growth regression, post-call RPL marker and unchanged Flash; all six
 launchers build. These fixtures retain their explicit bounded-probe scope:
 complete execution coverage and public registration remain open.
 
+An explicit execution-address planner now connects classified EXECUTION fields
+to qualified relocation without weakening the ordinary planner's rejection.
+Catalog switch fields and the maintained ARM register-transfer fixtures use it.
+Mapping isolation, positive/negative shifts, split fields, invalid event metadata,
+zero-sentinel rejection and unchanged outputs on errors pass focused sanitizers
+and ARM analysis. Both HP49g+ and HP50g pass all 88 native relocation/control
+cases, the post-call RPL marker and unchanged Flash. This closes address-field
+planning for these classified cases, not code-body or live-register coverage.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 

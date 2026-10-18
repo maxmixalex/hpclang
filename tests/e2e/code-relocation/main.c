@@ -153,10 +153,10 @@ static int run(void)
             if (transfer.via_memory)
                 guards[count++] =
                     (struct hpclang_rpl_reference_guard){1, field, transfer.target, 5};
-            struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, field,
+            struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_EXECUTION, field,
                                                  transfer.target, 0, 0};
             struct hpclang_rpl_reference_patch resolved;
-            planned = hpclang_rpl_reference_plan_qualified_shift(
+            planned = hpclang_rpl_reference_plan_execution_shift(
                 &edge, &maps, body + cases[i].old, body + cases[i].old + 16, 16, &resolved);
             if (planned == 1)
                 patch = (struct hpclang_rpl_code_patch){resolved.field, 5, transfer.target,
