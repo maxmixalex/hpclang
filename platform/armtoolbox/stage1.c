@@ -1626,7 +1626,9 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         rpl_bounds.native_root_count = sizeof(native_roots) / sizeof(native_roots[0]);
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must
-         * classify the suspended caller's slots before supplying extra roots. */
+         * classify the suspended caller's slots before supplying extra roots.
+         * Native collection also preserves such raw numbers even when they
+         * equal the old address of an independently rooted, moved object. */
 
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window

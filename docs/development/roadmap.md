@@ -1550,6 +1550,12 @@ relocation obligations, and the diagnostic does not supply their production
 type/provenance contract. The host stack-restoration regression retains the
 relocated object root without reading the consumed ARM fields again.
 
+A separate HP49g+/HP50g native collection control retains an object on the data
+stack while saving its old numeric address with `RSTK=C`. Native collection
+moves the owned object but leaves that machine-stack number unchanged. Thus
+neither address-range scanning nor invoking the native collector supplies a
+general execution-root classifier; live continuations need call-path evidence.
+
 Shared edit assembly now merges identical observations across discovery paths
 and rejects conflicting values, partial overlaps and exhausted storage without
 publishing a partial count. Host tests, sanitizers and ARM compilation/analysis
