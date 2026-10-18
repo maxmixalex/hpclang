@@ -421,14 +421,14 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **Latest submission:** `235d8ccf` contains the installation witness, ELF
-  binding and guarded transaction-admission follow-ups described below. Both
-  native model flows and the extra boundary-rejection probes pass locally;
-  new CI has not been queried.
+- **Latest submitted implementation:** `aaf23c02` includes the read-only native
+  installation matcher, maintained two-model installation E2E (`66cdf5e5`) and
+  unified recovery/admission ELF binding. Both native installation flows and full
+  guarded recovery regressions pass locally; new CI has not been queried.
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
-- **Local integration, not submitted:** native installation matching now has a
+- **Installation integration (`66cdf5e5`, included in submission):** native installation matching now has a
   maintained E2E suite, generated library fixture and shared ARM predicate entry.
   HP49g+ and HP50g both pass absent-library rejection and fresh Stock installation
   matching, with exact initialized code and enclosing CODE-object checks, stack
@@ -436,7 +436,19 @@ Current delivery checkpoints:
   The Runtime workflow reuses its existing setup for separate recovery and
   installation matrix jobs. Default-build Clang analysis and workflow validation
   pass. Full low-memory recovery regression after the shared-entry extraction
-  remains running; this integration has no CI acceptance yet.
+  passes on HP50g/HP49g+ in 636/637 seconds: 20,898-byte initial gap, all 24,000
+  user-array elements, 1,923 busy Flash operations, repeated restart, five
+  transaction-admission rejection cases and three wrong-reservation cases.
+  This integration has no CI acceptance yet.
+- **Bound packaging (`aaf23c02`, included in submission):** the guarded-library CLI accepts an
+  admission ELF and applies the same explicit journal/authority coordinates to
+  both it and the recovery ELF. Both relocation/layout/binding checks finish
+  before outputs are written; an unchecked prepacked predicate cannot be combined
+  with an explicit recovery binding. The maintained reservation E2E uses this
+  path. Actual ELF packaging reproduces both tested libraries on both models
+  byte-for-byte. All 75 focused host tests pass, including different compiled
+  defaults, shared rebinding and unchanged outputs after invalid admission input.
+  Matching coordinates still do not establish allocation or RAM ownership.
 - **Current scope:** M8.1 remains the only accepted complete M8 stage. M8.0
   installation identity, reservation/transaction ownership, safe startup,
   authority reuse and reclamation remain open, together with the retained Port 1
@@ -446,9 +458,9 @@ Current delivery checkpoints:
 #### Earlier batch evidence
 
 The following records preserve the evidence at each implementation step. Work
-through `235d8ccf` is submitted, regardless of an earlier local-only checkpoint;
+through `aaf23c02` is submitted, regardless of an earlier local-only checkpoint;
 only `62f7ece4` has accepted CI evidence recorded above. Later matcher commits
-`9e679dd5`, `f7fa0f9a` and their maintained-suite integration remain local.
+`9e679dd5`, `f7fa0f9a` and their maintained-suite integration are included in that submission.
 
 - **Previously submitted:** `eb81d433` includes guarded recovery packaging and maintained
   two-model E2E, both verified locally; remote acceptance is pending and the new
