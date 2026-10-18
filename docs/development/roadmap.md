@@ -488,6 +488,19 @@ The current backlog is summarized above and in the retained checklist after the
 history. In particular, Port 2 backup writes and library creation already exist;
 early statements that all Port 2 writes are unfinished describe earlier states.
 
+The HP49g+/HP50g stage now follows a prefix of consecutive `RTN`, `RTNSC` and
+`RTNCC` instructions, retaining up to eight distinct consumed machine-stack
+cells as execution roots. Each next cell requires its preceding target to name
+another proven return; unreadable or unsupported instructions stop discovery.
+Host sanitizer tests cover all cursor positions, one to eight returns, opcode
+boundaries, equal-valued unconsumed cells and failed preflight. Catalog-growth
+integration independently consumes the relocated instruction/stack chain to its
+marker. All six launchers build; the existing HP49g+/HP50g native catalog-growth
+and post-call-marker regressions pass with unchanged Flash. These native runs
+are regression evidence for the existing caller, not native acceptance of every
+multi-return shape. Other instruction paths, opaque contents and complete
+execution-reference coverage remain open; public reclamation is not enabled.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 

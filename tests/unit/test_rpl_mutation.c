@@ -2085,6 +2085,56 @@ static void test_immediate_return_relocation(void)
     }
 }
 
+static void test_return_chain_relocation(void)
+{
+    const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
+    for (unsigned length = 1; length <= 8; ++length) {
+        for (unsigned cursor = 0; cursor < 8; ++cursor) {
+            for (unsigned fail = 0; fail < 2; ++fail) {
+                struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+                uint32_t pc = 0x82400, stack[8], before[8];
+                uint32_t *roots[9] = {&pc};
+                for (unsigned i = 0; i < 8; ++i)
+                    stack[i] = 0x82500;
+                put_word(pc, 2, 0x10);
+                for (unsigned depth = 0; depth < length; ++depth) {
+                    stack[(cursor + 7 - depth) & 7] = 0x82500 + depth * 0x20;
+                    put_word(0x82500 + depth * 0x20, 2,
+                             depth + 1 < length ? 0x10 * (1 + depth % 3) : 0xab);
+                }
+                memcpy(before, stack, sizeof stack);
+                unsigned count = hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1);
+                assert(count == length);
+                io.native_roots = roots;
+                io.native_root_count = count + 1;
+                if (fail)
+                    rejected_read = 0x90000;
+                int result = hpclang_rpl_mutation_catalog_grow(&io, 0x82013);
+                assert(fail ? result < 0 : result == 0);
+                unsigned delta = fail ? 0 : 16;
+                assert(pc == 0x82400 + delta);
+                for (unsigned depth = 0; depth < 8; ++depth) {
+                    unsigned slot = (cursor + 7 - depth) & 7;
+                    assert(stack[slot] == before[slot] + (depth < length ? delta : 0));
+                }
+                if (fail) {
+                    assert(!writes);
+                    continue;
+                }
+                /* Independently consume the actual relocated instructions and
+                 * stack values, reaching the marker after exactly length pops. */
+                uint32_t next = pc;
+                for (unsigned depth = 0; depth < length; ++depth) {
+                    uint32_t opcode = get_word(next, 2);
+                    assert(opcode == 0x10 || opcode == 0x20 || opcode == 0x30);
+                    next = stack[(cursor + 7 - depth) & 7];
+                }
+                assert(get_word(next, 2) == 0xab);
+            }
+        }
+    }
+}
+
 static void test_catalog_growth(void)
 {
     struct hpclang_rpl_mutation_io io = setup_catalog_growth();
@@ -2163,6 +2213,7 @@ static void test_catalog_growth(void)
 int main(void)
 {
     test_immediate_return_relocation();
+    test_return_chain_relocation();
     test_catalog_growth();
     test_temp_allocation_visit();
     test_read_only_root_visit();

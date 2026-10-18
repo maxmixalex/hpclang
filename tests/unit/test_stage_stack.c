@@ -105,9 +105,61 @@ static void test_immediate_return_root(void)
     assert(!writes);
 }
 
+static void test_return_chain(void)
+{
+    const struct hpclang_stage_stack_io io = {NULL, read_word, NULL};
+    for (unsigned cursor = 0; cursor < 8; ++cursor) {
+        for (unsigned length = 1; length <= 8; ++length) {
+            for (unsigned tail = 0; tail < 256; ++tail) {
+                setup();
+                uint32_t stack[8], before[8];
+                uint32_t *roots[8] = {0};
+                put(0x88000, 0x10, 2);
+                for (unsigned depth = 0; depth < 8; ++depth) {
+                    unsigned slot = (cursor + 7 - depth) & 7;
+                    stack[slot] = 0x88100 + depth * 0x10;
+                    /* Unvisited lower cells also look like execution addresses. */
+                    put(stack[slot], depth + 1 < length ? 0x10 * (1 + depth % 3) : tail, 2);
+                }
+                memcpy(before, stack, sizeof stack);
+                unsigned count = hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots);
+                unsigned expected = tail == 0x10 || tail == 0x20 || tail == 0x30 ? 8 : length;
+                assert(count == expected);
+                for (unsigned depth = 0; depth < 8; ++depth)
+                    assert(roots[depth] ==
+                           (depth < count ? stack + ((cursor + 7 - depth) & 7) : NULL));
+                assert(!writes && !memcmp(before, stack, sizeof stack));
+                for (unsigned depth = 0; depth < length; ++depth) {
+                    fault = depth ? stack[(cursor + 8 - depth) & 7] : 0x88000;
+                    assert(hpclang_stage_return_roots(&io, 0x88000, stack, cursor, roots) == depth);
+                }
+            }
+        }
+    }
+    setup();
+    uint32_t stack[8] = {0};
+    uint32_t *roots[8] = {0};
+    put(0x88000, 0x10, 2);
+    stack[7] = 0x88000;
+    stack[6] = 0x100000;
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 1);
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 8, roots) == 0);
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, NULL) == 0);
+    assert(hpclang_stage_return_roots(NULL, 0x88000, stack, 0, roots) == 0);
+    assert(hpclang_stage_return_roots(&io, 0x88000, NULL, 0, roots) == 0);
+    /* Repeated target values still belong to distinct consumed cells. */
+    for (unsigned i = 0; i < 8; ++i)
+        stack[i] = 0x88000;
+    assert(hpclang_stage_return_roots(&io, 0x88000, stack, 0, roots) == 8);
+    for (unsigned i = 0; i < 8; ++i)
+        assert(roots[i] == &stack[7 - i]);
+    assert(!writes);
+}
+
 int main(void)
 {
     test_immediate_return_root();
+    test_return_chain();
     struct hpclang_stage_stack_io io = {NULL, read_word, write_word};
     struct stage_launcher_bias bias;
     setup();

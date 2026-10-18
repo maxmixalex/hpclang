@@ -1540,7 +1540,9 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     struct hpclang_launch_context launch;
     struct hpclang_rpl_memory_bounds rpl_bounds;
     struct stage_launcher_bias launcher_bias = {0u, 0u};
-    uint32_t *native_roots[] = {&launcher_bias.object, (uint32_t *)stock_frame, NULL};
+    uint32_t *native_roots[10];
+    native_roots[0] = &launcher_bias.object;
+    native_roots[1] = (uint32_t *)stock_frame;
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace =
@@ -1625,16 +1627,14 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         rpl_bounds.native_roots = native_roots;
         rpl_bounds.native_root_count = 2u;
         if ((model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G) && stock_frame) {
-            /* The resumed instruction establishes this root's use directly.
+            /* Consecutive resumed returns establish each consumed cell's use.
              * The validated 49/50 SAT_CPU layout has eight cells at 0x978 and
-             * its next-push cursor at 0x998. Do not infer liveness below the top. */
+             * its next-push cursor at 0x998. Stop at any unclassified instruction. */
             uint32_t *cpu = (uint32_t *)saturn_state;
             const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read, NULL};
-            native_roots[2] = hpclang_stage_immediate_return_root(&io, *(uint32_t *)stock_frame,
-                                                                  cpu + 0x978u / sizeof(uint32_t),
-                                                                  cpu[0x998u / sizeof(uint32_t)]);
-            if (native_roots[2])
-                ++rpl_bounds.native_root_count;
+            rpl_bounds.native_root_count += hpclang_stage_return_roots(
+                &io, *(uint32_t *)stock_frame, cpu + 0x978u / sizeof(uint32_t),
+                cpu[0x998u / sizeof(uint32_t)], native_roots + 2);
         }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must

@@ -31,6 +31,24 @@ uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_i
     return *root < RPL_MAIN_END ? root : NULL;
 }
 
+unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
+                                    uint32_t *machine_stack, uint32_t cursor, uint32_t **roots)
+{
+    if (!roots)
+        return 0;
+    unsigned count = 0;
+    while (count < 8u) {
+        uint32_t *root =
+            hpclang_stage_immediate_return_root(io, continuation, machine_stack, cursor);
+        if (!root)
+            break;
+        roots[count++] = root;
+        continuation = *root;
+        cursor = (cursor + 7u) & 7u;
+    }
+    return count;
+}
+
 int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t stage0_code,
                              struct stage_launcher_bias *bias)
 {
