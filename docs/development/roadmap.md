@@ -669,6 +669,14 @@ the moving RAM region; that observation does not justify assuming all future
 switch functions are immovable. Full register provenance and registration
 integration remain open.
 
+Post-submission source analysis bounds SETUP's observed `PC=A` dispatch block:
+under HEX mode and entry at the block start, the destination is
+`0x26bf1 + 7 * B.S`. Symbolic checks on both snapshots cover all 256 selector/P
+combinations, keep unrelated initial register nibbles unknown, reject any unknown
+input consumption and verify P restoration. All 16 targets are below moving RAM.
+This is a conditional block-level result, not native execution of every selector
+or proof that every possible entry reaches the block under those conditions.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
