@@ -764,14 +764,14 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
     struct catalog_plan_state *state = context;
     if (state->visited >= state->count)
         return HPCLANG_RPL_SPAN_MALFORMED;
-    uint32_t mapping;
-    int result = state->resolve(state->context, binding, &mapping);
+    struct hpclang_rpl_catalog_mappings mappings;
+    int result = state->resolve(state->context, binding, &mappings);
     if (result)
         return result;
     const struct hpclang_rpl_catalog_move *move = state->move;
     const struct hpclang_rpl_reference edge = {HPCLANG_RPL_REFERENCE_DIRECT, record + 3,
                                                binding->address, 0, 0};
-    const struct hpclang_rpl_reference_mappings maps = {move->catalog_mapping, mapping,
+    const struct hpclang_rpl_reference_mappings maps = {move->catalog_mapping, mappings.payload,
                                                         move->moving_mapping};
     struct hpclang_rpl_reference_patch patch;
     result = hpclang_rpl_reference_plan_qualified_shift(&edge, &maps, move->first, move->end,
@@ -782,8 +782,23 @@ static int catalog_plan_visit(void *context, uint32_t record, uint32_t number,
     state->plan->edits[index] =
         (struct hpclang_rpl_reference_edit){move->catalog_mapping, record + 3, binding->address,
                                             result ? patch.value : binding->address, 5};
+    uint32_t bank_switch = binding->bank_switch;
+    if (bank_switch) {
+        const struct hpclang_rpl_reference switch_edge = {HPCLANG_RPL_REFERENCE_DIRECT, record + 8,
+                                                          bank_switch, 0, 0};
+        const struct hpclang_rpl_reference_mappings switch_maps = {
+            move->catalog_mapping, mappings.bank_switch, move->moving_mapping};
+        result = hpclang_rpl_reference_plan_qualified_shift(&switch_edge, &switch_maps, move->first,
+                                                            move->end, move->delta, &patch);
+        if (result < 0)
+            return result;
+        if (result && !patch.value)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED; /* Would become the no-switch sentinel. */
+        if (result)
+            bank_switch = patch.value;
+    }
     state->plan->edits[index + 1] = (struct hpclang_rpl_reference_edit){
-        move->catalog_mapping, record + 8, binding->bank_switch, binding->bank_switch, 5};
+        move->catalog_mapping, record + 8, binding->bank_switch, bank_switch, 5};
     state->plan->guards[index + 1] =
         (struct hpclang_rpl_reference_guard){move->catalog_mapping, record, number, 3};
     state->plan->guards[index + 2] =

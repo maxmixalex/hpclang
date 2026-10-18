@@ -526,7 +526,11 @@ The internal `hpclang_rpl_catalog_plan_relocation()` assembles the catalog part
 of a reference-repair plan. The caller supplies a stable reader, a resolver for
 physical mapping identities and bounded output buffers. Every binding is resolved,
 including unbanked entries. For N entries the plan contains 2*N edits (address
-and unchanged bank-switch fields) and 1+2*N guards (count, IDs and flags).
+and bank-switch fields) and 1+2*N guards (count, IDs and flags). The resolver
+supplies separate physical mapping identities for the library payload and its
+switch function; executing the switch is what selects the payload mapping.
+Nonzero switch-function targets relocate under their own mapping. Zero means
+no switch and stays zero; moving a function to that sentinel is unsupported.
 Duplicate IDs remain distinct records. Identical addresses in different physical
 mappings do not imply the same target. On failure both output counts are zero;
 partially filled buffers must be discarded. Planning performs no native writes.

@@ -424,9 +424,9 @@ Quality failed because the code-relocation fixture header was unavailable after
 configuration; Runtime failed at PWM4 lease admission in all six Stock System
 Services jobs. Local fix `6668fc13` generates the fixture at configuration time
 and tests occupied-timer rejection with EBUSY and zero register writes, retaining
-actual IRQ delivery on an idle timer. Clean-config Clang analysis and HP50g Stock
-System Services, native return and independent input pixels pass. The remaining
-model regressions are running; the batch is not accepted. This does not establish
+actual IRQ delivery on an idle timer. Clean-config Clang analysis, all six Stock
+System Services targets and HP50g Direct pass, including native return and
+independent input pixels. Remote acceptance is pending. This does not establish
 a Stock asynchronous-audio backend. Earlier HP39 reject-return failures did not
 recur in the submitted batch.
 
@@ -651,6 +651,18 @@ bodies. Qualified planning leaves all 346 operands unchanged for the observed
 16-nibble catalog expansion. Six register-mediated transfer sites remain explicit
 data-flow obligations; this result does not resolve live-register provenance,
 other embedded data references or complete relocation safety.
+
+Following the register-mediated calls also identifies library bank-switch fields
+as executable targets, rather than inert catalog metadata. The internal catalog
+planner now resolves payload and switch-function mappings separately and plans
+both address fields. Equal numeric addresses in different mappings remain
+independent; the zero/no-switch sentinel stays zero, and moving a nonzero function
+to zero is rejected. Focused ASan/UBSan, ARM compilation and analysis pass for
+independent mapping combinations and positive/negative moves. The two observed
+Stock catalogs each contain 62 entries whose nonzero switch targets are below
+the moving RAM region; that observation does not justify assuming all future
+switch functions are immovable. Full register provenance and registration
+integration remain open.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>

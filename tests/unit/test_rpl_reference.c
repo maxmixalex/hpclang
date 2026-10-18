@@ -894,19 +894,20 @@ struct catalog_resolver
 };
 
 static int catalog_mapping(void *context, const struct hpclang_rpl_library_binding *binding,
-                           uint32_t *mapping)
+                           struct hpclang_rpl_catalog_mappings *mappings)
 {
     struct catalog_resolver *resolver = context;
     if (++resolver->calls == resolver->fail)
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
     if (binding->bank_switch == 0x10)
-        *mapping = 1;
+        mappings->payload = 1;
     else if (binding->bank_switch == 0x20)
-        *mapping = 2;
+        mappings->payload = 2;
     else if (!binding->bank_switch)
-        *mapping = 0;
+        mappings->payload = 0;
     else
         return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    mappings->bank_switch = 3;
     return 0;
 }
 
@@ -977,6 +978,64 @@ static void catalog_relocation_plan(void)
     plan.edit_capacity = 0;
     assert(!hpclang_rpl_catalog_plan_relocation(&reader, 0, 3, &move, NULL, NULL, &plan));
     assert(!plan.edit_count && plan.guard_count == 1 && !guards[0].expected);
+}
+
+static int catalog_independent_mappings(void *context,
+                                        const struct hpclang_rpl_library_binding *binding,
+                                        struct hpclang_rpl_catalog_mappings *mappings)
+{
+    (void)binding;
+    *mappings = *(const struct hpclang_rpl_catalog_mappings *)context;
+    return 0;
+}
+
+static void catalog_executable_switches(void)
+{
+    struct image image = {.size = 19, .fail = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put(&image, 0, 1, 3);
+    put(&image, 3, 275, 3);
+    put(&image, 6, 0x60020, 5);
+    put(&image, 11, 0x60020, 5);
+    put(&image, 16, 7, 3);
+    struct image before = image;
+    struct hpclang_rpl_reference_edit edits[2];
+    struct hpclang_rpl_reference_guard guards[3];
+    struct hpclang_rpl_catalog_reference_plan plan = {edits, 2, 0, guards, 3, 0};
+    for (unsigned payload = 0; payload < 2; ++payload) {
+        for (unsigned function = 0; function < 2; ++function) {
+            struct hpclang_rpl_catalog_mappings mappings = {payload, function};
+            for (int delta = -16; delta <= 16; delta += 32) {
+                const struct hpclang_rpl_catalog_move move = {0, 1, 0x60000, 0x60100, delta};
+                assert(!hpclang_rpl_catalog_plan_relocation(
+                    &reader, 0, image.size, &move, catalog_independent_mappings, &mappings, &plan));
+                assert(plan.edit_count == 2 && plan.guard_count == 3);
+                assert(edits[0].mapping == 0 && edits[0].field == 6 && edits[0].width == 5);
+                assert(edits[1].mapping == 0 && edits[1].field == 11 && edits[1].width == 5);
+                assert(edits[0].expected == 0x60020 && edits[1].expected == 0x60020);
+                assert(edits[0].value == (uint32_t)(0x60020 + (payload ? delta : 0)));
+                assert(edits[1].value == (uint32_t)(0x60020 + (function ? delta : 0)));
+                assert(!memcmp(&image, &before, sizeof image));
+            }
+        }
+    }
+    /* A zero switch means no executable target, even when zero is in the move.
+     * The real payload pointer still relocates under its independently resolved
+     * mapping. Both remain protected by explicit expected-value edits. */
+    put(&image, 6, 1, 5);
+    put(&image, 11, 0, 5);
+    struct hpclang_rpl_catalog_mappings mappings = {1, 1};
+    const struct hpclang_rpl_catalog_move move = {0, 1, 0, 2, 16};
+    assert(!hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &move,
+                                                catalog_independent_mappings, &mappings, &plan));
+    assert(edits[0].expected == 1 && edits[0].value == 17);
+    assert(!edits[1].expected && !edits[1].value);
+    put(&image, 11, 16, 5);
+    const struct hpclang_rpl_catalog_move to_zero = {0, 1, 16, 32, -16};
+    assert(hpclang_rpl_catalog_plan_relocation(&reader, 0, image.size, &to_zero,
+                                               catalog_independent_mappings, &mappings,
+                                               &plan) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+    assert(!plan.edit_count && !plan.guard_count);
 }
 
 static void compact_guard_observations(void)
@@ -1253,6 +1312,7 @@ int main(void)
     nested_unresolved();
     compact_guard_observations();
     catalog_relocation_plan();
+    catalog_executable_switches();
     rebuilt_catalog_replay();
     for (unsigned first = 1; first <= 5; ++first)
         for (unsigned second = 1; second <= 5; ++second)

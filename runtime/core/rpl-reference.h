@@ -261,12 +261,19 @@ int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_buil
                                          uint32_t mapping, uint32_t address, uint8_t value);
 
 struct hpclang_rpl_library_binding;
-/* Return zero with a normalized physical mapping identity, or an error.
- * Resolve every binding, including those without a bank switch. Read-only;
- * keep the resolution stable through validation/commit. */
+struct hpclang_rpl_catalog_mappings
+{
+    uint32_t payload, bank_switch;
+};
+
+/* Return zero with normalized physical mapping identities, or an error.
+ * Resolve every payload, including bindings without a bank switch. A nonzero
+ * bank_switch is executable code: resolve its own mapping independently of the
+ * payload mapping it selects. For zero (no switch), bank_switch mapping is
+ * ignored. Read-only; keep both resolutions stable through validation/commit. */
 typedef int (*hpclang_rpl_catalog_mapping_fn)(void *context,
                                               const struct hpclang_rpl_library_binding *binding,
-                                              uint32_t *mapping);
+                                              struct hpclang_rpl_catalog_mappings *mappings);
 
 struct hpclang_rpl_catalog_move
 {
@@ -283,10 +290,12 @@ struct hpclang_rpl_catalog_reference_plan
 };
 
 /* Assemble the catalog portion of a relocation plan without writing native
- * data. For N records, supply 2*N edits (address and unchanged bank switch)
+ * data. For N records, supply 2*N edits (payload address and bank-switch address)
  * and 1+2*N guards (count, IDs and flags). Arrays must be disjoint from each
  * other and all input/IO state. On success counts describe the complete plan;
  * on error both counts are zero and all partially filled entries are invalid.
+ * Zero bank-switch sentinels stay zero, even if the move includes address zero.
+ * Reject moving a nonzero function target to zero, which would change its meaning.
  * Duplicate IDs are preserved as distinct records. Fields retain old addresses.
  * Keep mappings/catalog/buffers exclusively owned throughout later validation
  * and commit. This does not discover other roots, repair references or authorize
