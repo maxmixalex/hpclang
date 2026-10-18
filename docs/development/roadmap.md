@@ -428,6 +428,13 @@ Current delivery checkpoints:
   two-model E2E, both verified locally; remote acceptance is pending and the new
   CI has not been queried. Reservation ownership and safe startup admission are
   still unproven.
+- **Local follow-up:** the installation witness now requires one live native
+  recovery allocation with the complete packaged library, a matching catalog
+  address/bank and no overlap with the recovery target sector. Deleted/interior
+  copies, duplicate identities and changed payload/catalog data are rejected.
+  Both models' saved guarded/observed installations pass; 64 focused host tests
+  pass. This strengthens installation evidence without establishing transaction
+  ownership, a production installer or startup ordering.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
   reservation to the current transaction. The maintained guarded-reservation E2E
   is already integrated; its remote acceptance remains a separate gate. Preserve

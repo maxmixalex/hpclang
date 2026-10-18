@@ -10,6 +10,7 @@ from prepare import prepare, reserve_bank_tail
 from verify import (
     home_object,
     home_string,
+    installed_recovery,
     native_words,
     require_stock_pc,
     verify,
@@ -158,6 +159,13 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         if (baseline / "flash").read_bytes() != (installed / "state/flash").read_bytes():
             raise ValueError("Clean guarded configuration changed Flash")
         read = reader(baseline)
+        installed_recovery(
+            (baseline / "flash").read_bytes(),
+            (package / artifact).read_bytes(),
+            LIBRARY_ID,
+            args.target,
+            read=read,
+        )
         count = read(0x8611D, 3)
         if count != len(original_ids) + 1 or {
             read(0x86120 + 16 * i, 3) for i in range(count)

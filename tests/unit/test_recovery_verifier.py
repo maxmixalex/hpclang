@@ -16,6 +16,109 @@ VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
 
 
+class InstalledRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "recovery_package", ROOT / "tools/package-recovery.py"
+        )
+        pack = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pack)
+        self.package = pack.configuration_library(
+            pack.package(bytes(range(8)), 64, model="hp50g"), 1701
+        )
+        self.flash = bytearray(b"\xff" * 0x200000)
+        for bank in range(0x140000, 0x200000, 0x20000):
+            identity = 0xF0 + ((bank // 0x20000 - 2) << 8)
+            self.flash[bank + 0x100 : bank + 0x105] = identity.to_bytes(5, "little")
+        self.slot = 0x1E0105
+        self.size = self.install(self.slot)
+        title = int(VERIFY.nibbles(self.package[8:])[10:12][::-1], 16)
+        self.catalog = {
+            0x8611D: 1,
+            0x86120: 1701,
+            0x86123: 0x40000 + 2 * ((self.slot + 4) & 0x1FFFF) + 14 + 2 * title,
+            0x86128: 13,
+        }
+        self.catalog.update({0x26BBB + 7 * i: i for i in range(16)})
+
+    def install(self, slot):
+        body = self.package[8:]
+        size = (4 + len(body) + 3) & ~3
+        self.flash[slot : slot + 4] = b"\x53" + ((size * 2 - 2) | 0x100000).to_bytes(3, "little")
+        self.flash[slot + 4 : slot + 4 + len(body)] = body
+        return size
+
+    def verify(self, target=0x140000):
+        return VERIFY.installed_recovery(
+            bytes(self.flash),
+            self.package,
+            1701,
+            target,
+            read=lambda address, count=5: self.catalog[address],
+        )
+
+    def test_exact_live_installation(self):
+        self.assertEqual(self.verify(), (self.slot, self.size))
+
+    def test_deleted_copy_is_not_installation(self):
+        self.flash[self.slot] = 0
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_duplicate_live_identity(self):
+        self.install(0x1C0105)
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_same_id_with_changed_code_is_rejected(self):
+        self.flash[self.slot + 4 + len(self.package[8:]) - 5] ^= 1
+        with self.assertRaisesRegex(ValueError, "differs from package"):
+            self.verify()
+
+    def test_matching_payload_inside_tombstone_is_not_installation(self):
+        self.flash[self.slot] = 0
+        self.install(self.slot + self.size + 4)
+        # A larger deleted allocation encloses the apparent live header.
+        size = self.size * 2 + 4
+        self.flash[self.slot + 1 : self.slot + 4] = (size * 2 - 2).to_bytes(3, "little")
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_target_must_preserve_entire_recovery_allocation(self):
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            self.verify(0x1E0000)
+
+    def test_bad_bank_identity_and_tail_fail_closed(self):
+        self.flash[0x180100] ^= 1
+        with self.assertRaisesRegex(ValueError, "bank identity"):
+            self.verify()
+        self.flash[0x180100] ^= 1
+        self.flash[self.slot + self.size + 1] = 0
+        with self.assertRaisesRegex(ValueError, "bank tail"):
+            self.verify()
+
+    def test_corrupt_expected_package_is_rejected(self):
+        damaged = bytearray(self.package)
+        damaged[-2] ^= 1
+        self.package = bytes(damaged)
+        with self.assertRaisesRegex(ValueError, "CRC"):
+            self.verify()
+
+    def test_wrong_catalog_object_or_bank_is_rejected(self):
+        self.catalog[0x86123] += 1
+        with self.assertRaisesRegex(ValueError, "another object"):
+            self.verify()
+        self.catalog[0x86123] -= 1
+        self.catalog[0x86128] = 12
+        with self.assertRaisesRegex(ValueError, "another Flash bank"):
+            self.verify()
+
+    def test_duplicate_catalog_binding_is_rejected(self):
+        self.catalog.update({0x8611D: 2, 0x86130: 1701})
+        with self.assertRaisesRegex(ValueError, "one recovery catalog"):
+            self.verify()
+
+
 class ExecutedImageTests(unittest.TestCase):
     def setUp(self):
         self.symbols = {"workspace": 64, "__image_end": 9000, "__tls_base": 40, "errno": 4}

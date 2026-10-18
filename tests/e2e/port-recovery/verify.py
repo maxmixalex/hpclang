@@ -163,6 +163,84 @@ def verify_retired(before, after, slot, target, *, authority_slot=None):
     return record
 
 
+def installed_recovery(flash, package, library_id, target, *, read):
+    """Verify the exact recovery library at a live native allocation boundary.
+
+    An installation witness, not transaction-root authorization. In particular,
+    a matching payload inside a deleted allocation is not an installed library.
+    The recovery allocation must survive erasing the proposed target sector.
+    """
+    require(len(flash) == 0x200000, "Expected complete hp4950 Flash")
+    require(package[:8] == b"HPHP49-C", "Invalid recovery library envelope")
+    expected = nibbles(package[8:])
+
+    def word(data, at, width=5):
+        require(0 <= at <= len(data) - width, "Library field outside allocation")
+        return int(data[at : at + width][::-1], 16)
+
+    require(word(expected, 0) == 0x2B40, "Expected a recovery library")
+    length = 5 + word(expected, 5)
+    require(length >= 34 and expected[length:] in ("", "0"), "Invalid library extent")
+    require(
+        word(expected, 14 + 2 * word(expected, 10, 2), 3) == library_id,
+        "Recovery library ID differs from package",
+    )
+    crc = 0
+    for value in expected[5 : length - 4]:
+        crc = (crc >> 4) ^ (((crc ^ int(value, 16)) & 15) * 0x1081)
+    require(word(expected, length - 4, 4) == crc, "Invalid packaged library CRC")
+    require(0x140000 <= target < 0x200000 and target % 4096 == 0, "Invalid recovery target sector")
+    matches = []
+    for bank in range(0x140000, 0x200000, 0x20000):
+        identity = int.from_bytes(flash[bank + 0x100 : bank + 0x105], "little")
+        require(identity == 0xF0 + ((bank // 0x20000 - 2) << 8), "Invalid installed bank identity")
+        cursor, end = bank + 0x105, bank + 0x20000
+        while cursor < end and flash[cursor] != 0xFF:
+            status = flash[cursor]
+            require(status in (0, 0x53) and cursor + 4 <= end, "Unresolved installed allocation")
+            extent = (int.from_bytes(flash[cursor + 1 : cursor + 4], "little") & 0xFFFFF) + 2
+            require(
+                extent >= 8 and extent % 8 == 0 and extent // 2 < end - cursor,
+                "Invalid installed allocation extent",
+            )
+            size = extent // 2
+            if status == 0x53:
+                body = nibbles(flash[cursor + 4 : cursor + size])
+                if word(body, 0) == 0x2B40:
+                    stop = 5 + word(body, 5)
+                    require(34 <= stop <= len(body), "Invalid installed library extent")
+                    header = 14 + 2 * word(body, 10, 2)
+                    require(header + 23 <= stop - 4, "Invalid installed library header")
+                    if word(body, header, 3) == library_id:
+                        require(
+                            body[:stop] == expected[:length],
+                            "Installed recovery differs from package",
+                        )
+                        require(
+                            target + 4096 <= cursor or target >= cursor + size,
+                            "Recovery target overlaps installed recovery",
+                        )
+                        matches.append((cursor, size))
+            cursor += size
+        require(
+            cursor < end and flash[cursor:end] == b"\xff" * (end - cursor),
+            "Invalid installed bank tail",
+        )
+    require(len(matches) == 1, "Expected exactly one live recovery installation")
+    slot, _ = matches[0]
+    count = read(0x8611D, 3)
+    require(0 < count < 128, "Invalid installed library catalog")
+    entries = [0x86120 + 16 * i for i in range(count) if read(0x86120 + 16 * i, 3) == library_id]
+    require(len(entries) == 1, "Expected one recovery catalog binding")
+    header = 0x40000 + 2 * ((slot + 4) & 0x1FFFF) + 14 + 2 * word(expected, 10, 2)
+    require(read(entries[0] + 3) == header, "Recovery catalog points to another object")
+    # Stock 2.15 fixture table: entries map physical Flash banks 2..17.
+    switch = read(entries[0] + 8)
+    banks = [index + 2 for index in range(16) if read(0x26BBB + 7 * index) == switch]
+    require(banks == [slot // 0x20000], "Recovery catalog selects another Flash bank")
+    return matches[0]
+
+
 def native_words(ram, flash):
     require(len(ram) == 0x80000, "Expected hp4950 SRAM")
     words = struct.unpack("<" + "I" * (len(ram) // 4), ram)
