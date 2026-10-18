@@ -1776,9 +1776,8 @@ checkpoint saves the final measurements before launcher unmapping; Direct and
 Stock artifacts include the versioned JSON. HP39g+ Direct reports 2,416/8,192
 stack bytes and 18,892/22,920 heap bytes; HP50g Stock reports 2,424/8,192 and
 20,076/22,920. Both retain the 36 KiB RW ceiling and pass independent UI pixels
-and normal return. HP39g+ Stock, HP48gII Direct/Stock, HP49g+ Direct/Stock and
-HP50g Direct also pass with the same memory-report gate; HP39gs/40gs acceptance
-is in progress. A watermark
+and normal return. All six Direct and all six Stock targets now pass with the
+same memory-report gate locally. A watermark
 measures touched words, includes instrumentation overhead, and does not bound
 untouched stack reservations or establish a minimum physical Stock allocation;
 those distinctions remain part of whole-application resource analysis.
@@ -1792,9 +1791,10 @@ and an excessive count), checking caller registers, interrupt state, mappings
 and the complete untouched temporary pool before ordinary application execution.
 HP39g+, HP48gII and HP50g pass those checks and the independent UI/memory/return
 gates locally; the old launcher fails the same rejection sequence. HP50g Stock
-also passes. All six launcher builds, relocated C/C++ SDK clients, model-specific
-notebooks and all three HP39 Aplet package families pass. HP39g+ Stock acceptance
-is in progress. This closes an early startup overwrite hazard, not the remaining
+also passes, as does HP39g+ Stock with its native-workspace exclusion. All six
+launcher builds, relocated C/C++ SDK clients, model-specific notebooks and all
+three HP39 Aplet package families pass. This closes an early startup overwrite
+hazard, not the remaining
 whole-application memory-admission or physical-reservation work.
 
 #### M8.4 — Historical source compatibility
