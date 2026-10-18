@@ -1851,17 +1851,19 @@ double-buffer editing, and explicit stdio ownership without display acquisition.
 The installed interactive example passes the SDK relocation/packaging gate.
 HP39g+/HP50g Direct physical-key editing passes a full-buffer rejection/re-edit
 scenario, with the scrolled result matching an independently drawn reference
-frame pixel for pixel. Both models also pass Stock; the maintained Display
-verifier checks the edited/reference frames. Wider native acceptance and the old unbounded-name
-compatibility policy remain pending; this does not close the line-input group.
+frame pixel for pixel. Both models also pass Stock. The maintained independent
+console verifier now checks edited/reference frames on all six Direct and all
+six Stock targets, as recorded below. The old unbounded-name compatibility
+policy remains pending; this does not close the line-input group.
 
 `hpstdio.h` now provides blocking `readint/readdouble` over that bounded editor.
 They retain historical numeric-prefix conversion and the 31-byte line capacity;
 invalid conversion, integer overflow and input cancellation have defined results.
 Host sanitizers cover boundaries, prefix conversion, floating range errors and
 input failures. ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key
-numeric input, and installed-SDK relocation/packaging pass locally. Wider
-native acceptance and CI acceptance of this addition remain pending.
+numeric input, and installed-SDK relocation/packaging pass locally. The split
+console suite below completes six-model Direct/Stock local numeric acceptance;
+CI acceptance of this addition remains pending.
 `readuint/readhex/readlonglong/readulonglong` now share a checked integer parser
 matching the reviewed historical sign, whitespace and bare-hex rules. Boundary
 and error cases pass host sanitizers; ARM analysis and HP39g+/HP50g Direct
@@ -1876,11 +1878,11 @@ tests ran. Historical console/input acceptance now has its own `hpgcc-console`
 runtime suite and independent pixel verifier; Display retains its original
 allocation-exhaustion, gray-level and cleanup checks. The split ARM payloads are
 48,552 and 66,192 bytes, versus 75,616 bytes combined. Native acceptance of the
-split console passes HP48gII/HP49g+/HP50g Direct/Stock and HP39g+ Stock, including
+split console passes all six Direct and all six Stock targets, including
 physical input, independent pixels and normal return. Split Display also passes
 HP39g+ Stock with its original allocation/gray assertions. A terminated USB
-transfer was diagnosed and repeated before this result. Remaining targets and
-CI acceptance are pending; the failed combined payload is not accepted.
+transfer was diagnosed and repeated before this result. CI acceptance remains
+pending; the failed combined payload is not accepted.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
