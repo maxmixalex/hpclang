@@ -424,21 +424,39 @@ Current delivery checkpoints:
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
-- **Follow-up:** guarded recovery packaging and maintained two-model E2E pass
-  locally; remote acceptance is pending. Reservation ownership and safe startup
-  admission are still unproven.
-- **Active M8.0 work:** integrate and accept the maintained guarded-reservation E2E
-  flow, then bind the reservation to the trusted
-  root and current transaction. Preserve the execution-reference requirements
+- **Submitted:** `eb81d433` includes guarded recovery packaging and maintained
+  two-model E2E, both verified locally; remote acceptance is pending and the new
+  CI has not been queried. Reservation ownership and safe startup admission are
+  still unproven.
+- **Active M8.0 work:** establish the trusted installation/root and bind the
+  reservation to the current transaction. The maintained guarded-reservation E2E
+  is already integrated; its remote acceptance remains a separate gate. Preserve
+  the execution-reference requirements
   while their scope clarification is pending. M8.1 remains the only accepted
   complete M8 stage.
+
+The next installation slice must connect the existing recovery pieces rather
+than treat fixture addresses as installed state. Its acceptance requires:
+
+1. Recover the exact authority/journal pair from the installed recovery identity,
+   with allocation/lifetime checks; a scanned signature or patched address alone
+   is not authorization.
+2. Bind the reserved RAM's identity and capacity to that installation and active
+   transaction before destructive writes, preserving unrelated HOME objects.
+3. Reject stale, conflicting or partially published installation information
+   without releasing unrelated RAM or mutating the target bank; accept retry only
+   for the same owned transaction.
+4. Exercise installation, interruption and recovery on both native Stock models,
+   including complete Flash/catalog and user-data checks. Keep global startup
+   ordering, safe authority reuse and reclamation as explicit remaining gates
+   until their own acceptance is demonstrated.
 
 The entries below preserve earlier batch evidence and check times; their older
 pending-CI descriptions do not supersede these delivery checkpoints.
 
 The accepted `d94580b4` batch was followed by `9d015660`, whose Quality, Core,
-Objects, Storage, Font Gallery and Runtime workflows all passed. The latest
-submitted `62f7ece4` additionally passes Quality, Core, Objects and Runtime,
+Objects, Storage, Font Gallery and Runtime workflows all passed. The accepted
+baseline `62f7ece4` additionally passes Quality, Core, Objects and Runtime,
 including both Stock recovery jobs. These batches add conditional SETUP dispatch
 evidence, native bank-switch execution roots, explicit execution-address repair
 planning, merged catalog repairs, direct-jump return-root discovery and compact
