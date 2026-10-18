@@ -411,7 +411,42 @@ M7 completion therefore means **practical HPGCC capability parity**, not binary 
 
 ## M8 — HPGCC source compatibility, SDK UX, and post-HPGCC extensions
 
-**Planned, with adapters allowed to begin incrementally once each M7 clean service is stable.**
+**In progress. M8.1 is accepted; the other stages retain the completion conditions below.**
+
+### Current M8 acceptance and execution order
+
+This summary describes current work. Older implementation snapshots below retain
+their original evidence scope; their then-pending statements are not the current
+backlog. Local verification, CI acceptance and milestone completion are distinct.
+
+| Stage | Current state | Remaining acceptance |
+| --- | --- | --- |
+| M8.0 | Native port reads and substantial mutation support exist. Port 2 backup create/replace/remove and library creation have native evidence. | Complete library registration/attachment and execution-reference safety; Port 1 replacement/removal; trusted Port 2 recovery installation and authority lifecycle, safe startup ordering, reclamation and retained per-port gates. |
+| M8.1 | Installed source SDK and six-model packaging accepted. | Preserve relocation/build/package regressions as later features are integrated. |
+| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted. | Public application/API review and remaining smallest-target resource/update-cost criteria. |
+| M8.3 | Components, themes and renderer implemented; all-six Direct/Stock local memory-report and low-memory checks pass. | Whole-application physical-memory admission and remaining resource/CI acceptance; touched-stack watermarks alone are insufficient. |
+| M8.4 | Multiple graphics, keyboard, console and system adapter groups exist. Fixed-array line-input aliases pass all-six Direct/Stock locally. | Complete the retained historical API/application ledger, asynchronous KOS sound and decimal-format policy, plus remaining adapter groups and CI acceptance. |
+| M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
+| M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
+
+The next implementation track is M8.0's existing native-port work: establish
+complete execution-reference coverage for safe movement/registration, then
+finish the trusted recovery installation/authority and startup requirements
+needed for reclamation. Those requirements must be satisfied together before
+public reclamation is enabled. Asynchronous sound is an M8.4 obligation, not a
+dependency of Port 2. Its verified timer/IRQ foundations remain available for
+later continuation. UI/resource and other adapter work may proceed independently
+when the native-port track has a concrete external wait; this does not silently
+replace that track or close its remaining requirements.
+
+Before each work session, read this roadmap and issue #1, reconcile their current
+state with implementation and verification evidence, and identify the selected
+stage, dependency and completion condition. After verified progress, commits,
+CI acceptance or a discovered discrepancy, update both records. Keep one current
+board summary and separate historical snapshots; distinguish local, submitted and
+accepted evidence. Preserve every retained goal and approved boundary, and seek
+confirmation before reducing scope. A demonstrated completion status needs no
+additional approval.
 
 M8 turns M7's capability parity into broad source-level compatibility and then moves beyond the historical SDK. The common 59-function `hpgraphics.h` surface is signature-stable across HPGCC 1.1, HPGCC 2.0 and HPGCC3, and the historical keyboard/stdio/filesystem/object inventories give similarly concrete adapter targets. Binary compatibility remains out of scope.
 
@@ -448,6 +483,13 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 | M8.6 | Integrated applications and SDK release acceptance | Non-trivial downstream applications, packaging/documentation and cross-family resource/return acceptance |
 
 #### M8.0 — Native port services
+
+The current backlog is summarized above and in the retained checklist after the
+history. In particular, Port 2 backup writes and library creation already exist;
+early statements that all Port 2 writes are unfinished describe earlier states.
+
+<details>
+<summary>Native-port implementation history and bounded verification evidence</summary>
 
 Local implementation now includes Port 0 backup create, variable-size replace
 and remove, with owned reads and preservation of live references to old records.
@@ -1682,6 +1724,8 @@ independent pixel checks, replacing the old combined fixture that failed with
 strict documentation checks pass. Public Port 1 replacement/removal remains open:
 bank-qualified traversal reaches ROM machine-code entries and user-library code
 whose execution references still require classification.
+
+</details>
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
