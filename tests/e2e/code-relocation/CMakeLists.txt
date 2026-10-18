@@ -7,10 +7,13 @@ endif()
 include("${HPCLANG_ROOT}/cmake/profiles/hpclang-v1.cmake")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/cases.h"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/fixtures.py"
-            "${CMAKE_CURRENT_BINARY_DIR}/cases.h"
-    DEPENDS fixtures.py VERBATIM)
+# The compile database must be usable immediately after configuration, including
+# by static analysis. This small deterministic header needs no compiled tools.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/fixtures.py")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/fixtures.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/cases.h"
+    COMMAND_ERROR_IS_FATAL ANY)
 
 add_executable(hpclang_code_relocation_e2e
     ${HPCLANG_RUNTIME_START}

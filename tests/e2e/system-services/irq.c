@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <errno.h>
 #include "clock-internal.h"
 #include "irq.h"
 #include "sound-alarm.h"
@@ -7,6 +8,7 @@
 
 volatile uint32_t hpclang_e2e_irq_hits;
 static uint32_t irq_stack[256] __attribute__((aligned(8)));
+static unsigned register_writes;
 void hpclang_e2e_irq_snapshot(struct hpclang_irq_bank *state);
 void hpclang_e2e_irq_handler(void);
 
@@ -20,6 +22,7 @@ static uint32_t read_reg(void *context, enum hpclang_sound_alarm_reg reg)
 static void write_reg(void *context, enum hpclang_sound_alarm_reg reg, uint32_t value)
 {
     (void)context;
+    ++register_writes;
     REG(addresses[reg]) = value;
 }
 
@@ -36,9 +39,18 @@ unsigned hpclang_e2e_irq_test(void)
     unsigned failure = 0;
     hpclang_e2e_irq_hits = 0;
     irq_stack[0] = 0x51ac7ead;
+    /* Stock can own PWM4. An owned-IRQ test may borrow an idle channel only;
+     * active/update/DMA or pending state must instead exercise rejection with
+     * no writes. Direct fixtures still require actual interrupt delivery when
+     * the channel is idle. This does not claim a Stock audio timer backend. */
+    unsigned busy = (REG(0x07600008) & 0x300000u) || ((REG(0x07600004) >> 20) & 15u) == 5u ||
+                    ((source | REG(0x07100010)) & 0x4000u);
+    register_writes = 0;
+    errno = 0;
     if (hpclang_sound_alarm_acquire(&bus, &alarm, num, den, 20000)) {
+        failure = busy && errno == EBUSY && !register_writes && !alarm.owned ? 0 : 1;
         hpclang_irq_restore(cpsr);
-        return 1;
+        return failure;
     }
 
     REG(0x07100008) = UINT32_MAX;
