@@ -132,6 +132,25 @@ class RecoveryPackageTests(unittest.TestCase):
             PACK.package(payload, 4096, model="hp50g"),
         )
 
+    def test_complete_program_must_fit_main_ram_window(self):
+        # Measure the serialized overhead independently, including both copies
+        # of initialized data and the surrounding RPL objects. The HP transfer
+        # header is not calculator memory. Passing this ceiling is not proof of
+        # enough free RAM: the OS and other objects also occupy this window.
+        window_bytes = 256 * 1024
+        for model in ("hp49gplus", "hp50g"):
+            for size in (1, 8, 32768):
+                with self.subTest(model=model, initialized=size):
+                    payload = bytes(size)
+                    runtime = (size + 7) & ~7
+                    baseline = PACK.package(payload, runtime, model=model)
+                    largest = runtime + ((window_bytes - (len(baseline) - 8)) // 8) * 8
+                    accepted = PACK.package(payload, largest, model=model)
+                    self.assertLessEqual(len(accepted) - 8, window_bytes)
+                    self.assertGreater(len(accepted) - 8 + 8, window_bytes)
+                    with self.assertRaisesRegex(ValueError, "main-RAM window"):
+                        PACK.package(payload, largest + 8, model=model)
+
 
 if __name__ == "__main__":
     unittest.main()

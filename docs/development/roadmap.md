@@ -485,6 +485,12 @@ While the execution-safety scope question remains unanswered, installation
 resource admission and recovery lifecycle work may proceed within M8.0 without
 relaxing relocation checks. Sound compatibility remains a separate M8.4 task.
 
+Recovery packaging now rejects complete programs larger than the supported
+256 KiB Stock main-RAM window, counting both initialized and runtime copies plus
+RPL framing. Boundary tests cover both target models and small/maximum initialized
+images. This is a necessary physical bound, not proof of available installation
+memory, Flash-bank fit or trusted installation; those acceptance steps remain open.
+
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
 describe the same bank-switch field; their repairs must not be applied twice.

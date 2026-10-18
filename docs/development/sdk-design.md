@@ -278,8 +278,11 @@ inside the CODE object, copies initialized bytes to an eight-byte-aligned
 destination and returns to RPL without adding a stack result. The ARM payload
 must initialize BSS, establish its stack, preserve hardware/native state and
 return through LR. Raw mode requires separate rejection of unsafe relocations; a raw
-binary cannot supply that proof. This envelope neither allocates MMU pages nor
-proves sufficient installation memory. Installation-space budgeting and a
+binary cannot supply that proof. The complete program, including its original
+initialized payload, reserved runtime copy and RPL framing, must fit within the
+256 KiB Stock main-RAM window; oversized programs are rejected before encoding.
+This physical ceiling does not deduct OS/other-object use. This envelope neither
+allocates MMU pages nor proves sufficient installation memory. Installation-space budgeting and a
 distributable recovery tool remain pending.
 
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded

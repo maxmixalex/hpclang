@@ -17,6 +17,10 @@ import tempfile
 
 MAX_INITIALIZED = 32768
 MAX_NIBBLES = 0xFFFFF
+# This entry converts Saturn addresses through the Stock main-RAM window
+# [0x80000, 0x100000). Count the entire enclosing program, not just its ARM copy.
+# This is a physical ceiling, not the amount of free RAM at installation time.
+MAIN_RAM_NIBBLES = 0x100000 - 0x80000
 MODELS = ("hp49gplus", "hp50g")
 
 # The owned recovery image uses PC-relative calls/data and local-exec TLS.
@@ -65,8 +69,9 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
 
     runtime_size includes initialized bytes, BSS, workspace and owned stack.
     The caller must check ELF relocation safety before providing raw bytes.
-    Bounds here prevent truncated Saturn lengths and copy/reservation overlap;
-    they do not establish free calculator RAM or a sufficient transfer budget.
+    Bounds here prevent truncated Saturn lengths, copy/reservation overlap and
+    programs larger than the supported main-RAM window. They do not establish
+    free calculator RAM or a sufficient transfer budget.
     """
     if model not in MODELS:
         raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
@@ -82,6 +87,9 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     body_size = len(code) + len(initialized) * 2 + reserve
     if body_size + 5 > MAX_NIBBLES:
         raise ValueError("recovery CODE object exceeds Saturn length capacity")
+    # DOCOL, CODE prologue, CODE length and SEMI each occupy five nibbles.
+    if body_size + 20 > MAIN_RAM_NIBBLES:
+        raise ValueError("recovery program exceeds the Stock main-RAM window")
     payload = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in initialized)
     body = code + payload + "0" * reserve
     program = (
