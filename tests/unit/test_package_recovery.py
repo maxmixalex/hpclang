@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import subprocess
+import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,6 +15,86 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_fresh_flash_copy_alignment_and_lifetime(self):
+        for model in ("hp49gplus", "hp50g"):
+            for size in (1, 8, 9, 24, 4096, 32768):
+                payload = bytes(i % 251 for i in range(size))
+                initialized = (size + 7) & ~7
+                runtime = initialized + 8192
+                raw = PACK.package(payload, runtime, model=model, fresh_copy=True)
+                ordinary = PACK.package(payload, runtime, model=model)
+                self.assertEqual(len(ordinary) - len(raw), initialized)
+                data = [n for byte in raw[8:] for n in (byte & 15, byte >> 4)]
+                end = 10 + sum(data[10 + i] << (4 * i) for i in range(5))
+                source = end - runtime * 2
+                expected = [
+                    n
+                    for byte in payload + bytes(initialized - size)
+                    for n in (byte & 15, byte >> 4)
+                ]
+                for phase in range(16):
+                    with self.subTest(model=model, size=size, phase=phase):
+                        # Each invocation starts from immutable Flash, not the
+                        # modified object left by an earlier RAM invocation.
+                        for _ in range(2):
+                            memory = [15] * phase + data[:]
+                            src = phase + source
+                            dst = src & ~15
+                            self.assertGreaterEqual(dst, phase + source - 15)
+                            self.assertLessEqual(dst + runtime * 2, phase + end)
+                            prefix, suffix = memory[:dst], memory[phase + end :]
+                            for offset in range(0, initialized * 2, 16):
+                                chunk = memory[src + offset : src + offset + 16]
+                                memory[dst + offset : dst + offset + 16] = chunk
+                            self.assertEqual(memory[dst : dst + initialized * 2], expected)
+                            memory[dst : dst + runtime * 2] = [15] * (runtime * 2)
+                            self.assertEqual(memory[:dst], prefix)
+                            self.assertEqual(memory[phase + end :], suffix)
+
+    def test_flash_cli_requires_library_and_separate_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, output, program = (
+                root / name for name in ("image.bin", "library.hp", "program.hp")
+            )
+            source.write_bytes(bytes(range(8)))
+            command = [
+                sys.executable,
+                str(ROOT / "tools/package-recovery.py"),
+                "--model",
+                "hp50g",
+                "--runtime-size",
+                "32",
+            ]
+            for options in (
+                ["--flash-copy"],
+                ["--program-output", str(program)],
+                ["--library-id", "1701", "--program-output", str(source)],
+            ):
+                result = subprocess.run(
+                    command + options + [str(source), str(output)], capture_output=True
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(source.read_bytes(), bytes(range(8)))
+                self.assertFalse(output.exists())
+            subprocess.run(
+                command
+                + [
+                    "--flash-copy",
+                    "--library-id",
+                    "1701",
+                    "--program-output",
+                    str(program),
+                    str(source),
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            expected = PACK.package(source.read_bytes(), 32, model="hp50g", fresh_copy=True)
+            self.assertEqual(program.read_bytes(), expected)
+            self.assertEqual(output.read_bytes(), PACK.configuration_library(expected, 1701))
+
     def test_configuration_library_fields_payload_and_crc(self):
         program = PACK.package(bytes(range(8)), 32, model="hp50g")
         raw = PACK.configuration_library(program, 1701)

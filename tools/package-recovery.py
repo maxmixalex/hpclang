@@ -42,19 +42,21 @@ def immediate(value: int, width: int = 5) -> str:
     return "".join(f"{(value >> (4 * i)) & 15:x}" for i in range(width))
 
 
-def entry(initialized_size: int, source_offset: int) -> str:
+def entry(initialized_size: int, source_offset: int, *, fresh_copy: bool = False) -> str:
     """Encode the independently implemented Saturn SAVE/copy/ARMSYS/GETPTR path.
 
     Offsets and lengths are in nibbles except initialized_size (bytes).
     The counted copy transfers complete 16-nibble blocks. Clearing the low
     four destination bits aligns the ARM image to eight bytes at every CODE
     nibble alignment. Fifteen extra reserved nibbles cover the rounding.
+    With fresh_copy the destination rounds the source downward instead; the
+    caller supplies fifteen nibbles between instructions and initialized bytes.
     """
     if not 8 <= initialized_size <= MAX_INITIALIZED or initialized_size % 8:
         raise ValueError("initialized image must contain 1..4096 eight-byte blocks")
     code = "8f" + immediate(0x679B) + "20" + "81b5"  # SAVE, P=0, C=PC
     code += "da" + "34" + immediate(source_offset) + "c2" + "134"
-    code += "da" + "34" + immediate(initialized_size * 2 + 15) + "c2"
+    code += "da" + "34" + immediate(0 if fresh_copy else initialized_size * 2 + 15) + "c2"
     code += "80880" + "80881" + "80882" + "80883" + "135" + "d5"
     code += "34" + immediate(initialized_size // 8 - 1)
     code += "1527" + "1517" + "16f" + "17f" + "ce" + "5fe"
@@ -64,7 +66,9 @@ def entry(initialized_size: int, source_offset: int) -> str:
     return code
 
 
-def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
+def package(
+    initialized: bytes, runtime_size: int, *, model: str, fresh_copy: bool = False
+) -> bytes:
     """Return an HP binary RPL program with one CODE object and no result marker.
 
     runtime_size includes initialized bytes, BSS, workspace and owned stack.
@@ -72,6 +76,11 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     Bounds here prevent truncated Saturn lengths, copy/reservation overlap and
     programs larger than the supported main-RAM window. They do not establish
     free calculator RAM or a sufficient transfer budget.
+
+    fresh_copy is only for a configuration entry copied from immutable Flash
+    on EVERY invocation. Forward copying to an aligned destination below the
+    source consumes that source; the resulting RAM object cannot be reused.
+    The default retains an immutable source for ordinary reusable RAM programs.
     """
     if model not in MODELS:
         raise ValueError("independent recovery entry is validated only for hp49gplus/hp50g")
@@ -80,18 +89,19 @@ def package(initialized: bytes, runtime_size: int, *, model: str) -> bytes:
     initialized += bytes((-len(initialized)) % 8)
     if runtime_size < len(initialized) or runtime_size % 8:
         raise ValueError("runtime size must be eight-byte aligned and contain initialized image")
-    code = entry(len(initialized), 0)
+    code = entry(len(initialized), 0, fresh_copy=fresh_copy)
     # C=PC captures the address 13 nibbles after the start of this entry.
-    code = entry(len(initialized), len(code) - 13)
-    reserve = runtime_size * 2 + 15
-    body_size = len(code) + len(initialized) * 2 + reserve
+    leading = 15 if fresh_copy else 0
+    code = entry(len(initialized), len(code) + leading - 13, fresh_copy=fresh_copy)
+    reserve = (runtime_size - len(initialized)) * 2 if fresh_copy else runtime_size * 2 + 15
+    body_size = len(code) + leading + len(initialized) * 2 + reserve
     if body_size + 5 > MAX_NIBBLES:
         raise ValueError("recovery CODE object exceeds Saturn length capacity")
     # DOCOL, CODE prologue, CODE length and SEMI each occupy five nibbles.
     if body_size + 20 > MAIN_RAM_NIBBLES:
         raise ValueError("recovery program exceeds the Stock main-RAM window")
     payload = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in initialized)
-    body = code + payload + "0" * reserve
+    body = code + "0" * leading + payload + "0" * reserve
     program = (
         immediate(0x2D9D)  # DOCOL
         + immediate(0x2DCC)  # CODE
@@ -147,7 +157,13 @@ def configuration_library(program: bytes, library_id: int) -> bytes:
 
 
 def package_elf(
-    elf: Path, *, model: str, nm: str, readelf: str, objcopy: str
+    elf: Path,
+    *,
+    model: str,
+    nm: str,
+    readelf: str,
+    objcopy: str,
+    fresh_copy: bool = False,
 ) -> tuple[bytes, bytes]:
     """Check the owned recovery ELF contract and return envelope and raw image.
 
@@ -174,7 +190,8 @@ def package_elf(
     with tempfile.TemporaryDirectory(prefix="hpclang-recovery-") as temporary:
         binary = Path(temporary) / "recovery.bin"
         subprocess.run(
-            [objcopy, "-O", "binary", "-j", ".text", "-j", ".tdata", elf, binary], check=True
+            [objcopy, "-O", "binary", "-j", ".text", "-j", ".tdata", elf, binary],
+            check=True,
         )
         initialized = binary.read_bytes()
     zero, end = symbols["__zero_start"], symbols["__image_end"]
@@ -182,7 +199,7 @@ def package_elf(
         raise ValueError(
             "Recovery BSS clearing must preserve initialized data and stay in the image"
         )
-    return package(initialized, end, model=model), initialized
+    return package(initialized, end, model=model, fresh_copy=fresh_copy), initialized
 
 
 def main() -> None:
@@ -190,12 +207,24 @@ def main() -> None:
     parser.add_argument("--model", required=True, choices=MODELS)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
-        "--runtime-size", type=lambda value: int(value, 0), help="trusted raw binary mode"
+        "--runtime-size",
+        type=lambda value: int(value, 0),
+        help="trusted raw binary mode",
     )
     mode.add_argument(
         "--elf", action="store_true", help="validate and package an owned recovery ELF"
     )
     parser.add_argument("--binary-output", type=Path, help="optional extracted image in ELF mode")
+    parser.add_argument(
+        "--flash-copy",
+        action="store_true",
+        help="compact configuration requiring a fresh copy from immutable Flash on every call",
+    )
+    parser.add_argument(
+        "--program-output",
+        type=Path,
+        help="optional configuration program before library wrapping",
+    )
     parser.add_argument(
         "--library-id",
         type=int,
@@ -206,23 +235,38 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    if args.input.resolve() == args.output.resolve():
-        parser.error("input and output must be different files")
+    if (args.flash_copy or args.program_output is not None) and args.library_id is None:
+        parser.error("--flash-copy and --program-output require --library-id")
+    paths = [args.input, args.output, args.binary_output, args.program_output]
+    resolved = [path.resolve() for path in paths if path is not None]
+    if len(set(resolved)) != len(resolved):
+        parser.error("input and all output paths must be different files")
     if args.binary_output is not None:
         if not args.elf:
             parser.error("--binary-output requires --elf")
-        if args.binary_output.resolve() in (args.input.resolve(), args.output.resolve()):
-            parser.error("binary output must differ from input and packaged output")
     if args.elf:
         result, initialized = package_elf(
-            args.input, model=args.model, nm=args.nm, readelf=args.readelf, objcopy=args.objcopy
+            args.input,
+            model=args.model,
+            nm=args.nm,
+            readelf=args.readelf,
+            objcopy=args.objcopy,
+            fresh_copy=args.flash_copy,
         )
-        if args.binary_output is not None:
-            args.binary_output.write_bytes(initialized)
     else:
-        result = package(args.input.read_bytes(), args.runtime_size, model=args.model)
+        result = package(
+            args.input.read_bytes(),
+            args.runtime_size,
+            model=args.model,
+            fresh_copy=args.flash_copy,
+        )
+    program = result
     if args.library_id is not None:
         result = configuration_library(result, args.library_id)
+    if args.binary_output is not None:
+        args.binary_output.write_bytes(initialized)
+    if args.program_output is not None:
+        args.program_output.write_bytes(program)
     args.output.write_bytes(result)
 
 

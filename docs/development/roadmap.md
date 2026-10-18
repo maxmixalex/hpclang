@@ -504,9 +504,16 @@ A local compact Flash-configuration prototype now passes that same low-memory
 fault on both models, reducing the package from 46,698 to 29,682 bytes. Independent
 verification preserves all 26,000 real elements and checks the complete Flash
 transition, catalog, image, stack/TLS and guards. Both models also pass retained-RAM,
-RAM-loss, callback-body and repeated-warmstart checks. The next integration step
-is to preserve its fresh-Flash-copy lifetime contract in maintained packaging and
-tests; ordinary reusable RAM programs must retain their immutable source. Trusted
+RAM-loss, callback-body and repeated-warmstart checks. Maintained packaging now
+provides explicit `--flash-copy` configuration libraries and a companion program
+for verification, while ordinary reusable RAM programs retain their immutable
+source. Host tests cover fresh/reusable lifetimes, all alignments, CLI restrictions,
+distinct outputs and every real-array metadata/data nibble. The maintained native
+configuration sequence now includes low-memory recovery and repeated startup;
+the expanded local run passes on both HP49g+ and HP50g, including native catalog,
+complete Flash, code/stack/TLS/guard and full real-array checks. All 49 focused
+host tests, a fresh ARM build, pinned Python lint/format and strict docs pass.
+This batch is ready for CI submission; it does not establish CI acceptance. Trusted
 installation, recovery-memory guarantees and all other M8.0 gates remain open.
 
 Catalog-growth integration requires unified preflight and repair ordering.

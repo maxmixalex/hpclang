@@ -100,6 +100,22 @@ class HomeStringTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "extent"):
                 VERIFY.home_string(self.read, b"HPCKEEP")
 
+    def test_real_array_shape_and_every_element_are_verified(self):
+        count = 3
+        self.memory[self.obj : self.obj + 25 + 16 * count] = bytes(25 + 16 * count)
+        for i, value in enumerate((0x29E8, 20 + 16 * count, 0x2933, 1, count)):
+            self.put(self.obj + 5 * i, value)
+        VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", count)
+        for offset in range(25 + 16 * count):
+            saved = self.memory[self.obj + offset]
+            self.memory[self.obj + offset] ^= 1
+            with self.assertRaises(ValueError):
+                VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", count)
+            self.memory[self.obj + offset] = saved
+        for invalid in (0, -1, 0x100000):
+            with self.assertRaises(ValueError):
+                VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", invalid)
+
 
 class RecoveryVerifierTests(unittest.TestCase):
     def setUp(self):

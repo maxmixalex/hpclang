@@ -297,7 +297,7 @@ evidence. Before destructive work, the installed protocol must ensure recovery
 execution storage remains available across restart, including retained user RAM;
 passing the packager's physical ceiling does not provide that guarantee.
 
-A local Flash-configuration prototype reduces this witness from 46,698 to
+The optional `--flash-copy` configuration mode reduces this witness from 46,698 to
 29,682 bytes by aligning the initialized image downward within each fresh RAM
 copy, rather than retaining a second original image. All sixteen nibble
 placements preserve the instruction prefix and image bounds. Both models pass
@@ -305,11 +305,22 @@ the existing configuration recovery checks (retained RAM, RAM loss, callback-bod
 damage and subsequent no-op warmstarts). Both also recover under the same
 37,823-byte-gap condition above, preserving every element of the real array;
 independent checks validate the catalog, complete Flash transition, code, stack,
-TLS and guards. This is not yet the maintained packaging mode. Its lifetime
+TLS and guards. Its lifetime
 contract requires a fresh copy from immutable Flash on every invocation: a
 modified RAM copy cannot be reused as the initialized source. Production
 integration must enforce that distinction and still guarantee recovery memory;
 reducing the footprint does not establish arbitrary low-memory recovery.
+
+`--flash-copy` requires `--library-id`; the resulting library must be installed
+in Flash, not Port 0/RAM. The caller remains responsible for proving that
+placement and the fresh-copy contract. `--program-output PATH` optionally emits
+the configuration program for independent verification; it is not a reusable
+RAM application when compact mode is selected. All input/output paths must be
+distinct. Without `--flash-copy`, the original image remains available for
+repeated RAM execution. The maintained configuration fixture builds both the
+library and its companion program and checks low-memory recovery plus a later
+unchanged restart, preserving the full real array. The existing Runtime artifact
+glob includes the companion; no separate workflow or resource exception is needed.
 
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from

@@ -24,6 +24,7 @@ from verify import (
     require_stock_pc,
     verify_flash,
     home_string,
+    verify_zero_real_array,
 )
 
 
@@ -316,7 +317,10 @@ def configuration_recovery(args, clean):
         before = damaged
         for name in names:
             after = boot(
-                before, name, clear_ram=lost_ram and before == damaged, check_home=not lost_ram
+                before,
+                name,
+                clear_ram=lost_ram and before == damaged,
+                check_home=not lost_ram,
             )
             if before == damaged:
                 verify_flash(
@@ -337,7 +341,7 @@ def configuration_recovery(args, clean):
                     after=after,
                     elf=build / "recovery.elf",
                     binary=build / "recovery.bin",
-                    package=build / "recovery.hp",
+                    package=build / "recovery-configuration.hp",
                     nm=args.nm,
                     slot=args.slot,
                     target=args.target,
@@ -370,7 +374,7 @@ def configuration_recovery(args, clean):
                 after=state,
                 elf=build / "recovery.elf",
                 binary=build / "recovery.bin",
-                package=build / "recovery.hp",
+                package=build / "recovery-configuration.hp",
                 nm=args.nm,
                 slot=args.slot,
                 target=body_target,
@@ -379,10 +383,73 @@ def configuration_recovery(args, clean):
                 authority_slot=authority_slot,
             )
         )
+    # Allocate after the USB server exits; otherwise its temporary storage masks
+    # the intended pressure. Decimal zero forces DOREAL rather than compact
+    # exact-integer elements. Keep commands below Stock's server command limit.
+    filled = args.output / "configuration-lowram-filled"
+    transfer(
+        setup,
+        filled,
+        baseline,
+        build,
+        "UNUSED",
+        installed=True,
+        execute=True,
+        remote_commands=[
+            "-95 CF HOME CLEAR",
+            r"\{171} { 26000 } 0. CON 'HPCFILL' STO \{187} 'HPCPAD' STO",
+            "'HPCPAD' RCL",
+        ],
+    )
+    before = filled / "state"
+    read_filled = native_words((before / "sram").read_bytes(), (before / "flash").read_bytes())
+    verify_zero_real_array(read_filled, b"HPCFILL", 26000)
+    gap = (read_filled(0x806F8) - read_filled(0x806F3)) // 2
+    if (
+        not (build / "recovery-configuration.hp").stat().st_size - 8
+        <= gap
+        < (build / "recovery.hp").stat().st_size - 8
+    ):
+        raise RuntimeError("Low-memory fixture does not distinguish the two recovery envelopes")
+    if (before / "flash").read_bytes() != (baseline / "flash").read_bytes():
+        raise RuntimeError("RAM pressure setup changed Flash")
+    low_fault = args.output / "configuration-lowram-fault"
+    prepare(before, low_fault, args.slot, args.target, bound=bound)
+    low_repaired = boot(low_fault, "configuration-lowram-recovered")
+    verify_flash(
+        (low_fault / "flash").read_bytes(),
+        (low_repaired / "flash").read_bytes(),
+        args.slot,
+        args.target,
+        retire=True,
+        authority_slot=authority_slot,
+    )
+    for state in (low_repaired, boot(low_repaired, "configuration-lowram-rechecked")):
+        verify_restart(before, low_repaired, state)
+        verify_zero_real_array(
+            native_words((state / "sram").read_bytes(), (state / "flash").read_bytes()),
+            b"HPCFILL",
+            26000,
+        )
+        verify(
+            SimpleNamespace(
+                before=low_repaired,
+                after=state,
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery-configuration.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation="check",
+                relocated_image=True,
+                authority_slot=authority_slot,
+            )
+        )
     print(
         "Flash configuration recovery rebuilt the catalog after bank-header and callback-body "
         "faults, including retained RAM and bank-header RAM loss; "
-        "later warmstarts unchanged",
+        "low-memory recovery preserved the real array; later warmstarts unchanged",
         flush=True,
     )
 

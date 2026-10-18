@@ -79,12 +79,15 @@ add_custom_target(package ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery.hp"
 if(HPCLANG_RECOVERY_RESTART_AFTER_REPAIR)
     # This ID belongs to the fresh Stock fixture, not a production reservation.
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/recovery-library.hp"
+            "${CMAKE_CURRENT_BINARY_DIR}/recovery-configuration.hp"
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
-            --elf --model hp50g --library-id 1701
+            --elf --model hp50g --library-id 1701 --flash-copy
+            --program-output "${CMAKE_CURRENT_BINARY_DIR}/recovery-configuration.hp"
             --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
             "$<TARGET_FILE:recovery>" "${CMAKE_CURRENT_BINARY_DIR}/recovery-library.hp"
         DEPENDS recovery "${HPCLANG_ROOT}/tools/package-recovery.py"
         VERBATIM)
     add_custom_target(configuration-package ALL
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery-library.hp")
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/recovery-library.hp"
+            "${CMAKE_CURRENT_BINARY_DIR}/recovery-configuration.hp")
 endif()

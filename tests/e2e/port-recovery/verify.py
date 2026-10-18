@@ -195,8 +195,8 @@ def native_words(ram, flash):
     raise ValueError("Native Saturn map not found")
 
 
-def home_string(read, name):
-    """Read an owned fixture string independently of the recovery diagnostics."""
+def home_object(read, name):
+    """Locate a named fixture independently of the recovery diagnostics."""
     home = read(0x80711)
     require(0x80000 <= home < 0x100000 and read(home) == 0x2A96, "Invalid HOME directory")
     link = home + 8 + 13 * read(home + 5, 3)
@@ -204,22 +204,44 @@ def home_string(read, name):
     item = link + offset
     seen = set()
     while offset:
-        require(0x80005 <= item < 0x100000 and item not in seen, "Invalid HOME variable chain")
+        require(
+            0x80005 <= item < 0x100000 and item not in seen,
+            "Invalid HOME variable chain",
+        )
         seen.add(item)
         length = read(item, 2)
         variable = bytes(read(item + 2 + 2 * i, 2) for i in range(length))
         if variable == name:
-            obj = item + (4 + 2 * length if length else 2)
-            require(read(obj) == 0x2A2C, "HOME fixture value is not a string")
-            extent = read(obj + 5)
-            require(
-                extent >= 5 and (extent - 5) % 2 == 0 and obj + 5 + extent <= 0x100000,
-                "Invalid HOME fixture string extent",
-            )
-            return bytes(read(obj + 10 + i, 2) for i in range(0, extent - 5, 2))
+            return item + (4 + 2 * length if length else 2)
         offset = read(item - 5)
         item = item - 5 - offset
-    raise ValueError("HOME fixture string is missing")
+    raise ValueError("HOME fixture variable is missing")
+
+
+def home_string(read, name):
+    """Read an owned fixture string independently of the recovery diagnostics."""
+    obj = home_object(read, name)
+    require(read(obj) == 0x2A2C, "HOME fixture value is not a string")
+    extent = read(obj + 5)
+    require(
+        extent >= 5 and (extent - 5) % 2 == 0 and obj + 5 + extent <= 0x100000,
+        "Invalid HOME fixture string extent",
+    )
+    return bytes(read(obj + 10 + i, 2) for i in range(0, extent - 5, 2))
+
+
+def verify_zero_real_array(read, name, count):
+    """Check actual DOREAL storage, excluding compact exact-integer containers."""
+    obj = home_object(read, name)
+    require(0 < count <= (0x100000 - obj - 25) // 16, "Invalid real array extent")
+    require(
+        [read(obj + 5 * i) for i in range(5)] == [0x29E8, 20 + 16 * count, 0x2933, 1, count],
+        "Unexpected real array shape/type",
+    )
+    require(
+        all(read(obj + 25 + i, 1) == 0 for i in range(16 * count)),
+        "Real array contents changed",
+    )
 
 
 def require_stock_pc(state_directory):
