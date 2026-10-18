@@ -532,42 +532,29 @@ host tests, a fresh ARM build, pinned Python lint/format and strict docs pass.
 This batch was submitted at `62f7ece4`; its CI has not been polled. Trusted
 installation, recovery-memory guarantees and all other M8.0 gates remain open.
 
-Local reservation experiments now pass on both models: one Flash library's
-configuration releases a controlled 32 KiB RAM placeholder before invoking its
-own hidden recovery command. With only 20,964 bytes initially free, recovery and
-the subsequent unchanged restart preserve all 24,000 user real-array elements
-and pass complete Flash/catalog/image/stack/TLS checks. An HP50g control without
-releasable storage remains unrecovered at comparable pressure. This proves a
-resource mechanism, not a production installer: admission must bind the reserved
-object to the trusted root/current transaction and establish safe global startup
-ordering before destructive work. Fixed fixture names are not ownership proof.
+Local guarded reservation release now passes on both models: one Flash library's
+configuration checks a controlled 32 KiB string's type, capacity and expected
+header before releasing it and invoking its hidden recovery command. Real
+literals and `SAME` avoid the failing experimental integer/numeric-comparison
+path during startup. With only 20,898 bytes initially free, recovery and the
+subsequent unchanged restart preserve all 24,000 user real-array elements and
+pass complete Flash/catalog/image/stack/TLS checks. Normal startup without a
+reservation also passes. An HP50g control without releasable storage remains
+unrecovered at comparable pressure.
 
-The reservation guard is not yet validated. A configuration that invokes only
-the recovery command boots in the controlled native fixture, but adding the
-experimental reservation lookup/conditional guard fails the healthy-startup
-checks, including a guard-only control without an ARM call. Explicit arithmetic
-mode initialization has not established a working guarded entry. Diagnose the
-startup and command context before adopting this guard. Acceptance must cover
-absent/valid reservations and wrong type, capacity or binding without deleting
-unrelated user data, in addition to low-memory recovery and repeated restart.
-These are unresolved local experiments, not regressions demonstrated in the
-submitted compact-recovery configuration or a completed ownership mechanism.
+This is a controlled resource mechanism, not a production installer or a proven
+general explanation of the earlier startup failures. Rejection tests must prove
+the guard ran and preserved wrong-type, wrong-capacity and wrong-header objects
+without replay. Admission must bind the reservation to the trusted installation
+root/current transaction and establish safe global startup ordering before
+destructive work. A fixed fixture name or matching header alone is not ownership
+proof. All retained installation, authority-lifecycle and reclamation gates remain.
 
 The recovery verifier now rejects ARM abort/undefined processor modes even when
 the saved PC lies inside ROM. Both captured failed-startup states are rejected;
 all 22 previously passing configuration-state snapshots across HP49g+/HP50g
 still pass this processor-state check. The 34 focused verifier tests and pinned
 Python checks pass. This strengthens one return check, not full startup proof.
-An isolated startup lookup of an absent reservation correctly stores `-1` and
-returns with valid native state; lookup plus a conditional and a helper-only
-conditional still fail before ownership acceptance. A matched-library direct-call
-control passes and actually executes recovery; switching to the ordinary recovery
-package does not fix the failing guard. On HP50g, comparing the lookup result to
-the real literal `-1.` with `SAME` passes startup and stores the expected true
-result, whereas the integer-literal/numeric-comparison variant fails. This is a
-working bounded comparison, not a proven general cause or complete guard. The
-two-model reserved-memory/recovery sequence and rejection of unrelated objects
-remain required before integrating the guarded reservation mechanism.
 
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
