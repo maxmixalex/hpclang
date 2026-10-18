@@ -419,7 +419,7 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
-Latest submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
+Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
 Quality failed because the code-relocation fixture header was unavailable after
 configuration; Runtime failed at PWM4 lease admission in all six Stock System
 Services jobs. Local fix `6668fc13` generates the fixture at configuration time
@@ -429,6 +429,11 @@ System Services targets and HP50g Direct pass, including native return and
 independent input pixels. Remote acceptance is pending. This does not establish
 a Stock asynchronous-audio backend. Earlier HP39 reject-return failures did not
 recur in the submitted batch.
+
+The follow-up batch includes the register-transfer and instruction-walk work
+through `5dfeca33`, the CI fixture fixes in `6668fc13`, and independent catalog
+switch-function relocation in `4a497fd5`. Local evidence is recorded below;
+remote acceptance remains pending and no M8 stage is closed by this submission.
 
 | Stage | Current state | Remaining acceptance |
 | --- | --- | --- |
