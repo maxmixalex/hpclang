@@ -35,6 +35,8 @@ extern "C"
         uint32_t temp_limit;
         uint32_t user_limit;
         uint32_t stack_reserve_nibbles;
+        /* Repeated ARM-side cell addresses are visited/relocated once.
+         * Distinct cells holding equal values remain independent roots. */
         uint32_t **native_roots;
         uint32_t native_root_count;
         /* Optional classic ROM-part table: 3-nibble count, 16-nibble records.

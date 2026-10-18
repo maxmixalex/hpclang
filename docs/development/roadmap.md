@@ -1586,6 +1586,15 @@ preflight passes and a contradictory duplicate is rejected. This read-only
 experiment uses unchanged values to verify assembly, not relocation semantics
 or complete reference coverage.
 
+ARM-side root scanning now coalesces repeated cell addresses before visiting or
+relocating them. Distinct cells holding the same value still move independently.
+The regression reproduces the previous double-shift bug; sanitizers also verify
+that a later invalid root fails before RAM or root changes. Related host tests,
+ARM compilation and static analysis pass. HP49g+/HP50g native catalog-growth
+controls deliberately repeat the saved return-PC cell and still reach the RPL
+post-call marker with the expected catalog entry and unchanged Flash. This fixes
+duplicate application, without claiming complete caller classification.
+
 A stopped-state HP50g integration experiment now combines shared root/nested
 enumeration, qualified shift planning, edit merging and RAM replay. Its 738
 unique fields include 44 changed values. After host-side relocation and catalog

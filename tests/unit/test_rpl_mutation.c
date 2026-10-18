@@ -1868,9 +1868,9 @@ static void test_root_sources(void)
     struct named_pair pair = prepare_two_named_chars();
     prepare_reference_tables(&pair);
     uint32_t native = pair.object_b;
-    uint32_t *roots[] = {&native};
+    uint32_t *roots[] = {&native, &native, &native};
     io.native_roots = roots;
-    io.native_root_count = 1;
+    io.native_root_count = sizeof roots / sizeof roots[0];
     io.library_table = 0x8611d;
     const uint32_t display[] = {0x8068d, 0x80695, 0x806d0, 0x806d5};
     io.display_roots = display;
@@ -2055,9 +2055,21 @@ static void test_catalog_growth(void)
     assert(get_word(AVMEM, 5) ==
            before_avmem - ((0x90000 - 0x8300f) / 5 - (0x90000 - 0x8301f) / 5));
 
+    /* Independent discovery paths may name the same ARM-side cell. Move each
+     * cell once, while retaining distinct cells pointing at the same object. */
+    io = setup_catalog_growth();
+    uint32_t first = 0x82555, second = first, fixed = 0x12345;
+    uint32_t *repeated[] = {&first, &second, &first, &fixed, &second};
+    io.native_roots = repeated;
+    io.native_root_count = sizeof repeated / sizeof repeated[0];
+    assert(hpclang_rpl_mutation_catalog_grow(&io, 0x82013) == 0);
+    assert(first == 0x82565 && second == first && fixed == 0x12345);
+    assert(memory[first] == 11 && get_word(0x90000, 5) == 0x83012);
+
     /* Interior unreadability, roots, native fences and bad record positions
      * must all fail before either RAM or ARM-side roots are modified. */
-    for (unsigned failure = 0; failure < 8; ++failure) {
+    uint32_t *invalid_roots[] = {&native, &native, NULL};
+    for (unsigned failure = 0; failure < 9; ++failure) {
         io = setup_catalog_growth();
         native = 0x83003;
         io.native_roots = roots;
@@ -2079,6 +2091,10 @@ static void test_catalog_growth(void)
             put_word(0x806e9, 5, 0x82022);
         if (failure == 7)
             put_word(io.library_table, 3, 0xfff);
+        if (failure == 8) {
+            io.native_roots = invalid_roots;
+            io.native_root_count = sizeof invalid_roots / sizeof invalid_roots[0];
+        }
         uint8_t *before = malloc(sizeof memory);
         assert(before);
         memcpy(before, memory, sizeof memory);

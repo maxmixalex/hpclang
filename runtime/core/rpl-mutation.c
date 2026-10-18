@@ -576,6 +576,18 @@ static int scan_all_references(const struct hpclang_rpl_mutation_io *io,
         uint32_t *root = io->native_roots[i];
         if (root == NULL)
             return HPCLANG_RPL_MUTATION_MALFORMED;
+        /* The same cell can be discovered through more than one caller path.
+         * Compare cell identity, not its value: apply changes the value, and
+         * separate cells pointing at the same object both need relocation. */
+        int repeated = 0;
+        for (uint32_t j = 0u; j < i; ++j) {
+            if (io->native_roots[j] == root) {
+                repeated = 1;
+                break;
+            }
+        }
+        if (repeated)
+            continue;
         int result = inspect_pointer_value(io, 0u, *root, request, root);
         if (result != HPCLANG_RPL_MUTATION_OK)
             return result;
