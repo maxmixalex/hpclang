@@ -422,7 +422,9 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 Latest CI-accepted batch: `d94580b4`; all four triggered workflows passed:
 Quality, Core, Objects and Runtime. Runtime includes both native code-relocation
 jobs and all six Stock System Services jobs. Follow-ups through `626fe53a`
-are locally verified and await separate CI acceptance. These
+were submitted in `9d015660`. A single CI check on 2026-10-18 found Quality,
+Objects and Storage passed, Core and Font Gallery running, and Runtime queued.
+The batch therefore still awaits full CI acceptance. These
 follow-ups add conditional SETUP dispatch evidence, native bank-switch execution
 roots, explicit execution-address repair planning and merged catalog repairs.
 They also extend direct-jump return-root discovery; they do not close library registration.
@@ -462,6 +464,26 @@ dependency of Port 2. Its verified timer/IRQ foundations remain available for
 later continuation. UI/resource and other adapter work may proceed independently
 when the native-port track has a concrete external wait; this does not silently
 replace that track or close its remaining requirements.
+
+Port 2 remains part of M8.0. Native backup writes and library creation are
+partial delivery, not acceptance of the complete service. The remaining work
+is tracked as the following dependent acceptance steps:
+
+1. Establish the retained relocation contract and safe public library
+   registration/attachment; preserve Port 1 replacement/removal requirements.
+2. Install and identify a trusted recovery root independently of test-fixture
+   addresses. Validate package layout and live resource admission, not merely
+   whether encoded lengths fit their fields.
+3. Establish authority publication, closure and reuse across interrupted writes
+   and erases. A surviving old journal must never regain replay authority.
+4. Establish recovery ordering before any startup consumer can access an
+   interrupted target bank; a low library ID alone is insufficient evidence.
+5. Integrate reclamation and verify interruption/restart, persistence and normal
+   Stock return before enabling the public operation.
+
+While the execution-safety scope question remains unanswered, installation
+resource admission and recovery lifecycle work may proceed within M8.0 without
+relaxing relocation checks. Sound compatibility remains a separate M8.4 task.
 
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
