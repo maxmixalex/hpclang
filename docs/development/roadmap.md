@@ -560,8 +560,14 @@ still pass this processor-state check. The 34 focused verifier tests and pinned
 Python checks pass. This strengthens one return check, not full startup proof.
 An isolated startup lookup of an absent reservation correctly stores `-1` and
 returns with valid native state; lookup plus a conditional and a helper-only
-conditional still fail before ownership acceptance. Continue isolating comparison
-and control-flow behavior before integrating the reservation guard.
+conditional still fail before ownership acceptance. A matched-library direct-call
+control passes and actually executes recovery; switching to the ordinary recovery
+package does not fix the failing guard. On HP50g, comparing the lookup result to
+the real literal `-1.` with `SAME` passes startup and stores the expected true
+result, whereas the integer-literal/numeric-comparison variant fails. This is a
+working bounded comparison, not a proven general cause or complete guard. The
+two-model reserved-memory/recovery sequence and rejection of unrelated objects
+remain required before integrating the guarded reservation mechanism.
 
 Catalog-growth integration requires unified preflight and repair ordering.
 Native root scanning and the separate catalog/reference planners can
