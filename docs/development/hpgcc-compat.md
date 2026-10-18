@@ -877,8 +877,13 @@ on `kos_CheckBeepEnd`, whose result is affected by the supplied mode flags.
 HP50g ROM inspection indicates that bit 1 selects completion waiting, while
 bit 0 permits a later request to replace the active tone. The admission check
 uses the active request's flags, so treating `override` as an ignored Boolean
-would change overlapping-call behavior. This still needs cross-model and
-runtime verification. An adapter requires owned asynchronous playback and
+would change overlapping-call behavior. Controlled native-state probes on all
+six models confirm the completion-query truth table and rejection of a new
+request while the active flags prohibit replacement. The low-level driver
+returns -1 in that case, but the public KOS entry discards it and returns zero.
+These probes restore the native state and return normally; they do not start
+tones or verify real asynchronous timing and permitted preemption. An adapter
+requires owned asynchronous playback and
 completion/preemption state; the current blocking `hpclang_sound_play` alone
 does not implement that contract.
 

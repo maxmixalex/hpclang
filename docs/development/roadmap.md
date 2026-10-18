@@ -2012,6 +2012,12 @@ below are retained.
   groups. Expand the four-generation declaration/implementation/evidence ledger.
 - [ ] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
+- [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
+  sound, completion queries and active-tone preemption policy. Verify flags
+  against each original system; cover autonomous stop while application code is
+  busy, overlapping requests, cancellation and normal/immediate-exit restoration.
+  Keep Stock interrupt handlers out of the temporary application mapping; the
+  existing blocking tone service alone does not satisfy this adapter group.
 - [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
