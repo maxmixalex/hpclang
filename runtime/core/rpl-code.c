@@ -15,6 +15,51 @@ static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsig
     return 0;
 }
 
+int hpclang_rpl_code_indirect_inspect(const struct hpclang_rpl_reader *instructions,
+                                      const struct hpclang_rpl_reader *pointers,
+                                      uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                      uint32_t c_low, struct hpclang_rpl_code_indirect *transfer)
+{
+    if (!instructions || !instructions->read_nibble || !transfer)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || limit < 4 || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, instruction, 4, &opcode);
+    if (result)
+        return result;
+    struct hpclang_rpl_code_indirect next = {0};
+    next.instruction = instruction;
+    switch (opcode) {
+    case 0x2b18:
+        break; /* PC=A */
+    case 0x3b18:
+        next.register_c = 1;
+        break;
+    case 0xc808:
+        next.via_memory = 1;
+        break;
+    case 0xe808:
+        next.register_c = next.via_memory = 1;
+        break;
+    default:
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    next.register_value = (next.register_c ? c_low : a_low) & 0xfffffu;
+    next.target = next.register_value;
+    if (next.via_memory) {
+        if (!pointers || !pointers->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (next.register_value > 0xffffbu)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(pointers, next.register_value, 5, &next.target);
+        if (result)
+            return result;
+    }
+    *transfer = next;
+    return 0;
+}
+
 int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
                                     uint32_t limit, struct hpclang_rpl_code_branch *branch)
 {

@@ -14,6 +14,27 @@ struct hpclang_rpl_code_patch
     uint32_t field, width, expected, value;
 };
 
+struct hpclang_rpl_code_indirect
+{
+    uint32_t instruction, register_value, target;
+    unsigned register_c, via_memory;
+};
+
+/* Resolve PC=A, PC=C, PC=(A), PC=(C) at a proven instruction boundary.
+ * a_low/c_low must describe the registers AT that instruction, not merely an
+ * earlier suspended snapshot. Only the low 20 bits are consumed. The separate
+ * pointer reader must resolve the selected register's mapping; it is unused
+ * for direct register transfers. An indirect pointer must fit without wrapping.
+ * Success reports a register use and (when via_memory) a five-nibble pointer
+ * field at register_value. It does not establish register provenance, target
+ * ownership/mapping, or authorize relocation. Guard both instruction and any
+ * dereferenced cell before mutation; repair register sources separately from
+ * memory pointer fields. No writes; output changes only on zero. */
+int hpclang_rpl_code_indirect_inspect(const struct hpclang_rpl_reader *instructions,
+                                      const struct hpclang_rpl_reader *pointers,
+                                      uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                      uint32_t c_low, struct hpclang_rpl_code_indirect *transfer);
+
 /* Plan an immediate D0=(5)/D1=(5) data-address update at a caller-proven
  * instruction boundary. Partial loads, A/C literals and computed addresses
  * require register/data-flow evidence and are not accepted here. The same

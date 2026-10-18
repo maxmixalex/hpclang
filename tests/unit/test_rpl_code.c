@@ -364,6 +364,81 @@ static void absolute_data_pointers(void)
     }
 }
 
+static void indirect_transfers(void)
+{
+    struct image code = {{0}, 0x40000, 4, UINT32_MAX};
+    struct image data = {{0}, 0x40000, 5, UINT32_MAX};
+    struct hpclang_rpl_reader instructions = {read_nibble, &code};
+    struct hpclang_rpl_reader pointers = {read_nibble, &data};
+    const struct hpclang_rpl_code_indirect unchanged = {1, 2, 3, 4, 5};
+    encode(&data, 0, 5, 0xabcde);
+    for (unsigned opcode = 0; opcode < 0x10000; ++opcode) {
+        encode(&code, 0, 4, opcode);
+        struct hpclang_rpl_code_indirect transfer = unchanged;
+        int supported =
+            opcode == 0x2b18 || opcode == 0x3b18 || opcode == 0xc808 || opcode == 0xe808;
+        unsigned selects_c = opcode == 0x3b18 || opcode == 0xe808;
+        int result = hpclang_rpl_code_indirect_inspect(
+            &instructions, &pointers, code.address, 4, selects_c ? 0xabc40001 : 0xabc40000,
+            selects_c ? 0xdef40000 : 0xdef40001, &transfer);
+        if (!supported) {
+            assert(result == HPCLANG_RPL_SPAN_UNSUPPORTED);
+            assert(!memcmp(&transfer, &unchanged, sizeof transfer));
+            continue;
+        }
+        assert(!result && transfer.instruction == code.address);
+        assert(transfer.register_c == (opcode == 0x3b18 || opcode == 0xe808));
+        assert(transfer.via_memory == (opcode == 0xc808 || opcode == 0xe808));
+        assert(transfer.register_value == 0x40000);
+        assert(transfer.target == (transfer.via_memory ? 0xabcde : 0x40000));
+        /* Numerically identical code/data addresses resolve through distinct
+         * readers. Register jumps must not dereference either register. */
+        if (!transfer.via_memory) {
+            assert(!hpclang_rpl_code_indirect_inspect(&instructions, NULL, code.address, 4,
+                                                      0x123fffff, 0x456fffff, &transfer));
+            assert(transfer.target == 0xfffff);
+        }
+    }
+    encode(&code, 0, 4, 0xc808);
+    for (unsigned which = 0; which < 2; ++which) {
+        struct image *image = which ? &data : &code;
+        for (unsigned i = 0; i < image->size; ++i) {
+            struct hpclang_rpl_code_indirect transfer = unchanged;
+            image->fail = image->address + i;
+            assert(hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address, 4,
+                                                     data.address, 0,
+                                                     &transfer) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            image->fail = UINT32_MAX;
+            uint8_t saved = image->data[i];
+            image->data[i] = 16;
+            assert(hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address, 4,
+                                                     data.address, 0,
+                                                     &transfer) == HPCLANG_RPL_SPAN_MALFORMED);
+            image->data[i] = saved;
+            assert(!memcmp(&transfer, &unchanged, sizeof transfer));
+        }
+    }
+    struct hpclang_rpl_code_indirect transfer = unchanged;
+    for (unsigned limit = 0; limit < 4; ++limit)
+        assert(hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address, limit,
+                                                 data.address, 0,
+                                                 &transfer) == HPCLANG_RPL_SPAN_BOUNDS);
+    for (uint32_t at = 0xffffc; at <= 0xfffff; ++at)
+        assert(hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address, 4, at, 0,
+                                                 &transfer) == HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_code_indirect_inspect(&instructions, NULL, code.address, 4, data.address, 0,
+                                             &transfer) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(!memcmp(&transfer, &unchanged, sizeof transfer));
+    data.address = 0xffffb;
+    code.address = 0xffffc;
+    assert(!hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address, 4,
+                                              data.address, 0, &transfer));
+    assert(transfer.target == 0xabcde);
+    assert(hpclang_rpl_code_indirect_inspect(&instructions, &pointers, code.address + 1, 4,
+                                             data.address, 0,
+                                             &transfer) == HPCLANG_RPL_SPAN_BOUNDS);
+}
+
 int main(void)
 {
     exhaustive();
@@ -372,5 +447,6 @@ int main(void)
     predicates();
     absolute_branches();
     absolute_data_pointers();
+    indirect_transfers();
     return 0;
 }

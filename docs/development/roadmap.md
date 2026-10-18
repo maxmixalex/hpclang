@@ -587,6 +587,21 @@ HP49g+ and HP50g each pass all 80 cases, the final RPL marker and unchanged Flas
 locally. Production integration, complete live/indirect-reference coverage and
 remote acceptance remain open.
 
+An internal register-transfer resolver now distinguishes `PC=A` / `PC=C` from
+`PC=(A)` / `PC=(C)`. It consumes only the selected register's low 20 bits and
+uses a separately supplied mapping reader for the indirect pointer cell; it
+does not infer register provenance from an earlier snapshot. All 65,536
+four-nibble encodings, separate code/data mappings, malformed reads, faults and
+address boundaries pass host tests, with ARM compilation/analysis. Local native
+watchpoint runs on HP49g+ and HP50g trace the normal post-ARMSYS return through
+GETPTR and the subsequent RPL dispatch. A is loaded from the restored runstream
+before `PC=(A)`; the observed pointer cell is the ROM SEMI entry, and the host
+resolver agrees with the next observed native address. The 46 preceding
+register accesses contain no R0–R4 use. Both runs preserve normal application
+and Stock return checks. This is bounded normal-path evidence and host
+resolution of native observations, not complete exceptional-path or register
+liveness coverage; production opaque checks remain unchanged.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
