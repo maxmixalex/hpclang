@@ -1555,9 +1555,15 @@ and circular-stack slots matching the suspended application snapshot. A separate
 catalog-growth diagnostic on both models returns and relaunches successfully
 while relocating only the subroutine return, leaving the two branch positions
 unchanged. Thus the earlier assertion that all three must be repaired on normal
-return was too strong. This does not establish that the branch positions can be
-ignored on exceptional paths or that helper tracing covers every stack consumer;
-production classification and complete relocation coverage remain open.
+return was too strong. A stronger native continuation witness now passes on both
+models with either root set: after registration, the original RPL caller executes
+its post-call marker. Redirecting the saved post-ARMSYS continuation to the
+validated launcher error exit produces the distinct outer error-handler marker;
+the same catcher without fault injection produces only the success marker.
+These checks also require the inserted catalog entry and unchanged Flash.
+They cover normal return and that explicit launcher error path, not arbitrary
+exceptional paths or every stack consumer. Production classification and complete
+relocation coverage remain open.
 
 A separate HP49g+/HP50g native collection control retains an object on the data
 stack while saving its old numeric address with `RSTK=C`. Native collection
