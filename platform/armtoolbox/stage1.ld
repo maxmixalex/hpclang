@@ -32,6 +32,9 @@ SECTIONS
 
     __stage1_end = .;
     __stage1_size = __stage1_end - HPCLANG_STAGE1_BASE;
+    /* Include the L2 prefix/alignment gaps and one live stage stack page. */
+    __stage1_min_pool_pages =
+        ((__stage1_end - HPCLANG_STAGE_WINDOW_BASE + 4095) / 4096) + 1;
 
     /DISCARD/ :
     {

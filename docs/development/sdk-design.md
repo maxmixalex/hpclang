@@ -697,6 +697,23 @@ provider can exercise effect transitions, alongside real calculator input and
 display verification. This fixture preserves the original application model
 while fitting each target's screen and input capabilities.
 
+### Startup resource admission
+
+Stock startup has an earlier admission boundary than the application's RW
+budget. Stage0 must fit the linked stage1 memory extent (including its prefix,
+alignment gaps and BSS) plus a complete stage stack page in the supplied pool.
+It rejects zero/undersized pools and counts beyond the coarse-table capacity
+before changing the mapping, switching SP or copying bytes. The minimum is
+derived from the stage1 link result. HP39's two native-workspace pages are
+excluded before this check. Stage1 subsequently checks application code, its
+MMU workspace, static data, boot page and application stack. This does not
+reduce the legacy launcher's reservation or guarantee application heap demand.
+
+The Direct harness exercises zero, one and 257 supplied pages before normal
+application execution. Each rejection must return with the caller registers,
+interrupt state and mappings intact and leave the entire temporary pool
+unchanged. Normal payload PASS, pixels and Stock return are still required.
+
 ### UI resource measurements
 
 The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only

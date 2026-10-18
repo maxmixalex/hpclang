@@ -124,16 +124,18 @@ def build(
     run(ld, "-m", "armelf", "--gc-sections", "-T", script, *objects, builtins, "-o", stage1_elf)
     if run(nm, "-u", stage1_elf).strip():
         raise ValueError("unresolved stage1 symbols")
-    sizes = [
-        int(line.split()[0], 16)
+    symbols = {
+        parts[-1]: int(parts[0], 16)
         for line in run(nm, stage1_elf).splitlines()
-        if line.split()[-1] == "__stage1_size"
-    ]
-    if len(sizes) != 1:
+        if len(parts := line.split()) == 3
+    }
+    stage_size = symbols.get("__stage1_size")
+    minimum_pool_pages = symbols.get("__stage1_min_pool_pages")
+    if stage_size is None or minimum_pool_pages is None:
         raise ValueError("missing stage1 memory extent")
     stage1 = scratch / "stage1.bin"
     run(tools / "llvm-objcopy", "-O", "binary", stage1_elf, stage1)
-    if stage1.stat().st_size > sizes[0]:
+    if stage1.stat().st_size > stage_size:
         raise ValueError("stage1 file exceeds its reserved memory extent")
 
     def assembly_path(path: Path) -> str:
@@ -152,8 +154,10 @@ def build(
 .section .rodata.hpclang.bundle,"a",%progbits
 .align 2
 .global __stage1_blob_start, __stage1_blob_end, __stage1_blob_size, __stage1_memory_size
+.global __stage1_min_pool_pages
 .global __hpc1_blob_start, __hpc1_blob_end, __hpc1_blob_size
-.set __stage1_memory_size, {sizes[0]}
+.set __stage1_memory_size, {stage_size}
+.set __stage1_min_pool_pages, {minimum_pool_pages}
 __stage1_blob_start:
 .incbin "{assembly_path(stage1)}"
 __stage1_blob_end:

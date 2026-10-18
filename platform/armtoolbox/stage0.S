@@ -58,6 +58,26 @@ hpclang_armtoolbox_stage0:
     mov     r10, r1                  /* ARMSYS/Saturn state */
     adr     r8, hpclang_armtoolbox_stage0
 
+    /* Reject an undersized pool before publishing a mapping, switching SP or
+     * copying stage1. The later C checks cannot protect these earlier writes.
+     * Keep one complete page above the copied/zeroed stage for its live stack.
+     * Stage1 separately admits application code, RW and its MMU workspace. */
+    ldr     r2, [r10, #0x914]
+    cmp     r2, #256
+    bhi     .Lrelease_kos
+#if HPCLANG_STAGE0_MODEL <= 3
+    ldr     r3, [r10, #0x200]       /* Stock Read[0x80]; absent in Direct */
+    cmp     r3, #0
+    beq     .Lcheck_stage_pool
+    cmp     r2, #2
+    bls     .Lrelease_kos
+    sub     r2, r2, #2             /* retain Stock's native workspace */
+#endif
+.Lcheck_stage_pool:
+    ldr     r3, =__stage1_min_pool_pages
+    cmp     r2, r3
+    blo     .Lrelease_kos
+
     /* Keep Stock IRQ/FIQ masked until the temporary stage mapping and stack
      * have been released. The common bootstrap observes this masked CPSR and
      * preserves it; native portal calls explicitly manage their Stock edge.
@@ -180,7 +200,9 @@ hpclang_armtoolbox_stage0:
     mov     r0, r9
     bl      .Lirq_restore
 
-    /* Release the optional KOS block allocated by the stock launcher. */
+.Lrelease_kos:
+    /* Also reached by preflight rejection, before IRQ or mapping changes.
+     * Release the optional KOS block allocated by the stock launcher. */
     ldr     r1, [r10, #0x918]
     tst     r1, r1
     beq     3f

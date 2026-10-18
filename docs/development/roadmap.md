@@ -1783,6 +1783,20 @@ measures touched words, includes instrumentation overhead, and does not bound
 untouched stack reservations or establish a minimum physical Stock allocation;
 those distinctions remain part of whole-application resource analysis.
 
+The startup resource review found that stage0 copied its C stage and moved SP
+before stage1 could reject an undersized page pool. Stage0 now checks the linked
+stage extent plus its reserved stack page before those writes or MMU changes,
+including HP39's native-workspace exclusion and the coarse-table capacity.
+The Direct harness first executes three rejected launches (zero pages, one page
+and an excessive count), checking caller registers, interrupt state, mappings
+and the complete untouched temporary pool before ordinary application execution.
+HP39g+, HP48gII and HP50g pass those checks and the independent UI/memory/return
+gates locally; the old launcher fails the same rejection sequence. HP50g Stock
+also passes. All six launcher builds, relocated C/C++ SDK clients, model-specific
+notebooks and all three HP39 Aplet package families pass. HP39g+ Stock acceptance
+is in progress. This closes an early startup overwrite hazard, not the remaining
+whole-application memory-admission or physical-reservation work.
+
 #### M8.4 — Historical source compatibility
 
 The system adapter now includes five `hpsys.h` entry points for millisecond delays,
