@@ -131,6 +131,26 @@ int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                     uint32_t bytes, uint32_t *slot);
 
+struct hpclang_rpl_flash_catalog
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t address, nibbles, flash_table;
+};
+
+/* Also require one native catalog binding to the exact matched library header
+ * and bank. The caller supplies a validated Stock catalog and ROM Flash-switch
+ * table (16 seven-nibble entries, user banks 8..13); the reader maps both.
+ * Compare actual table contents, requiring a unique switch match, rather than
+ * assuming routine addresses form an arithmetic sequence. Keep all mappings,
+ * expected bytes and catalog stable throughout. Output changes only on success.
+ * No writes, registration, attachment, persistent ownership or recovery entry
+ * are established; this verifies an installation before starting a transaction.
+ * Same result codes as match_library; an absent catalog entry is NOT_FOUND. */
+int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
+                                         const uint8_t *record, uint32_t bytes,
+                                         const struct hpclang_rpl_flash_catalog *catalog,
+                                         uint32_t *slot);
+
 /* Validate all six banks before deleting one uniquely named backup. Only its
  * status byte changes; payload, references and allocation extents stay put.
  * No erase/reclamation. Missing names return NOT_FOUND; ambiguous names DIRTY.

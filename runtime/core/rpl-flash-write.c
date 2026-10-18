@@ -843,6 +843,55 @@ int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const
     return result;
 }
 
+int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
+                                         const uint8_t *record, uint32_t bytes,
+                                         const struct hpclang_rpl_flash_catalog *catalog,
+                                         uint32_t *slot)
+{
+    if (!slot || !catalog || !catalog->reader || !catalog->reader->read_nibble ||
+        catalog->flash_table > 0x100000u - 112u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t matched;
+    int result = hpclang_rpl_flash_match_library(io, record, bytes, &matched);
+    if (result)
+        return result;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct hpclang_rpl_library_binding binding;
+    result = hpclang_rpl_library_lookup(catalog->reader, catalog->address, catalog->nibbles,
+                                        wanted.library_number, &binding);
+    if (result != 1)
+        return result == 0                              ? HPCLANG_RPL_FLASH_NOT_FOUND
+               : result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                        : HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t offset = (matched - io->first) % 0x20000u;
+    uint32_t header = 0x40000u + 2u * (offset + 4u) + 14u + 2u * wanted.name_length;
+    if (binding.address != header)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t expected_bank = 8u + (matched - io->first) / 0x20000u;
+    unsigned matches = 0;
+    for (uint32_t bank = 0; bank < 16; ++bank) {
+        uint32_t value;
+        result = recovery_word(catalog->reader, catalog->flash_table + 7u * bank, 5u, &value);
+        if (result)
+            return result;
+        if (!value)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (value == binding.bank_switch) {
+            if (bank != expected_bank || ++matches != 1)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    if (matches != 1)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *slot = matched;
+    return 0;
+}
+
 static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
                          uint32_t name_length, uint32_t bytes, struct record_selection *selection)
 {

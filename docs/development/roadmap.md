@@ -503,8 +503,17 @@ Current delivery checkpoints:
   analysis pass. The host-compiled C matcher agrees with the independent
   package/catalog oracle on all four saved guarded/observed installations from
   HP49g+/HP50g. This is saved-state evidence, not execution of the new function
-  on ARM or an installed persistent trust root. Catalog/lifetime and
-  reservation/transaction ownership integration remain open; not pushed.
+  on ARM or an installed persistent trust root. A local combined installation
+  check now also resolves the unique native catalog entry to that exact library
+  header and compares its bank switch with the supplied ROM table contents.
+  Tests cover all six user banks, absent/duplicate catalog entries, wrong headers,
+  wrong or ambiguous bank switches and failed reads without output changes or
+  writes. The host-compiled combined check passes all four saved installations
+  and rejects eight changed header/switch cases; the extended mutation suite
+  and ARM analysis pass. A private ARM probe is built and running on both models
+  for absent and newly installed libraries; native acceptance is still pending.
+  Persistent installation lifetime, reservation/transaction ownership and recovery
+  startup integration remain open; these follow-ups are not pushed.
 - **Active M8.0 work:** establish the trusted installation/root and bind the
   reservation to the current transaction. The maintained guarded-reservation E2E
   is already integrated; its remote acceptance remains a separate gate. Preserve
