@@ -1561,6 +1561,11 @@ its post-call marker. Redirecting the saved post-ARMSYS continuation to the
 validated launcher error exit produces the distinct outer error-handler marker;
 the same catcher without fault injection produces only the success marker.
 These checks also require the inserted catalog entry and unchanged Flash.
+Native-cell watchpoints on both models observe the launch return being consumed,
+while the old branch positions are overwritten without a reported intervening
+read after application return. HP50g cursor tracing attributes that replacement
+to ordinary modulo-eight pushes/pops, not a separate stack reset. A nonzero
+slot and the circular cursor therefore do not establish a live execution root.
 They cover normal return and that explicit launcher error path, not arbitrary
 exceptional paths or every stack consumer. Production classification and complete
 relocation coverage remain open.
