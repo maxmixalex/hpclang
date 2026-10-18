@@ -20,6 +20,9 @@ struct stage_launcher_bias
  * Hide returns 1 for a recognized launcher cell, 0 when absent/unreadable,
  * -1 on write failure. Restore returns nonzero on success. The caller must
  * retain the hidden object as a relocation root and reserve its stack cell.
+ * Entry/base fields identify the descriptor at hide time; restore uses only
+ * the retained object root, not those consumed ARM launch addresses. This is
+ * not permission to dereference stale fields or classify unrelated payloads.
  * These operations do not change AVMEM or supply rollback for failed writes. */
 int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t stage0_code,
                              struct stage_launcher_bias *bias);

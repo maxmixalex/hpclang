@@ -1539,6 +1539,17 @@ control preserves the contents too. This establishes that numerical address
 matches in this buffer must not become relocation edits. It does not classify
 the other opaque objects or discharge the launcher's owned-pointer obligations.
 
+The observed 50-nibble launcher descriptor has two ARM entry/base fields. Native
+HP49g+/HP50g controls still complete UI execution and Stock return when both
+fields are deliberately replaced with invalid addresses after application entry.
+Both models also pass the catalog-growth diagnostic, descriptor movement, normal
+return and relaunch/readback while retaining those invalid fields. This bounds
+their liveness on the tested Launcher V3 path; other descriptor forms remain
+unclassified. The three cached-program machine-stack continuations remain live
+relocation obligations, and the diagnostic does not supply their production
+type/provenance contract. The host stack-restoration regression retains the
+relocated object root without reading the consumed ARM fields again.
+
 Shared edit assembly now merges identical observations across discovery paths
 and rejects conflicting values, partial overlaps and exhausted storage without
 publishing a partial count. Host tests, sanitizers and ARM compilation/analysis

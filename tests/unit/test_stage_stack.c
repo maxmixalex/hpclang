@@ -64,8 +64,16 @@ int main(void)
     /* Simulate application push and relocation of the hidden native object. */
     put(0x806f8, 0xf0000, 5);
     put(0xf0000, 0x93000, 5);
+    memcpy(memory + 0x10100, memory + 0x10000, 50);
     bias.object = 0x90100;
+    /* Native Launcher V3 controls return after these already-consumed ARM
+     * fields are poisoned, including after descriptor relocation. The object
+     * remains a root; restore must not reinterpret its entry/base as roots. */
+    put(0x90112, 0xdeadbeef, 8);
+    put(0x90122, 0xbaadf00d, 8);
+    fault = 0x90112;
     assert(hpclang_stage_stack_restore(&io, &bias));
+    fault = UINT32_MAX;
     assert(get(0x806f8) == 0xefffb && get(0xefffb) == 0x90100);
     /* Native PrRUN drops exactly the restored cell, retaining output/input. */
     put(0x806f8, get(0x806f8) + 5, 5);
