@@ -496,10 +496,16 @@ Host sanitizer tests cover all cursor positions, one to eight returns, opcode
 boundaries, equal-valued unconsumed cells and failed preflight. Catalog-growth
 integration independently consumes the relocated instruction/stack chain to its
 marker. All six launchers build; the existing HP49g+/HP50g native catalog-growth
-and post-call-marker regressions pass with unchanged Flash. These native runs
-are regression evidence for the existing caller, not native acceptance of every
-multi-return shape. Other instruction paths, opaque contents and complete
-execution-reference coverage remain open; public reclamation is not enabled.
+and post-call-marker regressions pass with unchanged Flash. Controlled native
+fixtures also pass a three-return chain on HP50g and an eight-return chain on
+HP49g+: a test-only stage inserts additional frames targeting the existing
+return instruction before discovery, then the original ROM consumes the
+relocated chain and reaches the independent RPL marker. This is synthesized
+native-frame evidence, not proof of arbitrary nested callers. An HP50g control
+using the old single-root selector rejects the missing roots before movement,
+preserves the catalog and returns normally. Other instruction paths, opaque
+contents and complete execution-reference coverage remain open; public
+reclamation is not enabled.
 
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
