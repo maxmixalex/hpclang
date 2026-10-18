@@ -59,7 +59,13 @@ def verify(target, build, dist, state_root, output_root):
             hex(value),
         )
         results.append(
-            dict(name=case["name"], repaired=case["repair"], moved=case["move"], value=value)
+            dict(
+                name=case["name"],
+                repaired=case["repair"],
+                moved=case["move"],
+                pointer=case.get("pointer", False),
+                value=value,
+            )
         )
     (output / "result.json").write_text(
         json.dumps(
@@ -69,7 +75,7 @@ def verify(target, build, dist, state_root, output_root):
         + "\n"
     )
     print(
-        f"PASS: {target}: ARM-side repair and {len(cases)} native branch/control cases",
+        f"PASS: {target}: ARM-side repair and {len(cases)} native reference/control cases",
         flush=True,
     )
 

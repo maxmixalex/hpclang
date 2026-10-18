@@ -99,11 +99,10 @@ int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uin
     return 0;
 }
 
-int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
-                                       uint32_t instruction, uint32_t limit,
-                                       const struct hpclang_rpl_reference_mappings *mappings,
-                                       uint32_t first, uint32_t end, int32_t delta,
-                                       struct hpclang_rpl_code_patch *patch)
+static int plan_shift(const struct hpclang_rpl_reader *reader, uint32_t instruction, uint32_t limit,
+                      const struct hpclang_rpl_reference_mappings *mappings, uint32_t first,
+                      uint32_t end, int32_t delta, struct hpclang_rpl_code_patch *patch,
+                      int pointer)
 {
     if (!mappings || !patch)
         return HPCLANG_RPL_SPAN_UNAVAILABLE;
@@ -111,7 +110,24 @@ int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
         (int64_t)end + delta > 0x100000)
         return HPCLANG_RPL_SPAN_BOUNDS;
     struct hpclang_rpl_code_branch branch;
-    int result = hpclang_rpl_code_branch_inspect(reader, instruction, limit, &branch);
+    int result;
+    if (pointer) {
+        if (!reader || !reader->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (instruction >= 0x100000u || limit < 7 || limit > 0x100000u - instruction)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t opcode, target;
+        result = read_word(reader, instruction, 2, &opcode);
+        if (result)
+            return result;
+        if (opcode != 0xb1 && opcode != 0xf1)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        result = read_word(reader, instruction + 2, 5, &target);
+        branch = (struct hpclang_rpl_code_branch){
+            instruction, 7, instruction + 2, 5, 0, target, target, 0, 0};
+    } else {
+        result = hpclang_rpl_code_branch_inspect(reader, instruction, limit, &branch);
+    }
     if (result)
         return result;
     int source_moves = 0;
@@ -142,4 +158,22 @@ int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
         return 0;
     *patch = (struct hpclang_rpl_code_patch){branch.field, branch.width, branch.encoded, value};
     return 1;
+}
+
+int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
+                                       uint32_t instruction, uint32_t limit,
+                                       const struct hpclang_rpl_reference_mappings *mappings,
+                                       uint32_t first, uint32_t end, int32_t delta,
+                                       struct hpclang_rpl_code_patch *patch)
+{
+    return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 0);
+}
+
+int hpclang_rpl_code_pointer_plan_shift(const struct hpclang_rpl_reader *reader,
+                                        uint32_t instruction, uint32_t limit,
+                                        const struct hpclang_rpl_reference_mappings *mappings,
+                                        uint32_t first, uint32_t end, int32_t delta,
+                                        struct hpclang_rpl_code_patch *patch)
+{
+    return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 1);
 }

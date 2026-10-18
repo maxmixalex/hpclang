@@ -74,6 +74,13 @@ static int run(void)
             return 9;
         uint32_t body = cursor + 10, at = body + cases[i].at;
         addresses[i] = at;
+        if (cases[i].pointer) {
+            /* Bind the fixture's absolute address after Stock allocation. */
+            uint32_t target = body + cases[i].old;
+            for (unsigned n = 0; n < 5; ++n)
+                if (!io.write_nibble(io.context, at + 2 + n, (target >> (4 * n)) & 15))
+                    return 16;
+        }
         for (unsigned n = 0; n < cases[i].length;) {
             unsigned width = cases[i].length - n;
             if (width > 5)
@@ -86,10 +93,14 @@ static int run(void)
         }
         struct hpclang_rpl_reference_mappings maps = {1, 1, 1};
         struct hpclang_rpl_code_patch patch;
-        if (hpclang_rpl_code_branch_plan_shift(
-                &reader, at, cases[i].length, &maps, body + cases[i].old,
-                body + cases[i].old + (cases[i].move ? cases[i].length : 16),
-                cases[i].move ? 32 : 16, &patch) != 1)
+        int (*plan)(const struct hpclang_rpl_reader *, uint32_t, uint32_t,
+                    const struct hpclang_rpl_reference_mappings *, uint32_t, uint32_t, int32_t,
+                    struct hpclang_rpl_code_patch *) = cases[i].pointer
+                                                           ? hpclang_rpl_code_pointer_plan_shift
+                                                           : hpclang_rpl_code_branch_plan_shift;
+        if (plan(&reader, at, cases[i].length, &maps, body + cases[i].old,
+                 body + cases[i].old + (cases[i].move ? cases[i].length : 16),
+                 cases[i].move ? 32 : 16, &patch) != 1)
             return 11;
         if (cases[i].repair) {
             struct hpclang_rpl_reference_edit edit = {1, patch.field, patch.expected, patch.value,
@@ -106,15 +117,19 @@ static int run(void)
     if (hpclang_rpl_reference_edits_replay(&writer, edits, builder.count))
         return 14;
     for (unsigned i = 0; i < CASE_COUNT; ++i) {
-        if (!cases[i].move)
+        if (!cases[i].move && !cases[i].pointer)
             continue;
-        for (unsigned n = 0; n < cases[i].length; ++n) {
+        unsigned length = cases[i].pointer ? 5 : cases[i].length;
+        uint32_t start = addresses[i] + (cases[i].pointer ? cases[i].old - cases[i].at : 0);
+        for (unsigned n = 0; n < length; ++n) {
             uint32_t value, copied;
-            uint32_t source = addresses[i] + n, destination = source + 32;
+            uint32_t source = start + n, destination = source + (cases[i].pointer ? 16 : 32);
+            uint8_t poison = cases[i].pointer ? (0xfa173u >> (4 * n)) & 15 : 0;
             if (!word(&io, source, 1, &value) ||
                 !io.write_nibble(io.context, destination, (uint8_t)value) ||
                 !word(&io, destination, 1, &copied) || copied != value ||
-                !io.write_nibble(io.context, source, 0) || !word(&io, source, 1, &copied) || copied)
+                !io.write_nibble(io.context, source, poison) || !word(&io, source, 1, &copied) ||
+                copied != poison)
                 return 15;
         }
     }

@@ -297,6 +297,73 @@ static void absolute_branches(void)
     }
 }
 
+static void absolute_data_pointers(void)
+{
+    struct image image = {{1, 11}, 0x10000, 7, UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    struct hpclang_rpl_reference_mappings maps = {0, 0, 0};
+    for (unsigned opcode = 11; opcode <= 15; opcode += 4) {
+        image.data[1] = opcode;
+        for (uint32_t target = 0; target < 0x100000; ++target) {
+            encode(&image, 2, 5, target);
+            struct hpclang_rpl_code_patch patch = sentinel;
+            int moves = target >= 0x80000 && target < 0xfffe0;
+            assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x80000,
+                                                       0xfffe0, 16, &patch) == moves);
+            if (moves)
+                assert(patch.field == 0x10002 && patch.width == 5 && patch.expected == target &&
+                       patch.value == target + 16);
+            else
+                assert(!memcmp(&patch, &sentinel, sizeof patch));
+            maps.target = 1;
+            patch = sentinel;
+            assert(!hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x80000,
+                                                        0xfffe0, 16, &patch));
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+            maps.target = 0;
+        }
+        for (unsigned i = 0; i < 7; ++i) {
+            struct hpclang_rpl_code_patch patch = sentinel;
+            image.fail = image.address + i;
+            assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x80000,
+                                                       0xfffe0, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            image.fail = UINT32_MAX;
+            uint8_t saved = image.data[i];
+            image.data[i] = 16;
+            assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x80000,
+                                                       0xfffe0, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_MALFORMED);
+            image.data[i] = saved;
+            assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, i, &maps, 0x80000,
+                                                       0xfffe0, 16,
+                                                       &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+            assert(!memcmp(&patch, &sentinel, sizeof patch));
+        }
+        struct hpclang_rpl_code_patch patch = sentinel;
+        encode(&image, 2, 5, 0x90000);
+        assert(!hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, image.address,
+                                                    image.address + 7, -16, &patch));
+        assert(!memcmp(&patch, &sentinel, sizeof patch));
+        assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps,
+                                                   image.address + 1, image.address + 7, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_BOUNDS);
+        assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x90000,
+                                                   0x90001, -16, &patch) == 1);
+        assert(patch.value == 0x8fff0);
+    }
+    for (unsigned opcode = 0; opcode < 256; ++opcode) {
+        if (opcode == 0xb1 || opcode == 0xf1)
+            continue;
+        encode(&image, 0, 2, opcode);
+        struct hpclang_rpl_code_patch patch = sentinel;
+        assert(hpclang_rpl_code_pointer_plan_shift(&reader, image.address, 7, &maps, 0x80000,
+                                                   0xfffe0, 16,
+                                                   &patch) == HPCLANG_RPL_SPAN_UNSUPPORTED);
+        assert(!memcmp(&patch, &sentinel, sizeof patch));
+    }
+}
+
 int main(void)
 {
     exhaustive();
@@ -304,5 +371,6 @@ int main(void)
     failures_and_wrap();
     predicates();
     absolute_branches();
+    absolute_data_pointers();
     return 0;
 }

@@ -575,6 +575,18 @@ and unchanged Flash locally. This establishes actual instruction movement within
 controlled CODE fixtures; it does not establish whole-library movement, live
 register/indirect-reference classification or remote CI acceptance.
 
+Full five-nibble D0/D1 immediate data addresses now share qualified relocation
+planning with absolute transfers. Partial loads and computed/register literals
+remain unsupported without data-flow evidence. Exhaustive 20-bit target tests,
+mapping separation, negative shifts, split-instruction refusal, read faults and
+malformed inputs pass ASan/UBSan; ARM analysis and compilation pass. Both native
+snapshots match 15 complete data-address operands. The maintained suite adds four
+data-movement cases: ARM moves the data and poisons its old location; repaired
+D0/D1 loads read the moved value while unrepaired controls read the poison.
+HP49g+ and HP50g each pass all 80 cases, the final RPL marker and unchanged Flash
+locally. Production integration, complete live/indirect-reference coverage and
+remote acceptance remain open.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 

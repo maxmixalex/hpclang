@@ -14,6 +14,17 @@ struct hpclang_rpl_code_patch
     uint32_t field, width, expected, value;
 };
 
+/* Plan an immediate D0=(5)/D1=(5) data-address update at a caller-proven
+ * instruction boundary. Partial loads, A/C literals and computed addresses
+ * require register/data-flow evidence and are not accepted here. The same
+ * mapping, guard, return-value and OLD-field contract as branch_plan_shift
+ * applies. Source movement alone never changes a full absolute address. */
+int hpclang_rpl_code_pointer_plan_shift(const struct hpclang_rpl_reader *reader,
+                                        uint32_t instruction, uint32_t limit,
+                                        const struct hpclang_rpl_reference_mappings *mappings,
+                                        uint32_t first, uint32_t end, int32_t delta,
+                                        struct hpclang_rpl_code_patch *patch);
+
 /* Decode only a caller-proven instruction boundary: GOC/GONC, GOTO/GOSUB,
  * GOLONG/GOSUBL, absolute GOVLNG/GOSBVL, and GOYES operands of register, HST,
  * ST, P and A/C bit tests. Absolute operands have width 5 and base zero.
