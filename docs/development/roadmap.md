@@ -526,6 +526,18 @@ relationships as well as classify live references. Instruction-boundary checks
 use Saturn+ decoding: older Saturn-only output misdecodes extended operations
 and cannot establish these call paths.
 
+An internal relative-branch inspector and relocation planner now cover proven
+GOC/GONC, GOTO/GOSUB and GOLONG/GOSUBL boundaries, including cross-CODE targets.
+They preserve operand widths and qualified mappings, rejecting split
+instructions, unencodable distances and branch-to-return conversions. Exhaustive
+displacement tests pass with ASan/UBSan, ARM compilation/analysis and pinned
+formatting. Host checks against each HP49g+/HP50g snapshot match 140 native
+branch sites; 269 proposed rewrites per model independently decode to the
+intended target, while 11 invalid transitions are rejected. These are snapshot
+and host checks, not native execution or CI acceptance. Complete instruction
+coverage, guarded short-operand replay and production integration remain open;
+opaque preflight is not bypassed.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 

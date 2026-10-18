@@ -599,14 +599,15 @@ HP49g+/HP50g captures through the independent recovery envelope, with library
 range. The surrounding Stock evaluation path therefore remains part of the
 execution-root analysis even when the ARM image and its stack are owned.
 
-For HP49g+/HP50g, stage1 additionally recognizes a bounded immediate-return
-case: when the saved post-ARMSYS PC points to `RTN`, `RTNSC` or `RTNCC`, the next
+For HP49g+/HP50g, stage1 recognizes a bounded prefix of consecutive returns:
+when the saved post-ARMSYS PC points to `RTN`, `RTNSC` or `RTNCC`, the next
 instruction consumes the circular machine-stack top as an execution address.
 It publishes that cell as an invocation-local relocation root alongside the
-hidden launcher object and saved PC. Recognition reads the instruction at the
-proven continuation, validates the next-push cursor and 20-bit top value, and
-does not scan lower slots or infer past calls from nearby instruction bytes.
-Unsupported or unreadable instructions add no root; this does not certify
+hidden launcher object and saved PC. If the consumed target names another
+proven return, discovery continues, up to eight distinct cells. Recognition
+validates the next-push cursor and each 20-bit target; it does not scan arbitrary
+lower slots or infer past calls from nearby instruction bytes. Unsupported or
+unreadable instructions stop discovery; this does not certify
 complete execution-reference coverage or permit public reclamation.
 
 `hpclang_rpl_cached_program_match` verifies a caller-bounded TEMP allocation
@@ -627,6 +628,19 @@ can distinguish nested RPL boundaries from a machine-call return inside a CODE
 body, but neither reverse instruction matching nor a matching boundary proves
 that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
+
+The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
+GOTO/GOSUB and GOLONG/GOSUBL instruction boundaries. Its relocation planner
+qualifies source and target mappings separately, preserves signed 2/3/4-nibble
+displacements and 20-bit address wrap, and rejects split instructions, range
+overflow or conversion into a conditional return. Cross-CODE calls are allowed:
+the stored native `SETUP` program contains such calls, so an individual CODE
+object is not a sufficient ownership boundary. Returned patches retain their
+short operand width and old address; they cannot use the existing five-nibble
+object-edit writer. Complete instruction guards and ownership must remain valid
+through commit. This read-only planner neither discovers all instructions nor
+classifies opaque payloads or authorizes catalog movement. Compound tests with
+GOYES operands, indirect transfers and complete execution coverage remain open.
 
 ## Capabilities
 

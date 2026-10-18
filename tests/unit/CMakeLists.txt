@@ -364,6 +364,9 @@ hpclang_unit(rpl_object_store
 target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_code test_rpl_code.c "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
+target_include_directories(test_rpl_code PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_reference test_rpl_reference.c
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
