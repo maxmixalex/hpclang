@@ -95,6 +95,8 @@ struct hpclang_rpl_reference
  * Opaque code, binary data and unrecognized child-directory header metadata require
  * their own semantic traversal;
  * a caller must never treat an OPAQUE event as absence of references.
+ * Conversely, numerical address matches in an opaque payload are not evidence
+ * of pointers: ownership/type evidence must distinguish raw data from roots.
  * All addresses retain the input reader's mapping. No target is dereferenced.
  * The callback is read-only; keep mappings stable and discard partial results
  * on any nonzero return. Callback errors propagate unchanged. */

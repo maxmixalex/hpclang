@@ -1531,6 +1531,14 @@ Thus paired payload differences alone do not identify relocation fields. These
 objects still require semantic classification; no raw-address scanning or
 reference-free assumption is accepted from this experiment.
 
+The 798-nibble object is now identified through Stock's `leeway` root. On
+HP49g+/HP50g, independently copied contents remain unchanged across native
+garbage collection. A deliberate address-shaped value also remains unchanged
+while the referenced test object actually moves; the HP50g no-collection
+control preserves the contents too. This establishes that numerical address
+matches in this buffer must not become relocation edits. It does not classify
+the other opaque objects or discharge the launcher's owned-pointer obligations.
+
 Shared edit assembly now merges identical observations across discovery paths
 and rejects conflicting values, partial overlaps and exhausted storage without
 publishing a partial count. Host tests, sanitizers and ARM compilation/analysis
