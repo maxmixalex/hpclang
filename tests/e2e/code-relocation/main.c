@@ -38,6 +38,20 @@ enum
 {
     CASE_COUNT = sizeof cases / sizeof cases[0]
 };
+struct boundary_check
+{
+    uint32_t target, length, found;
+};
+static int check_boundary(void *context, uint32_t instruction, uint32_t length)
+{
+    struct boundary_check *check = context;
+    if (instruction == check->target) {
+        if (length != check->length)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        ++check->found;
+    }
+    return 0;
+}
 static int run(void)
 {
     struct hpclang_rpl_stock_memory memory;
@@ -81,6 +95,14 @@ static int run(void)
             span != cases[i].body + 10)
             return 9;
         uint32_t body = cursor + 10, at = body + cases[i].at;
+        /* The generator establishes this instruction-only prefix. Walk from
+         * its entry instead of trusting the proposed operand site's boundary.
+         * Padding and trailing pointer data are outside this interval. */
+        struct boundary_check boundary = {at, cases[i].length, 0};
+        if (hpclang_rpl_code_visit(&reader, body, cases[i].at + cases[i].length, check_boundary,
+                                   &boundary) ||
+            boundary.found != 1)
+            return 19;
         addresses[i] = at;
         if (cases[i].pointer) {
             /* Bind the fixture's absolute address after Stock allocation. */

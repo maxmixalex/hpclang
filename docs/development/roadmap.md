@@ -640,6 +640,18 @@ inline-data ownership, complete references or safe arbitrary program movement.
 Opcode references are the [Saturn instruction reference](https://literature.hpcalc.org/community/intro-saturn-asm.pdf)
 and [Rechlin's Saturn+ opcode observations](https://www.hpcalc.org/hp49/docs/programming/newopcodes.zip).
 
+The maintained Stock relocation suite now walks each generator-established
+instruction-only prefix on ARM and verifies the proposed repair site's boundary
+before planning. HP49g+ and HP50g both pass all 88 cases, the final RPL marker and
+unchanged Flash. A separate host walk of each model's native snapshot covers all
+seven known CODE objects (including the duplicated command cache): 1,616
+instructions and 346 direct branches. All 283 internal targets land on decoded
+boundaries; the other 63 target the lower address region outside these RAM CODE
+bodies. Qualified planning leaves all 346 operands unchanged for the observed
+16-nibble catalog expansion. Six register-mediated transfer sites remain explicit
+data-flow obligations; this result does not resolve live-register provenance,
+other embedded data references or complete relocation safety.
+
 <details>
 <summary>Native-port implementation history and bounded verification evidence</summary>
 
