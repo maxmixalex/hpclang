@@ -422,8 +422,13 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 Latest submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
 Quality failed because the code-relocation fixture header was unavailable after
 configuration; Runtime failed at PWM4 lease admission in all six Stock System
-Services jobs. Both defects are under local correction, so this batch is not
-accepted. Earlier HP39 reject-return failures did not recur in this batch.
+Services jobs. Local fix `6668fc13` generates the fixture at configuration time
+and tests occupied-timer rejection with EBUSY and zero register writes, retaining
+actual IRQ delivery on an idle timer. Clean-config Clang analysis and HP50g Stock
+System Services, native return and independent input pixels pass. The remaining
+model regressions are running; the batch is not accepted. This does not establish
+a Stock asynchronous-audio backend. Earlier HP39 reject-return failures did not
+recur in the submitted batch.
 
 | Stage | Current state | Remaining acceptance |
 | --- | --- | --- |
