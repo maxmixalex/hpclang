@@ -419,11 +419,13 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
-Latest submitted head: `d94580b4`; Quality and Objects passed. Core and Runtime
-were still running at the latest check; full remote acceptance remains pending. Local
+Latest CI-accepted batch: `d94580b4`; all four triggered workflows passed:
+Quality, Core, Objects and Runtime. Runtime includes both native code-relocation
+jobs and all six Stock System Services jobs. Follow-ups through `626fe53a`
+are locally verified and await separate CI acceptance. These
 follow-ups add conditional SETUP dispatch evidence, native bank-switch execution
 roots, explicit execution-address repair planning and merged catalog repairs.
-They are not yet submitted and do not close library registration.
+They also extend direct-jump return-root discovery; they do not close library registration.
 
 Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
 Quality failed because the code-relocation fixture header was unavailable after
@@ -432,14 +434,14 @@ Services jobs. Local fix `6668fc13` generates the fixture at configuration time
 and tests occupied-timer rejection with EBUSY and zero register writes, retaining
 actual IRQ delivery on an idle timer. Clean-config Clang analysis, all six Stock
 System Services targets and HP50g Direct pass, including native return and
-independent input pixels. Remote acceptance is pending. This does not establish
+independent input pixels. The corrected batch is CI-accepted at `d94580b4`. This does not establish
 a Stock asynchronous-audio backend. Earlier HP39 reject-return failures did not
 recur in the submitted batch.
 
 The follow-up batch includes the register-transfer and instruction-walk work
 through `5dfeca33`, the CI fixture fixes in `6668fc13`, and independent catalog
-switch-function relocation in `4a497fd5`. Local evidence is recorded below;
-remote acceptance remains pending and no M8 stage is closed by this submission.
+switch-function relocation in `4a497fd5`. Evidence is recorded below; the four
+triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
 
 | Stage | Current state | Remaining acceptance |
 | --- | --- | --- |
