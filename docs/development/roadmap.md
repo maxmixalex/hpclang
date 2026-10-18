@@ -1545,10 +1545,19 @@ fields are deliberately replaced with invalid addresses after application entry.
 Both models also pass the catalog-growth diagnostic, descriptor movement, normal
 return and relaunch/readback while retaining those invalid fields. This bounds
 their liveness on the tested Launcher V3 path; other descriptor forms remain
-unclassified. The three cached-program machine-stack continuations remain live
-relocation obligations, and the diagnostic does not supply their production
-type/provenance contract. The host stack-restoration regression retains the
+unclassified. The cached-program machine-stack values still require a production
+type/provenance and liveness contract. The host stack-restoration regression retains the
 relocated object root without reading the consumed ARM fields again.
+
+Native helper traces on both models identify the two saved conditional-branch
+positions and the launch subroutine return address, with their actual producers
+and circular-stack slots matching the suspended application snapshot. A separate
+catalog-growth diagnostic on both models returns and relaunches successfully
+while relocating only the subroutine return, leaving the two branch positions
+unchanged. Thus the earlier assertion that all three must be repaired on normal
+return was too strong. This does not establish that the branch positions can be
+ignored on exceptional paths or that helper tracing covers every stack consumer;
+production classification and complete relocation coverage remain open.
 
 A separate HP49g+/HP50g native collection control retains an object on the data
 stack while saving its old numeric address with `RSTK=C`. Native collection
