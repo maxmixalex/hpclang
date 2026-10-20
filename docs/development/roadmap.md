@@ -429,8 +429,15 @@ Current delivery checkpoints:
   The oracle requires journal invalidation before authority writes and exact
   preservation of all bytes outside the two envelopes; armed and ordinarily
   retired records are rejected. ASan/UBSan and ARM static analysis pass.
-  Native cancellation on the saved interrupted states and broader allocation
-  geometry coverage remain pending; this is not public service delivery.
+  The same fault matrix now passes with separate banks and both adjacent record
+  orders. Gaps, erased interiors of deleted allocations and a changed installed
+  root are rejected without writes. Native HP49g+/HP50g research passes cancellation
+  from both saved publication-cut states: eight writes after the journal-body cut
+  and five after the authority-body cut, followed by zero-write repeated calls.
+  Exact whole-Flash changes are limited to the two envelopes; catalog, initialized
+  code/owning CODE object, guards/mappings, native return and the complete 32 KiB
+  reservation pass. Cancellation-time native power cuts and maintained E2E
+  integration remain pending; this is not public service delivery.
   This does not establish the still-required durable installation claim, RAM
   ownership, startup ordering or reclamation. Port 2 remains in M8.0; all other
   stage requirements and the accepted M8.1 status remain as listed below.

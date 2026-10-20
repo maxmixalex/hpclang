@@ -525,16 +525,18 @@ static void seal_library(uint8_t library[64])
     packed_word(library, 124, crc, 4);
 }
 
+static uint32_t cancel_journal, cancel_authority;
+
 static int cancel_program(void *context, uint32_t address, uint16_t value)
 {
     assert(context == flash);
-    assert((address >= (JOURNAL & ~1u) && address < JOURNAL + 4) ||
-           (address >= (ROOT & ~1u) && address < ROOT + 4));
-    if (address >= (ROOT & ~1u)) {
+    assert((address >= (cancel_journal & ~1u) && address < cancel_journal + 4) ||
+           (address >= (cancel_authority & ~1u) && address < cancel_authority + 4));
+    if (address >= (cancel_authority & ~1u) && address < cancel_authority + 4) {
         uint32_t extent = 2u * sizeof journal - 2u;
-        assert(flash[JOURNAL - FIRST] == 0);
+        assert(flash[cancel_journal - FIRST] == 0);
         for (unsigned byte = 1; byte < 4; ++byte)
-            assert(flash[JOURNAL - FIRST + byte] == (uint8_t)(extent >> (8u * (byte - 1u))));
+            assert(flash[cancel_journal - FIRST + byte] == (uint8_t)(extent >> (8u * (byte - 1u))));
     }
     ++programs;
     if (silent)
@@ -543,7 +545,7 @@ static int cancel_program(void *context, uint32_t address, uint16_t value)
         value |= (uint16_t)~program_mask;
     flash[address - FIRST] &= (uint8_t)value;
     flash[address - FIRST + 1] &= (uint8_t)(value >> 8u);
-    assert(flash[JOURNAL - FIRST] != 0x53 && flash[ROOT - FIRST] != 0x53);
+    assert(flash[cancel_journal - FIRST] != 0x53 && flash[cancel_authority - FIRST] != 0x53);
     return programs != fail_program;
 }
 
@@ -554,17 +556,17 @@ static void cancellation_tests(const struct hpclang_rpl_flash_recovery_layout *l
     const struct hpclang_rpl_flash_io cancel_io = {flash, read16, cancel_program, FIRST, END};
     const uint16_t masks[] = {0, 0xff, 0xff00, 0x5555, 0xffff};
     for (unsigned state = 0; state < 4; ++state) {
-        prepare_native_port(0xff, state ? 0x7e : 0xff, ROOT, JOURNAL);
+        prepare_native_port(0xff, state ? 0x7e : 0xff, cancel_authority, cancel_journal);
         memcpy(flash + 0x1a0105 - FIRST, layout->record, layout->bytes);
         if (!state)
-            memset(flash + JOURNAL - FIRST, 255, sizeof journal);
+            memset(flash + cancel_journal - FIRST, 255, sizeof journal);
         if (state < 2)
-            memset(flash + ROOT - FIRST, 255, sizeof authority);
+            memset(flash + cancel_authority - FIRST, 255, sizeof authority);
         if (state == 3)
-            flash[ROOT - FIRST] = 0x7f;
+            flash[cancel_authority - FIRST] = 0x7f;
         memcpy(before, flash, sizeof flash);
-        tombstone(JOURNAL, sizeof journal);
-        tombstone(ROOT, sizeof authority);
+        tombstone(cancel_journal, sizeof journal);
+        tombstone(cancel_authority, sizeof authority);
         memcpy(expected, flash, sizeof flash);
         memcpy(flash, before, sizeof flash);
         reads = programs = fail_read = fail_program = 0;
@@ -609,7 +611,7 @@ static void cancellation_tests(const struct hpclang_rpl_flash_recovery_layout *l
     }
     const uint8_t rejected[][2] = {{0x7e, 0x7e}, {0, 0}, {0xff, 0}};
     for (unsigned i = 0; i < sizeof rejected / sizeof rejected[0]; ++i) {
-        prepare_native_port(rejected[i][0], rejected[i][1], ROOT, JOURNAL);
+        prepare_native_port(rejected[i][0], rejected[i][1], cancel_authority, cancel_journal);
         memcpy(flash + 0x1a0105 - FIRST, layout->record, layout->bytes);
         memcpy(before, flash, sizeof flash);
         assert(hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog) < 0);
@@ -709,13 +711,51 @@ static void installed_preflight_tests(void)
         layout.admission_binding = 88;
         packed_word(catalog_data, 126, 0x40222, 5);
     }
+    for (unsigned geometry = 0; geometry < 6; ++geometry) {
+        cancel_journal = JOURNAL;
+        cancel_authority = geometry ? JOURNAL + sizeof journal : ROOT;
+        if (geometry == 2) {
+            cancel_authority = JOURNAL;
+            cancel_journal = JOURNAL + sizeof authority;
+        }
+        if (geometry >= 3) {
+            cancel_journal = JOURNAL + 8;
+            cancel_authority = ROOT;
+        }
+        for (unsigned at = 56; at <= 88; at += 32) {
+            packed_word(library, at + 16, cancel_journal, 8);
+            packed_word(library, at + 24, cancel_authority, 8);
+        }
+        seal_library(library);
+        if (geometry < 3) {
+            cancellation_tests(&layout, &catalog);
+        } else {
+            /* Neither a gap nor an erased interior of a deleted allocation
+             * grants ownership. A changed installed root also forbids writes. */
+            prepare_native_port(0xff, 0xff, cancel_authority, cancel_journal);
+            memset(flash + cancel_journal - FIRST, 255, sizeof journal);
+            memset(flash + cancel_authority - FIRST, 255, sizeof authority);
+            memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+            if (geometry == 4)
+                tombstone(JOURNAL, sizeof journal + 8);
+            if (geometry == 5) {
+                tombstone(JOURNAL, 8);
+                flash[LIBRARY - FIRST + 40] ^= 1;
+            }
+            memcpy(initial, flash, sizeof flash);
+            const struct hpclang_rpl_flash_io cancel_io = {flash, read16, cancel_program, FIRST,
+                                                           END};
+            assert(hpclang_rpl_flash_cancel_installed(&cancel_io, &layout, &catalog) < 0);
+            assert(!programs && !memcmp(initial, flash, sizeof flash));
+        }
+    }
     for (unsigned at = 56; at <= 88; at += 32) {
         packed_word(library, at + 16, JOURNAL, 8);
         packed_word(library, at + 24, ROOT, 8);
     }
     seal_library(library);
     const uint8_t states[][2] = {{0x7e, 0x7e}, {0x7e, 0x7c}, {0x7c, 0}, {0, 0}};
-    cancellation_tests(&layout, &catalog);
+
     const int phases[] = {1, 2, 2, 0};
     for (unsigned i = 0; i < 4; ++i) {
         prepare_native_port(states[i][0], states[i][1], ROOT, JOURNAL);
