@@ -440,8 +440,11 @@ Current delivery checkpoints:
   existing-content collision cases. A lost-RAM-write-acknowledgement prototype
   also passes on both models. Maintained failure integration at `2952a44b`
   now passes both models, including both existing-content collision cases;
-  normal publication/restart/cancellation regression remains running.
-  Next: complete this regression, then durable reservation
+  normal publication, warm restart, zero-write closed repeat and both
+  unpublished cancellation cases now also pass on both models from the saved
+  clean installed baseline. All 82 related Python tests, ARM analysis, formatting
+  and strict docs pass. The follow-up through `a30ae484` is ready for batched CI.
+  Next: durable reservation
   ownership/lifetime and global startup order. No M8 acceptance gate is removed.
   The detailed evidence below includes earlier intermediate states.
 
@@ -557,8 +560,8 @@ Current delivery checkpoints:
   rather than returning an ordinary false predicate to Stock. A lost-write-
   acknowledgement prototype passes on both native models, preserving code/owner,
   guards and IRQ ownership without Flash publication. Maintained failure E2E
-  integration remains in progress. This
-  retains failure ownership and does not implement rollback or restart claims.
+  integration and the normal publication/restart/cancellation regression now pass
+  on both models. This retains failure ownership and does not implement rollback or restart claims.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
