@@ -300,7 +300,10 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     if not 0 < gap < len(program) - 8:
         raise ValueError("Reservation fixture did not establish low-memory pressure")
     fault = root / "fault"
-    prepare(before, fault, args.slot, args.target, bound=True)
+    # Exercise partial header publication in the existing low-memory boot.
+    # Body-sector configurations do not contain the native bank status byte.
+    bank_status = 0xF0 if args.target % 0x20000 == 0 else None
+    prepare(before, fault, args.slot, args.target, bound=True, bank_status=bank_status)
     repaired = boot(fault, "recovered")
     operations = verify_busy_reads(args, root / "recovered")
     if args.flash_busy_reads and not operations:
@@ -520,6 +523,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
                 "reservation_bytes": RESERVE_BYTES,
                 "user_elements": USER_ELEMENTS,
                 "busy_operations": operations,
+                "partial_bank_status": bank_status,
                 "admission_rejected": admission_rejected,
                 "admission_gap": admission_gap,
                 "rejected": rejected,

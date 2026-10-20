@@ -84,6 +84,33 @@ class RecoveryPrepareTests(unittest.TestCase):
             PREPARE.prepare(self.source, self.destination, 0x160105, 0x140000)
         self.assertEqual(retained.read_bytes(), b"previous state")
 
+    def test_partial_bank_status_preserves_the_original_recovery_records(self):
+        slot, target = 0x160105, 0x140000
+        PREPARE.prepare(self.source, self.destination, slot, target, bound=True)
+        erased = (self.destination / "flash").read_bytes()
+        for status in range(0xF0, 0x100):
+            destination = self.destination.with_name(f"status-{status:x}")
+            PREPARE.prepare(self.source, destination, slot, target, bound=True, bank_status=status)
+            expected = bytearray(erased)
+            expected[target + 0x100] = status
+            self.assertEqual((destination / "flash").read_bytes(), expected)
+            self.assertEqual((self.source / "flash").read_bytes(), self.flash)
+            self.assertEqual(
+                (destination / "sram").read_bytes(), (self.source / "sram").read_bytes()
+            )
+
+    def test_partial_bank_status_rejects_impossible_tears_and_body_sectors(self):
+        for status, target in (
+            (0xEF, 0x140000),
+            (256, 0x140000),
+            (True, 0x140000),
+            (240.0, 0x140000),
+            (0xF0, 0x141000),
+        ):
+            with self.subTest(status=status, target=target), self.assertRaises(ValueError):
+                PREPARE.prepare(self.source, self.destination, 0x160105, target, bank_status=status)
+            self.assertFalse(self.destination.exists())
+
     def test_body_fault_preserves_bank_header_and_binds_the_exact_sector(self):
         for target in (0x141000, 0x154000, 0x15F000):
             with self.subTest(target=target):

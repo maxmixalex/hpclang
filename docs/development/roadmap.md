@@ -427,6 +427,20 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local torn-bank startup coverage:** both models complete low-memory automatic
+  recovery for all sixteen `F0`–`FF` values reachable while programming the native
+  bank-status byte, with the remaining bank identity bytes still erased. All
+  32 cases restore exact Flash/catalog state, preserve 24,000 user-array elements,
+  release the matching reservation and pass the maintained execution-image,
+  owning-CODE, guard and reset-checkpoint oracle. The maintained fixture generator
+  reproduces those native inputs byte-for-byte and rejects impossible status
+  values or body-sector misuse. Existing low-memory E2E now exercises `F0`
+  partial-header publication without another emulator invocation; the existing
+  absent-reservation case retains fully erased-sector coverage. Sixty-one related
+  Python tests and formatting pass. This bounds one scanner-facing fault family;
+  other metadata/object tears, earlier callback access and installation lifetime
+  remain open. Local verification is not CI or M8 acceptance.
+
 - **Local pre-callback Flash access:** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
   the installation fixture's `0x140000` target sector, during warm startup.
