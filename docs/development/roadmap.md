@@ -419,6 +419,12 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Execution discipline: read this roadmap and remote issue #1 before selecting work;
+reconcile implementation, branch and verification evidence, then update both when
+results or scope facts change. M8.0 remains the primary track. Port 2 recovery
+ownership, startup ordering and reclamation are required deliverables, not a
+post-M8 deferral. Only M8.1 is accepted complete.
+
 Current delivery checkpoints:
 
 - **Installation identity follow-up (local, not submitted):** the existing
@@ -466,16 +472,34 @@ Current delivery checkpoints:
   wrong catalog mappings, read failures, a root supplied only by the journal
   and damaged current Flash after closure. Outputs and Flash remain unchanged
   on rejection. Host/sanitizer tests and ARM analysis pass; both native models
-  are running the five transaction-state probes. The current copied admission
+  have passed all five transaction-state probes (armed, damaged, retiring, closed
+  and unpublished), including exact code/owner/guards/catalog/Flash checks.
+  The current copied admission
   program occupies 26,914 bytes (26,832-byte ARM runtime extent), exceeding the
   earlier 20,898-byte low-memory gap; its containing library occupies 27,008 bytes.
   This is functional preflight evidence only: a smaller admission path and
   renewed physical-memory validation are required before startup integration.
+  Streaming admission now avoids the sector-sized scratch buffer by validating
+  the journal incrementally and reading the restored view directly from Flash.
+  Differential host tests pass against the buffered path, including invalid
+  closure order, a mismatched retiring target and a second pending journal.
+  Record tests cover every status byte, byte corruption and read failure;
+  focused CTest, ASan/UBSan and ARM static analysis pass. The native copied
+  program is now 17,098 bytes (17,016-byte ARM runtime extent), with a
+  17,192-byte installed library. Local commit `8311bb7d` passes armed,
+  damaged and retiring native admission on both models. With only 20,860
+  bytes free, both also pass damaged and closed admission, preserving all
+  24,000 user real-array elements, the 32 KiB reservation, exact Flash/catalog,
+  execution code/owning CODE, stack guards, mappings and native return.
+  These are explicit internal XLIB calls, not automatic startup acceptance.
+  The remaining normal-memory states are running; maintained sealed-library
+  E2E integration remains next. Record/authority regressions also pass.
+  This streaming path is not yet submitted.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
   tests through `8a717ec4` follow the previous submission `c8740410`.
-  This batch is prepared for CI; acceptance remains pending. `747fa4ae`
+  This batch was submitted as `8fc3fcd4`; acceptance remains pending. `747fa4ae`
   records the publication power-cut evidence below.
   Internal unpublished-transaction cancellation now passes host fault injection
   for four initial states: every program operation with five partial-write masks,
