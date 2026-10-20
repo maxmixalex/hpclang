@@ -367,7 +367,8 @@ responsibility of the individual service call.
 Bounded UTF-8 editing and length-bounded message rendering provide the clean
 primitives for historical line-input/error helpers. Buffer ownership, cancellation
 and errors are explicit. Historical modal screen policy and
-`readint`/`readline` spelling remain adapter/UI work. Model-native Alpha/Shift
+`readline` spelling remain adapter/UI work; `readint/readdouble` now have bounded
+console adapters described below. Model-native Alpha/Shift
 translation is implemented in the clean input layer. Explicit standard-stream
 routing is available through `hpclang/stdio.h`.
 
@@ -382,8 +383,8 @@ validation, cancellation or distinguishable conversion failures.
 
 | Historical capability | Clean equivalent / model and context | Source adapter | Validation |
 | --- | --- | --- | --- |
-| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Historical blocking `readint` and its narrower `int` range remain an adapter concern | Host exact-boundary/error/re-edit tests and ARM System Services probes; CI accepted on `b92e2a7d` |
-| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | `readdouble` spelling, modal rendering and console event loop remain adapter/UI work | Host and ARM finite-subnormal, range and correction probes; CI accepted on `b92e2a7d` |
+| Read an integer from an editable line | Bounded `hpclang_text_input` plus `hpclang_text_input_parse_int64`; all six models, Direct and Stock; no native-object context required | Blocking `readint` now uses the bounded compatibility editor with checked `int` range; acceptance below | Clean service: host exact-boundary/error/re-edit tests and ARM System Services probes; CI accepted on `b92e2a7d` |
+| Read a real number from an editable line | Same editor plus `hpclang_text_input_parse_double`; decimal/exponent syntax, explicit invalid/overflow/underflow errors | Blocking `readdouble` now uses the bounded compatibility editor; acceptance below | Clean service: host and ARM finite-subnormal, range and correction probes; CI accepted on `b92e2a7d` |
 
 The clean functions preserve the line and output on errors rather than silently
 accepting a numeric prefix. They do not implement Alpha-lock, a blocking console,
@@ -397,9 +398,17 @@ output failures and ownership changes are separate tested cases. This supplies
 console primitives without importing historical global screen state or raw-key
 numbering. Applications can use the accepted model-native Alpha/Shift state and
 default keyboard editor; they supply the event source and rendering/presentation
-policy. Historical blocking `readint` and
-`readdouble` adapters remain to be built over these clean services. The existing
+policy. Historical blocking `readint` and `readdouble` now use the bounded
+compatibility editor described below. The existing
 file-backed stream implementation is not replaced.
+
+The owned console additionally exposes grid/cursor snapshots, zero-based cursor
+movement, row-tail erasure and configurable tab widths. These are prerequisites
+for the historical `getx/gety`, `gotoxy/home`, `clreol` and tab controls now
+provided by `hpconio.h`. Movement validates the destination before finishing pending
+UTF-8; erasure does not wrap or scroll merely to erase the last column. Very
+large tab widths use work bounded by the visible grid. Historical global console
+selection, byte encoding and automatic presentation remain adapter responsibilities.
 
 ### Historical text-input policies
 
@@ -704,7 +713,7 @@ access, with both lower and upper delay bounds to catch unit mismatches.
 All six Direct and all six Stock targets pass locally with the corrected
 milliseconds conversion and stopwatch checks, including independent report
 pixel verification. The separate System Services payload also passes that
-full matrix. Formal CI is pending.
+full matrix. Runtime and Quality CI are accepted on `c2fb66fe`.
 The relocated installed SDK also builds its C/C++ examples, all six native
 launchers and three HP39 Aplet families, including `examples/hpgcc-timer`. Historical
 integer aliases are shared across `hpsys.h`, `hpkeyb49.h` and `saturn.h`.
@@ -717,7 +726,136 @@ adapter; it does not promise the historical time library's binary ABI. Host
 tests cover leap/century dates and failure preservation. The calendar check
 passes all six Direct and all six Stock targets with independent report pixel
 verification and normal Stock return. The relocated installed-SDK build also
-passes with the calendar example; formal CI for this addition remains pending.
+passes with the calendar example; Runtime and Quality CI are accepted on `c2fb66fe`.
+
+### Historical console output
+
+Including `hpconio.h` selects a lazy default output backend for `printf`, `puts`,
+`putchar` and other standard-stream writes. Header initialization registers the
+backend without allocating a console or acquiring the LCD. An explicit
+`hpclang_stdio_bind` takes precedence as a whole; unbinding resumes the default.
+`hpstdio.h` alone retains its existing file/standard-C interface and does not
+select a display backend. Define `HPCLANG_HPCONIO_NO_AUTOINIT` before including
+`hpconio.h` to opt out of automatic registration, then call
+`hpclang_hpgcc_console_enable()` when appropriate.
+
+The output group adds `home`, `getx/gety`, `gotoxy`, `clreol`, `_clear_screen`,
+`screen_width/height`, `get/set_tabsize` and `beep`. Coordinates are zero-based;
+queries return `-1` on failure, and void calls report errors through errno.
+Invalid coordinates and nonpositive tab widths are rejected. Tabs advance to
+the next configured stop without reproducing the historical modulo bug; very
+large widths take bounded work. Output uses calculator byte glyph IDs, including
+0x80–0x9f, with the existing HPG 4×6 native/fallback font policy. It is not UTF-8.
+Geometry fits complete cells within the visible display (32 columns on the
+current 131-pixel targets), avoiding the old partial cell/status-column overlap.
+
+Text and HPG share a display lease. Individual characters preserve surrounding
+graphics, and scrolling moves graphics together with text. Output wraps
+immediately at the final column, including scrolling after the last screen cell.
+Single-buffer output publishes immediately; HPG double-buffer modes still need
+`hpg_flip`. A separately owned clean display session yields `EBUSY`. Normal HPG
+cleanup restores the borrowed display. Historical `gets/_gets` spellings use
+the bounded adapters described below; decimal-format policy remains
+M8 work. Host sanitizers, ARM analysis, all six Direct targets and HP39g+,
+HP48gII, HP49g+ and HP50g Stock pass locally. The installed mixed C/C++ console
+example also passes relocation, six-model launchers and three HP39 Aplet
+packaging families. HP39gs/40gs Stock also pass; CI acceptance is pending.
+
+The default read callback now supplies blocking `getchar` input without echo.
+It consumes the existing physical event stream and applies the current model's
+Alpha/Shift rules, retaining text mode across calls without resetting keyboard
+timings or its queue. Enter returns LF and deletion returns BS. ON cancellation
+reports `EOF` with `ferror`, errno `ECANCELED`, and no `feof`; `clearerr(stdin)`
+allows subsequent input. Unrepresentable Unicode reports `EILSEQ` instead of a
+silently substituted byte. This intentionally replaces the old hardcoded 49
+keyboard table. An explicit standard-stream binding bypasses the default read
+callback entirely. Six-model host mapping tests, font regressions, ARM analysis
+and all six Direct and all six Stock physical-key checks pass locally,
+as does the updated installed-SDK relocation/packaging gate.
+`fgets` can
+consume these bytes, but it does not implement an interactive line editor.
+
+`hpclang_hpgcc_gets(buffer, capacity)` adds a bounded interactive byte line.
+Capacity includes the terminating NUL. It starts empty, echoes accepted bytes,
+accepts CR/LF, permits backspace, and rejects excess input while still allowing
+correction. Cancellation/error returns NULL with terminated partial text;
+nonempty ordinary EOF returns that text. Invalid or unknown capacity fails
+before consuming input. The default console temporarily saves its visible
+image so deletion can undo scrolling and restore earlier graphics. Each edit
+is published even in an HPG double-buffer mode, synchronizing its back page.
+Allocation failure can occur before editing. With explicit standard-stream
+callbacks, it uses those streams and emits BS-space-BS for deletion without
+acquiring a display. Host sanitizers, installed-SDK relocation/packaging and
+HP39g+/HP50g Direct and Stock physical-key editing checks pass, including independent
+pixel comparison after overflow rejection, backspace and scrolling. Wider
+native acceptance is pending.
+
+Including `hpconio.h` supplies `gets(array)` and `_gets(array)` call macros for
+fixed `char` arrays, including struct members, in C and C++. Their declared
+array extent becomes the editor capacity; the argument is evaluated once.
+Pointer expressions (including interior pointers, function results and a choice
+between buffers) have no declared array extent and fail with `EINVAL` before
+consuming input or changing the buffer. Use `hpclang_hpgcc_gets(pointer, capacity)`
+for those cases and variable-length arrays. This avoids relying on compiler
+object-size inference, which can lose member bounds through pointer expressions.
+These aliases do not export an unbounded function symbol or support taking its
+address. Define `HPCLANG_HPCONIO_NO_GETS_ALIASES` before including the header to
+disable both macros. The maintained console E2E now calls the historical name
+for its guarded four-byte buffer, overflow rejection, backspace and scroll-undo
+checks; all six Direct and all six Stock targets pass locally with independent
+console/editor pixels and normal return. The installed-SDK C++ input client
+exercises both spellings and passes relocation/packaging validation.
+
+`hpstdio.h` exposes `readint()` and `readdouble()` without enabling default
+stdio merely by including the header. Calling either uses the bounded editor
+and respects explicit stream ownership. Their 32-byte local storage admits 31
+input bytes; excess characters are rejected while backspace remains available.
+Both accept a numeric prefix, matching the historical `atoi/atof` use:
+`123tail` reads as 123. Integer conversion is decimal; double conversion uses
+C `strtod` syntax. Unlike the reviewed historical floating parser, this accepts
+leading whitespace and standard C hexadecimal/infinity/NaN forms, and applies
+the exponent of a valid prefix even when trailing text follows it. Historical
+floating-parser arithmetic and malformed-exponent quirks are not reproduced.
+No conversion returns zero with `EINVAL`. Integer overflow
+returns `INT_MIN/INT_MAX` with `ERANGE`; double range errors follow `strtod`.
+Input error/cancel returns zero with its error; empty EOF returns zero with
+stream EOF available to the caller. Successful conversion preserves errno.
+For full-line validation and separate result/status, use the clean text-input
+parsers. Host sanitizer acceptance covers prefix/boundary/range/error behavior;
+ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key numeric input,
+and installed-SDK relocation/packaging pass locally. Wider native and CI
+acceptance of these two adapters remains pending.
+
+The integer family also supplies `readuint`, `readhex`, `readlonglong` and
+`readulonglong`, with the shared `LONGLONG/ULONGLONG` typedefs. Source review of
+HPGCC 2.0's `atoui_base/atoull_base/atoi_base/atoll_base` establishes digit-prefix
+parsing from the first byte, without skipping whitespace or accepting `+`.
+Signed decimal forms accept a leading `-`; unsigned forms do not. `readhex`
+accepts mixed-case bare hexadecimal digits: `0xff` therefore converts the
+initial zero only. These rules also correct the initial `readint` adapter's
+overly permissive use of `strtol`. All integer forms saturate at their type's
+limit with `ERANGE`, replacing historical overflow behavior. Host sanitizers
+cover signed/unsigned limits, invalid prefixes and read errors. ARM analysis
+and HP39g+/HP50g Direct plus HP50g Stock physical-key acceptance pass locally.
+The relocated SDK builds and packages a C++ client using all six numeric entry
+points and the shared historical integer typedefs. The combined Display payload
+exhausted HP39g+ Stock memory in its 16-level display check before reaching
+console input. Console/input tests now form a separate `hpgcc-console` runtime
+suite; the split console passes HP48gII/HP49g+/HP50g Direct/Stock and HP39g+
+Stock, including independent pixels and normal return. Split Display passes
+HP39g+ Stock with its original allocation and gray-level assertions. Remaining
+target and CI acceptance is pending.
+
+`hpstring.h` and `hpconio.h` also expose the 1.0/1.1/2.0 `ints/uints` helpers.
+Bases 2–36 use lowercase digits. Other bases retain the historical `"0"` result,
+with a minus sign for negative signed input. Returned text is borrowed static
+storage: `uints` and nonnegative `ints` share a buffer; negative `ints` has its
+own buffer. Copy text before another call can overwrite it. Calls allocate
+nothing and preserve errno. `INT_MIN` is handled without the old signed-negation
+overflow. All bases and signed/unsigned boundaries pass host sanitizers and ARM
+analysis; HP39g+/HP50g Direct, HP50g Stock and updated installed-example
+relocation/packaging checks pass locally.
+The reviewed HPGCC3 source does not provide these same helpers.
 
 ### Historical tones and packed BCD
 
@@ -735,6 +873,36 @@ The older `sys_playTone` headers warn that parameter interpretation may be
 wrong: its cycle count implies hundredths of a second, but its delay assumes
 600 kHz while the historical tick service uses 750 kHz. The adapter implements
 the nominal units, not that clock error, arithmetic overflow or raw pin writes.
+
+`kos_beep` remains a separate compatibility requirement. HPGCC's wrapper waits
+on `kos_CheckBeepEnd`, whose result is affected by the supplied mode flags.
+HP50g ROM inspection indicates that bit 1 selects completion waiting, while
+bit 0 permits a later request to replace the active tone. The admission check
+uses the active request's flags, so treating `override` as an ignored Boolean
+would change overlapping-call behavior. Controlled native-state probes on all
+six models confirm the completion-query truth table and rejection of a new
+request while the active flags prohibit replacement. The low-level driver
+returns -1 in that case, but the public KOS entry discards it and returns zero.
+These probes restore the native state and return normally; they do not start
+tones or verify real asynchronous timing and permitted preemption. An adapter
+requires owned asynchronous playback and
+completion/preemption state; the current blocking `hpclang_sound_play` alone
+does not implement that contract.
+
+The internal PWM4 one-shot lease now provides a separate deadline timer without
+changing PWM2 audio output or the shared prescaler. It rejects an existing
+running, update, DMA or pending owner before modifying registers. Host sanitizer
+tests cover delay rounding, overflow and resource restoration; native Direct
+probes on all six model emulators pass expiry, rearm and stopped-state restoration.
+Those probes keep the interrupt masked and poll its pending bit. A separate
+supervisor helper now exchanges and restores the banked IRQ stack, link and
+status registers. Six-model Direct probes verify actual interrupt delivery
+while application code runs a busy loop and independently compare the restored
+bank. System Services E2E maintains this test, including the SWI vector, stack
+boundary and retained Stock source latches, and passes all six Direct targets
+locally. The production IRQ dispatcher,
+absolute-deadline handling and autonomous audio shutdown remain required before
+this becomes a public asynchronous sound adapter.
 
 Packed-BCD adapters follow the 1.1/2.0 contracts:
 
@@ -760,7 +928,8 @@ duration bounds, BCD results and independent report pixels. The separate sound
 service tests cover hardware ownership and restoration.
 Both tone spellings and BCD checks pass all six Direct and all six Stock targets
 locally, including normal Stock return. The relocated installed SDK builds the
-updated example for C/C++ launcher and Aplet acceptance. Formal CI is pending.
+updated example for C/C++ launcher and Aplet acceptance. Runtime and Quality CI
+are accepted on `c2fb66fe`.
 
 ### Historical slow-mode selection
 
@@ -777,12 +946,12 @@ provide raw `sys_clksave/restore`, PLL control or overclocking adapters.
 All six Direct and all six Stock targets pass repeated profile selection,
 frequency bounds, monotonic continuity and host-frequency restoration, with
 independent report pixels and normal return. The relocated SDK also builds the
-updated example, six-model launchers and three HP39 Aplet families. Formal CI
-for this adapter addition is pending.
+updated example, six-model launchers and three HP39 Aplet families. Runtime and
+Quality CI are accepted on `c2fb66fe`.
 
 ### RTC tick compatibility requirements
 
-The remaining `sys_setRTCTickPeriod`, `sys_isRTCTick` and `sys_waitRTCTicks`
+The `sys_setRTCTickPeriod`, `sys_isRTCTick` and `sys_waitRTCTicks`
 adapters form one stateful interface; `sys_waitRTCTicks` is not a fixed-unit
 delay. The reviewed four-generation implementations establish these contracts:
 
@@ -799,11 +968,39 @@ delay. The reviewed four-generation implementations establish these contracts:
   so multiplying count by the period is not equivalent.
 
 The historical implementation changes TICNT and clears the RTC bit in SRCPND.
-An hpclang implementation still needs explicit ownership, phase/pending-state
-semantics, error handling and exit restoration. An application-local timer
-would need to document its different relationship to the real interrupt latch;
-the existing cooperative timer's accumulated-expiration count alone is not a
-drop-in implementation. These three adapters remain unimplemented.
+The adapters now use the physical tick latch with an explicit polling lease.
+A query does not access hardware. A valid setter returns zero on failure with
+`errno`, leaving its software selector unchanged; polling returns -1 on error,
+and a failed poll terminates the void wait function. Unknown models report
+`ENOSYS`; conflicting RTC modes report `ENOTSUP` or `EBUSY`. The cooperative
+timer's accumulated-expiration count is not substituted for this latch.
+
+The internal physical-tick lease engine now saves the host divider/enable and
+tick interrupt mask, retains a pending indication across period changes, and
+consumes one indication per poll. Release restores the saved configuration;
+an initial indication survives only if the application never consumed it.
+Unrelated source/selected-pending bits and mask changes are preserved. FIQ
+routing, RTC test/reset modes and an inconsistent selected interrupt are
+rejected before writes. Host tests cover all 256 selector byte values,
+coalescing, pending consumption/preservation, disabled host ticks, repeated
+release and conflicts, including ASan/UBSan. The previous sub-period hardware
+phase cannot be restored when reprogramming the divider. The three public
+adapters are wired into the SDK, with optional cleanup on normal exit and
+`_Exit`. Interface and both exit-path host tests pass under ASan/UBSan, and
+ARM applications/launchers build. All six Direct targets and HP50g Stock pass
+the pending-first-wait, coalescing and physical-period E2E checks; HP50g's final
+Stock state restores TICNT to its host value after the app leaves selector 127
+owned. A maintained Direct return gate now compares RTCCON, TICNT and the tick
+source's routing/mask before frontend restoration or resumed Stock can conceal
+a missing release. All six Direct targets pass this gate. An HP50g `_Exit`
+variant also passes; a deliberate omission of cleanup is rejected with
+`rtc-tick-state`. The relocated installed SDK builds the timer example using
+all three adapters, C/C++ clients, six model-specific notebooks and three HP39
+Aplet families. All six Stock models now pass the full interface/timing payload,
+independent report-pixel checks and normal return. Host/ARM Clang analysis passes
+across the batch's 265 sources and 777 distinct configurations. Runtime and
+Quality CI are accepted on `413e5891`; the HPGCC system jobs pass in all three
+Direct families and all six Stock models.
 
 ### SD media discovery and replacement
 

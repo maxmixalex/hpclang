@@ -4,13 +4,16 @@ if(NOT DEFINED HPCLANG_ROOT)
     get_filename_component(HPCLANG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 endif()
 find_package(hpclang CONFIG REQUIRED PATHS "${HPCLANG_ROOT}/cmake" NO_DEFAULT_PATH)
-hpclang_add_application(hpclang_ui_e2e main.c cpp.cpp
+hpclang_add_application(hpclang_ui_e2e main.c cpp.cpp stack.c
     "${HPCLANG_ROOT}/examples/declarative-ui/app.c"
     "${HPCLANG_ROOT}/examples/declarative-ui-cpp/app.cpp")
 target_compile_features(hpclang_ui_e2e PRIVATE cxx_std_20)
+target_link_options(hpclang_ui_e2e PRIVATE "LINKER:--wrap=sbrk" "LINKER:--wrap=hpclang_start")
 set_target_properties(hpclang_ui_e2e PROPERTIES OUTPUT_NAME hpclang-ui-e2e)
 target_include_directories(hpclang_ui_e2e PRIVATE "${HPCLANG_ROOT}/examples/declarative-ui")
-hpclang_target_launchers(hpclang_ui_e2e)
+set(ui_rw_bytes 36864)
+target_compile_definitions(hpclang_ui_e2e PRIVATE HPCLANG_UI_RW_LIMIT=${ui_rw_bytes})
+hpclang_target_launchers(hpclang_ui_e2e MAX_RW_BYTES ${ui_rw_bytes})
 set(ui_ascii)
 foreach(codepoint RANGE 32 126)
     list(APPEND ui_ascii ${codepoint})

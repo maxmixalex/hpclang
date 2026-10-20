@@ -84,18 +84,33 @@ def main():
         application = work / "external application"
         shutil.copytree(package / "examples/hello", application)
         shutil.copytree(package / "examples/declarative-ui-cpp", application / "counter")
+        counter_cmake = application / "counter/CMakeLists.txt"
+        counter_source = counter_cmake.read_text()
+        launcher_call = "hpclang_target_launchers(declarative_ui_cpp)"
+        if counter_source.count(launcher_call) != 1:
+            raise AssertionError("C++ counter launcher declaration changed")
+        counter_cmake.write_text(
+            counter_source.replace(
+                launcher_call, "hpclang_target_launchers(declarative_ui_cpp MAX_RW_BYTES 36864)"
+            )
+        )
         shutil.copytree(package / "examples/object-cpp", application / "objects")
         shutil.copytree(package / "examples/hpgcc-timer", application / "timer")
+        shutil.copytree(package / "examples/hpgcc-console", application / "console")
         shutil.copytree(package / "examples/notebook", application / "notebook")
+        shutil.copyfile(root / "tests/sdk/numeric-input.cpp", application / "numeric-input.cpp")
         with (application / "CMakeLists.txt").open("a") as source:
             source.write(
                 "\nadd_subdirectory(counter)\nadd_subdirectory(objects)\nadd_subdirectory(timer)\n"
-                "add_subdirectory(notebook)\n"
+                "add_subdirectory(notebook)\nadd_subdirectory(console)\n"
+                "hpclang_add_application(numeric_input numeric-input.cpp)\n"
+                "target_compile_features(numeric_input PRIVATE cxx_std_17)\n"
+                "hpclang_target_launchers(numeric_input)\n"
             )
         if args.aplet_tool:
             with (application / "CMakeLists.txt").open("a") as source:
                 source.write("""
-foreach(application IN ITEMS hello_c hello_cpp)
+foreach(application IN ITEMS hello_c hello_cpp numeric_input)
     foreach(model IN ITEMS hp39gplus hp39gs hp40gs)
         hpclang_target_aplet(${application} MODEL ${model} NAME "SDK example"
             AUTHOR hpclang TOOL "${APLET_TOOL}" ASSETS "${APLET_ASSETS}")
@@ -106,6 +121,7 @@ endforeach()
                 ("counter", "declarative_ui_cpp"),
                 ("objects", "object_cpp"),
                 ("timer", "hpgcc_timer"),
+                ("console", "hpgcc_console"),
                 ("notebook", "notebook"),
             ):
                 with (application / directory / "CMakeLists.txt").open("a") as source:
@@ -139,6 +155,11 @@ endforeach()
             env=env,
         )
         run("cmake", "--build", str(build), "--parallel", "2", env=env)
+        counter_args = (
+            (build / "counter/declarative_ui_cpp-launchers.args").read_text().splitlines()
+        )
+        if counter_args[-2:] != ["--max-rw-bytes", "36864"]:
+            raise AssertionError("Relocated SDK lost the requested application RW limit")
         commands = json.loads((build / "compile_commands.json").read_text())
         for command in commands:
             serialized = json.dumps(command)
@@ -148,9 +169,11 @@ endforeach()
         for name, output in (
             ("hello_c", build),
             ("hello_cpp", build),
+            ("numeric_input", build),
             ("declarative_ui_cpp", build / "counter"),
             ("object_cpp", build / "objects"),
             ("hpgcc_timer", build / "timer"),
+            ("hpgcc_console", build / "console"),
             ("notebook", build / "notebook"),
         ):
             elf = (output / f"{name}.elf").read_bytes()

@@ -29,6 +29,13 @@ int main(void)
     sys_slowOff(); /* restore the original host clock */
     if (errno)
         return 1;
+    unsigned char previous_tick = sys_setRTCTickPeriod(1); /* 1/64 second per tick */
+    if (!previous_tick || sys_isRTCTick() < 0)
+        return 1;
+    sys_waitRTCTicks(2); /* consume indications, not an accumulated tick count */
+    if (errno || !sys_setRTCTickPeriod(previous_tick))
+        return 1;
+    /* Runtime exit restores the host's original divider and interrupt mask. */
     (void)sys_updateTimer(&timer);
     if (errno)
         return 1;

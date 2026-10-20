@@ -43,6 +43,20 @@ extern "C"
      * Does not require slow mode or reconfigure PWM/interrupt registers. */
     void sys_waitTicks(unsigned int ticks);
 
+    /* Physical RTC tick divider: (selector+1)/128 seconds, selector 1..127.
+     * Return the previous software selector (initially 15); 0 or >127 queries
+     * without touching hardware. Setter failure returns 0 and sets errno.
+     * First use leases the tick source; changing period restarts its phase.
+     * Poll returns 1 and consumes a pending indication, 0 when none, -1/error.
+     * Multiple expirations coalesce; an already pending tick counts first.
+     * Wait with count <=0 is a no-op; errors terminate the wait with errno.
+     * Exit/_Exit restore host divider/enable and interrupt mask, not elapsed
+     * phase or indications deliberately consumed by the application. Only the
+     * tick source is borrowed; civil RTC and PWM timers remain unchanged. */
+    unsigned char sys_setRTCTickPeriod(unsigned char selector);
+    int sys_isRTCTick(void);
+    void sys_waitRTCTicks(int count);
+
     /* Select the owned economy profile (at most 12 MHz), or restore the host
      * profile saved on entry to economy. These are not nested scopes. Retain
      * slower host settings; do not copy historical hardcoded LCD dividers or

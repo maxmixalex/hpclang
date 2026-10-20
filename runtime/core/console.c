@@ -5,22 +5,25 @@
 #include <hpclang/console.h>
 #include <hpclang/display.h>
 #include <hpclang/font.h>
+#include "console-internal.h"
 
 struct hpclang_console
 {
     unsigned columns, rows, column, row, width, height;
-    unsigned remaining;
+    unsigned remaining, tab_width;
     uint32_t pending, minimum;
-    const struct hpclang_font *font;
+    hpclang_console_glyph_fn draw;
+    const void *context;
     struct hpclang_surface *canvas, *glyph;
     uint32_t cells[];
 };
 
-struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
-                                               const struct hpclang_font *font)
+struct hpclang_console *hpclang_console_create_cells(unsigned columns, unsigned rows,
+                                                     unsigned width, unsigned height,
+                                                     hpclang_console_glyph_fn draw,
+                                                     const void *context)
 {
-    unsigned width = hpclang_font_advance(font), height = hpclang_font_height(font);
-    if (!font || !columns || !rows || !width || !height || columns > INT32_MAX / width ||
+    if (!draw || !columns || !rows || !width || !height || columns > INT32_MAX / width ||
         rows > INT32_MAX / height ||
         (size_t)columns > (SIZE_MAX - sizeof(struct hpclang_console)) / sizeof(uint32_t) / rows) {
         errno = EINVAL;
@@ -35,7 +38,9 @@ struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
     c->rows = rows;
     c->width = width;
     c->height = height;
-    c->font = font;
+    c->draw = draw;
+    c->context = context;
+    c->tab_width = 4;
     c->canvas = hpclang_surface_create_mono(columns * width, rows * height);
     c->glyph = hpclang_surface_create_mono(width, height);
     if (!c->canvas || !c->glyph) {
@@ -45,6 +50,22 @@ struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
     }
     hpclang_console_clear(c);
     return c;
+}
+
+static void font_glyph(struct hpclang_surface *cell, const void *context, uint32_t codepoint)
+{
+    hpclang_surface_draw_codepoint(cell, context, 0, 0, codepoint, 255);
+}
+
+struct hpclang_console *hpclang_console_create(unsigned columns, unsigned rows,
+                                               const struct hpclang_font *font)
+{
+    if (!font) {
+        errno = EINVAL;
+        return NULL;
+    }
+    return hpclang_console_create_cells(columns, rows, hpclang_font_advance(font),
+                                        hpclang_font_height(font), font_glyph, font);
 }
 
 void hpclang_console_destroy(struct hpclang_console *c)
@@ -80,6 +101,54 @@ static void newline(struct hpclang_console *c)
         c->cells[retained + i] = ' ';
 }
 
+int hpclang_console_get_state(const struct hpclang_console *c, struct hpclang_console_state *state)
+{
+    if (!c || !state) {
+        errno = EINVAL;
+        return -1;
+    }
+    *state = (struct hpclang_console_state){c->columns, c->rows, c->column, c->row, c->tab_width};
+    return 0;
+}
+
+int hpclang_console_move(struct hpclang_console *c, unsigned column, unsigned row)
+{
+    if (!c || column > c->columns || row >= c->rows) {
+        errno = EINVAL;
+        return -1;
+    }
+    hpclang_console_flush(c);
+    c->column = column;
+    c->row = row;
+    return 0;
+}
+
+int hpclang_console_clear_eol(struct hpclang_console *c)
+{
+    if (hpclang_console_flush(c))
+        return -1;
+    for (unsigned x = c->column; x < c->columns; ++x)
+        c->cells[(size_t)c->row * c->columns + x] = ' ';
+    return 0;
+}
+
+int hpclang_console_set_tab_width(struct hpclang_console *c, unsigned width)
+{
+    if (!c || !width) {
+        errno = EINVAL;
+        return -1;
+    }
+    c->tab_width = width;
+    return 0;
+}
+
+static void glyph(struct hpclang_console *c, uint32_t cp)
+{
+    if (c->column == c->columns)
+        newline(c);
+    c->cells[(size_t)c->row * c->columns + c->column++] = cp;
+}
+
 static void put(struct hpclang_console *c, uint32_t cp)
 {
     if (cp == '\n') {
@@ -94,14 +163,30 @@ static void put(struct hpclang_console *c, uint32_t cp)
     } else if (cp == '\t') {
         if (c->column == c->columns)
             newline(c);
-        unsigned spaces = 4 - c->column % 4;
+        unsigned spaces = c->tab_width - c->column % c->tab_width;
+        if ((uint64_t)spaces > (uint64_t)c->columns * c->rows) {
+            unsigned column = (unsigned)(((uint64_t)c->column + spaces - 1) % c->columns) + 1;
+            hpclang_console_clear(c);
+            c->row = c->rows - 1;
+            c->column = column;
+            return;
+        }
         while (spaces--)
             put(c, ' ');
     } else if (cp >= 0x20 && !(cp >= 0x7f && cp <= 0x9f)) {
-        if (c->column == c->columns)
-            newline(c);
-        c->cells[(size_t)c->row * c->columns + c->column++] = cp;
+        glyph(c, cp);
     }
+}
+
+int hpclang_console_write_byte(struct hpclang_console *c, unsigned char b)
+{
+    if (hpclang_console_flush(c))
+        return -1;
+    if (b >= 0x20)
+        glyph(c, b);
+    else
+        put(c, b);
+    return 0;
 }
 
 static void byte(struct hpclang_console *c, unsigned char b)
@@ -165,6 +250,22 @@ int hpclang_console_cell(const struct hpclang_console *c, unsigned column, unsig
     return 0;
 }
 
+int hpclang_console_render_cell(struct hpclang_console *c, struct hpclang_surface *destination,
+                                unsigned column, unsigned row)
+{
+    uint32_t cp;
+    if (!destination || hpclang_console_cell(c, column, row, &cp)) {
+        errno = EINVAL;
+        return -1;
+    }
+    hpclang_surface_clear(c->glyph, 0);
+    if (cp != ' ')
+        c->draw(c->glyph, c->context, cp);
+    hpclang_surface_blit(destination, (int32_t)(column * c->width), (int32_t)(row * c->height),
+                         c->glyph, 0, 0, (int32_t)c->width, (int32_t)c->height);
+    return 0;
+}
+
 int hpclang_console_render(struct hpclang_console *c, struct hpclang_surface *destination,
                            int32_t x, int32_t y)
 {
@@ -179,7 +280,7 @@ int hpclang_console_render(struct hpclang_console *c, struct hpclang_surface *de
             if (cp == ' ')
                 continue;
             hpclang_surface_clear(c->glyph, 0);
-            hpclang_surface_draw_codepoint(c->glyph, c->font, 0, 0, cp, 255);
+            c->draw(c->glyph, c->context, cp);
             hpclang_surface_blit(c->canvas, (int32_t)(col * c->width), (int32_t)(row * c->height),
                                  c->glyph, 0, 0, (int32_t)c->width, (int32_t)c->height);
         }

@@ -16,6 +16,69 @@ static int read_byte(const struct hpclang_stage_stack_io *io, uint32_t at, uint8
     *value = (uint8_t)word;
     return 1;
 }
+
+uint32_t *hpclang_stage_immediate_return_root(const struct hpclang_stage_stack_io *io,
+                                              uint32_t continuation, uint32_t *machine_stack,
+                                              uint32_t cursor)
+{
+    if (!io || !io->read || !machine_stack || cursor >= 8u || continuation > RPL_MAIN_END - 2u)
+        return NULL;
+    uint8_t instruction;
+    if (!read_byte(io, continuation, &instruction) ||
+        (instruction != 0x10u && instruction != 0x20u && instruction != 0x30u))
+        return NULL;
+    uint32_t *root = &machine_stack[(cursor + 7u) & 7u];
+    return *root < RPL_MAIN_END ? root : NULL;
+}
+
+unsigned hpclang_stage_return_roots(const struct hpclang_stage_stack_io *io, uint32_t continuation,
+                                    uint32_t *machine_stack, uint32_t cursor, uint32_t **roots)
+{
+    if (!roots || !io || !io->read || !machine_stack || cursor >= 8u)
+        return 0;
+    unsigned count = 0;
+    /* Only returns and direct unconditional jumps preserve the known stack
+     * evolution here. Bound cycles without allocating a visited-address table. */
+    for (unsigned steps = 0; count < 8u && steps < 64u; ++steps) {
+        uint32_t *root =
+            hpclang_stage_immediate_return_root(io, continuation, machine_stack, cursor);
+        if (root) {
+            roots[count++] = root;
+            continuation = *root;
+            cursor = (cursor + 7u) & 7u;
+            continue;
+        }
+        uint8_t opcode;
+        if (continuation > RPL_MAIN_END - 2u || !read_byte(io, continuation, &opcode))
+            break;
+        unsigned prefix, width;
+        if ((opcode & 15u) == 6u) { /* GOTO: signed 12-bit offset from operand. */
+            prefix = 1;
+            width = 3;
+        } else if (opcode == 0xc8u || opcode == 0xd8u) {
+            prefix = 2;
+            width = opcode == 0xc8u ? 4 : 5; /* GOLONG / GOVLNG. */
+        } else {
+            break;
+        }
+        uint32_t encoded;
+        if (continuation > RPL_MAIN_END - prefix - width ||
+            !io->read(io->context, continuation + prefix, width, &encoded) ||
+            encoded >> (4u * width))
+            break;
+        if (width == 5u) {
+            continuation = encoded;
+        } else {
+            uint32_t range = 1u << (4u * width);
+            int32_t offset = (int32_t)encoded;
+            if (encoded >= range / 2u)
+                offset -= (int32_t)range;
+            continuation = (uint32_t)((int32_t)(continuation + prefix) + offset) & 0xfffffu;
+        }
+    }
+    return count;
+}
+
 int hpclang_stage_stack_hide(const struct hpclang_stage_stack_io *io, uintptr_t stage0_code,
                              struct stage_launcher_bias *bias)
 {

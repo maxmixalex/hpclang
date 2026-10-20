@@ -81,6 +81,21 @@ It measures a short delay, draws the duration and returns. Its README explains
 the units and the boundary between historical timer calls and hpclang rendering;
 it does not imply complete HPGCC compatibility.
 
+`examples/hpgcc-console` combines C `printf`/`puts`, C++ `std::printf` and HPG
+graphics, edits a name in a 16-byte buffer, reads a count and a value, prints
+their product, then waits for a key before returning.
+Including `hpconio.h` enables
+lazy calculator-byte output without replacing standard C/C++ function names.
+The same header can appear in multiple translation units. Explicit
+`hpclang_stdio_bind` callbacks take priority over the historical default.
+The bounded editor takes an explicit capacity and supports backspace and ON
+cancellation. `hpstdio.h` provides `readint/readdouble` and the unsigned,
+hexadecimal and 64-bit integer variants. These use a 31-byte edited line and
+report conversion/input errors through `errno` and stream flags. They accept
+numeric prefixes; use the clean text-input parsers for whole-line validation.
+Old unbounded `gets` aliases and historical decimal-format controls remain
+separate work.
+
 An application CMake file uses:
 
 ```cmake
@@ -103,6 +118,16 @@ an explicit list limits the output. It uses the selected compiler's matching
 LLVM linker and binary tools and shares its bootstrap builder with repository
 E2E. Changing the payload or bootstrap sources, or removing an output file,
 causes CMake to regenerate the launchers.
+
+For a reproducible application memory ceiling, use
+`hpclang_target_launchers(my_application MAX_RW_BYTES 36864)` (36 KiB).
+The command-line builder exposes the same option as `--max-rw-bytes 36864`.
+The ceiling must be a positive multiple of 4096, at most 1 MiB, and must fit
+the boot page, page-rounded static data and the reserved 8 KiB stack. A launcher
+with fewer available pages still exposes only those available pages. This caps
+the application's mapped read/write arena and moves its stack top accordingly;
+it does not reduce the legacy launcher's Stock reservation or guarantee enough
+heap for a particular application. Omitting the option keeps all available pages.
 
 ## Own calculator objects in C++
 
@@ -187,8 +212,8 @@ Do not add an old HPGCC include directory ahead of the SDK headers or link its
 precompiled runtime libraries. This is source compatibility, not compatibility
 with the old library binaries, startup code or internal structure layouts.
 
-The SDK currently installs `hpgraphics.h`, `hpkeyb49.h`, `hpstdio.h`, `hpsys.h`,
-`hptime.h`, `saturn.h`, `satdir.h` and `fsystem.h`. Each exposes its implemented
+The SDK currently installs `hpgraphics.h`, `hpkeyb49.h`, `hpstdio.h`, `hpconio.h`,
+`hpstring.h`, `hpsys.h`, `hptime.h`, `saturn.h`, `satdir.h` and `fsystem.h`. Each exposes its implemented
 subset; the presence of a header does not promise every function from every
 HPGCC version. An umbrella `hpgcc49.h` is not provided. Replace that include
 with the individual headers needed by the application, then resolve remaining

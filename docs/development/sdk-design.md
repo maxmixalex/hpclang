@@ -278,9 +278,82 @@ inside the CODE object, copies initialized bytes to an eight-byte-aligned
 destination and returns to RPL without adding a stack result. The ARM payload
 must initialize BSS, establish its stack, preserve hardware/native state and
 return through LR. Raw mode requires separate rejection of unsafe relocations; a raw
-binary cannot supply that proof. This envelope neither allocates MMU pages nor
-proves sufficient installation memory. Installation-space budgeting and a
+binary cannot supply that proof. The complete program, including its original
+initialized payload, reserved runtime copy and RPL framing, must fit within the
+256 KiB Stock main-RAM window; oversized programs are rejected before encoding.
+This physical ceiling does not deduct OS/other-object use. This envelope neither
+allocates MMU pages nor proves sufficient installation memory. Installation-space budgeting and a
 distributable recovery tool remain pending.
+
+Recovery-time memory is a separate installation requirement. A local retained-RAM
+fault experiment on both HP49g+ and HP50g stores a verified 26,000-element DOREAL
+array after leaving USB transfer, leaving a 37,823-byte RPL stack/heap gap. The
+existing bound configuration witness has a 46,698-byte transfer package (including
+its eight-byte header). Following reset with an erased target sector, the observed
+startup does not repair Flash or retire the armed journal/authority. A Stock-ROM
+program counter alone does not establish successful startup. Less constrained
+states recover, so successful fresh-state installation is insufficient admission
+evidence. Before destructive work, the installed protocol must ensure recovery
+execution storage remains available across restart, including retained user RAM;
+passing the packager's physical ceiling does not provide that guarantee.
+
+The optional `--flash-copy` configuration mode reduces this witness from 46,698 to
+29,682 bytes by aligning the initialized image downward within each fresh RAM
+copy, rather than retaining a second original image. All sixteen nibble
+placements preserve the instruction prefix and image bounds. Both models pass
+the existing configuration recovery checks (retained RAM, RAM loss, callback-body
+damage and subsequent no-op warmstarts). Both also recover under the same
+37,823-byte-gap condition above, preserving every element of the real array;
+independent checks validate the catalog, complete Flash transition, code, stack,
+TLS and guards. Its lifetime
+contract requires a fresh copy from immutable Flash on every invocation: a
+modified RAM copy cannot be reused as the initialized source. Production
+integration must enforce that distinction and still guarantee recovery memory;
+reducing the footprint does not establish arbitrary low-memory recovery.
+
+`--flash-copy` requires `--library-id`; the resulting library must be installed
+in Flash, not Port 0/RAM. The caller remains responsible for proving that
+placement and the fresh-copy contract. `--program-output PATH` optionally emits
+the configuration program for independent verification; it is not a reusable
+RAM application when compact mode is selected. All input/output paths must be
+distinct. Without `--flash-copy`, the original image remains available for
+repeated RAM execution. The maintained configuration fixture builds both the
+library and its companion program and checks low-memory recovery plus a later
+unchanged restart, preserving the full real array. The existing Runtime artifact
+glob includes the companion; no separate workflow or resource exception is needed.
+
+The internal packager also accepts `--reservation-name NAME`,
+`--reservation-bytes SIZE` and `--reservation-prefix TEXT`, supplied together
+with `--library-id`. It generates a small configuration and six hidden commands;
+the large recovery program is copied to RAM only after checking/releasing the
+reservation. No calculator-side compiler or exported command names are needed.
+The name is a non-space ASCII identifier, the prefix is opaque UTF-8 bytes, and
+the exact string capacity must cover the recovery program while remaining below
+the Stock main-RAM ceiling. The library keeps ordinary and compact program
+lifetimes unchanged.
+
+The guard checks the HOME object's string type, exact capacity and prefix using
+real literals and `SAME`. A mismatch preserves the object and skips recovery;
+an absent object permits normal recovery. The generated library passes local
+HP49g+/HP50g low-memory recovery with a controlled 32 KiB string and a 20,898-byte
+initial RPL gap, preserving all 24,000 user real-array elements and passing a
+later unchanged restart. Comparable HP50g pressure without releasable storage
+leaves the transaction armed and Flash unrepaired.
+Instrumented native rejection checks on both models preserve wrong-type,
+wrong-capacity and wrong-prefix objects with unchanged Flash; an independently
+cleared/recreated completion marker proves the guard ran. The maintained
+bound-configuration flow runs these scenarios in the existing Stock recovery
+jobs and saves both generated packages. Synthetic busy reads exercise SDK
+recovery, with a required nonzero operation count and exact read budget; Stock
+uses its normal installation driver to construct the fixture first.
+
+This is an internal packaging mechanism, not a trusted installer. Production
+admission must bind the expected name/header, capacity and lifetime to the actual
+installation root and current transaction before destructive writes. A fixed
+name or matching header alone is insufficient. Release and recovery share one
+configuration invocation; ordering against earlier system callbacks remains a
+separate unresolved requirement. Capacity validation alone is not a guarantee
+of all startup allocation requirements.
 
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from
@@ -321,6 +394,14 @@ existing destination are preserved. The copied state must undergo hardware
 reset before transfer so Stock rebuilds its catalog from the damaged Flash.
 This is explicit offline fault injection, not a model of an erase/program pulse
 interrupted while the chip is busy.
+Targets may be aligned sectors anywhere inside the first user bank; the journal
+must remain in a separate empty bank. This permits body-only faults that leave
+the bank identity and earlier library headers intact. The configuration fixture
+derives its Stock 2.15 library-229 callback sector from the saved catalog and
+Flash header, verifies the expected bank mapping and rejects a target sharing
+the bank/library header sector. It checks exact recovery, the complete catalog,
+owned recovery state and an unchanged subsequent warmstart. Successful repair
+does not by itself prove which earlier factory callbacks executed or were skipped.
 
 `tests/e2e/port-recovery/run.py` orchestrates the fresh firmware boot, offline
 fault preparation, hardware reset, USB transfer and independent verification.
@@ -356,7 +437,114 @@ The verifier selects `--operation replay`, `retire` or `check`; `check` validate
 the known retired record and its target as well as the no-write invocation.
 This is an owned
 transaction fixture, not transaction-freshness proof for arbitrary journals or
-an automatic startup-recovery implementation. CI builds all three witness modes.
+an automatic startup-recovery implementation. CI also builds the configuration
+mode described below alongside these three witness modes.
+
+The retirement witness also exercises the documented
+[`STARTUP` warmstart entry](https://hpcc.org/calculators/hp50g/hp50g_aur.pdf#page=617)
+in a separate copy of the fresh damaged fixture. USB installation stores the
+program without recalling or evaluating it; the complete Flash image must stay
+unchanged before reset. The first warmstart must execute the owned recovery
+entry, restore the sector and retire its journal. A second warmstart must find
+no pending journal, perform zero erase/program commands, leave Flash unchanged
+and retain the clean native library catalog and empty stack. Both invocations
+use the same image/TLS/stack/mapping verifier and the configured Flash busy-read
+model. This path passes locally on HP49g+ and HP50g.
+
+This establishes automatic invocation for the fresh fixture, without Library
+275. Production installation must still preserve an existing user `STARTUP`,
+establish ordering relative to library configuration and other startup work,
+and enforce transaction ownership/freshness before allowing native mutation.
+The fixture does not install a recovery service into an existing user's HOME.
+
+Native HP49g+/HP50g Stock 2.15 ordering probes install a temporary Port 0 library
+whose configuration appends `C` to a HOME string, while `STARTUP` appends `S`.
+After warmstart, independent RAM inspection finds `CS` on both models, the
+installed library in the rebuilt catalog and execution back in Stock. Thus HOME
+`STARTUP` alone cannot guarantee recovery before library configuration accesses
+a damaged bank. A separate HP50g probe puts libraries 1701 and 1702 in Port 2:
+both installation orders run 1701's configuration before 1702's, then `STARTUP`.
+This is evidence for that pair, not a reserved earliest callback or a guarantee
+across arbitrary library IDs, ports and firmware configurations.
+Two further HP50g probes compare a Port 2 library numbered 769 with Port 0
+libraries: 769 runs before 1702 but after 768. Stock accepts the latter even
+though it is below the documented user-library range. A callback that appends
+to a HOME string demonstrates the consequence of recovery's internal restart:
+the earlier 768 callback executes twice during fault recovery, whereas the
+later 1702 callback executes once. Both runs finish with the complete 63-entry
+catalog and exact Flash repair/retirement. Choosing 769 alone therefore cannot
+establish a safe production entry; earlier callbacks may have side effects or
+access the damaged bank before recovery runs.
+Production recovery also needs an entry that survives loss of HOME RAM; the
+RAM-resident witness does not establish that property.
+
+Journal integrity is separate from transaction authority. A host regression
+keeps a valid ready journal and adds a valid backup inside its target sector.
+Whole-port overlay preflight still accepts the old image, because that image
+hides the later allocation. No erase is attempted: public write preparation
+rejects the ready or partially retired journal without modifying any Flash byte.
+Pinning the journal bytes alone cannot detect this stale-target case. Production
+startup replay requires a durable transaction ownership protocol before this
+internal recovery primitive can authorize writes outside a controlled fixture.
+
+An HP50g prototype stores the owned recovery program as a hidden Port 2 library
+command. Calling its ROMPTR after Stock startup passes the image/stack/TLS and
+return checks with unchanged Flash and no journal. This establishes execution
+from the installed library through a RAM-owned CODE copy. Configuration-time
+probes both through that hidden command and with the program directly in the
+configuration entry restore an injected damaged sector and retire its journal:
+complete Flash images match the independent replay oracle with 64-read busy
+intervals. Stock GC moves the containing CODE object, sometimes by an odd
+nibble, before the final warmstart snapshot. The verifier's explicit
+`--relocated-image` mode reconstructs its bytes and original execution address
+from the saved errno pointer and ELF TLS layout, then checks original alignment,
+RAM bounds, stack/TLS diagnostics, complete immutable image/guards and the
+owning CODE envelope. Both paths pass; ordinary probes retain strict unmoved
+alignment by default. This verifies this owned witness, not arbitrary active
+ARM callers or complete native-reference repair.
+The return-only configuration entry also passes these checks on HP49g+, but
+leaves only 59 of the original 62 catalog entries on both models. A subsequent
+warmstart restores all exact bindings. Production recovery must therefore
+rebuild the catalog before dependent library/application code continues.
+An HP50g test with that entry also clears the
+complete 512 KiB external SRAM before reset, leaving the installed Flash library
+and fault journal unchanged. After cold initialization completes, exact replay/retirement,
+the relocated-image checks and Stock return pass. The initial 16-second capture
+was still in firmware initialization; continuing that same state establishes
+completion without reintroducing saved HOME data. This remains an isolated
+fixture, not complete loss of every peripheral/on-chip state, production
+installation, transaction freshness or physical battery removal acceptance.
+
+The maintained runner includes a fresh Flash-configuration fixture with
+`--configuration-build`. This witness enables retirement and
+`HPCLANG_RECOVERY_RESTART_AFTER_REPAIR`: after successful retirement and Flash
+mapping/interrupt restoration, a nonzero discovered journal slot requests Stock's reset
+service. The resulting startup finds no pending journal and returns normally.
+An unexpected return from the reset service stops the witness instead of
+resuming an incomplete catalog. CMake rejects restart mode without retirement
+or together with the interrupted witness. This is an internal recovery mode;
+the general reset API remains deferred.
+
+The host packager wraps the owned CODE program in a configuration-only native
+library with no exported commands, hash table or command-link table. It checks
+the program envelope and emits the native library length and CRC. The optional
+`--library-id` accepts the documented user range 769..1791; it does not reserve
+the ID, install recovery or establish callback priority. Stock stores the
+packaged fixture in Port 2 and the transfer variable is removed from HOME;
+calculator-side library compilation is unnecessary. A clean restart establishes its catalog baseline;
+after fault injection, one host reset must finish with exact replay/retirement,
+the complete catalog and a verified final no-op recovery image. No second host
+reset may be needed to obtain the complete catalog. A later independent reset
+then checks unchanged Flash/catalog and no repeated recovery. A HOME string
+must survive every phase, distinguishing reinitialization from loss of user RAM.
+Both HP49g+ and HP50g pass this maintained path locally, including the HOME value,
+complete catalog, exact Flash transition and final no-op image verification.
+The workflow builds this configuration mode alongside normal, interrupted and
+returning-retirement witnesses. The library ID and temporary names
+are fixture-local, not a production reservation or existing-user installation.
+The synthetic busy-read model is enabled for the recovery warmstarts, after
+Stock constructs the fixture: applying it to Stock's installation driver fails
+in the emulator and is not an accepted hardware-timing model for that driver.
 
 The optional `--flash-busy-reads N` delays each program/erase operation by
 `N` status reads. During that interval the emulator toggles DQ6, reports DQ7
@@ -411,7 +599,11 @@ The internal `hpclang_rpl_catalog_plan_relocation()` assembles the catalog part
 of a reference-repair plan. The caller supplies a stable reader, a resolver for
 physical mapping identities and bounded output buffers. Every binding is resolved,
 including unbanked entries. For N entries the plan contains 2*N edits (address
-and unchanged bank-switch fields) and 1+2*N guards (count, IDs and flags).
+and bank-switch fields) and 1+2*N guards (count, IDs and flags). The resolver
+supplies separate physical mapping identities for the library payload and its
+switch function; executing the switch is what selects the payload mapping.
+Nonzero switch-function targets relocate under their own mapping. Zero means
+no switch and stays zero; moving a function to that sentinel is unsupported.
 Duplicate IDs remain distinct records. Identical addresses in different physical
 mappings do not imply the same target. On failure both output counts are zero;
 partially filled buffers must be discarded. Planning performs no native writes.
@@ -421,6 +613,27 @@ edits, and incorporate all other native roots before committing any relocation.
 The catalog plan alone establishes neither complete reference coverage nor
 permission to return to Stock after moving data.
 
+`hpclang_rpl_mutation_catalog_grow_repaired()` combines caller-proven main-RAM
+edits/guards with a snapshot of native root repairs. Every edit names its original
+field before movement. Exact duplicate repairs coalesce, including discoveries
+shared with native traversal; conflicting repairs, partial overlaps and edits
+that split across movement boundaries reject before writes. Unchanged native
+roots also constrain caller edits. ARM-held roots are identified by their cell
+addresses, independently of native nibble addresses. Geometry publication follows
+field repairs and movement. The legacy internal grow entry uses the same path
+without additional edits.
+
+The operation allocates temporary ARM heap storage for the root snapshot; an
+allocation or preflight error leaves native memory and ARM roots unchanged.
+Callers retain exclusive ownership and stable mappings/inputs throughout.
+`HPCLANG_RPL_MUTATION_INCOMPLETE` distinguishes commit failure from preflight
+rejection: even the first failed native nibble write may follow an ARM-root
+update. This status is not rollback or permission to resume Stock, and this
+geometry operation cannot simply be replayed. Temporary plan storage is released
+on success and on either failure path; this is not recovery of changed native
+state. Other physical banks, complete
+object/code coverage and registration publication remain separate obligations.
+
 `hpclang_rpl_mutation_visit_guarded_roots()` also reports every native nibble
 read during root enumeration, including stack/table boundaries and traversal
 metadata. Root provenance and order remain unchanged. The caller can coalesce
@@ -429,6 +642,24 @@ all partial output. The adapter does not forward native writes. IO configuration
 mapping identity and ARM-side root values still require caller-owned stability;
 they are not native-memory read dependencies. This traversal does not replace
 catalog bank resolution or object-body reference discovery.
+
+Catalog root traversal distinguishes `LIBRARY` (an unbanked payload binding)
+from `LIBRARY_SWITCH` (a nonzero executable switch address in the current
+mapping). RAM switch functions participate in reference preservation and
+relocation; their bank-selected payload addresses do not inherit that mapping.
+Zero/no-switch fields do not produce executable roots. The structural object
+visitor likewise emits a separate `EXECUTION` event for a nonzero ACPTR switch
+field, in addition to the ACPTR payload event. Compact and nested objects retain
+the true native field address. These execution events still require code and
+mapping analysis; the ordinary reference planner does not certify them safe.
+
+`hpclang_rpl_reference_plan_execution_shift()` explicitly plans the stored
+address of a validated EXECUTION event with separately qualified field/target
+mappings. It accepts only a nonzero five-nibble execution target with zero
+extent/auxiliary; a move to the no-function sentinel is rejected. Catalog switch
+planning uses this entry instead of reclassifying executable pointers as data.
+The ordinary planners continue rejecting EXECUTION. Planning an address does not
+resolve the target's code body or prove complete execution-reference coverage.
 
 `hpclang_rpl_reference_guards_begin()` and `guards_observe()` collect those
 observations in caller-owned storage, sorted by physical mapping and address.
@@ -463,12 +694,29 @@ reference discovery or later expected-value validation.
 
 Native execution context is a separate root source from the calculator's RPL
 return-stack cells. During a live ARM invocation the original runner can retain
-continuation addresses into movable RPL code outside the two roots currently
-registered by stage1. A successful payload marker therefore cannot establish
+continuation addresses into movable RPL code outside the roots registered by
+stage1. A successful payload marker therefore cannot establish
 return safety; acceptance must include the return to Stock and a subsequent
 invocation. Platform integration must establish the types, ownership and layout
 of these saved execution fields rather than infer roots from address-looking
 integers or command-specific offsets.
+
+Historical relocation routines do not establish a general machine-code safety
+contract. HPGCC 1.0.3's `examples/libtests/stack.c` demonstrates stack inspection;
+the 1.1/2.0 `sat_createtemp.c` allocates by moving the RPL return-stack area and
+adjusting boundaries. HPGCC3's `sat3_garbcol.c` calls `__sat3_fixptrs` in
+`sat3_free.c`; that helper repairs enumerated system roots, rather than decoding
+arbitrary object bodies or saved CPU registers. Its directory counterpart
+`__sat3_fixptrs2` has the same limited role. These are implementation observations,
+not proof that omitted references are safe to ignore in hpclang.
+
+Chapter 8 of [HP 49 Assembly Language Examples](https://literature.hpcalc.org/community/hp49-asm-examples.pdf)
+explicitly distinguishes collecting while machine code is running from a movable
+region from returning to SysRPL and restarting code after collection. This is
+evidence that the native execution boundary matters, not that a CODE prologue
+alone guarantees safe relocation. The proposed distinction between native-contract
+compatibility and arbitrary hidden-address repair awaits maintainer confirmation;
+existing preflight and M8 completion requirements remain in force meanwhile.
 
 The classic ROM's machine stack has eight 20-bit cells and a modulo-eight
 cursor; its pop helper clears the consumed cell. This layout is not a type
@@ -483,6 +731,24 @@ HP49g+/HP50g captures through the independent recovery envelope, with library
 275 absent, still contain one machine-stack value inside the movable TEMP
 range. The surrounding Stock evaluation path therefore remains part of the
 execution-root analysis even when the ARM image and its stack are owned.
+
+For HP49g+/HP50g, stage1 recognizes a bounded return path:
+when the saved post-ARMSYS PC points to `RTN`, `RTNSC` or `RTNCC`, the next
+instruction consumes the circular machine-stack top as an execution address.
+It publishes that cell as an invocation-local relocation root alongside the
+hidden launcher object and saved PC. If the consumed target names another
+proven return, discovery continues, up to eight distinct cells. Direct
+`GOTO`, `GOLONG` and `GOVLNG` may lead to that return without consuming a cell.
+The path is bounded to 64 instructions, including jumps and returns; conditional
+branches, calls and register-mediated jumps require separate analysis and stop
+this walker. Jump semantics follow chapters 41–42 of
+[Introduction to Saturn Assembly Language](https://literature.hpcalc.org/community/intro-saturn-asm.pdf).
+Identifying consumed stack cells does not repair embedded jump operands.
+Recognition
+validates the next-push cursor and each 20-bit target; it does not scan arbitrary
+lower slots or infer past calls from nearby instruction bytes. Unsupported or
+unreadable instructions stop discovery; this does not certify
+complete execution-reference coverage or permit public reclamation.
 
 `hpclang_rpl_cached_program_match` verifies a caller-bounded TEMP allocation
 containing a ROMP identity followed by a DOCOL program against an independently
@@ -502,6 +768,26 @@ can distinguish nested RPL boundaries from a machine-call return inside a CODE
 body, but neither reverse instruction matching nor a matching boundary proves
 that a saved scalar was produced by that call. The platform still owes the
 suspended caller's provenance contract before publishing relocation roots.
+
+The internal `rpl-code` branch inspector handles caller-proven GOC/GONC,
+GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and the GOYES operands of register, HST, ST, P and
+A/C bit-test instruction boundaries. Its relocation planner
+qualifies source and target mappings separately, preserves signed 2/3/4-nibble
+displacements and 20-bit address wrap, and rejects split instructions, range
+overflow or conversion into a conditional return. Cross-CODE calls are allowed:
+the stored native `SETUP` program contains such calls, so an individual CODE
+object is not a sufficient ownership boundary. Returned patches retain their
+short operand width and old address. The shared reference-edit builder,
+validator and RAM replay accept explicit widths of 1–5 nibbles, including mixed
+code operands and object pointers. Duplicate identity includes width; overlap
+and value bounds use each record's extent. Complete instruction guards and
+ownership must remain valid through commit. Predicate operands are checked even
+when they do not change. The read-only planner neither discovers all
+instructions nor classifies opaque payloads or authorizes catalog movement.
+Absolute transfers use five-nibble operands and do not change when only the
+instruction moves; target relocation still requires independently qualified
+mapping identity.
+Indirect transfers and complete execution coverage remain open.
 
 ## Capabilities
 
@@ -581,6 +867,49 @@ workload, not a promise of a new device-discovery service. A deterministic test
 provider can exercise effect transitions, alongside real calculator input and
 display verification. This fixture preserves the original application model
 while fitting each target's screen and input capabilities.
+
+### Startup resource admission
+
+Stock startup has an earlier admission boundary than the application's RW
+budget. Stage0 must fit the linked stage1 memory extent (including its prefix,
+alignment gaps and BSS) plus a complete stage stack page in the supplied pool.
+It rejects zero/undersized pools and counts beyond the coarse-table capacity
+before changing the mapping, switching SP or copying bytes. The minimum is
+derived from the stage1 link result. HP39's two native-workspace pages are
+excluded before this check. Stage1 subsequently checks application code, its
+MMU workspace, static data, boot page and application stack. This does not
+reduce the legacy launcher's reservation or guarantee application heap demand.
+
+The Direct harness exercises zero, one and 257 supplied pages before normal
+application execution. Each rejection must return with the caller registers,
+interrupt state and mappings intact and leave the entire temporary pool
+unchanged. Normal payload PASS, pixels and Stock return are still required.
+
+### UI resource measurements
+
+The UI E2E application limits its mapped writable arena to 36 KiB. Its test-only
+startup wrapper fills the unused reserved stack with a pattern before C/C++
+initialization, then samples the lowest changed word during main and after
+libc finalizers and runtime resource cleanup. The entry frame is retained. This
+measures touched stack words including instrumentation overhead, not a bound on
+stack-pointer excursions through unwritten storage. Heap observations count
+allocator-reserved bytes; deliberate exhaustion is excluded from the normal
+workload high-water observation.
+
+Before the launcher removes the mappings, the test requests a memory checkpoint.
+The shared Direct/Stock harness accepts a word-aligned descriptor within the
+reported application RW arena: `{id, count, words[count]}` with 1–64 words.
+The request is `0x4d100000 | offset`, where `offset` is relative to the boot page;
+the acknowledgement is `0x4d200000 | offset`. Invalid geometry, inaccessible
+memory or output failure rejects the checkpoint. Each ID produces one immutable
+`*-frame-memory-ID.json` artifact with `version`, `id` and `words` fields.
+
+UI report ID 1 contains eight words: schema version 1, entry stack use, main
+watermark, post-cleanup watermark, reserved stack bytes, normal heap high-water
+bytes, heap capacity and mapped RW bytes. The verifier requires the final sample,
+monotonic stack observations below the 8 KiB reservation, valid heap bounds and
+the unchanged 36 KiB RW limit. These test measurements do not reduce or measure
+the Stock launcher's physical reservation and do not change the public ABI.
 
 ## Modern C++ profile
 

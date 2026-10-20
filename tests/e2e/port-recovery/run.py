@@ -13,13 +13,19 @@ import sys
 import time
 from types import SimpleNamespace
 
-from prepare import prepare
+from prepare import configuration_body_sector, prepare, reserve_bank_tail
+from reservation import run_reservation
 from verify import (
     verify,
     verify_interruption,
     verify_restart,
     verify_power_cut,
     verify_retirement_cut,
+    native_words,
+    require_stock_pc,
+    verify_flash,
+    home_string,
+    verify_zero_real_array,
 )
 
 
@@ -52,7 +58,17 @@ def wait_for(predicate, children, timeout, description):
         time.sleep(0.1)
 
 
-def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None):
+def emulator(
+    args,
+    phase,
+    sequence,
+    extra=(),
+    usb=None,
+    power_cut=None,
+    *,
+    flash_busy=False,
+    reset_checkpoint=False,
+):
     phase.mkdir(parents=True, exist_ok=True)
     seq = phase / "sequence.seq"
     seq.write_text(sequence)
@@ -73,11 +89,13 @@ def emulator(args, phase, sequence, extra=(), usb=None, power_cut=None):
     if usb is not None:
         env["HPCLANG_X50NG_USB0"] = str(usb)
         env["HPCLANG_E2E_HOST_GATE_FILE"] = str(phase / "complete")
-        if args.flash_busy_reads:
-            env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
         if power_cut is not None:
             operation, reads, mask = power_cut
             env["HPCLANG_X50NG_FLASH_POWER_CUT"] = f"{operation}:{reads}:{mask:x}"
+    if args.flash_busy_reads and (usb is not None or flash_busy):
+        env["HPCLANG_X50NG_FLASH_BUSY_READS"] = str(args.flash_busy_reads)
+    if reset_checkpoint:
+        env["HPCLANG_X50NG_RESET_CHECKPOINT"] = str(phase / "before-reset")
     command = [
         str(args.dist / "x50ng"),
         "--datadir=" + str(phase / "state"),
@@ -93,13 +111,35 @@ def completed(child, timeout):
         raise RuntimeError("Emulator failed; inspect phase emulator.log")
 
 
-def transfer(args, recovery, source, build, name, power_cut=None, *, installed=False):
+def transfer(
+    args,
+    recovery,
+    source,
+    build,
+    name,
+    power_cut=None,
+    *,
+    installed=False,
+    execute=True,
+    remote_commands=None,
+    package_name="recovery.hp",
+    consume=False,
+):
+    if consume and (not execute or remote_commands is not None):
+        raise ValueError("Consuming a fixture requires its default execution command")
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
     send.mkdir()
     if not installed:
-        shutil.copyfile(build / "recovery.hp", send / "RECOVERY.HP")
+        shutil.copyfile(build / package_name, send / "RECOVERY.HP")
+    if remote_commands is None:
+        remote_commands = [f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME"]
+        if consume:
+            # RCL retains the executable object on the stack. Release only this
+            # one-shot fixture's HOME binding; snapshots retain its evidence.
+            # Accumulating old witnesses can exhaust Stock menu/USB workspace.
+            remote_commands[0] += f" '{name}' PURGE"
     prefix = []
     for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
         tokens = line.split()
@@ -112,7 +152,9 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
         raise ValueError("Stock USB sequence has no host gate")
     sequence = (
         "\n".join(prefix)
-        + "\n500 capture deposited\n1000 tap eval\n15000 capture checkpoint\n17000 finish-install\n"
+        + "\n500 capture deposited\n"
+        + ("1000 tap eval\n" if execute else "")
+        + "15000 capture checkpoint\n17000 finish-install\n"
     )
     xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
     with process(
@@ -140,8 +182,7 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
                     str(ktty),
                     str(send),
                     str(log),
-                    "--remote-host",
-                    f"-95 CF HOME '{name}' RCL",
+                    *[token for command in remote_commands for token in ("--remote-host", command)],
                     *([] if installed else [f"RECOVERY.HP={name}"]),
                 ],
                 os.environ,
@@ -149,15 +190,24 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
             ) as sender:
                 if sender.wait():
                     raise RuntimeError("Recovery transfer failed; inspect transfer.log")
+            # Stock can report an RPL error in a successful Kermit response.
+            if "Error:" in (recovery / "transfer.log").read_text(errors="replace"):
+                raise RuntimeError("Stock rejected recovery setup; inspect transfer.log")
             (recovery / "complete").touch()
             if power_cut is None:
                 completed(child, 90)
             elif child.wait(timeout=90) != 86:
                 raise RuntimeError("Emulator did not terminate at the requested Flash power cut")
 
-    if args.flash_busy_reads and power_cut is None:
+    if power_cut is None:
+        verify_busy_reads(args, recovery)
+
+
+def verify_busy_reads(args, phase):
+    """Validate saved busy-state evidence and return the observed operation count."""
+    if args.flash_busy_reads:
         state = configparser.ConfigParser()
-        state.read(recovery / "state/state")
+        state.read(phase / "state/state")
         evidence = state["flash"]
         operations = evidence.getint("busy-operations")
         if (
@@ -168,6 +218,264 @@ def transfer(args, recovery, source, build, name, power_cut=None, *, installed=F
             or evidence.getboolean("busy-active") is not False
         ):
             raise RuntimeError("Missing/incomplete Flash busy-state execution evidence")
+        return operations
+    return 0
+
+
+def startup_recovery(args, clean, damaged):
+    """Exercise Stock's STARTUP hook in a fresh fixture, never an existing user HOME."""
+    build = args.retirement_build
+    installed = args.output / "startup-installed"
+    transfer(args, installed, damaged, build, "STARTUP", execute=False)
+    if (installed / "state/flash").read_bytes() != (damaged / "flash").read_bytes():
+        raise RuntimeError("STARTUP installation changed Flash before warmstart")
+    before = installed / "state"
+    for name, operation in (("startup-recovered", "retire"), ("startup-rechecked", "check")):
+        phase = args.output / name
+        phase.mkdir()
+        shutil.copytree(before, phase / "state")
+        with emulator(
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+        ) as child:
+            completed(child, 90)
+        verify_busy_reads(args, phase)
+        verify(
+            SimpleNamespace(
+                before=before,
+                after=phase / "state",
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation=operation,
+            )
+        )
+        if operation == "check":
+            verify_restart(clean, before, phase / "state")
+        before = phase / "state"
+    print("Automatic STARTUP replay/retirement and clean second warmstart verified", flush=True)
+
+
+def configuration_recovery(args, clean):
+    """Prove automatic replay and catalog rebuilding, with retained RAM and RAM loss.
+
+    The library number and HOME names belong only to this fresh-firmware fixture.
+    This is not an installer for a user's existing calculator.
+    """
+    build = args.configuration_build
+    installed = args.output / "configuration-installed"
+    # Construct the fixture with Stock's own driver. The synthetic read-count
+    # busy model exercises our recovery polling below, not Stock's installation driver.
+    setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
+    installation_source = args.output / "configuration-install-source"
+    fault_bank = args.target & ~0x1FFFF
+    reserve_bank_tail(clean, installation_source, fault_bank)
+    transfer(
+        setup,
+        installed,
+        installation_source,
+        build,
+        "RECOVERY",
+        execute=False,
+        package_name="recovery-library.hp",
+        remote_commands=[
+            "-95 CF HOME 'RECOVERY' RCL 2 STO 'RECOVERY' PURGE",
+            "\"hpclang recovery\" 'HPCKEEP' STO",
+        ],
+    )
+    protected = slice(fault_bank, fault_bank + 0x20000)
+    if (installed / "state/flash").read_bytes()[protected] != (
+        installation_source / "flash"
+    ).read_bytes()[protected]:
+        raise RuntimeError("Stock changed the protected fault bank during recovery installation")
+
+    def boot(source, name, *, clear_ram=False, check_home=True):
+        phase = args.output / name
+        phase.mkdir()
+        shutil.copytree(source, phase / "state")
+        sequence = "10000 capture home\n12000 finish-install\n"
+        if clear_ram:
+            ram = phase / "state/sram"
+            ram.write_bytes(bytes(ram.stat().st_size))
+            # Stock asks whether to recover memory after RAM loss. Decline it;
+            # recovery must come from the installed Flash library alone.
+            sequence = "20000 tap f6\n40000 tap f6\n60000 capture home\n62000 finish-install\n"
+        with emulator(
+            args,
+            phase,
+            sequence,
+            ["--reset"],
+            flash_busy=True,
+        ) as child:
+            completed(child, 90)
+        verify_busy_reads(args, phase)
+        require_stock_pc(phase / "state")
+        read = native_words(
+            (phase / "state/sram").read_bytes(), (phase / "state/flash").read_bytes()
+        )
+        if check_home and home_string(read, b"HPCKEEP") != b"hpclang recovery":
+            raise RuntimeError("Configuration recovery changed the HOME fixture string")
+        return phase / "state"
+
+    baseline = boot(installed / "state", "configuration-clean")
+    if (baseline / "flash").read_bytes() != (installed / "state/flash").read_bytes():
+        raise RuntimeError("Clean library configuration changed Flash")
+    read = native_words((baseline / "sram").read_bytes(), (baseline / "flash").read_bytes())
+    count = read(0x8611D, 3)
+    if not 0 < count < 128 or 1701 not in [read(0x86120 + 16 * i, 3) for i in range(count)]:
+        raise RuntimeError("Configuration library is absent from the native catalog")
+    damaged = args.output / "configuration-fault"
+    bound = getattr(args, "configuration_authority", False)
+    authority_slot = args.slot + 4124 if bound else None
+    prepare(baseline, damaged, args.slot, args.target, bound=bound)
+    for lost_ram, names in (
+        (False, ("configuration-recovered", "configuration-rechecked")),
+        (True, ("configuration-ram-loss", "configuration-ram-loss-rechecked")),
+    ):
+        before = damaged
+        for name in names:
+            after = boot(
+                before,
+                name,
+                clear_ram=lost_ram and before == damaged,
+                check_home=not lost_ram,
+            )
+            if before == damaged:
+                verify_flash(
+                    (before / "flash").read_bytes(),
+                    (after / "flash").read_bytes(),
+                    args.slot,
+                    args.target,
+                    retire=True,
+                    authority_slot=authority_slot,
+                )
+                # The internal restart has already replaced the first invocation's
+                # diagnostics with a clean invocation. Verify the durable transition
+                # above, then verify this final no-op image and the complete catalog.
+                before = after
+            verify(
+                SimpleNamespace(
+                    before=before,
+                    after=after,
+                    elf=build / "recovery.elf",
+                    binary=build / "recovery.bin",
+                    package=build / "recovery-configuration.hp",
+                    nm=args.nm,
+                    slot=args.slot,
+                    target=args.target,
+                    operation="check",
+                    relocated_image=True,
+                    authority_slot=authority_slot,
+                )
+            )
+            verify_restart(baseline, before, after)
+            before = after
+    # A missing bank header can suppress callbacks entirely. Also damage a
+    # factory callback's body while retaining its library header and pointer.
+    body_target = configuration_body_sector((baseline / "flash").read_bytes(), read)
+    body_fault = args.output / "configuration-body-fault"
+    prepare(baseline, body_fault, args.slot, body_target, bound=bound)
+    repaired = boot(body_fault, "configuration-body-recovered")
+    verify_flash(
+        (body_fault / "flash").read_bytes(),
+        (repaired / "flash").read_bytes(),
+        args.slot,
+        body_target,
+        retire=True,
+        authority_slot=authority_slot,
+    )
+    for state in (repaired, boot(repaired, "configuration-body-rechecked")):
+        verify_restart(baseline, repaired, state)
+        verify(
+            SimpleNamespace(
+                before=repaired,
+                after=state,
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery-configuration.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=body_target,
+                operation="check",
+                relocated_image=True,
+                authority_slot=authority_slot,
+            )
+        )
+    # Allocate after the USB server exits; otherwise its temporary storage masks
+    # the intended pressure. Decimal zero forces DOREAL rather than compact
+    # exact-integer elements. Keep commands below Stock's server command limit.
+    filled = args.output / "configuration-lowram-filled"
+    transfer(
+        setup,
+        filled,
+        baseline,
+        build,
+        "UNUSED",
+        installed=True,
+        execute=True,
+        remote_commands=[
+            "-95 CF HOME CLEAR",
+            r"\{171} { 26000 } 0. CON 'HPCFILL' STO \{187} 'HPCPAD' STO",
+            "'HPCPAD' RCL",
+        ],
+    )
+    before = filled / "state"
+    read_filled = native_words((before / "sram").read_bytes(), (before / "flash").read_bytes())
+    verify_zero_real_array(read_filled, b"HPCFILL", 26000)
+    gap = (read_filled(0x806F8) - read_filled(0x806F3)) // 2
+    if (
+        not (build / "recovery-configuration.hp").stat().st_size - 8
+        <= gap
+        < (build / "recovery.hp").stat().st_size - 8
+    ):
+        raise RuntimeError("Low-memory fixture does not distinguish the two recovery envelopes")
+    if (before / "flash").read_bytes() != (baseline / "flash").read_bytes():
+        raise RuntimeError("RAM pressure setup changed Flash")
+    low_fault = args.output / "configuration-lowram-fault"
+    prepare(before, low_fault, args.slot, args.target, bound=bound)
+    low_repaired = boot(low_fault, "configuration-lowram-recovered")
+    verify_flash(
+        (low_fault / "flash").read_bytes(),
+        (low_repaired / "flash").read_bytes(),
+        args.slot,
+        args.target,
+        retire=True,
+        authority_slot=authority_slot,
+    )
+    for state in (low_repaired, boot(low_repaired, "configuration-lowram-rechecked")):
+        verify_restart(before, low_repaired, state)
+        verify_zero_real_array(
+            native_words((state / "sram").read_bytes(), (state / "flash").read_bytes()),
+            b"HPCFILL",
+            26000,
+        )
+        verify(
+            SimpleNamespace(
+                before=low_repaired,
+                after=state,
+                elf=build / "recovery.elf",
+                binary=build / "recovery.bin",
+                package=build / "recovery-configuration.hp",
+                nm=args.nm,
+                slot=args.slot,
+                target=args.target,
+                operation="check",
+                relocated_image=True,
+                authority_slot=authority_slot,
+            )
+        )
+    print(
+        "Flash configuration recovery rebuilt the catalog after bank-header and callback-body "
+        "faults, including retained RAM and bank-header RAM loss; "
+        "low-memory recovery preserved the real array; later warmstarts unchanged",
+        flush=True,
+    )
 
 
 def run(args):
@@ -191,6 +499,19 @@ def run(args):
         raise RuntimeError("Clean Stock state does not contain the selected model's bootloader")
     print(f"Clean {args.model} Stock boot complete", flush=True)
 
+    if args.suite == "installation":
+        from installation import run_installation
+
+        run_installation(
+            args,
+            clean / "state",
+            transfer=transfer,
+            emulator=emulator,
+            completed=completed,
+            verify_busy_reads=verify_busy_reads,
+        )
+        return
+
     reset = args.output / "reset"
     reset.mkdir()
     prepare(clean / "state", reset / "state", args.slot, args.target)
@@ -202,10 +523,13 @@ def run(args):
     if (reset / "state/flash").read_bytes() != damaged:
         raise RuntimeError("Hardware reset changed the injected Flash state")
     print("Fault prepared and hardware reset complete", flush=True)
+    startup_source = reset / "state"
 
     for cut_index, power_cut in enumerate(args.power_cut or []):
         interrupted = args.output / f"power-cut-{cut_index}"
-        transfer(args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut)
+        transfer(
+            args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut, consume=True
+        )
         restored = verify_power_cut(
             reset / "state/flash",
             interrupted / "state/flash",
@@ -231,7 +555,9 @@ def run(args):
 
     if args.interrupted_build is not None:
         interrupted = args.output / "interrupted"
-        transfer(args, interrupted, reset / "state", args.interrupted_build, "RECOVERYCUT")
+        transfer(
+            args, interrupted, reset / "state", args.interrupted_build, "RECOVERYCUT", consume=True
+        )
         verify_interruption(
             SimpleNamespace(
                 before=reset / "state",
@@ -260,7 +586,7 @@ def run(args):
         print("Interrupted recovery verified; reset kept the partial bank hidden", flush=True)
 
     recovery = args.output / "recovery"
-    transfer(args, recovery, reset / "state", args.build, "RECOVERY")
+    transfer(args, recovery, reset / "state", args.build, "RECOVERY", consume=True)
     verify(
         SimpleNamespace(
             before=reset / "state",
@@ -299,6 +625,7 @@ def run(args):
                 args.retirement_build,
                 "RETIRECUT",
                 retirement_cut,
+                consume=True,
             )
             verify_retirement_cut(
                 retirement_source / "flash",
@@ -364,6 +691,18 @@ def run(args):
         )
         verify_restart(clean / "state", retired_restart / "state", checked / "state")
         print("Journal retirement and unchanged native catalog after reset verified", flush=True)
+        startup_recovery(args, clean / "state", startup_source)
+    if args.configuration_build is not None:
+        configuration_recovery(args, clean / "state")
+        if args.configuration_authority:
+            run_reservation(
+                args,
+                clean / "state",
+                transfer=transfer,
+                emulator=emulator,
+                completed=completed,
+                verify_busy_reads=verify_busy_reads,
+            )
     (args.output / "result.json").write_text(
         json.dumps(
             {
@@ -375,6 +714,10 @@ def run(args):
                 "restored_catalog_entries": catalog_entries,
                 "interrupted_before_identity": args.interrupted_build is not None,
                 "journal_retirement": args.retirement_build is not None,
+                "startup_recovery": args.retirement_build is not None,
+                "configuration_recovery": args.configuration_build is not None,
+                "configuration_authority": args.configuration_authority,
+                "guarded_reservation": args.configuration_authority,
                 "retirement_power_cut": retirement_cut,
                 "flash_busy_reads": args.flash_busy_reads,
                 "power_cut": args.power_cut,
@@ -393,6 +736,7 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=("hp49gplus", "hp50g"), default="hp50g")
+    parser.add_argument("--suite", choices=("recovery", "installation"), default="recovery")
     parser.add_argument("--dist", type=Path, required=True, help="portable x50ng distribution")
     parser.add_argument(
         "--build", type=Path, required=True, help="built recovery witness directory"
@@ -408,6 +752,16 @@ def main():
         "--retirement-build",
         type=Path,
         help="optional witness built with HPCLANG_RECOVERY_RETIRE_JOURNAL",
+    )
+    parser.add_argument(
+        "--configuration-build",
+        type=Path,
+        help="optional retirement witness with HPCLANG_RECOVERY_RESTART_AFTER_REPAIR",
+    )
+    parser.add_argument(
+        "--configuration-authority",
+        action="store_true",
+        help="configuration witness binds --slot to the immediately following authority record",
     )
     parser.add_argument(
         "--flash-busy-reads",
@@ -426,6 +780,8 @@ def main():
     )
     parser.add_argument("--target", type=lambda value: int(value, 0), default=0x140000)
     args = parser.parse_args()
+    if args.configuration_authority and args.configuration_build is None:
+        parser.error("--configuration-authority requires --configuration-build")
     if not 0 <= args.flash_busy_reads <= 0xFFFFFFFF:
         parser.error("--flash-busy-reads must fit an unsigned 32-bit counter")
     for operation, reads, bits in args.power_cut or []:
@@ -445,6 +801,8 @@ def main():
         args.interrupted_build = args.interrupted_build.resolve()
     if args.retirement_build is not None:
         args.retirement_build = args.retirement_build.resolve()
+    if args.configuration_build is not None:
+        args.configuration_build = args.configuration_build.resolve()
     run(args)
 
 

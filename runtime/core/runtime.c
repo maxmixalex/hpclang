@@ -2,6 +2,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include "clock-internal.h"
+#include "exit-hooks.h"
 #include "../libc/stdio-lifetime.h"
 
 static const struct hpclang_boot_info *boot_info;
@@ -38,6 +39,7 @@ int hpclang_start(const struct hpclang_boot_info *boot)
         exit(main());
     }
     hpclang_sound_restore();
+    hpclang_rtc_tick_restore();
     hpclang_display_end();
     hpclang_power_restore();
     hpclang_storage_shutdown();

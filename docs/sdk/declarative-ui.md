@@ -43,12 +43,13 @@ new position after font-dependent measurement; Stock must expose its native
 eight-row font. These font/theme checks pass locally on all six Direct and all
 six Stock models, followed by further keyboard actions and normal system return.
 The installed SDK builds its ARM image and all six model launchers. The complete
-application flow also passes local Direct execution on all six models with
-electrical key injection, six display checkpoints and normal return. HP39g+
-Stock first-screen execution passes; complete Stock interaction and resource
-budgets are still pending. UI is included in the shared Runtime E2E suite matrix;
-its independent verifier checks captured states and waveform sample coordinates.
-The current batch has local evidence but has not yet been pushed to CI.
+application flow passes Direct and Stock execution on all six models with
+electrical key injection, display checkpoints and normal return. UI is included
+in the shared Runtime E2E suite matrix; its independent verifier checks captured
+states and waveform sample coordinates. These UI jobs passed in
+[Runtime CI on `a18302a3`](https://github.com/maxmixalex/hpclang/actions/runs/38410381089).
+The broader memory/update-cost acceptance remains open; the measured example
+pool and the limits of emulator timing evidence are documented below.
 
 An application owns its model and describes the current view with ordinary C
 functions, loops and conditions. Separate component instances scope their keys:
@@ -225,8 +226,9 @@ no physical state; commit its response and retry the same event. An `ENOSPC`
 edit still consumes native one-shot modifier state, matching the line editor.
 
 Host tests feed all six model layouts, including one-shot Alpha, release events,
-delimiter pairs and capacity recovery. Actual GPIO/display integration remains
-part of the interactive calculator example's acceptance.
+delimiter pairs and capacity recovery. The interactive calculator example also
+passes physical GPIO/display integration on all six Direct and Stock models;
+this does not replace the host matrix's exhaustive edit/error cases.
 
 ## Canvas and damaged regions
 
@@ -327,8 +329,9 @@ when switching back to a previously used renderer or after exposure. Destroy
 the renderer after callbacks finish; it does not own the UI or display session.
 Host pixel tests cover all three level counts, canvas confinement, partial
 updates, failed-frame retry, complete-page copying, input selection and an
-inverted theme. Six-model local execution and low-memory acceptance now pass;
-remote CI acceptance remains required before closing the renderer milestone.
+inverted theme. Six-model execution and low-memory acceptance pass, with the UI
+Runtime CI jobs accepted on `a18302a3`. Broader memory/update budgets remain
+part of the renderer milestone's outstanding acceptance work.
 
 The device-manager example budgets 48 nodes, 512 text bytes and one asynchronous
 task for its complete eight-device view (46 live nodes). Its ARM declaration pool
@@ -340,11 +343,106 @@ Host allocation
 fault injection covers every renderer-construction allocation, checks cleanup
 and recovery, and proves declaration/layout/render/copy still work with further
 allocation disabled. Full Stock flows now pass on HP39g+ and HP39gs with this
-pool, physical keyboard handoff and normal return. An earlier HP39g+ emulator run,
-before the pool was reduced from 16,764 bytes,
-reports 36,864 total read/write bytes, 46 peak nodes and 9,585 microseconds for
-the initial paint. This is a single emulator observation, not a hardware timing
-guarantee. The extended font/theme matrix also passes on all six Stock models.
+pool, physical keyboard handoff and normal return. A local HP39g+ Stock rerun
+at `413e5891` reports the current 13,692-byte pool, 46 nodes and 5,614 microseconds
+for the initial paint; the paired Direct run reports 5,888 microseconds.
+These single emulator observations measure only the initial renderer call,
+excluding declaration, layout, commit and presentation. They are not hardware
+timing guarantees or worst-case interaction costs. The displayed `RW` value is
+the launcher's read/write arena size, not measured peak heap consumption; the
+Direct launcher supplies a larger arena than Stock. The extended font/theme
+matrix also passes on all six Stock models.
+
+The E2E `HEAP used/capacity` line measures the maximum heap extent requested
+through `sbrk()` during the C++ flow and C flow through renderer and font
+changes, before deliberate allocator exhaustion. The test wraps the allocator
+boundary without changing the SDK
+allocator. `used` includes allocator bookkeeping and retained free blocks;
+it is not the sum of live application allocations. `capacity` is the space
+between the end of static data and the reserved stack boundary. Neither value
+measures stack high-water usage or separately allocated LCD DMA pages. Local
+runs of the instrumented fixture submitted at `19143951` report:
+
+| Target | Launcher RW arena | Peak heap extent | Heap capacity |
+| --- | ---: | ---: | ---: |
+| HP39g+ Direct | 307,200 | 18,892 | 293,320 |
+| HP39g+ Stock | 53,248 | 18,892 | 39,368 |
+| HP50g Stock | 303,104 | 20,076 | 289,224 |
+
+All sizes are bytes. Both Stock flows include native fonts and normal return;
+HP50g also exercises the 80-row renderer. The current HP39g+ fixture uses a
+52 KiB arena, so this run does not revalidate the earlier 36 KiB observation.
+These are observations of the scripted application flow, not upper bounds for
+arbitrary UI declarations or a minimum whole-application memory requirement.
+
+After the font checkpoint, the E2E program holds real allocator blocks until a
+4 KiB allocation fails. Creating an additional gray16 renderer must then fail
+with `ENOMEM`. The existing UI must still redeclare, render and publish exactly
+the same pixels while those blocks remain held. After releasing them, replacing
+the live renderer with the same font/theme must reproduce those pixels, and the application
+continues through cancellation and normal Stock return. This pressure phase is
+excluded from `HEAP`; it deliberately consumes the remaining arena and does not
+represent the application's ordinary memory requirement. Host tests separately
+inject failure at every renderer-construction allocation and check for leaks.
+
+With `MAX_RW_BYTES 36864`, the current pressure/reconstruction fixture also
+passes locally on HP39g+ and HP50g Stock. Both report a 36,864-byte mapped RW
+arena and 22,976-byte heap capacity; ordinary peak heap extents are 18,892 and
+20,076 bytes respectively. Native-font geometry, the two pressure/reconstruction
+pixel checkpoints and normal system return pass. This is an application mapping
+budget: the legacy launcher still reserves its original Stock page pool, and
+the observation does not measure peak stack use or prove an installation-space
+minimum. CI acceptance of this follow-up is pending.
+
+The maintained UI E2E target declares that 36 KiB ceiling in CMake. Its ordinary
+repository build consumes the same generated launcher arguments as SDK builds,
+and the guest rejects a larger arena. Direct and Stock runs therefore exercise
+the stated limit rather than merely printing the launcher's available memory.
+
+The E2E result screen also records `FRAME` and `INPUT` maxima in microseconds,
+with their respective counts on the `SAMPLES` line. `FRAME` spans declaration,
+layout, commit, rendering, surface copying and display publication at each
+captured update (loading/error/results, list reversal, waveform, theme and font
+changes). `INPUT` spans key interpretation, model update and any resulting
+declaration/layout/commit for each scripted key edge, including text edits.
+Host checkpoint waits and keyboard injection waits are excluded. These are
+separate sampled paths: adding their maxima would not establish an end-to-end
+latency bound. Renderer construction, asynchronous provider work and initial
+display acquisition are outside these measurements.
+The standalone C and C++ examples also deliberately sleep for 20 milliseconds
+per event-loop iteration. They process one keyboard event per iteration and
+draw an accepted model change on the following iteration. That scheduling and
+any queued input add latency beyond the E2E processing measurements; neither
+the initial-paint number nor `FRAME` alone describes key-to-display response.
+
+Local HP39g+ measurements of the instrumented update fixture (7 captured updates
+and 34 input edges in each launch mode) are:
+
+| Launch mode | Maximum sampled frame | Maximum sampled input processing |
+| --- | ---: | ---: |
+| Direct | 10,038 µs | 368 µs |
+| Stock | 10,349 µs | 367 µs |
+
+Both runs pass independent pixel checks and normal return; HP50g Direct also
+passes with the instrumentation. These observations do not impose a hardware
+performance guarantee or complete the remaining whole-application budget work.
+
+For the ARM ABI, the renderer with the example's two styles requests 188 bytes
+for its descriptors and copied styles, plus its two raster buffers:
+
+| Viewport | 2 levels | 4 levels | 16 levels |
+| --- | ---: | ---: | ---: |
+| 131 × 64 | 2,364 bytes | 4,412 bytes | 8,636 bytes |
+| 131 × 80 | 2,908 bytes | 5,468 bytes | 10,748 bytes |
+
+These are requested heap bytes, excluding allocator bookkeeping and alignment
+overhead. Add the declaration pool, application state, stack and any owned LCD
+DMA pages to obtain an application budget. LCD pages use the hardware scan
+width and row count, which need not equal this renderer's logical viewport.
+Host allocation tests check the two-buffer cost at every size/level combination
+above, independently of host descriptor sizes, and retain allocation-failure
+and allocation-free frame checks. Peak whole-application memory and complete
+update-cost acceptance remain open.
 
 ## Vertical scrolling
 

@@ -68,14 +68,9 @@ static int write_bytes(const struct hpclang_rpl_flash_io *io, uint32_t address, 
     return 1;
 }
 
-int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
-                                     const uint8_t *record, uint32_t bytes)
+static int publish_erased(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                          const uint8_t *record, uint32_t bytes)
 {
-    uint32_t target;
-    const uint8_t *image;
-    if (!io || !io->read16 || !io->program16 ||
-        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
-        return HPCLANG_RPL_FLASH_INVALID;
     uint16_t word = 0;
     for (uint32_t i = 0; i <= bytes; ++i) {
         uint32_t at = slot + i;
@@ -87,6 +82,132 @@ int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint
     if (!write_bytes(io, slot + 1u, record + 1u, bytes - 1u) || !write_bytes(io, slot, record, 1u))
         return HPCLANG_RPL_FLASH_DIRTY;
     return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                     const uint8_t *record, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    return publish_erased(io, slot, record, bytes);
+}
+
+/* Compare a complete durable binding, with a separately constrained status.
+ * Byte zero is excluded from body identity, never from phase validation. */
+static int matching_record(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                           const uint8_t *record, uint32_t bytes, int retiring,
+                           uint8_t required_status)
+{
+    uint16_t word = 0;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        uint32_t at = slot + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (i ? value != record[i]
+              : (retiring ? (value & 0x7eu) != value : value != required_status))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        uint32_t journal_slot, const uint8_t *journal,
+                                        uint32_t journal_bytes)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, slot, journal_slot, journal,
+                                           journal_bytes, authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    int result = matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e);
+    if (result != HPCLANG_RPL_FLASH_WRITTEN)
+        return result;
+    return publish_erased(io, slot, authority, sizeof authority);
+}
+
+static int finish_hidden_record(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                const uint8_t *record, uint32_t bytes)
+{
+    uint16_t word = 0;
+    uint8_t status = 0;
+    for (uint32_t i = 0; i <= bytes; ++i) {
+        uint32_t at = slot + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (!i) {
+            status = value;
+            if (status != 0xffu && status != 0x7fu && status != 0xfeu && status != 0x7eu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        } else if (i == bytes) {
+            if (value != 0xffu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        } else if (status == 0xffu ? (value & record[i]) != record[i] : value != record[i]) {
+            return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    if (status == 0x7eu)
+        return HPCLANG_RPL_FLASH_WRITTEN;
+    return write_bytes(io, slot + 1u, record + 1u, bytes - 1u) && write_bytes(io, slot, record, 1u)
+               ? HPCLANG_RPL_FLASH_WRITTEN
+               : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    return finish_hidden_record(io, slot, record, bytes);
+}
+
+int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, slot, journal_slot, journal,
+                                           journal_bytes, authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e) !=
+        HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return finish_hidden_record(io, slot, authority, sizeof authority);
+}
+
+int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, slot, journal_slot, journal,
+                                           journal_bytes, authority, sizeof authority) ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, journal_slot, journal, journal_bytes,
+                                        &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (matching_record(io, slot, authority, sizeof authority, 1, 0) != HPCLANG_RPL_FLASH_WRITTEN ||
+        matching_record(io, journal_slot, journal, journal_bytes, 0, 0) !=
+            HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    for (uint32_t i = 0; i < HPCLANG_RPL_FLASH_SECTOR_BYTES; i += 2u) {
+        uint16_t word;
+        uint16_t expected = (uint16_t)(image[i] | (uint16_t)image[i + 1u] << 8u);
+        if (!io->read16(io->context, target + i, &word) || word != expected)
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    const uint8_t closed = 0;
+    return write_bytes(io, slot, &closed, 1u) ? HPCLANG_RPL_FLASH_WRITTEN : HPCLANG_RPL_FLASH_DIRTY;
 }
 
 int hpclang_rpl_flash_retire_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
@@ -641,14 +762,13 @@ struct erased_tail
     uint32_t slot, bytes;
 };
 
-static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
-                         uint32_t name_length, uint32_t prologue, uint32_t library_number,
-                         uint32_t bytes, struct record_selection *selection,
-                         struct erased_tail *tails)
+static int scan_records(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                        uint32_t name_length, uint32_t prologue, uint32_t library_number,
+                        uint32_t bytes, struct record_selection *selection,
+                        struct erased_tail *tails)
 {
-    if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||
-        io->first > io->end || io->end - io->first != 6u * 0x20000u || (!name && name_length) ||
-        name_length > 255u)
+    if (!io || !io->read16 || ((io->first | io->end) & 1u) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u || (!name && name_length) || name_length > 255u)
         return HPCLANG_RPL_FLASH_INVALID;
     *selection = (struct record_selection){io->end, io->end, 0, 0};
     for (uint32_t index = 0; index < 6u; ++index) {
@@ -691,6 +811,100 @@ static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *n
             tails[index] = (struct erased_tail){bank + space.address / 2u, space.nibbles / 2u};
     }
     return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+static int select_record(const struct hpclang_rpl_flash_io *io, const uint8_t *name,
+                         uint32_t name_length, uint32_t prologue, uint32_t library_number,
+                         uint32_t bytes, struct record_selection *selection,
+                         struct erased_tail *tails)
+{
+    if (!io || !io->program16)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return scan_records(io, name, name_length, prologue, library_number, bytes, selection, tails);
+}
+
+int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes, uint32_t *slot)
+{
+    if (!slot || !valid_record(record, bytes))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1 || wanted.prologue != 0x02b40u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct record_selection selection;
+    int result =
+        scan_records(io, NULL, 0, wanted.prologue, wanted.library_number, bytes, &selection, NULL);
+    if (result)
+        return result;
+    if (!selection.matches)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (selection.matches != 1 || selection.match_bytes != bytes)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t nibbles = 8u + wanted.span;
+    result = matching_record(io, selection.match_slot, record, nibbles / 2u, 0, 0x53u);
+    if (!result && (nibbles & 1u)) {
+        uint32_t last = selection.match_slot + nibbles / 2u;
+        uint16_t word;
+        if (!io->read16(io->context, last & ~1u, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (((word >> (8u * (last & 1u))) & 15u) != (record[nibbles / 2u] & 15u))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    if (!result)
+        *slot = selection.match_slot;
+    return result;
+}
+
+int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
+                                         const uint8_t *record, uint32_t bytes,
+                                         const struct hpclang_rpl_flash_catalog *catalog,
+                                         uint32_t *slot)
+{
+    if (!slot || !catalog || !catalog->reader || !catalog->reader->read_nibble ||
+        catalog->flash_table > 0x100000u - 112u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t matched;
+    int result = hpclang_rpl_flash_match_library(io, record, bytes, &matched);
+    if (result)
+        return result;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct hpclang_rpl_library_binding binding;
+    result = hpclang_rpl_library_lookup(catalog->reader, catalog->address, catalog->nibbles,
+                                        wanted.library_number, &binding);
+    if (result != 1)
+        return result == 0                              ? HPCLANG_RPL_FLASH_NOT_FOUND
+               : result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                        : HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t offset = (matched - io->first) % 0x20000u;
+    uint32_t header = 0x40000u + 2u * (offset + 4u) + 14u + 2u * wanted.name_length;
+    if (binding.address != header)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint32_t expected_bank = 8u + (matched - io->first) / 0x20000u;
+    unsigned matches = 0;
+    for (uint32_t bank = 0; bank < 16; ++bank) {
+        uint32_t value;
+        result = recovery_word(catalog->reader, catalog->flash_table + 7u * bank, 5u, &value);
+        if (result)
+            return result;
+        if (!value)
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (value == binding.bank_switch) {
+            if (bank != expected_bank || ++matches != 1)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    if (matches != 1)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *slot = matched;
+    return 0;
 }
 
 static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,

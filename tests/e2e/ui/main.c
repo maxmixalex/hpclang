@@ -1,4 +1,5 @@
 #include "app.h"
+#include <hpclang/abi.h>
 #include <hpclang/bootstrap.h>
 #include <hpclang/device.h>
 #include <hpclang/time.h>
@@ -9,7 +10,42 @@
 extern const struct hpclang_font demo_font;
 volatile uint32_t hpclang_e2e_result;
 volatile uint32_t hpclang_ui_witness[5];
+/* Maximum elapsed microseconds and sample counts, excluding host handshakes. */
+volatile uint32_t hpclang_ui_update_witness[4];
+/* Allocator-reserved heap high-water bytes; excludes static data and stack. */
+volatile uint32_t hpclang_ui_heap_witness[2];
+extern volatile uint32_t hpclang_ui_stack_witness[3];
+uint32_t hpclang_ui_stack_sample(void);
+/* Deliberate exhaustion is excluded from the ordinary UI budget observation. */
+static int heap_pressure;
 static unsigned key_failure;
+
+extern unsigned char __bss_end[];
+extern void *__real_sbrk(intptr_t increment);
+
+void *__wrap_sbrk(intptr_t increment)
+{
+    void *previous = __real_sbrk(increment);
+    if (previous != (void *)-1) {
+        uintptr_t end = (uintptr_t)previous + (uintptr_t)increment;
+        uint32_t used = (uint32_t)(end - (uintptr_t)__bss_end);
+        if (!heap_pressure && used > hpclang_ui_heap_witness[0])
+            hpclang_ui_heap_witness[0] = used;
+        const struct hpclang_boot_info *boot = hpclang_boot_info();
+        hpclang_ui_heap_witness[1] = (uint32_t)(HPCLANG_BOOT_BASE + boot->rw_bytes -
+                                                HPCLANG_STACK_MIN - (uintptr_t)__bss_end);
+    }
+    return previous;
+}
+
+static void elapsed(unsigned slot, uint64_t start)
+{
+    uint64_t duration = hpclang_time_monotonic_us() - start;
+    uint32_t sample = duration > UINT32_MAX ? UINT32_MAX : (uint32_t)duration;
+    if (sample > hpclang_ui_update_witness[slot])
+        hpclang_ui_update_witness[slot] = sample;
+    ++hpclang_ui_update_witness[slot + 2];
+}
 
 static int frame(unsigned id)
 {
@@ -52,6 +88,7 @@ static int press(struct demo_app *app, struct hpclang_ui_surface *r, struct hpcl
             return -1;
         }
         struct hpclang_ui_event event;
+        uint64_t update_start = hpclang_time_monotonic_us();
         int result = hpclang_ui_key(app->ui, mode, &key, &event);
         if (result < 0)
             return -1;
@@ -60,6 +97,7 @@ static int press(struct demo_app *app, struct hpclang_ui_surface *r, struct hpcl
             if (result < 0 || (result && view(app, r)))
                 return -1;
         }
+        elapsed(1, update_start);
     }
     return 0;
 }
@@ -78,10 +116,42 @@ static int activate(struct demo_app *app, struct hpclang_ui_surface *r,
 }
 static int capture(struct demo_app *app, struct hpclang_ui_surface *r, unsigned id)
 {
+    uint64_t start = hpclang_time_monotonic_us();
     if (view(app, r) || hpclang_ui_surface_render(r, app->ui) < 0 ||
         hpclang_ui_surface_copy(r, hpclang_display_surface()) || hpclang_display_present(100000))
         return -1;
+    elapsed(0, start);
     return frame(id);
+}
+
+static int exhausted_renderer(struct demo_app *app, struct hpclang_ui_surface **renderer,
+                              const struct hpclang_font *font)
+{
+    void *blocks[256];
+    unsigned count = 0;
+    heap_pressure = 1;
+    while (count < 256 && (blocks[count] = malloc(4096)) != NULL)
+        ++count;
+    const struct hpclang_device_info *device = hpclang_device_info();
+    errno = 0;
+    /* Each gray16 raster exceeds the failed 4096-byte request on both heights. */
+    struct hpclang_ui_surface *attempt =
+        demo_renderer(device->display_width, device->display_height, 16, &demo_font, 0);
+    int error = errno;
+    int failed = count == 256 || attempt != NULL || error != ENOMEM;
+    hpclang_ui_surface_destroy(attempt);
+    /* Existing declarations and raster pages remain usable while still full. */
+    if (!failed && capture(app, *renderer, 121))
+        failed = 1;
+    while (count)
+        free(blocks[--count]);
+    /* Replace the live renderer as a normal theme/font change would; requiring
+     * two live renderers would inflate the application's minimum heap budget. */
+    hpclang_ui_surface_destroy(*renderer);
+    *renderer = demo_renderer(device->display_width, device->display_height, 2, font, 1);
+    if (!*renderer || capture(app, *renderer, 122))
+        failed = 1;
+    return failed ? -1 : 0;
 }
 static unsigned checks(void)
 {
@@ -216,6 +286,9 @@ static unsigned checks(void)
     if (!r || capture(&app, r, 100 + hpclang_font_height(font)) ||
         hpclang_ui_focused(ui) != focused)
         goto done;
+    failure = 0x1703;
+    if (exhausted_renderer(&app, &r, font))
+        goto done;
     failure = 18;
     if (activate(&app, r, &mode, DEMO_SCAN) || demo_poll(&app) < 0 ||
         activate(&app, r, &mode, DEMO_CANCEL) || app.model.scan != DEMO_IDLE || app.cleanups != 3)
@@ -233,9 +306,14 @@ done:
 int main(void)
 {
     extern unsigned hpclang_cpp_ui_test(void);
-    unsigned failure = hpclang_cpp_ui_test();
+    unsigned failure = hpclang_boot_info()->rw_bytes > HPCLANG_UI_RW_LIMIT ? 0x190b : 0;
+    if (!failure)
+        failure = hpclang_cpp_ui_test();
     if (!failure)
         failure = checks();
+    if (!failure &&
+        (!hpclang_ui_heap_witness[0] || hpclang_ui_heap_witness[0] > hpclang_ui_heap_witness[1]))
+        failure = 0x1901;
     struct hpclang_surface *screen = hpclang_display_surface();
     hpclang_surface_clear(screen, 0);
     char line[48];
@@ -248,6 +326,23 @@ int main(void)
     snprintf(line, sizeof(line), "ERR %lu KEY %lx", (unsigned long)hpclang_ui_witness[4],
              (unsigned long)key_failure);
     hpclang_surface_draw_text(screen, &demo_font, 0, 16, line, 255);
+    snprintf(line, sizeof(line), "FRAME %lu INPUT %lu", (unsigned long)hpclang_ui_update_witness[0],
+             (unsigned long)hpclang_ui_update_witness[1]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 24, line, 255);
+    snprintf(line, sizeof(line), "SAMPLES %lu %lu", (unsigned long)hpclang_ui_update_witness[2],
+             (unsigned long)hpclang_ui_update_witness[3]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 40, line, 255);
+    snprintf(line, sizeof(line), "HEAP %lu/%lu", (unsigned long)hpclang_ui_heap_witness[0],
+             (unsigned long)hpclang_ui_heap_witness[1]);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 48, line, 255);
+    hpclang_ui_stack_witness[1] = hpclang_ui_stack_sample();
+    if (!failure && (!hpclang_ui_stack_witness[0] ||
+                     hpclang_ui_stack_witness[1] < hpclang_ui_stack_witness[0] ||
+                     hpclang_ui_stack_witness[1] >= HPCLANG_STACK_MIN))
+        failure = 0x190c;
+    snprintf(line, sizeof(line), "STACK %lu/%u", (unsigned long)hpclang_ui_stack_witness[1],
+             HPCLANG_STACK_MIN);
+    hpclang_surface_draw_text(screen, &demo_font, 0, 56, line, 255);
     hpclang_surface_draw_text(screen, &demo_font, 20, 32, failure ? "UI FAIL" : "UI PASS", 255);
     hpclang_e2e_result = failure ? 0x46410000u | failure : 0x50415353u;
     if (failure)

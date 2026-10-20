@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import struct
 import tempfile
@@ -14,6 +15,265 @@ SPEC = importlib.util.spec_from_file_location(
 )
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
+
+
+class LiveTlsTests(unittest.TestCase):
+    def test_live_cells_must_match_even_when_diagnostics_are_intact(self):
+        image = bytes(16) + struct.pack("<2I", 0x12345679, 22)
+        symbols = {"__tls_base": 16, "__tls_end": 24, "tls_probe": 0, "errno": 4}
+        diagnostics = tuple([0] * 20 + [0xFFFFFFFF, 22, 0x08000014, 0x12345678, 0x12345679])
+        VERIFY.verify_tls(image, symbols, 0x08000000, diagnostics)
+        for offset in (16, 20):
+            changed = bytearray(image)
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaisesRegex(ValueError, "corrupted"):
+                VERIFY.verify_tls(changed, symbols, 0x08000000, diagnostics)
+        changed = list(diagnostics)
+        changed[22] -= 4  # Still inside TLS, but it names the other cell.
+        with self.assertRaisesRegex(ValueError, "owned TLS cell"):
+            VERIFY.verify_tls(image, symbols, 0x08000000, tuple(changed))
+        for changes in ({"errno": 8}, {"tls_probe": 1}, {"__tls_end": 28}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                VERIFY.verify_tls(image, symbols | changes, 0x08000000, diagnostics)
+
+
+class ResetSnapshotTests(unittest.TestCase):
+    def test_snapshot_requires_complete_sram_and_reset_cpu_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            prefix = Path(temporary) / "before-reset"
+            ram = bytes(0x80000)
+            valid = dict(version=1, pc=0x08001000, cpsr=0x13, r0=1, bytes=len(ram))
+            prefix.with_suffix(".sram").write_bytes(ram)
+            prefix.with_suffix(".json").write_text(json.dumps(valid))
+            self.assertEqual(VERIFY.reset_snapshot(prefix), (ram, valid))
+            for change in (
+                dict(version=2),
+                dict(r0=0),
+                dict(r0=True),
+                dict(pc=0x08001002),
+                dict(pc=0x100),
+                dict(cpsr=0x33),
+                dict(cpsr=0x17),
+                dict(cpsr=0x1B),
+                dict(bytes=0),
+                dict(extra=0),
+            ):
+                prefix.with_suffix(".json").write_text(json.dumps(valid | change))
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    VERIFY.reset_snapshot(prefix)
+            prefix.with_suffix(".json").write_text(json.dumps(valid))
+            prefix.with_suffix(".sram").write_bytes(ram[:-1])
+            with self.assertRaisesRegex(ValueError, "Incomplete"):
+                VERIFY.reset_snapshot(prefix)
+
+
+class InstalledRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "recovery_package", ROOT / "tools/package-recovery.py"
+        )
+        pack = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pack)
+        self.package = pack.configuration_library(
+            pack.package(bytes(range(8)), 64, model="hp50g"), 1701
+        )
+        self.flash = bytearray(b"\xff" * 0x200000)
+        for bank in range(0x140000, 0x200000, 0x20000):
+            identity = 0xF0 + ((bank // 0x20000 - 2) << 8)
+            self.flash[bank + 0x100 : bank + 0x105] = identity.to_bytes(5, "little")
+        self.slot = 0x1E0105
+        self.size = self.install(self.slot)
+        title = int(VERIFY.nibbles(self.package[8:])[10:12][::-1], 16)
+        self.catalog = {
+            0x8611D: 1,
+            0x86120: 1701,
+            0x86123: 0x40000 + 2 * ((self.slot + 4) & 0x1FFFF) + 14 + 2 * title,
+            0x86128: 13,
+        }
+        self.catalog.update({0x26BBB + 7 * i: i for i in range(16)})
+
+    def install(self, slot):
+        body = self.package[8:]
+        size = (4 + len(body) + 3) & ~3
+        self.flash[slot : slot + 4] = b"\x53" + ((size * 2 - 2) | 0x100000).to_bytes(3, "little")
+        self.flash[slot + 4 : slot + 4 + len(body)] = body
+        return size
+
+    def verify(self, target=0x140000):
+        return VERIFY.installed_recovery(
+            bytes(self.flash),
+            self.package,
+            1701,
+            target,
+            read=lambda address, count=5: self.catalog[address],
+        )
+
+    def test_exact_live_installation(self):
+        self.assertEqual(self.verify(), (self.slot, self.size))
+
+    def test_read_only_installation_has_no_erase_target(self):
+        self.assertEqual(self.verify(None), (self.slot, self.size))
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            self.verify(0x1E0000)
+
+    def test_deleted_copy_is_not_installation(self):
+        self.flash[self.slot] = 0
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_duplicate_live_identity(self):
+        self.install(0x1C0105)
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_same_id_with_changed_code_is_rejected(self):
+        self.flash[self.slot + 4 + len(self.package[8:]) - 5] ^= 1
+        with self.assertRaisesRegex(ValueError, "differs from package"):
+            self.verify()
+
+    def test_matching_payload_inside_tombstone_is_not_installation(self):
+        self.flash[self.slot] = 0
+        self.install(self.slot + self.size + 4)
+        # A larger deleted allocation encloses the apparent live header.
+        size = self.size * 2 + 4
+        self.flash[self.slot + 1 : self.slot + 4] = (size * 2 - 2).to_bytes(3, "little")
+        with self.assertRaisesRegex(ValueError, "exactly one live"):
+            self.verify()
+
+    def test_target_must_preserve_entire_recovery_allocation(self):
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            self.verify(0x1E0000)
+
+    def test_bad_bank_identity_and_tail_fail_closed(self):
+        self.flash[0x180100] ^= 1
+        with self.assertRaisesRegex(ValueError, "bank identity"):
+            self.verify()
+        self.flash[0x180100] ^= 1
+        self.flash[self.slot + self.size + 1] = 0
+        with self.assertRaisesRegex(ValueError, "bank tail"):
+            self.verify()
+
+    def test_corrupt_expected_package_is_rejected(self):
+        damaged = bytearray(self.package)
+        damaged[-2] ^= 1
+        self.package = bytes(damaged)
+        with self.assertRaisesRegex(ValueError, "CRC"):
+            self.verify()
+
+    def test_wrong_catalog_object_or_bank_is_rejected(self):
+        self.catalog[0x86123] += 1
+        with self.assertRaisesRegex(ValueError, "another object"):
+            self.verify()
+        self.catalog[0x86123] -= 1
+        self.catalog[0x86128] = 12
+        with self.assertRaisesRegex(ValueError, "another Flash bank"):
+            self.verify()
+
+    def test_duplicate_catalog_binding_is_rejected(self):
+        self.catalog.update({0x8611D: 2, 0x86130: 1701})
+        with self.assertRaisesRegex(ValueError, "one recovery catalog"):
+            self.verify()
+
+
+class ExecutedImageTests(unittest.TestCase):
+    def setUp(self):
+        self.symbols = {"workspace": 64, "__image_end": 9000, "__tls_base": 40, "errno": 4}
+        self.image = bytearray(9000)
+        self.image[:32] = bytes(range(32))
+        struct.pack_into("<I", self.image, 64, 0x48505046)
+        self.address = 0x08001000
+        struct.pack_into("<I", self.image, 64 + 8272 + 22 * 4, self.address + 44)
+
+    def ram(self, offset):
+        packed = "0" * offset + VERIFY.nibbles(self.image)
+        packed += "0" * (40000 - len(packed))
+        return bytes(int(packed[i : i + 2][::-1], 16) for i in range(0, len(packed), 2))
+
+    def test_unmoved_image_keeps_strict_alignment(self):
+        image, offset, address = VERIFY.executed_image(self.ram(8192), self.image, self.symbols)
+        self.assertEqual((image, offset, address), (self.image, 8192, self.address))
+        with self.assertRaisesRegex(ValueError, "alignment"):
+            VERIFY.executed_image(self.ram(8193), self.image, self.symbols)
+
+    def test_gc_move_preserves_original_execution_address(self):
+        for offset in (8193, 10000):
+            image, actual, address = VERIFY.executed_image(
+                self.ram(offset), self.image, self.symbols, relocated=True
+            )
+            self.assertEqual((image, actual, address), (self.image, offset, self.address))
+
+    def test_invalid_original_address_is_rejected(self):
+        for address in (0x08001001, 0x07FFFFF8, 0x08004FF8):
+            struct.pack_into("<I", self.image, 64 + 8272 + 22 * 4, address + 44)
+            with self.assertRaisesRegex(ValueError, "Original.*bounds/alignment"):
+                VERIFY.executed_image(self.ram(8193), self.image, self.symbols, relocated=True)
+
+    def test_duplicate_and_truncated_images_are_rejected(self):
+        ram = self.ram(8193)
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            VERIFY.executed_image(ram + ram, self.image, self.symbols, relocated=True)
+        with self.assertRaisesRegex(ValueError, "bounds"):
+            VERIFY.executed_image(ram[:5000], self.image, self.symbols, relocated=True)
+
+
+class HomeStringTests(unittest.TestCase):
+    def setUp(self):
+        self.memory = bytearray(0x100000)
+        self.home, self.item = 0x90000, 0x90100
+        self.put(0x80711, self.home)
+        self.put(self.home, 0x2A96)
+        self.put(self.home + 8, self.item - self.home - 8)
+        self.put(self.item, 7, 2)
+        for i, value in enumerate(b"HPCKEEP"):
+            self.put(self.item + 2 + 2 * i, value, 2)
+        self.obj = self.item + 18
+        self.put(self.obj, 0x2A2C)
+        self.put(self.obj + 5, 5 + 2 * len(b"kept"))
+        for i, value in enumerate(b"kept"):
+            self.put(self.obj + 10 + 2 * i, value, 2)
+
+    def put(self, address, value, width=5):
+        for i in range(width):
+            self.memory[address + i] = (value >> (4 * i)) & 15
+
+    def read(self, address, width=5):
+        if not 0 <= address <= len(self.memory) - width:
+            raise ValueError("Test read outside Saturn memory")
+        return sum(self.memory[address + i] << (4 * i) for i in range(width))
+
+    def test_value_and_changed_value_are_observed(self):
+        self.assertEqual(VERIFY.home_string(self.read, b"HPCKEEP"), b"kept")
+        self.put(self.obj + 10, ord("x"), 2)
+        self.assertEqual(VERIFY.home_string(self.read, b"HPCKEEP"), b"xept")
+
+    def test_missing_or_wrong_type_cannot_pass_as_empty(self):
+        with self.assertRaisesRegex(ValueError, "missing"):
+            VERIFY.home_string(self.read, b"ABSENT")
+        self.put(self.obj, 0x2D9D)
+        with self.assertRaisesRegex(ValueError, "not a string"):
+            VERIFY.home_string(self.read, b"HPCKEEP")
+
+    def test_malformed_string_extent_is_rejected(self):
+        for extent in (4, 6, 0xFFFFF):
+            self.put(self.obj + 5, extent)
+            with self.assertRaisesRegex(ValueError, "extent"):
+                VERIFY.home_string(self.read, b"HPCKEEP")
+
+    def test_real_array_shape_and_every_element_are_verified(self):
+        count = 3
+        self.memory[self.obj : self.obj + 25 + 16 * count] = bytes(25 + 16 * count)
+        for i, value in enumerate((0x29E8, 20 + 16 * count, 0x2933, 1, count)):
+            self.put(self.obj + 5 * i, value)
+        VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", count)
+        for offset in range(25 + 16 * count):
+            saved = self.memory[self.obj + offset]
+            self.memory[self.obj + offset] ^= 1
+            with self.assertRaises(ValueError):
+                VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", count)
+            self.memory[self.obj + offset] = saved
+        for invalid in (0, -1, 0x100000):
+            with self.assertRaises(ValueError):
+                VERIFY.verify_zero_real_array(self.read, b"HPCKEEP", invalid)
 
 
 class RecoveryVerifierTests(unittest.TestCase):
@@ -133,6 +393,62 @@ class RecoveryVerifierTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 VERIFY.verify_flash(before, after, slot, target)
+
+
+class RecoveryBindingTests(unittest.TestCase):
+    def setUp(self):
+        RecoveryVerifierTests.setUp(self)
+        self.root = self.slot + 4124
+        binding = bytearray.fromhex("7e3e0040") + b"HPCAUTH1"
+        binding += struct.pack(
+            "<4I", self.root, self.slot, self.target, int.from_bytes(self.record[-4:], "little")
+        )
+        binding += struct.pack("<I", zlib.crc32(binding[1:]))
+        self.before[self.root : self.root + 32] = binding
+        self.after[self.root : self.root + 32] = binding
+        self.after[self.root] = self.after[self.slot] = 0
+
+    def test_exact_closure_and_later_noop(self):
+        VERIFY.verify_flash(
+            self.before, self.after, self.slot, self.target, retire=True, authority_slot=self.root
+        )
+        VERIFY.verify_retired(
+            self.after, self.after, self.slot, self.target, authority_slot=self.root
+        )
+
+    def test_missing_closure_and_unrelated_changes_fail(self):
+        for offset in (self.root, self.root + 1, self.root + 31, self.root + 32):
+            changed = self.after.copy()
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_flash(
+                    self.before,
+                    changed,
+                    self.slot,
+                    self.target,
+                    retire=True,
+                    authority_slot=self.root,
+                )
+        unclosed = self.after.copy()
+        unclosed[self.root] = 0x7E
+        with self.assertRaises(ValueError):
+            VERIFY.verify_retired(
+                unclosed, unclosed, self.slot, self.target, authority_slot=self.root
+            )
+
+    def test_corrupt_binding_is_not_a_valid_oracle(self):
+        for offset in range(32):
+            changed = self.before.copy()
+            changed[self.root + offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                VERIFY.verify_flash(
+                    changed,
+                    self.after,
+                    self.slot,
+                    self.target,
+                    retire=True,
+                    authority_slot=self.root,
+                )
 
 
 class RecoveryPowerCutTests(unittest.TestCase):
@@ -334,7 +650,7 @@ class RecoveryRestartTests(unittest.TestCase):
             (directory / "flash").write_bytes(b"\xff" * 0x200000)
             self.write_native(directory, self.catalog)
 
-    def write_native(self, directory, catalog, *, depth=0, pc=0x8428):
+    def write_native(self, directory, catalog, *, depth=0, pc=0x8428, cpsr=0x13):
         ram = bytearray(0x80000)
         # A contiguous native main-RAM read map, independently populated with
         # the HOME prologue, empty stack and catalog records used by the oracle.
@@ -356,7 +672,7 @@ class RecoveryRestartTests(unittest.TestCase):
             for value, (offset, width) in zip(record, ((0, 3), (3, 5), (8, 5), (13, 3))):
                 write(0x86120 + 16 * index + offset, value, width)
         (directory / "sram").write_bytes(ram)
-        (directory / "state").write_text(f"[s3c2410-arm]\nreg-15={pc:#x}\n")
+        (directory / "state").write_text(f"[s3c2410-arm]\nreg-15={pc:#x}\ncpsr={cpsr:#x}\n")
 
     def test_native_catalog_reordering_is_allowed(self):
         self.write_native(self.restarted, self.catalog[::-1])
@@ -387,6 +703,24 @@ class RecoveryRestartTests(unittest.TestCase):
                 self.write_native(self.restarted, self.catalog, depth=depth, pc=pc)
                 with self.assertRaises(ValueError):
                     VERIFY.verify_restart(self.clean, self.repaired, self.restarted)
+
+    def test_rom_exception_handlers_are_not_successful_stock_return(self):
+        # Native failed-startup witnesses can sit inside ROM at 0x140 in abort
+        # mode. A ROM-range PC and intact catalog are insufficient evidence.
+        for pc in (0x0C, 0x140, 0x8428):
+            for cpsr in (0x17, 0x197, 0x1B, 0x600000DB):
+                with self.subTest(pc=pc, cpsr=cpsr):
+                    self.write_native(self.restarted, self.catalog, pc=pc, cpsr=cpsr)
+                    with self.assertRaisesRegex(ValueError, "abort/undefined"):
+                        VERIFY.verify_restart(self.clean, self.repaired, self.restarted)
+
+    def test_normal_rom_modes_and_condition_flags_are_allowed(self):
+        for cpsr in (0x10, 0x11, 0x12, 0x13, 0x1F, 0xA00000D3):
+            with self.subTest(cpsr=cpsr):
+                self.write_native(self.restarted, self.catalog, cpsr=cpsr)
+                self.assertEqual(
+                    VERIFY.verify_restart(self.clean, self.repaired, self.restarted), 2
+                )
 
 
 if __name__ == "__main__":

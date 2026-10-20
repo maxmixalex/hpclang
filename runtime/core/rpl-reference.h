@@ -82,6 +82,8 @@ struct hpclang_rpl_reference
  * or the available bound from a library table. Library edges use auxiliary =
  * library_reference_kind + 1; runstream edges use zero. This is not a type claim.
  * ACPTR: target is the stored Saturn address; auxiliary is its bank switch.
+ * A nonzero switch additionally emits EXECUTION for its own five-nibble field;
+ * resolving the payload bank does not resolve the switch's executable reference.
  * ROMP: target/auxiliary are library/command indices.
  * FLASHP: target/auxiliary are logical selector/index (not physical banks).
  * ATTACHMENT: target is a HOME attached-library pointer, auxiliary its library
@@ -95,6 +97,8 @@ struct hpclang_rpl_reference
  * Opaque code, binary data and unrecognized child-directory header metadata require
  * their own semantic traversal;
  * a caller must never treat an OPAQUE event as absence of references.
+ * Conversely, numerical address matches in an opaque payload are not evidence
+ * of pointers: ownership/type evidence must distinguish raw data from roots.
  * All addresses retain the input reader's mapping. No target is dereferenced.
  * The callback is read-only; keep mappings stable and discard partial results
  * on any nonzero return. Callback errors propagate unchanged. */
@@ -198,9 +202,22 @@ int hpclang_rpl_reference_plan_qualified_shift(
     const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
     int32_t delta, struct hpclang_rpl_reference_patch *patch);
 
+/* Explicitly plan the stored five-nibble address of an EXECUTION event after
+ * independently resolving its field and target mappings. Accept only that event
+ * kind, with zero extent/auxiliary and a nonzero target; reject a move to the
+ * zero/no-function sentinel. The ordinary planners still reject EXECUTION.
+ * This plans the address field only: retain the separate obligation to inspect
+ * the target code, its embedded references and live execution state before any
+ * mutation. It neither discovers an execution entry nor certifies code safety.
+ * Same return/output/old-field contract as plan_qualified_shift; no writes. */
+int hpclang_rpl_reference_plan_execution_shift(
+    const struct hpclang_rpl_reference *reference,
+    const struct hpclang_rpl_reference_mappings *mappings, uint32_t first, uint32_t end,
+    int32_t delta, struct hpclang_rpl_reference_patch *patch);
+
 struct hpclang_rpl_reference_edit
 {
-    uint32_t mapping, field, expected, value;
+    uint32_t mapping, field, expected, value, width; /* Explicit 1..5 nibbles. */
 };
 
 struct hpclang_rpl_reference_edit_builder
@@ -210,7 +227,7 @@ struct hpclang_rpl_reference_edit_builder
     int error;
 };
 
-/* Merge independently discovered edits into a sorted, nonoverlapping batch.
+/* Merge independently discovered 1..5-nibble edits into a sorted, nonoverlapping batch.
  * Exact duplicates (including unchanged fields) consume no extra capacity.
  * Conflicting duplicates and partial overlaps are malformed. Any error latches
  * and invalidates count; begin is required to restart. Caller owns storage and
@@ -259,12 +276,19 @@ int hpclang_rpl_reference_guards_observe(struct hpclang_rpl_reference_guard_buil
                                          uint32_t mapping, uint32_t address, uint8_t value);
 
 struct hpclang_rpl_library_binding;
-/* Return zero with a normalized physical mapping identity, or an error.
- * Resolve every binding, including those without a bank switch. Read-only;
- * keep the resolution stable through validation/commit. */
+struct hpclang_rpl_catalog_mappings
+{
+    uint32_t payload, bank_switch;
+};
+
+/* Return zero with normalized physical mapping identities, or an error.
+ * Resolve every payload, including bindings without a bank switch. A nonzero
+ * bank_switch is executable code: resolve its own mapping independently of the
+ * payload mapping it selects. For zero (no switch), bank_switch mapping is
+ * ignored. Read-only; keep both resolutions stable through validation/commit. */
 typedef int (*hpclang_rpl_catalog_mapping_fn)(void *context,
                                               const struct hpclang_rpl_library_binding *binding,
-                                              uint32_t *mapping);
+                                              struct hpclang_rpl_catalog_mappings *mappings);
 
 struct hpclang_rpl_catalog_move
 {
@@ -281,10 +305,12 @@ struct hpclang_rpl_catalog_reference_plan
 };
 
 /* Assemble the catalog portion of a relocation plan without writing native
- * data. For N records, supply 2*N edits (address and unchanged bank switch)
+ * data. For N records, supply 2*N edits (payload address and bank-switch address)
  * and 1+2*N guards (count, IDs and flags). Arrays must be disjoint from each
  * other and all input/IO state. On success counts describe the complete plan;
  * on error both counts are zero and all partially filled entries are invalid.
+ * Zero bank-switch sentinels stay zero, even if the move includes address zero.
+ * Reject moving a nonzero function target to zero, which would change its meaning.
  * Duplicate IDs are preserved as distinct records. Fields retain old addresses.
  * Keep mappings/catalog/buffers exclusively owned throughout later validation
  * and commit. This does not discover other roots, repair references or authorize

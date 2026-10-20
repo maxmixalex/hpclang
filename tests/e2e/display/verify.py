@@ -103,7 +103,7 @@ def verify(prefix: Path, height: int) -> None:
                         )
                     assert pixels[y * 132 + x] == expected, (frame, x, y)
     assert adapter_frames[111] == adapter_frames[113], "HPG lost the previous front page"
-    print(f"PASS: {prefix}: gray/DMA checks, historical clients and installed HPG adapter")
+    print(f"PASS: {prefix}: gray/DMA checks and historical graphics")
 
 
 def main() -> None:

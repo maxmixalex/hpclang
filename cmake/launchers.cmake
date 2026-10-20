@@ -1,8 +1,8 @@
 # Package an application through the production ARMToolbox bootstrap.
 function(hpclang_target_launchers target)
-    cmake_parse_arguments(PARSE_ARGV 1 launcher "" "" "MODELS")
+    cmake_parse_arguments(PARSE_ARGV 1 launcher "" "MAX_RW_BYTES" "MODELS")
     if(launcher_UNPARSED_ARGUMENTS OR launcher_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR "hpclang_target_launchers expects MODELS followed by model names")
+        message(FATAL_ERROR "hpclang_target_launchers expects MODELS and/or MAX_RW_BYTES")
     endif()
     if(NOT TARGET ${target}_hpc)
         message(FATAL_ERROR "Create ${target} with hpclang_add_application first")
@@ -15,7 +15,18 @@ function(hpclang_target_launchers target)
         endif()
     endif()
     set(supported hp39gplus hp39gs hp40gs hp48gii hp49gplus hp50g)
+    set(memory_args)
+    if(DEFINED launcher_MAX_RW_BYTES)
+        if(NOT launcher_MAX_RW_BYTES MATCHES "^(0[xX][0-9A-Fa-f]+|[0-9]+)$")
+            message(FATAL_ERROR "MAX_RW_BYTES must be an integer byte count")
+        endif()
+        list(APPEND memory_args --max-rw-bytes "${launcher_MAX_RW_BYTES}")
+    endif()
     set_property(TARGET ${target} PROPERTY HPCLANG_LAUNCHER_MODELS "${launcher_MODELS}")
+    set(launcher_args --models ${launcher_MODELS} ${memory_args})
+    string(REPLACE ";" "\n" launcher_args_content "${launcher_args}")
+    set(launcher_args_file "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers.args")
+    file(GENERATE OUTPUT "${launcher_args_file}" CONTENT "${launcher_args_content}\n")
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${target}-launchers")
     set(outputs)
     foreach(model IN LISTS launcher_MODELS)
@@ -38,10 +49,10 @@ function(hpclang_target_launchers target)
     add_custom_command(OUTPUT ${outputs}
         COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/build-launchers.py"
             "${CMAKE_CURRENT_BINARY_DIR}/${target}.hpc" "${output}"
-            --tool-bin "${tool_bin}" --models ${launcher_MODELS}
+            --tool-bin "${tool_bin}" "@${launcher_args_file}"
         DEPENDS ${target}_hpc "${CMAKE_CURRENT_BINARY_DIR}/${target}.hpc"
             "${HPCLANG_ROOT}/tools/build-launchers.py"
-            "${HPCLANG_ROOT}/tools/armtoolbox-wrap.py" ${bootstrap_sources}
+            "${HPCLANG_ROOT}/tools/armtoolbox-wrap.py" "${launcher_args_file}" ${bootstrap_sources}
         VERBATIM)
     add_custom_target(${target}_launchers ALL DEPENDS ${outputs})
 endfunction()

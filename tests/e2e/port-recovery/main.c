@@ -3,11 +3,32 @@
  * Diagnostics retain the entry/mapping/TLS/clock and first/repeated replay results.
  */
 #include "rpl-flash-replay.h"
+#include "binding.h"
 #include <stddef.h>
 #include "sst-flash.h"
 #include <hpclang/time.h>
 __thread int errno;
 __thread unsigned tls_probe = 0x12345678;
+#ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
+/* Packaging may bind this image to another reserved pair without recompiling.
+ * Volatile prevents embedding the build defaults in instructions. These fields
+ * identify allocations; they do not establish installation trust or freshness. */
+const volatile struct hpclang_recovery_binding hpclang_recovery_binding =
+    HPCLANG_RECOVERY_BINDING_INITIALIZER;
+#define AUTHORITY_SLOT hpclang_recovery_binding.authority_slot
+#endif
+
+static int replay_snapshot(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
+                           const uint8_t *expected, uint32_t bytes, uint8_t *scratch,
+                           uint32_t capacity)
+{
+#ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
+    return hpclang_rpl_flash_sector_replay_bound(io, AUTHORITY_SLOT, slot, expected, bytes, scratch,
+                                                 capacity);
+#else
+    return hpclang_rpl_flash_sector_replay_expected(io, slot, expected, bytes, scratch, capacity);
+#endif
+}
 struct workspace
 {
     unsigned marker;
@@ -17,6 +38,7 @@ struct workspace
     unsigned diagnostics[32];
 };
 _Static_assert(sizeof(struct workspace) == 8400, "entry.S workspace reservation");
+_Static_assert(offsetof(struct workspace, slot) == 8, "entry.S recovery restart condition");
 _Static_assert(offsetof(struct workspace, diagnostics[7]) == 8300,
                "entry.S restored CPSR diagnostic offset");
 static int read_flash(void *context, unsigned address, unsigned short *value)
@@ -85,6 +107,9 @@ static int program_flash(void *context, unsigned address, unsigned short value)
     if ((address & ~4095u) != out->target
 #ifdef HPCLANG_RECOVERY_RETIRE_JOURNAL
         && address != (out->slot & ~1u)
+#endif
+#ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
+        && address != (AUTHORITY_SLOT & ~1u)
 #endif
     )
         return 0;
@@ -161,8 +186,19 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
     out->diagnostics[5] = l1[0];
     out->diagnostics[6] = l1[1];
     struct hpclang_rpl_flash_io io = {out, read_flash, 0, 0x140000, 0x200000};
+#ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
+    out->result = HPCLANG_RPL_FLASH_INVALID;
+    if (hpclang_recovery_binding.magic[0] == 0x42435048u &&
+        hpclang_recovery_binding.magic[1] == 0x31444e49u)
+        out->result = hpclang_rpl_flash_preflight_bound(
+            &io, AUTHORITY_SLOT, hpclang_recovery_binding.journal_slot, out->scratch,
+            sizeof(out->scratch), &out->target);
+    if (out->result > 0)
+        out->slot = hpclang_recovery_binding.journal_slot;
+#else
     out->result = hpclang_rpl_flash_preflight_sector(&io, out->scratch, sizeof(out->scratch),
                                                      &out->slot, &out->target);
+#endif
     uint64_t clock;
     int recoverable = out->result == 1;
 #ifdef HPCLANG_RECOVERY_RETIRE_JOURNAL
@@ -178,18 +214,18 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
                 {out, read_flash, program_flash, 0x140000, 0x200000}, erase_flash};
             const uint32_t record_bytes = HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES;
             if (out->result == 1) {
-                out->diagnostics[27] = hpclang_rpl_flash_sector_replay_expected(
-                    &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
-                    sizeof(out->scratch) - record_bytes);
+                out->diagnostics[27] = replay_snapshot(&replay, out->slot, out->scratch,
+                                                       record_bytes, out->scratch + record_bytes,
+                                                       sizeof(out->scratch) - record_bytes);
                 if (out->diagnostics[27] != 0) {
                     out->marker = 0x48504641;
                     for (;;)
                         __asm__ volatile("nop");
                 }
                 unsigned erases = out->diagnostics[28], programs = out->diagnostics[29];
-                out->diagnostics[30] = hpclang_rpl_flash_sector_replay_expected(
-                    &replay, out->slot, out->scratch, record_bytes, out->scratch + record_bytes,
-                    sizeof(out->scratch) - record_bytes);
+                out->diagnostics[30] = replay_snapshot(&replay, out->slot, out->scratch,
+                                                       record_bytes, out->scratch + record_bytes,
+                                                       sizeof(out->scratch) - record_bytes);
                 out->diagnostics[31] =
                     (out->diagnostics[28] - erases) + (out->diagnostics[29] - programs);
                 if (out->diagnostics[30] != 0 || out->diagnostics[31] != 0) {
@@ -220,6 +256,15 @@ void exercise(struct workspace *out, unsigned caller_cpsr)
                 for (;;)
                     __asm__ volatile("nop");
             }
+#ifdef HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT
+            out->diagnostics[30] = hpclang_rpl_flash_close_authority(
+                &replay.flash, AUTHORITY_SLOT, out->slot, out->scratch, record_bytes);
+            if (out->diagnostics[30] != 0) {
+                out->marker = 0x48504641;
+                for (;;)
+                    __asm__ volatile("nop");
+            }
+#endif
 #endif
         }
     }

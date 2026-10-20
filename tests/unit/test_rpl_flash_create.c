@@ -747,6 +747,140 @@ static void remove_backups(const struct hpclang_rpl_flash_io *io)
     assert(flash[0x105u] == 0 && !memcmp(flash + 0x106u, record + 1u, sizeof record - 1u));
 }
 
+struct catalog_image
+{
+    uint8_t nibbles[160];
+    uint32_t fail_at;
+};
+static int catalog_read(void *context, uint32_t address, uint8_t *value)
+{
+    struct catalog_image *image = context;
+    if (address >= sizeof image->nibbles || address == image->fail_at)
+        return 0;
+    *value = image->nibbles[address];
+    return 1;
+}
+static void catalog_word(struct catalog_image *image, uint32_t address, uint32_t value,
+                         unsigned width)
+{
+    assert(address + width <= sizeof image->nibbles);
+    for (unsigned i = 0; i < width; ++i)
+        image->nibbles[address + i] = (uint8_t)((value >> (4 * i)) & 15);
+}
+static void match_installations(const struct hpclang_rpl_flash_io *source, const uint8_t *library,
+                                uint32_t bytes)
+{
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = NULL;
+    struct catalog_image image = {.fail_at = UINT32_MAX};
+    const struct hpclang_rpl_reader reader = {catalog_read, &image};
+    const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 35, 0};
+    for (uint32_t i = 0; i < 16; ++i)
+        catalog_word(&image, 7 * i, 0x12345 + i * i, 5);
+    catalog_word(&image, 120, 1, 3);
+    catalog_word(&image, 123, 123, 3);
+    catalog_word(&image, 126, 0x40222, 5);
+    uint32_t slot = UINT32_MAX;
+    for (uint32_t bank = 0; bank < 6; ++bank) {
+        init();
+        memcpy(flash + bank * 0x20000u + 0x105, library, bytes);
+        catalog_word(&image, 131, 0x12345 + (bank + 8) * (bank + 8), 5);
+        assert(!hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot));
+        assert(slot == base + bank * 0x20000u + 0x105 && !writes);
+    }
+    init();
+    memcpy(flash + 0x105, library, bytes);
+    catalog_word(&image, 131, 0x12345 + 64, 5);
+    slot = UINT32_MAX;
+    catalog_word(&image, 120, 0, 3);
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_NOT_FOUND);
+    catalog_word(&image, 120, 2, 3);
+    memcpy(image.nibbles + 139, image.nibbles + 123, 16);
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    catalog_word(&image, 120, 1, 3);
+    catalog_word(&image, 126, 0x40223, 5);
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    catalog_word(&image, 126, 0x40222, 5);
+    catalog_word(&image, 131, 0x12345 + 81, 5);
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    catalog_word(&image, 131, 0x12345 + 64, 5);
+    catalog_word(&image, 7 * 9, 0x12345 + 64, 5);
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    catalog_word(&image, 7 * 9, 0x12345 + 81, 5);
+    image.fail_at = 7 * 15;
+    assert(hpclang_rpl_flash_match_installation(&io, library, bytes, &catalog, &slot) ==
+           HPCLANG_RPL_FLASH_FAILED);
+    assert(slot == UINT32_MAX && !writes);
+}
+
+static void match_libraries(const struct hpclang_rpl_flash_io *source, const uint8_t *library,
+                            const uint8_t *different, uint32_t bytes)
+{
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = NULL;
+    uint32_t slot = UINT32_MAX;
+    init();
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) ==
+           HPCLANG_RPL_FLASH_NOT_FOUND);
+    assert(hpclang_rpl_flash_match_library(&io, record, sizeof record, &slot) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, NULL) == HPCLANG_RPL_FLASH_INVALID);
+    assert(hpclang_rpl_flash_create_library(&io, library, bytes, &slot) ==
+           HPCLANG_RPL_FLASH_INVALID); /* Read-only scanning must not enable mutation. */
+    assert(slot == UINT32_MAX && !writes);
+    for (unsigned bank = 0; bank < 6; ++bank) {
+        init();
+        uint32_t at = bank * 0x20000u + 0x105u;
+        memcpy(flash + at, library, bytes);
+        uint32_t before = fingerprint(sizeof flash);
+        assert(!hpclang_rpl_flash_match_library(&io, library, bytes, &slot));
+        assert(slot == base + at && !writes && fingerprint(sizeof flash) == before);
+        flash[at + 25] &= 15; /* Native STO may zero this non-object high nibble. */
+        assert(!hpclang_rpl_flash_match_library(&io, library, bytes, &slot));
+        assert(slot == base + at && !writes);
+        slot = UINT32_MAX;
+        flash[at] = 0;
+        assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) ==
+               HPCLANG_RPL_FLASH_NOT_FOUND);
+        assert(slot == UINT32_MAX && !writes);
+    }
+    init();
+    memcpy(flash + 0x105, different, bytes); /* Valid CRC and ID, different content. */
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == UINT32_MAX && !writes);
+    init();
+    memcpy(flash + 0x105, library, bytes);
+    memcpy(flash + 0x20105, library, bytes);
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == UINT32_MAX && !writes);
+    init();
+    /* A matching payload nested inside a tombstone is not an installation. */
+    uint32_t extent = (bytes + 8) * 2 - 2;
+    flash[0x105] = 0;
+    flash[0x106] = (uint8_t)extent;
+    flash[0x107] = (uint8_t)(extent >> 8);
+    flash[0x108] = (uint8_t)(extent >> 16);
+    memcpy(flash + 0x10d, library, bytes);
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) ==
+           HPCLANG_RPL_FLASH_NOT_FOUND);
+    assert(slot == UINT32_MAX && !writes);
+    init();
+    memcpy(flash + 0x105, library, bytes);
+    flash[0xa0110] = 0; /* A good early match must not conceal a dirty later bank. */
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(slot == UINT32_MAX && !writes);
+    init();
+    memcpy(flash + 0x105, library, bytes);
+    fail_address = base + 0xa0100;
+    assert(hpclang_rpl_flash_match_library(&io, library, bytes, &slot) == HPCLANG_RPL_FLASH_FAILED);
+    assert(slot == UINT32_MAX && !writes);
+}
+
 static void create_libraries(const struct hpclang_rpl_flash_io *io)
 {
     /* Native library 123, with the unused high nibble left erased by SDK. */
@@ -834,6 +968,8 @@ static void create_libraries(const struct hpclang_rpl_flash_io *io)
     assert(hpclang_rpl_flash_create_library(io, library, sizeof library, NULL) ==
            HPCLANG_RPL_FLASH_NOSPACE);
     assert(!writes);
+    match_libraries(io, library, renamed, sizeof library);
+    match_installations(io, library, sizeof library);
 }
 
 int main(void)

@@ -443,6 +443,15 @@ unsigned hpclang_e2e_console_test(void)
     unsigned result = 1;
     if (!c || !expected)
         goto done;
+    struct hpclang_console_state state;
+    if (hpclang_console_set_tab_width(c, UINT32_MAX) || hpclang_console_write(c, "\t", 1) ||
+        hpclang_console_get_state(c, &state) || state.column != 7 || state.row != 1 ||
+        state.columns != 8 || state.rows != 2 || state.tab_width != UINT32_MAX ||
+        hpclang_console_clear(c) || hpclang_console_set_tab_width(c, 3) ||
+        hpclang_console_write(c, "A\tB", 3) || hpclang_console_get_state(c, &state) ||
+        state.column != 4 || state.row != 0 || hpclang_console_clear(c) ||
+        hpclang_console_set_tab_width(c, 4))
+        goto done;
     if (getchar() != EOF || !feof(stdin) || ferror(stdin))
         goto done;
     result = 2;
@@ -450,8 +459,9 @@ unsigned hpclang_e2e_console_test(void)
         hpclang_stdio_bind(&callbacks) != -1 || errno != EBUSY)
         goto done;
     result = 3;
-    if (printf("%s\n", "AB") != 3 || fprintf(stderr, "%d", 12) != 2 || fflush(stdout) != 0 ||
-        fflush(stderr) != 0)
+    if (printf("%s", "ABjunk") != 6 || fflush(stdout) != 0 || hpclang_console_move(c, 2, 0) ||
+        hpclang_console_clear_eol(c) || hpclang_console_move(c, 0, 1) ||
+        fprintf(stderr, "%d", 12) != 2 || fflush(stdout) != 0 || fflush(stderr) != 0)
         goto done;
     uint32_t cp;
     if (hpclang_console_cell(c, 0, 0, &cp) != 0 || cp != 'A' ||

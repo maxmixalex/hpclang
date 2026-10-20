@@ -6,6 +6,83 @@
 #include <stddef.h>
 #include <hpclang/font-package.h>
 #include "display-surface.h"
+#include "hpg-internal.h"
+#define HPCLANG_HPCONIO_NO_AUTOINIT
+#include <hpconio.h>
+#include <hpclang/sound.h>
+#include <hpclang/stdio.h>
+#include "stdio-routing.h"
+
+uint32_t hpclang_font_advance(const struct hpclang_font *font)
+{
+    return font ? 4 : 0;
+}
+uint32_t hpclang_font_height(const struct hpclang_font *font)
+{
+    return font ? 6 : 0;
+}
+static const unsigned char *input_bytes;
+static int input_end = HPCLANG_STDIO_EOF, stream_error;
+int hpclang_hpgcc_console_read(void *context)
+{
+    (void)context;
+    assert(input_bytes && "graphics checks must not poll input");
+    if (*input_bytes)
+        return *input_bytes++;
+    if (input_end == HPCLANG_STDIO_ERROR)
+        errno = ECANCELED;
+    return input_end;
+}
+void hpclang_stdio_clear_streams(void)
+{
+    stream_error = 0;
+}
+int hpg_test_getc(FILE *stream)
+{
+    assert(stream == stdin);
+    int result = hpclang_stdio_route_read();
+    if (result == HPCLANG_STDIO_ERROR) {
+        stream_error = 1;
+        return EOF;
+    }
+    return result;
+}
+int hpg_test_getchar(void)
+{
+    /* Optimized libc headers may inline getchar as getc(stdin). Both entry
+     * points must consume the scripted stream rather than the host terminal. */
+    return hpg_test_getc(stdin);
+}
+int hpg_test_putc(int byte, FILE *stream)
+{
+    assert(stream == stdout);
+    return hpclang_stdio_route_write(1, (unsigned char)byte) ? EOF : (unsigned char)byte;
+}
+int hpg_test_putchar(int byte)
+{
+    return hpg_test_putc(byte, stdout);
+}
+int hpg_test_fputs(const char *text, FILE *stream)
+{
+    assert(stream == stdout);
+    while (*text)
+        if (hpg_test_putchar((unsigned char)*text++) == EOF)
+            return EOF;
+    return 0;
+}
+int hpg_test_ferror(FILE *stream)
+{
+    assert(stream == stdin);
+    return stream_error;
+}
+static unsigned tones;
+int hpclang_sound_play(uint32_t frequency, uint32_t duration, hpclang_sound_cancel_fn cancel,
+                       void *context)
+{
+    assert(frequency == 880 && duration == 100 && !cancel && !context);
+    ++tones;
+    return 0;
+}
 
 /* Distinct font providers let this test observe adapter selection and HP-byte
  * translation independently of the clean font renderer's own raster tests. */
@@ -130,6 +207,8 @@ static unsigned borrowed;
 static struct hpclang_surface *pages[2];
 static unsigned page_count, back, published, flips, ended;
 static int mode_failure;
+static int present_failure;
+static unsigned display_height = 6;
 static int configure(unsigned levels, unsigned count)
 {
     if (mode_failure) {
@@ -138,7 +217,7 @@ static int configure(unsigned levels, unsigned count)
     }
     for (unsigned i = 0; i < 2; ++i) {
         hpclang_surface_destroy(pages[i]);
-        pages[i] = i < count ? hpclang_surface_create(9, 6, levels) : NULL;
+        pages[i] = i < count ? hpclang_surface_create(9, display_height, levels) : NULL;
         assert(i >= count || pages[i]);
         if (pages[i])
             pages[i]->width = 8;
@@ -177,6 +256,10 @@ int hpclang_display_indicator_set(unsigned segment, uint8_t color)
 int hpclang_display_present(uint32_t timeout)
 {
     assert(timeout && page_count == 2);
+    if (present_failure) {
+        errno = ETIMEDOUT;
+        return -1;
+    }
     back ^= 1;
     ++flips;
     return 0;
@@ -267,6 +350,217 @@ static void indicators(void)
     assert(errno == EINVAL && published == previous);
     hpg_cleanup();
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
+}
+
+static void shared_screen(void)
+{
+    unsigned previous_end = ended, previous_publish = published;
+    mode_failure = 1;
+    assert(!hpclang_hpg_acquire_screen() && errno == ENOMEM);
+    assert(!page_count && ended == previous_end && published == previous_publish);
+    assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
+    mode_failure = 0;
+    hpg_t *shared = hpclang_hpg_acquire_screen();
+    assert(shared && page_count == 1 && published == previous_publish);
+    assert(hpg_get_pixel(shared, 1, 1) == 255);
+    struct hpclang_surface *page = hpclang_hpg_surface(shared);
+    hpclang_surface_set_pixel(page, 2, 2, 255);
+    assert(hpclang_hpg_acquire_screen() == shared && hpclang_hpg_surface(shared) == page);
+    assert(hpclang_surface_get_pixel(page, 2, 2) == 255);
+    hpclang_hpg_finish(shared);
+    assert(published == previous_publish + 1);
+    hpg_cleanup();
+    assert(ended == previous_end + 1 && !page_count);
+    assert(hpclang_surface_get_pixel(display, 2, 2) == 0);
+
+    for (int dbuf = 0; dbuf <= 1; ++dbuf) {
+        hpg_set_mode_gray16(dbuf);
+        hpg_set_color(NULL, 119);
+        hpg_set_mode(NULL, HPG_MODE_XOR);
+        hpg_clip(NULL, 1, 1, 7, 5);
+        page = hpclang_display_surface();
+        hpclang_surface_set_pixel(page, 2, 2, 85);
+        previous_publish = published;
+        unsigned previous_flips = flips;
+        shared = hpclang_hpg_acquire_screen();
+        assert(shared && hpclang_hpg_surface(shared) == page);
+        assert(page_count == (unsigned)dbuf + 1 && hpclang_surface_levels(page) == 16);
+        assert(hpclang_surface_get_pixel(page, 2, 2) == 85);
+        assert(shared->color == 119 && shared->mode == HPG_MODE_XOR && shared->left == 1 &&
+               shared->top == 1 && shared->right == 7 && shared->bottom == 5);
+        hpclang_hpg_finish(shared);
+        assert(published == previous_publish + !dbuf && flips == previous_flips);
+        hpg_cleanup();
+    }
+    assert(hpclang_display_begin_pages(4, 2) == 0);
+    page = hpclang_display_surface();
+    hpclang_surface_set_pixel(page, 3, 3, 170);
+    previous_end = ended;
+    assert(!hpclang_hpg_acquire_screen() && errno == EBUSY);
+    hpg_cleanup();
+    assert(ended == previous_end && page_count == 2 && hpclang_display_surface() == page);
+    assert(hpclang_surface_get_pixel(page, 3, 3) == 170);
+    hpclang_display_end();
+}
+
+static char captured[32];
+static unsigned captured_length;
+static int capture_byte(void *context, unsigned stream, unsigned char byte)
+{
+    (void)context;
+    assert(stream == 1 && captured_length + 1 < sizeof captured);
+    captured[captured_length++] = (char)byte;
+    captured[captured_length] = 0;
+    return 0;
+}
+static unsigned buffer_calls;
+static char dynamic_buffer[8];
+static char *next_buffer(void)
+{
+    ++buffer_calls;
+    return dynamic_buffer;
+}
+static void edited_lines(void)
+{
+    char text[16];
+    hpg_set_mode_mono(0);
+    _clear_screen();
+    struct hpclang_surface *s = hpclang_display_surface();
+    hpclang_surface_set_pixel(s, 7, 5, 255);
+    input_bytes = (const unsigned char *)"ABCDEFG\b\b\b\b\b\b\n";
+    assert(gets(text) == text && !strcmp(text, "A"));
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* restore pre-scroll graphics */
+    assert(getx() == 0 && gety() == 1);
+    hpg_set_mode_gray16(1);
+    _clear_screen();
+    input_bytes = (const unsigned char *)"ABC\b\n";
+    unsigned previous = flips;
+    assert(_gets(text) == text && !strcmp(text, "AB"));
+    assert(flips == previous + 5);
+    for (unsigned i = 0; i < 2; ++i) {
+        assert(hpclang_surface_get_pixel(pages[i], 0, 0) == 255);
+        assert(hpclang_surface_get_pixel(pages[i], 4, 0) == 255);
+        assert(hpclang_surface_get_pixel(pages[i], 0, 6) == 0);
+    }
+    input_bytes = (const unsigned char *)"X";
+    input_end = HPCLANG_STDIO_ERROR;
+    assert(!hpclang_hpgcc_gets(text, sizeof text) && errno == ECANCELED && !strcmp(text, "X"));
+    input_end = HPCLANG_STDIO_EOF;
+    stream_error = 0;
+    input_bytes = (const unsigned char *)"A\n";
+    present_failure = 1;
+    unsigned before_flips = flips;
+    assert(!hpclang_hpgcc_gets(text, sizeof text) && errno == ETIMEDOUT && !text[0]);
+    assert(flips == before_flips && page_count == 2);
+    present_failure = 0;
+    hpg_cleanup();
+    unsigned before = borrowed;
+    const struct hpclang_stdio_callbacks io = {.read = hpclang_hpgcc_console_read,
+                                               .write = capture_byte};
+    assert(hpclang_stdio_bind(&io) == 0);
+    input_bytes = (const unsigned char *)"AB\bC\n";
+    assert(hpclang_hpgcc_gets(text, sizeof text) == text && !strcmp(text, "AC"));
+    assert(!strcmp(captured, "AB\b \bC\n") && borrowed == before && !page_count);
+    struct
+    {
+        char before;
+        char text[4];
+        char after;
+    } bounded = {'x', "", 'y'};
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"ABCDE\bZ\n";
+    assert(gets(bounded.text) == bounded.text && !strcmp(bounded.text, "ABZ"));
+    assert(bounded.before == 'x' && bounded.after == 'y');
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"123\n";
+    assert(!_gets(&bounded.text[2]) && errno == EINVAL && !strcmp(bounded.text, "ABZ"));
+    assert(bounded.after == 'y');
+    char larger[12];
+    volatile int choose_small = 1;
+    captured_length = 0;
+    input_bytes = (const unsigned char *)"123456\n";
+    char *choice = choose_small ? bounded.text : larger;
+    char *chosen = gets(choice);
+    /* A pointer choice has no declared array bound. */
+    assert(!chosen && errno == EINVAL);
+    assert(bounded.before == 'x' && bounded.after == 'y');
+    input_bytes = (const unsigned char *)"untouched\n";
+    const unsigned char *unread = input_bytes;
+    strcpy(dynamic_buffer, "saved");
+    assert(!gets(next_buffer()) && errno == EINVAL);
+    assert(buffer_calls == 1 && input_bytes == unread && !strcmp(dynamic_buffer, "saved"));
+    volatile unsigned dynamic_size = 4;
+    char variable[dynamic_size];
+    memcpy(variable, "old", 4);
+    assert(!gets(variable) && errno == EINVAL && !memcmp(variable, "old", 4));
+    assert(input_bytes == unread);
+    assert(hpclang_stdio_unbind() == 0);
+    strcpy(text, "OK");
+    assert(!hpclang_hpgcc_gets(text, 0) && errno == EINVAL && !strcmp(text, "OK"));
+    assert(!hpclang_hpgcc_gets(text, SIZE_MAX) && errno == EINVAL && !strcmp(text, "OK"));
+    input_bytes = NULL;
+}
+static void historical_console(void)
+{
+    struct hpclang_surface *saved_display = display;
+    display_height = 18;
+    display = hpclang_surface_create_mono(9, display_height);
+    assert(display);
+    display->width = 8;
+    unsigned previous_borrowed = borrowed;
+    assert(hpclang_hpgcc_console_enable() == 0);
+    assert(hpclang_hpgcc_console_enable() == 0 && borrowed == previous_borrowed && !page_count);
+    assert(hpclang_stdio_route_flush(1) == 0 && borrowed == previous_borrowed);
+    assert(hpclang_display_begin_pages(2, 2) == 0);
+    assert(hpclang_stdio_route_write(1, 'A') == -1 && errno == EBUSY);
+    hpg_cleanup();
+    assert(page_count == 2);
+    hpclang_display_end();
+    assert(screen_width() == 2 && screen_height() == 3);
+    _clear_screen();
+    struct hpclang_surface *s = hpclang_display_surface();
+    hpclang_surface_set_pixel(s, 7, 5, 255);
+    assert(hpclang_stdio_route_write(1, 'A') == 0);
+    assert(getx() == 1 && gety() == 0);
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* unrelated graphics preserved */
+    home();
+    assert(hpclang_stdio_route_write(2, 0x87) == 0 && drawn_code == 0x3c0);
+    clreol();
+    assert(hpclang_surface_get_pixel(s, 0, 0) == 255);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 0);
+    gotoxy(-1, 0);
+    assert(errno == EINVAL && getx() == 1);
+    gotoxy(2, 0);
+    assert(errno == EINVAL && getx() == 1);
+    gotoxy(1, 2);
+    hpclang_surface_set_pixel(s, 7, 11, 255);
+    assert(hpclang_stdio_route_write(1, 'B') == 0); /* immediate wrap/scroll */
+    assert(getx() == 0 && gety() == 2 && hpclang_surface_get_pixel(s, 0, 0) == 0);
+    assert(hpclang_surface_get_pixel(s, 7, 5) == 255); /* graphics scroll with text */
+    set_tabsize(INT_MAX);
+    assert(get_tabsize() == INT_MAX);
+    assert(hpclang_stdio_route_write(1, '\t') == 0 && getx() == 1);
+    set_tabsize(0);
+    assert(errno == EINVAL && get_tabsize() == INT_MAX);
+    set_tabsize(4);
+    assert(hpclang_stdio_route_write(1, '\t') == 0 && getx() == 0);
+    assert(hpclang_stdio_route_write(1, 7) == 0 && tones == 1);
+    beep();
+    assert(tones == 2);
+    hpg_set_mode_gray16(1);
+    unsigned previous_publish = published, previous_flips = flips;
+    assert(hpclang_stdio_route_write(1, 'A') == 0);
+    assert(published == previous_publish && flips == previous_flips);
+    assert(hpclang_surface_levels(hpclang_display_surface()) == 16);
+    hpg_flip();
+    assert(flips == previous_flips + 1);
+    hpg_cleanup();
+    edited_lines();
+    hpclang_surface_destroy(display);
+    display = saved_display;
+    display_height = 6;
 }
 
 static void copies(void)
@@ -460,6 +754,8 @@ int main(void)
     assert(hpclang_surface_get_pixel(display, 1, 1) == 255);
     modes();
     indicators();
+    shared_screen();
+    historical_console();
     hpclang_surface_destroy(display);
     display = NULL;
     assert(hpg_get_width(NULL) == 0 && errno == ENODEV);

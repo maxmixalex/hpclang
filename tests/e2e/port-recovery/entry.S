@@ -47,6 +47,25 @@ entry:
  mrs r2, cpsr
  add r3, r7, #8192
  str r2, [r3, #108]
+#ifdef HPCLANG_RECOVERY_RESTART_AFTER_REPAIR
+ /* exercise returns only after successful replay/retirement and restoration.
+  * A nonzero journal slot means this invocation repaired/retired a transaction.
+  * After Stock reinitializes, discovery has no slot and this branch is skipped.
+  * Use Stock's reset service, not a version-specific Saturn ROM address.
+  */
+ ldr r0, [r7, #8]
+ cmp r0, #0
+ beq .Lrecovery_return
+ mov r0, #1
+ adr lr, .Lrestart_failed
+.global recovery_reset
+recovery_reset:
+ swi 0
+.Lrestart_failed:
+ /* Reset must not return into a startup with an incomplete library catalog. */
+ b .Lrestart_failed
+.Lrecovery_return:
+#endif
  ldmia sp!, {r0-r12,lr}
  bx lr
 stack_offset: .word stack_end-entry

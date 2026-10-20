@@ -39,6 +39,43 @@ int hpclang_rpl_flash_intent_decode(uint32_t first, uint32_t end, uint32_t slot,
 #define HPCLANG_RPL_FLASH_SECTOR_BYTES 4096u
 #define HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES (HPCLANG_RPL_FLASH_SECTOR_BYTES + 28u)
 
+#define HPCLANG_RPL_FLASH_AUTHORITY_BYTES 32u
+
+enum hpclang_rpl_flash_authority_phase
+{
+    HPCLANG_RPL_FLASH_AUTHORITY_UNPUBLISHED,
+    HPCLANG_RPL_FLASH_AUTHORITY_ARMED,
+    HPCLANG_RPL_FLASH_AUTHORITY_CLOSING,
+    HPCLANG_RPL_FLASH_AUTHORITY_CLOSED
+};
+
+/* Internal one-use transaction binding, metadata 4 / HPCAUTH1. Binds its own
+ * physical allocation to one validated sector journal's address, target and
+ * status-independent CRC. Encode accepts only a ready journal; inspect also
+ * accepts journal retirement cuts so cleanup can finish without replay.
+ * FF/7F/FE are unpublished, 7E armed, proper subsets of 7E closing, 00 closed.
+ * Only ARMED can be considered for replay; every other phase forbids it.
+ * ARMED never overrides a journal's own RETIRING/RETIRED replay prohibition.
+ *
+ * Memory-only codecs, not a durable authority installer or erase permission.
+ * The caller must locate this allocation through a trusted installation root,
+ * publish/verify it before target writes, exclude Stock writers until journal
+ * retirement/reference repair and closure, and gate startup before dependent
+ * callbacks. Finding arbitrary matching bytes does not establish freshness.
+ * Never erase/reuse this allocation while any bound journal can survive:
+ * interrupted erasure could resurrect an old ARMED status. Root replacement
+ * and reclamation require a separate protocol, not a counter in this record.
+ * Allocation and journal must not overlap each other or the target sector.
+ * Outputs remain unchanged on failure. Coordinates are physical byte offsets.
+ */
+int hpclang_rpl_flash_authority_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes, uint8_t *data, uint32_t capacity);
+int hpclang_rpl_flash_authority_inspect(uint32_t first, uint32_t end, uint32_t slot,
+                                        const uint8_t *data, uint32_t bytes, uint32_t journal_slot,
+                                        const uint8_t *journal, uint32_t journal_bytes,
+                                        enum hpclang_rpl_flash_authority_phase *phase);
+
 enum hpclang_rpl_flash_sector_phase
 {
     HPCLANG_RPL_FLASH_SECTOR_READY = 1,
@@ -55,8 +92,9 @@ int hpclang_rpl_flash_sector_inspect(uint32_t first, uint32_t end, uint32_t slot
                                      const uint8_t **image,
                                      enum hpclang_rpl_flash_sector_phase *phase);
 
-/* Internal redo-image allocation (metadata 3, HPCSECT1), not yet
- * used by public mutations or recognized by whole-port recovery. It holds a
+/* Internal redo-image allocation (metadata 3, HPCSECT1), recognized by the
+ * read-only sector preflight but not authorized by public write preparation.
+ * It is not yet used by public mutations. It holds a
  * complete 4 KiB desired sector image, its target/self addresses and a status-independent
  * CRC32. The journal allocation must be outside the target sector and native
  * bank headers, with an erased end-marker position remaining in its bank.

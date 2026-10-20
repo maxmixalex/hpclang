@@ -2,6 +2,7 @@
 
 import argparse
 import configparser
+import json
 import re
 from pathlib import Path
 import struct
@@ -14,7 +15,44 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def verify_flash(before, after, slot, target, *, retire=False):
+def verify_tls(image, symbols, physical, diagnostics):
+    """Check the live TLS cells as well as the witness's recorded observations."""
+    require(
+        diagnostics[20:22] == (0xFFFFFFFF, 22) and diagnostics[23:25] == (0x12345678, 0x12345679),
+        "TLS initialization failed",
+    )
+    first, end = symbols["__tls_base"], symbols["__tls_end"]
+    require(0 <= first < end <= len(image), "TLS extent is outside the execution image")
+    for name, expected in (("errno", 22), ("tls_probe", 0x12345679)):
+        # ELF TLS symbol values are offsets within the TLS block.
+        offset = first + symbols[name]
+        require(first <= offset <= end - 4 and offset % 4 == 0, "Invalid TLS cell extent")
+        if name == "errno":
+            require(diagnostics[22] == physical + offset, "errno is not its owned TLS cell")
+        require(struct.unpack_from("<I", image, offset)[0] == expected, f"TLS {name} corrupted")
+
+
+def verify_authority(flash, authority_slot, slot, target, status):
+    require(authority_slot == slot + 4124, "Binding is not at the fixture allocation boundary")
+    binding = flash[authority_slot : authority_slot + 32]
+    require(len(binding) == 32 and binding[0] == status, "Unexpected transaction binding phase")
+    require(binding[1:12] == bytes.fromhex("3e0040") + b"HPCAUTH1", "Invalid binding envelope")
+    require(
+        struct.unpack_from("<4I", binding, 12)
+        == (
+            authority_slot,
+            slot,
+            target,
+            int.from_bytes(flash[slot + 4120 : slot + 4124], "little"),
+        ),
+        "Transaction binding identity mismatch",
+    )
+    require(
+        zlib.crc32(binding[1:28]) == int.from_bytes(binding[28:], "little"), "Binding CRC mismatch"
+    )
+
+
+def verify_flash(before, after, slot, target, *, retire=False, authority_slot=None):
     require(len(before) == len(after) == 0x200000, "Expected complete 2 MiB Flash images")
     require(0x140000 <= target <= 0x1FF000 and target % 4096 == 0, "Invalid target sector")
     require(0x140000 <= slot <= 0x200000 - 4124, "Invalid journal address")
@@ -44,6 +82,10 @@ def verify_flash(before, after, slot, target, *, retire=False):
     expected[target : target + 4096] = record[24:4120]
     if retire:
         expected[slot] = 0
+    if authority_slot is not None:
+        verify_authority(before, authority_slot, slot, target, 0x7E)
+        if retire:
+            expected[authority_slot] = 0
     require(after == expected, "Flash differs from authorized replay/journal retirement")
     return bytes(record), already_restored
 
@@ -124,17 +166,101 @@ def verify_retirement_cut(before_path, after_path, log_path, slot, target, cut):
     require(after == expected, "Retirement cut changed unrelated Flash bytes")
 
 
-def verify_retired(before, after, slot, target):
+def verify_retired(before, after, slot, target, *, authority_slot=None):
     """Verify a known retired transaction remains unchanged on a later launch."""
     require(len(before) == len(after) == 0x200000, "Expected complete 2 MiB Flash images")
     require(0 <= slot < len(before) and before[slot] == 0, "Expected a retired journal")
     require(before == after, "Clean recovery invocation changed Flash")
+    if authority_slot is not None:
+        verify_authority(before, authority_slot, slot, target, 0)
     # Normalize a private oracle copy; the durable record must remain retired.
     ready = bytearray(before)
     ready[slot] = 0x7E
     record, restored = verify_flash(ready, ready, slot, target)
     require(restored, "Retired transaction target no longer matches")
     return record
+
+
+def installed_recovery(flash, package, library_id, target, *, read):
+    """Verify the exact recovery library at a live native allocation boundary.
+
+    An installation witness, not transaction-root authorization. In particular,
+    a matching payload inside a deleted allocation is not an installed library.
+    When a target sector is supplied, its erase must preserve this allocation.
+    """
+    require(len(flash) == 0x200000, "Expected complete hp4950 Flash")
+    require(package[:8] == b"HPHP49-C", "Invalid recovery library envelope")
+    expected = nibbles(package[8:])
+
+    def word(data, at, width=5):
+        require(0 <= at <= len(data) - width, "Library field outside allocation")
+        return int(data[at : at + width][::-1], 16)
+
+    require(word(expected, 0) == 0x2B40, "Expected a recovery library")
+    length = 5 + word(expected, 5)
+    require(length >= 34 and expected[length:] in ("", "0"), "Invalid library extent")
+    require(
+        word(expected, 14 + 2 * word(expected, 10, 2), 3) == library_id,
+        "Recovery library ID differs from package",
+    )
+    crc = 0
+    for value in expected[5 : length - 4]:
+        crc = (crc >> 4) ^ (((crc ^ int(value, 16)) & 15) * 0x1081)
+    require(word(expected, length - 4, 4) == crc, "Invalid packaged library CRC")
+    if target is not None:
+        require(
+            0x140000 <= target < 0x200000 and target % 4096 == 0,
+            "Invalid recovery target sector",
+        )
+    matches = []
+    for bank in range(0x140000, 0x200000, 0x20000):
+        identity = int.from_bytes(flash[bank + 0x100 : bank + 0x105], "little")
+        require(identity == 0xF0 + ((bank // 0x20000 - 2) << 8), "Invalid installed bank identity")
+        cursor, end = bank + 0x105, bank + 0x20000
+        while cursor < end and flash[cursor] != 0xFF:
+            status = flash[cursor]
+            require(status in (0, 0x53) and cursor + 4 <= end, "Unresolved installed allocation")
+            extent = (int.from_bytes(flash[cursor + 1 : cursor + 4], "little") & 0xFFFFF) + 2
+            require(
+                extent >= 8 and extent % 8 == 0 and extent // 2 < end - cursor,
+                "Invalid installed allocation extent",
+            )
+            size = extent // 2
+            if status == 0x53:
+                body = nibbles(flash[cursor + 4 : cursor + size])
+                if word(body, 0) == 0x2B40:
+                    stop = 5 + word(body, 5)
+                    require(34 <= stop <= len(body), "Invalid installed library extent")
+                    header = 14 + 2 * word(body, 10, 2)
+                    require(header + 23 <= stop - 4, "Invalid installed library header")
+                    if word(body, header, 3) == library_id:
+                        require(
+                            body[:stop] == expected[:length],
+                            "Installed recovery differs from package",
+                        )
+                        require(
+                            target is None or target + 4096 <= cursor or target >= cursor + size,
+                            "Recovery target overlaps installed recovery",
+                        )
+                        matches.append((cursor, size))
+            cursor += size
+        require(
+            cursor < end and flash[cursor:end] == b"\xff" * (end - cursor),
+            "Invalid installed bank tail",
+        )
+    require(len(matches) == 1, "Expected exactly one live recovery installation")
+    slot, _ = matches[0]
+    count = read(0x8611D, 3)
+    require(0 < count < 128, "Invalid installed library catalog")
+    entries = [0x86120 + 16 * i for i in range(count) if read(0x86120 + 16 * i, 3) == library_id]
+    require(len(entries) == 1, "Expected one recovery catalog binding")
+    header = 0x40000 + 2 * ((slot + 4) & 0x1FFFF) + 14 + 2 * word(expected, 10, 2)
+    require(read(entries[0] + 3) == header, "Recovery catalog points to another object")
+    # Stock 2.15 fixture table: entries map physical Flash banks 2..17.
+    switch = read(entries[0] + 8)
+    banks = [index + 2 for index in range(16) if read(0x26BBB + 7 * index) == switch]
+    require(banks == [slot // 0x20000], "Recovery catalog selects another Flash bank")
+    return matches[0]
 
 
 def native_words(ram, flash):
@@ -169,11 +295,67 @@ def native_words(ram, flash):
     raise ValueError("Native Saturn map not found")
 
 
+def home_object(read, name):
+    """Locate a named fixture independently of the recovery diagnostics."""
+    home = read(0x80711)
+    require(0x80000 <= home < 0x100000 and read(home) == 0x2A96, "Invalid HOME directory")
+    link = home + 8 + 13 * read(home + 5, 3)
+    offset = read(link)
+    item = link + offset
+    seen = set()
+    while offset:
+        require(
+            0x80005 <= item < 0x100000 and item not in seen,
+            "Invalid HOME variable chain",
+        )
+        seen.add(item)
+        length = read(item, 2)
+        variable = bytes(read(item + 2 + 2 * i, 2) for i in range(length))
+        if variable == name:
+            return item + (4 + 2 * length if length else 2)
+        offset = read(item - 5)
+        item = item - 5 - offset
+    raise ValueError("HOME fixture variable is missing")
+
+
+def home_string(read, name):
+    """Read an owned fixture string independently of the recovery diagnostics."""
+    obj = home_object(read, name)
+    require(read(obj) == 0x2A2C, "HOME fixture value is not a string")
+    extent = read(obj + 5)
+    require(
+        extent >= 5 and (extent - 5) % 2 == 0 and obj + 5 + extent <= 0x100000,
+        "Invalid HOME fixture string extent",
+    )
+    return bytes(read(obj + 10 + i, 2) for i in range(0, extent - 5, 2))
+
+
+def verify_zero_real_array(read, name, count):
+    """Check actual DOREAL storage, excluding compact exact-integer containers."""
+    obj = home_object(read, name)
+    require(0 < count <= (0x100000 - obj - 25) // 16, "Invalid real array extent")
+    require(
+        [read(obj + 5 * i) for i in range(5)] == [0x29E8, 20 + 16 * count, 0x2933, 1, count],
+        "Unexpected real array shape/type",
+    )
+    require(
+        all(read(obj + 25 + i, 1) == 0 for i in range(16 * count)),
+        "Real array contents changed",
+    )
+
+
 def require_stock_pc(state_directory):
+    """Reject unfinished ARM entry and CPU exceptions, even inside the ROM range.
+
+    This is only a processor-state check; callers must also validate the native
+    memory, catalog, stack and retained objects appropriate to their scenario.
+    """
     state = configparser.ConfigParser()
     state.read(state_directory / "state")
     pc = int(state["s3c2410-arm"]["reg-15"], 0)
     require(0 <= pc < 0x140000, "Execution has not returned to Stock ROM")
+    mode = int(state["s3c2410-arm"]["cpsr"], 0) & 0x1F
+    require(mode not in (0x17, 0x1B), "Stock return stopped in ARM abort/undefined mode")
 
 
 def symbol_offsets(elf, nm):
@@ -277,18 +459,87 @@ def verify_restart(clean, repaired, restarted):
     return len(catalogs[0])
 
 
+def nibbles(data):
+    return "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in data)
+
+
+def executed_image(ram, initialized, symbols, *, relocated=False):
+    """Locate a saved image, optionally moved by Saturn GC after ARM return.
+
+    GC can move whole CODE objects by an odd nibble. Runtime addresses in the
+    diagnostics remain the original addresses; never infer execution alignment
+    from the final object's position. The caller still verifies the complete
+    image, owning CODE envelope, stack, TLS and hardware-state diagnostics.
+    """
+    packed = nibbles(ram)
+    marker = nibbles(struct.pack("<I", 0x48505046))
+    prefix = nibbles(initialized[:32])
+    candidates = []
+    hit = packed.find(marker)
+    while hit >= 0:
+        start = hit - 2 * symbols["workspace"]
+        if start >= 0 and packed.startswith(prefix, start):
+            candidates.append(start)
+        hit = packed.find(marker, hit + 1)
+    require(len(candidates) == 1, "Executed recovery image is missing or ambiguous")
+    start = candidates[0]
+    size = symbols["__image_end"]
+    require(start + 2 * size <= len(packed), "Recovery image bounds/alignment")
+    image = bytes(int(packed[i : i + 2][::-1], 16) for i in range(start, start + 2 * size, 2))
+    if relocated:
+        errno_address = struct.unpack_from("<I", image, symbols["workspace"] + 8272 + 22 * 4)[0]
+        physical = errno_address - symbols["__tls_base"] - symbols["errno"]
+    else:
+        require(start % 16 == 0, "Recovery image bounds/alignment")
+        physical = 0x08000000 + start // 2
+    require(
+        physical % 8 == 0 and 0x08000000 <= physical <= 0x08000000 + len(ram) - size,
+        "Original recovery image bounds/alignment",
+    )
+    return image, start, physical
+
+
+def reset_snapshot(prefix):
+    metadata = json.loads(prefix.with_suffix(".json").read_text())
+    require(
+        isinstance(metadata, dict) and set(metadata) == {"version", "pc", "cpsr", "r0", "bytes"},
+        "Invalid reset checkpoint schema",
+    )
+    require(
+        all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in metadata.values()),
+        "Invalid reset checkpoint values",
+    )
+    require(
+        metadata["version"] == 1 and metadata["bytes"] == 0x80000 and metadata["r0"] == 1,
+        "Invalid reset checkpoint request",
+    )
+    require(
+        0x08000004 <= metadata["pc"] <= 0x08080000
+        and metadata["pc"] % 4 == 0
+        and not metadata["cpsr"] & 0x20
+        and metadata["cpsr"] & 0x1F not in (0x17, 0x1B),
+        "Invalid reset checkpoint CPU state",
+    )
+    ram = prefix.with_suffix(".sram").read_bytes()
+    require(len(ram) == 0x80000, "Incomplete reset checkpoint SRAM")
+    return ram, metadata
+
+
 def verify(args):
     before = (args.before / "flash").read_bytes()
     after = (args.after / "flash").read_bytes()
     operation = getattr(args, "operation", "replay")
     require(operation in ("replay", "retire", "check"), "Unknown recovery operation")
     retire = operation == "retire"
+    authority_slot = getattr(args, "authority_slot", None)
     if operation == "check":
-        record = verify_retired(before, after, args.slot, args.target)
+        record = verify_retired(
+            before, after, args.slot, args.target, authority_slot=authority_slot
+        )
         already_restored, phase = True, 0
     else:
         record, already_restored = verify_flash(
-            before, after, args.slot, args.target, retire=retire
+            before, after, args.slot, args.target, retire=retire, authority_slot=authority_slot
         )
         phase = 1 if before[args.slot] == 0x7E else 2
     ram = (args.after / "sram").read_bytes()
@@ -302,22 +553,19 @@ def verify(args):
 
     symbols = symbol_offsets(args.elf, args.nm)
     initialized = args.binary.read_bytes()
+    checkpoint = getattr(args, "reset_checkpoint", None)
+    execution_ram, reset = reset_snapshot(checkpoint) if checkpoint is not None else (ram, None)
     size = symbols["__image_end"]
     expected = bytearray(initialized + bytes(size - len(initialized)))
     struct.pack_into("<2I", expected, symbols["guard_low"], 0x13579BDF, 0x2468ACE0)
     struct.pack_into("<2I", expected, symbols["guard_high"], 0x89ABCDEF, 0xFEDCBA98)
-    candidates = []
-    for hit in range(len(ram) - 3):
-        if ram[hit : hit + 4] != struct.pack("<I", 0x48505046):
-            continue
-        start = hit - symbols["workspace"]
-        if start >= 0 and ram[start : start + 32] == initialized[:32]:
-            candidates.append(start)
-    require(len(candidates) == 1, "Executed recovery image is missing or ambiguous")
-    start = candidates[0]
-    require(start % 8 == 0 and start + size <= len(ram), "Recovery image bounds/alignment")
-    physical = 0x08000000 + start
-    result = struct.unpack_from("<Ii4I", ram, start + symbols["workspace"])
+    image, start, physical = executed_image(
+        execution_ram,
+        initialized,
+        symbols,
+        relocated=False if reset is not None else getattr(args, "relocated_image", False),
+    )
+    result = struct.unpack_from("<Ii4I", image, symbols["workspace"])
     discovery = (phase, args.slot, args.target) if phase else (0, 0, 0)
     require(result[1:4] == discovery and result[4] > 0, "Preflight/discovery failed")
     require(
@@ -325,12 +573,14 @@ def verify(args):
         and result[5] % 8 == 0,
         "C stack escaped its owned reservation",
     )
-    scratch = start + symbols["workspace"] + 24
+    scratch = symbols["workspace"] + 24
     if phase:
-        require(ram[scratch : scratch + 4124] == record, "RAM journal differs from durable journal")
+        require(
+            image[scratch : scratch + 4124] == record, "RAM journal differs from durable journal"
+        )
     if phase == 1:
         require(
-            ram[scratch + 4124 : scratch + 8248] == record,
+            image[scratch + 4124 : scratch + 8248] == record,
             "Replay did not retain a separate journal reload",
         )
     mutable = [
@@ -341,10 +591,7 @@ def verify(args):
     ]
     for i, value in enumerate(expected):
         if not any(first <= i < last for first, last in mutable):
-            require(ram[start + i] == value, f"Code/guard corruption at image offset {i:#x}")
-
-    def nibbles(data):
-        return "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in data)
+            require(image[i] == value, f"Code/guard corruption at image offset {i:#x}")
 
     package = args.package.read_bytes()
     require(package[:8] == b"HPHP49-C", "Invalid binary package header")
@@ -352,17 +599,31 @@ def verify(args):
     code_end = 10 + int(program[10:15][::-1], 16)
     reserve = size * 2 + 15
     prefix = program[: code_end - reserve]
-    packed_ram = nibbles(ram)
+    packed_ram = nibbles(execution_ram)
     owners = [
         i
         for i in range(len(packed_ram))
         if packed_ram.startswith(prefix, i)
-        and i + len(prefix) <= start * 2
-        and start * 2 + size * 2 <= i + code_end
+        and i + len(prefix) <= start
+        and start + size * 2 <= i + code_end
     ]
     require(len(owners) == 1, "Execution image is not inside one owning CODE object")
+    original_owner = 2 * (physical - 0x08000000) - (start - owners[0])
+    require(
+        0 <= original_owner and original_owner + code_end <= 2 * len(execution_ram),
+        "Original owning CODE object is outside RAM",
+    )
 
-    d = struct.unpack_from("<32I", ram, start + symbols["workspace"] + 8272)
+    d = struct.unpack_from("<32I", image, symbols["workspace"] + 8272)
+    if reset is not None:
+        require(
+            "recovery_reset" in symbols and reset["pc"] == physical + symbols["recovery_reset"] + 4,
+            "Reset checkpoint came from another instruction",
+        )
+        require(
+            reset["cpsr"] & 0xFF == d[7] & 0xFF,
+            "Reset checkpoint did not preserve caller CPU state",
+        )
     require(d[1] & 0xC0 == 0xC0 and d[0] & 0xFF == d[7] & 0xFF, "IRQ state not restored")
     require(d[2] == d[10] and d[3:5] == d[8:10], "Mapping/vector not restored")
     require(
@@ -373,14 +634,7 @@ def verify(args):
         d[16] == 0 and 1000 <= (d[18] - d[17]) & 0xFFFFFFFF < 100000 and d[19] < 100000,
         "Recovery monotonic clock failed",
     )
-    require(
-        d[20:22] == (0xFFFFFFFF, 22) and d[23:25] == (0x12345678, 0x12345679),
-        "TLS initialization failed",
-    )
-    require(
-        physical + symbols["__tls_base"] <= d[22] < physical + symbols["__tls_end"],
-        "errno is outside owned TLS",
-    )
+    verify_tls(image, symbols, physical, d)
     require(
         d[26:28] == (0, 0) and d[30:32] == (0, int(retire)),
         "Replay/retirement failed or repeated operation wrote Flash",
@@ -395,11 +649,22 @@ def verify(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--relocated-image",
+        action="store_true",
+        help="verify a CODE image moved by Stock GC after return",
+    )
     for name in ("before", "after", "elf", "binary", "package"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--nm", default="llvm-nm")
     parser.add_argument("--slot", type=lambda value: int(value, 0), required=True)
     parser.add_argument("--target", type=lambda value: int(value, 0), required=True)
+    parser.add_argument("--authority-slot", type=lambda value: int(value, 0))
+    parser.add_argument(
+        "--reset-checkpoint",
+        type=Path,
+        help="prefix of execution SRAM/CPU evidence captured before Stock reset",
+    )
     parser.add_argument(
         "--operation",
         choices=("replay", "retire", "check"),

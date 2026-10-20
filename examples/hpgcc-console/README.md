@@ -1,0 +1,28 @@
+# Historical console output
+
+This installed-package example combines C and C++17 output with HPG graphics,
+edits a bounded name, reads a count and a value, displays their product and
+waits for a key before returning to the calculator.
+Build it with the
+installed hpclang CMake package and ARMv4T toolchain, as described in the SDK
+getting-started guide. No generated font declaration is needed: the historical
+adapter selects its supported native/fallback minifont.
+
+Including `hpconio.h` in either language enables lazy standard-stream output;
+including it in multiple translation units is supported. `printf`, `puts` and
+`std::printf` keep their standard signatures. Text uses calculator bytes, not
+UTF-8. The visible screen holds complete 4×6 cells; it does not expose the old
+partial cell overlapping the status column.
+
+`hpclang_hpgcc_gets` takes the name buffer's capacity, supports backspace and
+refuses additional characters when full. ON cancels the input. `hpkeyb49.h`
+supplies the separate final key wait. Historical number-format policy and old
+unbounded `gets` aliases are not supplied by this example. An application using
+a clean UI can explicitly bind
+its own standard streams; that binding takes precedence over this default.
+
+`hpstdio.h` supplies `readint/readdouble`. Both edit at most 31 bytes and accept
+a numeric prefix, following historical `atoi/atof` behavior. The example checks
+`errno` and stream flags after each call; ON returns normally, while invalid
+conversion or a range error exits with failure. Use the clean text-input parsers
+when a whole line must be valid or the user should be prompted to correct it.

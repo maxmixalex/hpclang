@@ -411,7 +411,518 @@ M7 completion therefore means **practical HPGCC capability parity**, not binary 
 
 ## M8 — HPGCC source compatibility, SDK UX, and post-HPGCC extensions
 
-**Planned, with adapters allowed to begin incrementally once each M7 clean service is stable.**
+**In progress. M8.1 is accepted; the other stages retain the completion conditions below.**
+
+### Current M8 acceptance and execution order
+
+This summary describes current work. Older implementation snapshots below retain
+their original evidence scope; their then-pending statements are not the current
+backlog. Local verification, CI acceptance and milestone completion are distinct.
+
+Current delivery checkpoints:
+
+- **Current cancellation batch (2026-10-20):** implementation and maintained
+  tests through `8a717ec4` follow the previous submission `c8740410`.
+  This batch is prepared for CI; acceptance remains pending. `747fa4ae`
+  records the publication power-cut evidence below.
+  Internal unpublished-transaction cancellation now passes host fault injection
+  for four initial states: every program operation with five partial-write masks,
+  lost acknowledgements, silent writes, sampled read failures and repeated calls.
+  The oracle requires journal invalidation before authority writes and exact
+  preservation of all bytes outside the two envelopes; armed and ordinarily
+  retired records are rejected. ASan/UBSan and ARM static analysis pass.
+  The same fault matrix now passes with separate banks and both adjacent record
+  orders. Gaps, erased interiors of deleted allocations and a changed installed
+  root are rejected without writes. Native HP49g+/HP50g research passes cancellation
+  from both saved publication-cut states: eight writes after the journal-body cut
+  and five after the authority-body cut, followed by zero-write repeated calls.
+  Exact whole-Flash changes are limited to the two envelopes; catalog, initialized
+  code/owning CODE object, guards/mappings, native return and the complete 32 KiB
+  reservation pass. Native cuts during journal and authority cancellation also
+  pass on both models: an independent NOR command oracle verifies the torn image,
+  restart preserves it and the reservation, and retry completes in six/one writes
+  respectively with zero-write repeated calls. These remain fresh-fixture claims.
+  Maintained cancellation E2E now passes both generated interrupted states on
+  both models in the existing installation suite, with the same exact Flash,
+  execution, reservation and repeat checks. The seed records derive from the
+  runtime-captured publication fixture rather than saved ROM snapshots. Fresh
+  ARM packaging, 75 related host tests, lint/format and strict docs pass.
+  Cancellation-time power-cut experiments remain separate research evidence.
+  This is not public service delivery.
+  This does not establish the still-required durable installation claim, RAM
+  ownership, startup ordering or reclamation. Port 2 remains in M8.0; all other
+  stage requirements and the accepted M8.1 status remain as listed below.
+- **Publication power-cut research (local):** both native models now have
+  independently verified cuts at program operations 2 (journal body) and 1,939
+  (authority body), after 16 busy reads with completed-bit mask `0x5555`.
+  An independent command sequence matches the complete torn Flash image. Warm
+  restart preserves that image and the complete 32 KiB reservation. Subsequent
+  USB execution of the maintained installed-transaction predicate rejects all
+  four interrupted states as DIRTY, with valid code/owner/guards/mappings,
+  unchanged Flash/catalog/reservation and zero writes. The fixture's installation
+  has an empty configuration: these results prove rejection and native re-entry,
+  not automatic recovery before other startup consumers or durable ownership.
+- **Current implementation batch:** `85b57056` adds maintained native publication
+  and completed-transaction restart tests to the existing installation suite,
+  alongside initial planning (`2c7cb1c1`) and journal retry (`5d31e43a`). On both
+  models, planning and create-only 32 KiB reservation creation precede journal
+  and authority publication; each experiences one observed partial-bit program,
+  then continuation, retirement and closure succeed. Each initial run performs
+  1,957 real Flash operations. Restart preserves Flash and reservation; a repeated
+  closed call performs zero operations. Exact Flash/catalog, initialized code and
+  owning CODE object, stack guards/mappings and diagnostic results pass. The host
+  oracle was corrected to expect the observed empty post-reset stack and rechecked
+  against both saved native runs. Fresh ARM builds, 75 focused host tests, analysis
+  and pinned lint/format pass. Publication uses a no-op desired target and retries
+  within one invocation; mid-publication power-loss recovery and durable resource
+  ownership remain open. CI acceptance is pending; no milestone is closed.
+- **Previous submitted batch:** `b7b82d18` (implementation/tests through `0c263a97`)
+  includes installed-transaction
+  preflight, owned descriptor layout generation, one-shot fixture lifetime fixes
+  and maintained native transaction E2E. Both models pass the full recovery suite
+  and all five installed-transaction states locally; 75 focused host tests, ARM
+  analysis, pinned formatting/lint and strict documentation pass. CI acceptance
+  remains pending; `62f7ece4` remains the accepted baseline.
+
+- **Journal publication retry (`5d31e43a`, included in current batch):** sector capsules now have an
+  explicit continuation operation, sharing the existing authority-record
+  publication validator. It checks the entire caller-owned original capsule,
+  NOR-compatible partial body and erased end marker before writing; verifies the
+  complete body before READY; and rejects every retiring/retired status. Fault
+  injection covers every initial/resumed read and program cut, partial halfword
+  bits, lost acknowledgements, silent programming failures and repeated calls.
+  Target/unrelated bytes remain unchanged; authority regressions, ASan/UBSan,
+  ARM analysis and pinned formatting pass. This requires the original trusted
+  transaction identity/image and precedes any adjacent following allocation.
+  Maintained publication and completed-restart evidence is recorded above;
+  mid-publication power-loss recovery and durable RAM ownership remain open.
+- **Initial transaction planning (`2c7cb1c1`, included in current batch):** the installed-layout
+  planner validates the expected library/catalog on intact Flash before either
+  transaction record is published. It derives the owned journal/authority pair,
+  requires untouched bytes, validates their exact prospective allocation
+  boundaries and the desired target image, and keeps the recovery library outside
+  that target sector. Separate banks and either contiguous order work; tail holes,
+  erased interiors of deleted allocations, occupied slots and malformed plans
+  fail without output or Flash changes. Host tests, ASan/UBSan, ARM analysis and
+  pinned formatting pass. Both native models also pass planning followed by
+  create-only 32 KiB reservation creation and repeated-create rejection, with
+  complete code/owner/guard/mapping/Flash/catalog checks. Durable reservation
+  ownership and publication/interruption integration remain open.
+- **Reservation creation prototype (local):** both native models pass exact
+  installed-library/catalog matching before transaction publication, followed by
+  creation of a 32 KiB HOME string through the existing native create-only API.
+  Repeating the request returns EXISTS even for identical content; all 32 KiB
+  remain unchanged. Complete initialized-code/owning-CODE checks, stack guards,
+  restored mappings, Stock return, catalog preservation and zero Flash writes
+  pass. This establishes reuse of the existing allocator, not durable reservation
+  ownership, interruption handling or permission to mutate the target bank.
+- **Previously submitted implementation:** `aaf23c02` includes the read-only native
+  installation matcher, maintained two-model installation E2E (`66cdf5e5`) and
+  unified recovery/admission ELF binding. Both native installation flows and full
+  guarded recovery regressions pass locally. Quality, Runtime and Objects pass
+  remotely, but Core's two full recovery jobs fail at retirement re-entry; both
+  installation jobs pass. This batch is not fully CI-accepted.
+- **Recovery fixture lifetime correction (`e7604b41`, submitted):** completed one-shot programs
+  were retained in HOME across the full recovery chain. The failed HP50g state
+  had only 1,334 bytes between TEMP and the data stack after restart; re-entering
+  its menu reproduces screen corruption and USB timeout. One-shot witnesses now
+  release their own HOME binding after RCL; the final reusable retirement
+  program remains installed. Independent snapshot checks find the obsolete
+  bindings absent, the reusable program retained and 203,636 bytes of free gap
+  on both models. Both fresh native flows now pass the complete maintained
+  recovery suite, including retirement/re-entry, automatic STARTUP, configuration
+  recovery, transaction rejection and all reservation rejection cases.
+- **Installed transaction preflight (`6953972e`, submitted):** a new read-only composition derives
+  the pair from two matching HPCBIND1 descriptors at owned packaging coordinates,
+  checks the bound transaction, and matches the complete installed library and
+  catalog on the restored view. Its allocation must remain outside the target
+  sector; a library supplied only by the journal is rejected. Closed transactions
+  use actual Flash. Authority tests and ARM analysis pass; host execution against
+  fourteen native snapshots accepts pending/closed/repeated states and rejects
+  unpublished, corrupt, wrong-bank and dirty-tail states without output changes.
+  Packaging `b44d8aec` generates descriptor coordinates through ELF symbols and
+  command links; both fresh-copy and reusable layouts pass host tests, and actual
+  ELF packaging preserves the tested library bytes. A native prototype passes
+  armed/intact-target, closed and unpublished cases on both models, including
+  complete initialized code and its owning CODE object, reconstructed expected
+  library, stack guards, restored mappings, result and unchanged Flash/catalog.
+  The damaged-target native prototype also passes on both models. Maintained
+  installation E2E now includes armed, damaged-target, retiring, closed and
+  unpublished transactions in the existing suite (`0c263a97`); both models pass
+  all five states with unchanged Flash/catalog and zero Flash operations.
+  Root publication, lifetime, RAM ownership, startup ordering and
+  reclamation remain open.
+- **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
+  maintained low-memory/repeated-restart tests. All four triggered workflows pass;
+  the preceding `9d015660` batch also passes all six triggered workflows.
+- **Installation integration (`66cdf5e5`, included in submission):** native installation matching now has a
+  maintained E2E suite, generated library fixture and shared ARM predicate entry.
+  HP49g+ and HP50g both pass absent-library rejection and fresh Stock installation
+  matching, with exact initialized code and enclosing CODE-object checks, stack
+  guards, restored mappings, unchanged Flash/catalog and zero Flash operations.
+  The Runtime workflow reuses its existing setup for separate recovery and
+  installation matrix jobs. Default-build Clang analysis and workflow validation
+  pass. Full low-memory recovery regression after the shared-entry extraction
+  passes on HP50g/HP49g+ in 636/637 seconds: 20,898-byte initial gap, all 24,000
+  user-array elements, 1,923 busy Flash operations, repeated restart, five
+  transaction-admission rejection cases and three wrong-reservation cases.
+  This integration has no CI acceptance yet.
+- **Bound packaging (`aaf23c02`, included in submission):** the guarded-library CLI accepts an
+  admission ELF and applies the same explicit journal/authority coordinates to
+  both it and the recovery ELF. Both relocation/layout/binding checks finish
+  before outputs are written; an unchecked prepacked predicate cannot be combined
+  with an explicit recovery binding. The maintained reservation E2E uses this
+  path. Actual ELF packaging reproduces both tested libraries on both models
+  byte-for-byte. All 75 focused host tests pass, including different compiled
+  defaults, shared rebinding and unchanged outputs after invalid admission input.
+  Matching coordinates still do not establish allocation or RAM ownership.
+- **Current scope:** M8.1 remains the only accepted complete M8 stage. M8.0
+  installation identity, reservation/transaction ownership, safe startup,
+  authority reuse and reclamation remain open, together with the retained Port 1
+  and execution-reference/library-registration requirements. Sound compatibility
+  remains M8.4 work, not a prerequisite for Port 2.
+
+#### Earlier batch evidence
+
+The following records preserve the evidence at each implementation step. Work
+through `aaf23c02` is submitted, regardless of an earlier local-only checkpoint;
+only `62f7ece4` has accepted CI evidence recorded above. Later matcher commits
+`9e679dd5`, `f7fa0f9a` and their maintained-suite integration are included in that submission.
+
+- **Previously submitted:** `eb81d433` includes guarded recovery packaging and maintained
+  two-model E2E, both verified locally; remote acceptance is pending and the new
+  CI has not been queried. Reservation ownership and safe startup admission are
+  still unproven.
+- **Local follow-up:** the installation witness now requires one live native
+  recovery allocation with the complete packaged library, a matching catalog
+  address/bank and no overlap with the recovery target sector. Deleted/interior
+  copies, duplicate identities and changed payload/catalog data are rejected.
+  Both models' saved guarded/observed installations pass; 64 focused host tests
+  pass. This strengthens installation evidence without establishing transaction
+  ownership, a production installer or startup ordering.
+- **Locally verified, now included in `235d8ccf`:** the recovery witness accepts a versioned ELF
+  binding descriptor, allowing the packager to set journal/authority addresses
+  without recompiling ARM code. Descriptor/storage/overlap checks, validation of
+  compiled defaults and 68 focused host tests pass. Fresh HP49g+/HP50g runs move
+  the journal from `0x160105` to `0x180105` using the same ELF; only its packaged
+  address fields differ. Both complete low-memory recovery, unchanged restart,
+  all 24,000 user-array elements and all three reservation-rejection cases, with
+  1,923 busy Flash operations each. This parameter path does not itself authorize
+  those addresses or establish reservation ownership.
+- **Startup admission research:** a small ARM predicate returns both real-valued
+  outcomes correctly through the native library configuration on HP49g+/HP50g,
+  preserving the empty stack, retained user string and complete Flash image.
+  A follow-up using the existing authority/journal validators fits in an 11,946-byte
+  configuration program. Both models pass armed, retiring, closing, closed,
+  unpublished and corrupt-record decisions from a 20,935-byte free gap, preserving
+  a 32 KiB string, all 24,000 user-array elements, the full catalog and Flash.
+  Post-predicate ordinary arithmetic/variable-store controls also pass. The local
+  maintained integration now uses the internal real-valued return helper, guarded
+  stack and ROM-constant checks before RAM release. Its package is 15,722 bytes;
+  71 focused host tests and the mutation/object suites pass. Initial native flows
+  repaired Flash but lacked execution evidence after reset skipped the closed
+  transaction. Local commit `a8f6e889` adds an opt-in pre-reset SRAM/CPU checkpoint
+  and verifier support; the pinned emulator builds and the checkpoint unit test
+  passes. Fresh native
+  runs from both saved fault states pass pre-reset code/stack/TLS verification
+  and final recovery checks, with 1,923 Flash operations each. The 15,722-byte
+  maintained predicate passes complete fresh HP49g+/HP50g flows in approximately
+  611 seconds/model: low-memory repair, repeated restart, matching-reservation
+  rejection for closed/unpublished/corrupt records and all three wrong-object
+  cases, preserving Flash, catalog and 24,000 user-array elements.
+  Both original execution snapshots pass live TLS-cell checks, and 14 injected
+  corruptions across CPU state, code, guards and TLS are rejected. The previous
+  TLS check only validated recorded diagnostics and could miss later corruption;
+  the verifier now checks the actual cells and exact errno address as well.
+  Local follow-up `204b9572` extracts exact bound-allocation membership checks
+  for use before reservation release. Authority/replay host suites and ARM Clang
+  analysis pass, including nested records, wrong bank identity, dirty tail and
+  failed reads. Connecting this check increases the ordinary reusable predicate
+  to 25,002 bytes, above the low-memory fixture's gap. Its Flash-only fresh-copy
+  form is 15,658 bytes. Integration commit `727b7464` passes the complete native
+  flow on both models (609/612 seconds), including low-memory repair, repeated
+  restart, closed/unpublished/corrupt-transaction rejection and all three
+  wrong-object cases. Maintained packaging applies that lifetime only when embedding the hidden command in
+  the immutable library. Separate native probes on both models also pass the
+  bank-identity/dirty-tail rejection cases with zero Flash operations, no reset
+  request and intact reservation, user array and catalog. A fresh ARM rebuild
+  produces identical binaries; maintained ELF packaging produces byte-identical
+  guarded and observed libraries to those used by the native runs.
+  This follow-up batch is submitted as `235d8ccf`; no new CI acceptance or
+  milestone completion is claimed. Structural membership does not establish installed
+  identity, transaction freshness or RAM ownership; full recovery preflight and
+  the remaining installation gates are retained.
+- **Local installation follow-up:** a read-only native library matcher now
+  reuses the existing full-port scanner. It validates the expected record,
+  requires a unique live library ID and exact allocation header/length and
+  library object, and publishes the physical slot only after every bank and
+  erased tail passes. Deleted/nested copies, duplicates, changed valid libraries
+  and later-bank damage are rejected without writes or output changes. Native
+  STO's unused high padding nibble may be zero while the SDK encoder uses F;
+  this non-object padding is excluded from identity, while the entire library
+  and CRC remain checked. The extended creation/mutation suite and ARM Clang
+  analysis pass. The host-compiled C matcher agrees with the independent
+  package/catalog oracle on all four saved guarded/observed installations from
+  HP49g+/HP50g. Those comparisons use saved-state evidence. A local combined installation
+  check now also resolves the unique native catalog entry to that exact library
+  header and compares its bank switch with the supplied ROM table contents.
+  Tests cover all six user banks, absent/duplicate catalog entries, wrong headers,
+  wrong or ambiguous bank switches and failed reads without output changes or
+  writes. The host-compiled combined check passes all four saved installations
+  and rejects eight changed header/switch cases; the extended mutation suite
+  and ARM analysis pass. A private ARM probe now passes on both models for an
+  absent library and a fresh Stock-installed library after reset. Independent
+  checks verify the real-valued result, matched physical allocation, complete
+  initialized code, stack guards, restored mappings, unchanged catalog and Flash,
+  and zero Flash operations. Maintained E2E integration now passes both models
+  locally as recorded above; CI acceptance remains pending.
+  The read-only identity check is not a persistent installation trust root.
+  Persistent installation lifetime, reservation/transaction ownership and recovery
+  startup integration remain open; these follow-ups are not pushed.
+
+#### Next M8.0 acceptance
+
+Establish the trusted installation/root and bind the reservation to the current
+transaction. The maintained guarded-reservation E2E is accepted at `62f7ece4`;
+subsequent installation and recovery follow-ups retain the separate delivery
+checkpoints above. Preserve the execution-reference
+requirements while their scope clarification is pending. M8.1 remains the only
+accepted complete M8 stage.
+
+The next installation slice must connect the existing recovery pieces rather
+than treat fixture addresses as installed state. Its acceptance requires:
+
+1. Recover the exact authority/journal pair from the installed recovery identity,
+   with allocation/lifetime checks; a scanned signature or patched address alone
+   is not authorization.
+2. Bind the reserved RAM's identity and capacity to that installation and active
+   transaction before destructive writes, preserving unrelated HOME objects.
+3. Reject stale, conflicting or partially published installation information
+   without releasing unrelated RAM or mutating the target bank; accept retry only
+   for the same owned transaction.
+4. Exercise installation, interruption and recovery on both native Stock models,
+   including complete Flash/catalog and user-data checks. Keep global startup
+   ordering, safe authority reuse and reclamation as explicit remaining gates
+   until their own acceptance is demonstrated.
+
+The installation and recovery admission phases must remain distinct. Initial
+reservation creation precedes authority publication, so it uses exact installed
+library/catalog matching on intact Flash rather than requiring an already armed
+transaction. A new reservation must use create-only semantics: even an existing
+object with identical contents is a conflict, not evidence that this invocation
+created it. Bind the resulting resource to durable installation/transaction
+identity before authorizing target writes. Interrupted creation/publication must
+have explicit retry and orphan handling; matching a fixed name, size and prefix
+alone cannot establish that ownership. Preserve the existing recovery-time
+checks and the RAM-loss recovery requirement.
+
+If the original desired capsule is unavailable after power loss, compatible
+partial bytes cannot reconstruct it. The unpublished-transaction path therefore
+also needs cancellation under a trusted one-use installation claim: invalidate
+the journal before disposing of the authority, preserve the target and unrelated
+allocations, and make interruption of cancellation retryable without rearming a
+journal. An already armed transaction must follow its recovery lifecycle instead.
+Reservation release still requires proven ownership and completed cleanup.
+
+The entries below preserve earlier batch evidence and check times; their older
+pending-CI descriptions do not supersede these delivery checkpoints.
+
+The accepted `d94580b4` batch was followed by `9d015660`, whose Quality, Core,
+Objects, Storage, Font Gallery and Runtime workflows all passed. The accepted
+baseline `62f7ece4` additionally passes Quality, Core, Objects and Runtime,
+including both Stock recovery jobs. These batches add conditional SETUP dispatch
+evidence, native bank-switch execution roots, explicit execution-address repair
+planning, merged catalog repairs, direct-jump return-root discovery and compact
+recovery packaging. They do not close library registration or the other retained
+M8.0 gates.
+
+Previous submitted batch `4b34833d`: Core, Objects, Storage and Font Gallery passed.
+Quality failed because the code-relocation fixture header was unavailable after
+configuration; Runtime failed at PWM4 lease admission in all six Stock System
+Services jobs. Local fix `6668fc13` generates the fixture at configuration time
+and tests occupied-timer rejection with EBUSY and zero register writes, retaining
+actual IRQ delivery on an idle timer. Clean-config Clang analysis, all six Stock
+System Services targets and HP50g Direct pass, including native return and
+independent input pixels. The corrected batch is CI-accepted at `d94580b4`. This does not establish
+a Stock asynchronous-audio backend. Earlier HP39 reject-return failures did not
+recur in the submitted batch.
+
+The follow-up batch includes the register-transfer and instruction-walk work
+through `5dfeca33`, the CI fixture fixes in `6668fc13`, and independent catalog
+switch-function relocation in `4a497fd5`. Evidence is recorded below; the four
+triggered CI workflows pass at `d94580b4`, without closing an entire M8 stage.
+
+| Stage | Current state | Remaining acceptance |
+| --- | --- | --- |
+| M8.0 | Native port reads and substantial mutation support exist. Port 2 backup create/replace/remove and library creation have native evidence. | Complete library registration/attachment and execution-reference safety; Port 1 replacement/removal; trusted Port 2 recovery installation and authority lifecycle, safe startup ordering, reclamation and retained per-port gates. |
+| M8.1 | Installed source SDK and six-model packaging accepted. | Preserve relocation/build/package regressions as later features are integrated. |
+| M8.2 | Declaration, layout, input, effects and canvas implemented; integrated UI CI accepted. | Public application/API review and remaining smallest-target resource/update-cost criteria. |
+| M8.3 | Components, themes and renderer implemented; all-six Direct/Stock local memory-report and low-memory checks pass. | Whole-application physical-memory admission and remaining resource/CI acceptance; touched-stack watermarks alone are insufficient. |
+| M8.4 | Multiple graphics, keyboard, console and system adapter groups exist. Fixed-array line-input aliases pass all-six Direct/Stock locally. | Complete the retained historical API/application ledger, asynchronous KOS sound and decimal-format policy, plus remaining adapter groups and CI acceptance. |
+| M8.5 | Initial C++ UI/object wrappers accepted; additional owners verified locally. | Broader ownership/migration guidance, examples and pending integration acceptance. |
+| M8.6 | Integrated examples and relocated packaging have substantial local evidence. | Complete downstream scenarios, resource/error/return and release acceptance; retain the independent-launcher evaluation without presuming retirement. |
+
+The next implementation track is M8.0's existing native-port work: establish
+complete execution-reference coverage for safe movement/registration, then
+finish the trusted recovery installation/authority and startup requirements
+needed for reclamation. Those requirements must be satisfied together before
+public reclamation is enabled. Asynchronous sound is an M8.4 obligation, not a
+dependency of Port 2. Its verified timer/IRQ foundations remain available for
+later continuation. UI/resource and other adapter work may proceed independently
+when the native-port track has a concrete external wait; this does not silently
+replace that track or close its remaining requirements.
+
+Port 2 remains part of M8.0. Native backup writes and library creation are
+partial delivery, not acceptance of the complete service. The remaining work
+is tracked as the following dependent acceptance steps:
+
+1. Establish the retained relocation contract and safe public library
+   registration/attachment; preserve Port 1 replacement/removal requirements.
+2. Install and identify a trusted recovery root independently of test-fixture
+   addresses. Validate package layout and live resource admission, not merely
+   whether encoded lengths fit their fields.
+3. Establish authority publication, closure and reuse across interrupted writes
+   and erases. A surviving old journal must never regain replay authority.
+4. Establish recovery ordering before any startup consumer can access an
+   interrupted target bank; a low library ID alone is insufficient evidence.
+5. Integrate reclamation and verify interruption/restart, persistence and normal
+   Stock return before enabling the public operation.
+
+While the execution-safety scope question remains unanswered, installation
+resource admission and recovery lifecycle work may proceed within M8.0 without
+relaxing relocation checks. Sound compatibility remains a separate M8.4 task.
+
+Recovery packaging now rejects complete programs larger than the supported
+256 KiB Stock main-RAM window, counting both initialized and runtime copies plus
+RPL framing. Boundary tests cover both target models and small/maximum initialized
+images. This is a necessary physical bound, not proof of available installation
+memory, Flash-bank fit or trusted installation; those acceptance steps remain open.
+
+Local retained-RAM fault experiments now expose a concrete recovery resource gap:
+on HP49g+ and HP50g, a verified 26,000-element real array leaves 37,823 bytes between
+the RPL stacks, and the existing 46,698-byte bound recovery package does not repair
+the injected erased sector during the observed startup. Flash and both armed
+transaction statuses remain unchanged. Wider-memory controls recover. Installation
+must guarantee recovery-time storage before destructive mutation; a fresh-state
+success or installation-time free-memory check alone is insufficient. This is local
+negative evidence, not a completed installer or a relaxation of any startup gate.
+
+A local compact Flash-configuration prototype now passes that same low-memory
+fault on both models, reducing the package from 46,698 to 29,682 bytes. Independent
+verification preserves all 26,000 real elements and checks the complete Flash
+transition, catalog, image, stack/TLS and guards. Both models also pass retained-RAM,
+RAM-loss, callback-body and repeated-warmstart checks. Maintained packaging now
+provides explicit `--flash-copy` configuration libraries and a companion program
+for verification, while ordinary reusable RAM programs retain their immutable
+source. Host tests cover fresh/reusable lifetimes, all alignments, CLI restrictions,
+distinct outputs and every real-array metadata/data nibble. The maintained native
+configuration sequence now includes low-memory recovery and repeated startup;
+the expanded local run passes on both HP49g+ and HP50g, including native catalog,
+complete Flash, code/stack/TLS/guard and full real-array checks. All 49 focused
+host tests, a fresh ARM build, pinned Python lint/format and strict docs pass.
+This batch is CI-accepted at `62f7ece4`. Trusted
+installation, recovery-memory guarantees and all other M8.0 gates remain open.
+
+Local guarded reservation release now passes on both models: one Flash library's
+configuration checks a controlled 32 KiB string's type, capacity and expected
+header before releasing it and invoking its hidden recovery command. Real
+literals and `SAME` avoid the failing experimental integer/numeric-comparison
+path during startup. With only 20,898 bytes initially free, recovery and the
+subsequent unchanged restart preserve all 24,000 user real-array elements and
+pass complete Flash/catalog/image/stack/TLS checks. Normal startup without a
+reservation also passes. An HP50g control without releasable storage remains
+unrecovered at comparable pressure.
+
+The internal packager now generates this guarded library directly, with six
+hidden commands and no calculator-side compiler. Its generated package passes
+the two-model positive sequence above. Instrumented rejection checks preserve
+wrong-type, wrong-capacity and wrong-header objects with unchanged Flash on both
+models; a completion marker is cleared before each case and recreated after the
+unchanged guard command bodies run. All 54 focused recovery host tests, pinned
+Python checks and the real ELF CLI packaging path pass locally. The maintained
+bound-configuration E2E flow now includes these scenarios in the existing Stock
+recovery jobs and preserves generated library packages as evidence. Both models
+pass the maintained flow locally with 64 synthetic busy reads per operation:
+1,923 recovery operations and 123,072 status reads, with no active operation at
+return. Each added model run takes approximately 489 seconds. Stock's fixture
+installation retains its existing non-injected setup; SDK recovery and all
+subsequent checks use the configured busy model. Local validation is complete;
+remote acceptance of this follow-up is pending.
+
+This is a controlled resource mechanism, not a production installer or a proven
+general explanation of the earlier startup failures. Admission must bind the
+reservation to the trusted installation
+root/current transaction and establish safe global startup ordering before
+destructive work. A fixed fixture name or matching header alone is not ownership
+proof. All retained installation, authority-lifecycle and reclamation gates remain.
+
+The recovery verifier now rejects ARM abort/undefined processor modes even when
+the saved PC lies inside ROM. Both captured failed-startup states are rejected;
+all 22 previously passing configuration-state snapshots across HP49g+/HP50g
+still pass this processor-state check. The 34 focused verifier tests and pinned
+Python checks pass. This strengthens one return check, not full startup proof.
+
+Catalog-growth integration requires unified preflight and repair ordering.
+Native root scanning and the separate catalog/reference planners can
+describe the same bank-switch field; their repairs must not be applied twice.
+All geometry, mapping, reference and instruction guards must be checked before
+the first write. Acceptance requires overlapping-root deduplication, conflicting
+repair rejection, unchanged memory on preflight failure, and native continuation
+after movement. ARM-held root cells retain their separate identity. These are
+integration requirements, not evidence that complete opaque/live-code coverage
+has already been established; that coverage remains required before public
+registration can be enabled.
+
+Catalog growth now snapshots native repairs and merges additional main-RAM
+object/code edits before writing. Duplicate repairs coalesce by field or ARM
+cell identity; conflicting repairs, partial overlaps, split fields and changed
+guards reject before mutation. Geometry is published after repairs and movement.
+Focused sanitizer tests cover all five edit widths, duplicate native/caller
+discovery and sixteen rejection cases with unchanged memory/ARM roots. Existing
+object, port and reference regressions pass, as do ARM analysis and six-launcher
+builds. Controlled HP49g+/HP50g Stock probes require actual duplicate discoveries,
+merge them with native repairs, grow the catalog and reach the independent RPL
+continuation marker. Both preserve the sorted unique catalog and unchanged Flash.
+Their opaque-code coverage remains a fixture limitation. This is local work,
+not CI acceptance or complete execution-reference coverage; the next task remains
+classification of unresolved live execution references before public registration.
+
+Catalog commit failures now return a distinct `INCOMPLETE` result, preventing
+confusion with preflight rejection. Host ASan/UBSan failure injection covers the
+first write, movement, every geometry-publication field and a read failure after
+writing starts. It also verifies allocation failure leaves memory/ARM roots
+unchanged and that temporary plan storage is released on success, preflight
+rejection and incomplete commit. ARM static analysis passes. These checks do not
+provide rollback, replay or missing execution-reference classification.
+
+Stage return-root discovery now follows direct GOTO/GOLONG/GOVLNG paths to
+unconditional returns, bounded to 64 instructions and eight consumed cells.
+Conditional/call/register-mediated paths still stop discovery. Sanitizers cover
+signed relative ranges, mixed jump/return chains, all stack cursors, cycles,
+instruction faults and boundaries. Catalog-movement integration verifies relative
+offsets, absolute operand repair and preservation of unconsumed cells. All six
+launchers build; controlled HP49g+/HP50g catalog-growth/native-return regressions
+pass with unchanged Flash. A read-only snapshot check finds one pure
+jump-to-return path among 47 direct-jump sites per model, in SETUP CODE; that
+establishes an existing code pattern, not its liveness in every caller. ARM
+analysis passes. This local expansion does not close full execution coverage.
+
+Historical-source review distinguishes enumerated native roots from arbitrary
+addresses embedded in machine code: HPGCC3's GC helpers repair the former, and
+HP49 assembly documentation warns against collecting while executing from a
+movable code region, describing a SysRPL restart boundary instead. Clarification
+is pending on whether M8 acceptance follows that native relocation contract while
+retaining broader hidden-address analysis as future work. No scope reduction or
+preflight relaxation has been applied; all current gates remain open as above.
+
+Before each work session, read this roadmap and issue #1, reconcile their current
+state with implementation and verification evidence, and identify the selected
+stage, dependency and completion condition. After verified progress, commits,
+CI acceptance or a discovered discrepancy, update both records. Keep one current
+board summary and separate historical snapshots; distinguish local, submitted and
+accepted evidence. Preserve every retained goal and approved boundary, and seek
+confirmation before reducing scope. A demonstrated completion status needs no
+additional approval.
 
 M8 turns M7's capability parity into broad source-level compatibility and then moves beyond the historical SDK. The common 59-function `hpgraphics.h` surface is signature-stable across HPGCC 1.1, HPGCC 2.0 and HPGCC3, and the historical keyboard/stdio/filesystem/object inventories give similarly concrete adapter targets. Binary compatibility remains out of scope.
 
@@ -448,6 +959,210 @@ Public UI names and renderer contracts remain unfrozen until M8.2 design review.
 | M8.6 | Integrated applications and SDK release acceptance | Non-trivial downstream applications, packaging/documentation and cross-family resource/return acceptance |
 
 #### M8.0 — Native port services
+
+The current backlog is summarized above and in the retained checklist after the
+history. In particular, Port 2 backup writes and library creation already exist;
+early statements that all Port 2 writes are unfinished describe earlier states.
+
+The HP49g+/HP50g stage now follows `RTN`, `RTNSC` and `RTNCC`, including direct
+unconditional jumps to those returns, retaining up to eight distinct consumed
+machine-stack cells as execution roots within 64 instructions. Each next cell
+requires reaching another proven return; unreadable or unsupported instructions
+stop discovery.
+Host sanitizer tests cover all cursor positions, one to eight returns, opcode
+boundaries, equal-valued unconsumed cells and failed preflight. Catalog-growth
+integration independently consumes the relocated instruction/stack chain to its
+marker. All six launchers build; the existing HP49g+/HP50g native catalog-growth
+and post-call-marker regressions pass with unchanged Flash. Controlled native
+fixtures also pass a three-return chain on HP50g and an eight-return chain on
+HP49g+: a test-only stage inserts additional frames targeting the existing
+return instruction before discovery, then the original ROM consumes the
+relocated chain and reaches the independent RPL marker. This is synthesized
+native-frame evidence, not proof of arbitrary nested callers. An HP50g control
+using the old single-root selector rejects the missing roots before movement,
+preserves the catalog and returns normally. Other instruction paths, opaque
+contents and complete execution-reference coverage remain open; public
+reclamation is not enabled.
+
+Ownership tracing of the captured HP49g+/HP50g registration states identifies
+ten remaining opaque intervals per model: four temporary library-command CODE
+copies, three HOME CODE objects, one short HOME binary object, a launcher
+descriptor and a system workspace. Native catalog and bank-table resolution
+maps all four cached programs to library 275 commands 2, 3 and 4 (command 3
+appears twice); complete cached-program matching and CODE-body comparison pass
+on both captures. This establishes provenance, not relocation safety: source
+identity does not classify embedded addresses, live continuations or workspace
+contents. The next step is to establish those semantics and the remaining
+execution paths before relaxing mutation preflight. These are local snapshot
+results, not CI acceptance or a completed port-service gate. The three HOME
+CODE objects belong to the stored `SETUP` program; the short binary object is
+`UserKeys.CRC` in the hidden directory. `SETUP` includes relative calls between
+separate CODE objects, so validating each CODE interval in isolation would reject
+valid native code. Relocation analysis must preserve the enclosing program's
+relationships as well as classify live references. Instruction-boundary checks
+use Saturn+ decoding: older Saturn-only output misdecodes extended operations
+and cannot establish these call paths.
+
+An internal relative-branch inspector and relocation planner now cover proven
+GOC/GONC, GOTO/GOSUB, GOLONG/GOSUBL, absolute GOVLNG/GOSBVL and GOYES predicate boundaries, including
+cross-CODE targets.
+They preserve operand widths and qualified mappings, rejecting split
+instructions, unencodable distances and branch-to-return conversions. Exhaustive
+displacement tests pass with ASan/UBSan, ARM compilation/analysis and pinned
+formatting. Host checks against each HP49g+/HP50g snapshot match 211 native
+branch sites; 408 proposed rewrites per model independently decode to the
+intended target, while 14 invalid transitions are rejected. Shared reference
+edits now carry explicit 1–5-nibble widths; the existing builder, validation and
+retryable RAM replay handle mixed widths without overwriting adjacent bytes.
+All 25 width pairs pass read/write-failure injection and retry tests, alongside
+overlap checks and branch-plan/guard/replay integration. These are snapshot and
+host checks, not native execution or CI acceptance. Complete instruction and
+live-reference coverage plus production integration remain open; opaque
+preflight is not bypassed.
+
+Controlled HP49g+/HP50g Stock programs now execute 38 relative-branch cases per
+model: the host C planner and shared replay generate repaired operands; each
+repaired case reaches its success marker and its unrepaired control reaches a
+distinct failure marker. Both models reach an independent final RPL marker with
+unchanged Flash. This validates emitted instruction behavior, not in-calculator
+relocation planning or complete library movement. Absolute-transfer host tests
+cover qualified target movement, and 51 native ROM-call sites per snapshot
+retain their targets when only their containing code moves. Production
+integration and the remaining live-reference/opaque coverage are still open.
+
+The same 38-case relative-branch matrix also passes with planning and replay
+performed by the actual ARM application on both Stock models. The application
+locates its stored test program, validates complete instruction guards, merges
+19 operand repairs and applies the shared RAM replay before returning. Native
+execution distinguishes repaired cases from unrepaired controls and reaches
+the final RPL marker; Flash stays unchanged. All six launchers compile. These
+controlled target-placement probes establish ARM-to-Stock execution handoff,
+not arbitrary library movement or complete reference classification. The maintained
+`code-relocation` Runtime suite now reproduces this probe through the standard
+Stock installation flow and a required native-result verifier. Fresh local runs
+pass on HP49g+ and HP50g, including all 38 cases, the final RPL marker and unchanged
+Flash. CI integration is implemented; remote CI acceptance remains pending.
+
+The maintained suite additionally passes 38 source-movement cases per model
+(76 total). ARM repairs the original operand, copies the instruction 32 nibbles
+forward, verifies the copy and clears its old bytes. Stock enters the copied
+instruction and reaches the fixed success target; unrepaired controls reach a
+distinct failure target. Both HP49g+ and HP50g pass all cases, the final RPL marker
+and unchanged Flash locally. This establishes actual instruction movement within
+controlled CODE fixtures; it does not establish whole-library movement, live
+register/indirect-reference classification or remote CI acceptance.
+
+Full five-nibble D0/D1 immediate data addresses now share qualified relocation
+planning with absolute transfers. Partial loads and computed/register literals
+remain unsupported without data-flow evidence. Exhaustive 20-bit target tests,
+mapping separation, negative shifts, split-instruction refusal, read faults and
+malformed inputs pass ASan/UBSan; ARM analysis and compilation pass. Both native
+snapshots match 15 complete data-address operands. The maintained suite adds four
+data-movement cases: ARM moves the data and poisons its old location; repaired
+D0/D1 loads read the moved value while unrepaired controls read the poison.
+HP49g+ and HP50g each pass all 80 cases, the final RPL marker and unchanged Flash
+locally. Production integration, complete live/indirect-reference coverage and
+remote acceptance remain open.
+
+An internal register-transfer resolver now distinguishes `PC=A` / `PC=C` from
+`PC=(A)` / `PC=(C)`. It consumes only the selected register's low 20 bits and
+uses a separately supplied mapping reader for the indirect pointer cell; it
+does not infer register provenance from an earlier snapshot. All 65,536
+four-nibble encodings, separate code/data mappings, malformed reads, faults and
+address boundaries pass host tests, with ARM compilation/analysis. Local native
+watchpoint runs on HP49g+ and HP50g trace the normal post-ARMSYS return through
+GETPTR and the subsequent RPL dispatch. A is loaded from the restored runstream
+before `PC=(A)`; the observed pointer cell is the ROM SEMI entry, and the host
+resolver agrees with the next observed native address. The 46 preceding
+register accesses contain no R0–R4 use. Both runs preserve normal application
+and Stock return checks. This is bounded normal-path evidence and host
+resolution of native observations, not complete exceptional-path or register
+liveness coverage; production opaque checks remain unchanged.
+
+The maintained Stock suite now exercises those four register-transfer forms
+through the actual ARM resolver and shared qualified reference planning/replay.
+Eight new cases use explicit register-source cells and, for PC=(A/C), a separate
+guarded pointer cell. Repaired and unrepaired controls reach distinct native
+markers. Both HP49g+ and HP50g pass all 88 cases, the final RPL marker and unchanged
+Flash locally. These controlled sources do not prove arbitrary live-register
+provenance. Separately, error-return watchpoints are now gated on entry into the
+specific ARM application, avoiding a matching numeric error code during earlier
+Stock allocation. Both models copy the injected error code, restore RPL pointers
+through GETPTR and reach the outer RPL error-handler marker after catalog growth,
+with unchanged Flash. The first 400 observed register accesses contain no R0–R4
+use; later consumers and other exceptional paths remain unclassified. Remote
+acceptance and complete production reference coverage are still pending.
+
+The internal instruction framer now walks an independently established
+instruction-only interval, including variable-length literals and combined
+predicate/GOYES operands. It supports documented Saturn and selected Saturn+
+encodings, rejecting unknown extensions rather than treating `80B` as a short
+classic BUSCC. Truncation, invalid nibbles, read faults, maximum-length literals,
+callback failure and 20-bit bounds pass focused ASan/UBSan tests; ARM compilation
+and analysis pass. In the HP50g native snapshot, all 1,229 boundaries across three
+distinct cached library commands and the three SETUP CODE bodies match independent
+disassembly. This is local framing evidence, not a proof of instruction semantics,
+inline-data ownership, complete references or safe arbitrary program movement.
+Opcode references are the [Saturn instruction reference](https://literature.hpcalc.org/community/intro-saturn-asm.pdf)
+and [Rechlin's Saturn+ opcode observations](https://www.hpcalc.org/hp49/docs/programming/newopcodes.zip).
+
+The maintained Stock relocation suite now walks each generator-established
+instruction-only prefix on ARM and verifies the proposed repair site's boundary
+before planning. HP49g+ and HP50g both pass all 88 cases, the final RPL marker and
+unchanged Flash. A separate host walk of each model's native snapshot covers all
+seven known CODE objects (including the duplicated command cache): 1,616
+instructions and 346 direct branches. All 283 internal targets land on decoded
+boundaries; the other 63 target the lower address region outside these RAM CODE
+bodies. Qualified planning leaves all 346 operands unchanged for the observed
+16-nibble catalog expansion. Six register-mediated transfer sites remain explicit
+data-flow obligations; this result does not resolve live-register provenance,
+other embedded data references or complete relocation safety.
+
+Following the register-mediated calls also identifies library bank-switch fields
+as executable targets, rather than inert catalog metadata. The internal catalog
+planner now resolves payload and switch-function mappings separately and plans
+both address fields. Equal numeric addresses in different mappings remain
+independent; the zero/no-switch sentinel stays zero, and moving a nonzero function
+to zero is rejected. Focused ASan/UBSan, ARM compilation and analysis pass for
+independent mapping combinations and positive/negative moves. The two observed
+Stock catalogs each contain 62 entries whose nonzero switch targets are below
+the moving RAM region; that observation does not justify assuming all future
+switch functions are immovable. Full register provenance and registration
+integration remain open.
+
+Post-submission source analysis bounds SETUP's observed `PC=A` dispatch block:
+under HEX mode and entry at the block start, the destination is
+`0x26bf1 + 7 * B.S`. Symbolic checks on both snapshots cover all 256 selector/P
+combinations, keep unrelated initial register nibbles unknown, reject any unknown
+input consumption and verify P restoration. All 16 targets are below moving RAM.
+This is a conditional block-level result, not native execution of every selector
+or proof that every possible entry reaches the block under those conditions.
+
+The switch-function distinction now reaches native root enumeration and the
+catalog geometry primitive. Nonzero catalog switch pointers have their own
+execution-root provenance; RAM function pointers follow a move while banked
+payload addresses remain in their selected mapping. ACPTR traversal also emits
+the switch field as an unresolved execution reference, including compact and
+nested array bodies. Focused sanitizer tests cover catalog movement, preflight
+read failure without writes, root dependencies, zero sentinels, linked aliases
+and callback failure. On both before/after native snapshots, all 56 nonzero
+switch-function roots match their catalog fields; existing display-root
+relocation checks still pass. Both HP49g+ and HP50g pass the controlled native
+catalog-growth regression, post-call RPL marker and unchanged Flash; all six
+launchers build. These fixtures retain their explicit bounded-probe scope:
+complete execution coverage and public registration remain open.
+
+An explicit execution-address planner now connects classified EXECUTION fields
+to qualified relocation without weakening the ordinary planner's rejection.
+Catalog switch fields and the maintained ARM register-transfer fixtures use it.
+Mapping isolation, positive/negative shifts, split fields, invalid event metadata,
+zero-sentinel rejection and unchanged outputs on errors pass focused sanitizers
+and ARM analysis. Both HP49g+ and HP50g pass all 88 native relocation/control
+cases, the post-call RPL marker and unchanged Flash. This closes address-field
+planning for these classified cases, not code-body or live-register coverage.
+
+<details>
+<summary>Native-port implementation history and bounded verification evidence</summary>
 
 Local implementation now includes Port 0 backup create, variable-size replace
 and remove, with owned reads and preservation of live references to old records.
@@ -1283,6 +1998,187 @@ the retirement build and cut/resume stage. Broader physical fault patterns,
 transaction freshness, reference authority and automatic startup integration
 remain required separately.
 
+An automatic-entry slice now passes locally on HP49g+/HP50g: install the owned
+retirement witness as `STARTUP` without evaluating it, verify unchanged damaged
+Flash, then warmstart into replay/retirement. A second warmstart reports no
+pending journal and zero erase/program commands, preserving complete Flash,
+the empty stack and all 61 clean catalog entries. Both runs use 64-read Flash
+busy intervals and the independent image/stack/TLS/mapping verifier. The maintained
+runner includes this separate fresh-fixture branch whenever the retirement build
+is supplied. Production preservation of user startup programs, ordering against
+library configuration, durable ownership/freshness and complete reference repair
+remain open; this is not a general installed startup-recovery service.
+
+The complete HP50g CI-equivalent recovery chain also passes locally, including
+both configured busy-operation power cuts, interrupted bank-identity publication,
+journal retirement and the two automatic warmstarts. A separate native Stock
+2.15 ordering probe on HP49g+ and HP50g observes library configuration before HOME `STARTUP`.
+Consequently the production entry must address recovery before other library
+code can access damaged Flash, as well as survival after loss of HOME RAM.
+On HP50g, two Port 2 probe libraries (1701 and 1702) configure in ascending ID
+order with either installation order, before `STARTUP`. Ordering across arbitrary
+libraries/ports and an available earliest recovery callback remain unverified.
+Additional HP50g cross-port probes place Flash library 769 before RAM library
+1702 but after RAM library 768. With a real HOME-appending configuration callback,
+the earlier library runs twice across fault recovery and its internal restart;
+the later library runs once. Both finish with exact recovery and all 63 catalog
+entries. Selecting the lowest documented user ID is therefore insufficient to
+guarantee safe production startup ordering.
+HP49g+ and HP50g Stock dependency probes make that ordering failure observable: a RAM
+library 768 configuration appends a marker, recalls the real Port 2 EQLIB library
+226 and then appends a completion marker. After erasing the journaled bank-header
+sector, recovery library 769 is never reached: the dependent configuration
+repeatedly enters without completing (54 entries in each observation), Flash
+remains byte-for-byte unchanged and both journal and authority remain armed.
+With research-only recovery ID 4, the same dependency completes after
+exact sector repair; all 63 catalog entries, owned recovery CODE state and both
+closed transaction records pass verification. Both clean baselines complete the
+dependency once. This establishes the need for recovery before dependent
+configuration, not a production allocation of ID 4: factory IDs 0, 1 and 2 also
+have configuration callbacks, and their safety before recovery remains unproven.
+The public packager continues to restrict recovery IDs to 769..1791.
+Inspection of the HP50g Stock callback bodies narrows the earlier-callback
+question: library 1 recalls hidden `UserKeys.CRC` and `UserKeys`, checks the
+object checksum and restores key assignments; library 2 attaches itself to HOME.
+The primitive names are cross-checked against the authors' [entry database](https://www.hpcalc.org/details/5146).
+Assigning the EQLIB object to a user key copies that object into RAM in the
+observed Stock fixture, so its successful recovery does not establish safety
+for banked references in user-key data. Library 0 and reachable banked data
+still need validation. ID 4 also has a historical configuration-suppressor use,
+described by its [author](https://files.mpoli.fi/pub/unpacked/software/hp48/hp48cojh.zip/_horn8.zip/cnflib.doc);
+an installer must not assume that this ID is available on an existing calculator.
+A further HP50g native fixture stores the actual user-key list in a Flash backup
+and uses `StoHiddenVar` to retain an ACPTR in hidden `UserKeys`. Stock's `OCRC`
+calculates the checksum of this pointer object, rather than the original list;
+updating `UserKeys.CRC` with that result makes the clean warmstart preserve both.
+Erasing the referenced backup's bank-header sector then still permits recovery
+library 4 to restore the exact sector, retire/close the transaction and rebuild
+all 62 catalog entries. The key reference/CRC and owned recovery image/stack/TLS
+also pass. This accepts that explicit banked-key path; it does not prove every
+earlier callback or arbitrary user-key representation safe.
+The library 0 callback checks HOME's oldest, null-named directory entry. Its
+existing-directory path reads RAM directory geometry; the missing-directory
+path allocates a hidden directory and can call `GARBAGECOL` when `ROOM` reports
+less than 20 nibbles. The inspected HP49g+/HP50g callback code agrees, and clean,
+warm-repaired and cold-repaired saved states all have the expected RAM directory.
+Those final snapshots establish the existing-directory precondition, not that
+cold initialization never enters the allocation path. Installation and mutation
+preflight must account for this distinction before claiming early-callback safety.
+The maintained configuration fixture now also locates library 229's configuration
+program from its catalog/header and erases that body's sector while preserving
+the bank and library headers. Offline HP49g+/HP50g runs restore the exact sector,
+close both transaction records and reconstruct all 62 baseline catalog entries.
+The full maintained sequence additionally checks owned recovery state and an
+unchanged later warmstart; that expanded sequence passes locally on both models.
+This case does not prove that every earlier callback executed safely: Stock may
+skip damaged library contents, and the earlier dependent-library counterexample
+still requires a production startup design.
+An explicit stale-journal host regression also demonstrates why structural
+preflight is insufficient: a later valid backup inside the target sector is
+hidden by the old image overlay. Public write preparation rejects ready and
+partially retired sector journals without any Flash mutation. Durable
+transaction authority remains required before production startup replay.
+
+An internal one-use transaction-binding codec (`HPCAUTH1`) now binds a known
+physical authority allocation to one validated sector journal's address, target
+and status-independent CRC. It distinguishes unpublished, armed, closing and
+closed states, rejects changed/moved journals and overlapping allocations, and
+supports inspecting journal retirement without granting replay permission.
+Host tests cover every status byte and single-bit corruption of the binding.
+Caller-owned publication now verifies the durable journal and writes/verifies
+the binding body before arming it. Bound replay checks that entire armed record
+before the journal and target; closure requires a fully retired journal and an
+exact target image before clearing the binding. Host tests cut every publication
+and closure read/write, reject inactive bindings without erase/program commands,
+and exercise publication → replay → journal retirement → closure. Later target
+changes survive a replay attempt against that closed transaction. Resumption
+of the same reserved publication verifies NOR-compatible partial body bytes
+before completing them, requires exact bodies once status publication starts,
+and never rearms a closing/closed binding. Host tests also interrupt resumption
+and retry again. Trusted installed-root discovery, startup exclusion and
+reference repair remain required; this is not production startup integration.
+The bound read-only preflight now accepts an explicitly trusted authority/journal
+pair, validates its phases and all restored bank chains, and proves both records
+occupy exact native allocation boundaries. Matching records nested in deleted
+payloads are rejected. Closed transactions validate current Flash without an
+old-image overlay, preserving later valid backups; corrupt current objects still
+fail preflight. Armed/retiring transactions and target-equal closure remain
+distinct from clean, closed transactions. The bound Flash-configuration fixture
+now passes locally on HP49g+ and HP50g: exact sector restoration, journal
+retirement and authority closure, automatic complete catalog rebuilding, HOME
+preservation, owned relocated CODE verification and a later unchanged warmstart.
+The fixture's compiled journal/authority pair is explicit test input, not a
+trusted production installation root. CI now selects this configuration mode
+and uploads its generated library package alongside the standalone program.
+The bound configuration runner also covers loss of all SRAM before the damaged
+Flash boot. It declines Stock's memory-recovery prompt, then requires exact
+sector restoration, retired journal and closed authority, the original complete
+Flash library catalog, owned relocated CODE/stack/TLS and an unchanged later
+warmstart. HOME preservation is checked only in the retained-RAM scenario.
+Separate HP49g+ and HP50g cold baselines reconstruct all 62 Flash catalog entries;
+both the standard library 1701 and research-only library 4 pass bound cold repair
+and catalog reconstruction locally. This tests simulated RAM loss with an intact
+installed recovery library, not physical battery loss or safe ordering against
+arbitrary earlier library callbacks.
+The recovery envelope retains an immutable initialized image and a separate
+aligned runtime reservation so saved HOME programs can be executed repeatedly.
+An in-place alignment experiment passed fresh Flash configuration starts but
+overwrote its own source in HOME; that layout is not retained. Memory admission
+and reducing the recovery footprint remain open requirements.
+Installation must also remain independent of package size: Stock could
+place a smaller library in the bank whose header the test erases. The configuration fixture
+now occupies that bank's remaining tail with a native tombstone before Stock
+installation and verifies that installation leaves the protected bank unchanged.
+Recovery availability consequently no longer depends on package size forcing
+Stock to choose a different bank. The tombstone is test setup, not a production
+installer or space-reservation protocol. With the immutable-source envelope,
+the complete maintained runner passes locally on HP49g+ and HP50g: both busy
+power-cut masks, interrupted repair, journal retirement, saved-program reuse,
+automatic STARTUP, bound Flash configuration, SRAM loss and unchanged later
+warmstarts. All four build variants and their 16 Clang analysis configurations
+pass. Remote acceptance of this follow-up remains pending.
+An old binding
+must not be erased/reused while its journal can survive, because a partial erase
+can resurrect an armed status; root replacement needs its own protocol.
+
+HP50g Flash-resident configuration prototypes now restore the injected header
+sector and retire its journal automatically, both through a hidden library
+command and with the recovery program directly in the configuration entry.
+Full Flash comparison and 64-read busy-operation evidence pass. The first
+repaired startup still exposes 59 of 62 catalog entries; another warmstart
+restores all exact bindings without Flash changes. A post-startup invocation
+also passes the owned RAM image/stack/TLS checks. The startup image survives as
+a CODE object moved by native GC, including odd-nibble moves: the verifier now
+explicitly supports reconstruction while checking original execution alignment,
+RAM bounds, stack/TLS and the complete immutable image/guards and envelope.
+Both configuration variants pass these checks. Clearing all 512 KiB SRAM before
+HP50g reset also passes exact recovery, these ownership checks and Stock return
+after cold initialization finishes. Production startup integration, installation
+and transaction freshness remain open; this is not physical battery-loss testing.
+HP49g+ independently passes direct configuration-entry replay/retirement and
+the complete relocated-image checks, also retaining 59 entries on that first
+repaired startup. Its RAM-loss case has not yet been accepted.
+
+Both models pass the return-only Flash-configuration branch: native
+library installation, clean catalog baseline, injected fault, automatic repair
+and retirement, relocated CODE verification, then exact catalog rebuilding on
+the second warmstart. The configuration mode now requests Stock reinitialization
+after successful retirement, so the maintained runner requires all original
+catalog bindings before a second host reset. Both models pass this maintained
+automatic path, preserve the HOME string and end with a verified no-op invocation. The workflow
+builds this mode with `HPCLANG_RECOVERY_RESTART_AFTER_REPAIR` and supplies it with
+`--configuration-build`; ordinary retirement still returns to its caller.
+A host-generated configuration-only library now replaces calculator-side
+library compilation in this fixture. The packager validates the CODE envelope,
+native length and CRC; its explicit user-library ID does not reserve a number
+or guarantee priority. The original program artifact remains available for
+independent owned-image verification.
+A persistent HOME string also checks preservation of user RAM. Synthetic busy
+reads apply to the recovery stages; Stock constructs
+the fixture with the normal emulator Flash model because its installation
+driver does not pass the synthetic read-count timing model. Production
+installation/freshness and safe ordering before dependent libraries remain open.
+
 Both models also accept a later invocation of the already installed recovery
 program: discovery reports no pending journal, all erase/program counters stay
 zero, the complete Flash image stays unchanged, and a subsequent reset retains
@@ -1350,6 +2246,51 @@ Thus paired payload differences alone do not identify relocation fields. These
 objects still require semantic classification; no raw-address scanning or
 reference-free assumption is accepted from this experiment.
 
+The 798-nibble object is now identified through Stock's `leeway` root. On
+HP49g+/HP50g, independently copied contents remain unchanged across native
+garbage collection. A deliberate address-shaped value also remains unchanged
+while the referenced test object actually moves; the HP50g no-collection
+control preserves the contents too. This establishes that numerical address
+matches in this buffer must not become relocation edits. It does not classify
+the other opaque objects or discharge the launcher's owned-pointer obligations.
+
+The observed 50-nibble launcher descriptor has two ARM entry/base fields. Native
+HP49g+/HP50g controls still complete UI execution and Stock return when both
+fields are deliberately replaced with invalid addresses after application entry.
+Both models also pass the catalog-growth diagnostic, descriptor movement, normal
+return and relaunch/readback while retaining those invalid fields. This bounds
+their liveness on the tested Launcher V3 path; other descriptor forms remain
+unclassified. The cached-program machine-stack values still require a production
+type/provenance and liveness contract. The host stack-restoration regression retains the
+relocated object root without reading the consumed ARM fields again.
+
+Native helper traces on both models identify the two saved conditional-branch
+positions and the launch subroutine return address, with their actual producers
+and circular-stack slots matching the suspended application snapshot. A separate
+catalog-growth diagnostic on both models returns and relaunches successfully
+while relocating only the subroutine return, leaving the two branch positions
+unchanged. Thus the earlier assertion that all three must be repaired on normal
+return was too strong. A stronger native continuation witness now passes on both
+models with either root set: after registration, the original RPL caller executes
+its post-call marker. Redirecting the saved post-ARMSYS continuation to the
+validated launcher error exit produces the distinct outer error-handler marker;
+the same catcher without fault injection produces only the success marker.
+These checks also require the inserted catalog entry and unchanged Flash.
+Native-cell watchpoints on both models observe the launch return being consumed,
+while the old branch positions are overwritten without a reported intervening
+read after application return. HP50g cursor tracing attributes that replacement
+to ordinary modulo-eight pushes/pops, not a separate stack reset. A nonzero
+slot and the circular cursor therefore do not establish a live execution root.
+They cover normal return and that explicit launcher error path, not arbitrary
+exceptional paths or every stack consumer. Production classification and complete
+relocation coverage remain open.
+
+A separate HP49g+/HP50g native collection control retains an object on the data
+stack while saving its old numeric address with `RSTK=C`. Native collection
+moves the owned object but leaves that machine-stack number unchanged. Thus
+neither address-range scanning nor invoking the native collector supplies a
+general execution-root classifier; live continuations need call-path evidence.
+
 Shared edit assembly now merges identical observations across discovery paths
 and rejects conflicting values, partial overlaps and exhausted storage without
 publishing a partial count. Host tests, sanitizers and ARM compilation/analysis
@@ -1359,6 +2300,15 @@ Forward/reverse discovery order gives identical batches; native expected-value
 preflight passes and a contradictory duplicate is rejected. This read-only
 experiment uses unchanged values to verify assembly, not relocation semantics
 or complete reference coverage.
+
+ARM-side root scanning now coalesces repeated cell addresses before visiting or
+relocating them. Distinct cells holding the same value still move independently.
+The regression reproduces the previous double-shift bug; sanitizers also verify
+that a later invalid root fails before RAM or root changes. Related host tests,
+ARM compilation and static analysis pass. HP49g+/HP50g native catalog-growth
+controls deliberately repeat the saved return-PC cell and still reach the RPL
+post-call marker with the expected catalog entry and unchanged Flash. This fixes
+duplicate application, without claiming complete caller classification.
 
 A stopped-state HP50g integration experiment now combines shared root/nested
 enumeration, qualified shift planning, edit merging and RAM replay. Its 738
@@ -1430,6 +2380,16 @@ declared native roots, zero changed nested fields and ten opaque obligations;
 this smaller application therefore does not replace the earlier nested-field
 relocation evidence. The current host suite passes all 101 tests.
 
+Stage1 now recognizes an immediate execution root on HP49g+/HP50g: a saved
+post-ARMSYS PC naming `RTN`, `RTNSC` or `RTNCC` proves that the circular
+machine-stack top will be consumed as an address. Only that cell is added;
+lower slots remain unclassified. Local original-system diagnostics on both
+models use only stage1's three roots, grow the catalog and reach an independent
+post-call RPL marker with unchanged Flash. Exhaustive opcode/cursor unit tests
+pass with ASan/UBSan; all six launchers build, and HP39g+/HP48gII Direct UI
+regressions pass return, independent pixels and memory checks. This closes one
+root-discovery case, not complete execution coverage, registration or reclamation.
+
 The Port development branch now integrates the standalone historical-system client
 and system adapters. Both integrated HP40gs Stock clients pass normal return and
 independent pixel checks, replacing the old combined fixture that failed with
@@ -1437,6 +2397,8 @@ independent pixel checks, replacing the old combined fixture that failed with
 strict documentation checks pass. Public Port 1 replacement/removal remains open:
 bank-qualified traversal reaches ROM machine-code entries and user-library code
 whose execution references still require classification.
+
+</details>
 
 - [ ] Recheck each model's native port representation and supported contexts
   against historical implementations and Stock behavior; do not extrapolate a
@@ -1508,6 +2470,15 @@ on the preceding implementation; the text-node enum/scanner correction did not
 change Gallery inputs. The remaining milestone checklist below is retained;
 integration alone does not close M8.2/M8.3.
 
+The UI allocator-pressure fixture now keeps the live view while an additional
+gray16 renderer fails with `ENOMEM`, then releases the pressure blocks and
+reconstructs the original renderer. Independent LCD checks require unchanged
+pixels during pressure and after reconstruction. HP39g+ and HP50g Stock pass
+locally with application-visible RW capped at 36 KiB; the shared launcher builder
+and CMake API expose that page-aligned ceiling. The legacy Stock reservation is
+not reduced, and stack peaks/whole-application admission remain open. This local
+follow-up has not yet received CI acceptance.
+
 The retained design is [View = f(Model)](sdk-design.md#declarative-ui-core-planned):
 applications describe the current view, events update state, and stable keys
 preserve node identity when that view is declared again. C functions suffice
@@ -1548,23 +2519,74 @@ Deliver and review this core in the following slices, using the retained
 
 #### M8.3 — Components, rendering and themes
 
-- [ ] Provide reusable text, action, selection, scrolling/list and editing
+- [x] Provide reusable text, action, selection, scrolling/list and editing
   components with composable containers; confirm the initial component set
   through real example screens rather than application-specific dialogs.
-- [ ] Implement a usable default surface/font renderer and explicit theme
+- [x] Implement a usable default surface/font renderer and explicit theme
   inputs. Keep widget appearance, font choices and rasterization outside the
   state/layout engine. Measurement and drawing must agree across backends.
-- [ ] Demonstrate the same application tree with a second renderer/theme,
+- [x] Demonstrate the same application tree with a second renderer/theme,
   including focus and input behavior. Preserve the downstream 39gsX native
   appearance use case; a claim of faithful HP39 reproduction requires separate
   reverse-engineering and visual evidence.
-- [ ] Adapt the original sketch's illustrative native drawing/pointer boundary
+- [x] Adapt the original sketch's illustrative native drawing/pointer boundary
   to actual monochrome/grayscale surfaces and keyboard-only operation. Keep
   pointer support optional and test clipped drawing ownership/publication;
   RGB565 and device scanning in the sketch do not imply new target hardware.
 - [ ] Validate six-model geometry, native/fallback fonts, clipping, scrolling,
   partial redraw and custom canvas, including low-memory failure and clean
   Stock return. Record frame/update and memory budgets.
+
+The first four items are covered by the reusable C/C++ interfaces, the installed
+device-manager example, independent theme/font/canvas LCD checks in the accepted
+six-model Runtime UI suite, and the current `ui`, `ui_cpp`, `ui_surface`,
+`ui_demo` and `ui_surface_alloc` sanitizer tests. The final resource/low-memory
+acceptance remains open for the bounded follow-up's CI and whole-app analysis;
+this does not claim faithful HP39 native styling or complete M8.3.
+
+The maintained 36 KiB UI artifact now passes all six Direct and all six Stock
+targets locally, including exhausted-allocator rendering, reconstruction pixels,
+native/fallback font geometry and normal return. SDK relocation also passes with
+an external C++ application's RW limit, all six launcher/notebook builds and
+three HP39 Aplet package families. CI acceptance and the remaining whole-app
+resource analysis are still pending.
+
+UI acceptance now records touched stack words at entry, before main returns and
+after libc/runtime cleanup, using a test-only startup wrapper. A bounded memory
+checkpoint saves the final measurements before launcher unmapping; Direct and
+Stock artifacts include the versioned JSON. HP39g+ Direct reports 2,416/8,192
+stack bytes and 18,892/22,920 heap bytes; HP50g Stock reports 2,424/8,192 and
+20,076/22,920. Both retain the 36 KiB RW ceiling and pass independent UI pixels
+and normal return. All six Direct and all six Stock targets now pass with the
+same memory-report gate locally. A watermark
+measures touched words, includes instrumentation overhead, and does not bound
+untouched stack reservations or establish a minimum physical Stock allocation;
+those distinctions remain part of whole-application resource analysis.
+
+The startup resource review found that stage0 copied its C stage and moved SP
+before stage1 could reject an undersized page pool. Stage0 now checks the linked
+stage extent plus its reserved stack page before those writes or MMU changes,
+including HP39's native-workspace exclusion and the coarse-table capacity.
+The Direct harness first executes three rejected launches (zero pages, one page
+and an excessive count), checking caller registers, interrupt state, mappings
+and the complete untouched temporary pool before ordinary application execution.
+HP39g+, HP48gII and HP50g pass those checks and the independent UI/memory/return
+gates locally; the old launcher fails the same rejection sequence. HP50g Stock
+also passes, as does HP39g+ Stock with its native-workspace exclusion. All six
+launcher builds, relocated C/C++ SDK clients, model-specific notebooks and all
+three HP39 Aplet package families pass. This closes an early startup overwrite
+hazard, not the remaining
+whole-application memory-admission or physical-reservation work.
+
+The previous Runtime CI batch exposed a separate test-launcher defect: the
+HP39gs/40gs ARMSYS probe clobbered `r2` before saving registers when skipping
+its Stock-only path in Direct mode. The probe now preserves that register on
+both its skip and replay edges. All three HP39 Direct Runtime targets locally
+pass the three rejected launches, keyboard progression and normal return; the
+downloaded failing CI launcher reproduces the old rejection failure on HP39gs.
+HP39gs and HP40gs Stock Runtime also pass USB installation, the ARMSYS replay
+probe, the complete keyboard sequence and return to the original Aplet UI.
+Remote acceptance is still pending.
 
 #### M8.4 — Historical source compatibility
 
@@ -1587,11 +2609,95 @@ gate; it demonstrates the five historical calls and documents their units.
 The follow-up calendar adapter adds `sys_tm_RTC`, the `hptime.h` include spelling
 and date output in the installed timer example. Calendar conversion/failure
 tests, all six Direct and all six Stock targets (including independent pixels
-and normal return), and the updated relocated SDK acceptance pass. Formal CI
-for this calendar addition is pending. The original void signature is retained with errno and unchanged
+and normal return), and the updated relocated SDK acceptance pass. Runtime and
+Quality CI are accepted on `c2fb66fe`. The original void signature is retained with errno and unchanged
 output on failure; weekday/year-day are computed rather than copied from the
 historically unreliable RTC weekday field.
 The remaining historical system, timer and console interfaces remain open.
+
+The clean console now supplies cursor/state queries, cursor movement, erase to
+end of line and configurable tab stops. Tab expansion is bounded by the grid
+size even for `UINT_MAX`; controls preserve the documented incremental UTF-8
+behavior. Sanitizer tests and ARM analysis pass. Direct and Stock acceptance
+passes locally on HP39g+, HP48gII and HP50g, including independent LCD checks
+and normal return. These are prerequisites for the historical console adapter
+below, whose default streams, byte encoding and HPG ownership need their own
+integration acceptance.
+
+The next local output adapter supplies `hpconio.h` registration, cursor/clear/tab
+spellings and calculator-byte standard output on HPG's shared display lease.
+It preserves surrounding graphics and scrolls them with text, honors explicit
+stdio owners, and keeps HPG double-buffer publication explicit. Host sanitizer
+tests, ARM static analysis and all six Direct LCD checks pass. HP39g+, HP48gII,
+HP49g+ and HP50g Stock also pass. The installed C/C++ console example passes
+SDK relocation, six-model launchers and three HP39 Aplet packaging families.
+HP39gs/40gs Stock also pass; CI acceptance is pending. Historical input and numeric
+formatting remain open, so this does not close the console group.
+
+The follow-up `hpstring.h` group implements `ints/uints` using the verified
+1.0/1.1/2.0 base, sign and borrowed-buffer contracts, including defined `INT_MIN`
+handling. All bases and boundary values pass host sanitizers; ARM analysis and
+HP39g+/HP50g Direct conversion checks pass. HP50g Stock and updated installed-SDK
+relocation/packaging also pass locally; CI acceptance is pending.
+
+The default character-input callback now uses model-native Alpha/Shift state
+and the existing physical event stream, with shared HP-byte mapping for native
+and HPG fallback fonts. Six-model host checks cover ordinary input, single/held
+Alpha, classic locks and one-shot lowercase, Enter/backspace, cancellation and
+poll failures. Font/HPG sanitizers and ARM analysis pass. All six Direct and
+all six Stock physical-key checks pass locally, as does the updated SDK
+relocation/packaging gate. Historical input aliases are covered below;
+numeric-format policy remains open.
+
+The bounded `hpclang_hpgcc_gets` editor now integrates the tested byte-line core
+with standard streams and HPG rendering. Host sanitizers cover overflow/re-edit,
+partial-text cancellation, restoring graphics after scroll undo, synchronized
+double-buffer editing, and explicit stdio ownership without display acquisition.
+The installed interactive example passes the SDK relocation/packaging gate.
+HP39g+/HP50g Direct physical-key editing passes a full-buffer rejection/re-edit
+scenario, with the scrolled result matching an independently drawn reference
+frame pixel for pixel. Both models also pass Stock. The maintained independent
+console verifier now checks edited/reference frames on all six Direct and all
+six Stock targets, as recorded below.
+
+`hpconio.h` now adapts historical `gets/_gets` calls on fixed `char` arrays to
+the bounded editor in both C and C++. Pointer expressions and variable-length
+arrays require the explicit-capacity entry point; they fail before consuming
+input through the aliases. Host regressions check struct-member bounds,
+overflow/re-edit, single argument evaluation and unknown-capacity rejection.
+Both GCC ASan/UBSan and optimized Clang checks pass. The host stream fixture
+also covers libc's optimized `getc/putc` paths. The maintained ARM console
+witness uses `gets` and passes all six Direct and all six Stock targets with
+normal return and independent console/editor pixel checks locally. The updated
+installed-SDK C++ client also passes; formal CI for this batch remains pending.
+
+`hpstdio.h` now provides blocking `readint/readdouble` over that bounded editor.
+They retain historical numeric-prefix conversion and the 31-byte line capacity;
+invalid conversion, integer overflow and input cancellation have defined results.
+Host sanitizers cover boundaries, prefix conversion, floating range errors and
+input failures. ARM build/analysis, HP39g+ Direct and HP50g Stock physical-key
+numeric input, and installed-SDK relocation/packaging pass locally. The split
+console suite below completes six-model Direct/Stock local numeric acceptance;
+CI acceptance of this addition remains pending.
+`readuint/readhex/readlonglong/readulonglong` now share a checked integer parser
+matching the reviewed historical sign, whitespace and bare-hex rules. Boundary
+and error cases pass host sanitizers; ARM analysis and HP39g+/HP50g Direct
+physical-key acceptance pass locally; HP50g Stock also passes. Installed-SDK
+acceptance compiles and packages a separate C++ client using all six numeric
+entry points and the historical integer typedefs.
+Decimal-format controls remain open.
+
+Adding numeric conversion to the combined Display payload exposed HP39g+ Stock
+memory exhaustion while opening the existing 16-level display, before console
+tests ran. Historical console/input acceptance now has its own `hpgcc-console`
+runtime suite and independent pixel verifier; Display retains its original
+allocation-exhaustion, gray-level and cleanup checks. The split ARM payloads are
+48,552 and 66,192 bytes, versus 75,616 bytes combined. Native acceptance of the
+split console passes all six Direct and all six Stock targets, including
+physical input, independent pixels and normal return. Split Display also passes
+HP39g+ Stock with its original allocation/gray assertions. A terminated USB
+transfer was diagnosed and repeated before this result. CI acceptance remains
+pending; the failed combined payload is not accepted.
 
 The next system-adapter batch adds owned `sys_playTone2` (Hz/milliseconds),
 `sys_playTone` (Hz/hundredths of a second), and the 1.1/2.0 packed-BCD helpers.
@@ -1602,7 +2708,7 @@ behavior. Unit tests, sanitizers, ARM static analysis and all six Direct targets
 pass locally. The relocated SDK passes C/C++, six-model notebook/launcher builds
 and all three HP39 Aplet package families with the updated tone/BCD example.
 All six Stock targets also pass with independent pixels and normal return;
-formal CI for this addition is pending.
+Runtime and Quality CI are accepted on `c2fb66fe`.
 
 The follow-up adds `sys_slowOn/Off` as owned ECONOMY/HOST profile selection,
 retaining slower host clocks and restoring the saved host configuration rather
@@ -1610,11 +2716,12 @@ than historical fixed register values. Host error propagation, sanitizers and
 ARM analysis pass; native checks cover repeated selection, frequency bounds,
 monotonic continuity and restoration. All six Direct and all six Stock targets
 pass, as does the relocated SDK with the updated installed-package example,
-six-model launchers and three HP39 Aplet families. Formal CI remains pending.
+six-model launchers and three HP39 Aplet families. Runtime and Quality CI are
+accepted on `c2fb66fe`.
 Separately, the emulator RTC divider now carries fractional microseconds across
 ticks: all 128 settings over 4096 expirations each, sanitizers, a pinned-source
 build and HP50g Direct/Stock regression pass. This fixes the test environment;
-the historical RTC tick adapter group remains open.
+the historical RTC tick adapter acceptance is recorded below.
 
 Local HPG implementation now covers all 59 public functions. ARM declaration
 checks match all four historical headers (55 functions in 1.0; 59 thereafter).
@@ -1632,10 +2739,36 @@ below are retained.
   groups. Expand the four-generation declaration/implementation/evidence ledger.
 - [ ] Compile representative original historical applications, recording each
   required source edit; distinguish these from M7's clean-API behavioral ports.
-- [ ] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
+- [ ] Complete `kos_beep/kos_CheckBeepEnd` compatibility with owned asynchronous
+  sound, completion queries and active-tone preemption policy. Verify flags
+  against each original system; cover autonomous stop while application code is
+  busy, overlapping requests, cancellation and normal/immediate-exit restoration.
+  Keep Stock interrupt handlers out of the temporary application mapping; the
+  existing blocking tone service alone does not satisfy this adapter group.
+  The internal PWM4 one-shot lease passes host sanitizers and six-model Direct
+  expiry/rearm/restoration probes with the interrupt masked. Banked IRQ stack
+  exchange/restoration also passes six-model Direct probes with actual delivery
+  during a busy loop; System Services E2E now maintains this check and passes all
+  six Direct targets locally. Owned dispatch,
+  absolute-deadline handling and autonomous audio shutdown remain unfinished.
+- [x] Implement the RTC tick adapter group with configurable `(n + 1) / 128`
   second periods, query/restore semantics and coalesced pending indications.
   Preserve nonpositive wait behavior and account for a pending first tick;
   define ownership and exit restoration before claiming hardware equivalence.
+  The internal RTC tick lease engine now passes host and sanitizer tests for
+  selector validation, coalesced latch consumption, host configuration/pending
+  preservation and unrelated interrupt isolation. The three public adapters
+  and optional normal-exit/`_Exit` cleanup are now wired into the SDK; interface
+  and exit-path sanitizer tests pass, and ARM applications/launchers build.
+  Six-model Direct acceptance now includes a pre-Stock-restoration check of
+  RTC control/divider and tick routing/mask. An HP50g `_Exit` variant passes,
+  and deliberate missing cleanup is rejected. The relocated installed SDK
+  also passes C/C++, six-model launcher/notebook and HP39 Aplet packaging with
+  the adapters used by its timer example. All six Stock targets now pass the
+  complete interface/timing payload, independent pixels and normal return.
+  Host/ARM analysis passes across 265 sources and 777 configurations. Runtime
+  and Quality CI are accepted on `413e5891`, including the HPGCC system suite
+  in all three Direct families and all six Stock models.
 - [ ] Evaluate useful historical `win*` adapters on the accepted UI core where
   semantics fit. Keep raw KOS/Saturn/MMU migration guidance explicit, and
   preserve unsupported-context errors rather than supplying silent stubs.

@@ -9,6 +9,10 @@ extern "C"
     struct hpclang_console;
     struct hpclang_font;
     struct hpclang_surface;
+    struct hpclang_console_state
+    {
+        unsigned columns, rows, column, row, tab_width;
+    };
 
     /* Owned fixed-cell Unicode console. Borrows font until destroy. Cell geometry
      * uses its nominal advance and line height; each glyph is clipped to its cell.
@@ -19,9 +23,21 @@ extern "C"
                                                    const struct hpclang_font *font);
     void hpclang_console_destroy(struct hpclang_console *console);
     int hpclang_console_clear(struct hpclang_console *console);
+    /* Zero-based cells. column == columns denotes the deferred wrap position.
+     * Query does not flush UTF-8. Move/erase finish an incomplete sequence as
+     * U+FFFD first; invalid moves leave both text and decoder unchanged.
+     * Erase clears from the resulting cursor through its row without moving it.
+     * These operations allocate nothing; invalid arguments return -1/EINVAL. */
+    int hpclang_console_get_state(const struct hpclang_console *console,
+                                  struct hpclang_console_state *state);
+    int hpclang_console_move(struct hpclang_console *console, unsigned column, unsigned row);
+    int hpclang_console_clear_eol(struct hpclang_console *console);
+    /* Positive width in cells, initially four. Clear retains the selected width.
+     * A tab's work is bounded by the grid size, even for very large widths. */
+    int hpclang_console_set_tab_width(struct hpclang_console *console, unsigned width);
     /* Incremental UTF-8 across writes. Malformed sequences become U+FFFD. NUL and
      * unrecognized C0/C1 controls are ignored. LF moves to column 0 of the next row,
-     * CR to column 0, BS moves left without erasing, TAB inserts spaces to a 4-cell
+     * CR to column 0, BS moves left without erasing, TAB inserts spaces to a configured
      * stop, FF clears. Printing past the last column wraps; the last row scrolls.
      * A full final row is retained until another character/newline needs space.
      * Return 0 or -1/EINVAL. write(NULL,0) is allowed with a valid console. */

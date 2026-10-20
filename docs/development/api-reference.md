@@ -187,9 +187,10 @@ through explicit Unicode insertion. It does not introduce a global terminal or c
 stdin/stdout behavior. The application chooses rendering, event polling and
 whether to retain a cancelled working line.
 
-The default `stdin` returns EOF and `stdout`/`stderr` discard output until an
-application explicitly binds them. The console/standard-stream extension below
-supplies that routing. Native text-plane mapping and the bounded keyboard
+Without a selected historical backend, `stdin` returns EOF and `stdout`/`stderr`
+discard output until an application explicitly binds them. Including `hpconio.h`
+selects the optional historical console; explicit bindings take precedence.
+The console/standard-stream extension below supplies that routing. Native text-plane mapping and the bounded keyboard
 line-input loop are accepted on `c7451364` and `41d75dec` respectively.
 File-backed `FILE *` support is unaffected.
 
@@ -379,6 +380,9 @@ The numeric-input, console and stream-binding extensions passed CI on `b92e2a7d`
 | `hpclang_console_create/destroy()` | Own a fixed-cell Unicode grid and drawing buffers; borrow the selected font; no display session or hardware acquisition |
 | `hpclang_console_write/flush/clear()` | Incremental UTF-8, wrapping, scrolling, LF/CR/BS/TAB/FF; flush replaces an unfinished sequence; clear resets text and decoder |
 | `hpclang_console_cell()` | Inspect a visible cell as a Unicode scalar; scrolled-away text is not retained |
+| `hpclang_console_get_state()` | Snapshot grid size, cursor and tab width without flushing pending UTF-8; a column equal to the width denotes deferred wrapping |
+| `hpclang_console_move/clear_eol()` | Finish incomplete UTF-8 before moving or erasing the remainder of the row; invalid moves leave text and decoder unchanged; no allocation |
+| `hpclang_console_set_tab_width()` | Choose a positive cell width, initially four and retained by clear; even very large tabs take work bounded by the grid size |
 | `hpclang_console_render()` | Opaque black-on-white viewport, each glyph clipped to its cell; clip to destination; caller chooses when to draw and present |
 | `hpclang_stdio_bind/unbind()` | One explicit binding for the C standard streams; callbacks are copied and context is borrowed; file-backed streams and raw file descriptors are unaffected |
 
@@ -425,6 +429,26 @@ output channels and detaches even if a flush fails, returning the first error.
 Bind/unbind reset EOF, errors and pushback so old input cannot leak to a new
 source. stdout and stderr have separate C stream status; the console adapters
 deliberately combine their bytes into one ordered UTF-8 output stream.
+
+The optional historical `hpconio.h` header selects a lazy default console backend
+for otherwise unbound streams. It uses calculator bytes and fixed HPG cells,
+shares HPG display ownership and preserves neighbouring graphics. Explicit
+bindings override the complete default, including any missing application
+callbacks; unbind resumes it. Header registration itself acquires no hardware.
+See [historical console output](hpgcc-compat.md#historical-console-output) for
+cursor/clear/tab calls, model-native blocking character input and remaining
+line-editor limitations.
+
+`hpclang_hpgcc_gets(buffer, capacity)` edits a bounded calculator-byte line,
+including backspace, scroll undo and ON cancellation. Capacity includes NUL;
+the old unbounded `gets/_gets` aliases are not supplied. `hpstdio.h` supplies
+`readint/readuint/readhex/readlonglong/readulonglong/readdouble` over this editor
+with 32-byte internal buffers. Integer syntax follows the documented historical
+prefix/sign rules; floating conversion uses C `strtod`. No conversion reports
+`EINVAL`, and integer overflow saturates with `ERANGE`. These convenience calls
+accept a numeric prefix. The clean text-input parsers remain the interface for
+whole-line validation and separate status/output. Including `hpstdio.h` alone
+does not select a default console; calling the input adapters does.
 
 ## Display and surfaces
 
@@ -783,8 +807,8 @@ Historical `hpsys.h` mixes time, clock control, interrupts, LCD state, address m
 
 | Historical area | Representative HPGCC calls | hpclang |
 | --- | --- | --- |
-| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` now adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay; six Direct models and HP39g+/HP48gII/HP49g+/HP50g Stock pass locally. `sys_waitRTCTicks` remains pending. |
-| RTC wall clock | `sys_RTC_seconds`, `sys_delta_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday, accepted on `6a7f9a28`; `hpsys.h` now adapts seconds-of-day and midnight-wrapped differences. `sys_tm_RTC` now adapts the RTC to standard `struct tm`, with computed weekday/year-day and unchanged output on failure; host validation and all six Direct/Stock targets pass locally; formal CI for this addition is pending. |
+| elapsed time/delay | `sys_updateTimer`, `sys_sleep`, `sys_waitTicks`, `sys_waitRTCTicks` | ✅ Clean monotonic service. `hpsys.h` adapts nanosecond stopwatch accumulation, millisecond sleep and 750 kHz tick delay. The three RTC tick adapters use an owned configurable hardware divider, coalesced pending indications and normal-exit/`_Exit` restoration. Runtime and Quality CI accepted on `413e5891`, including all six Direct/Stock targets. |
+| RTC wall clock | `sys_RTC_seconds`, `sys_delta_seconds`, `sys_tm_RTC` | ✅ Civil read/set/conversion and computed weekday. `hpsys.h` adapts seconds-of-day and midnight-wrapped differences; `sys_tm_RTC` returns standard `struct tm`, with computed weekday/year-day and unchanged output on failure. Runtime and Quality CI accepted on `413e5891`, including all six Direct/Stock targets. |
 | clock speed | `sys_slowOn/off`, `sys_clksave/restore` | ✅ Typed HOST/ECONOMY policy preserves PLL/bus setup and restores borrowed clocks, accepted on `2988e1de`. `sys_slowOn/Off` now select these profiles; all six Direct/Stock adapter checks and installed-SDK acceptance pass locally; formal CI is pending. Raw `sys_clksave/restore` remains unimplemented. |
 | interrupt/timer hardware | `sys_int*`, `sys_setupTimers` | ✕/↪ backend ownership detail. |
 | LCD hardware state | `sys_lcd*`, `setDisplayPlane` | ↪ Owned display sessions restore LCD configuration and manage physical grayscale. |
@@ -814,7 +838,7 @@ hpclang now provides standard C stream semantics on the platform that actually h
 | owned directory iteration | ✅ independent iterators, UTF-8 LFN, preserved stored case |
 | unsupported stream access on HP39/40 and HP48 | ✅ clean `ENOSYS` |
 | HPGCC2/3 `FS*` adapter | ✅ bounded useful subset over clean FatFs core |
-| HPGCC `hpstdio.h` adapter | ✅ standard libc + thin `fdelete()` |
+| HPGCC `hpstdio.h` adapter | Standard libc, `fdelete()`, and bounded `readint/readuint/readhex/readlonglong/readulonglong/readdouble`; historical decimal-format controls remain open |
 | HPGCC `fsystem.h` useful subset | ✅ implemented and exercised in Storage #53 |
 | public raw KOS file API | ✕; raw KOS stays Migration/Internal, while real KOS remains host coordination only |
 

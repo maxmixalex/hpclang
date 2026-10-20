@@ -19,6 +19,7 @@
 #include "s3c2410/s3c2410_lcd.h"
 #include "s3c2410/s3c2410_io_port.h"
 #include "frame-checkpoint.h"
+#include "memory-checkpoint.h"
 #include "input-checkpoint.h"
 #include "media-checkpoint.h"
 #include "qemu/cpu-common.h"
@@ -59,6 +60,10 @@
 #define TIMER_TCFG1_VA 0x07600004u
 #define TIMER_TCON_VA 0x07600008u
 #define TIMER_TCNTB0_VA 0x0760000cu
+#define RTC_CONTROL_VA 0x07b00040u
+#define RTC_TICK_VA 0x07b00044u
+#define IRQ_MODE_VA 0x07100004u
+#define IRQ_MASK_VA 0x07100008u
 
 #define COARSE_FLAGS 0x11u
 #define SMALL_FLAGS 0x0ffeu
@@ -151,6 +156,7 @@ struct e2e
     uint32_t stock_tcfg1;
     uint32_t stock_tcon;
     uint32_t stock_tcntb0;
+    uint32_t stock_rtc_control, stock_rtc_tick, stock_tick_mode, stock_tick_mask;
 
     uint32_t result;
     int saw_pass;
@@ -158,6 +164,8 @@ struct e2e
     uint64_t input_held;
     struct input_sequence input_sequence;
     unsigned media_phase;
+    unsigned preflight_rejections;
+    uint32_t launch_regs[15], launch_cpsr;
     int returned;
     int failed;
     int lcd_height;
@@ -538,6 +546,11 @@ static int snapshot_stock(struct e2e *s)
     (void)guest_read32(s->hdw, TIMER_TCFG1_VA, &s->stock_tcfg1);
     (void)guest_read32(s->hdw, TIMER_TCON_VA, &s->stock_tcon);
     (void)guest_read32(s->hdw, TIMER_TCNTB0_VA, &s->stock_tcntb0);
+    if (!guest_read32(s->hdw, RTC_CONTROL_VA, &s->stock_rtc_control) ||
+        !guest_read32(s->hdw, RTC_TICK_VA, &s->stock_rtc_tick) ||
+        !guest_read32(s->hdw, IRQ_MODE_VA, &s->stock_tick_mode) ||
+        !guest_read32(s->hdw, IRQ_MASK_VA, &s->stock_tick_mask))
+        return 0;
 
     /*
      * HP's stock 49/50 layout stores the LCD framebuffer in the same 4 KiB
@@ -603,6 +616,7 @@ static void json(struct e2e *s, const char *status)
             "  \"status\":\"%s\",\n"
             "  \"result\":\"0x%08x\",\n"
             "  \"saw_pass\":%s,\n"
+            "  \"stage_preflight_rejections\":%u,\n"
             "  \"payload_keyboard_scheduled\":%s,\n"
             "  \"returned\":%s,\n"
             "  \"return_settled\":%s,\n"
@@ -634,7 +648,7 @@ static void json(struct e2e *s, const char *status)
             "  \"stock_tcntb0\":\"0x%08x\",\n"
             "  \"lcd_state_diff\":\"0x%08x\"\n"
             "}\n",
-            status, s->result, s->saw_pass ? "true" : "false",
+            status, s->result, s->saw_pass ? "true" : "false", s->preflight_rejections,
             s->payload_keyboard_scheduled ? "true" : "false", s->returned ? "true" : "false",
             return_is_settled(s) ? "true" : "false", s->return_quiescence.observations,
             s->hdw->cpu->regs[15], s->stock.regs[15], data, code, stage, inject, swi, s->old_swi,
@@ -719,7 +733,44 @@ static void monitor(void *arg)
         return;
     }
 
+    /* Exercise the actual packaged ARM entry before allowing the application
+     * to run. Rejection must leave the entire temporary pool untouched and
+     * return with caller registers, mappings and interrupt state intact. */
+    if (s->preflight_rejections < 3u) {
+        if (s->hdw->cpu->regs[15] == SENTINEL_VA) {
+            uint32_t data, code, stage, swi;
+            if (memcmp(s->launch_regs, s->hdw->cpu->regs, sizeof s->launch_regs) ||
+                ((cpsr_read(s->hdw->cpu) ^ s->launch_cpsr) & ~CPSR_NZCV) ||
+                !guest_read32(s->hdw, L1_DATA_VA, &data) || data != s->old_data ||
+                !guest_read32(s->hdw, L1_CODE_VA, &code) || code != s->old_code ||
+                !guest_read32(s->hdw, L1_STAGE_VA, &stage) || stage != s->old_stage ||
+                !guest_read32(s->hdw, SWI_VECTOR_VA, &swi) || swi != s->old_swi) {
+                fail(s, "stage-preflight-return");
+                return;
+            }
+            for (uint32_t i = 0; i < STAGE_SIZE / 4u; ++i) {
+                uint32_t expected = i < STAGE_PAGES ? (STAGE_PHYS + i * 0x1000u) | SMALL_FLAGS : 0;
+                if (ldl_phys(STAGE_PHYS + i * 4u) != expected) {
+                    fail(s, "stage-preflight-write");
+                    return;
+                }
+            }
+            static const uint32_t pages[] = {0u, 1u, 257u, STAGE_PAGES};
+            ++s->preflight_rejections;
+            stl_phys(INJECT_PHYS + 0x914u, pages[s->preflight_rejections]);
+            s->hdw->cpu->regs[15] = STAGE0_VA;
+            tb_flush(s->hdw->cpu);
+        }
+        if (!later(monitor, s, POLL_US))
+            fail(s, "monitor-timer");
+        return;
+    }
+
     if (guest_read32(s->hdw, s->result_addr, &v)) {
+        if (memory_checkpoint(s->hdw, s->result_addr, v) < 0) {
+            fail(s, "memory-checkpoint");
+            return;
+        }
         if (media_checkpoint(s->hdw, s->result_addr, v, &s->media_phase) < 0) {
             fail(s, "media-checkpoint");
             return;
@@ -784,6 +835,19 @@ static void monitor(void *arg)
             return;
         }
         s->lcd_state_diff = check_lcd_state(s);
+        /* Check before frontend restoration or resumed Stock can conceal an
+         * omitted runtime release. Pending events and divider phase are live
+         * state, not writable configuration that can be restored exactly. */
+        uint32_t rtc_control, rtc_tick, tick_mode, tick_mask;
+        if (!guest_read32(s->hdw, RTC_CONTROL_VA, &rtc_control) ||
+            !guest_read32(s->hdw, RTC_TICK_VA, &rtc_tick) ||
+            !guest_read32(s->hdw, IRQ_MODE_VA, &tick_mode) ||
+            !guest_read32(s->hdw, IRQ_MASK_VA, &tick_mask) || rtc_control != s->stock_rtc_control ||
+            rtc_tick != s->stock_rtc_tick || ((tick_mode ^ s->stock_tick_mode) & 0x100u) ||
+            ((tick_mask ^ s->stock_tick_mask) & 0x100u)) {
+            fail(s, "rtc-tick-state");
+            return;
+        }
         if (s->lcd_state_diff != 0u) {
             fail(s, "lcd-state");
             return;
@@ -865,6 +929,9 @@ static int64_t inject(void *arg)
     cpu->regs[1] = INJECT_VA;
     cpu->regs[14] = SENTINEL_VA;
     cpu->regs[15] = STAGE0_VA;
+    memcpy(s->launch_regs, cpu->regs, sizeof s->launch_regs);
+    s->launch_cpsr = cpsr_read(cpu);
+    stl_phys(INJECT_PHYS + 0x914u, 0u);
 
     s->deadline = timer_get_clock() + DEADLINE_US;
     tb_flush(cpu);

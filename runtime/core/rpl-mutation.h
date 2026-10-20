@@ -35,6 +35,8 @@ extern "C"
         uint32_t temp_limit;
         uint32_t user_limit;
         uint32_t stack_reserve_nibbles;
+        /* Repeated ARM-side cell addresses are visited/relocated once.
+         * Distinct cells holding equal values remain independent roots. */
         uint32_t **native_roots;
         uint32_t native_root_count;
         /* Optional classic ROM-part table: 3-nibble count, 16-nibble records.
@@ -61,7 +63,10 @@ extern "C"
         HPCLANG_RPL_MUTATION_EXISTS = -10,
         HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
         HPCLANG_RPL_MUTATION_NOT_EMPTY = -12,
-        HPCLANG_RPL_MUTATION_NOMEM = -13
+        HPCLANG_RPL_MUTATION_NOMEM = -13,
+        /* Catalog commit started and did not finish. Native/ARM state may be
+         * partially changed; retain ownership, never resume Stock or retry. */
+        HPCLANG_RPL_MUTATION_INCOMPLETE = -14
     };
 
     /* Read-only enumeration of the pointer cells already covered by native
@@ -86,14 +91,17 @@ extern "C"
         HPCLANG_RPL_ROOT_SYSTEM,
         HPCLANG_RPL_ROOT_LIBRARY,
         HPCLANG_RPL_ROOT_DISPLAY,
-        HPCLANG_RPL_ROOT_ATTACHMENT
+        HPCLANG_RPL_ROOT_ATTACHMENT,
+        HPCLANG_RPL_ROOT_LIBRARY_SWITCH
     };
 
     /* The same cells as visit_roots, with their source preserved. Source is
      * provenance, not a type assertion: system/support tables may mix metadata
      * and references, native roots may include saved execution positions, and
      * return-stack values need not point at object prologues. Library cells
-     * here are main-RAM bindings only; enumerate banked catalogs separately.
+     * tagged LIBRARY are main-RAM bindings only; enumerate banked payloads
+     * separately. LIBRARY_SWITCH is the nonzero executable switch pointer in
+     * the current mapping, before that function selects the payload bank.
      * No source is automatically safe to skip. Same read-only/error contract. */
     typedef int (*hpclang_rpl_root_source_visit_fn)(void *context,
                                                     enum hpclang_rpl_root_source source,
@@ -155,6 +163,11 @@ extern "C"
 
     /* Push the immutable supported-entry Boolean reference without allocating. */
     int hpclang_rpl_mutation_push_boolean(const struct hpclang_rpl_mutation_io *io, int value);
+
+    /* Return real 0/1 to a UserRPL condition without allocating a TEMPOB object.
+     * Caller validates the HP49g+/HP50g Stock ROM real constants and owns the
+     * captured RAM mapping throughout. Does not change the public Boolean ABI. */
+    int hpclang_rpl_mutation_push_real_boolean(const struct hpclang_rpl_mutation_io *io, int value);
 
     /*
      * Allocate/copy first, then replace one existing pointer cell. A failure before
@@ -250,6 +263,35 @@ extern "C"
      * during commit, as for the other mutation primitives. */
     int hpclang_rpl_mutation_catalog_grow(const struct hpclang_rpl_mutation_io *io,
                                           uint32_t position);
+
+    struct hpclang_rpl_reference_edit;
+    struct hpclang_rpl_reference_guard;
+    struct hpclang_rpl_catalog_repairs
+    {
+        uint32_t main_mapping;
+        const struct hpclang_rpl_reference_edit *edits;
+        uint32_t edit_count;
+        const struct hpclang_rpl_reference_guard *guards;
+        uint32_t guard_count;
+    };
+
+    /* Same geometry/ownership contract as catalog_grow. Merge caller-proven
+     * object/code repairs with an immutable snapshot of native root repairs.
+     * Exact duplicates coalesce; conflicting/partial overlaps reject before
+     * writes, including conflicts with unchanged roots. Fields are ORIGINAL
+     * pre-move addresses, wholly in main RAM; normalized mappings must equal
+     * main_mapping. Other physical banks require separate transaction work.
+     * Guards describe unchanged preconditions, not permissions to relocate.
+     * Keep input arrays, ARM roots, mappings and memory stable throughout.
+     * Allocates temporary ARM heap storage; allocation/preflight failure makes
+     * no writes. INCOMPLETE distinguishes a commit failure from those preflight
+     * errors: retain ownership, do not return to Stock or retry this non-replayable
+     * geometry operation. Complete
+     * reference coverage remains the caller's obligation; not public registration. */
+    int
+    hpclang_rpl_mutation_catalog_grow_repaired(const struct hpclang_rpl_mutation_io *io,
+                                               uint32_t position,
+                                               const struct hpclang_rpl_catalog_repairs *repairs);
 
 #ifdef __cplusplus
 }

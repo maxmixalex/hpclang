@@ -62,6 +62,17 @@ def compile_key(arguments, directory):
     return tuple(normalized), str(directory) if contextual else None
 
 
+def owned_sources(root):
+    """Include new authored files before staging; retain Git's ignore boundaries."""
+    return set(
+        subprocess.check_output(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            cwd=root,
+            text=True,
+        ).split("\0")
+    ) - {""}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clang_check")
@@ -71,7 +82,7 @@ def main() -> int:
     if not args.host_build and not args.arm_build:
         parser.error("at least one host or ARM build is required")
     root = Path(__file__).resolve().parent.parent
-    owned = set(subprocess.check_output(["git", "ls-files"], cwd=root, text=True).splitlines())
+    owned = owned_sources(root)
     entries = {}
     configurations = 0
     for build, embedded in [(p, False) for p in args.host_build] + [

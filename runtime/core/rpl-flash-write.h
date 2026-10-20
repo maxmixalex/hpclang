@@ -117,6 +117,40 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
 int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, uint32_t *attempted_slot);
 
+/* Resolve one installed library against the complete expected native record.
+ * Validate all six bank identities, live records and erased tails, then require
+ * a unique matching library ID, exact allocation length/header and complete
+ * library object. Padding outside the object's extent is not identity: native
+ * STO may zero the unused high nibble where the SDK encoder writes F. Deleted or
+ * nested copies do not count. Returns WRITTEN (0) with slot only on success,
+ * NOT_FOUND when absent, DIRTY for ambiguity or changed content, and the usual
+ * INVALID/FAILED results. program16 may be NULL: this never writes or recovers.
+ * Keep the expected record and mapped port stable throughout. The returned
+ * physical address is an installation witness, not a persistent ownership
+ * token, catalog/attachment check or authorization to erase/replay anything. */
+int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                    uint32_t bytes, uint32_t *slot);
+
+struct hpclang_rpl_flash_catalog
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t address, nibbles, flash_table;
+};
+
+/* Also require one native catalog binding to the exact matched library header
+ * and bank. The caller supplies a validated Stock catalog and ROM Flash-switch
+ * table (16 seven-nibble entries, user banks 8..13); the reader maps both.
+ * Compare actual table contents, requiring a unique switch match, rather than
+ * assuming routine addresses form an arithmetic sequence. Keep all mappings,
+ * expected bytes and catalog stable throughout. Output changes only on success.
+ * No writes, registration, attachment, persistent ownership or recovery entry
+ * are established; this verifies an installation before starting a transaction.
+ * Same result codes as match_library; an absent catalog entry is NOT_FOUND. */
+int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
+                                         const uint8_t *record, uint32_t bytes,
+                                         const struct hpclang_rpl_flash_catalog *catalog,
+                                         uint32_t *slot);
+
 /* Validate all six banks before deleting one uniquely named backup. Only its
  * status byte changes; payload, references and allocation extents stay put.
  * No erase/reclamation. Missing names return NOT_FOUND; ambiguous names DIRTY.
@@ -175,6 +209,63 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
  * does not establish automatic startup recovery. */
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
+
+/* Resume publication of the SAME caller-owned sector journal, using the exact
+ * original READY capsule retained/reconstructed from trusted installation state.
+ * FF permits NOR-compatible partial body bytes; 7F/FE/7E require the complete
+ * body already equal. Validate all bytes and the still-erased next end marker
+ * before writing anything, then verify the body before publishing READY.
+ * READY is idempotent; retiring/retired records never become READY again.
+ * Only the journal allocation can change; this does not erase or touch target
+ * data, publish authority, or authorize replay. DIRTY retains ownership/retry.
+ * Use before publishing a following adjacent allocation: an occupied end marker
+ * rejects even an otherwise complete journal. After authority publication use
+ * the bound lifecycle checks instead. Never infer ownership from compatible
+ * bits, scan for a convenient capsule, or substitute a newly generated image.
+ */
+int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes);
+
+/* Bind one caller-reserved erased authority allocation to an already durable
+ * ready journal. Verify the complete journal, then publish/verify the binding
+ * body before its ARMED status. Neither journal nor target is modified.
+ * The expected ready journal remains stable in RAM. Caller owns the allocation
+ * boundary, trusted root and transaction exclusion, including after reset.
+ * FAILED/OCCUPIED/INVALID before writing change nothing. DIRTY retains ownership;
+ * no target operation may start unless publication succeeded. Partial binding
+ * publication uses finish_authority below; this entry requires erased storage.
+ * This is not an installer, root replacement or startup discovery. */
+int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        uint32_t journal_slot, const uint8_t *journal,
+                                        uint32_t journal_bytes);
+
+/* Resume this SAME reserved transaction after a publication cut, including a
+ * lost acknowledgement of ARMED. Requires the exact durable READY journal and
+ * trusted root reservation used for the original attempt, not a newly selected
+ * or previously closed allocation. FF may contain a NOR-compatible partial
+ * body; 7F/FE/7E require the entire body to match already. Verify the whole
+ * allocation and erased end marker before programming/verifying missing body
+ * bits, then publish/verify ARMED. CLOSING/CLOSED never become writable again.
+ * A DIRTY return retains ownership and prohibits starting the target mutation.
+ * Reconstructing the trusted reservation after reset remains the installer's
+ * responsibility; byte compatibility alone is not ownership or freshness.
+ */
+int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes);
+
+/* Close a known transaction only after its journal is fully retired and the
+ * target still equals its desired image. Compare the whole durable binding
+ * and journal against the original READY journal in RAM before clearing the
+ * authority status. Accept ARMED/CLOSING/CLOSED for an idempotent close retry;
+ * never accept unpublished or incompatible state. Only that status may change.
+ * DIRTY requires continued ownership even on read/preflight failure. The caller
+ * must separately finish reference repair and native return obligations.
+ * CLOSED prohibits replay; this does not authorize erasing/reusing the binding.
+ */
+int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes);
 
 /* Retire a caller-owned sector journal only after reference repair and all
  * transaction obligations have completed. record is the original committed

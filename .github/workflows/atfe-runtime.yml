@@ -96,6 +96,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  HPCLANG_RECOVERY_JOURNAL_SLOT: "0x160105"
+
 jobs:
   runtime:
     name: Runtime and unit tests
@@ -117,18 +120,27 @@ jobs:
       - name: Build independent recovery witnesses
         run: |
           export PATH="$ATFE/bin:$PATH"
-          for mode in normal interrupted retirement; do
+          for mode in normal interrupted retirement configuration; do
             stop_before_identity=OFF
             retire_journal=OFF
+            restart_after_repair=OFF
+            bound_journal_slot=
             case "$mode" in
               interrupted) stop_before_identity=ON ;;
               retirement) retire_journal=ON ;;
+              configuration)
+                retire_journal=ON
+                restart_after_repair=ON
+                bound_journal_slot="$HPCLANG_RECOVERY_JOURNAL_SLOT"
+                ;;
             esac
             cmake -S tests/e2e/port-recovery -B "build/port-recovery/$mode" \
               -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/cmake/toolchains/hpclang-armv4t.cmake" \
               -DCMAKE_BUILD_TYPE=MinSizeRel \
               -DHPCLANG_RECOVERY_STOP_BEFORE_IDENTITY="$stop_before_identity" \
-              -DHPCLANG_RECOVERY_RETIRE_JOURNAL="$retire_journal"
+              -DHPCLANG_RECOVERY_RETIRE_JOURNAL="$retire_journal" \
+              -DHPCLANG_RECOVERY_RESTART_AFTER_REPAIR="$restart_after_repair" \
+              -DHPCLANG_RECOVERY_BOUND_JOURNAL_SLOT="$bound_journal_slot"
             cmake --build "build/port-recovery/$mode" -j2
           done
 
@@ -138,9 +150,9 @@ jobs:
           name: port-recovery-build
           retention-days: 1
           path: |
-            build/port-recovery/*/recovery.elf
-            build/port-recovery/*/recovery.bin
-            build/port-recovery/*/recovery.hp
+            build/port-recovery/*/*.elf
+            build/port-recovery/*/*.bin
+            build/port-recovery/*/*.hp
           if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache
@@ -185,7 +197,7 @@ jobs:
           if-no-files-found: error
 
   port-recovery:
-    name: Stock recovery / ${{ matrix.target }}
+    name: Stock ports / ${{ matrix.target }} / ${{ matrix.suite.name }}
     needs: runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -193,6 +205,11 @@ jobs:
       fail-fast: false
       matrix:
         target: [hp49gplus, hp50g]
+        suite:
+          - name: recovery
+            build: normal
+          - name: installation
+            build: configuration
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-atfe
@@ -203,26 +220,36 @@ jobs:
           path: build/port-recovery
       - name: Prepare Stock runtime
         run: bash tests/e2e/harness/setup-runtime.sh stock hp4950
-      - name: Execute independent recovery
+      - name: Execute native port suite
+        env:
+          TEST_SUITE: ${{ matrix.suite.name }}
         run: |
+          extra=()
+          if [[ "$TEST_SUITE" == recovery ]]; then
+            extra=(--interrupted-build build/port-recovery/interrupted
+              --retirement-build build/port-recovery/retirement
+              --configuration-build build/port-recovery/configuration
+              --configuration-authority --slot "$HPCLANG_RECOVERY_JOURNAL_SLOT"
+              --power-cut 2 16 0x5555 --power-cut 1 16 0x0101)
+          fi
           python3 tests/e2e/port-recovery/run.py \
             --model "${{ matrix.target }}" \
-            --dist build/x50ng/dist --build build/port-recovery/normal \
-            --interrupted-build build/port-recovery/interrupted \
-            --retirement-build build/port-recovery/retirement \
+            --suite "$TEST_SUITE" \
+            --dist build/x50ng/dist --build "build/port-recovery/${{ matrix.suite.build }}" \
             --flash-busy-reads 64 \
-            --power-cut 2 16 0x5555 --power-cut 1 16 0x0101 \
-            --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm"
+            --output build/port-recovery-evidence --nm "$ATFE/bin/llvm-nm" "${extra[@]}"
       - name: Upload recovery evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.target }}-independent-recovery
+          name: ${{ matrix.target }}-port-${{ matrix.suite.name }}
           retention-days: 14
           path: |
             build/port-recovery-evidence/**/*.json
+            build/port-recovery-evidence/**/*.hp
             build/port-recovery-evidence/**/*.log
             build/port-recovery-evidence/**/*.seq
+            build/port-recovery-evidence/**/*.sram
             build/port-recovery-evidence/**/*.pgm
             build/port-recovery-evidence/**/state
             build/port-recovery-evidence/**/sram

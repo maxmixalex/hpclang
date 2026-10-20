@@ -2,6 +2,7 @@
 """Verify the device-manager LCD checkpoints independently of guest assertions."""
 
 import argparse
+import json
 from pathlib import Path
 
 
@@ -26,7 +27,27 @@ def waveform(pixels: bytes, top: int, prefix: Path) -> None:
     assert pixels[top * 132 + 65] == 255, f"{prefix}: canvas background overwritten"
 
 
+def verify_memory(prefix: Path) -> tuple[int, int, int, int]:
+    memory = json.loads(Path(f"{prefix}-memory-1.json").read_text())
+    assert set(memory) == {"version", "id", "words"}, f"{prefix}: memory report fields"
+    assert type(memory["version"]) is int and type(memory["id"]) is int
+    assert memory["version"] == 1 and memory["id"] == 1, f"{prefix}: memory report schema"
+    assert isinstance(memory["words"], list) and len(memory["words"]) == 8
+    assert all(type(value) is int and 0 <= value <= 0xFFFFFFFF for value in memory["words"])
+    version, entry, main_peak, final_peak, stack_limit, heap_peak, heap_limit, rw_bytes = memory[
+        "words"
+    ]
+    assert version == 1 and rw_bytes == 36864, f"{prefix}: application memory budget"
+    assert 0 < entry <= main_peak <= final_peak < stack_limit == 8192, (
+        f"{prefix}: missing or exhausted stack watermark"
+    )
+    assert all(value % 4 == 0 for value in (entry, main_peak, final_peak))
+    assert 0 < heap_peak <= heap_limit < rw_bytes - stack_limit, f"{prefix}: heap budget"
+    return final_peak, stack_limit, heap_peak, heap_limit
+
+
 def verify(prefix: Path, height: int, stock: bool = False) -> None:
+    final_peak, stack_limit, heap_peak, heap_limit = verify_memory(prefix)
     frames = [read_frame(Path(f"{prefix}-{phase}.pgm"), height) for phase in range(1, 8)]
     assert len(set(frames)) == 7, f"{prefix}: distinct application/theme states missing"
 
@@ -54,11 +75,18 @@ def verify(prefix: Path, height: int, stock: bool = False) -> None:
     assert not stock or line_height == 8, f"{prefix}: Stock native font unavailable"
     font_pixels = read_frame(Path(f"{prefix}-{100 + line_height}.pgm"), height)
     waveform(font_pixels, height - (28 + line_height), prefix)
+    pressure_pixels = read_frame(Path(f"{prefix}-121.pgm"), height)
+    assert pressure_pixels == font_pixels, f"{prefix}: allocator exhaustion changed the live UI"
+    rebuilt_pixels = read_frame(Path(f"{prefix}-122.pgm"), height)
+    assert rebuilt_pixels == font_pixels, f"{prefix}: renderer reconstruction changed the live UI"
     if line_height == 6:
         assert font_pixels == frames[6], f"{prefix}: packaged fallback changed the view"
     else:
         assert font_pixels != frames[6], f"{prefix}: native font did not alter layout"
     print(f"PASS: {prefix}: UI states, waveform, independent theme and font layout")
+    print(
+        f"PASS: {prefix}: touched stack {final_peak}/{stack_limit}, heap {heap_peak}/{heap_limit}"
+    )
 
 
 def main() -> None:

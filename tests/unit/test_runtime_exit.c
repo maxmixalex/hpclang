@@ -34,6 +34,10 @@ void hpclang_sound_restore(void)
 {
     event('O');
 }
+void hpclang_rtc_tick_restore(void)
+{
+    event('R');
+}
 void hpclang_display_end(void)
 {
     event('D');
@@ -83,8 +87,8 @@ int fixture_main(void)
 
 int main(void)
 {
-    static const char *const expected[] = {"STIMFCODPN", "STIMFCODPN", "STIMODPN", "STIFCODPN",
-                                           "STIODPN"};
+    static const char *const expected[] = {"STIMFCORDPN", "STIMFCORDPN", "STIMORDPN", "STIFCORDPN",
+                                           "STIORDPN"};
     const int statuses[] = {0, 1, -1, INT_MIN, INT_MAX};
     struct hpclang_boot_info boot = {0};
 #ifdef HPCLANG_COMPILED_MODEL

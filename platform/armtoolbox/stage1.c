@@ -1480,6 +1480,13 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         return -3;
 
     uint32_t rw_count = total_pages - STAGE_STACK_PAGES - rw_first;
+#ifdef HPCLANG_MAX_RW_BYTES
+    _Static_assert(HPCLANG_MAX_RW_BYTES > 0 && HPCLANG_MAX_RW_BYTES % HPCLANG_PAGE_SIZE == 0 &&
+                       HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE <= HPCLANG_RW_PAGE_CAPACITY,
+                   "invalid application RW limit");
+    if (rw_count > HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE)
+        rw_count = HPCLANG_MAX_RW_BYTES / HPCLANG_PAGE_SIZE;
+#endif
     uint32_t rw_needed = 1u + (hpc1->rw_static_size + HPCLANG_PAGE_SIZE - 1u) / HPCLANG_PAGE_SIZE +
                          HPCLANG_STACK_MIN / HPCLANG_PAGE_SIZE;
 
@@ -1533,7 +1540,9 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
     struct hpclang_launch_context launch;
     struct hpclang_rpl_memory_bounds rpl_bounds;
     struct stage_launcher_bias launcher_bias = {0u, 0u};
-    uint32_t *native_roots[] = {&launcher_bias.object, (uint32_t *)stock_frame};
+    uint32_t *native_roots[10];
+    native_roots[0] = &launcher_bias.object;
+    native_roots[1] = (uint32_t *)stock_frame;
 
     launch.mmu.l1 = (volatile uint32_t *)(uintptr_t)0x07f00000u;
     launch.mmu.l2_workspace =
@@ -1616,10 +1625,24 @@ int hpclang_armtoolbox_stage1(void *saturn_state, const struct hpclang_image_hea
         /* Hidden launcher value and saved post-ARMSYS Saturn PC are live
            roots even though neither is in a Stock-visible pointer table. */
         rpl_bounds.native_roots = native_roots;
-        rpl_bounds.native_root_count = sizeof(native_roots) / sizeof(native_roots[0]);
+        rpl_bounds.native_root_count = 2u;
+        if ((model == HPCLANG_MODEL_HP49GPLUS || model == HPCLANG_MODEL_HP50G) && stock_frame) {
+            /* Consecutive resumed returns establish each consumed cell's use.
+             * The validated 49/50 SAT_CPU layout has eight cells at 0x978 and
+             * its next-push cursor at 0x998. Stop at any unclassified instruction. */
+            uint32_t *cpu = (uint32_t *)saturn_state;
+            const struct hpclang_stage_stack_io io = {(void *)saturn_state, stage_stack_read, NULL};
+            rpl_bounds.native_root_count += hpclang_stage_return_roots(
+                &io, *(uint32_t *)stock_frame, cpu + 0x978u / sizeof(uint32_t),
+                cpu[0x998u / sizeof(uint32_t)], native_roots + 2);
+        }
         /* Do not publish Saturn's machine return stack as unconditional roots:
          * RSTK=C can also save numbers. Operations that move TEMP code must
-         * classify the suspended caller's slots before supplying extra roots. */
+         * classify the suspended caller's slots before supplying extra roots.
+         * Native collection also preserves such raw numbers even when they
+         * equal the old address of an independently rooted, moved object.
+         * Nonzero slots may also retain obsolete branch positions until the
+         * circular stack overwrites them; the cursor is not a live-depth tag. */
 
         /*
          * rpl_bounds lives in this stage1 stack frame, whose ARMToolbox window

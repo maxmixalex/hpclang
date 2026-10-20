@@ -17,8 +17,22 @@ endfunction()
 hpclang_unit(flash_busy test_flash_busy.c)
 target_include_directories(test_flash_busy PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
 
+hpclang_unit(memory_checkpoint test_memory_checkpoint.c)
+target_include_directories(test_memory_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+
+if(UNIX)
+    hpclang_unit(reset_checkpoint test_reset_checkpoint.c)
+    target_include_directories(test_reset_checkpoint PRIVATE "${HPCLANG_ROOT}/tests/e2e/harness/x50ng")
+endif()
+
+hpclang_unit(libc_sbrk test_libc_sbrk.c)
+target_include_directories(test_libc_sbrk PRIVATE "${HPCLANG_ROOT}/include")
+
 hpclang_unit(sst_flash test_sst_flash.c "${HPCLANG_ROOT}/runtime/core/sst-flash.c")
 target_include_directories(test_sst_flash PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rtc_tick test_rtc_tick.c "${HPCLANG_ROOT}/runtime/core/rtc-tick.c")
+target_include_directories(test_rtc_tick PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_flash_record test_rpl_flash_record.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
@@ -42,6 +56,15 @@ hpclang_unit(rpl_flash_replay test_rpl_flash_replay.c
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_flash_replay PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(rpl_flash_authority test_rpl_flash_authority.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-replay.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_flash_authority PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_flash_write test_rpl_flash_write.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
@@ -91,11 +114,40 @@ hpclang_unit(hpgcc_system test_hpgcc_system.c
     "${HPCLANG_ROOT}/runtime/core/datetime.c")
 target_include_directories(test_hpgcc_system PRIVATE "${HPCLANG_ROOT}/include")
 
+hpclang_unit(hpgcc_string test_hpgcc_string.c "${HPCLANG_ROOT}/runtime/core/hpgcc-string.c")
+target_include_directories(test_hpgcc_string PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(hpgcc_number test_hpgcc_number.c "${HPCLANG_ROOT}/runtime/core/hpgcc-number.c")
+target_include_directories(test_hpgcc_number PRIVATE "${HPCLANG_ROOT}/include")
+
+hpclang_unit(hpgcc_line test_hpgcc_line.c "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c")
+target_include_directories(test_hpgcc_line PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(hpgcc_input test_hpgcc_input.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-input.c"
+    "${HPCLANG_ROOT}/runtime/core/input-mode.c"
+    "${HPCLANG_ROOT}/runtime/core/input-keymap.c"
+    "${HPCLANG_ROOT}/runtime/core/input-alpha.c")
+target_include_directories(test_hpgcc_input PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
+hpclang_unit(hpgcc_rtc test_hpgcc_rtc.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-rtc.c"
+    "${HPCLANG_ROOT}/runtime/core/rtc-tick.c"
+    "${HPCLANG_ROOT}/runtime/core/exit-hooks.c")
+target_include_directories(test_hpgcc_rtc PRIVATE "${HPCLANG_ROOT}/include"
+    "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(hpgcc_keyboard test_hpgcc_keyboard.c
     "${HPCLANG_ROOT}/runtime/core/hpgcc-keyboard.c"
     "${HPCLANG_ROOT}/runtime/core/keyboard-key-map.c")
 target_include_directories(test_hpgcc_keyboard PRIVATE "${HPCLANG_ROOT}/include")
 hpclang_unit(hpg_context test_hpg_context.c
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-console.c"
+    "${HPCLANG_ROOT}/runtime/core/hpgcc-line.c"
+    "${HPCLANG_ROOT}/runtime/core/console.c"
+    "${HPCLANG_ROOT}/runtime/core/stdio-routing.c"
     "${HPCLANG_ROOT}/runtime/core/hpg-context.c"
     "${HPCLANG_ROOT}/runtime/core/hpg-draw.c"
     "${HPCLANG_ROOT}/runtime/core/hpg-font.c"
@@ -103,6 +155,8 @@ hpclang_unit(hpg_context test_hpg_context.c
     "${HPCLANG_ROOT}/runtime/core/display-surface.c")
 target_include_directories(test_hpg_context PRIVATE "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
+target_compile_definitions(test_hpg_context PRIVATE getchar=hpg_test_getchar getc=hpg_test_getc
+    putchar=hpg_test_putchar putc=hpg_test_putc fputs=hpg_test_fputs ferror=hpg_test_ferror)
 set(HPCLANG_UI_TEST_SOURCES "${HPCLANG_ROOT}/runtime/core/ui.c"
     "${HPCLANG_ROOT}/runtime/core/ui-layout.c"
     "${HPCLANG_ROOT}/runtime/core/ui-focus.c"
@@ -244,6 +298,8 @@ target_include_directories(test_sound_api PRIVATE "${HPCLANG_ROOT}/include" "${H
 
 hpclang_unit(sound test_sound.c "${HPCLANG_ROOT}/runtime/core/sound-engine.c")
 target_include_directories(test_sound PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(sound_alarm test_sound_alarm.c "${HPCLANG_ROOT}/runtime/core/sound-alarm.c")
+target_include_directories(test_sound_alarm PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(time test_time.c "${HPCLANG_ROOT}/runtime/core/time-math.c")
 target_include_directories(test_time PRIVATE "${HPCLANG_ROOT}/runtime/core")
@@ -313,7 +369,11 @@ hpclang_unit(rpl_object_store
 target_include_directories(test_rpl_object_store PRIVATE
     "${HPCLANG_ROOT}/runtime/core")
 
+hpclang_unit(rpl_code test_rpl_code.c "${HPCLANG_ROOT}/runtime/core/rpl-code.c")
+target_include_directories(test_rpl_code PRIVATE "${HPCLANG_ROOT}/runtime/core")
+
 hpclang_unit(rpl_reference test_rpl_reference.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-code.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-reference.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
@@ -483,6 +543,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
@@ -492,8 +553,13 @@ hpclang_unit(rpl_mutation
     "${HPCLANG_ROOT}/runtime/core/object-snapshot.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_mutation PRIVATE
+    "${HPCLANG_ROOT}/platform/armtoolbox"
     "${HPCLANG_ROOT}/include"
     "${HPCLANG_ROOT}/runtime/core")
+if(UNIX)
+    target_compile_definitions(test_rpl_mutation PRIVATE HPCLANG_TEST_WRAP_ALLOC=1)
+    target_link_options(test_rpl_mutation PRIVATE "LINKER:--wrap=malloc,--wrap=free")
+endif()
 
 hpclang_unit(mmu test_mmu.c "${HPCLANG_ROOT}/runtime/bootstrap/mmu.c")
 target_include_directories(test_mmu PRIVATE "${HPCLANG_ROOT}/include")

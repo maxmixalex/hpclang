@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 4 ]]; then
-    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
+    echo "usage: $0 <runtime|storage|hardware|system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|sd-media-manual|object-basics|object-mutation|object-composite|object-catalog|font-gallery|font-gallery-stock> [out-dir] [all|hp39|hp48|hp4950] [universal|model]" >&2
     exit 2
 fi
 
@@ -98,7 +98,7 @@ case "$MODE" in
     hardware)
         E2E_CMAKE_ARGS=()
         ;;
-    system-services|hpgcc-system|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|object-basics|sd-media-manual)
+    system-services|hpgcc-system|hpgcc-console|display|ui|notebook|notebook-backup|notebook-export|port-flash|port-flash-backup|port-flash-remove|port-flash-replace|port-library|code-relocation|object-basics|sd-media-manual)
         E2E_SOURCE="$ROOT/tests/e2e/$MODE"
         E2E_TARGET="hpclang_${MODE//-/_}_e2e"
         E2E_ELF="hpclang-$MODE-e2e.elf"
@@ -169,6 +169,9 @@ if "$ATFE/bin/llvm-readelf" -Ws "$OUT/e2e.elf" |
 fi
 
 LAUNCHER_ARGS=()
+if [[ -f "$OUT/cmake/$E2E_TARGET-launchers.args" ]]; then
+    LAUNCHER_ARGS+=("@$OUT/cmake/$E2E_TARGET-launchers.args")
+fi
 if (( ! WRAP_LAUNCHERS )); then
     LAUNCHER_ARGS+=(--raw-only)
 fi
@@ -190,7 +193,7 @@ for path in sorted(Path(sys.argv[1]).glob("*.json")):
 PY
 )
 python3 "$ROOT/tools/build-launchers.py" "$OUT/e2e.hpc" "$OUT/launchers" \
-    --tool-bin "$ATFE/bin" --models "${LAUNCHER_MODELS[@]}" "${LAUNCHER_ARGS[@]}"
+    --tool-bin "$ATFE/bin" "${LAUNCHER_ARGS[@]}" --models "${LAUNCHER_MODELS[@]}"
 
 if [[ "$MODE" == font-gallery ]]; then
     # The Gallery frontend provides a synthetic injection mapping of 224

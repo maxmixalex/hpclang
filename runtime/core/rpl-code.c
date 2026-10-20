@@ -1,0 +1,478 @@
+#include "rpl-code.h"
+
+struct instruction_cursor
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t at, limit, used;
+    uint8_t code[21]; /* LA can contain sixteen immediate nibbles. */
+};
+
+static int instruction_take(struct instruction_cursor *cursor, unsigned count)
+{
+    if (count > cursor->limit || count > sizeof cursor->code)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    while (cursor->used < count) {
+        uint8_t nibble;
+        if (!cursor->reader->read_nibble(cursor->reader->context, cursor->at + cursor->used,
+                                         &nibble))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (nibble > 15)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        cursor->code[cursor->used++] = nibble;
+    }
+    return 0;
+}
+
+static int instruction_size(struct instruction_cursor *cursor, unsigned *size)
+{
+    int result = instruction_take(cursor, 2);
+    if (result)
+        return result;
+    const uint8_t *op = cursor->code;
+    switch (op[0]) {
+    case 0:
+        *size = op[1] == 14 ? 4 : 2;
+        return 0;
+    case 1:
+        if (op[1] <= 2) {
+            result = instruction_take(cursor, 3);
+            if (result)
+                return result;
+            if ((op[2] & 7) > 4)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+        switch (op[1]) {
+        case 5:
+        case 9:
+        case 13:
+            *size = 4;
+            break;
+        case 10:
+        case 14:
+            *size = 6;
+            break;
+        case 11:
+        case 15:
+            *size = 7;
+            break;
+        default:
+            *size = 3;
+            break;
+        }
+        return 0;
+    case 2:
+        *size = 2;
+        return 0;
+    case 3:
+        *size = op[1] + 3;
+        return 0;
+    case 4:
+    case 5:
+        *size = 3;
+        return 0;
+    case 6:
+    case 7:
+        *size = 4;
+        return 0;
+    case 9:
+        *size = 5;
+        return 0;
+    case 10:
+    case 11:
+        *size = 3;
+        return 0;
+    case 12:
+    case 13:
+    case 14:
+    case 15:
+        *size = 2;
+        return 0;
+    default:
+        break; /* 8: extended instructions. */
+    }
+    if (op[1] >= 12) {
+        *size = (op[1] & 1) ? 7 : 6;
+        return 0;
+    }
+    if (op[1] >= 2) {
+        *size = (op[1] == 2 || op[1] == 4 || op[1] == 5) ? 3 : 5;
+        return 0;
+    }
+    result = instruction_take(cursor, 3);
+    if (result)
+        return result;
+    if (op[1] == 1) {
+        if (op[2] < 8 || op[2] >= 12) {
+            *size = 3;
+            return 0;
+        }
+        *size = op[2] == 11 ? 4 : op[2] == 9 ? 5 : 6;
+        result = instruction_take(cursor, *size);
+        if (result)
+            return result;
+        if ((op[2] == 8 && (op[4] & 7) > 3) || (op[2] == 9 && op[4] > 3) ||
+            (op[2] == 10 && (op[4] > 2 || (op[5] & 7) > 4)) ||
+            (op[2] == 11 && (op[3] < 2 || op[3] > 7)))
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        return 0;
+    }
+    if (op[2] == 11) {
+        /* Saturn+ facts: Eric Rechlin's newopcodes.txt. Deliberately support
+         * documented families, not guessed lengths for every 80B selector. */
+        result = instruction_take(cursor, 5);
+        if (result)
+            return result;
+        if (op[4] == 8) {
+            result = instruction_take(cursor, 7);
+            if (result)
+                return result;
+            unsigned custom = op[6] >= 8 && op[6] <= 14;
+            unsigned pair = op[5];
+            unsigned cross = pair == 3 || pair == 7 || pair == 12 || pair == 13;
+            if ((op[3] == 0 &&
+                 (cross || (custom && pair != 5 && pair != 10 && pair != 14 && pair != 15))) ||
+                (op[3] == 1 && (cross || custom)) || op[3] == 3 || op[3] == 4 || op[3] == 5 ||
+                op[3] == 8 || op[3] == 9 || op[3] == 10) {
+                *size = 7;
+                return 0;
+            }
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+        unsigned service = (op[3] << 4) | op[4];
+        switch (service) {
+        case 0x00:
+        case 0x01:
+        case 0x03:
+        case 0x05:
+        case 0x06:
+        case 0x11:
+        case 0x13:
+        case 0x15:
+        case 0x16:
+        case 0x21:
+        case 0x23:
+        case 0x31:
+        case 0x33:
+        case 0x41:
+        case 0x43:
+        case 0x50:
+        case 0x51:
+        case 0x60:
+        case 0x65:
+        case 0x70:
+        case 0x71:
+        case 0x80:
+        case 0x92:
+        case 0xa0:
+        case 0xa2:
+        case 0xb0:
+        case 0xb2:
+        case 0xc2:
+        case 0xfe:
+        case 0xff:
+            *size = 5;
+            return 0;
+        case 0x82:
+            *size = 6;
+            return 0;
+        default:
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+    }
+    if (op[2] != 8) {
+        *size = op[2] == 12 || op[2] == 13 || op[2] == 15 ? 4 : 3;
+        return 0;
+    }
+    result = instruction_take(cursor, 4);
+    if (result)
+        return result;
+    switch (op[3]) {
+    case 1:
+    case 2:
+        result = instruction_take(cursor, 5);
+        if (result)
+            return result;
+        if (op[3] == 1 && op[4])
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        *size = op[3] == 1 ? 5 : op[4] + 6;
+        return 0;
+    case 4:
+    case 5:
+    case 8:
+    case 9:
+        *size = 5;
+        return 0;
+    case 6:
+    case 7:
+    case 10:
+    case 11:
+        *size = 7;
+        return 0;
+    default:
+        *size = 4;
+        return 0;
+    }
+}
+
+int hpclang_rpl_code_extent(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                            uint32_t limit, uint32_t *length)
+{
+    if (!reader || !reader->read_nibble || !length)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct instruction_cursor cursor = {.reader = reader, .at = instruction, .limit = limit};
+    unsigned size;
+    int result = instruction_size(&cursor, &size);
+    if (result)
+        return result;
+    result = instruction_take(&cursor, size);
+    if (result)
+        return result;
+    *length = size;
+    return 0;
+}
+
+int hpclang_rpl_code_visit(const struct hpclang_rpl_reader *reader, uint32_t first, uint32_t length,
+                           hpclang_rpl_code_visit_fn visit, void *context)
+{
+    if (!reader || !reader->read_nibble || !visit)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first >= 0x100000u || length > 0x100000u - first)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    while (length) {
+        uint32_t size;
+        int result = hpclang_rpl_code_extent(reader, first, length, &size);
+        if (result)
+            return result;
+        result = visit(context, first, size);
+        if (result)
+            return result;
+        first += size;
+        length -= size;
+    }
+    return 0;
+}
+
+static int read_word(const struct hpclang_rpl_reader *reader, uint32_t at, unsigned width,
+                     uint32_t *value)
+{
+    *value = 0;
+    for (unsigned i = 0; i < width; ++i) {
+        uint8_t nibble;
+        if (!reader->read_nibble(reader->context, at + i, &nibble))
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (nibble > 15)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        *value |= (uint32_t)nibble << (4 * i);
+    }
+    return 0;
+}
+
+int hpclang_rpl_code_indirect_inspect(const struct hpclang_rpl_reader *instructions,
+                                      const struct hpclang_rpl_reader *pointers,
+                                      uint32_t instruction, uint32_t limit, uint32_t a_low,
+                                      uint32_t c_low, struct hpclang_rpl_code_indirect *transfer)
+{
+    if (!instructions || !instructions->read_nibble || !transfer)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || limit < 4 || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(instructions, instruction, 4, &opcode);
+    if (result)
+        return result;
+    struct hpclang_rpl_code_indirect next = {0};
+    next.instruction = instruction;
+    switch (opcode) {
+    case 0x2b18:
+        break; /* PC=A */
+    case 0x3b18:
+        next.register_c = 1;
+        break;
+    case 0xc808:
+        next.via_memory = 1;
+        break;
+    case 0xe808:
+        next.register_c = next.via_memory = 1;
+        break;
+    default:
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    next.register_value = (next.register_c ? c_low : a_low) & 0xfffffu;
+    next.target = next.register_value;
+    if (next.via_memory) {
+        if (!pointers || !pointers->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (next.register_value > 0xffffbu)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(pointers, next.register_value, 5, &next.target);
+        if (result)
+            return result;
+    }
+    *transfer = next;
+    return 0;
+}
+
+int hpclang_rpl_code_branch_inspect(const struct hpclang_rpl_reader *reader, uint32_t instruction,
+                                    uint32_t limit, struct hpclang_rpl_code_branch *branch)
+{
+    if (!reader || !reader->read_nibble || !branch)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (instruction >= 0x100000u || !limit || limit > 0x100000u - instruction)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t opcode;
+    int result = read_word(reader, instruction, 1, &opcode);
+    if (result)
+        return result;
+    struct hpclang_rpl_code_branch next = {0};
+    next.instruction = instruction;
+    next.field = instruction + 1;
+    if (opcode == 4 || opcode == 5) {
+        next.width = 2;
+        next.conditional = 1;
+    } else if (opcode == 6 || opcode == 7) {
+        next.width = 3;
+        next.call = opcode == 7;
+    } else if (opcode == 9) {
+        next.field = instruction + 3;
+        next.width = 2;
+        next.conditional = 1;
+    } else if (opcode == 8) {
+        if (limit < 2)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        result = read_word(reader, instruction + 1, 1, &opcode);
+        if (result)
+            return result;
+        if (opcode >= 12) {
+            ++next.field;
+            next.width = (opcode & 1) ? 5 : 4;
+            next.call = opcode >= 14;
+        } else if (opcode == 3 || (opcode >= 6 && opcode <= 11)) {
+            next.field = instruction + 3;
+            next.width = 2;
+            next.conditional = 1;
+        } else if (opcode == 0) {
+            if (limit < 4)
+                return HPCLANG_RPL_SPAN_BOUNDS;
+            result = read_word(reader, instruction + 2, 2, &opcode);
+            if (result)
+                return result;
+            if (opcode != 0x68 && opcode != 0x78 && opcode != 0xa8 && opcode != 0xb8)
+                return HPCLANG_RPL_SPAN_UNSUPPORTED;
+            next.field = instruction + 5;
+            next.width = 2;
+            next.conditional = 1;
+        } else {
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        }
+    } else {
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    }
+    next.length = next.field - instruction + next.width;
+    if (next.length > limit)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    /* Predicate operands are part of the proven instruction, including fields
+     * and bit indices. Validate them even though relocation preserves them. */
+    uint32_t prefix;
+    result = read_word(reader, instruction, next.field - instruction, &prefix);
+    if (result)
+        return result;
+    result = read_word(reader, next.field, next.width, &next.encoded);
+    if (result)
+        return result;
+    if (next.conditional && !next.encoded)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (next.width == 5) {
+        next.target = next.encoded;
+        *branch = next;
+        return 0;
+    }
+    next.base = (next.field + (next.call ? next.width : 0)) & 0xfffffu;
+    uint32_t range = 1u << (4 * next.width);
+    int32_t displacement = (int32_t)next.encoded;
+    if (next.encoded >= range / 2)
+        displacement -= (int32_t)range;
+    next.target = (uint32_t)((int32_t)next.base + displacement) & 0xfffffu;
+    *branch = next;
+    return 0;
+}
+
+static int plan_shift(const struct hpclang_rpl_reader *reader, uint32_t instruction, uint32_t limit,
+                      const struct hpclang_rpl_reference_mappings *mappings, uint32_t first,
+                      uint32_t end, int32_t delta, struct hpclang_rpl_code_patch *patch,
+                      int pointer)
+{
+    if (!mappings || !patch)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (first >= end || end > 0x100000u || (int64_t)first + delta < 0 ||
+        (int64_t)end + delta > 0x100000)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    struct hpclang_rpl_code_branch branch;
+    int result;
+    if (pointer) {
+        if (!reader || !reader->read_nibble)
+            return HPCLANG_RPL_SPAN_UNAVAILABLE;
+        if (instruction >= 0x100000u || limit < 7 || limit > 0x100000u - instruction)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        uint32_t opcode, target;
+        result = read_word(reader, instruction, 2, &opcode);
+        if (result)
+            return result;
+        if (opcode != 0xb1 && opcode != 0xf1)
+            return HPCLANG_RPL_SPAN_UNSUPPORTED;
+        result = read_word(reader, instruction + 2, 5, &target);
+        branch = (struct hpclang_rpl_code_branch){
+            instruction, 7, instruction + 2, 5, 0, target, target, 0, 0};
+    } else {
+        result = hpclang_rpl_code_branch_inspect(reader, instruction, limit, &branch);
+    }
+    if (result)
+        return result;
+    int source_moves = 0;
+    if (mappings->field == mappings->moving && instruction < end &&
+        first < instruction + branch.length) {
+        if (instruction < first || instruction + branch.length > end)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        source_moves = 1;
+    }
+    int target_moves =
+        mappings->target == mappings->moving && branch.target >= first && branch.target < end;
+    uint32_t base = (uint32_t)((int64_t)branch.base + (source_moves ? delta : 0)) & 0xfffffu;
+    uint32_t target = (uint32_t)((int64_t)branch.target + (target_moves ? delta : 0));
+    if (branch.width == 5) {
+        if (target == branch.encoded)
+            return 0;
+        *patch = (struct hpclang_rpl_code_patch){branch.field, 5, branch.encoded, target};
+        return 1;
+    }
+    uint32_t distance = (target - base) & 0xfffffu;
+    uint32_t range = 1u << (4 * branch.width);
+    if (distance >= range / 2 && distance < 0x100000u - range / 2)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t value = distance & (range - 1);
+    if (branch.conditional && !value)
+        return HPCLANG_RPL_SPAN_UNSUPPORTED;
+    if (value == branch.encoded)
+        return 0;
+    *patch = (struct hpclang_rpl_code_patch){branch.field, branch.width, branch.encoded, value};
+    return 1;
+}
+
+int hpclang_rpl_code_branch_plan_shift(const struct hpclang_rpl_reader *reader,
+                                       uint32_t instruction, uint32_t limit,
+                                       const struct hpclang_rpl_reference_mappings *mappings,
+                                       uint32_t first, uint32_t end, int32_t delta,
+                                       struct hpclang_rpl_code_patch *patch)
+{
+    return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 0);
+}
+
+int hpclang_rpl_code_pointer_plan_shift(const struct hpclang_rpl_reader *reader,
+                                        uint32_t instruction, uint32_t limit,
+                                        const struct hpclang_rpl_reference_mappings *mappings,
+                                        uint32_t first, uint32_t end, int32_t delta,
+                                        struct hpclang_rpl_code_patch *patch)
+{
+    return plan_shift(reader, instruction, limit, mappings, first, end, delta, patch, 1);
+}

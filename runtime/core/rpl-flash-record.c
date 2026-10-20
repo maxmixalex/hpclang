@@ -178,6 +178,78 @@ int hpclang_rpl_flash_sector_decode(uint32_t first, uint32_t end, uint32_t slot,
     return hpclang_rpl_flash_sector_inspect(first, end, slot, data, bytes, target, image, &phase);
 }
 
+static uint32_t authority_crc(const uint8_t *data)
+{
+    uint32_t crc = UINT32_MAX;
+    for (uint32_t i = 1; i < HPCLANG_RPL_FLASH_AUTHORITY_BYTES - 4u; ++i)
+        crc = crc_byte(crc, data[i]);
+    return ~crc;
+}
+
+static int authority_bounds(uint32_t first, uint32_t end, uint32_t slot, uint32_t journal_slot,
+                            uint32_t target)
+{
+    return intent_allocation(first, end, slot, HPCLANG_RPL_FLASH_AUTHORITY_BYTES) &&
+           separate(slot, HPCLANG_RPL_FLASH_AUTHORITY_BYTES, journal_slot,
+                    HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) &&
+           separate(slot, HPCLANG_RPL_FLASH_AUTHORITY_BYTES, target,
+                    HPCLANG_RPL_FLASH_SECTOR_BYTES);
+}
+
+int hpclang_rpl_flash_authority_encode(uint32_t first, uint32_t end, uint32_t slot,
+                                       uint32_t journal_slot, const uint8_t *journal,
+                                       uint32_t journal_bytes, uint8_t *data, uint32_t capacity)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!data || capacity < HPCLANG_RPL_FLASH_AUTHORITY_BYTES ||
+        hpclang_rpl_flash_sector_decode(first, end, journal_slot, journal, journal_bytes, &target,
+                                        &image) != HPCLANG_RPL_SPAN_OK ||
+        !authority_bounds(first, end, slot, journal_slot, target))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint8_t encoded[HPCLANG_RPL_FLASH_AUTHORITY_BYTES] = {0x7e, 0x3e, 0, 0x40};
+    memcpy(encoded + 4u, "HPCAUTH1", 8u);
+    write_le32(encoded + 12u, slot);
+    write_le32(encoded + 16u, journal_slot);
+    write_le32(encoded + 20u, target);
+    write_le32(encoded + 24u, sector_crc(journal));
+    write_le32(encoded + 28u, authority_crc(encoded));
+    memcpy(data, encoded, sizeof encoded);
+    return HPCLANG_RPL_SPAN_OK;
+}
+
+int hpclang_rpl_flash_authority_inspect(uint32_t first, uint32_t end, uint32_t slot,
+                                        const uint8_t *data, uint32_t bytes, uint32_t journal_slot,
+                                        const uint8_t *journal, uint32_t journal_bytes,
+                                        enum hpclang_rpl_flash_authority_phase *phase)
+{
+    uint32_t target;
+    const uint8_t *image;
+    enum hpclang_rpl_flash_sector_phase journal_phase;
+    if (!data || !phase || bytes != HPCLANG_RPL_FLASH_AUTHORITY_BYTES || data[1] != 0x3eu ||
+        data[2] || data[3] != 0x40u || memcmp(data + 4u, "HPCAUTH1", 8u) ||
+        read_le32(data + 12u) != slot || read_le32(data + 16u) != journal_slot ||
+        read_le32(data + 28u) != authority_crc(data) ||
+        hpclang_rpl_flash_sector_inspect(first, end, journal_slot, journal, journal_bytes, &target,
+                                         &image, &journal_phase) != HPCLANG_RPL_SPAN_OK ||
+        read_le32(data + 20u) != target || read_le32(data + 24u) != sector_crc(journal) ||
+        !authority_bounds(first, end, slot, journal_slot, target))
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    enum hpclang_rpl_flash_authority_phase decoded;
+    if (data[0] == 0xffu || data[0] == 0x7fu || data[0] == 0xfeu)
+        decoded = HPCLANG_RPL_FLASH_AUTHORITY_UNPUBLISHED;
+    else if (data[0] == 0x7eu)
+        decoded = HPCLANG_RPL_FLASH_AUTHORITY_ARMED;
+    else if (!data[0])
+        decoded = HPCLANG_RPL_FLASH_AUTHORITY_CLOSED;
+    else if (!(data[0] & ~0x7eu))
+        decoded = HPCLANG_RPL_FLASH_AUTHORITY_CLOSING;
+    else
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    *phase = decoded;
+    return HPCLANG_RPL_SPAN_OK;
+}
+
 int hpclang_rpl_flash_record_crc(const struct hpclang_rpl_reader *reader, uint32_t address,
                                  uint32_t bytes, uint32_t *crc)
 {
