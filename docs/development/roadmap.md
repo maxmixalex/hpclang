@@ -424,7 +424,35 @@ Current delivery checkpoints:
 - **Latest submitted implementation:** `aaf23c02` includes the read-only native
   installation matcher, maintained two-model installation E2E (`66cdf5e5`) and
   unified recovery/admission ELF binding. Both native installation flows and full
-  guarded recovery regressions pass locally; new CI has not been queried.
+  guarded recovery regressions pass locally. Quality, Runtime and Objects pass
+  remotely, but Core's two full recovery jobs fail at retirement re-entry; both
+  installation jobs pass. This batch is not fully CI-accepted.
+- **Recovery fixture lifetime correction (`e7604b41`, local):** completed one-shot programs
+  were retained in HOME across the full recovery chain. The failed HP50g state
+  had only 1,334 bytes between TEMP and the data stack after restart; re-entering
+  its menu reproduces screen corruption and USB timeout. One-shot witnesses now
+  release their own HOME binding after RCL; the final reusable retirement
+  program remains installed. Independent snapshot checks find the obsolete
+  bindings absent, the reusable program retained and 203,636 bytes of free gap
+  on both models. Both fresh native flows pass the previously failing
+  retirement/re-entry step; the remaining complete flows are still running.
+- **Installed transaction preflight (`6953972e`, local):** a new read-only composition derives
+  the pair from two matching HPCBIND1 descriptors at owned packaging coordinates,
+  checks the bound transaction, and matches the complete installed library and
+  catalog on the restored view. Its allocation must remain outside the target
+  sector; a library supplied only by the journal is rejected. Closed transactions
+  use actual Flash. Authority tests and ARM analysis pass; host execution against
+  fourteen native snapshots accepts pending/closed/repeated states and rejects
+  unpublished, corrupt, wrong-bank and dirty-tail states without output changes.
+  Packaging `b44d8aec` generates descriptor coordinates through ELF symbols and
+  command links; both fresh-copy and reusable layouts pass host tests, and actual
+  ELF packaging preserves the tested library bytes. A native prototype passes
+  armed/intact-target, closed and unpublished cases on both models, including
+  complete initialized code and its owning CODE object, reconstructed expected
+  library, stack guards, restored mappings, result and unchanged Flash/catalog.
+  The damaged-target native case is running; maintained E2E integration remains
+  pending. Root publication, lifetime, RAM ownership, startup ordering and
+  reclamation remain open.
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
   the preceding `9d015660` batch also passes all six triggered workflows.
