@@ -432,9 +432,23 @@ Current delivery checkpoints:
   Embedding that record in the installation witness exceeds the recovery CODE
   loader's 32 KiB initialized-image limit; its native packaging rejects it.
   The small empty-configuration installation fixture therefore does not prove
-  real-template installation. Next: provide the full template separately,
-  validate it against the installer's known sealed identity, and exercise native
-  preparation/rebinding with its actual memory requirements.
+  real-template installation. A separate-input prototype now passes native
+  preparation on HP49g+/HP50g: the installer verifies the full template against
+  its compiled sealed identity, and its 16,596-byte initialized image fits the
+  loader bound (138,706-byte package). The complete 49,588-byte prepared record
+  matches an independently rebound/sealed package; placement, owning CODE,
+  stack guards and startup inventory pass. The source template, Flash and
+  library catalog remain unchanged, with no Flash programming operations.
+  HP50g also rejects a different valid sealed library before copying or
+  preparation, preserving Flash/catalog/CODE/guards with no programming.
+  Both models additionally store the complete independently rebound record at
+  the selected `0x160105` slot with 24,761 SST operations, preserving every
+  other Flash byte and the executing CODE/guards/catalog. Stock restart
+  discovers the exact library at that slot without changing Flash. The write
+  witness initializes 20,436 bytes and packages to 146,474 bytes.
+  This is local prototype evidence, not maintained E2E or CI acceptance.
+  Next: integrate reproducible template generation and native coverage, then
+  connect real installation to transaction recovery and safe reclamation.
 
 - **Unarmed transaction staging (local):** new internal staging
   and staging-retry operations store the complete authority body at `7F`,
