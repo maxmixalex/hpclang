@@ -427,6 +427,24 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Active startup decision and existing counterexample:** the earlier native
+  dependency fixture remains decisive: Port 0 library 768 can repeatedly enter
+  its configuration while recalling damaged EQLIB, preventing recovery library
+  769 from running. Research ID 4 repairs that case but is not a production
+  allocation policy. The existing library-229 body-fault and explicit banked
+  UserKeys-reference probes already cover those particular paths; repeating
+  narrower intact-data probes does not close the remaining gate. The next
+  prerequisite is to establish creation/GC safety during startup, then a
+  supported installation entry before dependent callbacks. Cold-boot read
+  watchpoints now prove both models enter the hidden-directory creation routine:
+  the Saturn instruction pointer is `0xada5`, with the interpreter fetch returning
+  to `0x288dc`. This distinguishes execution from the earlier ROM scanner's
+  read of the same bytes. Both runs reconstruct the hidden RAM directory and
+  return normally with unchanged Flash. They use intact Flash and do not yet
+  establish allocation-time memory availability or whether GC is required.
+  Preserve these requirements alongside metadata fault coverage, durable
+  ownership and reclamation.
+
 - **Local torn-bank startup coverage:** both models complete low-memory automatic
   recovery for all sixteen `F0`–`FF` values reachable while programming the native
   bank-status byte, with the remaining bank identity bytes still erased. All
