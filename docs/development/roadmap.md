@@ -421,8 +421,10 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **Reconciled delivery state (2026-10-20):** the latest submitted head is
-  `c8740410`; `747fa4ae` adds local documentation of the power-cut evidence below.
+- **Current cancellation batch (2026-10-20):** implementation and maintained
+  tests through `8a717ec4` follow the previous submission `c8740410`.
+  This batch is prepared for CI; acceptance remains pending. `747fa4ae`
+  records the publication power-cut evidence below.
   Internal unpublished-transaction cancellation now passes host fault injection
   for four initial states: every program operation with five partial-write masks,
   lost acknowledgements, silent writes, sampled read failures and repeated calls.
