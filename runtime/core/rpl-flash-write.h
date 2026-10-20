@@ -292,6 +292,27 @@ int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, u
                                         uint32_t journal_slot, const uint8_t *journal,
                                         uint32_t journal_bytes);
 
+/* Store the same binding body but stop at durable status 7F (UNPUBLISHED).
+ * Requires the same owned erased allocation and exact READY journal as publish.
+ * Target and journal remain unchanged; replay/preflight must still reject this
+ * phase. Use finish_staged_authority for a cut during staging, then explicitly
+ * finish_authority only after the installer's resource/ownership prerequisites.
+ * A complete 7F record is not itself durable installation provenance or RAM
+ * ownership: an interrupted older direct publication can have the same bytes. */
+int hpclang_rpl_flash_stage_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                      uint32_t journal_slot, const uint8_t *journal,
+                                      uint32_t journal_bytes);
+
+/* Retry this SAME owned staging attempt without enabling it. Only FF with a
+ * compatible partial body or 7F with the complete expected body is accepted.
+ * A repeated complete stage makes no writes. Reject FE/ARMED/CLOSING/CLOSED
+ * without writes; never reinterpret activation as a fresh staging attempt.
+ * Validates the whole body and erased end marker before its first write.
+ * DIRTY retains ownership. This does not reconstruct a trusted claim after reset. */
+int hpclang_rpl_flash_finish_staged_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              uint32_t journal_slot, const uint8_t *journal,
+                                              uint32_t journal_bytes);
+
 /* Resume this SAME reserved transaction after a publication cut, including a
  * lost acknowledgement of ARMED. Requires the exact durable READY journal and
  * trusted root reservation used for the original attempt, not a newly selected

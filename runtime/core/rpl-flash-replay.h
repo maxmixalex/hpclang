@@ -90,6 +90,21 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
                                      const uint8_t *journal, uint32_t journal_bytes,
                                      struct hpclang_rpl_flash_installed_recovery *installed);
 
+/* Read-only validation of a complete staged (7F) authority and READY journal
+ * addressed by the trusted executing layout. Validate both actual allocation
+ * boundaries, the intact current port and the proposed target image, with the
+ * same exact installed library/catalog binding outside target in both views.
+ * Reject FF/FE/ARMED/CLOSING/CLOSED rather than treating them as staged.
+ * scratch holds one sector record and is disposable on failure; it must be
+ * disjoint from all other inputs/output. installed changes only on success (0).
+ * Stable exclusive views and a separately established original one-use claim
+ * remain required. This proves content/placement, not provenance, RAM ownership,
+ * safe startup, authority to activate, or permission to adopt matching records. */
+int hpclang_rpl_flash_preflight_staged_installed(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    const struct hpclang_rpl_flash_catalog *catalog, uint8_t *scratch, uint32_t capacity,
+    struct hpclang_rpl_flash_installed_recovery *installed);
+
 /* Cancel an unpublished transaction under the SAME trusted one-use installation
  * claim, without needing the lost desired image. Caller must have established
  * initial empty-slot ownership and prevented reuse/other writers since then.

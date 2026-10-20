@@ -427,6 +427,40 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Real recovery template integration (local, open):** packaging the actual
+  guarded recovery/admission ELF images produces a 49,588-byte native record.
+  Embedding that record in the installation witness exceeds the recovery CODE
+  loader's 32 KiB initialized-image limit; its native packaging rejects it.
+  The small empty-configuration installation fixture therefore does not prove
+  real-template installation. Next: provide the full template separately,
+  validate it against the installer's known sealed identity, and exercise native
+  preparation/rebinding with its actual memory requirements.
+
+- **Unarmed transaction staging (local):** new internal staging
+  and staging-retry operations store the complete authority body at `7F`,
+  without enabling replay. Retry accepts only compatible `FF` or complete `7F`;
+  it cannot downgrade an activation/closure state. Explicit activation uses
+  the existing authority-finishing operation. A native staging witness on both
+  HP49g+/HP50g writes the independently encoded journal/binding, rejects
+  installed replay preflight and repeats staging without further writes.
+  Exact other Flash, target, catalog and owning CODE/guards are preserved;
+  both runs observe 1,953 SST operations. Eleven verifier tests, ARM packaging
+  and core ARM analysis pass, as does the complete authority ASan/UBSan suite.
+  Both native models restart with exact Flash/catalog preserved and unchanged
+  cumulative SST counters. The maintained staging/restart flow is now connected
+  to installation E2E and passes on both native models.
+  A read-only staged-installation preflight now verifies complete `7F`/READY
+  records, actual allocation boundaries and exact library/catalog identity in
+  both current and proposed views. It rejects a damaged current target rather
+  than hiding it with the journal image. Twenty-one host scenarios cover
+  alternate valid target contents, contiguous/separate placement, wrong phases,
+  corrupt data/catalog/root, gaps/interior records, read failure and insufficient
+  scratch; errors preserve outputs and all storage. The complete authority
+  ASan/UBSan suite, core ARM analysis and both native integrated flows pass.
+  Status `7F` alone is not installation provenance or RAM ownership: an older
+  interrupted direct publication can have the same bytes. This step still
+  needs the trusted fresh-installation claim and resource lifecycle.
+
 - **Cleanup/inventory CI submission:** the locally validated cleanup
   (`0dbd6429`) and Port 1 inventory (`444bbe8f`) changes are submitted together
   with their maintained E2E paths. CI acceptance is pending; new runs are not

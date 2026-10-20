@@ -278,6 +278,7 @@ def verify_probe(
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
     from startup import run_port1_inventory, verify_startup
+    from staging import run_staging
 
     root = args.output / "installation"
     root.mkdir()
@@ -327,6 +328,16 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     startup_port1 = run_port1_inventory(
         args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    run_staging(
+        args,
+        before,
+        root,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
     )
     transactions = []
     for label, status in (
@@ -413,6 +424,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 publication=True,
                 cancellation=True,
                 selected_storage=True,
+                unarmed_staging=True,
             ),
             indent=2,
         )

@@ -14,6 +14,7 @@ VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
 startup = importlib.import_module("startup")
 storage = importlib.import_module("store")
+staging = importlib.import_module("staging")
 
 
 class InstallationExecutionTests(unittest.TestCase):
@@ -269,6 +270,59 @@ class CleanupTests(unittest.TestCase):
                 (before / "flash").write_bytes(bytes([0x53, 0x36, 0, 0x10]))
                 with self.assertRaises(ValueError):
                     storage.verify_cleanup(before, after, root, "unused", 0)
+
+
+class StagingTests(unittest.TestCase):
+    def test_staged_oracle_and_replay_rejection_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            flash = bytearray(b"\xff" * 0x200000)
+            for bank in range(0x140000, 0x200000, 0x20000):
+                flash[bank + 0x100 : bank + 0x105] = (0xF0 + ((bank // 0x20000 - 2) << 8)).to_bytes(
+                    5, "little"
+                )
+            (before / "flash").write_bytes(flash)
+            expected_dir = root / "expected"
+            VERIFY.prepare(before, expected_dir, VERIFY.JOURNAL_SLOT, VERIFY.TARGET, bound=True)
+            expected = bytearray((expected_dir / "flash").read_bytes())
+            expected[VERIFY.TARGET : VERIFY.TARGET + 4096] = flash[
+                VERIFY.TARGET : VERIFY.TARGET + 4096
+            ]
+            expected[VERIFY.AUTHORITY_SLOT] = 0x7F
+            values = [
+                0,
+                0,
+                0xFFFFFFFC,
+                0,
+                100,
+                0x7F,
+                0,
+                123,
+                VERIFY.JOURNAL_SLOT,
+                VERIFY.AUTHORITY_SLOT,
+                VERIFY.TARGET,
+                0,
+            ]
+            (after / "sram").write_bytes(struct.pack("<12I", *values))
+            with (
+                patch.object(staging, "verify_probe", return_value=0) as probe,
+                patch.object(staging, "symbol_offsets", return_value={"publication_result": 0}),
+            ):
+                self.assertEqual(staging.verify_staging(before, after, root, "unused", 123), 100)
+                self.assertEqual(probe.call_args.kwargs["expected_flash"], expected)
+                for offset in range(12):
+                    changed = values.copy()
+                    changed[offset] = 0 if offset == 4 else changed[offset] ^ 1
+                    (after / "sram").write_bytes(struct.pack("<12I", *changed))
+                    with self.subTest(offset=offset), self.assertRaises(ValueError):
+                        staging.verify_staging(before, after, root, "unused", 123)
+            flash[VERIFY.AUTHORITY_SLOT + 32] = 0
+            (before / "flash").write_bytes(flash)
+            with self.assertRaises(ValueError):
+                staging.staged_flash(before)
 
 
 class StartupInventoryTests(unittest.TestCase):

@@ -111,9 +111,9 @@ static int bound_read(void *context, uint32_t address, uint16_t *value)
     else if (!view->io->read16(view->io->context, address, value))
         return 0;
     if (address == (view->authority & ~1u))
-        *value &= (uint16_t)~(255u << (8u * (view->authority & 1u)));
+        *value &= (uint16_t) ~(255u << (8u * (view->authority & 1u)));
     if (view->hide_journal && address == (view->journal & ~1u))
-        *value &= (uint16_t)~(255u << (8u * (view->journal & 1u)));
+        *value &= (uint16_t) ~(255u << (8u * (view->journal & 1u)));
     return 1;
 }
 
@@ -400,6 +400,67 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
     if (matched != library)
         return HPCLANG_RPL_FLASH_DIRTY;
     *installed = (struct hpclang_rpl_flash_installed_recovery){library, j, a, target};
+    return 0;
+}
+
+int hpclang_rpl_flash_preflight_staged_installed(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    const struct hpclang_rpl_flash_catalog *catalog, uint8_t *scratch, uint32_t capacity,
+    struct hpclang_rpl_flash_installed_recovery *installed)
+{
+    if (!io || !io->read16 || !installed || !scratch ||
+        capacity < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES || (io->first & 0x1ffffu) ||
+        io->first > io->end || io->end - io->first != 6u * 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t journal, authority;
+    int result = layout_binding(layout, &journal, &authority);
+    if (result)
+        return result;
+    if (journal < io->first || journal >= io->end ||
+        HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES >= io->end - journal || authority < io->first ||
+        authority >= io->end || HPCLANG_RPL_FLASH_AUTHORITY_BYTES >= io->end - authority)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint8_t actual[HPCLANG_RPL_FLASH_AUTHORITY_BYTES], expected[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!load_bytes(io, journal, scratch, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ||
+        !load_bytes(io, authority, actual, sizeof actual))
+        return HPCLANG_RPL_FLASH_FAILED;
+    uint32_t target;
+    const uint8_t *image;
+    if (hpclang_rpl_flash_sector_decode(io->first, io->end, journal, scratch,
+                                        HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &target, &image) ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, authority, journal, scratch,
+                                           HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, expected,
+                                           sizeof expected))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    expected[0] = 0x7f;
+    if (memcmp(actual, expected, sizeof actual))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* Mask only the two known statuses. The current target must validate
+     * without a repair overlay: staging has not authorized any target write. */
+    struct bound_overlay view = {io, authority, journal, target, 0, NULL, 1};
+    result = bound_membership(&view);
+    if (result)
+        return result;
+    const struct hpclang_rpl_flash_io masked = {&view, bound_read, NULL, io->first, io->end};
+    uint32_t library;
+    result = hpclang_rpl_flash_match_installation(&masked, layout->record, layout->bytes, catalog,
+                                                  &library);
+    if (result)
+        return result;
+    if (library < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < library + layout->bytes)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    view.image = image;
+    result = bound_membership(&view);
+    if (result)
+        return result;
+    uint32_t proposed;
+    result = hpclang_rpl_flash_match_installation(&masked, layout->record, layout->bytes, catalog,
+                                                  &proposed);
+    if (result)
+        return result;
+    if (proposed != library)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *installed = (struct hpclang_rpl_flash_installed_recovery){library, journal, authority, target};
     return 0;
 }
 
