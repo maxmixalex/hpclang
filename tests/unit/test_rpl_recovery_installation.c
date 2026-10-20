@@ -71,7 +71,7 @@ int main(void)
             assert(slot == FIRST + bank * 0x20000 + 0x105);
             assert(!memcmp(before, flash, sizeof flash));
         }
-    for (unsigned fault = 0; fault < 10; ++fault) {
+    for (unsigned fault = 0; fault < 12; ++fault) {
         install(fault == 9 ? 1 : 0, 0); /* Another valid library with the same ID. */
         uint8_t expected[48];
         memcpy(expected, vectors[0].descriptor, sizeof expected);
@@ -97,6 +97,16 @@ int main(void)
         }
         if (fault == 8)
             flash[END - FIRST - 1] = 0;
+        if (fault == 10)
+            flash[0x108] &= 15; /* Correct object inside the wrong envelope type. */
+        if (fault == 11) {
+            unsigned extent =
+                flash[0x106] | (unsigned)flash[0x107] << 8 | (unsigned)(flash[0x108] & 15) << 16;
+            extent += 8; /* A larger allocation is not implied by a content seal. */
+            flash[0x106] = extent;
+            flash[0x107] = extent >> 8;
+            flash[0x108] = 0x10 | (extent >> 16);
+        }
         memcpy(before, flash, sizeof flash);
         uint32_t slot = UINT32_MAX;
         assert(hpclang_rpl_recovery_installation_match(&io, 1701, &catalog, expected, &slot) < 0);

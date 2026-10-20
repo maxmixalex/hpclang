@@ -942,6 +942,12 @@ int hpclang_rpl_flash_locate_installation(const struct hpclang_rpl_flash_io *io,
     struct hpclang_rpl_port_entry wanted;
     if (hpclang_rpl_port_next(&reader, &cursor, &wanted) != 1)
         return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t metadata;
+    if (!io_nibble(&flash, 7u, &metadata))
+        return HPCLANG_RPL_FLASH_FAILED;
+    if (metadata != 1u || (((wanted.span + 15u) & ~7u) != selection.match_bytes * 2u &&
+                           ((wanted.span + 11u) & ~3u) != selection.match_bytes * 2u))
+        return HPCLANG_RPL_FLASH_DIRTY;
     result = match_catalog(io, selection.match_slot, &wanted, catalog);
     if (!result)
         *slot = selection.match_slot;

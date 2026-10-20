@@ -446,7 +446,18 @@ Current delivery checkpoints:
   ambiguous mappings, changed descriptors, read failure, dirty tails and a
   different valid library with the same ID reject without changing output or
   Flash. The new matcher, existing creation/authority regressions, ASan/UBSan
-  and ARM analysis pass. Native admission integration remains next.
+  and ARM analysis pass. A native prototype built from `791fcd34` now passes on
+  HP49g+/HP50g: Stock installs the 14,896-byte sealed library, and a real XLIB
+  call executes its internal admission command. The original content matches;
+  changing only the library title and independently repairing the native CRC
+  returns DIRTY. Both cases preserve exact Flash/catalog content, initialized
+  execution code, its owning fresh CODE object, guards/mappings and normal
+  native return, with zero Flash operations. The configuration is empty:
+  this proves internal execution, not automatic startup admission.
+  A local follow-up additionally validates allocation metadata and canonical
+  or supported legacy envelope length; wrong-type and enlarged envelopes
+  reject in host tests, with ARM analysis passing. Maintained native integration
+  and admission against an interrupted transaction's restored view remain next.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
