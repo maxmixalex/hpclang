@@ -421,6 +421,16 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
+- **Publication power-cut research (local):** both native models now have
+  independently verified cuts at program operations 2 (journal body) and 1,939
+  (authority body), after 16 busy reads with completed-bit mask `0x5555`.
+  An independent command sequence matches the complete torn Flash image. Warm
+  restart preserves that image and the complete 32 KiB reservation. Subsequent
+  USB execution of the maintained installed-transaction predicate rejects all
+  four interrupted states as DIRTY, with valid code/owner/guards/mappings,
+  unchanged Flash/catalog/reservation and zero writes. The fixture's installation
+  has an empty configuration: these results prove rejection and native re-entry,
+  not automatic recovery before other startup consumers or durable ownership.
 - **Current implementation batch:** `85b57056` adds maintained native publication
   and completed-transaction restart tests to the existing installation suite,
   alongside initial planning (`2c7cb1c1`) and journal retry (`5d31e43a`). On both
@@ -674,6 +684,14 @@ identity before authorizing target writes. Interrupted creation/publication must
 have explicit retry and orphan handling; matching a fixed name, size and prefix
 alone cannot establish that ownership. Preserve the existing recovery-time
 checks and the RAM-loss recovery requirement.
+
+If the original desired capsule is unavailable after power loss, compatible
+partial bytes cannot reconstruct it. The unpublished-transaction path therefore
+also needs cancellation under a trusted one-use installation claim: invalidate
+the journal before disposing of the authority, preserve the target and unrelated
+allocations, and make interruption of cancellation retryable without rearming a
+journal. An already armed transaction must follow its recovery lifecycle instead.
+Reservation release still requires proven ownership and completed cleanup.
 
 The entries below preserve earlier batch evidence and check times; their older
 pending-CI descriptions do not supersede these delivery checkpoints.
