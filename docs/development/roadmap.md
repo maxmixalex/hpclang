@@ -427,6 +427,22 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local installation placement planning:** a read-only library planner now
+  validates all six Port 2 banks and selects the same erased allocation as
+  creation under a stable view, with no programming callback required. Creation
+  shares its selection implementation. Existing IDs, including unregistered
+  Flash libraries, remain conflicts; matching deleted payloads are not adopted.
+  This provides coordinates before installation metadata is finalized, without
+  reserving storage or granting publication authority. Actual C against saved
+  HP49g+/HP50g Stock states agrees with an independent allocation parser and
+  preserves the output on an existing-library conflict. Cross-port/catalog
+  exclusion, owned publication, registration and early entry remain installer
+  requirements; the ordinary storage API retains its per-port semantics.
+  ARM build/static analysis and complete Flash creation/write ASan/UBSan
+  regressions pass, including selection, duplicates, read failures, no-space,
+  interrupted writes and recovery. Planning rejects before changing its output.
+  This follow-up is local, separate from the submitted batch below.
+
 - **CI submission batch:** bounded configuration resolution, captured ROM-bank
   validation, native startup inventory, partial bank-header recovery coverage
   and the retained-RAM prerequisite below are submitted together on

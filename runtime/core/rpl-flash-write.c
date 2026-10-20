@@ -965,10 +965,10 @@ static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *n
     return select_record(io, name, name_length, 0x02b62u, 0, bytes, selection, NULL);
 }
 
-static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
-                         uint32_t bytes, uint32_t prologue, uint32_t *attempted_slot)
+static int plan_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record, uint32_t bytes,
+                       uint32_t prologue, uint32_t *slot)
 {
-    if (!valid_record(record, bytes))
+    if (!slot || !valid_record(record, bytes))
         return HPCLANG_RPL_FLASH_INVALID;
     struct packed_record packed = {record, bytes};
     const struct hpclang_rpl_reader source = {packed_read, &packed};
@@ -977,8 +977,8 @@ static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *r
     if (hpclang_rpl_port_next(&source, &source_cursor, &wanted) != 1 || wanted.prologue != prologue)
         return HPCLANG_RPL_FLASH_INVALID;
     struct record_selection selection;
-    int result = select_record(io, wanted.name, wanted.name_length, wanted.prologue,
-                               wanted.library_number, bytes, &selection, NULL);
+    int result = scan_records(io, wanted.name, wanted.name_length, wanted.prologue,
+                              wanted.library_number, bytes, &selection, NULL);
     if (result)
         return result;
     if (selection.matches)
@@ -986,6 +986,25 @@ static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *r
     uint32_t selected = selection.free_slot;
     if (selected == io->end)
         return HPCLANG_RPL_FLASH_NOSPACE;
+    *slot = selected;
+    return HPCLANG_RPL_FLASH_WRITTEN;
+}
+
+int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                   uint32_t bytes, uint32_t *slot)
+{
+    return plan_record(io, record, bytes, 0x02b40u, slot);
+}
+
+static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                         uint32_t bytes, uint32_t prologue, uint32_t *attempted_slot)
+{
+    if (!io || !io->program16)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t selected;
+    int result = plan_record(io, record, bytes, prologue, &selected);
+    if (result)
+        return result;
     struct hpclang_rpl_flash_io reserved = *io;
     uint32_t bank = io->first + ((selected - io->first) / 0x20000u) * 0x20000u;
     reserved.first = bank + 0x104u;

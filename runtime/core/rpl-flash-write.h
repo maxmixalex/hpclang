@@ -117,6 +117,18 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
 int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, uint32_t *attempted_slot);
 
+/* Read-only selection for a complete encoded library record. Validate every
+ * Port 2 bank/allocation/tail and require its ID to be absent from that port,
+ * including unregistered libraries. Return the same erased slot creation would
+ * select under the same stable view; program16 may be NULL. Output changes only
+ * on WRITTEN. Uses create_library's INVALID/FAILED/DIRTY/EXISTS/NOSPACE results.
+ * This neither reserves storage nor proves cross-port/catalog uniqueness,
+ * registration, startup priority or ownership of an existing matching library.
+ * An installer must retain exclusive ownership and revalidate after changing
+ * its encoded record; the selected address alone never authorizes a write. */
+int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                                   uint32_t bytes, uint32_t *slot);
+
 /* Resolve one installed library against the complete expected native record.
  * Validate all six bank identities, live records and erased tails, then require
  * a unique matching library ID, exact allocation length/header and complete
