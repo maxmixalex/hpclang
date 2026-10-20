@@ -1,4 +1,4 @@
-/* Read-only installation witness for the supported hp4950 Stock 2.15 fixture.
+/* Installation witnesses for the supported hp4950 Stock 2.15 fixture.
  * ROM/catalog addresses are fixture inputs, not production profile discovery. */
 #include "rpl-flash-replay.h"
 #include "expected-library.h"
@@ -13,6 +13,10 @@ volatile unsigned transaction_pair[3];
 static volatile unsigned expected_bytes = sizeof expected_library;
 #endif
 void hpclang_flash_mapping_swap(unsigned descriptors[2]);
+#ifdef HPCLANG_INSTALLATION_PUBLICATION
+int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_flash_io *io,
+                                 const struct hpclang_rpl_flash_catalog *catalog, uint32_t *slot);
+#endif
 
 static int read_flash(void *context, uint32_t address, uint16_t *value)
 {
@@ -61,6 +65,8 @@ int hpclang_recovery_predicate(const uint32_t *map)
         transaction_pair[1] = installed.authority_slot;
         transaction_pair[2] = installed.target;
     }
+#elif defined(HPCLANG_INSTALLATION_PUBLICATION)
+    int result = hpclang_installation_publish(map, &io, &catalog, &slot);
 #else
     int result = hpclang_rpl_flash_match_installation(&io, expected_library,
                                                       sizeof expected_library, &catalog, &slot);

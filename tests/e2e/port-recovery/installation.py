@@ -1,4 +1,4 @@
-"""Generate and verify the independent, read-only native installation witness."""
+"""Generate and verify native installation and transaction witnesses."""
 
 import argparse
 import json
@@ -59,6 +59,9 @@ def generate_fixture(output):
         + "\n};\n"
         + f"#define EXPECTED_RECOVERY_BINDING {layout['recovery_binding_nibble']}u\n"
         + f"#define EXPECTED_ADMISSION_BINDING {layout['admission_binding_nibble']}u\n"
+        + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
+        + f"#define EXPECTED_AUTHORITY_SLOT {AUTHORITY_SLOT}u\n"
+        + f"#define EXPECTED_TARGET {TARGET}u\n"
     )
 
 
@@ -103,11 +106,22 @@ def verify_execution(ram, initialized, symbols, package, result, slot):
     return base
 
 
-def verify_probe(before, after, build, nm, result, slot, *, image="installation"):
+def verify_probe(
+    before,
+    after,
+    build,
+    nm,
+    result,
+    slot,
+    *,
+    image="installation",
+    expected_flash=None,
+):
     require_stock_pc(after)
     require(
-        (before / "flash").read_bytes() == (after / "flash").read_bytes(),
-        "Read-only installation witness changed Flash",
+        ((before / "flash").read_bytes() if expected_flash is None else expected_flash)
+        == (after / "flash").read_bytes(),
+        "Installation witness changed unexpected Flash bytes",
     )
     read, original = reader(after), reader(before)
     require(original(0x806FD) - original(0x806F8) == 5, "Expected an empty baseline stack")
@@ -139,6 +153,7 @@ def verify_probe(before, after, build, nm, result, slot, *, image="installation"
             == ((JOURNAL_SLOT, AUTHORITY_SLOT, TARGET) if result >= 0 else (0, 0, 0)),
             "Installed transaction coordinates differ from the owned fixture",
         )
+    return base
 
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
@@ -224,6 +239,17 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         require(verify_busy_reads(args, phase) == 0, "Installed transaction preflight wrote Flash")
         transactions.append(label)
         print(f"Installed transaction preflight verified: {label}", flush=True)
+    from publication import run_publication
+
+    run_publication(
+        args,
+        before,
+        slot,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     (args.output / "result.json").write_text(
         json.dumps(
             dict(
@@ -233,12 +259,13 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
+                publication=True,
             ),
             indent=2,
         )
         + "\n"
     )
-    print("PASS: native installation and transaction preflight without Flash writes", flush=True)
+    print("PASS: native installation, transaction preflight and publication lifecycle", flush=True)
 
 
 if __name__ == "__main__":

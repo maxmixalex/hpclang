@@ -126,7 +126,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${HPCLANG_ROOT}/tools/package-recovery.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
-foreach(witness IN ITEMS installation installation-transaction)
+foreach(witness IN ITEMS installation installation-transaction installation-publication)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
@@ -136,6 +136,13 @@ foreach(witness IN ITEMS installation installation-transaction)
     if(witness STREQUAL "installation-transaction")
         target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
+    elseif(witness STREQUAL "installation-publication")
+        target_sources(${witness} PRIVATE publication.c predicate-tls.S)
+        foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot
+                time time-math rtc rtc-decode datetime sst-flash)
+            target_sources(${witness} PRIVATE "${CORE}/${module}.c")
+        endforeach()
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_PUBLICATION)
     endif()
     configure_recovery_image(${witness})
     target_include_directories(${witness} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
