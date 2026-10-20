@@ -436,8 +436,17 @@ Current delivery checkpoints:
   and five after the authority-body cut, followed by zero-write repeated calls.
   Exact whole-Flash changes are limited to the two envelopes; catalog, initialized
   code/owning CODE object, guards/mappings, native return and the complete 32 KiB
-  reservation pass. Cancellation-time native power cuts and maintained E2E
-  integration remain pending; this is not public service delivery.
+  reservation pass. Native cuts during journal and authority cancellation also
+  pass on both models: an independent NOR command oracle verifies the torn image,
+  restart preserves it and the reservation, and retry completes in six/one writes
+  respectively with zero-write repeated calls. These remain fresh-fixture claims.
+  Maintained cancellation E2E now passes both generated interrupted states on
+  both models in the existing installation suite, with the same exact Flash,
+  execution, reservation and repeat checks. The seed records derive from the
+  runtime-captured publication fixture rather than saved ROM snapshots. Fresh
+  ARM packaging, 75 related host tests, lint/format and strict docs pass.
+  Cancellation-time power-cut experiments remain separate research evidence.
+  This is not public service delivery.
   This does not establish the still-required durable installation claim, RAM
   ownership, startup ordering or reclamation. Port 2 remains in M8.0; all other
   stage requirements and the accepted M8.1 status remain as listed below.

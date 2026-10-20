@@ -42,6 +42,8 @@ def verify_publication(before, after, build, nm, expected, slot, repeated):
 
 
 def run_publication(args, baseline, slot, *, transfer, emulator, completed, verify_busy_reads):
+    from cancellation import run_cancellation
+
     root = args.output / "installation" / "publication"
     root.mkdir()
     prepared = root / "expected"
@@ -89,3 +91,11 @@ def run_publication(args, baseline, slot, *, transfer, emulator, completed, veri
                 home_string(reader(before), b"HPCLEASE") == RESERVATION,
                 "Restart lost or changed the reservation",
             )
+    run_cancellation(
+        args,
+        root / "restart" / "state",
+        records,
+        slot,
+        transfer=transfer,
+        verify_busy_reads=verify_busy_reads,
+    )

@@ -260,12 +260,15 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 bytes=size,
                 transactions=transactions,
                 publication=True,
+                cancellation=True,
             ),
             indent=2,
         )
         + "\n"
     )
-    print("PASS: native installation, transaction preflight and publication lifecycle", flush=True)
+    print(
+        "PASS: native installation, transaction preflight, publication and cancellation", flush=True
+    )
 
 
 if __name__ == "__main__":
