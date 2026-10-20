@@ -29,4 +29,14 @@ int hpclang_rpl_recovery_installation_preflight(
     uint32_t journal, uint8_t *scratch, uint32_t capacity,
     struct hpclang_rpl_flash_installed_recovery *installed);
 
+/* Same stable-view identity/admission contract without a sector scratch buffer.
+ * CRC-check the complete capsule, then read its image directly through the same
+ * exclusive Flash view. Validate exact pair membership and all native banks.
+ * Closing/retiring states require target equality; closed uses actual Flash.
+ * No heap, writes, RAM release or new ownership/startup authority. */
+int hpclang_rpl_recovery_installation_stream(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected[48], uint32_t authority,
+    uint32_t journal, struct hpclang_rpl_flash_installed_recovery *installed);
+
 #endif

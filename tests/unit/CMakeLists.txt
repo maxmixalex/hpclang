@@ -40,6 +40,12 @@ hpclang_unit(rpl_flash_record test_rpl_flash_record.c
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_flash_record PRIVATE "${HPCLANG_ROOT}/runtime/core")
+hpclang_unit(rpl_flash_stream test_rpl_flash_stream.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_flash_stream PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
 hpclang_unit(rpl_flash_intent test_rpl_flash_intent.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"

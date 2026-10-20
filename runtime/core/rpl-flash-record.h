@@ -83,6 +83,31 @@ enum hpclang_rpl_flash_sector_phase
     HPCLANG_RPL_FLASH_SECTOR_RETIRED = 3
 };
 
+struct hpclang_rpl_flash_sector_descriptor
+{
+    uint32_t target, crc;
+    enum hpclang_rpl_flash_sector_phase phase;
+};
+
+/* Validate a sector capsule without retaining its 4 KiB image. The reader uses
+ * bounded local nibble coordinates; slot/target remain physical byte addresses.
+ * Read and CRC-check every byte, retaining only the 24-byte header. Output
+ * changes only on success. Keep this same Flash view stable for subsequent
+ * image reads, membership checks and authority inspection. This descriptor
+ * does not establish freshness, ownership or permission to replay anything. */
+int hpclang_rpl_flash_sector_inspect_reader(uint32_t first, uint32_t end, uint32_t slot,
+                                            const struct hpclang_rpl_reader *reader,
+                                            uint32_t address,
+                                            struct hpclang_rpl_flash_sector_descriptor *descriptor);
+
+/* Use only a descriptor from a successful inspect_reader (or equivalently
+ * validated capsule) from the SAME stable view. Validates authority bytes and
+ * binding; does not validate allocation membership or grant replay permission. */
+int hpclang_rpl_flash_authority_inspect_descriptor(
+    uint32_t first, uint32_t end, uint32_t slot, const uint8_t *data, uint32_t bytes,
+    uint32_t journal_slot, const struct hpclang_rpl_flash_sector_descriptor *journal,
+    enum hpclang_rpl_flash_authority_phase *phase);
+
 /* Validate a complete sector capsule and classify 7E-to-00 retirement cuts.
  * Unpublished/partially published statuses are rejected. Outputs change only
  * on success. RETIRING/RETIRED never authorize replay; recovery must verify the
