@@ -429,6 +429,18 @@ Current delivery checkpoints:
   analysis, pinned formatting/lint and strict documentation pass. CI acceptance
   remains pending; `62f7ece4` remains the accepted baseline.
 
+- **Initial transaction planning (`2c7cb1c1`, local):** the installed-layout
+  planner validates the expected library/catalog on intact Flash before either
+  transaction record is published. It derives the owned journal/authority pair,
+  requires untouched bytes, validates their exact prospective allocation
+  boundaries and the desired target image, and keeps the recovery library outside
+  that target sector. Separate banks and either contiguous order work; tail holes,
+  erased interiors of deleted allocations, occupied slots and malformed plans
+  fail without output or Flash changes. Host tests, ASan/UBSan, ARM analysis and
+  pinned formatting pass. Both native models also pass planning followed by
+  create-only 32 KiB reservation creation and repeated-create rejection, with
+  complete code/owner/guard/mapping/Flash/catalog checks. Durable reservation
+  ownership and publication/interruption integration remain open; not submitted.
 - **Reservation creation prototype (local):** both native models pass exact
   installed-library/catalog matching before transaction publication, followed by
   creation of a 32 KiB HOME string through the existing native create-only API.
