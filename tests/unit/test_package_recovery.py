@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 import subprocess
@@ -23,6 +24,7 @@ class RecoveryPackageTests(unittest.TestCase):
             output, binary, program = (
                 root / name for name in ("library.hp", "image.bin", "code.hp")
             )
+            layout_path = root / "layout.json"
             image = PACK.bind_image(bytes(32) + b"HPCBIND1" + bytes(24), 32, 0x160105, 0x161121)
             predicate_image = PACK.bind_image(b"HPCBIND1" + bytes(56), 0, 0x1A0105, 0x1A1121)
             valid_predicate = True
@@ -63,6 +65,8 @@ class RecoveryPackageTests(unittest.TestCase):
                 str(binary),
                 "--program-output",
                 str(program),
+                "--layout-output",
+                str(layout_path),
                 "--nm",
                 "nm",
                 "--readelf",
@@ -99,13 +103,39 @@ class RecoveryPackageTests(unittest.TestCase):
                         admission=admission,
                     ),
                 )
-                for path in (output, binary, program):
+                layout = json.loads(layout_path.read_text())
+                self.assertEqual((layout["version"], layout["library_id"]), (1, 1701))
+                packed = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in output.read_bytes()[8:])
+                span = 5 + int(packed[5:10][::-1], 16)
+                self.assertEqual(layout["record_bytes"], ((span + 15) & ~7) // 2)
+                bound = b"HPCBIND1" + bytes.fromhex("0501180021111800")
+                descriptor = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in bound)
+                for name in ("recovery", "admission"):
+                    offset = layout[name + "_binding_nibble"] - 8
+                    self.assertEqual(packed[offset : offset + 32], descriptor)
+                self.assertNotEqual(
+                    layout["recovery_binding_nibble"], layout["admission_binding_nibble"]
+                )
+                argv.remove("--flash-copy")
+                PACK.main()
+                reusable = json.loads(layout_path.read_text())
+                packed = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in output.read_bytes()[8:])
+                for name in ("recovery", "admission"):
+                    offset = reusable[name + "_binding_nibble"] - 8
+                    self.assertEqual(packed[offset : offset + 32], descriptor)
+                self.assertNotEqual(
+                    reusable["recovery_binding_nibble"], layout["recovery_binding_nibble"]
+                )
+                for path in (output, binary, program, layout_path):
                     path.write_bytes(b"retained")
                 valid_predicate = False
                 with self.assertRaisesRegex(ValueError, "outside initialized"):
                     PACK.main()
                 self.assertTrue(
-                    all(path.read_bytes() == b"retained" for path in (output, binary, program))
+                    all(
+                        path.read_bytes() == b"retained"
+                        for path in (output, binary, program, layout_path)
+                    )
                 )
 
     def test_admission_precedes_the_complete_reservation_guard(self):

@@ -10,6 +10,7 @@ Only the HP49g+/HP50g Stock main-RAM mapping has been validated for this entry.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -352,6 +353,48 @@ def bind_image(initialized: bytes, offset: int, journal: int, authority: int) ->
     )
 
 
+def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
+    symbols = {}
+    for line in subprocess.check_output([nm, elf], text=True).splitlines():
+        fields = line.split()
+        if len(fields) == 3:
+            symbols[fields[2]] = int(fields[0], 16)
+    return symbols
+
+
+def recovery_layout(library, images):
+    """Locate owned ELF descriptors through generated command links, never signatures.
+
+    Nibble offsets include the native allocation's four-byte envelope. Consumers
+    must validate this exact expected library; metadata is not root publication.
+    """
+    data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
+
+    def word(at, width=5):
+        return int(data[at : at + width][::-1], 16)
+
+    fields = 17 + 2 * word(10, 2)
+    links = fields + 10 + word(fields + 10)
+    if word(links) != 0x2A4E or word(links + 5) != 40:
+        raise ValueError("Recovery layout requires the seven-command guarded library")
+    layout = dict(
+        version=1, library_id=word(fields - 3, 3), record_bytes=((5 + word(5) + 15) & ~7) // 2
+    )
+    for name, index, initialized, offset, fresh_copy in images:
+        link = links + 10 + 5 * index
+        start = link + word(link)
+        size = (len(initialized) + 7) & ~7
+        source = 15 + len(entry(size, 0, fresh_copy=fresh_copy)) + (15 if fresh_copy else 0)
+        descriptor = start + source + 2 * offset
+        expected = "".join(
+            f"{byte & 15:x}{byte >> 4:x}" for byte in initialized[offset : offset + 16]
+        )
+        if len(expected) != 32 or data[descriptor : descriptor + 32] != expected:
+            raise ValueError("Recovery descriptor does not match its generated command")
+        layout[name + "_binding_nibble"] = 8 + descriptor
+    return layout
+
+
 def package_elf(
     elf: Path,
     *,
@@ -375,11 +418,7 @@ def package_elf(
         raise ValueError(
             f"Unverified recovery relocations: {sorted(relocations - PIC_RELOCATIONS)}"
         )
-    symbols = {}
-    for line in subprocess.check_output([nm, elf], text=True).splitlines():
-        fields = line.split()
-        if len(fields) == 3:
-            symbols[fields[2]] = int(fields[0], 16)
+    symbols = elf_symbols(elf, nm)
     if not {"entry", "__zero_start", "__image_end"} <= symbols.keys():
         raise ValueError("Recovery ELF is missing required entry/layout symbols")
     if symbols["entry"] != 0:
@@ -466,6 +505,11 @@ def main() -> None:
         type=Path,
         help="predicate ELF bound to the same explicit journal/authority pair as recovery",
     )
+    parser.add_argument(
+        "--layout-output",
+        type=Path,
+        help="write descriptor coordinates for the exact generated guarded library",
+    )
     for tool in ("nm", "readelf", "objcopy"):
         parser.add_argument("--" + tool, default="llvm-" + tool)
     parser.add_argument("input", type=Path, help="recovery ELF or trusted PIC binary, not HPC1")
@@ -495,6 +539,8 @@ def main() -> None:
         parser.error(
             "explicit recovery binding requires --admission-elf, not a prepacked predicate"
         )
+    if args.layout_output is not None and args.admission_elf is None:
+        parser.error("--layout-output requires --admission-elf")
     paths = [
         args.input,
         args.output,
@@ -502,6 +548,7 @@ def main() -> None:
         args.program_output,
         args.admission_program,
         args.admission_elf,
+        args.layout_output,
     ]
     resolved = [path.resolve() for path in paths if path is not None]
     if len(set(resolved)) != len(resolved):
@@ -531,7 +578,7 @@ def main() -> None:
     if args.admission_elf is not None:
         # A hidden command always starts with a fresh immutable Flash copy.
         # Validate both ELFs and bind both before writing any output file.
-        admission, _ = package_elf(
+        admission, admission_initialized = package_elf(
             args.admission_elf,
             model=args.model,
             nm=args.nm,
@@ -551,10 +598,32 @@ def main() -> None:
         )
     elif args.library_id is not None:
         result = configuration_library(result, args.library_id)
+    if args.layout_output is not None:
+        layout = recovery_layout(
+            result,
+            (
+                (
+                    "recovery",
+                    0,
+                    initialized,
+                    elf_symbols(args.input, args.nm)["hpclang_recovery_binding"],
+                    args.flash_copy,
+                ),
+                (
+                    "admission",
+                    6,
+                    admission_initialized,
+                    elf_symbols(args.admission_elf, args.nm)["hpclang_recovery_binding"],
+                    True,
+                ),
+            ),
+        )
     if args.binary_output is not None:
         args.binary_output.write_bytes(initialized)
     if args.program_output is not None:
         args.program_output.write_bytes(program)
+    if args.layout_output is not None:
+        args.layout_output.write_text(json.dumps(layout, indent=2) + "\n")
     args.output.write_bytes(result)
 
 

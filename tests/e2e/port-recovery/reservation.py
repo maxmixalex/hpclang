@@ -128,6 +128,8 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             str(build / "admission.elf"),
             "--program-output",
             str(package / "recovery-configuration.hp"),
+            "--layout-output",
+            str(package / "recovery-layout.json"),
             "--nm",
             args.nm,
             "--readelf",
