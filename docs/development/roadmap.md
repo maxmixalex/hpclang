@@ -427,6 +427,24 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Installed transaction recovery (local, open):** the real planner places
+  the library in the second user bank and the journal/authority in the first
+  bank's free tail. Injecting damage into that first bank's header after a
+  real installation leaves both native models unrepaired. A new host regression
+  reproduces the cause: bound replay discovers journals through the damaged
+  current bank header before applying the validated target image. The local fix
+  scans the restored view with separate image/scanner buffers, while retiring
+  transactions still require equality with the actual target. The regression,
+  66 Python tests, ARM analysis and complete authority ASan/UBSan suite pass.
+  Additional focused sanitizer checks preserve Flash/output on rejection of
+  unfinished retirement and competing journals. Both native models pass fresh
+  real-template installation, recovery/retirement with 1,923 SST operations,
+  exact remaining Flash/catalog/source preservation and a second boot with zero
+  writes. This path is connected to maintained installation E2E; it is local,
+  not yet submitted or CI-accepted. Fault preparation validates tails and sector overlap
+  instead of requiring a separate empty bank. This injected transaction does
+  not prove production activation authority or safe reclamation.
+
 - **Current submission batch:** real-template build/native coverage
   (`192310b5`) and unarmed staging/preflight (`1f51170d`) are submitted together.
   Local verification is recorded below; CI acceptance remains pending and new

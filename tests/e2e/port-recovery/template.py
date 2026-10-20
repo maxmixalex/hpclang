@@ -74,6 +74,72 @@ def verify_source(state, library):
     )
 
 
+def run_installed_recovery(
+    args, before, root, library, layout, *, emulator, completed, verify_busy_reads
+):
+    """Exercise the actually installed/rebound root with an injected transaction.
+
+    The fixture constructs authority; this does not establish production
+    installation provenance, resource ownership or activation permission.
+    """
+    import shutil
+    from prepare import prepare
+    from verify import verify_flash, verify_restart, verify_retired
+
+    obj = nibbles(library[8:])
+    at = layout["recovery_binding_nibble"] - 8
+    journal = int(obj[at + 16 : at + 24][::-1], 16)
+    authority = int(obj[at + 24 : at + 32][::-1], 16)
+    require(authority == journal + 4124, "Expected contiguous prepared transaction")
+    target = 0x140000
+    fault = root / "transaction-fault"
+    prepare(before, fault, journal, target, bound=True)
+
+    def boot(source, label):
+        phase = root / label
+        phase.mkdir()
+        shutil.copytree(source, phase / "state")
+        with emulator(
+            args,
+            phase,
+            "10000 capture home\n12000 finish-install\n",
+            ["--reset"],
+            flash_busy=True,
+            reset_checkpoint=True,
+        ) as child:
+            completed(child, 90)
+        return phase / "state"
+
+    repaired = boot(fault, "transaction-recovered")
+    verify_flash(
+        (fault / "flash").read_bytes(),
+        (repaired / "flash").read_bytes(),
+        journal,
+        target,
+        retire=True,
+        authority_slot=authority,
+    )
+    verify_restart(before, repaired, repaired)
+    operations = verify_busy_reads(args, root / "transaction-recovered")
+    require(not args.flash_busy_reads or operations > 0, "Recovery bypassed Flash polling")
+    repeated = boot(repaired, "transaction-rechecked")
+    verify_restart(before, repaired, repeated)
+    verify_retired(
+        (repaired / "flash").read_bytes(),
+        (repeated / "flash").read_bytes(),
+        journal,
+        target,
+        authority_slot=authority,
+    )
+    require(
+        verify_busy_reads(args, root / "transaction-rechecked") == 0,
+        "Closed installed transaction programmed Flash again",
+    )
+    for state in (repaired, repeated):
+        verify_source(state, (args.build / "template.hp").read_bytes())
+    return {"journal": journal, "authority": authority, "operations": operations}
+
+
 def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     from installation import verify_placement, verify_preparation, verify_probe
     from startup import verify_startup
@@ -168,8 +234,26 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     )
     verify_source(rejected / "state", (build / "expected-library.hp").read_bytes())
     require(verify_busy_reads(args, rejected) == 0, "Rejected template wrote Flash")
-    print("Real recovery template preparation, storage, restart and rejection passed", flush=True)
-    return {"bytes": layout["record_bytes"], "slot": slot, "operations": operations}
+    recovery = run_installed_recovery(
+        args,
+        root / "restart/state",
+        root,
+        rebound,
+        layout,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
+    print(
+        "Real recovery template preparation, storage, restart, rejection and recovery passed",
+        flush=True,
+    )
+    return {
+        "bytes": layout["record_bytes"],
+        "slot": slot,
+        "operations": operations,
+        "recovery": recovery,
+    }
 
 
 if __name__ == "__main__":

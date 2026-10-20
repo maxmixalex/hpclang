@@ -227,10 +227,36 @@ int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
     struct bound_overlay view = {
         io, authority_slot, journal_slot, destination, authority_slot & ~0x1ffffu, NULL, 0};
     struct hpclang_rpl_flash_io masked = {&view, bound_read, NULL, io->first, io->end};
-    uint32_t found, restored;
-    int result = hpclang_rpl_flash_preflight_sector(&masked, scratch, capacity, &found, &restored);
-    if (result < 0)
-        return result;
+    /* The validated bound pair may live after the damaged bank header. Resolve
+     * discovery against its restored view, keeping the trusted image separate
+     * from scanner scratch. Retiring records still require actual target
+     * equality before any overlay can hide a discrepancy. */
+    if (journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRING) {
+        for (uint32_t offset = 0; offset < HPCLANG_RPL_FLASH_SECTOR_BYTES; offset += 2u) {
+            uint16_t actual;
+            if (!io->read16(io->context, destination + offset, &actual))
+                return HPCLANG_RPL_FLASH_FAILED;
+            if (actual != image_word(image, offset))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    view.image = journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED ? NULL : image;
+    uint32_t found = io->end, restored = 0;
+    int result = 0;
+    for (uint32_t bank = io->first; bank < io->end; bank += 0x20000u) {
+        uint32_t candidate, candidate_target;
+        int scanned = hpclang_rpl_flash_find_sector(&masked, bank, scratch + bytes, bytes,
+                                                    &candidate, &candidate_target);
+        if (scanned < 0)
+            return scanned;
+        if (scanned > 0) {
+            if (result)
+                return HPCLANG_RPL_FLASH_DIRTY;
+            result = scanned;
+            found = candidate;
+            restored = candidate_target;
+        }
+    }
     if (journal_phase == HPCLANG_RPL_FLASH_SECTOR_RETIRED) {
         if (result != 0)
             return HPCLANG_RPL_FLASH_DIRTY;

@@ -461,6 +461,47 @@ static void tombstone(uint32_t slot, uint32_t bytes)
     flash[slot - FIRST + 3] = (uint8_t)(extent >> 16);
 }
 
+static void bound_same_bank_tests(void)
+{
+    const uint32_t slot = FIRST + 0x2005u, root = slot + sizeof journal;
+    uint8_t scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    prepare_native_port(0x7e, 0x7e, root, slot);
+    tombstone(FIRST + 0x105u, slot - FIRST - 0x105u);
+    memcpy(image, flash, sizeof image);
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, slot, FIRST, image, journal,
+                                           sizeof journal) == 0);
+    assert(hpclang_rpl_flash_authority_encode(FIRST, END, root, slot, journal, sizeof journal,
+                                              authority, sizeof authority) == 0);
+    memcpy(flash + slot - FIRST, journal, sizeof journal);
+    memcpy(flash + root - FIRST, authority, sizeof authority);
+    memset(flash, 255, sizeof image);
+    memcpy(initial, flash, sizeof flash);
+    uint32_t target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_SECTOR_READY);
+    assert(target == FIRST && !programs && !erases);
+    assert(!memcmp(initial, flash, sizeof flash));
+    assert(!memcmp(scratch, journal, sizeof journal));
+    assert(flash[0x100] == 255);
+    flash[slot - FIRST] = 0x7c;
+    target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(target == 123);
+    memcpy(flash, image, sizeof image);
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_SECTOR_RETIRING);
+    assert(target == FIRST && !programs && !erases);
+    uint8_t foreign[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    assert(hpclang_rpl_flash_sector_encode(FIRST, END, ROOT, FIRST, image, foreign,
+                                           sizeof foreign) == 0);
+    memcpy(flash + ROOT - FIRST, foreign, sizeof foreign);
+    target = 123;
+    assert(hpclang_rpl_flash_preflight_bound(&io, root, slot, scratch, sizeof scratch, &target) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(target == 123 && !programs && !erases);
+}
+
 static void bound_preflight_tests(void)
 {
     uint8_t scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
@@ -960,6 +1001,7 @@ static void installed_preflight_tests(void)
 
 int main(void)
 {
+    bound_same_bank_tests();
     bound_membership_tests();
     memset(initial, 255, sizeof initial);
     memset(image, 0x42, sizeof image);

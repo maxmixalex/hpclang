@@ -183,6 +183,49 @@ class RecoveryPrepareTests(unittest.TestCase):
                 PREPARE.prepare(self.source, self.destination, slot, target)
             self.assertFalse(self.destination.exists())
 
+    def test_journal_can_follow_existing_allocations_without_modifying_them(self):
+        first = 0x160105
+        prefix = bytes.fromhex("000e000012345678530e001078563412")
+        self.flash[first : first + len(prefix)] = prefix
+        (self.source / "flash").write_bytes(self.flash)
+        slot = first + len(prefix)
+        PREPARE.prepare(self.source, self.destination, slot, 0x140000, bound=True)
+        actual = (self.destination / "flash").read_bytes()
+        self.assertEqual(actual[first:slot], prefix)
+        record = actual[slot : slot + 4124]
+        authority = actual[slot + 4124 : slot + 4156]
+        self.assertEqual(int.from_bytes(record[12:16], "little"), slot)
+        self.assertEqual(int.from_bytes(authority[16:20], "little"), slot)
+        expected = self.flash.copy()
+        expected[0x140000:0x141000] = b"\xff" * 4096
+        expected[slot : slot + 4156] = record + authority
+        self.assertEqual(actual, expected)
+        self.assertEqual((self.source / "flash").read_bytes(), self.flash)
+
+    def test_journal_rejects_payload_offsets_holes_and_insufficient_tail(self):
+        first = 0x160105
+        for extent, slot in ((16, first + 4), (16, first + 12), (0x3FDF0, first + 0x1FEF8)):
+            with self.subTest(extent=extent, slot=slot):
+                flash = self.flash.copy()
+                flash[first : first + 4] = b"\0" + (extent - 2).to_bytes(3, "little")
+                (self.source / "flash").write_bytes(flash)
+                with self.assertRaises(ValueError):
+                    PREPARE.prepare(self.source, self.destination, slot, 0x140000, bound=True)
+                self.assertFalse(self.destination.exists())
+
+    def test_journal_can_share_target_bank_but_not_target_sector(self):
+        first, slot = 0x140105, 0x142105
+        self.flash[first : first + 4] = b"\0" + (2 * (slot - first) - 2).to_bytes(3, "little")
+        (self.source / "flash").write_bytes(self.flash)
+        for target in (0x142000, 0x143000):
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, "overlap"):
+                PREPARE.prepare(self.source, self.destination, slot, target, bound=True)
+            self.assertFalse(self.destination.exists())
+        PREPARE.prepare(self.source, self.destination, slot, 0x140000, bound=True)
+        actual = (self.destination / "flash").read_bytes()
+        self.assertEqual(actual[0x141000:slot], self.flash[0x141000:slot])
+        self.assertEqual(actual[slot + 4156 :], self.flash[slot + 4156 :])
+
     def test_callback_body_target_is_derived_and_rejects_changed_mapping(self):
         flash = self.flash.copy()
         header, callback = 0x61BE8, 0x6896F

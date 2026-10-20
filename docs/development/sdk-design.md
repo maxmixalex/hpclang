@@ -474,15 +474,20 @@ tests reject collateral writes, incomplete replay, corrupt journals and truncate
 state.
 
 `tests/e2e/port-recovery/prepare.py` creates a separate fault-state directory
-from a clean HP49g+/HP50g Stock boot. It validates the six native bank identities and
-an empty journal bank, preserves the target sector in a CRC-protected journal,
+from a clean HP49g+/HP50g Stock boot or an installed recovery fixture. It validates
+the six native bank identities, allocation chain and erased journal tail,
+preserves the target sector in a CRC-protected journal,
 then erases that sector in the copied Flash image. The original state and any
 existing destination are preserved. The copied state must undergo hardware
 reset before transfer so Stock rebuilds its catalog from the damaged Flash.
 This is explicit offline fault injection, not a model of an erase/program pulse
 interrupted while the chip is busy.
 Targets may be aligned sectors anywhere inside the first user bank; the journal
-must remain in a separate empty bank. This permits body-only faults that leave
+and optional authority must fit at a real free allocation boundary, leave an
+erased end marker and avoid the target sector. They may share its bank. Bound
+replay scans the validated restored view so a damaged bank header does not hide
+its own journal; scanner scratch cannot overwrite that image. Retiring phases
+still compare the actual target before applying this view. This permits body-only faults that leave
 the bank identity and earlier library headers intact. The configuration fixture
 derives its Stock 2.15 library-229 callback sector from the saved catalog and
 Flash header, verifies the expected bank mapping and rejects a target sharing

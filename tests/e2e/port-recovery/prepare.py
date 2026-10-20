@@ -86,14 +86,8 @@ def configuration_body_sector(flash: bytes, read) -> int:
     return sector
 
 
-def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
-    """Occupy a fixture bank's erased tail so Stock installs recovery elsewhere.
-
-    A native tombstone consumes capacity without introducing a library or a
-    callback. Existing allocations and the final erased marker are preserved.
-    This constructs test state; it is not an installation or reclamation API.
-    """
-    flash = bytearray((source / "flash").read_bytes())
+def free_tail(flash: bytes, bank: int) -> int:
+    """Find a fixture allocation boundary without interpreting payload as a header."""
     if len(flash) != 0x200000 or not 0x140000 <= bank < 0x200000 or bank % 0x20000:
         raise ValueError("Invalid fixture bank")
     identity = int.from_bytes(flash[bank + 0x100 : bank + 0x105], "little")
@@ -109,6 +103,18 @@ def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
         cursor += extent // 2
     if cursor >= end or flash[cursor:end] != b"\xff" * (end - cursor):
         raise ValueError("Fixture bank has no intact erased tail")
+    return cursor
+
+
+def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
+    """Occupy a fixture bank's erased tail so Stock installs recovery elsewhere.
+
+    A native tombstone consumes capacity without introducing a library or a
+    callback. Existing allocations and the final erased marker are preserved.
+    This constructs test state; it is not an installation or reclamation API.
+    """
+    flash = bytearray((source / "flash").read_bytes())
+    cursor, end = free_tail(flash, bank), bank + 0x20000
     capacity = (end - cursor - 1) & ~3
     if capacity >= 4:
         flash[cursor : cursor + 4] = b"\0" + (capacity * 2 - 2).to_bytes(3, "little")
@@ -129,16 +135,17 @@ def prepare(
     ):
         raise ValueError("Partial bank status requires a bank-header sector and an F0–FF byte")
     bank = slot & ~0x1FFFF
-    if not 0x160000 <= bank < 0x200000 or slot != bank + 0x105:
-        raise ValueError(
-            "Journal must start at an intact, separate empty bank's allocation boundary"
-        )
+    if not 0x140000 <= bank < 0x200000 or slot != free_tail(flash, bank):
+        raise ValueError("Journal must start at an intact bank's free allocation boundary")
+    end = slot + 4124 + (32 if bound else 0)
+    if end >= bank + 0x20000:
+        raise ValueError("Journal and authority must leave an erased end marker")
+    if slot < target + 4096 and target < end:
+        raise ValueError("Journal and authority must not overlap the target sector")
     for base in range(0x140000, 0x200000, 0x20000):
         identity = int.from_bytes(flash[base + 0x100 : base + 0x105], "little")
         if identity != 0xF0 + ((base // 0x20000 - 2) << 8):
             raise ValueError(f"Invalid native bank identity at {base:#x}")
-    if flash[slot : bank + 0x20000] != b"\xff" * (bank + 0x20000 - slot):
-        raise ValueError("Journal bank is not empty")
     record = bytearray(4124)
     record[:4] = bytes.fromhex("7e362030")
     record[4:12] = b"HPCSECT1"
