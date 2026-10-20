@@ -421,7 +421,14 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **Latest submitted implementation:** `aaf23c02` includes the read-only native
+- **Current batch prepared for CI:** `0c263a97` includes installed-transaction
+  preflight, owned descriptor layout generation, one-shot fixture lifetime fixes
+  and maintained native transaction E2E. Both models pass the full recovery suite
+  and all five installed-transaction states locally; 75 focused host tests, ARM
+  analysis, pinned formatting/lint and strict documentation pass. CI acceptance
+  remains pending; `62f7ece4` remains the accepted baseline.
+
+- **Previously submitted implementation:** `aaf23c02` includes the read-only native
   installation matcher, maintained two-model installation E2E (`66cdf5e5`) and
   unified recovery/admission ELF binding. Both native installation flows and full
   guarded recovery regressions pass locally. Quality, Runtime and Objects pass
@@ -434,8 +441,9 @@ Current delivery checkpoints:
   release their own HOME binding after RCL; the final reusable retirement
   program remains installed. Independent snapshot checks find the obsolete
   bindings absent, the reusable program retained and 203,636 bytes of free gap
-  on both models. Both fresh native flows pass the previously failing
-  retirement/re-entry step; the remaining complete flows are still running.
+  on both models. Both fresh native flows now pass the complete maintained
+  recovery suite, including retirement/re-entry, automatic STARTUP, configuration
+  recovery, transaction rejection and all reservation rejection cases.
 - **Installed transaction preflight (`6953972e`, local):** a new read-only composition derives
   the pair from two matching HPCBIND1 descriptors at owned packaging coordinates,
   checks the bound transaction, and matches the complete installed library and
@@ -450,8 +458,11 @@ Current delivery checkpoints:
   armed/intact-target, closed and unpublished cases on both models, including
   complete initialized code and its owning CODE object, reconstructed expected
   library, stack guards, restored mappings, result and unchanged Flash/catalog.
-  The damaged-target native case is running; maintained E2E integration remains
-  pending. Root publication, lifetime, RAM ownership, startup ordering and
+  The damaged-target native prototype also passes on both models. Maintained
+  installation E2E now includes armed, damaged-target, retiring, closed and
+  unpublished transactions in the existing suite (`0c263a97`); both models pass
+  all five states with unchanged Flash/catalog and zero Flash operations.
+  Root publication, lifetime, RAM ownership, startup ordering and
   reclamation remain open.
 - **CI accepted:** `62f7ece4`, including compact Flash recovery packaging and
   maintained low-memory/repeated-restart tests. All four triggered workflows pass;
@@ -584,8 +595,9 @@ only `62f7ece4` has accepted CI evidence recorded above. Later matcher commits
 #### Next M8.0 acceptance
 
 Establish the trusted installation/root and bind the reservation to the current
-transaction. The maintained guarded-reservation E2E is already integrated; its
-remote acceptance remains a separate gate. Preserve the execution-reference
+transaction. The maintained guarded-reservation E2E is accepted at `62f7ece4`;
+subsequent installation and recovery follow-ups retain the separate delivery
+checkpoints above. Preserve the execution-reference
 requirements while their scope clarification is pending. M8.1 remains the only
 accepted complete M8 stage.
 
