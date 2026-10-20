@@ -421,7 +421,21 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **Current submitted batch:** `b7b82d18` (implementation/tests through `0c263a97`)
+- **Current implementation batch:** `85b57056` adds maintained native publication
+  and completed-transaction restart tests to the existing installation suite,
+  alongside initial planning (`2c7cb1c1`) and journal retry (`5d31e43a`). On both
+  models, planning and create-only 32 KiB reservation creation precede journal
+  and authority publication; each experiences one observed partial-bit program,
+  then continuation, retirement and closure succeed. Each initial run performs
+  1,957 real Flash operations. Restart preserves Flash and reservation; a repeated
+  closed call performs zero operations. Exact Flash/catalog, initialized code and
+  owning CODE object, stack guards/mappings and diagnostic results pass. The host
+  oracle was corrected to expect the observed empty post-reset stack and rechecked
+  against both saved native runs. Fresh ARM builds, 75 focused host tests, analysis
+  and pinned lint/format pass. Publication uses a no-op desired target and retries
+  within one invocation; mid-publication power-loss recovery and durable resource
+  ownership remain open. CI acceptance is pending; no milestone is closed.
+- **Previous submitted batch:** `b7b82d18` (implementation/tests through `0c263a97`)
   includes installed-transaction
   preflight, owned descriptor layout generation, one-shot fixture lifetime fixes
   and maintained native transaction E2E. Both models pass the full recovery suite
@@ -429,7 +443,7 @@ Current delivery checkpoints:
   analysis, pinned formatting/lint and strict documentation pass. CI acceptance
   remains pending; `62f7ece4` remains the accepted baseline.
 
-- **Journal publication retry (`5d31e43a`, local):** sector capsules now have an
+- **Journal publication retry (`5d31e43a`, included in current batch):** sector capsules now have an
   explicit continuation operation, sharing the existing authority-record
   publication validator. It checks the entire caller-owned original capsule,
   NOR-compatible partial body and erased end marker before writing; verifies the
@@ -439,9 +453,9 @@ Current delivery checkpoints:
   Target/unrelated bytes remain unchanged; authority regressions, ASan/UBSan,
   ARM analysis and pinned formatting pass. This requires the original trusted
   transaction identity/image and precedes any adjacent following allocation.
-  Native publication/restart integration and durable RAM ownership remain open;
-  not submitted.
-- **Initial transaction planning (`2c7cb1c1`, local):** the installed-layout
+  Maintained publication and completed-restart evidence is recorded above;
+  mid-publication power-loss recovery and durable RAM ownership remain open.
+- **Initial transaction planning (`2c7cb1c1`, included in current batch):** the installed-layout
   planner validates the expected library/catalog on intact Flash before either
   transaction record is published. It derives the owned journal/authority pair,
   requires untouched bytes, validates their exact prospective allocation
@@ -452,7 +466,7 @@ Current delivery checkpoints:
   pinned formatting pass. Both native models also pass planning followed by
   create-only 32 KiB reservation creation and repeated-create rejection, with
   complete code/owner/guard/mapping/Flash/catalog checks. Durable reservation
-  ownership and publication/interruption integration remain open; not submitted.
+  ownership and publication/interruption integration remain open.
 - **Reservation creation prototype (local):** both native models pass exact
   installed-library/catalog matching before transaction publication, followed by
   creation of a 32 KiB HOME string through the existing native create-only API.
