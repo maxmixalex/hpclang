@@ -524,7 +524,13 @@ Current delivery checkpoints:
   uses this bound number, sealed content and streaming transaction preflight
   with a 4 KiB stack. ARM build/analysis and 77 related Python tests pass; both
   models are running the complete automatic recovery and rejection fixture.
-  Native acceptance of this follow-up remains pending.
+  Automatic low-memory recovery/restart and closed, unpublished, bad-CRC,
+  bank-identity and dirty-tail rejection now pass on both models. An additional
+  native startup case changes only the installed library title and repairs its
+  native CRC; both models reject it without releasing RAM, writing Flash or
+  requesting reset. The completion marker proves the callback ran, and all
+  retained user data remain exact. Remaining reservation rejection cases are
+  still running; full native acceptance of this follow-up remains pending.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

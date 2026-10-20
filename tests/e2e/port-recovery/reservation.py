@@ -8,7 +8,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-from prepare import prepare, reserve_bank_tail
+from prepare import changed_library_title, prepare, reserve_bank_tail
 from verify import (
     home_object,
     home_string,
@@ -338,8 +338,29 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     admission_gap = (admission_read(0x806F8) - admission_read(0x806F3)) // 2
     if not 0 < admission_gap < len(program) - 8:
         raise ValueError("Admission rejection fixture did not retain low-memory pressure")
+    observed_package = (package / "recovery-observed.hp").read_bytes()
+    observed_slot, _ = installed_recovery(
+        (admission_before / "flash").read_bytes(),
+        observed_package,
+        LIBRARY_ID,
+        args.target,
+        read=admission_read,
+    )
+    altered_package = changed_library_title(observed_package)
+    altered_view = bytearray((admission_before / "flash").read_bytes())
+    altered_view[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
+        altered_package[8:]
+    )
+    installed_recovery(altered_view, altered_package, LIBRARY_ID, args.target, read=admission_read)
     admission_rejected = []
-    for label in ("closed", "unpublished", "bad-crc", "bank-identity", "dirty-tail"):
+    for label in (
+        "closed",
+        "unpublished",
+        "bad-crc",
+        "bank-identity",
+        "dirty-tail",
+        "library-identity",
+    ):
         fault = root / ("admission-" + label + "-fault")
         prepare(admission_before, fault, args.slot, args.target, bound=True)
         flash = bytearray((fault / "flash").read_bytes())
@@ -356,6 +377,10 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             flash[authority + 28] ^= 1
         elif label == "bank-identity":
             flash[(args.slot & ~0x1FFFF) + 0x100] ^= 1
+        elif label == "library-identity":
+            flash[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
+                altered_package[8:]
+            )
         else:
             flash[authority + 32 + 4] = 0
         (fault / "flash").write_bytes(flash)

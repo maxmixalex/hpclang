@@ -11,7 +11,7 @@ from installation import (
     TARGET,
     verify_probe,
 )
-from prepare import prepare
+from prepare import changed_library_title, prepare
 from reservation import home_string, packager, reader, verify_zero_real_array
 from verify import installed_recovery, nibbles, require, symbol_offsets
 
@@ -153,18 +153,7 @@ def run_identity(args, clean, *, transfer, emulator, completed, verify_busy_read
 
     changed = root / "changed-library"
     shutil.copytree(before, changed)
-    values = [int(nibble, 16) for nibble in nibbles(library[8:])]
-    span = 5 + sum(values[5 + i] << (4 * i) for i in range(5))
-    values[12] ^= 1  # Title only: keep ID, command code and allocation geometry.
-    crc = 0
-    for value in values[5 : span - 4]:
-        for bit in range(4):
-            carry = (crc ^ (value >> bit)) & 1
-            crc >>= 1
-            if carry:
-                crc ^= 0x8408
-    values[span - 4 : span] = [(crc >> (4 * i)) & 15 for i in range(4)]
-    altered = bytes(values[i] | values[i + 1] << 4 for i in range(0, len(values), 2))
+    altered = changed_library_title(library)[8:]
     flash = bytearray((changed / "flash").read_bytes())
     flash[slot + 4 : slot + 4 + len(altered)] = altered
     (changed / "flash").write_bytes(flash)

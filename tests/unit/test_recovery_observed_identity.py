@@ -10,6 +10,7 @@ sys.path.insert(0, str(SOURCE))
 SPEC = importlib.util.spec_from_file_location("reservation_verify", SOURCE / "reservation.py")
 RESERVATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RESERVATION)
+changed_library_title = RESERVATION.changed_library_title
 
 
 def unpack(data):
@@ -91,6 +92,26 @@ class ObservedIdentityTests(unittest.TestCase):
         for position in (0, self.position - 1, self.position + 1, len(self.library) * 2):
             with self.subTest(position=position), self.assertRaises(ValueError):
                 RESERVATION.observed_library(self.pack, self.library, identity_nibble=position)
+
+    def test_changed_title_preserves_code_but_has_valid_native_crc(self):
+        altered = changed_library_title(self.library)
+        self.assertEqual(len(altered), len(self.library))
+        before, after = unpack(self.library[8:]), unpack(altered[8:])
+        span = 5 + sum(after[5 + i] << (4 * i) for i in range(5))
+        self.assertEqual(before[:12], after[:12])
+        self.assertNotEqual(before[12], after[12])
+        self.assertEqual(before[13 : span - 4], after[13 : span - 4])
+        crc = 0
+        for nibble in after[5 : span - 4]:
+            crc = (crc >> 4) ^ (((crc ^ nibble) & 15) * 0x1081)
+        self.assertEqual(sum(after[span - 4 + i] << (4 * i) for i in range(4)), crc)
+        with self.assertRaises(AssertionError):
+            self.check_identity(altered)
+        damaged = bytearray(self.library)
+        damaged[20] ^= 1
+        for invalid in (b"", self.library[:-1], bytes(damaged)):
+            with self.subTest(invalid=invalid[:12]), self.assertRaises(ValueError):
+                changed_library_title(invalid)
 
 
 if __name__ == "__main__":
