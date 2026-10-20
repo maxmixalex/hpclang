@@ -2,14 +2,25 @@
 
 import shutil
 import struct
+import zlib
 
-from installation import AUTHORITY_SLOT, JOURNAL_SLOT, TARGET, verify_probe
+from installation import AUTHORITY_SLOT, JOURNAL_SLOT, TARGET, fixture_identity, verify_probe
 from prepare import prepare
 from reservation import packager, reader
 from verify import home_string, require, require_stock_pc, symbol_offsets
 
 
-RESERVATION = bytes((i * 37 + 11) & 255 for i in range(32768))
+def reservation_value(flash, slot):
+    capsule = bytes.fromhex("362030") + b"HPCSECT1"
+    capsule += struct.pack("<3I", JOURNAL_SLOT, TARGET, 4096)
+    capsule += flash[TARGET : TARGET + 4096]
+    header = b"HPCMEM2\0" + fixture_identity()
+    header += struct.pack(
+        "<6I", slot, JOURNAL_SLOT, AUTHORITY_SLOT, TARGET, zlib.crc32(capsule), 32768
+    )
+    value = bytearray((i * 37 + 11) & 255 for i in range(32768))
+    value[:80] = header
+    return bytes(value)
 
 
 def verify_publication(before, after, build, nm, expected, slot, repeated):
@@ -33,7 +44,11 @@ def verify_publication(before, after, build, nm, expected, slot, repeated):
     )
     require(results[10] == int(repeated), "Wrong publication or closed-repeat path")
     require(results[11] == (0 if repeated else 2), "Partial programming was not observed")
-    require(home_string(reader(after), b"HPCLEASE") == RESERVATION, "Reservation was modified")
+    require(
+        home_string(reader(after), b"HPCLEASE")
+        == reservation_value((before / "flash").read_bytes(), slot),
+        "Reservation differs from its installation/transaction binding",
+    )
     require(
         results[9] == 0 if repeated else results[9] > 0,
         "Unexpected publication or closed-repeat program count",
@@ -41,9 +56,10 @@ def verify_publication(before, after, build, nm, expected, slot, repeated):
     return results[9]
 
 
-def run_reservation_collisions(args, baseline, root, *, transfer, verify_busy_reads):
+def run_reservation_collisions(args, baseline, root, slot, *, transfer, verify_busy_reads):
     pack = packager()
-    for label, value in (("different", b"user-owned reservation name"), ("identical", RESERVATION)):
+    expected = reservation_value((baseline / "flash").read_bytes(), slot)
+    for label, value in (("different", b"user-owned reservation name"), ("identical", expected)):
         package = root / ("collision-" + label + "-package")
         package.mkdir()
         data = pack.immediate(0x2A2C) + pack.immediate(5 + 2 * len(value))
@@ -108,7 +124,7 @@ def run_publication(args, baseline, slot, *, transfer, emulator, completed, veri
     root = args.output / "installation" / "publication"
     root.mkdir()
     run_reservation_collisions(
-        args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+        args, baseline, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
     run_failure(args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
     prepared = root / "expected"
@@ -153,7 +169,8 @@ def run_publication(args, baseline, slot, *, transfer, emulator, completed, veri
                 (before / "flash").read_bytes() == expected, "Restart changed transaction Flash"
             )
             require(
-                home_string(reader(before), b"HPCLEASE") == RESERVATION,
+                home_string(reader(before), b"HPCLEASE")
+                == reservation_value((baseline / "flash").read_bytes(), slot),
                 "Restart lost or changed the reservation",
             )
     run_cancellation(

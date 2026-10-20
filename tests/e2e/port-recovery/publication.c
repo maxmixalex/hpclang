@@ -70,7 +70,8 @@ static void set_word(uint32_t at, uint32_t value, unsigned count)
         value >>= 4;
     }
 }
-static int create_reservation(const uint32_t *map)
+static int create_reservation(const uint32_t *map,
+                              const struct hpclang_rpl_flash_installed_recovery *planned)
 {
     struct hpclang_rpl_stock_memory memory;
     const volatile unsigned *l1 = (void *)0x07f00000;
@@ -89,6 +90,12 @@ static int create_reservation(const uint32_t *map)
     set_word(5, 5 + 2 * CAPACITY, 5);
     for (unsigned i = 0; i < CAPACITY; ++i)
         reservation.data[5 + i] = (uint8_t)(i * 37 + 11);
+    uint32_t crc = 0;
+    for (unsigned i = 0; i < 4; ++i)
+        crc |= (uint32_t)planned_journal[sizeof planned_journal - 4 + i] << (8u * i);
+    if (!hpclang_rpl_recovery_reservation_header(expected_identity, planned, crc, CAPACITY,
+                                                 reservation.data + 5))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
     return hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"HPCLEASE", 8,
                                                    (const struct hpclang_object *)&reservation,
                                                    &created_reservation);
@@ -206,7 +213,7 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
                                               sizeof planned_journal, &planned);
     if (result)
         return result;
-    result = create_reservation(map);
+    result = create_reservation(map, &planned);
     reservation_result[0] = (uint32_t)result;
     if (result == HPCLANG_RPL_MUTATION_INCOMPLETE) {
         /* The directory/arena may already have changed. Do not publish Flash

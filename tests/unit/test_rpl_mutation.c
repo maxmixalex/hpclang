@@ -673,6 +673,72 @@ struct reservation_fault
     unsigned calls, cut, mode, address;
 };
 
+static void test_recovery_reservation_binding(void)
+{
+    setup(1u);
+    uint8_t identity[48] = "HPCROOT1";
+    identity[9] = 2; /* 512 nibbles, owned descriptor at nibble 16. */
+    identity[12] = 16;
+    for (unsigned i = 16; i < sizeof identity; ++i)
+        identity[i] = (uint8_t)(i * 3);
+    const struct hpclang_rpl_flash_installed_recovery installed = {0x180105, 0x160105, 0x161121,
+                                                                   0x140000};
+    uint8_t header[HPCLANG_RPL_RECOVERY_RESERVATION_HEADER_BYTES];
+    assert(hpclang_rpl_recovery_reservation_header(identity, &installed, 0x12345678, 512, header));
+    static const uint8_t coordinates[24] = {5, 1, 24, 0, 5,   1,  22, 0,  33, 17, 22, 0,
+                                            0, 0, 20, 0, 120, 86, 52, 18, 0,  2,  0,  0};
+    assert(sizeof header == 80 && !memcmp(header, "HPCMEM2", 8));
+    assert(!memcmp(header + 8, identity, 48) && !memcmp(header + 56, coordinates, 24));
+    uint8_t output[sizeof header];
+    memset(output, 0xa5, sizeof output);
+    const uint32_t invalid[] = {0, 79, UINT32_MAX};
+    for (unsigned i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        assert(
+            !hpclang_rpl_recovery_reservation_header(identity, &installed, 0, invalid[i], output));
+        for (unsigned j = 0; j < sizeof output; ++j)
+            assert(output[j] == 0xa5);
+    }
+    identity[12] = 1;
+    assert(!hpclang_rpl_recovery_reservation_header(identity, &installed, 0, 512, output));
+    identity[12] = 16;
+    const struct hpclang_rpl_reader reader = {read_nibble, NULL};
+    const unsigned object = 0x90000;
+    put_word(object, 5, 0x2a2c);
+    put_word(object + 5, 5, 1029);
+    for (unsigned i = 0; i < sizeof header; ++i)
+        put_word(object + 10 + 2 * i, 2, header[i]);
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == 1);
+    /* Every nibble of identity, coordinates, transaction CRC and capacity matters. */
+    for (unsigned i = 0; i < 2 * sizeof header; ++i) {
+        memory[object + 10 + i] ^= 1;
+        assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == 0);
+        memory[object + 10 + i] ^= 1;
+    }
+    for (unsigned i = 0; i < 10 + 2 * sizeof header; ++i) {
+        rejected_read = object + i;
+        assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == -1);
+    }
+    rejected_read = UINT32_MAX;
+    put_word(object, 5, 0x29bf);
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == 0);
+    put_word(object, 5, 0x2a2c);
+    put_word(object + 5, 5, 1031);
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == 0);
+    put_word(object + 5, 5, 1029);
+    uint8_t previous[sizeof header];
+    assert(
+        hpclang_rpl_recovery_reservation_header(identity, &installed, 0x12345679, 512, previous));
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, previous) == 0);
+    identity[16] ^= 1;
+    assert(
+        hpclang_rpl_recovery_reservation_header(identity, &installed, 0x12345678, 512, previous));
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, previous) == 0);
+    assert(hpclang_rpl_recovery_reservation_match(&reader, 0xfffff, header) == -1);
+    header[8] ^= 1;
+    assert(hpclang_rpl_recovery_reservation_match(&reader, object, header) == -1);
+    assert(writes == 0);
+}
+
 static int reservation_write(void *context, uint32_t address, uint8_t value)
 {
     struct reservation_fault *fault = context;
@@ -2655,6 +2721,7 @@ int main(void)
     test_named_reference_preservation_nospace_is_non_mutating();
     test_named_create();
     test_recovery_reservation_create();
+    test_recovery_reservation_binding();
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();
     test_named_remove_newest();

@@ -427,6 +427,21 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local installation/resource binding:** the installation witness now creates
+  an `HPCMEM2` reservation header from its sealed installed identity, physical
+  library/journal/authority coordinates, target, journal CRC and capacity.
+  It verifies fresh creation before publication and never persists a RAM
+  pointer. A read-only matcher checks exact native type/capacity and all header
+  bytes. Host tests cover independent encoded fields, every header-nibble
+  corruption/read failure, old transaction CRCs, changed identities and invalid
+  input; integrated mutation tests and ASan/UBSan pass, as do 82 Python tests
+  and ARM analysis. Both native models install the newly sealed fixture and
+  pass creation/publication and retained failure, including the independently
+  reconstructed header, full Flash/catalog/code/owner/guard checks and zero
+  Flash writes on failed creation. Automatic admission
+  integration, durable creation/publication proof, restart/orphan handling and
+  global startup ordering remain open; a matching header alone is not authority.
+
 - **Local reservation creation follow-up:** a shared internal creation step
   replaces the fixture's direct allocator call. It rejects existing names,
   resolves HOME again after movement and verifies the complete stored string

@@ -377,6 +377,20 @@ address is useful only within the current exclusive invocation. It must not be
 saved as a persistent identity across native allocation, garbage collection or
 restart; durable installation/transaction binding remains required.
 
+The internal 80-byte `HPCMEM2` payload header records the full sealed
+`HPCROOT1` identity, physical library/journal/authority coordinates, target,
+status-independent journal CRC and exact RAM capacity. It contains no RAM
+pointer. The installation witness derives it from its validated initial plan
+and desired capsule before fresh creation; the independent native verifier
+reconstructs it from the installed library and original target image.
+`hpclang_rpl_recovery_reservation_match` checks a native string's type, exact
+capacity and all header bytes without writing. Neither the encoder nor the
+matcher supplies ownership by itself. Durable publication must follow verified
+fresh creation, prevent intervening native/user writes and retain the
+installation's one-use lifetime; startup admission must verify that same
+installation and active transaction before this header can authorize release.
+Automatic admission integration and the complete lifetime protocol remain open.
+
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an
 owned `hpclang_recovery_identity` ELF symbol and fills its 48-byte `HPCROOT1`
