@@ -241,6 +241,32 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
     return 1;
 }
 
+int hpclang_rpl_library_configuration(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t header, uint32_t number,
+                                      uint32_t *target)
+{
+    if (!reader || !reader->read_nibble || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (end > 0x100000u || first >= end || header < first || header > end || end - header < 23u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t id, relative;
+    int result = word(reader, header, 3, &id);
+    if (result)
+        return result;
+    if (id != number)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(reader, header + 18u, 5, &relative);
+    if (result || !relative)
+        return result;
+    uint32_t resolved = (header + 18u + relative) & 0xfffffu;
+    if (resolved < first || resolved >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *target = resolved;
+    return 1;
+}
+
 int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding)

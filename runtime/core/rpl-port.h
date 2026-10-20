@@ -125,6 +125,16 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t end, uint32_t header, uint32_t number, uint32_t command,
                                 uint32_t *target);
 
+/* Resolve a library's configuration entry through its ID header. As with
+ * command lookup, the caller supplies a stable selected mapping and bounds.
+ * Zero offset means no callback. The result is a bank-local address, not proof
+ * of callback safety, execution order or permission to run it. Do not infer
+ * absence from an unreadable header. Returns 1 found, 0 absent, or a negative
+ * span result; target changes only on 1. The callback is not dereferenced. */
+int hpclang_rpl_library_configuration(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t header, uint32_t number,
+                                      uint32_t *target);
+
 /* Match a switch address against a caller-validated ROM table containing
  * 16 seven-nibble Flash entries and a separate ERAM entry. Addresses are read,
  * never inferred from an arithmetic sequence of implementation routines.

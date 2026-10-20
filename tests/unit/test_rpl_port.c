@@ -450,6 +450,63 @@ static void test_library_command_resolution(void)
            HPCLANG_RPL_SPAN_BOUNDS);
 }
 
+static void test_library_configuration(void)
+{
+    struct image image = {.count = 100, .fail_at = UINT32_MAX};
+    struct hpclang_rpl_reader reader = {read_nibble, &image};
+    put_word(&image, 5, 161, 3);
+    uint32_t target = 91;
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target) == 0);
+    assert(target == 91);
+    put_word(&image, 23, 57, 5);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target) == 1);
+    assert(target == 80);
+    /* A backward relative pointer wraps in the 20-bit Saturn address space. */
+    put_word(&image, 23, 0x100000u - 21u, 5);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target) == 1);
+    assert(target == 2);
+    assert(hpclang_rpl_library_configuration(&reader, 3, 100, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(target == 2);
+    put_word(&image, 23, 77, 5);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    put_word(&image, 23, 57, 5);
+    for (unsigned at = 0; at < image.count; ++at) {
+        image.fail_at = at;
+        int result = hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target);
+        if ((at >= 5 && at < 8) || (at >= 23 && at < 28)) {
+            assert(result == HPCLANG_RPL_SPAN_UNAVAILABLE);
+            assert(target == 2);
+        } else {
+            assert(result == 1 && target == 80);
+            target = 2;
+        }
+    }
+    image.fail_at = UINT32_MAX;
+    image.data[24] = 16;
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    image.data[24] = 3;
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 162, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 4096, &target) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 27, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 101, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 0x100001, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_configuration(&reader, 10, 5, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_library_configuration(NULL, 0, 100, 5, 161, &target) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(hpclang_rpl_library_configuration(&reader, 0, 100, 5, 161, NULL) ==
+           HPCLANG_RPL_SPAN_UNAVAILABLE);
+    assert(target == 2);
+}
+
 static void test_bank_lookup(void)
 {
     struct image image = {.count = 125, .fail_at = UINT32_MAX};
@@ -782,6 +839,7 @@ int main(void)
     test_flashptr_special_table();
     test_bank_lookup();
     test_library_command_resolution();
+    test_library_configuration();
     test_library_catalog_lookup();
     test_catalog_traversal();
     test_port_containment();

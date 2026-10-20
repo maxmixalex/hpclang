@@ -427,6 +427,23 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local startup prerequisite:** a bounded library-configuration resolver now
+  distinguishes an absent callback from unreadable/mismatched metadata, preserves
+  bank-local identity and never dereferences or executes the result. Read-failure,
+  malformed-nibble and relative-pointer boundary tests pass under ASan/UBSan;
+  pinned host analysis passes. Actual C against both native saved states resolves
+  all 62 bindings using the observed emulator-state physical bank bases: 17
+  callbacks (including recovery) and 45 absent callbacks. The ordinary physical
+  Flash formula incorrectly mapped bank-table entry zero; its saved base is
+  `0x48000`, not `0x40000`. This restores previously skipped libraries 221/223
+  (both have callbacks) and 257 (none). Native watchpoints on both models confirm
+  that Stock initializes the bank array from its ROM size directory and uses it
+  to rebuild mappings and scan libraries. The directory describes a 96 KiB first
+  bank and thirteen 128 KiB banks, ending exactly at 2 MiB. Production mapping
+  capture and callback behavior/order analysis remain open; a low library number
+  alone is insufficient.
+  This follow-up is local and has not been submitted to CI.
+
 - **Current automatic-binding follow-up:** owned ELF namespace/capacity fields
   are filled before sealing the library. The automatic predicate compares the
   complete HPCMEM2 binding after streaming installation/transaction preflight,
@@ -440,13 +457,14 @@ Current delivery checkpoints:
   object present. There is no reduced memory-pressure requirement.
   All 83 related Python tests and ARM analysis pass. Durable ownership proof,
   installation/restart/orphan handling and global startup ordering remain open.
-  This is local follow-up after `869c8f00`, not a completed M8 stage.
+  Submitted at `26f312e5` (implementation `542d832d`, synchronized with main).
+  CI results have not been polled; this is not a completed M8 stage.
 
 - **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
   (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects
   (`39442340824`). PR #3 merged that exact submitted head into main as
   `b10699df`. Main CI is not awaited. The newer creation/resource-binding work
-  remains on the active branch for batched submission.
+  was submitted together at `26f312e5` on the active branch.
 
 - **Local installation/resource binding:** the installation witness now creates
   an `HPCMEM2` reservation header from its sealed installed identity, physical

@@ -565,6 +565,26 @@ access the damaged bank before recovery runs.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
+The internal `hpclang_rpl_library_configuration()` resolver reads the configuration
+offset from a validated library ID header in a caller-selected stable mapping.
+It distinguishes a zero offset from read failures, malformed IDs and out-of-bounds
+relative pointers; it neither executes nor classifies the callback as safe.
+Native saved-state checks on both models resolve 17 callbacks and 45 absent
+callbacks in the 62-entry fixture catalog when using the emulator state's observed
+physical bank bases. Entry zero starts at `0x48000`, unlike the ordinary Flash
+formula's `0x40000`. The latter fails ID-header validation for libraries 221, 223
+and 257; earlier exploratory inventories skipped these bindings. With the observed
+mapping, 221 and 223 have callbacks and 257 has none. This does not alter the
+validated physical layout of user Port 2 banks. Native watchpoints on both models
+observe Stock initialization of that bank array, followed by reads in the mapping
+builder and library scanner, with normal Stock return. The initialization reads
+the ROM directory's count and per-bank KiB sizes: a 96 KiB first bank followed by
+thirteen 128 KiB banks, ending exactly at 2 MiB. Production capture must validate
+the directory, mapping and bounds together; the private probe's state-relative
+offset is not an SDK contract. Callback behavior/order remains a separate proof.
+No numeric-ID or skipped-entry heuristic
+provides permission to start a destructive transaction.
+
 Journal integrity is separate from transaction authority. A host regression
 keeps a valid ready journal and adds a valid backup inside its target sector.
 Whole-port overlay preflight still accepts the old image, because that image
