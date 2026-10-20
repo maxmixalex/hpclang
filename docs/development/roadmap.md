@@ -427,6 +427,20 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local pre-callback Flash access:** native read watchpoints on both models
+  observe the original ARM library scanner reading physical `0x140100`, inside
+  the installation fixture's `0x140000` target sector, during warm startup.
+  ROM instructions identify the bank-status load in the scanner called at
+  `0x2ed40`, immediately after native state initialization; subsequent Saturn
+  reads also reach that metadata. Both observed runs return normally. This
+  establishes an additional startup dependency, not a failure of an interrupted
+  transaction: these probes use intact Flash. Merely moving the recovery
+  configuration ahead of other library callbacks cannot establish safety.
+  Acceptance must also cover scanner behavior on torn target metadata and
+  recovery reachability before affected data is consumed. The four-byte
+  sector-start probe saw no access; only the metadata watchpoint supplies
+  positive evidence, and it is not a whole-sector access trace.
+
 - **Local attachment/startup boundary:** on both supported hp4950 fixtures,
   ordinary `ATTACH` rejects experimental library ID 4, although Stock previously
   accepted its installation and configuration callback. This does not justify
