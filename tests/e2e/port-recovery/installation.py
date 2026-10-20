@@ -370,6 +370,17 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         )
         transactions.append(label)
         print(f"Installed transaction preflight verified: {label}", flush=True)
+    from store import run_storage
+
+    run_storage(
+        args,
+        clean,
+        root,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     from publication import run_publication
 
     run_publication(
@@ -394,6 +405,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,
+                selected_storage=True,
             ),
             indent=2,
         )

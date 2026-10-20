@@ -13,6 +13,7 @@ SPEC = importlib.util.spec_from_file_location("installation_verify", SOURCE / "i
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
 startup = importlib.import_module("startup")
+storage = importlib.import_module("store")
 
 
 class InstallationExecutionTests(unittest.TestCase):
@@ -182,6 +183,55 @@ class PreparationTests(unittest.TestCase):
                             before, after, root, "unused", 0, existing=existing
                         )
                     (after / "flash").write_bytes(flash)
+
+
+class StorageTests(unittest.TestCase):
+    def test_written_record_matches_draft_and_operation_count(self):
+        _, original, _ = VERIFY.fixture()
+        slot = 0x160105
+        journal = slot + len(original)
+        authority = journal + 4124
+        library, record, _ = VERIFY.fixture(journal_slot=journal, authority_slot=authority)
+        flash = b"\xff" * 0x200000
+        written = bytearray(flash)
+        written[slot : slot + len(record)] = record
+        ram = struct.pack("<6I", 0, slot, journal, authority, 0, 100) + record
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (after / "flash").write_bytes(written)
+            (after / "sram").write_bytes(ram)
+            with (
+                patch.object(storage, "verify_probe", return_value=0) as probe,
+                patch.object(
+                    storage,
+                    "symbol_offsets",
+                    return_value={
+                        "preparation_result": 0,
+                        "storage_result": 16,
+                        "prepared_library": 24,
+                    },
+                ),
+            ):
+                self.assertEqual(
+                    storage.verify_storage(before, after, root, "unused"), (slot, library, 100)
+                )
+                self.assertEqual(probe.call_args.kwargs["expected_flash"], written)
+                self.assertEqual(probe.call_args.kwargs["image"], "installation-store")
+                for offset in (0, 4, 8, 12, 16, 24, len(ram) - 1):
+                    changed = bytearray(ram)
+                    changed[offset] ^= 1
+                    (after / "sram").write_bytes(changed)
+                    with self.subTest(offset=offset), self.assertRaises(ValueError):
+                        storage.verify_storage(before, after, root, "unused")
+                changed = bytearray(ram)
+                struct.pack_into("<I", changed, 20, 0)
+                (after / "sram").write_bytes(changed)
+                with self.assertRaises(ValueError):
+                    storage.verify_storage(before, after, root, "unused")
 
 
 class StartupInventoryTests(unittest.TestCase):

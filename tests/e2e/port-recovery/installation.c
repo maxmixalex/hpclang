@@ -15,6 +15,11 @@ uint8_t prepared_library[sizeof expected_library];
  * constant aggregate embedded in the recovery image. */
 static volatile uint32_t preparation_bytes = sizeof expected_library;
 void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_reader *reader);
+#ifdef HPCLANG_INSTALLATION_STORE
+static int stored_result;
+int hpclang_installation_store(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                               uint32_t bytes, uint32_t slot);
+#endif
 
 static void plan_placement(const struct hpclang_rpl_flash_io *io,
                            const struct hpclang_rpl_flash_catalog *catalog)
@@ -50,6 +55,11 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
     preparation_result[1] = space.library_slot;
     preparation_result[2] = space.journal_slot;
     preparation_result[3] = space.authority_slot;
+#ifdef HPCLANG_INSTALLATION_STORE
+    if (!preparation_result[0])
+        stored_result = hpclang_installation_store(io, prepared_library, sizeof prepared_library,
+                                                   space.library_slot);
+#endif
 }
 #endif
 #ifdef HPCLANG_INSTALLATION_IDENTITY
@@ -149,6 +159,12 @@ int hpclang_recovery_predicate(const uint32_t *map)
     int result = hpclang_installation_publish(map, &io, &catalog, &slot);
 #elif defined(HPCLANG_INSTALLATION_CANCELLATION)
     int result = hpclang_installation_cancel(map, &io, &catalog, &slot);
+#elif defined(HPCLANG_INSTALLATION_STORE)
+    int result = (int)preparation_result[0];
+    if (!result) {
+        result = stored_result;
+        slot = preparation_result[1];
+    }
 #else
     int result = hpclang_rpl_flash_match_installation(&io, expected_library,
                                                       sizeof expected_library, &catalog, &slot);

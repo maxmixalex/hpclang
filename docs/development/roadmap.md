@@ -427,6 +427,13 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **New CI submission:** the accumulated placement, namespace exclusion, grouped
+  space planning, runtime sealing, draft preparation and selected-slot storage
+  work is submitted together after local validation. The native preparation
+  checks reuse existing E2E launches; storage adds one write and one restart
+  phase per installation model. CI acceptance is pending and will not be
+  polled immediately. This does not close M8.0.
+
 - **Local selected-slot library storage:** an internal storage primitive now
   revalidates all six banks, library-ID absence and the exact selected tail before
   appending at the planned address. Ordinary create still chooses its first free
@@ -435,8 +442,15 @@ Current delivery checkpoints:
   all six bank locations, gaps/interior/out-of-range addresses, selected-tail
   exhaustion, later read/damage/ID conflicts and a failed program followed by
   verified discard. Bytes outside the selected allocation remain unchanged.
-  Native execution of this new writer remains unverified. It stores only a
-  library and inherits append's returned-error cleanup contract; durable
+  Both HP49g+/HP50g now prepare and store the exact rebound library at the
+  selected address through the SST driver, with busy-read operation counts
+  checked. Full Flash differs only by that record; prepared content, native
+  catalog, owning CODE and guards validate. A subsequent Stock restart discovers
+  the same library at the same slot with exact Flash preserved. The maintained
+  installation suite now includes storage and restart verification. Eight
+  verifier tests and all witness package builds pass; strict PIC checks remain
+  enabled. This stores only a library and inherits append's returned-error
+  cleanup contract; durable
   installation claims, registration and power-loss/startup recovery remain open.
 
 - **Local installation draft preparation:** the runtime now validates an owned
