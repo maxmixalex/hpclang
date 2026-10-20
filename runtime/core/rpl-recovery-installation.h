@@ -26,6 +26,16 @@ int hpclang_rpl_recovery_installation_plan(const struct hpclang_rpl_flash_io *io
                                            const struct hpclang_rpl_flash_catalog *catalog,
                                            uint32_t *slot);
 
+/* The same namespace check, followed by placement of the library and its fresh
+ * journal/authority pair outside target. All views remain stable across both
+ * checks. Output changes only on success; storage and authority are not reserved.
+ * Seal and revalidate the final descriptors before any owned publication. */
+int hpclang_rpl_recovery_installation_plan_space(
+    const struct hpclang_rpl_flash_io *io, const uint8_t *record, uint32_t bytes,
+    const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target,
+    struct hpclang_rpl_flash_recovery_space *space);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use

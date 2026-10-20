@@ -427,6 +427,21 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local fresh-installation space planning:** installation preflight can now
+  place the library, journal and authority together after namespace exclusion.
+  It validates all bank tails and searches bank combinations, consumes tails
+  without gaps and keeps every extent outside the selected target sector.
+  Separate banks are supported; it backtracks when placing the library in the
+  first candidate would consume the only space large enough for the journal.
+  Eleven space cases plus the twelve namespace cases pass ASan/UBSan in the
+  installation suite, including insufficient pair space, target overlap,
+  malformed/read-failed Flash and unchanged failure outputs. Successful split
+  layouts also pass the existing journal/authority encoders. ARM build/static
+  analysis pass. This new grouped planner has no native execution acceptance
+  yet. It reserves no bytes and grants no authority: final descriptor sealing,
+  revalidation, owned publication, registration, startup and reclamation remain
+  required. This is local work, not a new CI submission or milestone closure.
+
 - **Local cross-port installation preflight:** the recovery installation planner
   combines read-only Flash selection with complete caller-supplied Port 0/1
   chains and a strictly ordered native catalog. Live unregistered RAM libraries

@@ -129,6 +129,21 @@ int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                    uint32_t bytes, uint32_t *slot);
 
+struct hpclang_rpl_flash_recovery_space
+{
+    uint32_t library_slot, journal_slot, authority_slot;
+};
+
+/* Read-only placement of a fresh native-aligned library and one recovery pair.
+ * Validate all banks and ID absence, then allocate each extent from an erased
+ * tail, without holes or overlap with target's 4 KiB sector. Search all bank
+ * combinations; the pair need not share the library's bank. Output changes only
+ * on success. This reserves nothing and does not seal descriptors, establish
+ * cross-port exclusion, authorize publication or prove safe startup ordering. */
+int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space);
+
 /* Resolve one installed library against the complete expected native record.
  * Validate all six bank identities, live records and erased tails, then require
  * a unique matching library ID, exact allocation length/header and complete

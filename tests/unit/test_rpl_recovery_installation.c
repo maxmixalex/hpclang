@@ -207,8 +207,16 @@ static void placement_tests(const struct hpclang_rpl_flash_io *io,
         uint32_t slot = UINT32_MAX;
         int result =
             hpclang_rpl_recovery_installation_plan(io, record, bytes, ports, catalog, &slot);
+        const struct hpclang_rpl_flash_recovery_space sentinel = {1, 2, 3};
+        struct hpclang_rpl_flash_recovery_space space = sentinel;
+        int planned = hpclang_rpl_recovery_installation_plan_space(io, record, bytes, ports,
+                                                                   catalog, FIRST, &space);
         if (!scenario) {
             assert(!result && slot == FIRST + 0x105);
+            assert(!planned && space.library_slot == FIRST + 0x20105 &&
+                   space.journal_slot == space.library_slot + bytes &&
+                   space.authority_slot ==
+                       space.journal_slot + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
         } else {
             int expected = scenario <= 3 || scenario == 10 ? HPCLANG_RPL_FLASH_EXISTS
                            : scenario == 4 || scenario == 5 || scenario == 11
@@ -216,10 +224,89 @@ static void placement_tests(const struct hpclang_rpl_flash_io *io,
                            : scenario == 9 ? HPCLANG_RPL_FLASH_INVALID
                                            : HPCLANG_RPL_FLASH_DIRTY;
             assert(result == expected && slot == UINT32_MAX);
+            assert(planned == expected && !memcmp(&space, &sentinel, sizeof space));
         }
         assert(!memcmp(before, flash, sizeof flash));
         assert(!memcmp(original, ram, sizeof ram));
         assert(!memcmp(old_catalog, catalog_data, sizeof catalog_data));
+    }
+}
+
+static void tail_space(unsigned bank, unsigned bytes)
+{
+    unsigned start = bank * 0x20000u + 0x105u;
+    unsigned tail = (bank + 1u) * 0x20000u - bytes - 3u;
+    unsigned extent = 2u * (tail - start) - 2u;
+    flash[start] = 0;
+    flash[start + 1] = extent;
+    flash[start + 2] = extent >> 8;
+    flash[start + 3] = 0xf0 | (extent >> 16);
+}
+
+static void space_tests(const struct hpclang_rpl_flash_io *io)
+{
+    uint8_t record[4096], journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES], image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
+    unsigned bytes = ((vectors[0].span + 15) & ~7u) / 2;
+    install(0, 0);
+    memcpy(record, flash + 0x105, bytes);
+    if (vectors[0].span & 1u)
+        record[4 + vectors[0].span / 2] |= 0xf0;
+    const struct hpclang_rpl_flash_recovery_space sentinel = {1, 2, 3};
+    for (unsigned scenario = 0; scenario < 11; ++scenario) {
+        install(0, 0);
+        memset(flash + 0x105, 255, bytes);
+        for (unsigned bank = 0; bank < 6; ++bank)
+            tail_space(bank, 0);
+        tail_space(0, bytes + HPCLANG_RPL_FLASH_AUTHORITY_BYTES);
+        tail_space(1, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        uint32_t target = END - HPCLANG_RPL_FLASH_SECTOR_BYTES;
+        if (scenario == 1)
+            tail_space(1, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4);
+        if (scenario == 2)
+            target = FIRST + 0x3f000; /* The only journal tail intersects target. */
+        if (scenario == 3)
+            target++;
+        if (scenario == 4)
+            fail_address = END - 2;
+        if (scenario == 5)
+            flash[END - FIRST - 1] = 0;
+        if (scenario == 6)
+            target = FIRST - HPCLANG_RPL_FLASH_SECTOR_BYTES;
+        if (scenario == 7)
+            target = END;
+        if (scenario == 8)
+            tail_space(0, bytes); /* Library fits, authority does not. */
+        if (scenario == 10) {
+            tail_space(0, HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+            tail_space(1, bytes + HPCLANG_RPL_FLASH_AUTHORITY_BYTES);
+        }
+        memcpy(before, flash, sizeof flash);
+        struct hpclang_rpl_flash_recovery_space space = sentinel;
+        int result = hpclang_rpl_flash_plan_recovery_space(io, record, bytes, target,
+                                                           scenario == 9 ? NULL : &space);
+        if (!scenario || scenario == 10) {
+            assert(!result);
+            unsigned library_end = FIRST + (scenario ? 0x40000 : 0x20000);
+            unsigned journal_end = FIRST + (scenario ? 0x20000 : 0x40000);
+            assert(space.library_slot == library_end - bytes - sizeof authority - 3);
+            assert(space.journal_slot == journal_end - sizeof journal - 3);
+            assert(space.authority_slot == space.library_slot + bytes);
+            memcpy(image, flash + target - FIRST, sizeof image);
+            assert(!hpclang_rpl_flash_sector_encode(FIRST, END, space.journal_slot, target, image,
+                                                    journal, sizeof journal));
+            assert(!hpclang_rpl_flash_authority_encode(FIRST, END, space.authority_slot,
+                                                       space.journal_slot, journal, sizeof journal,
+                                                       authority, sizeof authority));
+        } else {
+            int expected = scenario == 4   ? HPCLANG_RPL_FLASH_FAILED
+                           : scenario == 5 ? HPCLANG_RPL_FLASH_DIRTY
+                           : scenario == 3 || (scenario >= 6 && scenario != 8)
+                               ? HPCLANG_RPL_FLASH_INVALID
+                               : HPCLANG_RPL_FLASH_NOSPACE;
+            assert(result == expected && !memcmp(&space, &sentinel, sizeof space));
+        }
+        assert(!memcmp(before, flash, sizeof flash));
     }
 }
 
@@ -229,6 +316,7 @@ int main(void)
     const struct hpclang_rpl_reader reader = {read_catalog, catalog_data};
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 35, 0};
     placement_tests(&io, &catalog);
+    space_tests(&io);
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v)
         for (unsigned bank = 0; bank < 6; ++bank) {
             install(v, bank);

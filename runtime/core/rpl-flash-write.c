@@ -966,7 +966,7 @@ static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *n
 }
 
 static int plan_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record, uint32_t bytes,
-                       uint32_t prologue, uint32_t *slot)
+                       uint32_t prologue, uint32_t *slot, struct erased_tail *tails)
 {
     if (!slot || !valid_record(record, bytes))
         return HPCLANG_RPL_FLASH_INVALID;
@@ -978,7 +978,7 @@ static int plan_record(const struct hpclang_rpl_flash_io *io, const uint8_t *rec
         return HPCLANG_RPL_FLASH_INVALID;
     struct record_selection selection;
     int result = scan_records(io, wanted.name, wanted.name_length, wanted.prologue,
-                              wanted.library_number, bytes, &selection, NULL);
+                              wanted.library_number, bytes, &selection, tails);
     if (result)
         return result;
     if (selection.matches)
@@ -993,7 +993,52 @@ static int plan_record(const struct hpclang_rpl_flash_io *io, const uint8_t *rec
 int hpclang_rpl_flash_plan_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                    uint32_t bytes, uint32_t *slot)
 {
-    return plan_record(io, record, bytes, 0x02b40u, slot);
+    return plan_record(io, record, bytes, 0x02b40u, slot, NULL);
+}
+
+static int take_recovery_tail(struct erased_tail *tail, uint32_t bytes, uint32_t target,
+                              uint32_t *slot)
+{
+    if ((tail->slot & 3u) != 1u || tail->bytes < bytes ||
+        (tail->slot < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < tail->slot + bytes))
+        return 0;
+    *slot = tail->slot;
+    tail->slot += bytes;
+    tail->bytes -= bytes;
+    return 1;
+}
+
+int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space)
+{
+    if (!space || !io || (io->first & 0x1ffffu) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u || target < io->first ||
+        target > io->end - HPCLANG_RPL_FLASH_SECTOR_BYTES ||
+        (target & (HPCLANG_RPL_FLASH_SECTOR_BYTES - 1u)) || (bytes & 3u))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct erased_tail tails[6];
+    uint32_t unused;
+    int result = plan_record(io, record, bytes, 0x02b40u, &unused, tails);
+    if (result)
+        return result;
+    for (unsigned library = 0; library < 6; ++library)
+        for (unsigned journal = 0; journal < 6; ++journal)
+            for (unsigned authority = 0; authority < 6; ++authority) {
+                struct erased_tail available[6];
+                memcpy(available, tails, sizeof available);
+                struct hpclang_rpl_flash_recovery_space selected;
+                if (take_recovery_tail(&available[library], bytes, target,
+                                       &selected.library_slot) &&
+                    take_recovery_tail(&available[journal], HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES,
+                                       target, &selected.journal_slot) &&
+                    take_recovery_tail(&available[authority], HPCLANG_RPL_FLASH_AUTHORITY_BYTES,
+                                       target, &selected.authority_slot)) {
+                    *space = selected;
+                    return 0;
+                }
+            }
+    return HPCLANG_RPL_FLASH_NOSPACE;
 }
 
 static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
@@ -1002,7 +1047,7 @@ static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *r
     if (!io || !io->program16)
         return HPCLANG_RPL_FLASH_INVALID;
     uint32_t selected;
-    int result = plan_record(io, record, bytes, prologue, &selected);
+    int result = plan_record(io, record, bytes, prologue, &selected, NULL);
     if (result)
         return result;
     struct hpclang_rpl_flash_io reserved = *io;

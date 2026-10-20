@@ -48,6 +48,21 @@ int hpclang_rpl_recovery_installation_plan(const struct hpclang_rpl_flash_io *io
     return 0;
 }
 
+int hpclang_rpl_recovery_installation_plan_space(
+    const struct hpclang_rpl_flash_io *io, const uint8_t *record, uint32_t bytes,
+    const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target,
+    struct hpclang_rpl_flash_recovery_space *space)
+{
+    if (!space)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t unused;
+    int result = hpclang_rpl_recovery_installation_plan(io, record, bytes, ports, catalog, &unused);
+    if (result)
+        return result;
+    return hpclang_rpl_flash_plan_recovery_space(io, record, bytes, target, space);
+}
+
 struct object_reader
 {
     const struct hpclang_rpl_flash_io *io;
