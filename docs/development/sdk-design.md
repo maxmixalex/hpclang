@@ -562,6 +562,13 @@ later 1702 callback executes once. Both runs finish with the complete 63-entry
 catalog and exact Flash repair/retirement. Choosing 769 alone therefore cannot
 establish a safe production entry; earlier callbacks may have side effects or
 access the damaged bank before recovery runs.
+Further native probes install a Port 0 library numbered 768 before a Port 2
+library numbered 4 (unused in these clean fixtures). Both HP49g+/HP50g run 4
+before 768 and then `STARTUP` on two consecutive restarts, preserving the exact
+catalog ID set and Flash. This demonstrates Stock acceptance of that earlier
+entry, not a reserved ID policy or safety of the preceding system callbacks.
+An existing ID must never be replaced merely to obtain early execution; the
+installer still needs availability, firmware and complete startup-safety checks.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
 
@@ -584,6 +591,17 @@ the directory, mapping and bounds together; the private probe's state-relative
 offset is not an SDK contract. Callback behavior/order remains a separate proof.
 No numeric-ID or skipped-entry heuristic
 provides permission to start a destructive transaction.
+
+`hpclang_rpl_rom_bank_layout()` validates a stable captured size directory against
+all sixteen native bank-base cells, including zeroed unused cells. Bank extents
+come from the per-bank KiB sizes; the first bank starts immediately after the
+directory and the final bank must end exactly at the supplied Flash limit.
+Zero/oversized banks, mismatched bases, truncated coverage and overflow are errors,
+including when the requested index is unused. Output changes only for a valid
+populated bank. Callers must supply a firmware-verified directory location and
+capture stable inputs; plausible bytes or a successful parse do not identify a ROM
+or authorize recovery. Both native saved-state inventories use this parser and
+the first bank's actual 96 KiB bound when resolving configuration entries.
 
 Journal integrity is separate from transaction authority. A host regression
 keeps a valid ready journal and adds a valid backup inside its target sector.

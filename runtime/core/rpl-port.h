@@ -150,6 +150,25 @@ struct hpclang_rpl_bank_binding
     enum hpclang_rpl_bank_kind kind;
     uint32_t index;
 };
+
+struct hpclang_rpl_rom_bank
+{
+    uint32_t physical, bytes;
+};
+
+/* Validate a captured ROM size directory against all 16 captured native bank
+ * bases. The count KiB-size bytes immediately precede the first bank; their
+ * address and the Flash size are supplied by a separately verified firmware
+ * layout. Do not discover that layout by searching for plausible data.
+ * Every bank must fit a Saturn window, the complete bank sequence must end exactly
+ * at flash_bytes, and unused native base cells must be zero. Inputs stay stable.
+ * Returns 1 for a populated index, 0 for an unused index, negative span results
+ * for inconsistent metadata. Output changes only on 1. This is read-only
+ * geometry validation, not firmware identity or mutation authorization. */
+int hpclang_rpl_rom_bank_layout(const uint8_t *kib_sizes, uint32_t count, uint32_t directory,
+                                uint32_t flash_bytes, const uint32_t native_bases[16],
+                                uint32_t index, struct hpclang_rpl_rom_bank *bank);
+
 int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding);

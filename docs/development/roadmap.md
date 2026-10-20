@@ -427,6 +427,20 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local ROM-layout validation:** the shared parser now derives bank extents
+  from the captured KiB-size directory and compares every native base, including
+  unused cells. It checks complete Flash coverage, window sizes, alignment and
+  arithmetic bounds before publishing a selected bank. ASan/UBSan, pinned host
+  analysis and ARM compilation pass. Both saved native states still resolve all
+  62 library bindings using the actual first bank's 96 KiB bound, without a
+  special-case address formula. Firmware-profile discovery and live capture
+  integration remain separate requirements; this local work is not CI acceptance.
+  Native ordering probes additionally confirm on both models, across two
+  restarts, that an available Port 2 library ID 4 executes before a Port 0 ID 768
+  callback and HOME `STARTUP`, despite reverse installation order. Exact catalog
+  IDs and Flash are preserved. This is a candidate entry in a clean fixture,
+  not an allocated production ID or proof that earlier system callbacks are safe.
+
 - **Local startup prerequisite:** a bounded library-configuration resolver now
   distinguishes an absent callback from unreadable/mismatched metadata, preserves
   bank-local identity and never dereferences or executes the result. Read-failure,

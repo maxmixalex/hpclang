@@ -507,6 +507,75 @@ static void test_library_configuration(void)
     assert(target == 2);
 }
 
+static void test_rom_bank_layout(void)
+{
+    uint8_t sizes[16] = {96};
+    uint32_t bases[16] = {0x48000};
+    for (unsigned i = 1; i < 14; ++i) {
+        sizes[i] = 128;
+        bases[i] = (i + 2) * 0x20000u;
+    }
+    struct hpclang_rpl_rom_bank bank = {11, 13}, saved = bank;
+    for (unsigned i = 0; i < 16; ++i) {
+        int result = hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, i, &bank);
+        assert(result == (i < 14));
+        if (result)
+            assert(bank.physical == bases[i] && bank.bytes == (uint32_t)sizes[i] * 1024u);
+        else
+            assert(memcmp(&bank, &saved, sizeof bank) == 0);
+        bank = saved;
+    }
+    /* Validate the whole table even when querying its first or unused bank. */
+    for (unsigned i = 0; i < 16; ++i) {
+        bases[i] ^= 1024u;
+        for (unsigned query = 0; query < 16; query += 15) {
+            assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, query, &bank) ==
+                   HPCLANG_RPL_SPAN_MALFORMED);
+            assert(memcmp(&bank, &saved, sizeof bank) == 0);
+        }
+        bases[i] ^= 1024u;
+    }
+    for (unsigned i = 0; i < 14; ++i) {
+        uint8_t old = sizes[i];
+        sizes[i] = 0;
+        assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, 0, &bank) < 0);
+        sizes[i] = 129;
+        assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, 0, &bank) < 0);
+        sizes[i] = old;
+    }
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x1fffff, bases, 0, &bank) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200001, bases, 0, &bank) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff1, 0x200000, bases, 0, &bank) ==
+           HPCLANG_RPL_SPAN_MALFORMED);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, UINT32_MAX - 1, UINT32_MAX, bases, 0, &bank) ==
+           HPCLANG_RPL_SPAN_BOUNDS);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 0, 0, 0x200000, bases, 0, &bank) < 0);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 17, 0, 0x200000, bases, 0, &bank) < 0);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, 16, &bank) < 0);
+    assert(hpclang_rpl_rom_bank_layout(NULL, 14, 0x47ff2, 0x200000, bases, 0, &bank) < 0);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, NULL, 0, &bank) < 0);
+    assert(hpclang_rpl_rom_bank_layout(sizes, 14, 0x47ff2, 0x200000, bases, 0, NULL) < 0);
+    assert(memcmp(&bank, &saved, sizeof bank) == 0);
+
+    /* Geometry comes from metadata, not a special case for the observed ROM. */
+    memset(bases, 0, sizeof bases);
+    sizes[0] = 32;
+    sizes[1] = 64;
+    bases[0] = 0x800;
+    bases[1] = 0x8800;
+    assert(hpclang_rpl_rom_bank_layout(sizes, 2, 0x7fe, 0x18800, bases, 1, &bank) == 1);
+    assert(bank.physical == 0x8800 && bank.bytes == 65536);
+    /* All sixteen slots may be populated. */
+    for (unsigned i = 0; i < 16; ++i) {
+        sizes[i] = 1;
+        bases[i] = 0x400 + i * 1024;
+    }
+    assert(hpclang_rpl_rom_bank_layout(sizes, 16, 0x3f0, 0x4400, bases, 15, &bank) == 1);
+    assert(bank.physical == 0x4000 && bank.bytes == 1024);
+}
+
 static void test_bank_lookup(void)
 {
     struct image image = {.count = 125, .fail_at = UINT32_MAX};
@@ -840,6 +909,7 @@ int main(void)
     test_bank_lookup();
     test_library_command_resolution();
     test_library_configuration();
+    test_rom_bank_layout();
     test_library_catalog_lookup();
     test_catalog_traversal();
     test_port_containment();
