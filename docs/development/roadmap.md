@@ -458,6 +458,19 @@ Current delivery checkpoints:
   or supported legacy envelope length; wrong-type and enlarged envelopes
   reject in host tests, with ARM analysis passing. Maintained native integration
   and admission against an interrupted transaction's restored view remain next.
+  The subsequent local preflight now validates the bound transaction before
+  checking installed content on the restored view, reads the exact native
+  allocation extent and rejects any recovery allocation overlapping the target.
+  Host tests accept ready/damaged, retiring and closed states, preserve later
+  valid allocations after closure, and reject unpublished/corrupt records,
+  wrong catalog mappings, read failures, a root supplied only by the journal
+  and damaged current Flash after closure. Outputs and Flash remain unchanged
+  on rejection. Host/sanitizer tests and ARM analysis pass; both native models
+  are running the five transaction-state probes. The current copied admission
+  program occupies 26,914 bytes (26,832-byte ARM runtime extent), exceeding the
+  earlier 20,898-byte low-memory gap; its containing library occupies 27,008 bytes.
+  This is functional preflight evidence only: a smaller admission path and
+  renewed physical-memory validation are required before startup integration.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

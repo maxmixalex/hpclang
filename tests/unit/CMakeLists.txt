@@ -80,6 +80,7 @@ hpclang_unit(rpl_recovery_installation test_rpl_recovery_installation.c
     "${CMAKE_CURRENT_BINARY_DIR}/recovery-identity-vectors.h"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-installation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-identity.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-replay.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"

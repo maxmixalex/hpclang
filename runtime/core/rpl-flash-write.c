@@ -945,8 +945,13 @@ int hpclang_rpl_flash_locate_installation(const struct hpclang_rpl_flash_io *io,
     uint8_t metadata;
     if (!io_nibble(&flash, 7u, &metadata))
         return HPCLANG_RPL_FLASH_FAILED;
-    if (metadata != 1u || (((wanted.span + 15u) & ~7u) != selection.match_bytes * 2u &&
-                           ((wanted.span + 11u) & ~3u) != selection.match_bytes * 2u))
+    uint32_t extent;
+    result = recovery_word(&reader, 2u, 5u, &extent);
+    if (result)
+        return result;
+    if (metadata != 1u || extent + 2u != selection.match_bytes * 2u ||
+        (((wanted.span + 15u) & ~7u) != selection.match_bytes * 2u &&
+         ((wanted.span + 11u) & ~3u) != selection.match_bytes * 2u))
         return HPCLANG_RPL_FLASH_DIRTY;
     result = match_catalog(io, selection.match_slot, &wanted, catalog);
     if (!result)
