@@ -429,6 +429,18 @@ Current delivery checkpoints:
   analysis, pinned formatting/lint and strict documentation pass. CI acceptance
   remains pending; `62f7ece4` remains the accepted baseline.
 
+- **Journal publication retry (`5d31e43a`, local):** sector capsules now have an
+  explicit continuation operation, sharing the existing authority-record
+  publication validator. It checks the entire caller-owned original capsule,
+  NOR-compatible partial body and erased end marker before writing; verifies the
+  complete body before READY; and rejects every retiring/retired status. Fault
+  injection covers every initial/resumed read and program cut, partial halfword
+  bits, lost acknowledgements, silent programming failures and repeated calls.
+  Target/unrelated bytes remain unchanged; authority regressions, ASan/UBSan,
+  ARM analysis and pinned formatting pass. This requires the original trusted
+  transaction identity/image and precedes any adjacent following allocation.
+  Native publication/restart integration and durable RAM ownership remain open;
+  not submitted.
 - **Initial transaction planning (`2c7cb1c1`, local):** the installed-layout
   planner validates the expected library/catalog on intact Flash before either
   transaction record is published. It derives the owned journal/authority pair,
