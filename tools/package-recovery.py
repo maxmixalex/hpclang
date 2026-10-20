@@ -367,6 +367,26 @@ def bind_library_id(initialized: bytes, offset: int, library_id: int | None) -> 
     return initialized[:offset] + library_id.to_bytes(4, "little") + initialized[offset + 4 :]
 
 
+def bind_reservation(initialized: bytes, offset: int, reservation: tuple[str, int] | None) -> bytes:
+    """Fill the owned admission namespace/capacity contract before sealing."""
+    size = 144
+    if type(offset) is not int or offset < 0 or offset % 4 or offset + size > len(initialized):
+        raise ValueError("Recovery reservation is outside initialized aligned storage")
+    if initialized[offset : offset + size] != b"HPCRESV1" + bytes(size - 8):
+        raise ValueError("Recovery reservation is not an unbound placeholder")
+    if reservation is None:
+        return initialized
+    name, capacity = reservation
+    encoded = name.encode("ascii")
+    if not 1 <= len(encoded) <= 127 or any(byte < 33 or byte > 126 for byte in encoded):
+        raise ValueError("Recovery reservation requires a printable native name")
+    if type(capacity) is not int or not 80 <= capacity <= (MAIN_RAM_NIBBLES - 10) // 2:
+        raise ValueError("Recovery reservation capacity leaves native RAM")
+    descriptor = b"HPCRESV1" + capacity.to_bytes(4, "little") + len(encoded).to_bytes(4, "little")
+    descriptor += encoded + bytes(128 - len(encoded))
+    return initialized[:offset] + descriptor + initialized[offset + size :]
+
+
 def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     symbols = {}
     for line in subprocess.check_output([nm, elf], text=True).splitlines():
@@ -499,6 +519,7 @@ def package_elf(
     fresh_copy: bool = False,
     binding: tuple[int, int] | None = None,
     library_id: int | None = None,
+    reservation: tuple[str, int] | None = None,
 ) -> tuple[bytes, bytes]:
     """Check the owned recovery ELF contract and return envelope and raw image.
 
@@ -542,6 +563,9 @@ def package_elf(
     library_offset = symbols.get("hpclang_recovery_library_id")
     if library_offset is not None:
         initialized = bind_library_id(initialized, library_offset, library_id)
+    reservation_offset = symbols.get("hpclang_recovery_reservation")
+    if reservation_offset is not None:
+        initialized = bind_reservation(initialized, reservation_offset, reservation)
     return package(initialized, end, model=model, fresh_copy=fresh_copy), initialized
 
 
@@ -687,8 +711,15 @@ def main() -> None:
             fresh_copy=True,
             binding=binding,
             library_id=args.library_id,
+            reservation=(args.reservation_name, args.reservation_bytes),
         )
-        identity_offset = elf_symbols(args.admission_elf, args.nm).get("hpclang_recovery_identity")
+        admission_symbols = elf_symbols(args.admission_elf, args.nm)
+        identity_offset = admission_symbols.get("hpclang_recovery_identity")
+        if (
+            "hpclang_recovery_reservation" in admission_symbols
+            and args.reservation_prefix != "HPCMEM2"
+        ):
+            raise ValueError("Bound reservation admission requires the HPCMEM2 header prefix")
     if guarded:
         result = guarded_configuration_library(
             result,

@@ -316,6 +316,16 @@ class RecoveryPackageTests(unittest.TestCase):
                 self.assertEqual(envelope, PACK.package(expected, 128, model="hp50g"))
             with self.assertRaisesRegex(ValueError, "placeholder"):
                 package(descriptor + "00000014 D hpclang_recovery_library_id\n", library_id=1701)
+            image = bytes(16) + b"HPCRESV1" + bytes(136) + bytes(16)
+            symbols = "00000000 T entry\n000000b0 B __zero_start\n00000100 B __image_end\n"
+            owned_reservation = "00000010 D hpclang_recovery_reservation\n"
+            self.assertEqual(package(owned_reservation)[1], image)
+            envelope, initialized = package(owned_reservation, reservation=("HPCRES", 32768))
+            expected = PACK.bind_reservation(image, 16, ("HPCRES", 32768))
+            self.assertEqual(initialized, expected)
+            self.assertEqual(envelope, PACK.package(expected, 256, model="hp50g"))
+            with self.assertRaisesRegex(ValueError, "outside initialized"):
+                package("000000b0 D hpclang_recovery_reservation\n")
 
     def test_library_number_uses_only_owned_placeholder(self):
         image = bytes(range(16)) + b"\xff" * 4 + bytes(range(16))
@@ -333,6 +343,33 @@ class RecoveryPackageTests(unittest.TestCase):
                 PACK.bind_library_id(image, offset, 1701)
         with self.assertRaisesRegex(ValueError, "placeholder"):
             PACK.bind_library_id(image, 0, 1701)
+
+    def test_reservation_contract_uses_only_owned_placeholder(self):
+        image = bytes(range(16)) + b"HPCRESV1" + bytes(136) + bytes(range(16))
+        self.assertEqual(PACK.bind_reservation(image, 16, None), image)
+        for name in ("HPCRES", "x" * 127):
+            patched = PACK.bind_reservation(image, 16, (name, 32768))
+            self.assertEqual(patched[:24], image[:24])
+            self.assertEqual(patched[160:], image[160:])
+            self.assertEqual(int.from_bytes(patched[24:28], "little"), 32768)
+            self.assertEqual(int.from_bytes(patched[28:32], "little"), len(name))
+            self.assertEqual(patched[32:160], name.encode() + bytes(128 - len(name)))
+            with self.assertRaisesRegex(ValueError, "placeholder"):
+                PACK.bind_reservation(patched, 16, (name, 32768))
+        for name, capacity in (
+            ("", 32768),
+            ("bad name", 32768),
+            ("x" * 128, 32768),
+            ("非ASCII", 32768),
+            ("HPCRES", 79),
+            ("HPCRES", True),
+            ("HPCRES", PACK.MAIN_RAM_NIBBLES),
+        ):
+            with self.subTest(name=name, capacity=capacity), self.assertRaises(ValueError):
+                PACK.bind_reservation(image, 16, (name, capacity))
+        for offset in (-4, 1, 36, True):
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                PACK.bind_reservation(image, offset, ("HPCRES", 32768))
 
     def test_binding_changes_only_reserved_address_fields(self):
         image = bytes(range(32)) + b"HPCBIND1" + bytes(8) + bytes(range(64))

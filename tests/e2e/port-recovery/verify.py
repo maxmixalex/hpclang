@@ -263,6 +263,31 @@ def installed_recovery(flash, package, library_id, target, *, read):
     return matches[0]
 
 
+class _NativeWords:
+    def __init__(self, ram, flash, words, table):
+        self.ram, self.flash, self.words, self.table = ram, flash, words, table
+
+    def physical(self, address):
+        require(0 <= address < 0x100000, "Native address outside Saturn memory")
+        index = self.table + (address >> 12) - 128
+        require(0 <= index < len(self.words), "Native map index outside SRAM")
+        return self.words[index] + (address & 4095) // 2
+
+    def __call__(self, address, count=5):
+        result = 0
+        for i in range(count):
+            at = address + i
+            physical = self.physical(at)
+            data, offset = (
+                (self.ram, physical - 0x08000000)
+                if physical >= 0x08000000
+                else (self.flash, physical)
+            )
+            require(0 <= offset < len(data), "Native mapping outside saved memory")
+            result |= ((data[offset] >> (4 * (at & 1))) & 15) << (4 * i)
+        return result
+
+
 def native_words(ram, flash):
     require(len(ram) == 0x80000, "Expected hp4950 SRAM")
     words = struct.unpack("<" + "I" * (len(ram) // 4), ram)
@@ -272,20 +297,7 @@ def native_words(ram, flash):
         if any(words[table + j] != value + j * 2048 for j in (1, 2, 3, 16, 64, 127)):
             continue
 
-        def read(address, count=5):
-            result = 0
-            for i in range(count):
-                at = address + i
-                index = table + (at >> 12) - 128
-                require(0 <= index < len(words), "Native map index outside SRAM")
-                physical = words[index] + (at & 4095) // 2
-                data, offset = (
-                    (ram, physical - 0x08000000) if physical >= 0x08000000 else (flash, physical)
-                )
-                require(0 <= offset < len(data), "Native mapping outside saved memory")
-                result |= ((data[offset] >> (4 * (at & 1))) & 15) << (4 * i)
-            return result
-
+        read = _NativeWords(ram, flash, words, table)
         try:
             home = read(0x80711)
             if home >= 0x80000 and read(home) == 0x2A96:

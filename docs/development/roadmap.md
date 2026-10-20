@@ -427,6 +427,27 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Current automatic-binding follow-up:** owned ELF namespace/capacity fields
+  are filled before sealing the library. The automatic predicate compares the
+  complete HPCMEM2 binding after streaming installation/transaction preflight,
+  before RAM release or replay. Both native models pass low-memory recovery and
+  repeated restart with all 24,000 user array elements preserved and a measured
+  20,902-byte free gap. Existing rejection cases pass. Separate native runs of
+  the maintained new cases reject changed resource identity, location, transaction
+  CRC and capacity with valid active Flash transactions, preserving the complete
+  altered resource and user data, with no Flash write/reset; the completion
+  marker proves callback execution. Both also recover with no reservation
+  object present. There is no reduced memory-pressure requirement.
+  All 83 related Python tests and ARM analysis pass. Durable ownership proof,
+  installation/restart/orphan handling and global startup ordering remain open.
+  This is local follow-up after `869c8f00`, not a completed M8 stage.
+
+- **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
+  (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects
+  (`39442340824`). PR #3 merged that exact submitted head into main as
+  `b10699df`. Main CI is not awaited. The newer creation/resource-binding work
+  remains on the active branch for batched submission.
+
 - **Local installation/resource binding:** the installation witness now creates
   an `HPCMEM2` reservation header from its sealed installed identity, physical
   library/journal/authority coordinates, target, journal CRC and capacity.
@@ -438,8 +459,8 @@ Current delivery checkpoints:
   and ARM analysis. Both native models install the newly sealed fixture and
   pass creation/publication and retained failure, including the independently
   reconstructed header, full Flash/catalog/code/owner/guard checks and zero
-  Flash writes on failed creation. Automatic admission
-  integration, durable creation/publication proof, restart/orphan handling and
+  Flash writes on failed creation. Automatic admission is covered by the
+  current follow-up above; durable creation/publication proof, restart/orphan handling and
   global startup ordering remain open; a matching header alone is not authority.
 
 - **Local reservation creation follow-up:** a shared internal creation step
@@ -459,7 +480,7 @@ Current delivery checkpoints:
   installation/transaction identity, restart/orphan handling and startup order
   remain open. This follow-up is local, after submitted `96bcf1f5`.
 
-- **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
+- **Previous delivery checkpoint (2026-10-20):** `5aad911e` was submitted, with CI acceptance
   pending; Objects passes, Quality fails because the identity-vector header
   was generated only at build time, and Core/Runtime are still running/queued
   at the latest inspection. A local CMake fix generates the header during

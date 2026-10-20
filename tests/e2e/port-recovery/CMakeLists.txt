@@ -100,7 +100,7 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
         "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-replay rpl-port rpl-backup rpl-object-span rpl-flash-write
-            rpl-recovery-installation rpl-recovery-identity)
+            rpl-recovery-installation rpl-recovery-identity rpl-recovery-reservation rpl-object-store)
         target_sources(admission PRIVATE "${CORE}/${module}.c")
     endforeach()
     configure_recovery_image(admission)

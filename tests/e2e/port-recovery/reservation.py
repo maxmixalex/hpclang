@@ -6,6 +6,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import struct
+import zlib
 from types import SimpleNamespace
 
 from prepare import changed_library_title, prepare, reserve_bank_tail
@@ -29,6 +31,22 @@ RESERVE_BYTES = 1 << RESERVE_POWER
 USER_ELEMENTS = 24000
 NAME = b"HPCRES"
 MARKER = b"RCDONE"
+
+
+def bound_header(library, identity_nibble, library_slot, journal, target, flash):
+    data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
+    identity = bytes(
+        int(data[i : i + 2][::-1], 16) for i in range(identity_nibble, identity_nibble + 96, 2)
+    )
+    capsule = bytes.fromhex("362030") + b"HPCSECT1"
+    capsule += struct.pack("<3I", journal, target, 4096) + flash[target : target + 4096]
+    return (
+        b"HPCMEM2\0"
+        + identity
+        + struct.pack(
+            "<6I", library_slot, journal, journal + 4124, target, zlib.crc32(capsule), RESERVE_BYTES
+        )
+    )
 
 
 def packager():
@@ -109,7 +127,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     root.mkdir()
     build = args.configuration_build
     authority = args.slot + 4124
-    prefix = f"HPCMEM1:{LIBRARY_ID:04d}:{authority:06X}:00000001".encode("ascii")
+    prefix = b"HPCMEM2"
     pack = packager()
     package = root / "package"
     package.mkdir()
@@ -236,32 +254,46 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             raise ValueError("Guarded library did not preserve the native catalog")
         return baseline
 
+    def reservation_package(state, library, label):
+        flash = (state / "flash").read_bytes()
+        slot, _ = installed_recovery(flash, library, LIBRARY_ID, args.target, read=reader(state))
+        header = bound_header(
+            library, layout["identity_object_nibble"], slot, args.slot, args.target, flash
+        )
+        folder = package / label
+        folder.mkdir()
+        data = pack.immediate(0x2A2C) + pack.immediate(5 + 2 * len(header))
+        data += "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in header)
+        (folder / "header.hp").write_bytes(
+            b"HPHP49-C" + bytes(int(data[i : i + 2][::-1], 16) for i in range(0, len(data), 2))
+        )
+        return folder, header + b"x" * (RESERVE_BYTES - len(header))
+
     baseline = install("guarded", "recovery-guarded.hp")
+    header_package, expected = reservation_package(baseline, library, "guarded-header")
     fill_commands = [
         "-95 CF HOME CLEAR",
-        rf'\{{171}} 1 "{prefix.decode()}" REPL \'HPCRES\' STO \{{187}} \'RMARK\' STO'.replace(
-            "\\'", "'"
-        ),
+        r"\{171} 1 BINDHDR REPL 'HPCRES' STO \{187} 'RMARK' STO",
         rf'\{{171}} "x" 1 {RESERVE_POWER} START DUP + NEXT RMARK \{{187}} \'RESMAKE\' STO'.replace(
             "\\'", "'"
         ),
         rf"\{{171}} {{ {USER_ELEMENTS} }} 0. CON 'HPCFILL' STO \{{187}} 'FILLMAKE' STO",
-        r"\{171} RESMAKE FILLMAKE \{187} 'HPCPAD' STO 'HPCPAD' RCL",
+        r"\{171} RESMAKE 'BINDHDR' PURGE FILLMAKE \{187} 'HPCPAD' STO 'HPCPAD' RCL",
     ]
     filled = root / "filled"
     transfer(
         args,
         filled,
         baseline,
-        build,
-        "UNUSED",
-        installed=True,
+        header_package,
+        "BINDHDR",
+        package_name="header.hp",
         execute=True,
         remote_commands=fill_commands,
     )
     before = filled / "state"
     read = reader(before)
-    if home_string(read, NAME) != prefix + b"x" * (RESERVE_BYTES - len(prefix)):
+    if home_string(read, NAME) != expected:
         raise ValueError("Incorrect reservation fixture contents")
     verify_zero_real_array(read, b"HPCFILL", USER_ELEMENTS)
     gap = (read(0x806F8) - read(0x806F3)) // 2
@@ -317,20 +349,43 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
 
     observed = install("observed", "recovery-observed.hp")
     require_marker(reader(observed))
+    # RAM loss must not make a valid Flash transaction unrecoverable. This
+    # path has no reservation object to release and enough ordinary free RAM.
+    missing_fault = root / "absent-fault"
+    require_absent(reader(observed), NAME)
+    prepare(observed, missing_fault, args.slot, args.target, bound=True)
+    missing_after = boot(missing_fault, "absent-recovered")
+    verify_flash(
+        (missing_fault / "flash").read_bytes(),
+        (missing_after / "flash").read_bytes(),
+        args.slot,
+        args.target,
+        retire=True,
+        authority_slot=authority,
+    )
+    verify_restart(observed, missing_after, missing_after)
+    require_absent(reader(missing_after), NAME)
+    require_marker(reader(missing_after))
+    if args.flash_busy_reads and not verify_busy_reads(args, root / "absent-recovered"):
+        raise ValueError("Absent-reservation recovery did not exercise the Flash driver")
+    print("Absent reservation permits recovery without RAM release", flush=True)
+    observed_package = (package / "recovery-observed.hp").read_bytes()
+    header_package, expected_reservation = reservation_package(
+        observed, observed_package, "observed-header"
+    )
     admission_filled = root / "admission-filled"
     transfer(
         args,
         admission_filled,
         observed,
-        None,
-        "UNUSED",
-        installed=True,
+        header_package,
+        "BINDHDR",
+        package_name="header.hp",
         execute=True,
         remote_commands=["-95 CF HOME CLEAR 'RCDONE' PURGE", *fill_commands[1:]],
     )
     admission_before = admission_filled / "state"
     require_absent(reader(admission_before), MARKER)
-    expected_reservation = prefix + b"x" * (RESERVE_BYTES - len(prefix))
     if home_string(reader(admission_before), NAME) != expected_reservation:
         raise ValueError("Admission fixture has the wrong reservation")
     verify_zero_real_array(reader(admission_before), b"HPCFILL", USER_ELEMENTS)
@@ -338,7 +393,6 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     admission_gap = (admission_read(0x806F8) - admission_read(0x806F3)) // 2
     if not 0 < admission_gap < len(program) - 8:
         raise ValueError("Admission rejection fixture did not retain low-memory pressure")
-    observed_package = (package / "recovery-observed.hp").read_bytes()
     observed_slot, _ = installed_recovery(
         (admission_before / "flash").read_bytes(),
         observed_package,
@@ -352,6 +406,12 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         altered_package[8:]
     )
     installed_recovery(altered_view, altered_package, LIBRARY_ID, args.target, read=admission_read)
+    binding_faults = {
+        "resource-root": 24,
+        "resource-location": 56,
+        "resource-transaction": 72,
+        "resource-capacity": 76,
+    }
     admission_rejected = []
     for label in (
         "closed",
@@ -360,6 +420,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
         "bank-identity",
         "dirty-tail",
         "library-identity",
+        *binding_faults,
     ):
         fault = root / ("admission-" + label + "-fault")
         prepare(admission_before, fault, args.slot, args.target, bound=True)
@@ -381,9 +442,23 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             flash[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
                 altered_package[8:]
             )
-        else:
+        elif label == "dirty-tail":
             flash[authority + 32 + 4] = 0
         (fault / "flash").write_bytes(flash)
+        retained = expected_reservation
+        if label in binding_faults:
+            ram = bytearray((fault / "sram").read_bytes())
+            mapped = native_words(ram, flash)
+            at = home_object(mapped, NAME) + 10 + 2 * binding_faults[label]
+            physical = mapped.physical(at)
+            if not 0x08000000 <= physical < 0x08080000:
+                raise ValueError("Reservation fault leaves native RAM")
+            ram[physical - 0x08000000] ^= 1 << (4 * (at & 1))
+            retained = bytearray(expected_reservation)
+            retained[binding_faults[label]] ^= 1
+            if home_string(mapped, NAME) != retained:
+                raise ValueError("Reservation fault did not change exactly its selected field")
+            (fault / "sram").write_bytes(ram)
         phase_name = "admission-" + label + "-rejected"
         after = boot(fault, phase_name)
         read = reader(after)
@@ -394,7 +469,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             raise ValueError("Rejected admission issued a Flash operation")
         if (root / phase_name / "before-reset.json").exists():
             raise ValueError("Rejected admission requested a reset")
-        if home_string(read, NAME) != expected_reservation:
+        if home_string(read, NAME) != retained:
             raise ValueError("Rejected admission released the matching reservation")
         verify_zero_real_array(read, b"HPCFILL", USER_ELEMENTS)
         verify_restart(admission_before, after, after)
@@ -448,6 +523,7 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
                 "admission_rejected": admission_rejected,
                 "admission_gap": admission_gap,
                 "rejected": rejected,
+                "absent_reservation": True,
             },
             indent=2,
         )

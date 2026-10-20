@@ -389,7 +389,9 @@ matcher supplies ownership by itself. Durable publication must follow verified
 fresh creation, prevent intervening native/user writes and retain the
 installation's one-use lifetime; startup admission must verify that same
 installation and active transaction before this header can authorize release.
-Automatic admission integration and the complete lifetime protocol remain open.
+The maintained automatic predicate now compares this binding after the sealed
+installation/transaction preflight. Durable creation/publication proof and the
+complete lifetime/startup-order protocol remain open.
 
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an
@@ -404,6 +406,15 @@ before sealing, so the executing predicate checks the requested library rather
 than a compiled fixture number. The standalone admission artifact remains
 unbound and rejects execution as an installed predicate. A misplaced symbol or
 non-placeholder value is rejected before output files are written.
+
+The owned `hpclang_recovery_reservation` symbol contains a 144-byte `HPCRESV1`
+contract: magic, capacity, name length and a 128-byte name field. Packaging fills
+it from the reservation options before sealing; standalone artifacts retain an
+unbound placeholder. This admission requires `--reservation-prefix HPCMEM2`.
+The RPL wrapper checks that prefix after ARM checks the complete binary binding.
+The ARM phase rejects a different installation, physical location, transaction
+CRC or capacity before either release or replay. An absent object permits the
+normal recovery path without releasing RAM, preserving RAM-loss recovery.
 
 `hpclang_rpl_recovery_installation_stream()` validates a unique live library,
 native catalog/bank switch, complete sealed content, exact journal/authority
@@ -424,8 +435,9 @@ It also covers changed library content with a valid native CRC and constrained
 memory with preserved user data. Tests that append a configuration completion
 marker reseal the resulting library at the owned descriptor coordinate, so an
 invalid digest cannot masquerade as correct rejection of another condition.
-The maintained automatic admission fixture uses the same streaming check before
-the RPL reservation guard. Its stack is 4 KiB: the earlier 2 KiB predicate stack
+The maintained automatic admission fixture uses the same streaming check and
+complete resource binding before the RPL reservation guard. Its stack is 4 KiB:
+the earlier 2 KiB predicate stack
 was insufficient for the combined entry, catalog scan and identity call chain.
 This improves installation/transaction validation but does not replace the
 separate ownership checks required before releasing a reservation.
