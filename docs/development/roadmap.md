@@ -427,7 +427,7 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
-- **Installation identity follow-up (local, not submitted):** the existing
+- **Sealed installation identity batch:** the existing
   exact-library witness executes outside the library it verifies. An embedded
   admission command cannot embed its entire containing library as its own
   expected image. A packaging prototype now fills an owned `HPCROOT1` descriptor
@@ -505,14 +505,19 @@ Current delivery checkpoints:
   both low-memory cases now pass on both models, including exact code/owner,
   guards, Flash/catalog, all user-array elements and reservation contents.
   The maintained copied admission program is 17,114 bytes; the measured free
-  gap is 20,860 bytes. The corrected standalone clean-boot suite is running.
+  gap in the installation baseline is 20,860 bytes. The complete standalone
+  clean-boot suite now passes on both models, including all five transaction
+  states, changed content and both pressure cases; its measured gap is 20,868 bytes.
   A separate local prototype is testing sealed admission before automatic
   reservation release/recovery. Its initial 2 KiB startup stack corrupted the
-  lower guard and adjacent code on both models; a 4 KiB variant, matching the
-  verified internal-command fixture, is running. Completion-marker libraries
+  lower guard and adjacent code on both models. A 4 KiB variant matching the
+  verified internal-command fixture now passes automatic recovery and repeated
+  restart with preserved user data and exact Flash on both models. This remains
+  a prototype; maintained automatic integration and negative cases remain open.
+  Completion-marker libraries
   now reseal their owned identity after configuration changes; independent
   digest/native-CRC tests pass. These changes do not establish RAM ownership.
-  This streaming path is not yet submitted.
+  The maintained identity batch is ready for CI; acceptance remains pending.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
