@@ -9,10 +9,17 @@ from types import SimpleNamespace
 
 from prepare import prepare
 from reservation import packager, reader
-from verify import installed_recovery, nibbles, require, require_stock_pc, symbol_offsets
+from verify import (
+    installed_recovery,
+    nibbles,
+    require,
+    require_stock_pc,
+    symbol_offsets,
+)
 
 
 LIBRARY_ID = 1703
+IDENTITY_LIBRARY_ID = 1704
 JOURNAL_SLOT = 0x160105
 AUTHORITY_SLOT = JOURNAL_SLOT + 4124
 TARGET = 0x140000
@@ -62,10 +69,11 @@ def generate_fixture(output):
         + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
         + f"#define EXPECTED_AUTHORITY_SLOT {AUTHORITY_SLOT}u\n"
         + f"#define EXPECTED_TARGET {TARGET}u\n"
+        + f"#define EXPECTED_IDENTITY_LIBRARY {IDENTITY_LIBRARY_ID}u\n"
     )
 
 
-def verify_execution(ram, initialized, symbols, package, result, slot):
+def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_copy=False):
     require(len(ram) == 0x80000, "Expected complete hp4950 SRAM")
     matches = []
     position = 0
@@ -80,8 +88,14 @@ def verify_execution(ram, initialized, symbols, package, result, slot):
         position += 1
     require(len(matches) == 1, "Installation execution image is missing or ambiguous")
     base, values = matches[0]
-    require(values[1:3] == (result & 0xFFFFFFFF, slot), "Unexpected native installation result")
-    require(values[3:5] == values[5:7], "Installation witness did not restore Flash mappings")
+    require(
+        values[1:3] == (result & 0xFFFFFFFF, slot),
+        "Unexpected native installation result",
+    )
+    require(
+        values[3:5] == values[5:7],
+        "Installation witness did not restore Flash mappings",
+    )
     for name in ("admission_stack_low", "admission_stack_high"):
         require(
             struct.unpack_from("<2I", ram, base + symbols[name]) == (0x51A7B09D,) * 2,
@@ -93,13 +107,18 @@ def verify_execution(ram, initialized, symbols, package, result, slot):
     end = 10 + int(program[10:15][::-1], 16)
     reserve = symbols["__image_end"] * 2 + 15
     require(reserve + 15 < end <= len(program), "Invalid installation CODE extent")
-    prefix = program[: end - reserve]
+    prefix = (
+        program[: 15 + len(packager().entry((len(initialized) + 7) & ~7, 0, fresh_copy=True))]
+        if fresh_copy
+        else program[: end - reserve]
+    )
     packed_ram = nibbles(ram)
     owners = [
         i
         for i in range(len(packed_ram))
         if packed_ram.startswith(prefix, i)
         and i + len(prefix) <= base * 2
+        and (not fresh_copy or base * 2 <= i + len(prefix) + 15)
         and (base + symbols["__image_end"]) * 2 <= i + end
     ]
     require(len(owners) == 1, "Installation execution is not inside one owning CODE object")
@@ -116,6 +135,7 @@ def verify_probe(
     *,
     image="installation",
     expected_flash=None,
+    fresh_copy=False,
 ):
     require_stock_pc(after)
     require(
@@ -132,7 +152,10 @@ def verify_probe(
         "Installation predicate returned the wrong real-valued result",
     )
     count = read(0x8611D, 3)
-    require(0 < count < 128 and count == original(0x8611D, 3), "Installation changed catalog count")
+    require(
+        0 < count < 128 and count == original(0x8611D, 3),
+        "Installation changed catalog count",
+    )
     require(
         all(read(0x86120 + i * 16, 16) == original(0x86120 + i * 16, 16) for i in range(count)),
         "Read-only installation witness changed the catalog",
@@ -146,8 +169,9 @@ def verify_probe(
         (build / (image + ".hp")).read_bytes(),
         result,
         slot,
+        fresh_copy=fresh_copy,
     )
-    if image == "installation-transaction":
+    if image in ("installation-transaction", "installation-identity"):
         require(
             struct.unpack_from("<3I", ram, base + symbols["transaction_pair"])
             == ((JOURNAL_SLOT, AUTHORITY_SLOT, TARGET) if result >= 0 else (0, 0, 0)),
@@ -236,7 +260,10 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
             slot if status >= 0 else 0xFFFFFFFF,
             image="installation-transaction",
         )
-        require(verify_busy_reads(args, phase) == 0, "Installed transaction preflight wrote Flash")
+        require(
+            verify_busy_reads(args, phase) == 0,
+            "Installed transaction preflight wrote Flash",
+        )
         transactions.append(label)
         print(f"Installed transaction preflight verified: {label}", flush=True)
     from publication import run_publication
@@ -267,7 +294,8 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         + "\n"
     )
     print(
-        "PASS: native installation, transaction preflight, publication and cancellation", flush=True
+        "PASS: native installation, transaction preflight, publication and cancellation",
+        flush=True,
     )
 
 

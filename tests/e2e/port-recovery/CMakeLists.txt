@@ -127,14 +127,18 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
 foreach(witness IN ITEMS installation installation-transaction installation-publication
-        installation-cancellation)
+        installation-cancellation installation-identity)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
-    if(witness STREQUAL "installation-transaction")
+    if(witness STREQUAL "installation-identity")
+        target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
+            "${CORE}/rpl-recovery-installation.c")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_IDENTITY)
+    elseif(witness STREQUAL "installation-transaction")
         target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
     elseif(witness STREQUAL "installation-publication")

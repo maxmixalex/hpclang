@@ -492,14 +492,25 @@ Current delivery checkpoints:
   24,000 user real-array elements, the 32 KiB reservation, exact Flash/catalog,
   execution code/owning CODE, stack guards, mappings and native return.
   These are explicit internal XLIB calls, not automatic startup acceptance.
-  The remaining normal-memory states are running; maintained sealed-library
-  E2E integration remains next. Record/authority regressions also pass.
+  All five normal-memory states now pass on both models. Record/authority
+  regressions also pass. Maintained E2E integration adds an identity suite to
+  the existing Runtime matrix, sharing its configuration build. It packages
+  the sealed library from owned ELF coordinates, invokes its internal command,
+  and checks transaction phases, changed content with repaired native CRC and
+  low-memory preservation. ARM build/analysis, 78 related Python tests and
+  lint pass. Native integration passes all five transaction states on both
+  models. The new changed-content fixture initially validated ordinary native
+  allocations after injecting pending journal records; it now validates the
+  altered library before injection. That case, low-memory integration and the
+  standalone clean-boot suite still need final validation.
   This streaming path is not yet submitted.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
   tests through `8a717ec4` follow the previous submission `c8740410`.
-  This batch was submitted as `8fc3fcd4`; acceptance remains pending. `747fa4ae`
+  This batch passed Quality, Core, Runtime and Objects at `8fc3fcd4` and was
+  merged into main through PR #2 (`ff35ffe9`). Main CI is not awaited.
+  `747fa4ae`
   records the publication power-cut evidence below.
   Internal unpublished-transaction cancellation now passes host fault injection
   for four initial states: every program operation with five partial-write masks,

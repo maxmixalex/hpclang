@@ -5,6 +5,15 @@
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_IDENTITY
+#include "rpl-recovery-installation.h"
+#define HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT EXPECTED_JOURNAL_SLOT
+#include "binding.h"
+const volatile struct hpclang_recovery_binding hpclang_recovery_binding =
+    HPCLANG_RECOVERY_BINDING_INITIALIZER;
+const volatile unsigned char hpclang_recovery_identity[48] = "HPCROOT1";
+volatile unsigned transaction_pair[3];
+#endif
 #ifdef HPCLANG_INSTALLATION_TRANSACTION
 static uint8_t transaction_scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
 volatile unsigned transaction_pair[3];
@@ -57,7 +66,21 @@ int hpclang_recovery_predicate(const uint32_t *map)
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
     const struct hpclang_rpl_flash_io io = {descriptors, read_flash, NULL, 0x140000, 0x200000};
     uint32_t slot = UINT32_MAX;
-#ifdef HPCLANG_INSTALLATION_TRANSACTION
+#if defined(HPCLANG_INSTALLATION_IDENTITY)
+    uint8_t identity[48];
+    for (unsigned i = 0; i < sizeof identity; ++i)
+        identity[i] = hpclang_recovery_identity[i];
+    struct hpclang_rpl_flash_installed_recovery installed;
+    int result = hpclang_rpl_recovery_installation_stream(
+        &io, EXPECTED_IDENTITY_LIBRARY, &catalog, identity, hpclang_recovery_binding.authority_slot,
+        hpclang_recovery_binding.journal_slot, &installed);
+    if (result >= 0) {
+        slot = installed.library_slot;
+        transaction_pair[0] = installed.journal_slot;
+        transaction_pair[1] = installed.authority_slot;
+        transaction_pair[2] = installed.target;
+    }
+#elif defined(HPCLANG_INSTALLATION_TRANSACTION)
     const struct hpclang_rpl_flash_recovery_layout layout = {
         expected_library, expected_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
     struct hpclang_rpl_flash_installed_recovery installed;
