@@ -529,8 +529,11 @@ Current delivery checkpoints:
   native startup case changes only the installed library title and repairs its
   native CRC; both models reject it without releasing RAM, writing Flash or
   requesting reset. The completion marker proves the callback ran, and all
-  retained user data remain exact. Remaining reservation rejection cases are
-  still running; full native acceptance of this follow-up remains pending.
+  retained user data remain exact. Wrong-type, wrong-capacity and wrong-prefix
+  reservation refusal also pass, completing the maintained automatic fixture
+  on both models. A creation-side follow-up now checks that existing names
+  are rejected even for byte-identical reservation content, without entering
+  transaction publication; these native collision tests are running.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

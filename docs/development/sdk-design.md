@@ -354,6 +354,10 @@ name or matching header alone is insufficient. Release and recovery share one
 configuration invocation; ordering against earlier system callbacks remains a
 separate unresolved requirement. Capacity validation alone is not a guarantee
 of all startup allocation requirements.
+Creation must reject an existing reservation name even when its bytes exactly
+match the planned reservation. The publication fixture uses create-only object
+storage and checks this boundary before publishing either transaction record;
+matching content never grants permission to adopt an existing user object.
 
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an
