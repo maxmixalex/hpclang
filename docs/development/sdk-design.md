@@ -358,6 +358,14 @@ Creation must reject an existing reservation name even when its bytes exactly
 match the planned reservation. The publication fixture uses create-only object
 storage and checks this boundary before publishing either transaction record;
 matching content never grants permission to adopt an existing user object.
+The fixture also tracks attempted native RAM writes. An error after the first
+attempt retains execution in an owned failure loop with interrupts disabled,
+before any Flash publication; it cannot safely return an ordinary false
+predicate after a possible directory/arena mutation. A separate fault build
+injects a lost acknowledgement after the first actual RAM write. Its verifier
+requires exact execution code and its owning CODE object, intact stack guards,
+the owned failure PC, and zero Flash operations. This is failure containment,
+not rollback or recovery after a restart.
 
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an

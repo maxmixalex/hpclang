@@ -91,6 +91,10 @@ def run_reservation_collisions(args, baseline, root, *, transfer, verify_busy_re
         results = struct.unpack_from(
             "<12I", (after / "sram").read_bytes(), base + symbols["publication_result"]
         )
+        reservation = struct.unpack_from(
+            "<2I", (after / "sram").read_bytes(), base + symbols["reservation_result"]
+        )
+        require(reservation == (0xFFFFFFF6, 0), "Collision attempted native RAM mutation")
         require(results == (0,) * 12, "Collision entered transaction publication")
         require(verify_busy_reads(args, phase) == 0, "Collision wrote Flash")
         require(home_string(reader(after), b"HPCLEASE") == value, "Collision adopted user data")
@@ -99,12 +103,14 @@ def run_reservation_collisions(args, baseline, root, *, transfer, verify_busy_re
 
 def run_publication(args, baseline, slot, *, transfer, emulator, completed, verify_busy_reads):
     from cancellation import run_cancellation
+    from reservation_failure import run_failure
 
     root = args.output / "installation" / "publication"
     root.mkdir()
     run_reservation_collisions(
         args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads
     )
+    run_failure(args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
     prepared = root / "expected"
     prepare(baseline, prepared, JOURNAL_SLOT, TARGET, bound=True)
     records = (prepared / "flash").read_bytes()

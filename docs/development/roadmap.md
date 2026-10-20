@@ -427,6 +427,17 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
+  pending; `8fc3fcd4` is accepted and merged into main as `ff35ffe9`.
+  Local follow-up through `c15a9231` integrates automatic sealed admission
+  and checks create-only reservation collisions. Both native models pass
+  recovery/restart, all maintained automatic rejection cases and both
+  existing-content collision cases. A lost-RAM-write-acknowledgement prototype
+  also passes on both models; maintained integration and normal-path regression
+  are running. Next: complete this regression, then durable reservation
+  ownership/lifetime and global startup order. No M8 acceptance gate is removed.
+  The detailed evidence below includes earlier intermediate states.
+
 - **Sealed installation identity batch:** the existing
   exact-library witness executes outside the library it verifies. An embedded
   admission command cannot embed its entire containing library as its own
@@ -533,7 +544,14 @@ Current delivery checkpoints:
   reservation refusal also pass, completing the maintained automatic fixture
   on both models. A creation-side follow-up now checks that existing names
   are rejected even for byte-identical reservation content, without entering
-  transaction publication; these native collision tests are running.
+  transaction publication; both content variants now pass on both native models.
+  A local failure-path follow-up tracks native RAM write attempts during
+  reservation creation and retains the invocation after a subsequent error,
+  rather than returning an ordinary false predicate to Stock. A lost-write-
+  acknowledgement prototype passes on both native models, preserving code/owner,
+  guards and IRQ ownership without Flash publication. Maintained failure E2E
+  integration remains in progress. This
+  retains failure ownership and does not implement rollback or restart claims.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

@@ -96,6 +96,19 @@ def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_
         values[3:5] == values[5:7],
         "Installation witness did not restore Flash mappings",
     )
+    verify_owned_image(ram, initialized, symbols, package, base, fresh_copy=fresh_copy)
+    return base
+
+
+def verify_owned_image(ram, initialized, symbols, package, base, *, fresh_copy=False):
+    require(
+        len(ram) == 0x80000 and 0 <= base <= len(ram) - symbols["__image_end"],
+        "Execution image leaves the captured RAM",
+    )
+    require(
+        ram[base : base + len(initialized)] == initialized,
+        "Initialized execution image differs",
+    )
     for name in ("admission_stack_low", "admission_stack_high"):
         require(
             struct.unpack_from("<2I", ram, base + symbols[name]) == (0x51A7B09D,) * 2,
@@ -122,7 +135,6 @@ def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_
         and (base + symbols["__image_end"]) * 2 <= i + end
     ]
     require(len(owners) == 1, "Installation execution is not inside one owning CODE object")
-    return base
 
 
 def verify_probe(
@@ -286,6 +298,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
+                reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,
             ),

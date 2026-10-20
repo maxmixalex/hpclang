@@ -129,7 +129,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
 foreach(witness IN ITEMS installation installation-transaction installation-publication
-        installation-cancellation installation-identity)
+        installation-cancellation installation-identity installation-reservation-failure)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
@@ -143,13 +143,17 @@ foreach(witness IN ITEMS installation installation-transaction installation-publ
     elseif(witness STREQUAL "installation-transaction")
         target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
-    elseif(witness STREQUAL "installation-publication")
+    elseif(witness STREQUAL "installation-publication" OR
+            witness STREQUAL "installation-reservation-failure")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot
                 time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_PUBLICATION)
+        if(witness STREQUAL "installation-reservation-failure")
+            target_compile_definitions(${witness} PRIVATE HPCLANG_RESERVATION_FAIL_WRITE=1)
+        endif()
     elseif(witness STREQUAL "installation-cancellation")
         target_sources(${witness} PRIVATE cancellation.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay time time-math rtc rtc-decode datetime sst-flash)
