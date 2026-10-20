@@ -754,10 +754,29 @@ static int reservation_write(void *context, uint32_t address, uint8_t value)
     return result;
 }
 
+static struct named_pair prepare_reservation_home(void)
+{
+    struct named_pair pair = prepare_two_named_chars();
+    /* Insert the native oldest null-named directory before the two variables. */
+    memmove(memory + pair.link_b + 20u, memory + pair.link_b, pair.object_a + 7u - pair.link_b);
+    memset(memory + pair.link_b, 0, 20u);
+    pair.link_a += 20u;
+    pair.item_a += 20u;
+    pair.object_a += 20u;
+    pair.link_b += 20u;
+    pair.item_b += 20u;
+    pair.object_b += 20u;
+    put_word(pair.chain, 5u, pair.item_a - pair.chain);
+    put_word(pair.link_b, 5u, pair.link_b - (pair.chain + 10u));
+    put_word(pair.chain + 12u, 5u, DORRP);
+    put_word(pair.chain + 17u, 3u, 0x7ffu);
+    return pair;
+}
+
 static void test_recovery_reservation_create(void)
 {
     struct hpclang_rpl_mutation_io io = setup(1u);
-    struct named_pair pair = prepare_two_named_chars();
+    struct named_pair pair = prepare_reservation_home();
     struct hpclang_object *snapshot = make_string1('R');
     const struct hpclang_rpl_recovery_reservation sentinel = {123u, 456u};
     struct hpclang_rpl_recovery_reservation created = sentinel;
@@ -778,7 +797,7 @@ static void test_recovery_reservation_create(void)
     assert(fault.calls == count && !memcmp(&created, &sentinel, sizeof created));
     for (unsigned cut = 1; cut <= count; ++cut) {
         io = setup(1u);
-        prepare_two_named_chars();
+        prepare_reservation_home();
         fault = (struct reservation_fault){.cut = cut};
         io.context = &fault;
         io.write_nibble = reservation_write;
@@ -790,7 +809,7 @@ static void test_recovery_reservation_create(void)
     /* Success acknowledgements cannot hide a bad payload or failed readback. */
     for (unsigned mode = 1; mode <= 2; ++mode) {
         io = setup(1u);
-        prepare_two_named_chars();
+        prepare_reservation_home();
         fault = (struct reservation_fault){.cut = count, .mode = mode, .address = object + 10u};
         io.context = &fault;
         io.write_nibble = reservation_write;
@@ -800,7 +819,7 @@ static void test_recovery_reservation_create(void)
         assert(fault.calls == count && !memcmp(&created, &sentinel, sizeof created));
     }
     io = setup(1u);
-    prepare_two_named_chars();
+    prepare_reservation_home();
     rejected_read = USEROB;
     assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
                                                    &created) == HPCLANG_RPL_MUTATION_IO);
@@ -810,6 +829,54 @@ static void test_recovery_reservation_create(void)
     assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
                                                    &created) == HPCLANG_RPL_MUTATION_MALFORMED);
     assert(writes == 0 && !memcmp(&created, &sentinel, sizeof created));
+    hpclang_object_release(snapshot);
+}
+
+static void test_recovery_reservation_hidden_preflight(void)
+{
+    struct hpclang_object *snapshot = make_string1('R');
+    const struct hpclang_rpl_recovery_reservation sentinel = {123u, 456u};
+    struct hpclang_rpl_recovery_reservation created = sentinel;
+    static uint8_t original[NIBBLES];
+    for (unsigned fault = 0; fault < 27; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup(1u);
+        struct named_pair pair = prepare_reservation_home();
+        int expected = HPCLANG_RPL_MUTATION_IO;
+        if (fault < 3)
+            rejected_read = pair.home + 5u + fault;
+        else if (fault < 20)
+            rejected_read = pair.chain + fault - 3u;
+        else if (fault == 20) {
+            put_word(pair.chain, 5u, 0u);
+            expected = HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        } else if (fault == 21) {
+            put_word(pair.chain + 10u, 2u, 1u);
+            expected = HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        } else if (fault == 22) {
+            put_word(pair.chain + 12u, 5u, 0x02a2cu);
+            expected = HPCLANG_RPL_MUTATION_UNSUPPORTED;
+        } else if (fault == 23) {
+            put_word(pair.chain + 5u, 5u, 1u);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        } else if (fault == 24) {
+            put_word(pair.chain, 5u, 0xfffffu);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        } else if (fault == 25) {
+            put_word(USEROB, 5u, 0xff000u);
+            put_word(0xff000u, 5u, DORRP);
+            put_word(0xff005u, 3u, 0xfffu);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        } else {
+            put_word(USEROB, 5u, 0xffff0u);
+            put_word(0xffff0u, 5u, DORRP);
+            expected = HPCLANG_RPL_MUTATION_MALFORMED;
+        }
+        memcpy(original, memory, sizeof memory);
+        assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1u, snapshot,
+                                                       &created) == expected);
+        assert(!writes && !memcmp(original, memory, sizeof memory));
+        assert(!memcmp(&created, &sentinel, sizeof created));
+    }
     hpclang_object_release(snapshot);
 }
 
@@ -2721,6 +2788,7 @@ int main(void)
     test_named_reference_preservation_nospace_is_non_mutating();
     test_named_create();
     test_recovery_reservation_create();
+    test_recovery_reservation_hidden_preflight();
     test_recovery_reservation_binding();
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();

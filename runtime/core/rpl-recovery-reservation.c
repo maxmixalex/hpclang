@@ -95,6 +95,37 @@ struct creation
     int attempted;
 };
 
+/* Stock's first configuration callback expects the oldest HOME item to be its
+ * inline, null-named hidden directory. Missing it can trigger allocation/GC
+ * before recovery. Check this retained-RAM prerequisite before reserving memory;
+ * this does not authorize any Flash transaction or establish startup ordering. */
+static int hidden_directory_ready(const struct hpclang_rpl_reader *reader, uint32_t home)
+{
+    if (home < 0x80000u || home > 0x100000u - 33u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t libraries;
+    if (!read_word(reader, home + 5u, 3u, &libraries))
+        return HPCLANG_RPL_MUTATION_IO;
+    if (libraries > (0x100000u - home - 33u) / 13u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t chain = home + 8u + 13u * libraries;
+    uint32_t newest, previous, length, prologue;
+    if (!read_word(reader, chain, 5u, &newest))
+        return HPCLANG_RPL_MUTATION_IO;
+    if (!newest)
+        return HPCLANG_RPL_MUTATION_UNSUPPORTED;
+    if (newest < 10u || newest > 0x100000u - chain - 2u)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    if (!read_word(reader, chain + 5u, 5u, &previous) ||
+        !read_word(reader, chain + 10u, 2u, &length) ||
+        !read_word(reader, chain + 12u, 5u, &prologue))
+        return HPCLANG_RPL_MUTATION_IO;
+    if (previous)
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    return !length && prologue == 0x2a96u ? HPCLANG_RPL_MUTATION_OK
+                                          : HPCLANG_RPL_MUTATION_UNSUPPORTED;
+}
+
 static int read_nibble(void *context, uint32_t address, uint8_t *value)
 {
     struct creation *creation = context;
@@ -133,7 +164,7 @@ verify_created(const struct hpclang_rpl_reader *reader, const uint8_t *name, uin
     /* Creating USEROB storage can move HOME. Never reuse its old coordinate. */
     uint32_t home;
     struct hpclang_rpl_directory_entry_view entry;
-    if (hpclang_rpl_store_home_object(reader, &home) ||
+    if (hpclang_rpl_store_home_object(reader, &home) || hidden_directory_ready(reader, home) ||
         hpclang_rpl_directory_find(reader, home, name, name_length, &entry) ||
         entry.prologue != 0x2a2cu || entry.object_address >= 0x100000u ||
         snapshot->nibble_count > 0x100000u - entry.object_address)
@@ -168,7 +199,10 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
     uint32_t home;
     if (hpclang_rpl_store_home_object(&reader, &home))
         return HPCLANG_RPL_MUTATION_IO;
-    int result = hpclang_rpl_mutation_store_create(&observed, home, name, name_length, snapshot);
+    int result = hidden_directory_ready(&reader, home);
+    if (result)
+        return result;
+    result = hpclang_rpl_mutation_store_create(&observed, home, name, name_length, snapshot);
     if (result)
         return creation.attempted ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
     return verify_created(&reader, name, name_length, snapshot, created);

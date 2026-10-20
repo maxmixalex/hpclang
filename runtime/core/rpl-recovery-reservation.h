@@ -35,7 +35,10 @@ struct hpclang_rpl_recovery_reservation
     uint32_t object, capacity;
 };
 
-/* Create a new HOME string, then relocate HOME and verify the whole object.
+/* Require Stock's oldest, inline null-named hidden directory in HOME, create a
+ * new HOME string, then relocate HOME and recheck that prerequisite and object.
+ * A missing hidden directory returns UNSUPPORTED without allocation or writes;
+ * this API does not invoke Stock initialization or repair a malformed HOME.
  * Existing names, including identical contents, are never adopted. The caller
  * owns the native view, roots and immutable snapshot throughout. Output changes
  * only on success. Its address is valid only while that ownership continues;

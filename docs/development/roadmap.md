@@ -427,6 +427,25 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **CI submission batch:** bounded configuration resolution, captured ROM-bank
+  validation, native startup inventory, partial bank-header recovery coverage
+  and the retained-RAM prerequisite below are submitted together on
+  `m8-flash-write` after local validation. CI acceptance remains pending; no
+  additional M8 milestone is complete.
+
+- **Retained-RAM installation prerequisite:** reservation creation now checks
+  that HOME's oldest item is the inline null-named hidden directory before any
+  writes, then checks it again after native movement when verifying the created
+  resource. Missing structure returns unsupported; unreadable, out-of-range or
+  malformed metadata rejects without changing memory or the caller's output.
+  The normal mutation preflight still validates the complete directory contents.
+  Twenty-seven targeted rejection cases and the existing creation/movement/fault
+  suite pass, including ASan/UBSan, pinned formatting and ARM static analysis.
+  Native creation/publication and failure-retention checks pass on both models,
+  preserving exact Flash/catalog, bound resource contents, owning CODE, guards
+  and mappings. This is an installation precondition, not proof
+  of durable ownership, arbitrary later RAM integrity or global startup order.
+
 - **Active startup decision and existing counterexample:** the earlier native
   dependency fixture remains decisive: Port 0 library 768 can repeatedly enter
   its configuration while recalling damaged EQLIB, preventing recovery library
