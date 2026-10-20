@@ -427,6 +427,18 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Interrupted fresh-library commit gap (local):** on both HP49g+/HP50g,
+  cutting the final status program at SST operation 286, busy read 1, mask
+  `0x0400` leaves status `0xFB` at slot `0x157e75`. All other Flash bytes match
+  the successful stored draft. Stock restarts normally, preserves that Flash
+  and keeps the original 61-library catalog without registering ID 1703.
+  Current C tail recovery against both saved native states returns DIRTY with
+  zero writes: hidden-library cleanup is not covered by the backup-only path.
+  Next: establish a bounded abandoned-install cleanup transition, including
+  interruption of cleanup itself; do not infer permission to complete a live
+  installation from matching payload bytes. These results do not establish
+  arbitrary torn-state boot safety or durable installation ownership.
+
 - **New CI submission:** the accumulated placement, namespace exclusion, grouped
   space planning, runtime sealing, draft preparation and selected-slot storage
   work is submitted together after local validation. The native preparation
