@@ -68,6 +68,28 @@ struct hpclang_rpl_flash_installed_recovery
     uint32_t library_slot, journal_slot, authority_slot, target;
 };
 
+/* Read-only initial transaction planning, before publishing either record.
+ * Derive both slots from the owned installed layout. Require exact library and
+ * catalog identity on intact Flash, untouched journal/authority storage and a
+ * valid native allocation chain after virtually adding both record envelopes.
+ * Validate the proposed journal's desired target image too; the installed root
+ * must survive outside that target sector. Holes in an erased tail, interior
+ * erased bytes of existing allocations and previously used slots are rejected.
+ * journal is the caller's complete READY capsule for the derived slot.
+ * Return 0 and publish output only on success. No writes or heap allocation.
+ *
+ * Inputs and IO remain stable and disjoint from output throughout. This neither
+ * reserves the slots against another writer nor creates/owns recovery RAM.
+ * Namespace exclusion, durable resource ownership, reference repair, startup
+ * order and transaction publication remain required before any target write.
+ * This initial planner cannot resume partial publication or reuse old records.
+ */
+int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
+                                     const struct hpclang_rpl_flash_recovery_layout *layout,
+                                     const struct hpclang_rpl_flash_catalog *catalog,
+                                     const uint8_t *journal, uint32_t journal_bytes,
+                                     struct hpclang_rpl_flash_installed_recovery *installed);
+
 /* Connect exact installed library content/catalog identity to its two HPCBIND1
  * descriptors and the bound transaction preflight. Both descriptors must agree.
  * Validate the library against the restored port view for a pending transaction;

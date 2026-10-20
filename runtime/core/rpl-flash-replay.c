@@ -281,14 +281,10 @@ static uint32_t layout_word(const uint8_t *record, uint32_t at, unsigned count)
     return value;
 }
 
-int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
-                                          const struct hpclang_rpl_flash_recovery_layout *layout,
-                                          const struct hpclang_rpl_flash_catalog *catalog,
-                                          uint8_t *scratch, uint32_t capacity,
-                                          struct hpclang_rpl_flash_installed_recovery *installed)
+static int layout_binding(const struct hpclang_rpl_flash_recovery_layout *layout,
+                          uint32_t *journal_slot, uint32_t *authority_slot)
 {
-    if (!layout || !layout->record || !installed || layout->bytes < 16u ||
-        layout->bytes >= 0x20000u)
+    if (!layout || !layout->record || layout->bytes < 16u || layout->bytes >= 0x20000u)
         return HPCLANG_RPL_FLASH_INVALID;
     const uint8_t *record = layout->record;
     uint32_t end = 13u + layout_word(record, 13u, 5u);
@@ -309,6 +305,116 @@ int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
         journal = j;
         authority = a;
     }
+    *journal_slot = journal;
+    *authority_slot = authority;
+    return 0;
+}
+
+struct proposed_transaction
+{
+    const struct hpclang_rpl_flash_io *io;
+    uint32_t journal_slot, authority_slot, target;
+    const uint8_t *journal, *authority, *image;
+};
+
+static int proposed_read(void *context, uint32_t address, uint16_t *value)
+{
+    const struct proposed_transaction *view = context;
+    if (!view->io->read16(view->io->context, address, value))
+        return 0;
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t at = address + i;
+        uint8_t byte;
+        if (at >= view->journal_slot &&
+            at - view->journal_slot < HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) {
+            uint32_t offset = at - view->journal_slot;
+            byte = offset ? view->journal[offset] : 0;
+        } else if (at >= view->authority_slot &&
+                   at - view->authority_slot < HPCLANG_RPL_FLASH_AUTHORITY_BYTES) {
+            uint32_t offset = at - view->authority_slot;
+            byte = offset ? view->authority[offset] : 0;
+        } else if (at >= view->target && at - view->target < HPCLANG_RPL_FLASH_SECTOR_BYTES) {
+            byte = view->image[at - view->target];
+        } else {
+            continue;
+        }
+        *value = (uint16_t)((*value & ~(255u << (8u * i))) | ((uint16_t)byte << (8u * i)));
+    }
+    return 1;
+}
+
+int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
+                                     const struct hpclang_rpl_flash_recovery_layout *layout,
+                                     const struct hpclang_rpl_flash_catalog *catalog,
+                                     const uint8_t *journal, uint32_t journal_bytes,
+                                     struct hpclang_rpl_flash_installed_recovery *installed)
+{
+    if (!io || !io->read16 || !installed)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t j, a, target;
+    int result = layout_binding(layout, &j, &a);
+    if (result)
+        return result;
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    const uint8_t *image;
+    if (hpclang_rpl_flash_sector_decode(io->first, io->end, j, journal, journal_bytes, &target,
+                                        &image) ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, a, j, journal, journal_bytes,
+                                           authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t library;
+    result =
+        hpclang_rpl_flash_match_installation(io, layout->record, layout->bytes, catalog, &library);
+    if (result)
+        return result;
+    if (library < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < library + layout->bytes)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* Require untouched storage, not reusable tombstones or publication retries. */
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t slot = index ? a : j;
+        uint32_t size = index ? sizeof authority : journal_bytes;
+        for (uint32_t offset = 0; offset < size; ++offset) {
+            uint32_t at = slot + offset;
+            uint16_t word;
+            if (!io->read16(io->context, at & ~1u, &word))
+                return HPCLANG_RPL_FLASH_FAILED;
+            if (((word >> (8u * (at & 1u))) & 255u) != 255u)
+                return HPCLANG_RPL_FLASH_OCCUPIED;
+        }
+    }
+    /* The proposed deleted envelopes test actual allocation boundaries without
+     * asking ordinary Stock scanners to interpret unpublished private records.
+     * No durable status is changed. A hole before either allocation is rejected
+     * by the full erased-tail check, even if the requested bytes are all FF. */
+    struct proposed_transaction view = {io, j, a, target, journal, authority, image};
+    const struct hpclang_rpl_flash_io proposed = {&view, proposed_read, NULL, io->first, io->end};
+    struct bound_overlay membership = {&proposed, a, j, target, 0, NULL, 1};
+    result = bound_membership(&membership);
+    if (result)
+        return result;
+    uint32_t matched;
+    result = hpclang_rpl_flash_match_installation(&proposed, layout->record, layout->bytes, catalog,
+                                                  &matched);
+    if (result)
+        return result;
+    if (matched != library)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *installed = (struct hpclang_rpl_flash_installed_recovery){library, j, a, target};
+    return 0;
+}
+
+int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
+                                          const struct hpclang_rpl_flash_recovery_layout *layout,
+                                          const struct hpclang_rpl_flash_catalog *catalog,
+                                          uint8_t *scratch, uint32_t capacity,
+                                          struct hpclang_rpl_flash_installed_recovery *installed)
+{
+    if (!installed)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t journal, authority;
+    int result = layout_binding(layout, &journal, &authority);
+    if (result)
+        return result;
     uint32_t target = 0;
     int phase =
         hpclang_rpl_flash_preflight_bound(io, authority, journal, scratch, capacity, &target);
@@ -325,8 +431,8 @@ int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
     struct bound_overlay view = {io, authority, journal, target, 0, phase ? image : NULL, 1};
     const struct hpclang_rpl_flash_io restored = {&view, bound_read, NULL, io->first, io->end};
     uint32_t library;
-    int result =
-        hpclang_rpl_flash_match_installation(&restored, record, layout->bytes, catalog, &library);
+    result = hpclang_rpl_flash_match_installation(&restored, layout->record, layout->bytes, catalog,
+                                                  &library);
     if (result)
         return result;
     if (library < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < library + layout->bytes)

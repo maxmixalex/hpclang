@@ -557,6 +557,71 @@ static void installed_preflight_tests(void)
     const struct hpclang_rpl_flash_installed_recovery sentinel = {1, 2, 3, 4};
     struct hpclang_rpl_flash_installed_recovery output;
     uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    /* Initial planning must work before either private record exists. Test
+     * separate banks and both contiguous orders, without imposing fixture-only
+     * adjacency. Erased bytes inside a tombstone are not free allocations. */
+    for (unsigned fault = 0; fault < 13; ++fault) {
+        uint32_t j = JOURNAL, a = ROOT;
+        if (fault == 1)
+            a = j + sizeof journal;
+        if (fault == 2) {
+            a = j;
+            j += sizeof authority;
+        }
+        if (fault == 3 || fault == 6)
+            j += 8;
+        if (fault == 4)
+            a += 8;
+        prepare_native_port(0x7e, 0x7e, a, j);
+        memset(flash + j - FIRST, 255, sizeof journal);
+        memset(flash + a - FIRST, 255, sizeof authority);
+        for (unsigned at = 56; at <= 88; at += 32) {
+            packed_word(library, at + 16, j, 8);
+            packed_word(library, at + 24, a, 8);
+        }
+        seal_library(library);
+        memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+        if (fault == 5)
+            flash[a - FIRST] = 0xfe; /* A publication retry is not fresh space. */
+        if (fault == 6)
+            tombstone(JOURNAL, sizeof journal + 8);
+        if (fault == 7) {
+            image[0x101] ^= 1; /* Invalid desired bank identity. */
+            assert(!hpclang_rpl_flash_sector_encode(FIRST, END, j, FIRST, image, journal,
+                                                    sizeof journal));
+        }
+        if (fault == 8) {
+            memcpy(image, flash + (LIBRARY & ~4095u) - FIRST, sizeof image);
+            assert(!hpclang_rpl_flash_sector_encode(FIRST, END, j, LIBRARY & ~4095u, image, journal,
+                                                    sizeof journal));
+        }
+        if (fault == 9)
+            layout.admission_binding = layout.recovery_binding;
+        if (fault == 10)
+            journal[100] ^= 1;
+        if (fault == 12)
+            packed_word(catalog_data, 126, 0x40223, 5);
+        reads = 0;
+        fail_read = fault == 11 ? 1 : 0;
+        memcpy(initial, flash, sizeof flash);
+        output = sentinel;
+        int result = hpclang_rpl_flash_plan_installed(&io, &layout, &catalog, journal,
+                                                      sizeof journal, &output);
+        if (fault < 3) {
+            assert(result == 0 && output.library_slot == LIBRARY && output.journal_slot == j &&
+                   output.authority_slot == a && output.target == FIRST);
+        } else {
+            assert(result < 0 && !memcmp(&output, &sentinel, sizeof output));
+        }
+        assert(!memcmp(initial, flash, sizeof flash) && !programs && !erases);
+        layout.admission_binding = 88;
+        packed_word(catalog_data, 126, 0x40222, 5);
+    }
+    for (unsigned at = 56; at <= 88; at += 32) {
+        packed_word(library, at + 16, JOURNAL, 8);
+        packed_word(library, at + 24, ROOT, 8);
+    }
+    seal_library(library);
     const uint8_t states[][2] = {{0x7e, 0x7e}, {0x7e, 0x7c}, {0x7c, 0}, {0, 0}};
     const int phases[] = {1, 2, 2, 0};
     for (unsigned i = 0; i < 4; ++i) {
