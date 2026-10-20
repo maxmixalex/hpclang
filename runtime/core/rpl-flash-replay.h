@@ -54,6 +54,37 @@ int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
                                       uint32_t authority_slot, uint32_t journal_slot,
                                       uint8_t *scratch, uint32_t capacity, uint32_t *target);
 
+struct hpclang_rpl_flash_recovery_layout
+{
+    const uint8_t *record;
+    uint32_t bytes;
+    /* Nibble offsets in the expected native record, obtained from owned ELF
+     * packaging, not signature searches in untrusted Flash. */
+    uint32_t recovery_binding, admission_binding;
+};
+
+struct hpclang_rpl_flash_installed_recovery
+{
+    uint32_t library_slot, journal_slot, authority_slot, target;
+};
+
+/* Connect exact installed library content/catalog identity to its two HPCBIND1
+ * descriptors and the bound transaction preflight. Both descriptors must agree.
+ * Validate the library against the restored port view for a pending transaction;
+ * require its entire allocation outside the target sector, so the journal cannot
+ * supply missing installation bytes. Closed transactions use actual Flash only.
+ * Return preflight_bound's READY/RETIRING/closed result; output changes only on
+ * success (including closed). Scratch has the same two-record requirement.
+ * Expected record/layout, mappings and catalog are trusted stable caller inputs,
+ * disjoint from scratch/output. This is read-only structural/identity validation,
+ * not root publication, freshness, RAM ownership or startup-order authorization.
+ */
+int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
+                                          const struct hpclang_rpl_flash_recovery_layout *layout,
+                                          const struct hpclang_rpl_flash_catalog *catalog,
+                                          uint8_t *scratch, uint32_t capacity,
+                                          struct hpclang_rpl_flash_installed_recovery *installed);
+
 /* Replay a caller-authorized, fully published sector image from Flash. scratch
  * is caller-owned RAM of at least SECTOR_RECORD_BYTES, disjoint from IO state.
  * Read and validate the entire durable record before any target mutation.

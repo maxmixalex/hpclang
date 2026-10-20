@@ -496,6 +496,129 @@ static void bound_membership_tests(void)
     assert(!programs && !erases);
 }
 
+static void packed_word(uint8_t *data, uint32_t at, uint32_t value, unsigned count)
+{
+    for (unsigned i = 0; i < count; ++i, ++at) {
+        unsigned shift = 4u * (at & 1u);
+        data[at / 2u] =
+            (uint8_t)((data[at / 2u] & ~(15u << shift)) | (((value >> (4u * i)) & 15u) << shift));
+    }
+}
+
+static uint8_t catalog_data[100];
+static int read_catalog(void *context, uint32_t at, uint8_t *value)
+{
+    assert(context == catalog_data);
+    if (at >= sizeof catalog_data * 2)
+        return 0;
+    *value = (uint8_t)((catalog_data[at / 2u] >> (4u * (at & 1u))) & 15u);
+    return 1;
+}
+
+static void seal_library(uint8_t library[64])
+{
+    uint32_t crc = 0;
+    for (unsigned at = 13; at < 124; ++at) {
+        unsigned nibble = (library[at / 2u] >> (4u * (at & 1u))) & 15u;
+        crc = (crc >> 4u) ^ (((crc ^ nibble) & 15u) * 0x1081u);
+    }
+    packed_word(library, 124, crc, 4);
+}
+
+static void installed_preflight_tests(void)
+{
+    enum
+    {
+        LIBRARY = 0x1a0105
+    };
+    uint8_t library[64] = {0x53, 0x7e, 0, 0x10};
+    packed_word(library, 8, 0x2b40, 5);
+    packed_word(library, 13, 115, 5);
+    packed_word(library, 18, 1, 2);
+    packed_word(library, 20, 'X', 2);
+    packed_word(library, 22, 1, 2);
+    packed_word(library, 24, 123, 3);
+    for (unsigned at = 56; at <= 88; at += 32) {
+        packed_word(library, at, 0x42435048, 8);
+        packed_word(library, at + 8, 0x31444e49, 8);
+        packed_word(library, at + 16, JOURNAL, 8);
+        packed_word(library, at + 24, ROOT, 8);
+    }
+    seal_library(library);
+    for (unsigned i = 0; i < 16; ++i)
+        packed_word(catalog_data, i * 7u, 0x12345u + i * i, 5);
+    packed_word(catalog_data, 120, 1, 3);
+    packed_word(catalog_data, 123, 123, 3);
+    packed_word(catalog_data, 126, 0x40222, 5);
+    packed_word(catalog_data, 131, 0x12345 + 11 * 11, 5);
+    const struct hpclang_rpl_reader reader = {read_catalog, catalog_data};
+    const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 19, 0};
+    struct hpclang_rpl_flash_recovery_layout layout = {library, sizeof library, 56, 88};
+    const struct hpclang_rpl_flash_installed_recovery sentinel = {1, 2, 3, 4};
+    struct hpclang_rpl_flash_installed_recovery output;
+    uint8_t workspace[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+    const uint8_t states[][2] = {{0x7e, 0x7e}, {0x7e, 0x7c}, {0x7c, 0}, {0, 0}};
+    const int phases[] = {1, 2, 2, 0};
+    for (unsigned i = 0; i < 4; ++i) {
+        prepare_native_port(states[i][0], states[i][1], ROOT, JOURNAL);
+        memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+        if (!i)
+            memset(flash, 0xff, sizeof image); /* Damaged target identity. */
+        output = sentinel;
+        assert(hpclang_rpl_flash_preflight_installed(&io, &layout, &catalog, workspace,
+                                                     sizeof workspace, &output) == phases[i]);
+        assert(output.library_slot == LIBRARY && output.journal_slot == JOURNAL &&
+               output.authority_slot == ROOT && output.target == FIRST);
+        assert(!programs && !erases);
+    }
+    /* A library existing only in the journal cannot be the recovery root. */
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    memcpy(image + 0x105, library, sizeof library);
+    assert(!hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
+                                            sizeof journal));
+    assert(!hpclang_rpl_flash_authority_encode(FIRST, END, ROOT, JOURNAL, journal, sizeof journal,
+                                               authority, sizeof authority));
+    memcpy(flash + JOURNAL - FIRST, journal, sizeof journal);
+    memcpy(flash + ROOT - FIRST, authority, sizeof authority);
+    memset(flash, 0xff, sizeof image);
+    packed_word(catalog_data, 131, 0x12345 + 8 * 8, 5);
+    output = sentinel;
+    assert(hpclang_rpl_flash_preflight_installed(&io, &layout, &catalog, workspace,
+                                                 sizeof workspace,
+                                                 &output) == HPCLANG_RPL_FLASH_DIRTY);
+    assert(!memcmp(&output, &sentinel, sizeof output) && !programs && !erases);
+    packed_word(catalog_data, 131, 0x12345 + 11 * 11, 5);
+    prepare_native_port(0x7e, 0x7e, ROOT, JOURNAL);
+    memcpy(flash + LIBRARY - FIRST, library, sizeof library);
+    memcpy(initial, flash, sizeof flash);
+    for (unsigned fault = 0; fault < 10; ++fault) {
+        memcpy(flash, initial, sizeof flash);
+        output = sentinel;
+        layout.admission_binding = fault == 0 ? 56 : 88;
+        if (fault == 7)
+            layout.admission_binding = UINT32_MAX;
+        layout.recovery_binding = fault == 8 ? 124 : 56;
+        layout.bytes = fault == 9 ? 15 : sizeof library;
+        if (fault == 1)
+            packed_word(library, 104, JOURNAL + 4, 8);
+        if (fault == 2)
+            flash[LIBRARY - FIRST] = 0;
+        if (fault == 3)
+            flash[ROOT - FIRST] = 0xff;
+        if (fault == 4)
+            flash[LIBRARY - FIRST + 40] ^= 1;
+        if (fault == 5)
+            packed_word(catalog_data, 126, 0x40223, 5);
+        reads = 0;
+        fail_read = fault == 6 ? 1 : 0;
+        assert(hpclang_rpl_flash_preflight_installed(&io, &layout, &catalog, workspace,
+                                                     sizeof workspace, &output) < 0);
+        assert(!memcmp(&output, &sentinel, sizeof output) && !programs && !erases);
+        packed_word(library, 104, JOURNAL, 8);
+        packed_word(catalog_data, 126, 0x40222, 5);
+    }
+}
+
 int main(void)
 {
     bound_membership_tests();
@@ -514,5 +637,6 @@ int main(void)
     bound_replay_tests();
     transaction_test();
     bound_preflight_tests();
+    installed_preflight_tests();
     return 0;
 }

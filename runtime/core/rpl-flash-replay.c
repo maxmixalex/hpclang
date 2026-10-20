@@ -273,6 +273,68 @@ int hpclang_rpl_flash_preflight_bound(const struct hpclang_rpl_flash_io *io,
     return result;
 }
 
+static uint32_t layout_word(const uint8_t *record, uint32_t at, unsigned count)
+{
+    uint32_t value = 0;
+    for (unsigned i = 0; i < count; ++i, ++at)
+        value |= (uint32_t)((record[at / 2u] >> (4u * (at & 1u))) & 15u) << (4u * i);
+    return value;
+}
+
+int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
+                                          const struct hpclang_rpl_flash_recovery_layout *layout,
+                                          const struct hpclang_rpl_flash_catalog *catalog,
+                                          uint8_t *scratch, uint32_t capacity,
+                                          struct hpclang_rpl_flash_installed_recovery *installed)
+{
+    if (!layout || !layout->record || !installed || layout->bytes < 16u ||
+        layout->bytes >= 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    const uint8_t *record = layout->record;
+    uint32_t end = 13u + layout_word(record, 13u, 5u);
+    if (layout_word(record, 8u, 5u) != 0x02b40u || end > 2u * layout->bytes || end < 36u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t offsets[2] = {layout->recovery_binding, layout->admission_binding};
+    uint32_t journal = 0, authority = 0;
+    for (unsigned i = 0; i < 2; ++i) {
+        uint32_t at = offsets[i];
+        if (at < 18u || at > end - 36u || layout_word(record, at, 8u) != 0x42435048u ||
+            layout_word(record, at + 8u, 8u) != 0x31444e49u)
+            return HPCLANG_RPL_FLASH_INVALID;
+        uint32_t j = layout_word(record, at + 16u, 8u);
+        uint32_t a = layout_word(record, at + 24u, 8u);
+        if (i &&
+            (j != journal || a != authority || (offsets[0] < at + 32u && at < offsets[0] + 32u)))
+            return HPCLANG_RPL_FLASH_INVALID;
+        journal = j;
+        authority = a;
+    }
+    uint32_t target = 0;
+    int phase =
+        hpclang_rpl_flash_preflight_bound(io, authority, journal, scratch, capacity, &target);
+    if (phase < 0)
+        return phase;
+    /* Closed preflight leaves target unchanged but retains the loaded journal.
+     * Decode it to protect the installed allocation even during cleanup. */
+    enum hpclang_rpl_flash_sector_phase journal_phase;
+    const uint8_t *image;
+    if (hpclang_rpl_flash_sector_inspect(io->first, io->end, journal, scratch,
+                                         HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES, &target, &image,
+                                         &journal_phase))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct bound_overlay view = {io, authority, journal, target, 0, phase ? image : NULL, 1};
+    const struct hpclang_rpl_flash_io restored = {&view, bound_read, NULL, io->first, io->end};
+    uint32_t library;
+    int result =
+        hpclang_rpl_flash_match_installation(&restored, record, layout->bytes, catalog, &library);
+    if (result)
+        return result;
+    if (library < target + HPCLANG_RPL_FLASH_SECTOR_BYTES && target < library + layout->bytes)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *installed = (struct hpclang_rpl_flash_installed_recovery){library, journal, authority, target};
+    return phase;
+}
+
 static int sector_replay(const struct hpclang_rpl_flash_replay_io *io, uint32_t slot,
                          const uint8_t *expected_record, uint8_t *scratch, uint32_t capacity)
 {
