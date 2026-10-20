@@ -8,7 +8,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-from prepare import prepare, reserve_bank_tail
+from prepare import changed_library_title, prepare, reserve_bank_tail
 from verify import (
     home_object,
     home_string,
@@ -39,7 +39,7 @@ def packager():
     return module
 
 
-def observed_library(pack, library):
+def observed_library(pack, library, *, identity_nibble=None):
     """Append a completion witness without changing any generated guard command.
 
     The unmodified library is tested separately for successful recovery. Negative
@@ -47,6 +47,15 @@ def observed_library(pack, library):
     because configuration never ran. Only this fixture tail writes the marker.
     """
     data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
+    if identity_nibble is not None:
+        # The marker changes library content, so an owned sealed admission must
+        # receive a new descriptor. Never locate it through a signature search.
+        descriptor = data[identity_nibble : identity_nibble + 96]
+        magic = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in b"HPCROOT1")
+        if len(descriptor) != 96 or not descriptor.startswith(magic):
+            raise ValueError("Observed library lacks the owned identity descriptor")
+        placeholder = magic + "0" * 80
+        data = data[:identity_nibble] + placeholder + data[identity_nibble + 96 :]
 
     def word(at, width=5):
         return int(data[at : at + width][::-1], 16)
@@ -67,9 +76,12 @@ def observed_library(pack, library):
     marker += pack.immediate(len(MARKER), 2)
     marker += "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in MARKER)
     marker += pack.immediate(0x38A14) + pack.immediate(0x3E739)
-    return pack._configuration_library(
+    observed = pack._configuration_library(
         configuration[:-10] + marker + configuration[-10:], LIBRARY_ID, commands
     )
+    if identity_nibble is not None:
+        observed = pack.seal_recovery_identity(observed, identity_nibble)
+    return observed
 
 
 def reader(state):
@@ -145,7 +157,10 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     if program != (build / "recovery-configuration.hp").read_bytes():
         raise ValueError("Recovery build binding differs from the requested transaction")
     library = (package / "recovery-guarded.hp").read_bytes()
-    (package / "recovery-observed.hp").write_bytes(observed_library(pack, library))
+    layout = json.loads((package / "recovery-layout.json").read_text())
+    (package / "recovery-observed.hp").write_bytes(
+        observed_library(pack, library, identity_nibble=layout.get("identity_object_nibble"))
+    )
     source = root / "install-source"
     bank = args.target & ~0x1FFFF
     reserve_bank_tail(clean, source, bank)
@@ -323,8 +338,29 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
     admission_gap = (admission_read(0x806F8) - admission_read(0x806F3)) // 2
     if not 0 < admission_gap < len(program) - 8:
         raise ValueError("Admission rejection fixture did not retain low-memory pressure")
+    observed_package = (package / "recovery-observed.hp").read_bytes()
+    observed_slot, _ = installed_recovery(
+        (admission_before / "flash").read_bytes(),
+        observed_package,
+        LIBRARY_ID,
+        args.target,
+        read=admission_read,
+    )
+    altered_package = changed_library_title(observed_package)
+    altered_view = bytearray((admission_before / "flash").read_bytes())
+    altered_view[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
+        altered_package[8:]
+    )
+    installed_recovery(altered_view, altered_package, LIBRARY_ID, args.target, read=admission_read)
     admission_rejected = []
-    for label in ("closed", "unpublished", "bad-crc", "bank-identity", "dirty-tail"):
+    for label in (
+        "closed",
+        "unpublished",
+        "bad-crc",
+        "bank-identity",
+        "dirty-tail",
+        "library-identity",
+    ):
         fault = root / ("admission-" + label + "-fault")
         prepare(admission_before, fault, args.slot, args.target, bound=True)
         flash = bytearray((fault / "flash").read_bytes())
@@ -341,6 +377,10 @@ def run_reservation(args, clean, *, transfer, emulator, completed, verify_busy_r
             flash[authority + 28] ^= 1
         elif label == "bank-identity":
             flash[(args.slot & ~0x1FFFF) + 0x100] ^= 1
+        elif label == "library-identity":
+            flash[observed_slot + 4 : observed_slot + 4 + len(altered_package) - 8] = (
+                altered_package[8:]
+            )
         else:
             flash[authority + 32 + 4] = 0
         (fault / "flash").write_bytes(flash)

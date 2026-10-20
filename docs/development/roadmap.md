@@ -419,11 +419,156 @@ This summary describes current work. Older implementation snapshots below retain
 their original evidence scope; their then-pending statements are not the current
 backlog. Local verification, CI acceptance and milestone completion are distinct.
 
+Execution discipline: read this roadmap and remote issue #1 before selecting work;
+reconcile implementation, branch and verification evidence, then update both when
+results or scope facts change. M8.0 remains the primary track. Port 2 recovery
+ownership, startup ordering and reclamation are required deliverables, not a
+post-M8 deferral. Only M8.1 is accepted complete.
+
 Current delivery checkpoints:
 
+- **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
+  pending; Objects passes, Quality fails because the identity-vector header
+  was generated only at build time, and Core/Runtime are still running/queued
+  at the latest inspection. A local CMake fix generates the header during
+  configuration and tracks its inputs for regeneration. Both affected sources
+  pass pinned Clang analysis in a fresh, configure-only build directory, and
+  their two CTests pass. `8fc3fcd4` is accepted and merged into main as `ff35ffe9`.
+  Local follow-up through `c15a9231` integrates automatic sealed admission
+  and checks create-only reservation collisions. Both native models pass
+  recovery/restart, all maintained automatic rejection cases and both
+  existing-content collision cases. A lost-RAM-write-acknowledgement prototype
+  also passes on both models. Maintained failure integration at `2952a44b`
+  now passes both models, including both existing-content collision cases;
+  normal publication, warm restart, zero-write closed repeat and both
+  unpublished cancellation cases now also pass on both models from the saved
+  clean installed baseline. All 82 related Python tests, ARM analysis, formatting
+  and strict docs pass. The follow-up through `a30ae484` is ready for batched CI.
+  Next: durable reservation
+  ownership/lifetime and global startup order. No M8 acceptance gate is removed.
+  The detailed evidence below includes earlier intermediate states.
+
+- **Sealed installation identity batch:** the existing
+  exact-library witness executes outside the library it verifies. An embedded
+  admission command cannot embed its entire containing library as its own
+  expected image. A packaging prototype now fills an owned `HPCROOT1` descriptor
+  with the library span, descriptor coordinate and SHA-256 of canonical object
+  nibbles, zeroing only the digest and native CRC fields before hashing, then
+  rebuilding the native CRC. Tests cover descriptor alignment, odd object length,
+  unchanged other fields, deterministic output and invalid inputs; all 76 related
+  host tests and lint/format pass. Packaging now locates the optional descriptor
+  through the owned admission ELF symbol and command layout, and seals it even
+  when no layout sidecar is requested. Invalid symbol positions preserve all
+  output files. A streaming C verifier checks the embedded descriptor, length,
+  native CRC and canonical digest without heap allocation. Twenty generated
+  reference vectors cover both nibble alignments, both length parities and SHA
+  block/padding boundaries; every input-read failure and every content-nibble
+  mutation with a repaired native CRC is rejected. CMake/CTest, ASan/UBSan,
+  ARMv4T build/analysis and the related Python tests pass. ARM frame reports are
+  192 bytes for the matcher and 168 for its hashing helper. A subsequent
+  read-only installed-content matcher now resolves a unique live library and
+  its catalog/bank switch before streaming the identity check. It reuses the
+  complete six-bank allocation/tail scanner and shared catalog validation.
+  All 20 vectors pass in all six banks; deleted/duplicate roots, wrong or
+  ambiguous mappings, changed descriptors, read failure, dirty tails and a
+  different valid library with the same ID reject without changing output or
+  Flash. The new matcher, existing creation/authority regressions, ASan/UBSan
+  and ARM analysis pass. A native prototype built from `791fcd34` now passes on
+  HP49g+/HP50g: Stock installs the 14,896-byte sealed library, and a real XLIB
+  call executes its internal admission command. The original content matches;
+  changing only the library title and independently repairing the native CRC
+  returns DIRTY. Both cases preserve exact Flash/catalog content, initialized
+  execution code, its owning fresh CODE object, guards/mappings and normal
+  native return, with zero Flash operations. The configuration is empty:
+  this proves internal execution, not automatic startup admission.
+  A local follow-up additionally validates allocation metadata and canonical
+  or supported legacy envelope length; wrong-type and enlarged envelopes
+  reject in host tests, with ARM analysis passing. Maintained native integration
+  and admission against an interrupted transaction's restored view remain next.
+  The subsequent local preflight now validates the bound transaction before
+  checking installed content on the restored view, reads the exact native
+  allocation extent and rejects any recovery allocation overlapping the target.
+  Host tests accept ready/damaged, retiring and closed states, preserve later
+  valid allocations after closure, and reject unpublished/corrupt records,
+  wrong catalog mappings, read failures, a root supplied only by the journal
+  and damaged current Flash after closure. Outputs and Flash remain unchanged
+  on rejection. Host/sanitizer tests and ARM analysis pass; both native models
+  have passed all five transaction-state probes (armed, damaged, retiring, closed
+  and unpublished), including exact code/owner/guards/catalog/Flash checks.
+  The current copied admission
+  program occupies 26,914 bytes (26,832-byte ARM runtime extent), exceeding the
+  earlier 20,898-byte low-memory gap; its containing library occupies 27,008 bytes.
+  This is functional preflight evidence only: a smaller admission path and
+  renewed physical-memory validation are required before startup integration.
+  Streaming admission now avoids the sector-sized scratch buffer by validating
+  the journal incrementally and reading the restored view directly from Flash.
+  Differential host tests pass against the buffered path, including invalid
+  closure order, a mismatched retiring target and a second pending journal.
+  Record tests cover every status byte, byte corruption and read failure;
+  focused CTest, ASan/UBSan and ARM static analysis pass. The native copied
+  program is now 17,098 bytes (17,016-byte ARM runtime extent), with a
+  17,192-byte installed library. Local commit `8311bb7d` passes armed,
+  damaged and retiring native admission on both models. With only 20,860
+  bytes free, both also pass damaged and closed admission, preserving all
+  24,000 user real-array elements, the 32 KiB reservation, exact Flash/catalog,
+  execution code/owning CODE, stack guards, mappings and native return.
+  These are explicit internal XLIB calls, not automatic startup acceptance.
+  All five normal-memory states now pass on both models. Record/authority
+  regressions also pass. Maintained E2E integration adds an identity suite to
+  the existing Runtime matrix, sharing its configuration build. It packages
+  the sealed library from owned ELF coordinates, invokes its internal command,
+  and checks transaction phases, changed content with repaired native CRC and
+  low-memory preservation. ARM build/analysis, 78 related Python tests and
+  lint pass. Native integration passes all five transaction states on both
+  models. The new changed-content fixture initially validated ordinary native
+  allocations after injecting pending journal records; it now validates the
+  altered library before injection. The corrected content-mismatch case and
+  both low-memory cases now pass on both models, including exact code/owner,
+  guards, Flash/catalog, all user-array elements and reservation contents.
+  The maintained copied admission program is 17,114 bytes; the measured free
+  gap in the installation baseline is 20,860 bytes. The complete standalone
+  clean-boot suite now passes on both models, including all five transaction
+  states, changed content and both pressure cases; its measured gap is 20,868 bytes.
+  A separate local prototype is testing sealed admission before automatic
+  reservation release/recovery. Its initial 2 KiB startup stack corrupted the
+  lower guard and adjacent code on both models. A 4 KiB variant matching the
+  verified internal-command fixture now passes automatic recovery and repeated
+  restart with preserved user data and exact Flash on both models. This remains
+  a prototype; maintained automatic integration and negative cases remain open.
+  Completion-marker libraries
+  now reseal their owned identity after configuration changes; independent
+  digest/native-CRC tests pass. These changes do not establish RAM ownership.
+  The maintained identity batch was submitted as `5aad911e`; CI acceptance
+  remains pending. A local automatic-admission follow-up binds the library
+  number through an owned ELF placeholder before sealing, rather than baking
+  a fixture ID into the admission code. The maintained automatic predicate now
+  uses this bound number, sealed content and streaming transaction preflight
+  with a 4 KiB stack. ARM build/analysis and 77 related Python tests pass; both
+  models are running the complete automatic recovery and rejection fixture.
+  Automatic low-memory recovery/restart and closed, unpublished, bad-CRC,
+  bank-identity and dirty-tail rejection now pass on both models. An additional
+  native startup case changes only the installed library title and repairs its
+  native CRC; both models reject it without releasing RAM, writing Flash or
+  requesting reset. The completion marker proves the callback ran, and all
+  retained user data remain exact. Wrong-type, wrong-capacity and wrong-prefix
+  reservation refusal also pass, completing the maintained automatic fixture
+  on both models. A creation-side follow-up now checks that existing names
+  are rejected even for byte-identical reservation content, without entering
+  transaction publication; both content variants now pass on both native models.
+  A local failure-path follow-up tracks native RAM write attempts during
+  reservation creation and retains the invocation after a subsequent error,
+  rather than returning an ordinary false predicate to Stock. A lost-write-
+  acknowledgement prototype passes on both native models, preserving code/owner,
+  guards and IRQ ownership without Flash publication. Maintained failure E2E
+  integration and the normal publication/restart/cancellation regression now pass
+  on both models. This retains failure ownership and does not implement rollback or restart claims.
+  This content check does not establish installation provenance, fresh
+  transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
   tests through `8a717ec4` follow the previous submission `c8740410`.
-  This batch is prepared for CI; acceptance remains pending. `747fa4ae`
+  This batch passed Quality, Core, Runtime and Objects at `8fc3fcd4` and was
+  merged into main through PR #2 (`ff35ffe9`). Main CI is not awaited.
+  `747fa4ae`
   records the publication power-cut evidence below.
   Internal unpublished-transaction cancellation now passes host fault injection
   for four initial states: every program operation with five partial-write masks,

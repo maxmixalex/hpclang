@@ -5,7 +5,7 @@ import struct
 
 from installation import AUTHORITY_SLOT, JOURNAL_SLOT, TARGET, verify_probe
 from prepare import prepare
-from reservation import reader
+from reservation import packager, reader
 from verify import home_string, require, require_stock_pc, symbol_offsets
 
 
@@ -41,11 +41,76 @@ def verify_publication(before, after, build, nm, expected, slot, repeated):
     return results[9]
 
 
+def run_reservation_collisions(args, baseline, root, *, transfer, verify_busy_reads):
+    pack = packager()
+    for label, value in (("different", b"user-owned reservation name"), ("identical", RESERVATION)):
+        package = root / ("collision-" + label + "-package")
+        package.mkdir()
+        data = pack.immediate(0x2A2C) + pack.immediate(5 + 2 * len(value))
+        data += "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in value)
+        (package / "reservation.hp").write_bytes(
+            b"HPHP49-C" + bytes(int(data[i : i + 2][::-1], 16) for i in range(0, len(data), 2))
+        )
+        occupied = root / ("collision-" + label + "-occupied")
+        transfer(
+            args,
+            occupied,
+            baseline,
+            package,
+            "LEASEIN",
+            execute=False,
+            package_name="reservation.hp",
+            remote_commands=[
+                "-95 CF HOME CLEAR",
+                "'LEASEIN' RCL 'HPCLEASE' STO 'LEASEIN' PURGE",
+            ],
+        )
+        before = occupied / "state"
+        require(home_string(reader(before), b"HPCLEASE") == value, "Collision fixture differs")
+        phase = root / ("collision-" + label + "-rejected")
+        transfer(
+            args,
+            phase,
+            before,
+            args.build,
+            "PUBTEST",
+            package_name="installation-publication.hp",
+            remote_commands=["-95 CF HOME CLEAR 'PUBTEST' RCL 'PUBTEST' PURGE"],
+        )
+        after = phase / "state"
+        base = verify_probe(
+            before,
+            after,
+            args.build,
+            args.nm,
+            -10,
+            0xFFFFFFFF,
+            image="installation-publication",
+        )
+        symbols = symbol_offsets(args.build / "installation-publication.elf", args.nm)
+        results = struct.unpack_from(
+            "<12I", (after / "sram").read_bytes(), base + symbols["publication_result"]
+        )
+        reservation = struct.unpack_from(
+            "<2I", (after / "sram").read_bytes(), base + symbols["reservation_result"]
+        )
+        require(reservation == (0xFFFFFFF6, 0), "Collision attempted native RAM mutation")
+        require(results == (0,) * 12, "Collision entered transaction publication")
+        require(verify_busy_reads(args, phase) == 0, "Collision wrote Flash")
+        require(home_string(reader(after), b"HPCLEASE") == value, "Collision adopted user data")
+        print(f"Reservation creation rejected {label} existing content without writes", flush=True)
+
+
 def run_publication(args, baseline, slot, *, transfer, emulator, completed, verify_busy_reads):
     from cancellation import run_cancellation
+    from reservation_failure import run_failure
 
     root = args.output / "installation" / "publication"
     root.mkdir()
+    run_reservation_collisions(
+        args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    run_failure(args, baseline, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
     prepared = root / "expected"
     prepare(baseline, prepared, JOURNAL_SLOT, TARGET, bound=True)
     records = (prepared / "flash").read_bytes()

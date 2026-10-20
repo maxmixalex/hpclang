@@ -13,6 +13,8 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class InstallationExecutionTests(unittest.TestCase):
+    fresh_copy = False
+
     def setUp(self):
         self.initialized = bytes(range(32))
         self.symbols = {
@@ -21,9 +23,13 @@ class InstallationExecutionTests(unittest.TestCase):
             "admission_stack_low": 64,
             "admission_stack_high": 120,
         }
-        self.package = VERIFY.packager().package(self.initialized, 128, model="hp50g")
+        self.package = VERIFY.packager().package(
+            self.initialized, 128, model="hp50g", fresh_copy=self.fresh_copy
+        )
         program = VERIFY.nibbles(self.package[8:])
         prefix_length = 10 + int(program[10:15][::-1], 16) - (128 * 2 + 15)
+        if self.fresh_copy:
+            prefix_length = 15 + len(VERIFY.packager().entry(32, 0, fresh_copy=True))
         self.owner = 0x400
         self.base = (self.owner + (prefix_length + 1) // 2 + 7) & ~7
         self.ram = bytearray(0x80000)
@@ -53,6 +59,7 @@ class InstallationExecutionTests(unittest.TestCase):
             self.package if package is None else package,
             0,
             0x1E0105,
+            fresh_copy=self.fresh_copy,
         )
 
     def test_owned_image_is_required_in_addition_to_result_marker(self):
@@ -77,6 +84,10 @@ class InstallationExecutionTests(unittest.TestCase):
             self.check(self.ram, b"HPHP49-C")
         with self.assertRaises(ValueError):
             self.check(self.ram, self.package[:13])
+
+
+class FreshInstallationExecutionTests(InstallationExecutionTests):
+    fresh_copy = True
 
 
 if __name__ == "__main__":

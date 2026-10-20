@@ -99,11 +99,13 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     add_executable(admission admission-entry.S admission.c predicate.c "${CORE}/flash-mapping.S"
         "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
-            rpl-flash-replay rpl-port rpl-backup rpl-object-span)
+            rpl-flash-replay rpl-port rpl-backup rpl-object-span rpl-flash-write
+            rpl-recovery-installation rpl-recovery-identity)
         target_sources(admission PRIVATE "${CORE}/${module}.c")
     endforeach()
     configure_recovery_image(admission)
     target_compile_definitions(admission PRIVATE
+        HPCLANG_PREDICATE_STACK_BYTES=4096
         HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
             "${CMAKE_CURRENT_BINARY_DIR}/admission.bin"
@@ -127,23 +129,31 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
 foreach(witness IN ITEMS installation installation-transaction installation-publication
-        installation-cancellation)
+        installation-cancellation installation-identity installation-reservation-failure)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
-    if(witness STREQUAL "installation-transaction")
+    if(witness STREQUAL "installation-identity")
+        target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
+            "${CORE}/rpl-recovery-installation.c")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_IDENTITY)
+    elseif(witness STREQUAL "installation-transaction")
         target_sources(${witness} PRIVATE "${CORE}/rpl-flash-replay.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
-    elseif(witness STREQUAL "installation-publication")
+    elseif(witness STREQUAL "installation-publication" OR
+            witness STREQUAL "installation-reservation-failure")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot
                 time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_PUBLICATION)
+        if(witness STREQUAL "installation-reservation-failure")
+            target_compile_definitions(${witness} PRIVATE HPCLANG_RESERVATION_FAIL_WRITE=1)
+        endif()
     elseif(witness STREQUAL "installation-cancellation")
         target_sources(${witness} PRIVATE cancellation.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay time time-math rtc rtc-decode datetime sst-flash)

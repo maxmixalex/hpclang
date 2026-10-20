@@ -858,33 +858,19 @@ int hpclang_rpl_flash_match_library(const struct hpclang_rpl_flash_io *io, const
     return result;
 }
 
-int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
-                                         const uint8_t *record, uint32_t bytes,
-                                         const struct hpclang_rpl_flash_catalog *catalog,
-                                         uint32_t *slot)
+static int match_catalog(const struct hpclang_rpl_flash_io *io, uint32_t matched,
+                         const struct hpclang_rpl_port_entry *wanted,
+                         const struct hpclang_rpl_flash_catalog *catalog)
 {
-    if (!slot || !catalog || !catalog->reader || !catalog->reader->read_nibble ||
-        catalog->flash_table > 0x100000u - 112u)
-        return HPCLANG_RPL_FLASH_INVALID;
-    uint32_t matched;
-    int result = hpclang_rpl_flash_match_library(io, record, bytes, &matched);
-    if (result)
-        return result;
-    struct packed_record packed = {record, bytes};
-    const struct hpclang_rpl_reader source = {packed_read, &packed};
-    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
-    struct hpclang_rpl_port_entry wanted;
-    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
-        return HPCLANG_RPL_FLASH_INVALID;
     struct hpclang_rpl_library_binding binding;
-    result = hpclang_rpl_library_lookup(catalog->reader, catalog->address, catalog->nibbles,
-                                        wanted.library_number, &binding);
+    int result = hpclang_rpl_library_lookup(catalog->reader, catalog->address, catalog->nibbles,
+                                            wanted->library_number, &binding);
     if (result != 1)
         return result == 0                              ? HPCLANG_RPL_FLASH_NOT_FOUND
                : result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
                                                         : HPCLANG_RPL_FLASH_DIRTY;
     uint32_t offset = (matched - io->first) % 0x20000u;
-    uint32_t header = 0x40000u + 2u * (offset + 4u) + 14u + 2u * wanted.name_length;
+    uint32_t header = 0x40000u + 2u * (offset + 4u) + 14u + 2u * wanted->name_length;
     if (binding.address != header)
         return HPCLANG_RPL_FLASH_DIRTY;
     uint32_t expected_bank = 8u + (matched - io->first) / 0x20000u;
@@ -903,8 +889,74 @@ int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
     }
     if (matches != 1)
         return HPCLANG_RPL_FLASH_DIRTY;
-    *slot = matched;
     return 0;
+}
+
+static int valid_catalog(const struct hpclang_rpl_flash_catalog *catalog)
+{
+    return catalog && catalog->reader && catalog->reader->read_nibble &&
+           catalog->flash_table <= 0x100000u - 112u;
+}
+
+int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
+                                         const uint8_t *record, uint32_t bytes,
+                                         const struct hpclang_rpl_flash_catalog *catalog,
+                                         uint32_t *slot)
+{
+    if (!slot || !valid_catalog(catalog))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t matched;
+    int result = hpclang_rpl_flash_match_library(io, record, bytes, &matched);
+    if (result)
+        return result;
+    struct packed_record packed = {record, bytes};
+    const struct hpclang_rpl_reader source = {packed_read, &packed};
+    struct hpclang_rpl_port_cursor cursor = {8u, bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&source, &cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_INVALID;
+    result = match_catalog(io, matched, &wanted, catalog);
+    if (!result)
+        *slot = matched;
+    return result;
+}
+
+int hpclang_rpl_flash_locate_installation(const struct hpclang_rpl_flash_io *io,
+                                          uint32_t library_number,
+                                          const struct hpclang_rpl_flash_catalog *catalog,
+                                          uint32_t *slot)
+{
+    if (!slot || library_number > 0xfffu || !valid_catalog(catalog))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct record_selection selection;
+    int result = scan_records(io, NULL, 0, 0x2b40u, library_number, 0, &selection, NULL);
+    if (result)
+        return result;
+    if (!selection.matches)
+        return HPCLANG_RPL_FLASH_NOT_FOUND;
+    if (selection.matches != 1)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct recovery_reader flash = {io, selection.match_slot};
+    const struct hpclang_rpl_reader reader = {io_nibble, &flash};
+    struct hpclang_rpl_port_cursor cursor = {8u, selection.match_bytes * 2u, 0};
+    struct hpclang_rpl_port_entry wanted;
+    if (hpclang_rpl_port_next(&reader, &cursor, &wanted) != 1)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t metadata;
+    if (!io_nibble(&flash, 7u, &metadata))
+        return HPCLANG_RPL_FLASH_FAILED;
+    uint32_t extent;
+    result = recovery_word(&reader, 2u, 5u, &extent);
+    if (result)
+        return result;
+    if (metadata != 1u || extent + 2u != selection.match_bytes * 2u ||
+        (((wanted.span + 15u) & ~7u) != selection.match_bytes * 2u &&
+         ((wanted.span + 11u) & ~3u) != selection.match_bytes * 2u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    result = match_catalog(io, selection.match_slot, &wanted, catalog);
+    if (!result)
+        *slot = selection.match_slot;
+    return result;
 }
 
 static int select_backup(const struct hpclang_rpl_flash_io *io, const uint8_t *name,

@@ -210,6 +210,8 @@ jobs:
             build: normal
           - name: installation
             build: configuration
+          - name: identity
+            build: configuration
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-atfe

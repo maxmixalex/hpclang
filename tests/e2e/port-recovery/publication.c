@@ -37,13 +37,28 @@ static struct
     uint32_t kind, nibble_count, native_prologue;
     uint8_t data[CAPACITY + 5];
 } reservation;
+volatile uint32_t reservation_result[2];
+static unsigned reservation_writes;
+__attribute__((noinline, noreturn)) static void reservation_failed(void)
+{
+    for (;;)
+        __asm__ volatile("nop");
+}
 static int stock_read(void *context, uint32_t address, uint8_t *value)
 {
     return hpclang_rpl_stock_memory_read(context, address, value);
 }
 static int stock_write(void *context, uint32_t address, uint8_t value)
 {
-    return hpclang_rpl_stock_memory_write(context, address, value);
+    ++reservation_writes;
+    reservation_result[1] = reservation_writes;
+    int result = hpclang_rpl_stock_memory_write(context, address, value);
+#ifdef HPCLANG_RESERVATION_FAIL_WRITE
+    /* A lost acknowledgement may follow an actual native RAM write. */
+    if (reservation_writes == HPCLANG_RESERVATION_FAIL_WRITE)
+        return 0;
+#endif
+    return result;
 }
 static void set_word(uint32_t at, uint32_t value, unsigned count)
 {
@@ -194,6 +209,13 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
     if (result)
         return result;
     result = create_reservation(map);
+    reservation_result[0] = (uint32_t)result;
+    if (result && reservation_writes) {
+        /* The directory/arena may already have changed. Do not publish Flash
+         * or resume Stock on an ordinary negative predicate result. This is
+         * retention of the failed invocation, not rollback or restart recovery. */
+        reservation_failed();
+    }
     if (result)
         return result;
     publish_owned(io, &layout, catalog);

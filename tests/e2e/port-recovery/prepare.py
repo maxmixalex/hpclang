@@ -12,6 +12,38 @@ import struct
 import zlib
 
 
+def changed_library_title(library: bytes) -> bytes:
+    """Change only a generated library title and repair its native CRC."""
+    if library[:8] != b"HPHP49-C":
+        raise ValueError("Expected an HP49 library transfer envelope")
+    data = [nibble for byte in library[8:] for nibble in (byte & 15, byte >> 4)]
+
+    def word(at, count=5):
+        return sum(data[at + i] << (4 * i) for i in range(count))
+
+    def checksum():
+        crc = 0
+        for nibble in data[5 : span - 4]:
+            for bit in range(4):
+                carry = (crc ^ (nibble >> bit)) & 1
+                crc >>= 1
+                if carry:
+                    crc ^= 0x8408
+        return crc
+
+    if len(data) < 14 or word(0) != 0x2B40:
+        raise ValueError("Expected a complete native library")
+    span = 5 + word(5)
+    if span < 34 or len(data) != (span + 1) // 2 * 2 or not word(10, 2):
+        raise ValueError("Invalid library length or empty title")
+    if 34 + 2 * word(10, 2) > span or word(span - 4, 4) != checksum():
+        raise ValueError("Invalid library title or native CRC")
+    data[12] ^= 1
+    crc = checksum()
+    data[span - 4 : span] = [(crc >> (4 * i)) & 15 for i in range(4)]
+    return b"HPHP49-C" + bytes(data[i] | data[i + 1] << 4 for i in range(0, len(data), 2))
+
+
 def configuration_body_sector(flash: bytes, read) -> int:
     """Locate the Stock 2.15 library 229 callback sector in this fixture.
 

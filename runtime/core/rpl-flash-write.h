@@ -151,6 +151,17 @@ int hpclang_rpl_flash_match_installation(const struct hpclang_rpl_flash_io *io,
                                          const struct hpclang_rpl_flash_catalog *catalog,
                                          uint32_t *slot);
 
+/* Locate one live library ID after validating all banks, allocations/tails and
+ * its unique catalog/bank binding. This does not compare expected content:
+ * identity consumers must additionally validate the complete library. Deleted
+ * or nested copies are not live installations. Read-only; slot changes only on
+ * success. Keep the same stable mapping/ownership for subsequent content checks.
+ * Same result codes as match_installation; no transaction authority is granted. */
+int hpclang_rpl_flash_locate_installation(const struct hpclang_rpl_flash_io *io,
+                                          uint32_t library_number,
+                                          const struct hpclang_rpl_flash_catalog *catalog,
+                                          uint32_t *slot);
+
 /* Validate all six banks before deleting one uniquely named backup. Only its
  * status byte changes; payload, references and allocation extents stay put.
  * No erase/reclamation. Missing names return NOT_FOUND; ambiguous names DIRTY.
