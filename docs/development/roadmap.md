@@ -421,20 +421,29 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
-- **Current batch prepared for CI:** `0c263a97` includes installed-transaction
+- **Current submitted batch:** `b7b82d18` (implementation/tests through `0c263a97`)
+  includes installed-transaction
   preflight, owned descriptor layout generation, one-shot fixture lifetime fixes
   and maintained native transaction E2E. Both models pass the full recovery suite
   and all five installed-transaction states locally; 75 focused host tests, ARM
   analysis, pinned formatting/lint and strict documentation pass. CI acceptance
   remains pending; `62f7ece4` remains the accepted baseline.
 
+- **Reservation creation prototype (local):** both native models pass exact
+  installed-library/catalog matching before transaction publication, followed by
+  creation of a 32 KiB HOME string through the existing native create-only API.
+  Repeating the request returns EXISTS even for identical content; all 32 KiB
+  remain unchanged. Complete initialized-code/owning-CODE checks, stack guards,
+  restored mappings, Stock return, catalog preservation and zero Flash writes
+  pass. This establishes reuse of the existing allocator, not durable reservation
+  ownership, interruption handling or permission to mutate the target bank.
 - **Previously submitted implementation:** `aaf23c02` includes the read-only native
   installation matcher, maintained two-model installation E2E (`66cdf5e5`) and
   unified recovery/admission ELF binding. Both native installation flows and full
   guarded recovery regressions pass locally. Quality, Runtime and Objects pass
   remotely, but Core's two full recovery jobs fail at retirement re-entry; both
   installation jobs pass. This batch is not fully CI-accepted.
-- **Recovery fixture lifetime correction (`e7604b41`, local):** completed one-shot programs
+- **Recovery fixture lifetime correction (`e7604b41`, submitted):** completed one-shot programs
   were retained in HOME across the full recovery chain. The failed HP50g state
   had only 1,334 bytes between TEMP and the data stack after restart; re-entering
   its menu reproduces screen corruption and USB timeout. One-shot witnesses now
@@ -444,7 +453,7 @@ Current delivery checkpoints:
   on both models. Both fresh native flows now pass the complete maintained
   recovery suite, including retirement/re-entry, automatic STARTUP, configuration
   recovery, transaction rejection and all reservation rejection cases.
-- **Installed transaction preflight (`6953972e`, local):** a new read-only composition derives
+- **Installed transaction preflight (`6953972e`, submitted):** a new read-only composition derives
   the pair from two matching HPCBIND1 descriptors at owned packaging coordinates,
   checks the bound transaction, and matches the complete installed library and
   catalog on the restored view. Its allocation must remain outside the target
@@ -616,6 +625,17 @@ than treat fixture addresses as installed state. Its acceptance requires:
    including complete Flash/catalog and user-data checks. Keep global startup
    ordering, safe authority reuse and reclamation as explicit remaining gates
    until their own acceptance is demonstrated.
+
+The installation and recovery admission phases must remain distinct. Initial
+reservation creation precedes authority publication, so it uses exact installed
+library/catalog matching on intact Flash rather than requiring an already armed
+transaction. A new reservation must use create-only semantics: even an existing
+object with identical contents is a conflict, not evidence that this invocation
+created it. Bind the resulting resource to durable installation/transaction
+identity before authorizing target writes. Interrupted creation/publication must
+have explicit retry and orphan handling; matching a fixed name, size and prefix
+alone cannot establish that ownership. Preserve the existing recovery-time
+checks and the RAM-loss recovery requirement.
 
 The entries below preserve earlier batch evidence and check times; their older
 pending-CI descriptions do not supersede these delivery checkpoints.
