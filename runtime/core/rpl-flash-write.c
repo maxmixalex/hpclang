@@ -1071,6 +1071,28 @@ int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, cons
     return create_record(io, record, bytes, 0x02b40u, attempted_slot);
 }
 
+int hpclang_rpl_flash_create_library_at(const struct hpclang_rpl_flash_io *io,
+                                        const uint8_t *record, uint32_t bytes, uint32_t slot)
+{
+    if (!io || !io->program16 || slot < io->first || slot >= io->end)
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct erased_tail tails[6];
+    uint32_t unused;
+    int result = plan_record(io, record, bytes, 0x02b40u, &unused, tails);
+    if (result)
+        return result;
+    uint32_t index = (slot - io->first) / 0x20000u;
+    if (slot != tails[index].slot)
+        return HPCLANG_RPL_FLASH_OCCUPIED;
+    if (bytes > tails[index].bytes)
+        return HPCLANG_RPL_FLASH_NOSPACE;
+    struct hpclang_rpl_flash_io reserved = *io;
+    uint32_t bank = io->first + index * 0x20000u;
+    reserved.first = bank + 0x104u;
+    reserved.end = bank + 0x20000u;
+    return hpclang_rpl_flash_append(&reserved, slot, record, bytes);
+}
+
 int hpclang_rpl_flash_finish_remove(const struct hpclang_rpl_flash_io *io, uint32_t address)
 {
     if (!io || !io->read16 || !io->program16 || ((io->first | io->end) & 1u) ||

@@ -12,6 +12,19 @@ enum
 static uint8_t flash[END - FIRST], before[END - FIRST], catalog_data[160];
 static uint32_t fail_address;
 static const uint8_t *fail_after_staging;
+static unsigned programs, fail_program;
+static int program_flash(void *context, uint32_t at, uint16_t value)
+{
+    assert(context == flash && !(at & 1) && at >= FIRST && at + 1 < END);
+    if (++programs == fail_program)
+        return 0;
+    unsigned offset = at - FIRST;
+    uint16_t old = flash[offset] | (uint16_t)flash[offset + 1] << 8;
+    assert((old & value) == value);
+    flash[offset] = value;
+    flash[offset + 1] = value >> 8;
+    return 1;
+}
 static int read_flash(void *context, uint32_t at, uint16_t *value)
 {
     assert(context == flash && !(at & 1) && at >= FIRST && at + 1 < END);
@@ -381,6 +394,61 @@ static void preparation_tests(const struct hpclang_rpl_flash_io *io,
     }
 }
 
+static void selected_creation_tests(const struct hpclang_rpl_flash_io *source)
+{
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_flash;
+    for (unsigned scenario = 0; scenario < 14; ++scenario) {
+        install(0, 0);
+        memset(flash + 0x105, 255, ((vectors[0].span + 15) & ~7u) / 2);
+        uint32_t slot = FIRST + (scenario < 6 ? scenario : 4) * 0x20000 + 0x105;
+        if (scenario == 6)
+            slot += 4; /* No holes, even in otherwise erased storage. */
+        if (scenario == 7)
+            slot--;
+        if (scenario == 8)
+            slot = END;
+        if (scenario == 9)
+            fail_address = END - 2;
+        if (scenario == 10)
+            flash[END - FIRST - 1] = 0;
+        if (scenario == 11)
+            memcpy(flash + 0x105, binding_original, sizeof binding_original);
+        if (scenario == 12) {
+            tail_space(4, 0);
+            slot = FIRST + 5 * 0x20000 - 3;
+        }
+        programs = 0;
+        fail_program = scenario == 13 ? 1 : 0;
+        memcpy(before, flash, sizeof flash);
+        int result = hpclang_rpl_flash_create_library_at(&io, binding_original,
+                                                         sizeof binding_original, slot);
+        if (scenario < 6) {
+            assert(!result && programs);
+            assert(!memcmp(flash + slot - FIRST, binding_original, sizeof binding_original));
+            assert(!memcmp(flash, before, slot - FIRST));
+            unsigned after = slot - FIRST + sizeof binding_original;
+            assert(!memcmp(flash + after, before + after, sizeof flash - after));
+        } else if (scenario == 13) {
+            assert(result == HPCLANG_RPL_FLASH_FAILED && programs > 1);
+            assert(flash[slot - FIRST] == 0); /* Verified discard, never a live library. */
+            assert(!memcmp(flash, before, slot - FIRST));
+            unsigned after = slot - FIRST + sizeof binding_original;
+            assert(!memcmp(flash + after, before + after, sizeof flash - after));
+        } else {
+            int expected = scenario <= 7    ? HPCLANG_RPL_FLASH_OCCUPIED
+                           : scenario == 8  ? HPCLANG_RPL_FLASH_INVALID
+                           : scenario == 9  ? HPCLANG_RPL_FLASH_FAILED
+                           : scenario == 10 ? HPCLANG_RPL_FLASH_DIRTY
+                           : scenario == 11 ? HPCLANG_RPL_FLASH_EXISTS
+                                            : HPCLANG_RPL_FLASH_NOSPACE;
+            assert(result == expected && !programs);
+            assert(!memcmp(before, flash, sizeof flash));
+        }
+    }
+    fail_program = 0;
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read_flash, NULL, FIRST, END};
@@ -389,6 +457,7 @@ int main(void)
     placement_tests(&io, &catalog);
     space_tests(&io);
     preparation_tests(&io, &catalog);
+    selected_creation_tests(&io);
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v)
         for (unsigned bank = 0; bank < 6; ++bank) {
             install(v, bank);

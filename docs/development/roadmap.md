@@ -427,6 +427,18 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local selected-slot library storage:** an internal storage primitive now
+  revalidates all six banks, library-ID absence and the exact selected tail before
+  appending at the planned address. Ordinary create still chooses its first free
+  slot; this explicit variant allows installation planning to choose another
+  bank without silently moving the record. Fourteen host cases pass ASan/UBSan:
+  all six bank locations, gaps/interior/out-of-range addresses, selected-tail
+  exhaustion, later read/damage/ID conflicts and a failed program followed by
+  verified discard. Bytes outside the selected allocation remain unchanged.
+  Native execution of this new writer remains unverified. It stores only a
+  library and inherits append's returned-error cleanup contract; durable
+  installation claims, registration and power-loss/startup recovery remain open.
+
 - **Local installation draft preparation:** the runtime now validates an owned
   sealed template, plans all three allocations with namespace exclusion, updates
   both layout-named HPCBIND1 descriptors in separate staging RAM, reseals the
@@ -517,11 +529,14 @@ Current delivery checkpoints:
   interrupted writes and recovery. Planning rejects before changing its output.
   This follow-up is local, separate from the submitted batch below.
 
-- **CI submission batch:** bounded configuration resolution, captured ROM-bank
+- **Accepted CI batch:** bounded configuration resolution, captured ROM-bank
   validation, native startup inventory, partial bank-header recovery coverage
-  and the retained-RAM prerequisite below are submitted together on
-  `m8-flash-write` after local validation. CI acceptance remains pending; no
-  additional M8 milestone is complete.
+  and the retained-RAM prerequisite below passed all four workflows at
+  `b31a3a6b`: Quality `39462737479`, Core `39462737456`, Runtime `39462737482`
+  and Objects `39462737472`. PR #4 merged that exact head into main at
+  `97275d3a`; the active branch incorporated main without conflict. Main CI is
+  not awaited. The later placement/preparation work remains local; no additional
+  M8 milestone is complete.
 
 - **Retained-RAM installation prerequisite:** reservation creation now checks
   that HOME's oldest item is the inline null-named hidden directory before any
@@ -674,7 +689,7 @@ Current delivery checkpoints:
   `39450806503`, Runtime `39450806511` and Objects `39450806502` are queued.
   This is not a completed M8 stage.
 
-- **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
+- **Earlier accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
   (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects
   (`39442340824`). PR #3 merged that exact submitted head into main as
   `b10699df`. Main CI is not awaited. The newer creation/resource-binding work

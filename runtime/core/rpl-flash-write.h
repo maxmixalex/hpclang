@@ -117,6 +117,15 @@ int hpclang_rpl_flash_create_backup(const struct hpclang_rpl_flash_io *io, const
 int hpclang_rpl_flash_create_library(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                      uint32_t bytes, uint32_t *attempted_slot);
 
+/* Store a library at the caller-selected exact erased tail. Revalidate every
+ * bank, ID absence and the selected tail/capacity before attempting a write.
+ * A gap, interior address or insufficient selected tail is rejected even when
+ * another bank has room. Same append failure/cleanup and exclusive-mapping
+ * contract as create_library. No cross-port exclusion, registration, durable
+ * ownership or startup permission is inferred from the supplied coordinates. */
+int hpclang_rpl_flash_create_library_at(const struct hpclang_rpl_flash_io *io,
+                                        const uint8_t *record, uint32_t bytes, uint32_t slot);
+
 /* Read-only selection for a complete encoded library record. Validate every
  * Port 2 bank/allocation/tail and require its ID to be absent from that port,
  * including unregistered libraries. Return the same erased slot creation would
