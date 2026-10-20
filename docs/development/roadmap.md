@@ -427,6 +427,19 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Port 1 startup inventory extension (local):** the read-only native witness
+  now resolves ERAM catalog bindings through the existing validated Port 1
+  mapping, keeping its Saturn-window bounds separate from Flash geometry.
+  The independent oracle reads the corresponding saved SRAM bytes and rejects
+  mismatched IDs/out-of-window callbacks. Ten verifier tests, ARM packaging and
+  ARM static analysis pass. Both native models report the expected 62 libraries
+  and 17 callbacks with a Port 1 library installed, preserving all Port 1 bytes,
+  Flash, catalog and owning CODE. The maintained Port 1 setup/inventory flow
+  also passes on HP50g and is included in installation E2E. This extends
+  callback coverage, not startup authorization or durable installation
+  ownership. The proposed internal use of research ID 4 is awaiting
+  maintainer confirmation; the public recovery packager's ID policy is unchanged.
+
 - **Abandoned-library cleanup implementation (local, not submitted):** tail
   recovery now accepts a complete CRC-checked unpublished library only as the
   final allocation, clears its metadata before status, and preserves its
@@ -439,7 +452,7 @@ Current delivery checkpoints:
   pass. Both models additionally restart and finish cleanup after cuts at the
   metadata and live-status writes, requiring only the remaining two or one
   operations. The maintained storage suite now includes final-commit
-  interruption, Stock restart and cleanup; its integrated HP50g run passes.
+  interruption, Stock restart and cleanup; integrated runs pass on both models.
   These are local results, not CI acceptance or M8.0 closure.
   Broader regression exposed an overly permissive zero-metadata path for
   backups; the implementation now restricts odd unpublished cancellation
@@ -447,7 +460,10 @@ Current delivery checkpoints:
   retained unchanged. The narrowed implementation passes the installation
   ASan/UBSan suite and ARM static analysis. Both native models also pass the
   narrowed zero-metadata retry, with exactly two remaining writes and preserved
-  Flash/catalog/guards. Broader Flash regressions are still running.
+  Flash/catalog/guards. The complete Flash creation/write ASan/UBSan regressions
+  finish successfully, as does a focused run of the unchanged partial-backup
+  recovery/corruption-rejection tests. Implementation is local at `0dbd6429`;
+  no additional CI submission.
 
 - **Interrupted fresh-library commit gap (local):** on both HP49g+/HP50g,
   cutting the final status program at SST operation 286, busy read 1, mask

@@ -277,7 +277,7 @@ def verify_probe(
 
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
-    from startup import verify_startup
+    from startup import run_port1_inventory, verify_startup
 
     root = args.output / "installation"
     root.mkdir()
@@ -325,6 +325,9 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     verify_placement(before, matched / "state", build, args.nm, base, existing=True)
     verify_preparation(before, matched / "state", build, args.nm, base, existing=True)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
+    startup_port1 = run_port1_inventory(
+        args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
     transactions = []
     for label, status in (
         ("armed", 1),
@@ -401,7 +404,11 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
-                startup_inventory={"missing": startup_missing, "matched": startup_matched},
+                startup_inventory={
+                    "missing": startup_missing,
+                    "matched": startup_matched,
+                    "port1": startup_port1,
+                },
                 reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,

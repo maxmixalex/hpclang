@@ -272,6 +272,58 @@ class CleanupTests(unittest.TestCase):
 
 
 class StartupInventoryTests(unittest.TestCase):
+    def test_eram_callback_uses_port1_bytes(self):
+        flash = bytearray(0x200000)
+        struct.pack_into("<II", flash, 0x248A0, 0x47FF1, 0x47FF2)
+        flash[0x47FF1:0x48000] = bytes([14, 96] + [128] * 13)
+        original = bytearray(0x80000)
+        header, target = 0x40020, 0x40080
+
+        def put(at, value, count):
+            for i in range(count):
+                offset = 0x20000 + (at + i - 0x40000) // 2
+                shift = 4 * ((at + i) & 1)
+                original[offset] = (original[offset] & ~(15 << shift)) | (
+                    ((value >> (4 * i)) & 15) << shift
+                )
+
+        put(header, 124, 3)
+        put(header + 18, target - header - 18, 5)
+        words = {0x8611D: 1, 0x86120: 124, 0x86123: header, 0x86128: 0x76543, 0x26C39: 0x76543}
+        words.update({0x26BBB + 7 * i: 0x12345 + i for i in range(16)})
+        actual = bytearray(64)
+        struct.pack_into("<3I", actual, 0, 0, 1, 14)
+        struct.pack_into("<4I", actual, 16, 124, header, 16, target)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (before / "sram").write_bytes(original)
+            (after / "sram").write_bytes(actual)
+            with (
+                patch.object(startup, "native_words", return_value=lambda at, n=5: words[at]),
+                patch.object(
+                    startup,
+                    "symbol_offsets",
+                    return_value={"startup_result": 0, "startup_entries": 16},
+                ),
+            ):
+                self.assertEqual(
+                    startup.verify_startup(before, after, root, "unused", 0),
+                    {"libraries": 1, "callbacks": 1},
+                )
+                put(header, 125, 3)
+                (before / "sram").write_bytes(original)
+                with self.assertRaises(ValueError):
+                    startup.verify_startup(before, after, root, "unused", 0)
+                put(header, 124, 3)
+                put(header + 18, 0x80000 - header - 18, 5)
+                (before / "sram").write_bytes(original)
+                with self.assertRaises(ValueError):
+                    startup.verify_startup(before, after, root, "unused", 0)
+
     def test_independent_layout_and_diagnostic_checks(self):
         flash = bytearray(0x200000)
         struct.pack_into("<II", flash, 0x248A0, 0x47FF1, 0x47FF2)
@@ -288,6 +340,7 @@ class StartupInventoryTests(unittest.TestCase):
         write_word(physical_header + 18, target - header - 18, 5)
         words = {0x8611D: 1, 0x86120: 221, 0x86123: header, 0x86128: 0x12345}
         words.update({0x26BBB + 7 * i: 0x12345 + i for i in range(16)})
+        words[0x26C39] = 0x76543
         ram = bytearray(64)
         struct.pack_into("<3I", ram, 0, 0, 1, 14)
         struct.pack_into("<4I", ram, 16, 221, header, 0, target)

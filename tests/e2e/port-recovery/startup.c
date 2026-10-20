@@ -1,6 +1,7 @@
 /* Read-only inventory on the supported Stock 2.15 fixture. Profile addresses
  * are verified fixture inputs, not production ROM discovery or startup safety. */
 #include "rpl-port.h"
+#include "rpl-stock-memory.h"
 #include <stddef.h>
 
 volatile uint32_t startup_result[3];
@@ -12,7 +13,16 @@ struct inventory
     uint8_t sizes[16];
     uint32_t bases[16], count, directory, entries;
     struct hpclang_rpl_rom_bank active;
+    struct hpclang_rpl_reader port1;
 };
+
+static int eram_nibble(void *context, uint32_t address, uint8_t *value)
+{
+    const struct inventory *inventory = context;
+    if (address < 0x40000u || address >= 0x80000u)
+        return 0;
+    return inventory->port1.read_nibble(inventory->port1.context, address - 0x40000u, value);
+}
 
 static int bank_nibble(void *context, uint32_t address, uint8_t *value)
 {
@@ -40,17 +50,22 @@ static int visit(void *context, uint32_t record, uint32_t number,
                                              binding->bank_switch, &mapping);
         if (result != 1)
             return result < 0 ? result : HPCLANG_RPL_SPAN_UNAVAILABLE;
-        if (mapping.kind != HPCLANG_RPL_BANK_FLASH)
-            return HPCLANG_RPL_SPAN_UNSUPPORTED;
-        bank = mapping.index;
-        result =
-            hpclang_rpl_rom_bank_layout(inventory->sizes, inventory->count, inventory->directory,
-                                        0x200000u, inventory->bases, bank, &inventory->active);
-        if (result != 1)
-            return result < 0 ? result : HPCLANG_RPL_SPAN_UNAVAILABLE;
-        selected = (struct hpclang_rpl_reader){bank_nibble, inventory};
         first = 0x40000u;
-        end = first + inventory->active.bytes * 2u;
+        if (mapping.kind == HPCLANG_RPL_BANK_ERAM) {
+            /* Inventory bank 16 denotes the separate ERAM switch-table entry. */
+            bank = 16;
+            selected = (struct hpclang_rpl_reader){eram_nibble, inventory};
+            end = first + HPCLANG_RPL_PORT1_NIBBLES;
+        } else {
+            bank = mapping.index;
+            result = hpclang_rpl_rom_bank_layout(inventory->sizes, inventory->count,
+                                                 inventory->directory, 0x200000u, inventory->bases,
+                                                 bank, &inventory->active);
+            if (result != 1)
+                return result < 0 ? result : HPCLANG_RPL_SPAN_UNAVAILABLE;
+            selected = (struct hpclang_rpl_reader){bank_nibble, inventory};
+            end = first + inventory->active.bytes * 2u;
+        }
     }
     uint32_t target = 0;
     int result =
@@ -81,6 +96,9 @@ void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_rea
     if (!count || count > 16u || count > 0x200000u - directory)
         return;
     struct inventory inventory = {.mapped = mapped, .count = count, .directory = directory};
+    const volatile uint32_t *l1 = (void *)0x07f00000u;
+    if (!hpclang_rpl_stock_port1_capture(&inventory.port1, (void *)0x08020000u, l1[0x80]))
+        return;
     for (uint32_t i = 0; i < count; ++i)
         inventory.sizes[i] = *(const volatile uint8_t *)(uintptr_t)(directory + i);
     const volatile uint32_t *bases = (void *)(state + 0xbe0u);
