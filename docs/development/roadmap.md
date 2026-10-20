@@ -439,11 +439,16 @@ Current delivery checkpoints:
   watchpoints now prove both models enter the hidden-directory creation routine:
   the Saturn instruction pointer is `0xada5`, with the interpreter fetch returning
   to `0x288dc`. This distinguishes execution from the earlier ROM scanner's
-  read of the same bytes. Both runs reconstruct the hidden RAM directory and
-  return normally with unchanged Flash. They use intact Flash and do not yet
-  establish allocation-time memory availability or whether GC is required.
-  Preserve these requirements alongside metadata fault coverage, durable
-  ownership and reclamation.
+  read of the same bytes. Follow-up SRAM snapshots taken after `SAVPTR` and
+  `ROOM`, at Saturn `0xadb3`, establish the actual allocation-time gap on both
+  models: 494,024 nibbles with intact Flash and 494,117 with the bound pending
+  bank-header recovery. HOME is empty at that point. Both exceed the routine's
+  20-nibble requirement, so this creation path skips its explicit GC branch in
+  these cold fixtures. The damaged cold boots then restore exact Flash, close
+  the transaction and rebuild the baseline catalog. Entry snapshots taken before
+  pointer synchronization are not the decision evidence. Retained-RAM hidden
+  directory validity, general movement/reference safety and a supported early
+  installation entry remain required alongside durable ownership and reclamation.
 
 - **Local torn-bank startup coverage:** both models complete low-memory automatic
   recovery for all sixteen `F0`–`FF` values reachable while programming the native
