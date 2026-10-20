@@ -354,6 +354,19 @@ def bind_image(initialized: bytes, offset: int, journal: int, authority: int) ->
     )
 
 
+def bind_library_id(initialized: bytes, offset: int, library_id: int | None) -> bytes:
+    """Fill an owned admission's library-number placeholder before sealing."""
+    if type(offset) is not int or offset < 0 or offset % 4 or offset + 4 > len(initialized):
+        raise ValueError("Recovery library number is outside initialized aligned storage")
+    if initialized[offset : offset + 4] != b"\xff" * 4:
+        raise ValueError("Recovery library number is not an unbound placeholder")
+    if library_id is None:
+        return initialized  # Standalone build artifact; not an installed admission.
+    if type(library_id) is not int or not 769 <= library_id <= 1791:
+        raise ValueError("Recovery library number must be in the user library range")
+    return initialized[:offset] + library_id.to_bytes(4, "little") + initialized[offset + 4 :]
+
+
 def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     symbols = {}
     for line in subprocess.check_output([nm, elf], text=True).splitlines():
@@ -485,6 +498,7 @@ def package_elf(
     objcopy: str,
     fresh_copy: bool = False,
     binding: tuple[int, int] | None = None,
+    library_id: int | None = None,
 ) -> tuple[bytes, bytes]:
     """Check the owned recovery ELF contract and return envelope and raw image.
 
@@ -525,6 +539,9 @@ def package_elf(
                 int.from_bytes(initialized[offset + i : offset + i + 4], "little") for i in (8, 12)
             )
         initialized = bind_image(initialized, offset, *binding)
+    library_offset = symbols.get("hpclang_recovery_library_id")
+    if library_offset is not None:
+        initialized = bind_library_id(initialized, library_offset, library_id)
     return package(initialized, end, model=model, fresh_copy=fresh_copy), initialized
 
 
@@ -646,6 +663,7 @@ def main() -> None:
             objcopy=args.objcopy,
             fresh_copy=args.flash_copy,
             binding=binding,
+            library_id=args.library_id,
         )
     else:
         result = package(
@@ -668,6 +686,7 @@ def main() -> None:
             objcopy=args.objcopy,
             fresh_copy=True,
             binding=binding,
+            library_id=args.library_id,
         )
         identity_offset = elf_symbols(args.admission_elf, args.nm).get("hpclang_recovery_identity")
     if guarded:

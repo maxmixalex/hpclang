@@ -517,7 +517,14 @@ Current delivery checkpoints:
   Completion-marker libraries
   now reseal their owned identity after configuration changes; independent
   digest/native-CRC tests pass. These changes do not establish RAM ownership.
-  The maintained identity batch is ready for CI; acceptance remains pending.
+  The maintained identity batch was submitted as `5aad911e`; CI acceptance
+  remains pending. A local automatic-admission follow-up binds the library
+  number through an owned ELF placeholder before sealing, rather than baking
+  a fixture ID into the admission code. The maintained automatic predicate now
+  uses this bound number, sealed content and streaming transaction preflight
+  with a 4 KiB stack. ARM build/analysis and 77 related Python tests pass; both
+  models are running the complete automatic recovery and rejection fixture.
+  Native acceptance of this follow-up remains pending.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

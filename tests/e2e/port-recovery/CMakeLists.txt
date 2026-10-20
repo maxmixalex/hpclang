@@ -99,11 +99,13 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     add_executable(admission admission-entry.S admission.c predicate.c "${CORE}/flash-mapping.S"
         "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
-            rpl-flash-replay rpl-port rpl-backup rpl-object-span)
+            rpl-flash-replay rpl-port rpl-backup rpl-object-span rpl-flash-write
+            rpl-recovery-installation rpl-recovery-identity)
         target_sources(admission PRIVATE "${CORE}/${module}.c")
     endforeach()
     configure_recovery_image(admission)
     target_compile_definitions(admission PRIVATE
+        HPCLANG_PREDICATE_STACK_BYTES=4096
         HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT=${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT})
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/admission.hp"
             "${CMAKE_CURRENT_BINARY_DIR}/admission.bin"

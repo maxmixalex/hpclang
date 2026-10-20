@@ -362,6 +362,12 @@ descriptor: magic, native object span, descriptor nibble coordinate and SHA-256.
 The digest covers canonical packed object nibbles with only its own digest and
 the native CRC cleared; packaging then regenerates the native CRC. Descriptor
 coordinates exclude the allocation envelope. No signature search is involved.
+An optional owned `hpclang_recovery_library_id` ELF symbol reserves an aligned
+four-byte `UINT32_MAX` placeholder. Library packaging fills it from `--library-id`
+before sealing, so the executing predicate checks the requested library rather
+than a compiled fixture number. The standalone admission artifact remains
+unbound and rejects execution as an installed predicate. A misplaced symbol or
+non-placeholder value is rejected before output files are written.
 
 `hpclang_rpl_recovery_installation_stream()` validates a unique live library,
 native catalog/bank switch, complete sealed content, exact journal/authority
@@ -382,6 +388,11 @@ It also covers changed library content with a valid native CRC and constrained
 memory with preserved user data. Tests that append a configuration completion
 marker reseal the resulting library at the owned descriptor coordinate, so an
 invalid digest cannot masquerade as correct rejection of another condition.
+The maintained automatic admission fixture uses the same streaming check before
+the RPL reservation guard. Its stack is 4 KiB: the earlier 2 KiB predicate stack
+was insufficient for the combined entry, catalog scan and identity call chain.
+This improves installation/transaction validation but does not replace the
+separate ownership checks required before releasing a reservation.
 
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from

@@ -306,6 +306,33 @@ class RecoveryPackageTests(unittest.TestCase):
                 package("", binding=(0x180105, 0x181121))
             with self.assertRaisesRegex(ValueError, "outside initialized"):
                 package("00000040 D hpclang_recovery_binding\n")
+            image = image[:16] + b"\xff" * 4 + image[20:]
+            owned_id = descriptor + "00000010 D hpclang_recovery_library_id\n"
+            self.assertEqual(package(owned_id)[1], image)
+            for number in (769, 1701, 1791):
+                envelope, initialized = package(owned_id, library_id=number)
+                expected = PACK.bind_library_id(image, 16, number)
+                self.assertEqual(initialized, expected)
+                self.assertEqual(envelope, PACK.package(expected, 128, model="hp50g"))
+            with self.assertRaisesRegex(ValueError, "placeholder"):
+                package(descriptor + "00000014 D hpclang_recovery_library_id\n", library_id=1701)
+
+    def test_library_number_uses_only_owned_placeholder(self):
+        image = bytes(range(16)) + b"\xff" * 4 + bytes(range(16))
+        self.assertEqual(PACK.bind_library_id(image, 16, None), image)
+        for number in (769, 1701, 1791):
+            patched = PACK.bind_library_id(image, 16, number)
+            self.assertEqual(patched[:16], image[:16])
+            self.assertEqual(patched[20:], image[20:])
+            self.assertEqual(int.from_bytes(patched[16:20], "little"), number)
+        for number in (0, 768, 1792, True, 1701.0):
+            with self.subTest(number=number), self.assertRaises(ValueError):
+                PACK.bind_library_id(image, 16, number)
+        for offset in (-4, 1, 36, True):
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                PACK.bind_library_id(image, offset, 1701)
+        with self.assertRaisesRegex(ValueError, "placeholder"):
+            PACK.bind_library_id(image, 0, 1701)
 
     def test_binding_changes_only_reserved_address_fields(self):
         image = bytes(range(32)) + b"HPCBIND1" + bytes(8) + bytes(range(64))
