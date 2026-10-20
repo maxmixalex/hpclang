@@ -1,6 +1,7 @@
 #include "rpl-recovery-installation.h"
 #include <assert.h>
 #include <string.h>
+#define HPCLANG_RECOVERY_BINDING_VECTORS
 #include "recovery-identity-vectors.h"
 
 enum
@@ -10,10 +11,11 @@ enum
 };
 static uint8_t flash[END - FIRST], before[END - FIRST], catalog_data[160];
 static uint32_t fail_address;
+static const uint8_t *fail_after_staging;
 static int read_flash(void *context, uint32_t at, uint16_t *value)
 {
     assert(context == flash && !(at & 1) && at >= FIRST && at + 1 < END);
-    if (at == fail_address)
+    if (at == fail_address || (fail_after_staging && *fail_after_staging != 0xa5))
         return 0;
     *value = flash[at - FIRST] | (uint16_t)flash[at - FIRST + 1] << 8;
     return 1;
@@ -310,6 +312,75 @@ static void space_tests(const struct hpclang_rpl_flash_io *io)
     }
 }
 
+static void preparation_tests(const struct hpclang_rpl_flash_io *io,
+                              const struct hpclang_rpl_flash_catalog *catalog)
+{
+    uint8_t original[sizeof binding_original], saved[sizeof original];
+    uint8_t staging[sizeof original + 16], old_catalog[sizeof catalog_data];
+    struct ram_port ram = {.fail = UINT32_MAX};
+    const struct hpclang_rpl_reader empty = {read_port, &ram};
+    const struct hpclang_rpl_recovery_port_view ports[2] = {{&empty, 0, sizeof ram.data},
+                                                            {&empty, 0, sizeof ram.data}};
+    const struct hpclang_rpl_flash_recovery_space sentinel = {1, 2, 3};
+    for (unsigned scenario = 0; scenario < 11; ++scenario) {
+        install(0, 0);
+        memset(flash + 0x105, 255, ((vectors[0].span + 15) & ~7u) / 2);
+        word(120, 0, 3);
+        memcpy(original, binding_original, sizeof original);
+        memset(staging, 0xa5, sizeof staging);
+        struct hpclang_rpl_flash_recovery_layout layout = {
+            original, sizeof original, recovery_binding_nibble, admission_binding_nibble};
+        uint32_t identity = identity_object_nibble, capacity = sizeof staging;
+        if (scenario == 1)
+            identity = UINT32_MAX;
+        if (scenario == 2)
+            layout.recovery_binding = UINT32_MAX;
+        if (scenario == 3)
+            layout.admission_binding = layout.recovery_binding;
+        if (scenario == 4)
+            layout.admission_binding = 8 + identity;
+        if (scenario == 5)
+            original[30] ^= 1;
+        if (scenario == 6)
+            capacity = sizeof original - 1;
+        if (scenario == 7)
+            fail_address = END - 2;
+        if (scenario == 8)
+            fail_after_staging = staging;
+        if (scenario == 10)
+            identity++;
+        memcpy(saved, original, sizeof saved);
+        memcpy(before, flash, sizeof flash);
+        memcpy(old_catalog, catalog_data, sizeof catalog_data);
+        struct hpclang_rpl_flash_recovery_space space = sentinel;
+        int result = hpclang_rpl_recovery_installation_prepare(
+            io, &layout, identity, ports, catalog, FIRST, scenario == 9 ? original : staging,
+            capacity, &space);
+        fail_after_staging = NULL;
+        if (!scenario) {
+            assert(!result && !memcmp(staging, binding_expected, sizeof binding_expected));
+            assert(space.library_slot == FIRST + 0x20105);
+            assert(space.journal_slot == space.library_slot + sizeof binding_original);
+            assert(space.authority_slot ==
+                   space.journal_slot + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        } else {
+            assert(result < 0 && !memcmp(&space, &sentinel, sizeof space));
+            if (scenario == 8) {
+                assert(result == HPCLANG_RPL_FLASH_FAILED);
+                assert(!memcmp(staging, binding_expected, sizeof binding_expected));
+            } else {
+                for (unsigned i = 0; i < sizeof staging; ++i)
+                    assert(staging[i] == 0xa5);
+            }
+        }
+        for (unsigned i = sizeof original; i < sizeof staging; ++i)
+            assert(staging[i] == 0xa5);
+        assert(!memcmp(original, saved, sizeof saved));
+        assert(!memcmp(before, flash, sizeof flash));
+        assert(!memcmp(old_catalog, catalog_data, sizeof catalog_data));
+    }
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read_flash, NULL, FIRST, END};
@@ -317,6 +388,7 @@ int main(void)
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 35, 0};
     placement_tests(&io, &catalog);
     space_tests(&io);
+    preparation_tests(&io, &catalog);
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v)
         for (unsigned bank = 0; bank < 6; ++bank) {
             install(v, bank);

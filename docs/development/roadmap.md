@@ -427,6 +427,19 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local installation draft preparation:** the runtime now validates an owned
+  sealed template, plans all three allocations with namespace exclusion, updates
+  both layout-named HPCBIND1 descriptors in separate staging RAM, reseals the
+  identity/CRC and repeats placement checks before returning coordinates.
+  The complete prepared record matches an independent Python-packaged reference.
+  Eleven preparation scenarios pass ASan/UBSan, including invalid/overlapping
+  layout offsets, corrupted templates, short/aliased staging and a Flash read
+  failure after the draft is populated. Failures preserve coordinate outputs;
+  staging is explicitly disposable, while source/Flash/catalog remain intact.
+  ARM static analysis passes. Native execution of this preparation path remains
+  unverified; it creates a draft, not durable ownership, registration, safe
+  startup or permission to publish. These lifecycle gates remain open.
+
 - **Local runtime identity sealing:** an owned packed-library template can now
   receive its HPCROOT1 span/offset/digest and native CRC in RAM, matching the host
   packager. All twenty independent hashlib/native-CRC vectors match byte for
@@ -435,8 +448,9 @@ Current delivery checkpoints:
   the input unchanged; allocation padding is preserved. Identity ASan/UBSan and
   ARM build/static analysis pass. This is not native execution acceptance or
   permission to authenticate arbitrary code: trusted template/layout provenance
-  remains required. Rebinding both owned command descriptors, rechecking final
-  placement and the installation publication/lifetime gates remain open.
+  remains required. The draft-preparation step above connects rebinding and
+  final placement checks locally; native preparation validation and the
+  installation publication/lifetime gates remain open.
 
 - **Local fresh-installation space planning:** installation preflight can now
   place the library, journal and authority together after namespace exclusion.

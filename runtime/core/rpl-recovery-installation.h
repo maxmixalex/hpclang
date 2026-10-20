@@ -36,6 +36,21 @@ int hpclang_rpl_recovery_installation_plan_space(
     const struct hpclang_rpl_flash_catalog *catalog, uint32_t target,
     struct hpclang_rpl_flash_recovery_space *space);
 
+/* Prepare a fresh owned installation record in caller-owned staging RAM.
+ * The immutable trusted layout names both HPCBIND1 descriptors; identity_nibble
+ * excludes the allocation envelope. Validate the original sealed identity,
+ * plan space with namespace exclusion, copy/update both bindings, reseal, and
+ * repeat placement validation before publishing space. No native writes.
+ * staging must be disjoint from the source and every input/output/view. On
+ * failure space is unchanged, but staging is disposable and may be modified.
+ * Keep mappings and exclusive ownership stable throughout. The resulting draft
+ * is not a storage reservation, library registration or publication authority. */
+int hpclang_rpl_recovery_installation_prepare(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use
