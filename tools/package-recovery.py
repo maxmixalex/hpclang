@@ -10,6 +10,7 @@ Only the HP49g+/HP50g Stock main-RAM mapping has been validated for this entry.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -362,11 +363,13 @@ def elf_symbols(elf: Path, nm: str) -> dict[str, int]:
     return symbols
 
 
-def recovery_layout(library, images):
+def recovery_layout(library, images, *, identity_offset=None):
     """Locate owned ELF descriptors through generated command links, never signatures.
 
     Nibble offsets include the native allocation's four-byte envelope. Consumers
     must validate this exact expected library; metadata is not root publication.
+    Optional identity_object_nibble instead excludes the allocation envelope,
+    matching the coordinate carried inside the HPCROOT1 descriptor.
     """
     data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
 
@@ -392,7 +395,85 @@ def recovery_layout(library, images):
         if len(expected) != 32 or data[descriptor : descriptor + 32] != expected:
             raise ValueError("Recovery descriptor does not match its generated command")
         layout[name + "_binding_nibble"] = 8 + descriptor
+        if name == "admission" and identity_offset is not None:
+            if (
+                type(identity_offset) is not int
+                or identity_offset < 0
+                or identity_offset % 4
+                or identity_offset + 48 > len(initialized)
+                or initialized[identity_offset : identity_offset + 48] != b"HPCROOT1" + bytes(40)
+            ):
+                raise ValueError("Recovery identity symbol is not an owned initialized placeholder")
+            identity = start + source + 2 * identity_offset
+            expected_identity = "".join(
+                f"{byte & 15:x}{byte >> 4:x}"
+                for byte in initialized[identity_offset : identity_offset + 48]
+            )
+            if data[identity : identity + 96] != expected_identity:
+                raise ValueError("Recovery identity does not match its generated admission command")
+            layout["identity_object_nibble"] = identity
+    if identity_offset is not None and "identity_object_nibble" not in layout:
+        raise ValueError("Recovery identity requires the owned admission image")
     return layout
+
+
+def seal_recovery_identity(library: bytes, identity_nibble: int) -> bytes:
+    """Seal an owned HPCROOT1 placeholder inside a generated library.
+
+    Coordinates are relative to the library object, excluding the transfer
+    header and native allocation envelope. The caller derives this location
+    from the owned ELF symbol/command layout, never a signature search.
+    The 48-byte descriptor contains magic, object span, descriptor coordinate
+    and SHA-256. Hash canonical packed object nibbles with only the digest and
+    native CRC fields zeroed; an odd final high nibble is zero. This avoids
+    embedding a library inside its own admission command.
+
+    This is content identity, not installation provenance, transaction ownership
+    or authentication against someone able to replace the executing program.
+    No runtime consumer or public installation permission is implied.
+    """
+    if not isinstance(library, bytes) or library[:8] != b"HPHP49-C":
+        raise ValueError("Recovery identity requires a generated HP49 library")
+    data = [nibble for byte in library[8:] for nibble in (byte & 15, byte >> 4)]
+
+    def word(at, count=5):
+        return sum(data[at + i] << (4 * i) for i in range(count))
+
+    def packed(values):
+        values = list(values)
+        if len(values) % 2:
+            values.append(0)
+        return bytes(values[i] | values[i + 1] << 4 for i in range(0, len(values), 2))
+
+    if len(data) < 14 or word(0) != 0x2B40:
+        raise ValueError("Recovery identity requires a complete library object")
+    span = 5 + word(5)
+    if span < 14 or len(data) != (span + 1) // 2 * 2:
+        raise ValueError("Recovery identity library length does not match its object")
+    crc = 0
+    for nibble in data[5 : span - 4]:
+        crc = (crc >> 4) ^ (((crc ^ nibble) & 15) * 0x1081)
+    if word(span - 4, 4) != crc:
+        raise ValueError("Recovery identity library CRC is invalid")
+    if type(identity_nibble) is not int or identity_nibble < 10 or identity_nibble + 96 > span - 4:
+        raise ValueError("Recovery identity descriptor leaves the library body")
+    descriptor = packed(data[identity_nibble : identity_nibble + 96])
+    if descriptor != b"HPCROOT1" + bytes(40):
+        raise ValueError("Recovery identity requires an untouched owned placeholder")
+    descriptor = b"HPCROOT1" + span.to_bytes(4, "little") + identity_nibble.to_bytes(4, "little")
+    for index, byte in enumerate(descriptor):
+        data[identity_nibble + 2 * index : identity_nibble + 2 * index + 2] = [byte & 15, byte >> 4]
+    data[span - 4 : span] = [0] * 4
+    digest = hashlib.sha256(packed(data[:span])).digest()
+    digest_at = identity_nibble + 32
+    data[digest_at : digest_at + 64] = [
+        nibble for byte in digest for nibble in (byte & 15, byte >> 4)
+    ]
+    crc = 0
+    for nibble in data[5 : span - 4]:
+        crc = (crc >> 4) ^ (((crc ^ nibble) & 15) * 0x1081)
+    data[span - 4 : span] = [(crc >> (4 * i)) & 15 for i in range(4)]
+    return b"HPHP49-C" + packed(data[:span])
 
 
 def package_elf(
@@ -575,6 +656,7 @@ def main() -> None:
         )
     program = result
     admission = args.admission_program.read_bytes() if args.admission_program else None
+    identity_offset = None
     if args.admission_elf is not None:
         # A hidden command always starts with a fresh immutable Flash copy.
         # Validate both ELFs and bind both before writing any output file.
@@ -587,6 +669,7 @@ def main() -> None:
             fresh_copy=True,
             binding=binding,
         )
+        identity_offset = elf_symbols(args.admission_elf, args.nm).get("hpclang_recovery_identity")
     if guarded:
         result = guarded_configuration_library(
             result,
@@ -598,7 +681,7 @@ def main() -> None:
         )
     elif args.library_id is not None:
         result = configuration_library(result, args.library_id)
-    if args.layout_output is not None:
+    if args.layout_output is not None or identity_offset is not None:
         layout = recovery_layout(
             result,
             (
@@ -617,7 +700,10 @@ def main() -> None:
                     True,
                 ),
             ),
+            identity_offset=identity_offset,
         )
+        if identity_offset is not None:
+            result = seal_recovery_identity(result, layout["identity_object_nibble"])
     if args.binary_output is not None:
         args.binary_output.write_bytes(initialized)
     if args.program_output is not None:

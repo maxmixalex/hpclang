@@ -421,6 +421,27 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
+- **Installation identity follow-up (local, not submitted):** the existing
+  exact-library witness executes outside the library it verifies. An embedded
+  admission command cannot embed its entire containing library as its own
+  expected image. A packaging prototype now fills an owned `HPCROOT1` descriptor
+  with the library span, descriptor coordinate and SHA-256 of canonical object
+  nibbles, zeroing only the digest and native CRC fields before hashing, then
+  rebuilding the native CRC. Tests cover descriptor alignment, odd object length,
+  unchanged other fields, deterministic output and invalid inputs; all 76 related
+  host tests and lint/format pass. Packaging now locates the optional descriptor
+  through the owned admission ELF symbol and command layout, and seals it even
+  when no layout sidecar is requested. Invalid symbol positions preserve all
+  output files. A streaming C verifier checks the embedded descriptor, length,
+  native CRC and canonical digest without heap allocation. Twenty generated
+  reference vectors cover both nibble alignments, both length parities and SHA
+  block/padding boundaries; every input-read failure and every content-nibble
+  mutation with a repaired native CRC is rejected. CMake/CTest, ASan/UBSan,
+  ARMv4T build/analysis and the related Python tests pass. ARM frame reports are
+  192 bytes for the matcher and 168 for its hashing helper. Native admission
+  integration and full installed allocation/catalog binding remain next.
+  This content check does not establish installation provenance, fresh
+  transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained
   tests through `8a717ec4` follow the previous submission `c8740410`.
   This batch is prepared for CI; acceptance remains pending. `747fa4ae`

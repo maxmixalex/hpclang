@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -17,6 +18,65 @@ SPEC.loader.exec_module(PACK)
 
 
 class RecoveryPackageTests(unittest.TestCase):
+    def test_library_identity_seal_has_no_recursive_digest_dependency(self):
+        placeholder = b"HPCROOT1" + bytes(40)
+        payload = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in placeholder)
+        literal = PACK.immediate(0x2A2C) + PACK.immediate(5 + len(payload)) + payload
+        empty = PACK.immediate(0x2D9D) + PACK.immediate(0x312B)
+        alignments, lengths = set(), set()
+        for wrapped, extra in ((False, False), (True, False), (False, True)):
+            command = (
+                PACK.immediate(0x2D9D) + literal + PACK.immediate(0x312B) if wrapped else literal
+            )
+            original = PACK._configuration_library(
+                empty, 1701, (command, empty) if extra else (command,)
+            )
+            original_nibbles = [n for byte in original[8:] for n in (byte & 15, byte >> 4)]
+            # This synthetic fixture contains exactly one explicitly constructed
+            # payload. Production callers must use owned ELF/command offsets.
+            offset = "".join(format(n, "x") for n in original_nibbles).index(payload)
+            sealed = PACK.seal_recovery_identity(original, offset)
+            data = [n for byte in sealed[8:] for n in (byte & 15, byte >> 4)]
+            span = 5 + sum(data[5 + i] << (4 * i) for i in range(5))
+            alignments.add(offset % 2)
+            lengths.add(span % 2)
+            descriptor = bytes(
+                data[offset + i] | data[offset + i + 1] << 4 for i in range(0, 96, 2)
+            )
+            self.assertEqual(descriptor[:8], b"HPCROOT1")
+            self.assertEqual(int.from_bytes(descriptor[8:12], "little"), span)
+            self.assertEqual(int.from_bytes(descriptor[12:16], "little"), offset)
+            canonical = bytearray((span + 1) // 2)
+            for index in range(span):
+                value = (
+                    0 if offset + 32 <= index < offset + 96 or index >= span - 4 else data[index]
+                )
+                canonical[index // 2] |= value << (4 * (index % 2))
+                if not (offset + 16 <= index < offset + 96 or index >= span - 4):
+                    self.assertEqual(data[index], original_nibbles[index])
+            self.assertEqual(descriptor[16:], hashlib.sha256(canonical).digest())
+            crc = 0
+            for nibble in data[5 : span - 4]:
+                for bit in range(4):
+                    carry = (crc ^ (nibble >> bit)) & 1
+                    crc >>= 1
+                    if carry:
+                        crc ^= 0x8408
+            self.assertEqual(sum(data[span - 4 + i] << (4 * i) for i in range(4)), crc)
+            self.assertEqual(sealed, PACK.seal_recovery_identity(original, offset))
+            for bad_offset in (-1, True, offset + 1, span - 4):
+                with self.assertRaises(ValueError):
+                    PACK.seal_recovery_identity(original, bad_offset)
+            for invalid in (sealed, original[:-1], original + b"\0", b"bad"):
+                with self.assertRaises(ValueError):
+                    PACK.seal_recovery_identity(invalid, offset)
+            changed = bytearray(original)
+            changed[-2] ^= 1
+            with self.assertRaisesRegex(ValueError, "CRC"):
+                PACK.seal_recovery_identity(bytes(changed), offset)
+        self.assertEqual(alignments, {0, 1})
+        self.assertEqual(lengths, {0, 1})
+
     def test_bound_cli_packages_both_elfs_before_publishing_outputs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -28,14 +88,20 @@ class RecoveryPackageTests(unittest.TestCase):
             image = PACK.bind_image(bytes(32) + b"HPCBIND1" + bytes(24), 32, 0x160105, 0x161121)
             predicate_image = PACK.bind_image(b"HPCBIND1" + bytes(56), 0, 0x1A0105, 0x1A1121)
             valid_predicate = True
+            identity_offset = None
 
             def listing(command, **kwargs):
                 if command[0] == "readelf":
                     return "R_ARM_REL32"
                 offset = 32 if command[-1] == recovery else (0 if valid_predicate else 64)
+                identity_symbol = (
+                    f"{identity_offset:08x} D hpclang_recovery_identity\n"
+                    if command[-1] == predicate and identity_offset is not None
+                    else ""
+                )
                 return (
                     "00000000 T entry\n00000040 B __zero_start\n00000080 B __image_end\n"
-                    f"{offset:08x} D hpclang_recovery_binding\n"
+                    f"{offset:08x} D hpclang_recovery_binding\n" + identity_symbol
                 )
 
             def extract(command, **kwargs):
@@ -126,6 +192,40 @@ class RecoveryPackageTests(unittest.TestCase):
                 self.assertNotEqual(
                     reusable["recovery_binding_nibble"], layout["recovery_binding_nibble"]
                 )
+                identity_offset = 16
+                predicate_image = predicate_image[:16] + b"HPCROOT1" + bytes(40)
+                PACK.main()
+                sealed = output.read_bytes()
+                owned_layout = json.loads(layout_path.read_text())
+                identity_at = owned_layout["identity_object_nibble"]
+                values = [n for byte in sealed[8:] for n in (byte & 15, byte >> 4)]
+                identity = bytes(
+                    values[identity_at + i] | values[identity_at + i + 1] << 4
+                    for i in range(0, 96, 2)
+                )
+                self.assertEqual(identity[:8], b"HPCROOT1")
+                self.assertEqual(int.from_bytes(identity[12:16], "little"), identity_at)
+                self.assertNotEqual(identity[16:], bytes(32))
+                # Sealing is required by the image symbol even without a JSON
+                # sidecar. It must not silently leave an executable placeholder.
+                layout_option = argv.index("--layout-output")
+                del argv[layout_option : layout_option + 2]
+                PACK.main()
+                self.assertEqual(output.read_bytes(), sealed)
+                argv[layout_option:layout_option] = ["--layout-output", str(layout_path)]
+                for bad_identity_offset in (8, 18, 64):
+                    identity_offset = bad_identity_offset
+                    for path in (output, binary, program, layout_path):
+                        path.write_bytes(b"retained")
+                    with self.assertRaisesRegex(ValueError, "owned initialized placeholder"):
+                        PACK.main()
+                    self.assertTrue(
+                        all(
+                            path.read_bytes() == b"retained"
+                            for path in (output, binary, program, layout_path)
+                        )
+                    )
+                identity_offset = 16
                 for path in (output, binary, program, layout_path):
                     path.write_bytes(b"retained")
                 valid_predicate = False
