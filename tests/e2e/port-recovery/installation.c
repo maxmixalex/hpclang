@@ -9,6 +9,11 @@ volatile unsigned installation_result[8];
 #include "rpl-recovery-installation.h"
 #include "rpl-stock-memory.h"
 volatile uint32_t placement_result[2];
+volatile uint32_t preparation_result[4];
+uint8_t prepared_library[sizeof expected_library];
+/* Keep the layout pointer in the runtime PIC construction, not a relocated
+ * constant aggregate embedded in the recovery image. */
+static volatile uint32_t preparation_bytes = sizeof expected_library;
 void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_reader *reader);
 
 static void plan_placement(const struct hpclang_rpl_flash_io *io,
@@ -34,6 +39,17 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
     placement_result[0] = (uint32_t)hpclang_rpl_recovery_installation_plan(
         io, expected_library, sizeof expected_library, ports, catalog, &slot);
     placement_result[1] = slot;
+    for (unsigned i = 0; i < sizeof prepared_library; ++i)
+        prepared_library[i] = 0xa5;
+    struct hpclang_rpl_flash_recovery_space space = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
+    const struct hpclang_rpl_flash_recovery_layout layout = {
+        expected_library, preparation_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
+    preparation_result[0] = (uint32_t)hpclang_rpl_recovery_installation_prepare(
+        io, &layout, EXPECTED_IDENTITY_NIBBLE, ports, catalog, EXPECTED_TARGET, prepared_library,
+        sizeof prepared_library, &space);
+    preparation_result[1] = space.library_slot;
+    preparation_result[2] = space.journal_slot;
+    preparation_result[3] = space.authority_slot;
 }
 #endif
 #ifdef HPCLANG_INSTALLATION_IDENTITY

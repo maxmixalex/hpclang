@@ -25,7 +25,7 @@ AUTHORITY_SLOT = JOURNAL_SLOT + 4124
 TARGET = 0x140000
 
 
-def fixture():
+def fixture(*, journal_slot=JOURNAL_SLOT, authority_slot=AUTHORITY_SLOT):
     pack = packager()
     # Empty configuration: installable through Stock without an application callback.
     # Two owned PIC stubs (BX LR), never invoked by the empty configuration.
@@ -33,8 +33,8 @@ def fixture():
     image = pack.bind_image(
         bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8) + b"HPCROOT1" + bytes(40),
         16,
-        JOURNAL_SLOT,
-        AUTHORITY_SLOT,
+        journal_slot,
+        authority_slot,
     )
     program = pack._recovery_program(pack.package(image, len(image), model="hp50g"))
     empty = pack.immediate(0x2D9D) + pack.immediate(0x312B)
@@ -78,6 +78,7 @@ def generate_fixture(output):
         + "};\n"
         + f"#define EXPECTED_RECOVERY_BINDING {layout['recovery_binding_nibble']}u\n"
         + f"#define EXPECTED_ADMISSION_BINDING {layout['admission_binding_nibble']}u\n"
+        + f"#define EXPECTED_IDENTITY_NIBBLE {layout['identity_object_nibble']}u\n"
         + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
         + f"#define EXPECTED_AUTHORITY_SLOT {AUTHORITY_SLOT}u\n"
         + f"#define EXPECTED_TARGET {TARGET}u\n"
@@ -115,6 +116,45 @@ def verify_placement(before, after, build, nm, base, *, existing):
         "Native cross-port installation plan differs",
     )
     require((after / "flash").read_bytes() == flash, "Placement planning changed Flash")
+
+
+def verify_preparation(before, after, build, nm, base, *, existing):
+    symbols = symbol_offsets(build / "installation.elf", nm)
+    ram = (after / "sram").read_bytes()
+    result, library, journal, authority = struct.unpack_from(
+        "<4I", ram, base + symbols["preparation_result"]
+    )
+    _, original, _ = fixture()
+    at = base + symbols["prepared_library"]
+    actual = ram[at : at + len(original)]
+    flash = (before / "flash").read_bytes()
+    require((after / "flash").read_bytes() == flash, "Draft preparation changed Flash")
+    if existing:
+        require(
+            (result, library, journal, authority) == (0xFFFFFFFA,) + (0xFFFFFFFF,) * 3,
+            "Conflicting draft published installation coordinates",
+        )
+        require(actual == b"\xa5" * len(original), "Conflicting draft changed staging")
+        return
+    require(result == 0, "Native draft preparation failed")
+    _, expected, _ = fixture(journal_slot=journal, authority_slot=authority)
+    require(actual == expected, "Native draft differs from independently rebound package")
+    tails = {}
+    for bank in range(0x140000, 0x200000, 0x20000):
+        pos, end = bank + 0x105, bank + 0x20000
+        while pos < end and flash[pos] != 255:
+            require(flash[pos] in (0, 0x53), "Unexpected allocation before draft space")
+            extent = (int.from_bytes(flash[pos + 1 : pos + 4], "little") & 0xFFFFF) + 2
+            require(extent >= 8 and extent % 4 == 0 and pos + extent // 2 < end, "Invalid extent")
+            pos += extent // 2
+        require(flash[pos:end] == b"\xff" * (end - pos), "Draft tail is not erased")
+        tails[bank] = pos
+    for pos, size in ((library, len(expected)), (journal, 4124), (authority, 32)):
+        bank = pos & ~0x1FFFF
+        require(bank in tails and pos == tails[bank], "Draft allocation leaves a hole or overlaps")
+        require(pos % 4 == 1 and pos + size < bank + 0x20000, "Draft allocation leaves bank")
+        require(pos + size <= TARGET or pos >= TARGET + 4096, "Draft overlaps target sector")
+        tails[bank] += size
 
 
 def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_copy=False):
@@ -248,6 +288,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
     startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
     verify_placement(clean, missing / "state", build, args.nm, base, existing=False)
+    verify_preparation(clean, missing / "state", build, args.nm, base, existing=False)
     require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
     print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
@@ -282,6 +323,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
     startup_matched = verify_startup(before, matched / "state", build, args.nm, base)
     verify_placement(before, matched / "state", build, args.nm, base, existing=True)
+    verify_preparation(before, matched / "state", build, args.nm, base, existing=True)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     transactions = []
     for label, status in (

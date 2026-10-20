@@ -436,9 +436,16 @@ Current delivery checkpoints:
   layout offsets, corrupted templates, short/aliased staging and a Flash read
   failure after the draft is populated. Failures preserve coordinate outputs;
   staging is explicitly disposable, while source/Flash/catalog remain intact.
-  ARM static analysis passes. Native execution of this preparation path remains
-  unverified; it creates a draft, not durable ownership, registration, safe
-  startup or permission to publish. These lifecycle gates remain open.
+  ARM build/static analysis pass. Both HP49g+/HP50g now execute the complete
+  path: absent-ID drafts match independently repackaged bytes, and existing-ID
+  rejection preserves sentinel coordinates/staging. Independent allocation
+  walks validate all three extents, without holes or target overlap. Exact
+  Flash, catalog, owning CODE and stack guards remain intact; no Flash operations
+  occur. The maintained missing/matched E2E launches include these checks without
+  extra boots. Seven verifier tests pass, including altered draft/coordinates,
+  failed-output/staging and Flash-change rejection. This remains a draft, not
+  durable ownership, registration, safe startup or permission to publish.
+  These lifecycle gates remain open; this follow-up is local, not CI acceptance.
 
 - **Local runtime identity sealing:** an owned packed-library template can now
   receive its HPCROOT1 span/offset/digest and native CRC in RAM, matching the host
@@ -446,11 +453,11 @@ Current delivery checkpoints:
   byte across descriptor/object nibble alignment and SHA padding boundaries.
   Invalid bounds, damaged/nonempty placeholders and insufficient capacity leave
   the input unchanged; allocation padding is preserved. Identity ASan/UBSan and
-  ARM build/static analysis pass. This is not native execution acceptance or
-  permission to authenticate arbitrary code: trusted template/layout provenance
-  remains required. The draft-preparation step above connects rebinding and
-  final placement checks locally; native preparation validation and the
-  installation publication/lifetime gates remain open.
+  ARM build/static analysis pass. The native preparation fixtures above also
+  exercise sealing, without granting permission to authenticate arbitrary code:
+  trusted template/layout provenance remains required. The draft-preparation
+  step connects rebinding and final placement checks; installation publication
+  and lifetime gates remain open.
 
 - **Local fresh-installation space planning:** installation preflight can now
   place the library, journal and authority together after namespace exclusion.
@@ -462,9 +469,10 @@ Current delivery checkpoints:
   installation suite, including insufficient pair space, target overlap,
   malformed/read-failed Flash and unchanged failure outputs. Successful split
   layouts also pass the existing journal/authority encoders. ARM build/static
-  analysis pass. This new grouped planner has no native execution acceptance
-  yet. It reserves no bytes and grants no authority: final descriptor sealing,
-  revalidation, owned publication, registration, startup and reclamation remain
+  analysis pass. The native preparation fixtures above now exercise grouped
+  planning as part of the full draft path. It reserves no bytes and grants no
+  authority: exclusive storage ownership, owned publication, registration,
+  startup and reclamation remain
   required. This is local work, not a new CI submission or milestone closure.
 
 - **Local cross-port installation preflight:** the recovery installation planner

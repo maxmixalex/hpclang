@@ -131,6 +131,59 @@ class PlacementTests(unittest.TestCase):
                         VERIFY.verify_placement(before, after, root, "unused", 0, existing=existing)
 
 
+class PreparationTests(unittest.TestCase):
+    def test_complete_draft_coordinates_and_failure_staging(self):
+        _, original, _ = VERIFY.fixture()
+        library = 0x160105
+        journal = library + len(original)
+        authority = journal + 4124
+        _, expected, _ = VERIFY.fixture(journal_slot=journal, authority_slot=authority)
+        flash = b"\xff" * 0x200000
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            (after / "flash").write_bytes(flash)
+            with patch.object(
+                VERIFY,
+                "symbol_offsets",
+                return_value={"preparation_result": 0, "prepared_library": 16},
+            ):
+                for existing in (False, True):
+                    words = (
+                        (0xFFFFFFFA,) + (0xFFFFFFFF,) * 3
+                        if existing
+                        else (0, library, journal, authority)
+                    )
+                    ram = struct.pack("<4I", *words) + (
+                        b"\xa5" * len(original) if existing else expected
+                    )
+                    (after / "sram").write_bytes(ram)
+                    VERIFY.verify_preparation(before, after, root, "unused", 0, existing=existing)
+                    for offset in (0, 4, 8, 12, 16, len(ram) - 1):
+                        changed = bytearray(ram)
+                        changed[offset] ^= 1
+                        (after / "sram").write_bytes(changed)
+                        with (
+                            self.subTest(existing=existing, offset=offset),
+                            self.assertRaises(ValueError),
+                        ):
+                            VERIFY.verify_preparation(
+                                before, after, root, "unused", 0, existing=existing
+                            )
+                    (after / "sram").write_bytes(ram)
+                    changed = bytearray(flash)
+                    changed[0x140100] ^= 1
+                    (after / "flash").write_bytes(changed)
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_preparation(
+                            before, after, root, "unused", 0, existing=existing
+                        )
+                    (after / "flash").write_bytes(flash)
+
+
 class StartupInventoryTests(unittest.TestCase):
     def test_independent_layout_and_diagnostic_checks(self):
         flash = bytearray(0x200000)
