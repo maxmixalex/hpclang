@@ -214,7 +214,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     missing = root / "missing"
     transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
-    verify_startup(clean, missing / "state", build, args.nm, base)
+    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
     require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
     print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
@@ -247,7 +247,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
-    verify_startup(before, matched / "state", build, args.nm, base)
+    startup_matched = verify_startup(before, matched / "state", build, args.nm, base)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     transactions = []
     for label, status in (
@@ -314,6 +314,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
+                startup_inventory={"missing": startup_missing, "matched": startup_matched},
                 reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,

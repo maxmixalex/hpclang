@@ -427,6 +427,17 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local earlier-callback evidence:** targeted warm-start probes on HP49g+
+  and HP50g cover valid user-key bindings and an invalid hidden UserKeys CRC.
+  The valid 739-nibble binding remains byte-for-byte intact; the invalid-CRC
+  case resets it to an empty list. Neither case executes the assigned user
+  program. Both preserve unrelated HOME objects and complete Flash contents,
+  and reach the observed Port 2 / Port 0 / HOME startup sequence. These are
+  representative native cases, not a complete proof of the preceding system
+  callbacks or authorization to replay a pending transaction. HOME initialization,
+  attachment behavior and production entry allocation remain open. This evidence
+  is local only; no additional milestone is complete.
+
 - **Local native startup inventory:** the existing installation witness now
   captures the actual ROM size directory and emulator bank bases, validates
   their geometry and resolves each catalog configuration entry on ARM. An
