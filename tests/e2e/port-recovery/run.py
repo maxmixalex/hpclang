@@ -123,7 +123,10 @@ def transfer(
     execute=True,
     remote_commands=None,
     package_name="recovery.hp",
+    consume=False,
 ):
+    if consume and (not execute or remote_commands is not None):
+        raise ValueError("Consuming a fixture requires its default execution command")
     recovery.mkdir()
     shutil.copytree(source, recovery / "state")
     send = recovery / "send"
@@ -132,6 +135,11 @@ def transfer(
         shutil.copyfile(build / package_name, send / "RECOVERY.HP")
     if remote_commands is None:
         remote_commands = [f"-95 CF HOME '{name}' RCL" if execute else "-95 CF HOME"]
+        if consume:
+            # RCL retains the executable object on the stack. Release only this
+            # one-shot fixture's HOME binding; snapshots retain its evidence.
+            # Accumulating old witnesses can exhaust Stock menu/USB workspace.
+            remote_commands[0] += f" '{name}' PURGE"
     prefix = []
     for line in (ROOT / "tests/e2e/sequences/hp4950-stock-usb-run.seq").read_text().splitlines():
         tokens = line.split()
@@ -519,7 +527,9 @@ def run(args):
 
     for cut_index, power_cut in enumerate(args.power_cut or []):
         interrupted = args.output / f"power-cut-{cut_index}"
-        transfer(args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut)
+        transfer(
+            args, interrupted, reset / "state", args.build, "RECOVERYPOWER", power_cut, consume=True
+        )
         restored = verify_power_cut(
             reset / "state/flash",
             interrupted / "state/flash",
@@ -545,7 +555,9 @@ def run(args):
 
     if args.interrupted_build is not None:
         interrupted = args.output / "interrupted"
-        transfer(args, interrupted, reset / "state", args.interrupted_build, "RECOVERYCUT")
+        transfer(
+            args, interrupted, reset / "state", args.interrupted_build, "RECOVERYCUT", consume=True
+        )
         verify_interruption(
             SimpleNamespace(
                 before=reset / "state",
@@ -574,7 +586,7 @@ def run(args):
         print("Interrupted recovery verified; reset kept the partial bank hidden", flush=True)
 
     recovery = args.output / "recovery"
-    transfer(args, recovery, reset / "state", args.build, "RECOVERY")
+    transfer(args, recovery, reset / "state", args.build, "RECOVERY", consume=True)
     verify(
         SimpleNamespace(
             before=reset / "state",
@@ -613,6 +625,7 @@ def run(args):
                 args.retirement_build,
                 "RETIRECUT",
                 retirement_cut,
+                consume=True,
             )
             verify_retirement_cut(
                 retirement_source / "flash",
