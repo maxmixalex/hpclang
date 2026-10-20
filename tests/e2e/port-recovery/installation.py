@@ -86,9 +86,11 @@ def generate_fixture(output):
     )
 
 
-def verify_placement(before, after, build, nm, base, *, existing):
+def verify_placement(
+    before, after, build, nm, base, *, existing, make_fixture=fixture, image="installation"
+):
     """Check selection independently from native allocation headers."""
-    _, record, _ = fixture()
+    _, record, _ = make_fixture()
     flash = (before / "flash").read_bytes()
     if existing:
         expected = (0xFFFFFFFA, 0xFFFFFFFF)  # EXISTS, unchanged output
@@ -109,7 +111,7 @@ def verify_placement(before, after, build, nm, base, *, existing):
                 candidates.append(at)
         require(candidates, "Fixture has no room for planned library")
         expected = (0, candidates[0])
-    symbols = symbol_offsets(build / "installation.elf", nm)
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
     require(
         struct.unpack_from("<2I", ram, base + symbols["placement_result"]) == expected,
@@ -118,13 +120,15 @@ def verify_placement(before, after, build, nm, base, *, existing):
     require((after / "flash").read_bytes() == flash, "Placement planning changed Flash")
 
 
-def verify_preparation(before, after, build, nm, base, *, existing):
-    symbols = symbol_offsets(build / "installation.elf", nm)
+def verify_preparation(
+    before, after, build, nm, base, *, existing, make_fixture=fixture, image="installation"
+):
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
     result, library, journal, authority = struct.unpack_from(
         "<4I", ram, base + symbols["preparation_result"]
     )
-    _, original, _ = fixture()
+    _, original, _ = make_fixture()
     at = base + symbols["prepared_library"]
     actual = ram[at : at + len(original)]
     flash = (before / "flash").read_bytes()
@@ -137,7 +141,7 @@ def verify_preparation(before, after, build, nm, base, *, existing):
         require(actual == b"\xa5" * len(original), "Conflicting draft changed staging")
         return
     require(result == 0, "Native draft preparation failed")
-    _, expected, _ = fixture(journal_slot=journal, authority_slot=authority)
+    _, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority)
     require(actual == expected, "Native draft differs from independently rebound package")
     tails = {}
     for bank in range(0x140000, 0x200000, 0x20000):
@@ -396,6 +400,17 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         verify_busy_reads=verify_busy_reads,
     )
     from publication import run_publication
+    from template import run_template
+
+    real_template = run_template(
+        args,
+        clean,
+        root,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
 
     run_publication(
         args,
@@ -425,6 +440,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 cancellation=True,
                 selected_storage=True,
                 unarmed_staging=True,
+                real_template=real_template,
             ),
             indent=2,
         )

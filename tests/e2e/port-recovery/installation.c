@@ -1,7 +1,12 @@
 /* Installation witnesses for the supported hp4950 Stock 2.15 fixture.
  * ROM/catalog addresses are fixture inputs, not production profile discovery. */
 #include "rpl-flash-replay.h"
+#ifdef HPCLANG_INSTALLATION_TEMPLATE
+#include "template.h"
+#else
 #include "expected-library.h"
+#define EXPECTED_LIBRARY_BYTES sizeof expected_library
+#endif
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
@@ -13,10 +18,12 @@ int hpclang_installation_cleanup(const struct hpclang_rpl_flash_io *io);
 #include "rpl-stock-memory.h"
 volatile uint32_t placement_result[2];
 volatile uint32_t preparation_result[4];
-uint8_t prepared_library[sizeof expected_library];
+#ifndef HPCLANG_INSTALLATION_TEMPLATE
+uint8_t prepared_library[EXPECTED_LIBRARY_BYTES];
 /* Keep the layout pointer in the runtime PIC construction, not a relocated
  * constant aggregate embedded in the recovery image. */
 static volatile uint32_t preparation_bytes = sizeof expected_library;
+#endif
 void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_reader *reader);
 #ifdef HPCLANG_INSTALLATION_STORE
 static int stored_result;
@@ -45,22 +52,22 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
                                                             {&port1, 0, HPCLANG_RPL_PORT1_NIBBLES}};
     uint32_t slot = UINT32_MAX;
     placement_result[0] = (uint32_t)hpclang_rpl_recovery_installation_plan(
-        io, expected_library, sizeof expected_library, ports, catalog, &slot);
+        io, expected_library, EXPECTED_LIBRARY_BYTES, ports, catalog, &slot);
     placement_result[1] = slot;
-    for (unsigned i = 0; i < sizeof prepared_library; ++i)
+    for (unsigned i = 0; i < EXPECTED_LIBRARY_BYTES; ++i)
         prepared_library[i] = 0xa5;
     struct hpclang_rpl_flash_recovery_space space = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
     const struct hpclang_rpl_flash_recovery_layout layout = {
         expected_library, preparation_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
     preparation_result[0] = (uint32_t)hpclang_rpl_recovery_installation_prepare(
         io, &layout, EXPECTED_IDENTITY_NIBBLE, ports, catalog, EXPECTED_TARGET, prepared_library,
-        sizeof prepared_library, &space);
+        EXPECTED_LIBRARY_BYTES, &space);
     preparation_result[1] = space.library_slot;
     preparation_result[2] = space.journal_slot;
     preparation_result[3] = space.authority_slot;
 #ifdef HPCLANG_INSTALLATION_STORE
     if (!preparation_result[0])
-        stored_result = hpclang_installation_store(io, prepared_library, sizeof prepared_library,
+        stored_result = hpclang_installation_store(io, prepared_library, EXPECTED_LIBRARY_BYTES,
                                                    space.library_slot);
 #endif
 }
@@ -122,11 +129,24 @@ int hpclang_recovery_predicate(const uint32_t *map)
     installation_result[4] = l1[1];
     unsigned descriptors[2] = {(l1[0] & ~0xcu) | 0xc00u, (l1[1] & ~0xcu) | 0xc00u};
     hpclang_flash_mapping_swap(descriptors);
+#ifndef HPCLANG_INSTALLATION_CLEANUP
     const struct hpclang_rpl_reader reader = {mapped_nibble, (void *)map};
+#ifdef HPCLANG_INSTALLATION_TEMPLATE
+    if (!hpclang_installation_load_template(&reader)) {
+        hpclang_flash_mapping_swap(descriptors);
+        installation_result[0] = 0x48504944;
+        installation_result[1] = (uint32_t)-100;
+        installation_result[2] = UINT32_MAX;
+        installation_result[5] = l1[0];
+        installation_result[6] = l1[1];
+        return 0;
+    }
+#endif
 #ifdef HPCLANG_INSTALLATION_STARTUP
     hpclang_startup_inventory(map, &reader);
 #endif
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
+#endif
     const struct hpclang_rpl_flash_io io = {descriptors, read_flash, NULL, 0x140000, 0x200000};
 #ifdef HPCLANG_INSTALLATION_STARTUP
     plan_placement(&io, &catalog);
@@ -171,8 +191,8 @@ int hpclang_recovery_predicate(const uint32_t *map)
         slot = preparation_result[1];
     }
 #else
-    int result = hpclang_rpl_flash_match_installation(&io, expected_library,
-                                                      sizeof expected_library, &catalog, &slot);
+    int result = hpclang_rpl_flash_match_installation(&io, expected_library, EXPECTED_LIBRARY_BYTES,
+                                                      &catalog, &slot);
 #endif
     hpclang_flash_mapping_swap(descriptors);
     installation_result[0] = 0x48504944;

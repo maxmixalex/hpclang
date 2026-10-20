@@ -8,13 +8,13 @@ from reservation import reader
 from verify import installed_recovery, require, require_stock_pc, symbol_offsets
 
 
-def verify_storage(before, after, build, nm):
+def verify_storage(before, after, build, nm, *, make_fixture=fixture, image="installation-store"):
     prior = (before / "flash").read_bytes()
     actual = (after / "flash").read_bytes()
     changed = [i for i, (a, b) in enumerate(zip(prior, actual, strict=True)) if a != b]
     require(changed, "Selected-slot witness did not store a library")
     slot = changed[0]
-    _, original, layout = fixture()
+    _, original, layout = make_fixture()
     require(
         0x140105 <= slot < 0x200000
         and slot % 4 == 1
@@ -34,15 +34,15 @@ def verify_storage(before, after, build, nm):
 
     journal = word(layout["recovery_binding_nibble"] + 16)
     authority = word(layout["recovery_binding_nibble"] + 24)
-    library, expected, _ = fixture(journal_slot=journal, authority_slot=authority)
+    library, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority)
     require(record == expected, "Stored record differs from independently rebound library")
     require(prior[slot : slot + len(record)] == b"\xff" * len(record), "Storage overwrote data")
     expected_flash = bytearray(prior)
     expected_flash[slot : slot + len(record)] = record
     base = verify_probe(
-        before, after, build, nm, 0, slot, image="installation-store", expected_flash=expected_flash
+        before, after, build, nm, 0, slot, image=image, expected_flash=expected_flash
     )
-    symbols = symbol_offsets(build / "installation-store.elf", nm)
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
     require(
         struct.unpack_from("<4I", ram, base + symbols["preparation_result"])
@@ -122,7 +122,9 @@ def run_storage(args, clean, root, *, transfer, emulator, completed, verify_busy
     )
 
 
-def restart_storage(args, stored, restart, library, slot, *, emulator, completed):
+def restart_storage(
+    args, stored, restart, library, slot, *, emulator, completed, library_id=LIBRARY_ID
+):
     restart.mkdir()
     shutil.copytree(stored / "state", restart / "state")
     with emulator(
@@ -136,7 +138,7 @@ def restart_storage(args, stored, restart, library, slot, *, emulator, completed
         "Stock restart changed the stored library",
     )
     found, _ = installed_recovery(
-        (state / "flash").read_bytes(), library, LIBRARY_ID, TARGET, read=reader(state)
+        (state / "flash").read_bytes(), library, library_id, TARGET, read=reader(state)
     )
     require(found == slot, "Stock restart did not discover the exact stored library")
 

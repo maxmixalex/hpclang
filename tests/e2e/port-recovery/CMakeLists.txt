@@ -128,26 +128,61 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${HPCLANG_ROOT}/tools/package-recovery.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/installation.py"
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
-foreach(witness IN ITEMS installation installation-transaction installation-publication
+set(installation_witnesses installation installation-transaction installation-publication
         installation-cancellation installation-identity installation-reservation-failure
         installation-store installation-cleanup installation-staging)
+if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
+    math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
+            "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
+            "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
+        COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
+            --elf --model hp50g --flash-copy --library-id 1701
+            --journal-slot "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT}"
+            --authority-slot "${TEMPLATE_AUTHORITY}"
+            --reservation-name HPCRES --reservation-bytes 32768 --reservation-prefix HPCMEM2
+            --admission-elf "$<TARGET_FILE:admission>"
+            --layout-output "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
+            --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
+            "$<TARGET_FILE:recovery>" "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/template.py"
+            "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
+            "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
+            "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
+        DEPENDS recovery admission "${HPCLANG_ROOT}/tools/package-recovery.py"
+            "${CMAKE_CURRENT_LIST_DIR}/template.py"
+            "${CMAKE_CURRENT_LIST_DIR}/reservation.py" "${CMAKE_CURRENT_LIST_DIR}/verify.py"
+        VERBATIM)
+    add_custom_target(recovery-template-data
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/template-data.c")
+    list(APPEND installation_witnesses installation-template installation-template-store)
+endif()
+foreach(witness IN LISTS installation_witnesses)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
-    if(witness STREQUAL "installation-store" OR witness STREQUAL "installation-cleanup")
+    if(witness MATCHES "^installation-template")
+        add_dependencies(${witness} recovery-template-data)
+        target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
+            "${CORE}/rpl-object-store.c")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE)
+    endif()
+    if(witness STREQUAL "installation-store" OR witness STREQUAL "installation-cleanup" OR
+            witness STREQUAL "installation-template-store")
         target_sources(${witness} PRIVATE store.c predicate-tls.S)
         foreach(module IN ITEMS time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()
     endif()
-    if(witness STREQUAL "installation" OR witness STREQUAL "installation-store")
+    if(witness STREQUAL "installation" OR witness STREQUAL "installation-store" OR
+            witness MATCHES "^installation-template")
         target_sources(${witness} PRIVATE startup.c "${CORE}/rpl-recovery-installation.c"
             "${CORE}/rpl-recovery-identity.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_STARTUP)
-        if(witness STREQUAL "installation-store")
+        if(witness STREQUAL "installation-store" OR witness STREQUAL "installation-template-store")
             target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_STORE)
         endif()
     elseif(witness STREQUAL "installation-cleanup")

@@ -446,9 +446,17 @@ Current delivery checkpoints:
   other Flash byte and the executing CODE/guards/catalog. Stock restart
   discovers the exact library at that slot without changing Flash. The write
   witness initializes 20,436 bytes and packages to 146,474 bytes.
-  This is local prototype evidence, not maintained E2E or CI acceptance.
-  Next: integrate reproducible template generation and native coverage, then
-  connect real installation to transaction recovery and safe reclamation.
+  The maintained build now generates the real template, sealed identity and
+  layout constants from the current recovery/admission ELFs. Separate input
+  loading and both preparation/storage witnesses are included in installation
+  E2E; the workflow carries their layout artifact. A clean repository build
+  matches the tested packages exactly. Both HP49g+/HP50g pass the maintained
+  preparation, storage, restart, source-preservation and wrong-template
+  rejection flow. The maintained preparation/storage initialized images are
+  16,684/20,520 bytes, with packages of 138,882/146,634 bytes. Sixty-three recovery
+  Python tests, ARM analysis and formatting pass. These are local results;
+  CI acceptance and the full transaction lifecycle remain open.
+  Next: connect real installation to transaction recovery and safe reclamation.
 
 - **Unarmed transaction staging (local):** new internal staging
   and staging-retry operations store the complete authority body at `7F`,

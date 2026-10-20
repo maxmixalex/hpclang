@@ -5,7 +5,7 @@ import struct
 from verify import native_words, require, require_stock_pc, symbol_offsets
 
 
-def verify_startup(before, after, build, nm, base):
+def verify_startup(before, after, build, nm, base, *, image="installation"):
     flash = (before / "flash").read_bytes()
     original_ram = (before / "sram").read_bytes()
     read = native_words(original_ram, flash)
@@ -52,7 +52,7 @@ def verify_startup(before, after, build, nm, base):
             require(0x40000 <= target < 0x40000 + size * 2, "Callback leaves its bank")
         expected.append((number, header, bank, target))
     ram = (after / "sram").read_bytes()
-    symbols = symbol_offsets(build / "installation.elf", nm)
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
     require(
         struct.unpack_from("<3I", ram, base + symbols["startup_result"])
         == (0, len(expected), banks),
