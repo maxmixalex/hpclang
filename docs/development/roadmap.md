@@ -427,6 +427,21 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local attachment/startup boundary:** on both supported hp4950 fixtures,
+  ordinary `ATTACH` rejects experimental library ID 4, although Stock previously
+  accepted its installation and configuration callback. This does not justify
+  relaxing the production packager's user-library range. Repeated ordinary
+  attachment of ID 768 and direct execution of the system library-2 callback do
+  not run the observer user callbacks. The internal library-2 path can insert a
+  duplicate HOME attachment; warm startup rebuilds the table, removing that
+  duplicate and the manual ID 768 attachment whose configuration does not attach
+  itself. Across two restarts on each model, the observed startup sequence and
+  unrelated HOME/child payloads, exact catalog and Flash remain correct.
+  Preserving the old attachment table is
+  therefore not the right oracle. Earlier callbacks mutate HOME metadata;
+  safe movement/reference handling and their possible access to pending Flash
+  remain required before accepting this as a recovery entry.
+
 - **Local earlier-callback evidence:** targeted warm-start probes on HP49g+
   and HP50g cover valid user-key bindings and an invalid hidden UserKeys CRC.
   The valid 739-nibble binding remains byte-for-byte intact; the invalid-CRC
