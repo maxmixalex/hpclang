@@ -501,8 +501,13 @@ Current delivery checkpoints:
   lint pass. Native integration passes all five transaction states on both
   models. The new changed-content fixture initially validated ordinary native
   allocations after injecting pending journal records; it now validates the
-  altered library before injection. That case, low-memory integration and the
-  standalone clean-boot suite still need final validation.
+  altered library before injection. The corrected content-mismatch case and
+  both low-memory cases now pass on both models, including exact code/owner,
+  guards, Flash/catalog, all user-array elements and reservation contents.
+  The maintained copied admission program is 17,114 bytes; the measured free
+  gap is 20,860 bytes. The corrected standalone clean-boot suite is running.
+  A separate local prototype is testing sealed admission before automatic
+  reservation release/recovery; it does not establish reservation ownership.
   This streaming path is not yet submitted.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
