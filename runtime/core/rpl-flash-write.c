@@ -129,6 +129,45 @@ int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, u
     return publish_erased(io, slot, authority, sizeof authority);
 }
 
+static int finish_hidden_record(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                const uint8_t *record, uint32_t bytes)
+{
+    uint16_t word = 0;
+    uint8_t status = 0;
+    for (uint32_t i = 0; i <= bytes; ++i) {
+        uint32_t at = slot + i;
+        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (!i) {
+            status = value;
+            if (status != 0xffu && status != 0x7fu && status != 0xfeu && status != 0x7eu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        } else if (i == bytes) {
+            if (value != 0xffu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+        } else if (status == 0xffu ? (value & record[i]) != record[i] : value != record[i]) {
+            return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    if (status == 0x7eu)
+        return HPCLANG_RPL_FLASH_WRITTEN;
+    return write_bytes(io, slot + 1u, record + 1u, bytes - 1u) && write_bytes(io, slot, record, 1u)
+               ? HPCLANG_RPL_FLASH_WRITTEN
+               : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes)
+{
+    uint32_t target;
+    const uint8_t *image;
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_sector_decode(io->first, io->end, slot, record, bytes, &target, &image))
+        return HPCLANG_RPL_FLASH_INVALID;
+    return finish_hidden_record(io, slot, record, bytes);
+}
+
 int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                        uint32_t journal_slot, const uint8_t *journal,
                                        uint32_t journal_bytes)
@@ -141,31 +180,7 @@ int hpclang_rpl_flash_finish_authority(const struct hpclang_rpl_flash_io *io, ui
     if (matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e) !=
         HPCLANG_RPL_FLASH_WRITTEN)
         return HPCLANG_RPL_FLASH_DIRTY;
-    uint16_t word = 0;
-    uint8_t status = 0;
-    for (uint32_t i = 0; i <= sizeof authority; ++i) {
-        uint32_t at = slot + i;
-        if ((!i || !(at & 1u)) && !io->read16(io->context, at & ~1u, &word))
-            return HPCLANG_RPL_FLASH_DIRTY;
-        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
-        if (!i) {
-            status = value;
-            if (status != 0xffu && status != 0x7fu && status != 0xfeu && status != 0x7eu)
-                return HPCLANG_RPL_FLASH_DIRTY;
-        } else if (i == sizeof authority) {
-            if (value != 0xffu)
-                return HPCLANG_RPL_FLASH_DIRTY;
-        } else if (status == 0xffu ? (value & authority[i]) != authority[i]
-                                   : value != authority[i]) {
-            return HPCLANG_RPL_FLASH_DIRTY;
-        }
-    }
-    if (status == 0x7eu)
-        return HPCLANG_RPL_FLASH_WRITTEN;
-    return write_bytes(io, slot + 1u, authority + 1u, sizeof authority - 1u) &&
-                   write_bytes(io, slot, authority, 1u)
-               ? HPCLANG_RPL_FLASH_WRITTEN
-               : HPCLANG_RPL_FLASH_DIRTY;
+    return finish_hidden_record(io, slot, authority, sizeof authority);
 }
 
 int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,

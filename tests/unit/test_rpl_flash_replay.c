@@ -202,6 +202,25 @@ static int publish(void)
     return result;
 }
 
+static int finish_publication(void)
+{
+    int result = hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                                 HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+    check_publication();
+    return result;
+}
+
+static void retry_publication(void)
+{
+    reset_counters();
+    assert(finish_publication() == HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!memcmp(flash + SLOT - FIRST, original + SLOT - FIRST,
+                   HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES));
+    reset_counters();
+    assert(finish_publication() == HPCLANG_RPL_FLASH_WRITTEN);
+    assert(!programs && !erases);
+}
+
 static void publication_tests(void)
 {
     prepare_publication();
@@ -220,11 +239,17 @@ static void publication_tests(void)
         assert(result == HPCLANG_RPL_FLASH_FAILED || result == HPCLANG_RPL_FLASH_DIRTY);
         if (result == HPCLANG_RPL_FLASH_FAILED)
             assert(!programs);
+        retry_publication();
     }
+    const uint16_t masks[] = {0, 0x00ff, 0xff00, 0x5555, 0xffff};
     for (unsigned cut = 1; cut <= total_programs; ++cut) {
-        prepare_publication();
-        fail_program = cut;
-        assert(publish() == HPCLANG_RPL_FLASH_DIRTY);
+        for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask) {
+            prepare_publication();
+            fail_program = cut;
+            failed_program_bits = masks[mask];
+            assert(publish() == HPCLANG_RPL_FLASH_DIRTY);
+            retry_publication();
+        }
     }
     /* Occupation anywhere, including the next end marker, forbids all writes. */
     for (unsigned i = 0; i <= HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES; ++i) {
@@ -239,6 +264,87 @@ static void publication_tests(void)
     silent_program = 1;
     assert(publish() == HPCLANG_RPL_FLASH_DIRTY);
     assert(flash[SLOT - FIRST] == 255);
+    retry_publication();
+    publishing = 0;
+}
+
+static void partial_publication(void)
+{
+    prepare_publication();
+    fail_program = 3;
+    failed_program_bits = 0x5555;
+    assert(publish() == HPCLANG_RPL_FLASH_DIRTY && flash[SLOT - FIRST] == 255);
+    reset_counters();
+}
+
+static void publication_resumption_tests(void)
+{
+    partial_publication();
+    assert(finish_publication() == HPCLANG_RPL_FLASH_WRITTEN);
+    unsigned total_reads = reads, total_programs = programs;
+    assert(total_programs);
+    for (unsigned cut = 1; cut <= total_reads; ++cut) {
+        partial_publication();
+        fail_read = cut;
+        assert(finish_publication() == HPCLANG_RPL_FLASH_DIRTY);
+        retry_publication();
+    }
+    for (unsigned cut = 1; cut <= total_programs; ++cut) {
+        partial_publication();
+        fail_program = cut;
+        failed_program_bits = cut & 1u ? 0x5555 : 0xffff;
+        assert(finish_publication() == HPCLANG_RPL_FLASH_DIRTY);
+        retry_publication();
+    }
+    for (unsigned status = 0; status < 256; ++status) {
+        prepare_publication();
+        memcpy(flash + SLOT - FIRST, original + SLOT - FIRST,
+               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        flash[SLOT - FIRST] = (uint8_t)status;
+        int result = hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                                     HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        if (status == 0xff || status == 0x7f || status == 0xfe || status == 0x7e) {
+            assert(result == 0 && flash[SLOT - FIRST] == 0x7e);
+            check_publication();
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs && !erases);
+        }
+    }
+    const uint8_t valid_statuses[] = {0xff, 0x7f, 0xfe, 0x7e};
+    for (unsigned i = 0; i < sizeof valid_statuses; ++i) {
+        prepare_publication();
+        memcpy(flash + SLOT - FIRST, original + SLOT - FIRST,
+               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+        flash[SLOT - FIRST] = valid_statuses[i];
+        flash[SLOT - FIRST + 1] &= (uint8_t)~2u; /* Cannot restore this required bit. */
+        assert(hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases);
+    }
+    for (unsigned i = 1; i < sizeof valid_statuses; ++i) {
+        partial_publication();
+        flash[SLOT - FIRST] = valid_statuses[i];
+        assert(hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                               HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+               HPCLANG_RPL_FLASH_DIRTY);
+        assert(!programs && !erases);
+    }
+    prepare_publication();
+    assert(hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                           HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 1) ==
+           HPCLANG_RPL_FLASH_INVALID);
+    assert(!reads && !programs && !erases);
+    prepare_publication();
+    flash[SLOT - FIRST + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES] = 0x7e;
+    assert(hpclang_rpl_flash_finish_sector(&io.flash, SLOT, original + SLOT - FIRST,
+                                           HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) ==
+           HPCLANG_RPL_FLASH_DIRTY);
+    assert(!programs && !erases);
+    partial_publication();
+    silent_program = 1;
+    assert(finish_publication() == HPCLANG_RPL_FLASH_DIRTY);
+    retry_publication();
     publishing = 0;
 }
 
@@ -666,6 +772,7 @@ int main(void)
     expected_replay_tests();
     non_header_sector_test();
     publication_tests();
+    publication_resumption_tests();
     retirement_tests();
     discovery_tests();
     preflight_tests();

@@ -210,6 +210,22 @@ int hpclang_rpl_flash_publish_intent(const struct hpclang_rpl_flash_io *io, cons
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes);
 
+/* Resume publication of the SAME caller-owned sector journal, using the exact
+ * original READY capsule retained/reconstructed from trusted installation state.
+ * FF permits NOR-compatible partial body bytes; 7F/FE/7E require the complete
+ * body already equal. Validate all bytes and the still-erased next end marker
+ * before writing anything, then verify the body before publishing READY.
+ * READY is idempotent; retiring/retired records never become READY again.
+ * Only the journal allocation can change; this does not erase or touch target
+ * data, publish authority, or authorize replay. DIRTY retains ownership/retry.
+ * Use before publishing a following adjacent allocation: an occupied end marker
+ * rejects even an otherwise complete journal. After authority publication use
+ * the bound lifecycle checks instead. Never infer ownership from compatible
+ * bits, scan for a convenient capsule, or substitute a newly generated image.
+ */
+int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                    const uint8_t *record, uint32_t bytes);
+
 /* Bind one caller-reserved erased authority allocation to an already durable
  * ready journal. Verify the complete journal, then publish/verify the binding
  * body before its ARMED status. Neither journal nor target is modified.
