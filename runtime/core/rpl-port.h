@@ -125,6 +125,16 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
                                 uint32_t end, uint32_t header, uint32_t number, uint32_t command,
                                 uint32_t *target);
 
+/* Resolve a library's configuration entry through its ID header. As with
+ * command lookup, the caller supplies a stable selected mapping and bounds.
+ * Zero offset means no callback. The result is a bank-local address, not proof
+ * of callback safety, execution order or permission to run it. Do not infer
+ * absence from an unreadable header. Returns 1 found, 0 absent, or a negative
+ * span result; target changes only on 1. The callback is not dereferenced. */
+int hpclang_rpl_library_configuration(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t header, uint32_t number,
+                                      uint32_t *target);
+
 /* Match a switch address against a caller-validated ROM table containing
  * 16 seven-nibble Flash entries and a separate ERAM entry. Addresses are read,
  * never inferred from an arithmetic sequence of implementation routines.
@@ -140,6 +150,25 @@ struct hpclang_rpl_bank_binding
     enum hpclang_rpl_bank_kind kind;
     uint32_t index;
 };
+
+struct hpclang_rpl_rom_bank
+{
+    uint32_t physical, bytes;
+};
+
+/* Validate a captured ROM size directory against all 16 captured native bank
+ * bases. The count KiB-size bytes immediately precede the first bank; their
+ * address and the Flash size are supplied by a separately verified firmware
+ * layout. Do not discover that layout by searching for plausible data.
+ * Every bank must fit a Saturn window, the complete bank sequence must end exactly
+ * at flash_bytes, and unused native base cells must be zero. Inputs stay stable.
+ * Returns 1 for a populated index, 0 for an unused index, negative span results
+ * for inconsistent metadata. Output changes only on 1. This is read-only
+ * geometry validation, not firmware identity or mutation authorization. */
+int hpclang_rpl_rom_bank_layout(const uint8_t *kib_sizes, uint32_t count, uint32_t directory,
+                                uint32_t flash_bytes, const uint32_t native_bases[16],
+                                uint32_t index, struct hpclang_rpl_rom_bank *bank);
+
 int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding);

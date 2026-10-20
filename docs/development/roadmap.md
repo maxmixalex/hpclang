@@ -427,7 +427,202 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
-- **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
+- **CI submission batch:** bounded configuration resolution, captured ROM-bank
+  validation, native startup inventory, partial bank-header recovery coverage
+  and the retained-RAM prerequisite below are submitted together on
+  `m8-flash-write` after local validation. CI acceptance remains pending; no
+  additional M8 milestone is complete.
+
+- **Retained-RAM installation prerequisite:** reservation creation now checks
+  that HOME's oldest item is the inline null-named hidden directory before any
+  writes, then checks it again after native movement when verifying the created
+  resource. Missing structure returns unsupported; unreadable, out-of-range or
+  malformed metadata rejects without changing memory or the caller's output.
+  The normal mutation preflight still validates the complete directory contents.
+  Twenty-seven targeted rejection cases and the existing creation/movement/fault
+  suite pass, including ASan/UBSan, pinned formatting and ARM static analysis.
+  Native creation/publication and failure-retention checks pass on both models,
+  preserving exact Flash/catalog, bound resource contents, owning CODE, guards
+  and mappings. This is an installation precondition, not proof
+  of durable ownership, arbitrary later RAM integrity or global startup order.
+
+- **Active startup decision and existing counterexample:** the earlier native
+  dependency fixture remains decisive: Port 0 library 768 can repeatedly enter
+  its configuration while recalling damaged EQLIB, preventing recovery library
+  769 from running. Research ID 4 repairs that case but is not a production
+  allocation policy. The existing library-229 body-fault and explicit banked
+  UserKeys-reference probes already cover those particular paths; repeating
+  narrower intact-data probes does not close the remaining gate. The next
+  prerequisite is to establish creation/GC safety during startup, then a
+  supported installation entry before dependent callbacks. Cold-boot read
+  watchpoints now prove both models enter the hidden-directory creation routine:
+  the Saturn instruction pointer is `0xada5`, with the interpreter fetch returning
+  to `0x288dc`. This distinguishes execution from the earlier ROM scanner's
+  read of the same bytes. Follow-up SRAM snapshots taken after `SAVPTR` and
+  `ROOM`, at Saturn `0xadb3`, establish the actual allocation-time gap on both
+  models: 494,024 nibbles with intact Flash and 494,117 with the bound pending
+  bank-header recovery. HOME is empty at that point. Both exceed the routine's
+  20-nibble requirement, so this creation path skips its explicit GC branch in
+  these cold fixtures. The damaged cold boots then restore exact Flash, close
+  the transaction and rebuild the baseline catalog. Entry snapshots taken before
+  pointer synchronization are not the decision evidence. Retained-RAM hidden
+  directory validity, general movement/reference safety and a supported early
+  installation entry remain required alongside durable ownership and reclamation.
+
+- **Local torn-bank startup coverage:** both models complete low-memory automatic
+  recovery for all sixteen `F0`–`FF` values reachable while programming the native
+  bank-status byte, with the remaining bank identity bytes still erased. All
+  32 cases restore exact Flash/catalog state, preserve 24,000 user-array elements,
+  release the matching reservation and pass the maintained execution-image,
+  owning-CODE, guard and reset-checkpoint oracle. The maintained fixture generator
+  reproduces those native inputs byte-for-byte and rejects impossible status
+  values or body-sector misuse. Existing low-memory E2E now exercises `F0`
+  partial-header publication without another emulator invocation; the existing
+  absent-reservation case retains fully erased-sector coverage. Sixty-one related
+  Python tests and formatting pass. This bounds one scanner-facing fault family;
+  other metadata/object tears, earlier callback access and installation lifetime
+  remain open. Local verification is not CI or M8 acceptance.
+
+- **Local pre-callback Flash access:** native read watchpoints on both models
+  observe the original ARM library scanner reading physical `0x140100`, inside
+  the installation fixture's `0x140000` target sector, during warm startup.
+  ROM instructions identify the bank-status load in the scanner called at
+  `0x2ed40`, immediately after native state initialization; subsequent Saturn
+  reads also reach that metadata. Both observed runs return normally. This
+  establishes an additional startup dependency, not a failure of an interrupted
+  transaction: these probes use intact Flash. Merely moving the recovery
+  configuration ahead of other library callbacks cannot establish safety.
+  Acceptance must also cover scanner behavior on torn target metadata and
+  recovery reachability before affected data is consumed. The four-byte
+  sector-start probe saw no access; only the metadata watchpoint supplies
+  positive evidence, and it is not a whole-sector access trace.
+
+- **Local attachment/startup boundary:** on both supported hp4950 fixtures,
+  ordinary `ATTACH` rejects experimental library ID 4, although Stock previously
+  accepted its installation and configuration callback. This does not justify
+  relaxing the production packager's user-library range. Repeated ordinary
+  attachment of ID 768 and direct execution of the system library-2 callback do
+  not run the observer user callbacks. The internal library-2 path can insert a
+  duplicate HOME attachment; warm startup rebuilds the table, removing that
+  duplicate and the manual ID 768 attachment whose configuration does not attach
+  itself. Across two restarts on each model, the observed startup sequence and
+  unrelated HOME/child payloads, exact catalog and Flash remain correct.
+  Preserving the old attachment table is
+  therefore not the right oracle. Earlier callbacks mutate HOME metadata;
+  safe movement/reference handling and their possible access to pending Flash
+  remain required before accepting this as a recovery entry.
+
+- **Local earlier-callback evidence:** targeted warm-start probes on HP49g+
+  and HP50g cover valid user-key bindings and an invalid hidden UserKeys CRC.
+  The valid 739-nibble binding remains byte-for-byte intact; the invalid-CRC
+  case resets it to an empty list. Neither case executes the assigned user
+  program. Both preserve unrelated HOME objects and complete Flash contents,
+  and reach the observed Port 2 / Port 0 / HOME startup sequence. These are
+  representative native cases, not a complete proof of the preceding system
+  callbacks or authorization to replay a pending transaction. HOME initialization,
+  attachment behavior and production entry allocation remain open. This evidence
+  is local only; no additional milestone is complete.
+
+- **Local native startup inventory:** the existing installation witness now
+  captures the actual ROM size directory and emulator bank bases, validates
+  their geometry and resolves each catalog configuration entry on ARM. An
+  independent host oracle compares every ID/header/bank/target row. Both models
+  pass the original clean catalog (61 libraries / 16 callbacks) and the installed
+  recovery fixture (62 / 17), preserving initialized code, owning CODE, stack
+  guards, mappings, catalog and Flash. The existing missing/matched invocations
+  carry this gate without additional emulator launches. Verifier corruption
+  tests, ARM build/analysis and formatting pass. This is fixture-profile capture,
+  not production firmware discovery or authorization of earlier callback behavior.
+  No further M8 stage is complete.
+
+- **Local ROM-layout validation:** the shared parser now derives bank extents
+  from the captured KiB-size directory and compares every native base, including
+  unused cells. It checks complete Flash coverage, window sizes, alignment and
+  arithmetic bounds before publishing a selected bank. ASan/UBSan, pinned host
+  analysis and ARM compilation pass. Both saved native states still resolve all
+  62 library bindings using the actual first bank's 96 KiB bound, without a
+  special-case address formula. Firmware-profile discovery and live capture
+  integration remain separate requirements; this local work is not CI acceptance.
+  Native ordering probes additionally confirm on both models, across two
+  restarts, that an available Port 2 library ID 4 executes before a Port 0 ID 768
+  callback and HOME `STARTUP`, despite reverse installation order. Exact catalog
+  IDs and Flash are preserved. This is a candidate entry in a clean fixture,
+  not an allocated production ID or proof that earlier system callbacks are safe.
+
+- **Local startup prerequisite:** a bounded library-configuration resolver now
+  distinguishes an absent callback from unreadable/mismatched metadata, preserves
+  bank-local identity and never dereferences or executes the result. Read-failure,
+  malformed-nibble and relative-pointer boundary tests pass under ASan/UBSan;
+  pinned host analysis passes. Actual C against both native saved states resolves
+  all 62 bindings using the observed emulator-state physical bank bases: 17
+  callbacks (including recovery) and 45 absent callbacks. The ordinary physical
+  Flash formula incorrectly mapped bank-table entry zero; its saved base is
+  `0x48000`, not `0x40000`. This restores previously skipped libraries 221/223
+  (both have callbacks) and 257 (none). Native watchpoints on both models confirm
+  that Stock initializes the bank array from its ROM size directory and uses it
+  to rebuild mappings and scan libraries. The directory describes a 96 KiB first
+  bank and thirteen 128 KiB banks, ending exactly at 2 MiB. Production mapping
+  capture and callback behavior/order analysis remain open; a low library number
+  alone is insufficient.
+  This follow-up is local and has not been submitted to CI.
+
+- **Current automatic-binding follow-up:** owned ELF namespace/capacity fields
+  are filled before sealing the library. The automatic predicate compares the
+  complete HPCMEM2 binding after streaming installation/transaction preflight,
+  before RAM release or replay. Both native models pass low-memory recovery and
+  repeated restart with all 24,000 user array elements preserved and a measured
+  20,902-byte free gap. Existing rejection cases pass. Separate native runs of
+  the maintained new cases reject changed resource identity, location, transaction
+  CRC and capacity with valid active Flash transactions, preserving the complete
+  altered resource and user data, with no Flash write/reset; the completion
+  marker proves callback execution. Both also recover with no reservation
+  object present. There is no reduced memory-pressure requirement.
+  All 83 related Python tests and ARM analysis pass. Durable ownership proof,
+  installation/restart/orphan handling and global startup ordering remain open.
+  Submitted at `26f312e5` (implementation `542d832d`, synchronized with main).
+  CI inspected once on 2026-10-21: Quality `39450806498` passes; Core
+  `39450806503`, Runtime `39450806511` and Objects `39450806502` are queued.
+  This is not a completed M8 stage.
+
+- **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
+  (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects
+  (`39442340824`). PR #3 merged that exact submitted head into main as
+  `b10699df`. Main CI is not awaited. The newer creation/resource-binding work
+  was submitted together at `26f312e5` on the active branch.
+
+- **Local installation/resource binding:** the installation witness now creates
+  an `HPCMEM2` reservation header from its sealed installed identity, physical
+  library/journal/authority coordinates, target, journal CRC and capacity.
+  It verifies fresh creation before publication and never persists a RAM
+  pointer. A read-only matcher checks exact native type/capacity and all header
+  bytes. Host tests cover independent encoded fields, every header-nibble
+  corruption/read failure, old transaction CRCs, changed identities and invalid
+  input; integrated mutation tests and ASan/UBSan pass, as do 82 Python tests
+  and ARM analysis. Both native models install the newly sealed fixture and
+  pass creation/publication and retained failure, including the independently
+  reconstructed header, full Flash/catalog/code/owner/guard checks and zero
+  Flash writes on failed creation. Automatic admission is covered by the
+  current follow-up above; durable creation/publication proof, restart/orphan handling and
+  global startup ordering remain open; a matching header alone is not authority.
+
+- **Local reservation creation follow-up:** a shared internal creation step
+  replaces the fixture's direct allocator call. It rejects existing names,
+  resolves HOME again after movement and verifies the complete stored string
+  before exposing its address/capacity for subsequent binding. Every lost-write-
+  acknowledgement cut, silent payload corruption and failed readback produce
+  INCOMPLETE without publishing a resource result; malformed/preflight failures
+  do not write. The integrated mutation tests, ASan/UBSan and ARM analysis pass.
+  Initial native runs correctly rejected a lower-stack-guard overwrite.
+  Creation and readback now have separate frames (120 and 312 bytes), keeping
+  the directory-entry buffer out of the allocator's deeper call chain.
+  Both native models now pass normal creation/publication and retained-
+  failure checks with the existing 4 KiB stack, exact code/owning CODE and
+  intact guards. The result describes
+  current-invocation ownership only; durable
+  installation/transaction identity, restart/orphan handling and startup order
+  remain open. This follow-up is local, after submitted `96bcf1f5`.
+
+- **Previous delivery checkpoint (2026-10-20):** `5aad911e` was submitted, with CI acceptance
   pending; Objects passes, Quality fails because the identity-vector header
   was generated only at build time, and Core/Runtime are still running/queued
   at the latest inspection. A local CMake fix generates the header during
@@ -443,7 +638,8 @@ Current delivery checkpoints:
   normal publication, warm restart, zero-write closed repeat and both
   unpublished cancellation cases now also pass on both models from the saved
   clean installed baseline. All 82 related Python tests, ARM analysis, formatting
-  and strict docs pass. The follow-up through `a30ae484` is ready for batched CI.
+  and strict docs pass. The follow-up through `a30ae484` was submitted as `96bcf1f5`;
+  new CI is pending and will not be polled.
   Next: durable reservation
   ownership/lifetime and global startup order. No M8 acceptance gate is removed.
   The detailed evidence below includes earlier intermediate states.

@@ -31,7 +31,7 @@ def fixture():
     # Two owned PIC stubs (BX LR), never invoked by the empty configuration.
     # Their descriptors exercise the same command-layout path as real recovery.
     image = pack.bind_image(
-        bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8),
+        bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8) + b"HPCROOT1" + bytes(40),
         16,
         JOURNAL_SLOT,
         AUTHORITY_SLOT,
@@ -45,7 +45,9 @@ def fixture():
             ("recovery", 0, image, 16, False),
             ("admission", 6, image, 16, False),
         ),
+        identity_offset=32,
     )
+    library = pack.seal_recovery_identity(library, layout["identity_object_nibble"])
     obj = nibbles(library[8:])
     span = 5 + int(obj[5:10][::-1], 16)
     allocated = (span + 15) & ~7
@@ -53,6 +55,13 @@ def fixture():
     record = b"\x53" + ((allocated - 2) | 0x100000).to_bytes(3, "little")
     record += bytes(int(body[i], 16) | int(body[i + 1], 16) << 4 for i in range(0, len(body), 2))
     return library, record, layout
+
+
+def fixture_identity():
+    library, _, layout = fixture()
+    obj = nibbles(library[8:])
+    at = layout["identity_object_nibble"]
+    return bytes(int(obj[i : i + 2][::-1], 16) for i in range(at, at + 96, 2))
 
 
 def generate_fixture(output):
@@ -64,6 +73,9 @@ def generate_fixture(output):
         "static const unsigned char expected_library[] = {\n    "
         + ", ".join(str(byte) for byte in record)
         + "\n};\n"
+        + "static const unsigned char expected_identity[] = {"
+        + ", ".join(str(byte) for byte in fixture_identity())
+        + "};\n"
         + f"#define EXPECTED_RECOVERY_BINDING {layout['recovery_binding_nibble']}u\n"
         + f"#define EXPECTED_ADMISSION_BINDING {layout['admission_binding_nibble']}u\n"
         + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
@@ -193,13 +205,16 @@ def verify_probe(
 
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from startup import verify_startup
+
     root = args.output / "installation"
     root.mkdir()
     build = args.build
     setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
     missing = root / "missing"
     transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
-    verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
     require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
     print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
@@ -231,7 +246,8 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     )
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
-    verify_probe(before, matched / "state", build, args.nm, 0, slot)
+    base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
+    startup_matched = verify_startup(before, matched / "state", build, args.nm, base)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     transactions = []
     for label, status in (
@@ -298,6 +314,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 slot=slot,
                 bytes=size,
                 transactions=transactions,
+                startup_inventory={"missing": startup_missing, "matched": startup_matched},
                 reservation_creation=["existing-different", "existing-identical", "lost-write-ack"],
                 publication=True,
                 cancellation=True,

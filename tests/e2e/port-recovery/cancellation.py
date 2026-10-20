@@ -4,7 +4,7 @@ import shutil
 import struct
 
 from installation import AUTHORITY_SLOT, JOURNAL_SLOT, verify_probe
-from publication import RESERVATION
+from publication import reservation_value
 from reservation import reader
 from verify import home_string, require, symbol_offsets
 
@@ -62,7 +62,8 @@ def run_cancellation(args, baseline, records, slot, *, transfer, verify_busy_rea
             "Unexpected cancellation Flash operations",
         )
         require(
-            home_string(reader(after), b"HPCLEASE") == RESERVATION,
+            home_string(reader(after), b"HPCLEASE")
+            == reservation_value((baseline / "flash").read_bytes(), slot),
             "Cancellation modified the reservation",
         )
         print(f"Native unpublished transaction cancellation verified: {label}", flush=True)

@@ -2,12 +2,16 @@
  * Content identity does not establish reservation ownership or startup order. */
 #include "binding.h"
 #include "rpl-recovery-installation.h"
+#include "rpl-recovery-reservation.h"
+#include "rpl-object-store.h"
 #include <stddef.h>
 
 const volatile struct hpclang_recovery_binding hpclang_recovery_binding =
     HPCLANG_RECOVERY_BINDING_INITIALIZER;
 const volatile unsigned char hpclang_recovery_identity[48] = "HPCROOT1";
 const volatile uint32_t hpclang_recovery_library_id = UINT32_MAX;
+const volatile struct hpclang_recovery_reservation_binding hpclang_recovery_reservation =
+    HPCLANG_RECOVERY_RESERVATION_INITIALIZER;
 
 void hpclang_flash_mapping_swap(unsigned descriptors[2]);
 static int read_flash(void *context, uint32_t address, uint16_t *value)
@@ -30,6 +34,46 @@ static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
         (*(volatile uint8_t *)(page + ((address & 4095u) >> 1)) >> (4u * (address & 1u))) & 15u;
     return 1;
 }
+/* Keep directory buffers out of the streaming preflight's call chain. */
+__attribute__((noinline)) static int
+reservation_matches(const struct hpclang_rpl_reader *reader,
+                    const struct hpclang_rpl_flash_installed_recovery *installed,
+                    const uint8_t identity[48])
+{
+    uint32_t length = hpclang_recovery_reservation.name_length;
+    uint32_t capacity = hpclang_recovery_reservation.capacity;
+    if (hpclang_recovery_reservation.magic[0] != 0x52435048u ||
+        hpclang_recovery_reservation.magic[1] != 0x31565345u || !length || length > 127u ||
+        capacity < HPCLANG_RPL_RECOVERY_RESERVATION_HEADER_BYTES ||
+        capacity > (0x80000u - 10u) / 2u)
+        return 0;
+    uint8_t name[128], header[HPCLANG_RPL_RECOVERY_RESERVATION_HEADER_BYTES];
+    for (unsigned i = 0; i < length; ++i) {
+        name[i] = hpclang_recovery_reservation.name[i];
+        if (name[i] < 33 || name[i] > 126)
+            return 0;
+    }
+    uint32_t home;
+    struct hpclang_rpl_directory_entry_view entry;
+    if (hpclang_rpl_store_home_object(reader, &home))
+        return 0;
+    int found = hpclang_rpl_directory_find(reader, home, name, length, &entry);
+    if (found == HPCLANG_RPL_STORE_NOT_FOUND)
+        return 1; /* No RAM object will be released; retain the RAM-loss path. */
+    if (found)
+        return 0;
+    uint32_t crc = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        uint32_t at = installed->journal_slot + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4u + i;
+        uint16_t word;
+        if (!read_flash(NULL, at & ~1u, &word))
+            return 0;
+        crc |= (uint32_t)(uint8_t)(word >> (8u * (at & 1u))) << (8u * i);
+    }
+    return hpclang_rpl_recovery_reservation_header(identity, installed, crc, capacity, header) &&
+           hpclang_rpl_recovery_reservation_match(reader, entry.object_address, header) == 1;
+}
+
 int hpclang_recovery_predicate(const uint32_t *map)
 {
     uint32_t j = hpclang_recovery_binding.journal_slot;
@@ -52,6 +96,7 @@ int hpclang_recovery_predicate(const uint32_t *map)
     struct hpclang_rpl_flash_installed_recovery installed;
     int phase = hpclang_rpl_recovery_installation_stream(&io, hpclang_recovery_library_id, &catalog,
                                                          identity, a, j, &installed);
+    int admitted = phase > 0 && reservation_matches(&reader, &installed, identity);
     hpclang_flash_mapping_swap(descriptors);
-    return phase > 0;
+    return admitted;
 }

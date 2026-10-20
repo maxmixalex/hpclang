@@ -577,6 +577,7 @@ target_include_directories(test_object PRIVATE
 
 hpclang_unit(rpl_mutation
     test_rpl_mutation.c
+    "${HPCLANG_ROOT}/runtime/core/rpl-recovery-reservation.c"
     "${HPCLANG_ROOT}/platform/armtoolbox/stage-stack.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port-mutation.c"
     "${HPCLANG_ROOT}/runtime/core/rpl-port.c"

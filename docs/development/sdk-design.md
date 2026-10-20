@@ -366,6 +366,32 @@ injects a lost acknowledgement after the first actual RAM write. Its verifier
 requires exact execution code and its owning CODE object, intact stack guards,
 the owned failure PC, and zero Flash operations. This is failure containment,
 not rollback or recovery after a restart.
+The internal `hpclang_rpl_recovery_reservation_create` step now owns this
+create-and-check boundary: it accepts a validated string snapshot, observes
+native write attempts, resolves HOME again after creation moves it, and checks
+every stored nibble before returning the new object's address and capacity.
+Preflight errors leave the output unchanged; a failure after any write attempt,
+including a failed or mismatched readback, returns `MUTATION_INCOMPLETE`.
+The caller must retain execution and IRQ ownership in that case. The returned
+address is useful only within the current exclusive invocation. It must not be
+saved as a persistent identity across native allocation, garbage collection or
+restart; durable installation/transaction binding remains required.
+
+The internal 80-byte `HPCMEM2` payload header records the full sealed
+`HPCROOT1` identity, physical library/journal/authority coordinates, target,
+status-independent journal CRC and exact RAM capacity. It contains no RAM
+pointer. The installation witness derives it from its validated initial plan
+and desired capsule before fresh creation; the independent native verifier
+reconstructs it from the installed library and original target image.
+`hpclang_rpl_recovery_reservation_match` checks a native string's type, exact
+capacity and all header bytes without writing. Neither the encoder nor the
+matcher supplies ownership by itself. Durable publication must follow verified
+fresh creation, prevent intervening native/user writes and retain the
+installation's one-use lifetime; startup admission must verify that same
+installation and active transaction before this header can authorize release.
+The maintained automatic predicate now compares this binding after the sealed
+installation/transaction preflight. Durable creation/publication proof and the
+complete lifetime/startup-order protocol remain open.
 
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an
@@ -380,6 +406,15 @@ before sealing, so the executing predicate checks the requested library rather
 than a compiled fixture number. The standalone admission artifact remains
 unbound and rejects execution as an installed predicate. A misplaced symbol or
 non-placeholder value is rejected before output files are written.
+
+The owned `hpclang_recovery_reservation` symbol contains a 144-byte `HPCRESV1`
+contract: magic, capacity, name length and a 128-byte name field. Packaging fills
+it from the reservation options before sealing; standalone artifacts retain an
+unbound placeholder. This admission requires `--reservation-prefix HPCMEM2`.
+The RPL wrapper checks that prefix after ARM checks the complete binary binding.
+The ARM phase rejects a different installation, physical location, transaction
+CRC or capacity before either release or replay. An absent object permits the
+normal recovery path without releasing RAM, preserving RAM-loss recovery.
 
 `hpclang_rpl_recovery_installation_stream()` validates a unique live library,
 native catalog/bank switch, complete sealed content, exact journal/authority
@@ -400,8 +435,9 @@ It also covers changed library content with a valid native CRC and constrained
 memory with preserved user data. Tests that append a configuration completion
 marker reseal the resulting library at the owned descriptor coordinate, so an
 invalid digest cannot masquerade as correct rejection of another condition.
-The maintained automatic admission fixture uses the same streaming check before
-the RPL reservation guard. Its stack is 4 KiB: the earlier 2 KiB predicate stack
+The maintained automatic admission fixture uses the same streaming check and
+complete resource binding before the RPL reservation guard. Its stack is 4 KiB:
+the earlier 2 KiB predicate stack
 was insufficient for the combined entry, catalog scan and identity call chain.
 This improves installation/transaction validation but does not replace the
 separate ownership checks required before releasing a reservation.
@@ -526,8 +562,57 @@ later 1702 callback executes once. Both runs finish with the complete 63-entry
 catalog and exact Flash repair/retirement. Choosing 769 alone therefore cannot
 establish a safe production entry; earlier callbacks may have side effects or
 access the damaged bank before recovery runs.
+Further native probes install a Port 0 library numbered 768 before a Port 2
+library numbered 4 (unused in these clean fixtures). Both HP49g+/HP50g run 4
+before 768 and then `STARTUP` on two consecutive restarts, preserving the exact
+catalog ID set and Flash. This demonstrates Stock acceptance of that earlier
+entry, not a reserved ID policy or safety of the preceding system callbacks.
+An existing ID must never be replaced merely to obtain early execution; the
+installer still needs availability, firmware and complete startup-safety checks.
 Production recovery also needs an entry that survives loss of HOME RAM; the
 RAM-resident witness does not establish that property.
+
+The internal `hpclang_rpl_library_configuration()` resolver reads the configuration
+offset from a validated library ID header in a caller-selected stable mapping.
+It distinguishes a zero offset from read failures, malformed IDs and out-of-bounds
+relative pointers; it neither executes nor classifies the callback as safe.
+Native saved-state checks on both models resolve 17 callbacks and 45 absent
+callbacks in the 62-entry fixture catalog when using the emulator state's observed
+physical bank bases. Entry zero starts at `0x48000`, unlike the ordinary Flash
+formula's `0x40000`. The latter fails ID-header validation for libraries 221, 223
+and 257; earlier exploratory inventories skipped these bindings. With the observed
+mapping, 221 and 223 have callbacks and 257 has none. This does not alter the
+validated physical layout of user Port 2 banks. Native watchpoints on both models
+observe Stock initialization of that bank array, followed by reads in the mapping
+builder and library scanner, with normal Stock return. The initialization reads
+the ROM directory's count and per-bank KiB sizes: a 96 KiB first bank followed by
+thirteen 128 KiB banks, ending exactly at 2 MiB. Production capture must validate
+the directory, mapping and bounds together; the private probe's state-relative
+offset is not an SDK contract. Callback behavior/order remains a separate proof.
+No numeric-ID or skipped-entry heuristic
+provides permission to start a destructive transaction.
+
+`hpclang_rpl_rom_bank_layout()` validates a stable captured size directory against
+all sixteen native bank-base cells, including zeroed unused cells. Bank extents
+come from the per-bank KiB sizes; the first bank starts immediately after the
+directory and the final bank must end exactly at the supplied Flash limit.
+Zero/oversized banks, mismatched bases, truncated coverage and overflow are errors,
+including when the requested index is unused. Output changes only for a valid
+populated bank. Callers must supply a firmware-verified directory location and
+capture stable inputs; plausible bytes or a successful parse do not identify a ROM
+or authorize recovery. Both native saved-state inventories use this parser and
+the first bank's actual 96 KiB bound when resolving configuration entries.
+
+The maintained installation witness exercises this capture on ARM, using the
+supported Stock 2.15 fixture's verified initializer literal-pool addresses and
+state layout. Its existing missing-library and matched-installation invocations
+emit every catalog ID, library header, selected bank and resolved configuration
+entry. The host reconstructs each row independently from the ROM directory and
+saved catalog, while the installation verifier checks owned execution memory,
+stack guards, restored mappings and unchanged Flash/catalog. An absent callback
+is recorded only after successful header validation; an unsupported mapping or
+failed inventory is rejected by the verifier. This gate does not certify callback
+behavior or make fixture addresses a production firmware-discovery mechanism.
 
 Journal integrity is separate from transaction authority. A host regression
 keeps a valid ready journal and adds a valid backup inside its target sector.

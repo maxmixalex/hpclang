@@ -100,7 +100,7 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
         "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-replay rpl-port rpl-backup rpl-object-span rpl-flash-write
-            rpl-recovery-installation rpl-recovery-identity)
+            rpl-recovery-installation rpl-recovery-identity rpl-recovery-reservation rpl-object-store)
         target_sources(admission PRIVATE "${CORE}/${module}.c")
     endforeach()
     configure_recovery_image(admission)
@@ -136,7 +136,10 @@ foreach(witness IN ITEMS installation installation-transaction installation-publ
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
-    if(witness STREQUAL "installation-identity")
+    if(witness STREQUAL "installation")
+        target_sources(${witness} PRIVATE startup.c)
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_STARTUP)
+    elseif(witness STREQUAL "installation-identity")
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
             "${CORE}/rpl-recovery-installation.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_IDENTITY)
@@ -146,7 +149,7 @@ foreach(witness IN ITEMS installation installation-transaction installation-publ
     elseif(witness STREQUAL "installation-publication" OR
             witness STREQUAL "installation-reservation-failure")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
-        foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot
+        foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot rpl-recovery-reservation
                 time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()

@@ -241,6 +241,69 @@ int hpclang_rpl_library_command(const struct hpclang_rpl_reader *reader, uint32_
     return 1;
 }
 
+int hpclang_rpl_library_configuration(const struct hpclang_rpl_reader *reader, uint32_t first,
+                                      uint32_t end, uint32_t header, uint32_t number,
+                                      uint32_t *target)
+{
+    if (!reader || !reader->read_nibble || !target)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (end > 0x100000u || first >= end || header < first || header > end || end - header < 23u)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    if (number > 0xfffu)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    uint32_t id, relative;
+    int result = word(reader, header, 3, &id);
+    if (result)
+        return result;
+    if (id != number)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    result = word(reader, header + 18u, 5, &relative);
+    if (result || !relative)
+        return result;
+    uint32_t resolved = (header + 18u + relative) & 0xfffffu;
+    if (resolved < first || resolved >= end)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    *target = resolved;
+    return 1;
+}
+
+int hpclang_rpl_rom_bank_layout(const uint8_t *kib_sizes, uint32_t count, uint32_t directory,
+                                uint32_t flash_bytes, const uint32_t native_bases[16],
+                                uint32_t index, struct hpclang_rpl_rom_bank *bank)
+{
+    if (!kib_sizes || !native_bases || !bank)
+        return HPCLANG_RPL_SPAN_UNAVAILABLE;
+    if (!count || count > 16u || index >= 16u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (directory >= flash_bytes || count > flash_bytes - directory)
+        return HPCLANG_RPL_SPAN_BOUNDS;
+    uint32_t at = directory + count;
+    if (at & 1023u)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    struct hpclang_rpl_rom_bank selected = {0};
+    for (uint32_t i = 0; i < 16u; ++i) {
+        if (i >= count) {
+            if (native_bases[i])
+                return HPCLANG_RPL_SPAN_MALFORMED;
+            continue;
+        }
+        uint32_t bytes = (uint32_t)kib_sizes[i] * 1024u;
+        if (!bytes || bytes > 0x20000u || native_bases[i] != at)
+            return HPCLANG_RPL_SPAN_MALFORMED;
+        if (bytes > flash_bytes - at)
+            return HPCLANG_RPL_SPAN_BOUNDS;
+        if (i == index)
+            selected = (struct hpclang_rpl_rom_bank){at, bytes};
+        at += bytes;
+    }
+    if (at != flash_bytes)
+        return HPCLANG_RPL_SPAN_MALFORMED;
+    if (index >= count)
+        return 0;
+    *bank = selected;
+    return 1;
+}
+
 int hpclang_rpl_bank_lookup(const struct hpclang_rpl_reader *reader, uint32_t flash_table,
                             uint32_t eram_entry, uint32_t bank_switch,
                             struct hpclang_rpl_bank_binding *binding)

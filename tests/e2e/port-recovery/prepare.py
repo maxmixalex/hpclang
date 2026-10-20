@@ -116,12 +116,18 @@ def reserve_bank_tail(source: Path, destination: Path, bank: int) -> None:
     (destination / "flash").write_bytes(flash)
 
 
-def prepare(source: Path, destination: Path, slot: int, target: int, *, bound=False) -> None:
+def prepare(
+    source: Path, destination: Path, slot: int, target: int, *, bound=False, bank_status=None
+) -> None:
     flash = bytearray((source / "flash").read_bytes())
     if len(flash) != 0x200000:
         raise ValueError("Expected a complete hp4950 Flash image")
     if not 0x140000 <= target < 0x160000 or target % 4096:
         raise ValueError("Target must be an aligned sector within the first user bank")
+    if bank_status is not None and (
+        type(bank_status) is not int or not 0xF0 <= bank_status <= 0xFF or target % 0x20000
+    ):
+        raise ValueError("Partial bank status requires a bank-header sector and an F0–FF byte")
     bank = slot & ~0x1FFFF
     if not 0x160000 <= bank < 0x200000 or slot != bank + 0x105:
         raise ValueError(
@@ -149,6 +155,11 @@ def prepare(source: Path, destination: Path, slot: int, target: int, *, bound=Fa
         authority += struct.pack("<I", zlib.crc32(authority[1:]))
         flash[authority_slot : authority_slot + len(authority)] = authority
     flash[target : target + 4096] = b"\xff" * 4096
+    if bank_status is not None:
+        # NOR programming from FF to F0 can leave any of these sixteen values.
+        # Keep the remaining identity bytes erased; the journal retains the
+        # original complete sector, including its native bank identity.
+        flash[target + 0x100] = bank_status
     # Refuse an existing output so stale RAM/Flash cannot enter the scenario.
     shutil.copytree(source, destination)
     (destination / "flash").write_bytes(flash)
