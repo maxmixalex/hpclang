@@ -403,6 +403,144 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
     return 0;
 }
 
+struct cancellation_view
+{
+    const struct hpclang_rpl_flash_io *io;
+    uint32_t slots[2];
+    uint8_t headers[2][4];
+};
+
+static int cancellation_read(void *context, uint32_t address, uint16_t *value)
+{
+    const struct cancellation_view *view = context;
+    if (!view->io->read16(view->io->context, address, value))
+        return 0;
+    for (unsigned half = 0; half < 2; ++half)
+        for (unsigned index = 0; index < 2; ++index) {
+            uint32_t at = address + half;
+            if (at >= view->slots[index] && at - view->slots[index] < 4u) {
+                uint8_t byte = view->headers[index][at - view->slots[index]];
+                *value =
+                    (uint16_t)((*value & ~(255u << (8u * half))) | ((uint16_t)byte << (8u * half)));
+            }
+        }
+    return 1;
+}
+
+static int cancellation_slot(const struct hpclang_rpl_flash_io *io, uint32_t slot, uint32_t size)
+{
+    uint32_t offset = slot & 0x1ffffu;
+    return slot >= io->first && slot < io->end && offset >= 0x105u && offset % 4u == 1u &&
+           size < 0x20000u - offset;
+}
+
+static int cancellation_byte(const struct hpclang_rpl_flash_io *io, uint32_t at, uint8_t byte)
+{
+    uint16_t old, observed;
+    unsigned shift = 8u * (at & 1u);
+    if (!io->read16(io->context, at & ~1u, &old))
+        return 0;
+    uint16_t value = (uint16_t)((old & ~(255u << shift)) | (uint16_t)byte << shift);
+    return (old & value) == value &&
+           (old == value || io->program16(io->context, at & ~1u, value)) &&
+           io->read16(io->context, at & ~1u, &observed) && observed == value;
+}
+
+static int cancellation_status(const uint8_t old[4], const uint8_t desired[4], unsigned metadata)
+{
+    /* FF may have a partially programmed extent. Once publication status was
+     * attempted, the extent is complete; only cancellation can clear metadata. */
+    if (old[0] == 0xffu)
+        return 1;
+    if (old[1] != desired[1] || old[2] != desired[2] || (old[3] & 15u) != desired[3])
+        return 0;
+    unsigned stored_metadata = old[3] >> 4u;
+    if (old[0] == 0x7fu || old[0] == 0xfeu || old[0] == 0x7eu)
+        return !(stored_metadata & ~metadata);
+    /* Status clearing starts only after zero metadata has been verified.
+     * Bit zero was removed first, preventing transient native status 53. */
+    return !stored_metadata && !(old[0] & 1u);
+}
+
+int hpclang_rpl_flash_cancel_installed(const struct hpclang_rpl_flash_io *io,
+                                       const struct hpclang_rpl_flash_recovery_layout *layout,
+                                       const struct hpclang_rpl_flash_catalog *catalog)
+{
+    if (!io || !io->read16 || !io->program16 || (io->first & 0x1ffffu) || io->first > io->end ||
+        io->end - io->first != 6u * 0x20000u)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t journal, authority;
+    int result = layout_binding(layout, &journal, &authority);
+    if (result)
+        return result;
+    const uint32_t sizes[2] = {HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES,
+                               HPCLANG_RPL_FLASH_AUTHORITY_BYTES};
+    if (!cancellation_slot(io, journal, sizes[0]) || !cancellation_slot(io, authority, sizes[1]) ||
+        (journal < authority + sizes[1] && authority < journal + sizes[0]))
+        return HPCLANG_RPL_FLASH_INVALID;
+    struct cancellation_view view = {.io = io, .slots = {journal, authority}};
+    uint8_t original[2][4];
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t extent = 2u * sizes[index] - 2u;
+        view.headers[index][0] = 0;
+        for (unsigned byte = 1; byte < 4; ++byte)
+            view.headers[index][byte] = (uint8_t)(extent >> (8u * (byte - 1u)));
+        if (!load_bytes(io, view.slots[index], original[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        for (unsigned byte = 1; byte < 4; ++byte)
+            if ((original[index][byte] & view.headers[index][byte]) != view.headers[index][byte])
+                return HPCLANG_RPL_FLASH_DIRTY;
+        if (!cancellation_status(original[index], view.headers[index], index ? 4u : 3u))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    int journal_cancelled = !memcmp(original[0], view.headers[0], 4);
+    uint8_t authority_status = original[1][0];
+    if (authority_status != 0xffu && authority_status != 0x7fu && authority_status != 0xfeu) {
+        if (!journal_cancelled || memcmp(original[1] + 1, view.headers[1] + 1, 3))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    /* A cleared required authority metadata bit is cancellation evidence only
+     * after the journal barrier. Ordinary publication cannot clear this bit. */
+    if (!(original[1][3] & 0x40u) && !journal_cancelled)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    const struct hpclang_rpl_flash_io proposed = {&view, cancellation_read, NULL, io->first,
+                                                  io->end};
+    struct bound_overlay membership = {&proposed, authority, journal, 0, 0, NULL, 1};
+    result = bound_membership(&membership);
+    if (result)
+        return result;
+    uint32_t library;
+    result = hpclang_rpl_flash_match_installation(&proposed, layout->record, layout->bytes, catalog,
+                                                  &library);
+    if (result)
+        return result;
+    /* Recheck both envelopes before the first write. The caller's exclusive
+     * ownership keeps payloads, mappings and the installed identity stable. */
+    for (unsigned index = 0; index < 2; ++index) {
+        uint8_t current[4];
+        if (!load_bytes(io, view.slots[index], current, 4) || memcmp(current, original[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    for (unsigned index = 0; index < 2; ++index) {
+        uint32_t slot = view.slots[index];
+        for (unsigned byte = 1; byte < 4; ++byte)
+            if (!cancellation_byte(io, slot + byte, view.headers[index][byte]))
+                return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t status = original[index][0];
+        if ((status & 0x53u) == 0x53u && !cancellation_byte(io, slot, (uint8_t)(status & ~1u)))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        if (!cancellation_byte(io, slot, 0))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t current[4];
+        if (!load_bytes(io, slot, current, 4) || memcmp(current, view.headers[index], 4))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    uint32_t matched;
+    result =
+        hpclang_rpl_flash_match_installation(io, layout->record, layout->bytes, catalog, &matched);
+    return !result && matched == library ? HPCLANG_RPL_FLASH_WRITTEN : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 int hpclang_rpl_flash_preflight_installed(const struct hpclang_rpl_flash_io *io,
                                           const struct hpclang_rpl_flash_recovery_layout *layout,
                                           const struct hpclang_rpl_flash_catalog *catalog,

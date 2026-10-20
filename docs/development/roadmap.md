@@ -421,6 +421,19 @@ backlog. Local verification, CI acceptance and milestone completion are distinct
 
 Current delivery checkpoints:
 
+- **Reconciled delivery state (2026-10-20):** the latest submitted head is
+  `c8740410`; `747fa4ae` adds local documentation of the power-cut evidence below.
+  Internal unpublished-transaction cancellation now passes host fault injection
+  for four initial states: every program operation with five partial-write masks,
+  lost acknowledgements, silent writes, sampled read failures and repeated calls.
+  The oracle requires journal invalidation before authority writes and exact
+  preservation of all bytes outside the two envelopes; armed and ordinarily
+  retired records are rejected. ASan/UBSan and ARM static analysis pass.
+  Native cancellation on the saved interrupted states and broader allocation
+  geometry coverage remain pending; this is not public service delivery.
+  This does not establish the still-required durable installation claim, RAM
+  ownership, startup ordering or reclamation. Port 2 remains in M8.0; all other
+  stage requirements and the accepted M8.1 status remain as listed below.
 - **Publication power-cut research (local):** both native models now have
   independently verified cuts at program operations 2 (journal body) and 1,939
   (authority body), after 16 busy reads with completed-bit mask `0x5555`.

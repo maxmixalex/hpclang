@@ -90,6 +90,29 @@ int hpclang_rpl_flash_plan_installed(const struct hpclang_rpl_flash_io *io,
                                      const uint8_t *journal, uint32_t journal_bytes,
                                      struct hpclang_rpl_flash_installed_recovery *installed);
 
+/* Cancel an unpublished transaction under the SAME trusted one-use installation
+ * claim, without needing the lost desired image. Caller must have established
+ * initial empty-slot ownership and prevented reuse/other writers since then.
+ * Derive both slots from the owned layout; validate the installed library/catalog
+ * and exact allocation boundaries with only the two envelopes virtually made
+ * into tombstones. Reject an armed authority or ordinary retired transaction.
+ * Finish/verify the journal's zero-metadata tombstone before cancelling authority.
+ * This ordering also permits retry after a torn cancellation status write.
+ * Clear a native live-status bit before clearing remaining status bits, so a
+ * cancellation cut cannot expose an incomplete native live object.
+ *
+ * Only the two four-byte envelopes change. No erase, target write, payload
+ * destruction, RAM release, allocation reuse or root retirement. Return 0 only
+ * after both tombstones and the actual installed library/catalog validate;
+ * DIRTY requires retaining ownership and retry/recovery, never permission to
+ * return to Stock. Keep expected layout/catalog/mappings stable throughout.
+ * Matching bytes or a discoverable library alone do not establish the required
+ * durable claim; this does not supply startup ordering or a public installer.
+ */
+int hpclang_rpl_flash_cancel_installed(const struct hpclang_rpl_flash_io *io,
+                                       const struct hpclang_rpl_flash_recovery_layout *layout,
+                                       const struct hpclang_rpl_flash_catalog *catalog);
+
 /* Connect exact installed library content/catalog identity to its two HPCBIND1
  * descriptors and the bound transaction preflight. Both descriptors must agree.
  * Validate the library against the restored port view for a pending transaction;

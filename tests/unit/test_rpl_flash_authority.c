@@ -525,6 +525,98 @@ static void seal_library(uint8_t library[64])
     packed_word(library, 124, crc, 4);
 }
 
+static int cancel_program(void *context, uint32_t address, uint16_t value)
+{
+    assert(context == flash);
+    assert((address >= (JOURNAL & ~1u) && address < JOURNAL + 4) ||
+           (address >= (ROOT & ~1u) && address < ROOT + 4));
+    if (address >= (ROOT & ~1u)) {
+        uint32_t extent = 2u * sizeof journal - 2u;
+        assert(flash[JOURNAL - FIRST] == 0);
+        for (unsigned byte = 1; byte < 4; ++byte)
+            assert(flash[JOURNAL - FIRST + byte] == (uint8_t)(extent >> (8u * (byte - 1u))));
+    }
+    ++programs;
+    if (silent)
+        return 1;
+    if (programs == fail_program)
+        value |= (uint16_t)~program_mask;
+    flash[address - FIRST] &= (uint8_t)value;
+    flash[address - FIRST + 1] &= (uint8_t)(value >> 8u);
+    assert(flash[JOURNAL - FIRST] != 0x53 && flash[ROOT - FIRST] != 0x53);
+    return programs != fail_program;
+}
+
+static void cancellation_tests(const struct hpclang_rpl_flash_recovery_layout *layout,
+                               const struct hpclang_rpl_flash_catalog *catalog)
+{
+    static uint8_t before[END - FIRST], expected[END - FIRST];
+    const struct hpclang_rpl_flash_io cancel_io = {flash, read16, cancel_program, FIRST, END};
+    const uint16_t masks[] = {0, 0xff, 0xff00, 0x5555, 0xffff};
+    for (unsigned state = 0; state < 4; ++state) {
+        prepare_native_port(0xff, state ? 0x7e : 0xff, ROOT, JOURNAL);
+        memcpy(flash + 0x1a0105 - FIRST, layout->record, layout->bytes);
+        if (!state)
+            memset(flash + JOURNAL - FIRST, 255, sizeof journal);
+        if (state < 2)
+            memset(flash + ROOT - FIRST, 255, sizeof authority);
+        if (state == 3)
+            flash[ROOT - FIRST] = 0x7f;
+        memcpy(before, flash, sizeof flash);
+        tombstone(JOURNAL, sizeof journal);
+        tombstone(ROOT, sizeof authority);
+        memcpy(expected, flash, sizeof flash);
+        memcpy(flash, before, sizeof flash);
+        reads = programs = fail_read = fail_program = 0;
+        silent = 0;
+        assert(!hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog));
+        unsigned total = programs;
+        unsigned total_reads = reads;
+        assert(total && !memcmp(flash, expected, sizeof flash));
+        programs = 0;
+        assert(!hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog));
+        assert(!programs && !memcmp(flash, expected, sizeof flash));
+        for (unsigned cut = 1; cut <= total; ++cut)
+            for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask) {
+                memcpy(flash, before, sizeof flash);
+                reads = programs = 0;
+                fail_program = cut;
+                program_mask = masks[mask];
+                assert(hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog) < 0);
+                fail_program = 0;
+                assert(!hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog));
+                assert(!memcmp(flash, expected, sizeof flash));
+            }
+        /* Exercise early admission and final verification failures, plus reads
+         * distributed through the complete catalog/allocation traversal. */
+        for (unsigned sample = 0; sample < 48; ++sample) {
+            memcpy(flash, before, sizeof flash);
+            reads = programs = 0;
+            fail_read = sample < 16   ? sample + 1
+                        : sample < 32 ? total_reads - (sample - 16)
+                                      : 1 + (total_reads - 1) / 16 * (sample - 32);
+            assert(hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog) < 0);
+            fail_read = 0;
+            assert(!hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog));
+            assert(!memcmp(flash, expected, sizeof flash));
+        }
+        memcpy(flash, before, sizeof flash);
+        programs = 0;
+        silent = 1;
+        assert(hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog) < 0);
+        assert(!memcmp(flash, before, sizeof flash));
+        silent = 0;
+    }
+    const uint8_t rejected[][2] = {{0x7e, 0x7e}, {0, 0}, {0xff, 0}};
+    for (unsigned i = 0; i < sizeof rejected / sizeof rejected[0]; ++i) {
+        prepare_native_port(rejected[i][0], rejected[i][1], ROOT, JOURNAL);
+        memcpy(flash + 0x1a0105 - FIRST, layout->record, layout->bytes);
+        memcpy(before, flash, sizeof flash);
+        assert(hpclang_rpl_flash_cancel_installed(&cancel_io, layout, catalog) < 0);
+        assert(!programs && !memcmp(flash, before, sizeof flash));
+    }
+}
+
 static void installed_preflight_tests(void)
 {
     enum
@@ -623,6 +715,7 @@ static void installed_preflight_tests(void)
     }
     seal_library(library);
     const uint8_t states[][2] = {{0x7e, 0x7e}, {0x7e, 0x7c}, {0x7c, 0}, {0, 0}};
+    cancellation_tests(&layout, &catalog);
     const int phases[] = {1, 2, 2, 0};
     for (unsigned i = 0; i < 4; ++i) {
         prepare_native_port(states[i][0], states[i][1], ROOT, JOURNAL);
