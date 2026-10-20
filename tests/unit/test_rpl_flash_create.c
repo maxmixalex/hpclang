@@ -953,8 +953,11 @@ static void create_libraries(const struct hpclang_rpl_flash_io *io)
     init();
     memcpy(flash + 0x105u, library, sizeof library);
     flash[0x105u] = 0x73;
-    assert(hpclang_rpl_flash_recover_tails(io) == HPCLANG_RPL_FLASH_DIRTY && !writes);
-    assert(flash[0x105u] == 0x73 && !memcmp(flash + 0x106u, library + 1u, sizeof library - 1u));
+    assert(!hpclang_rpl_flash_recover_tails(io) && writes == 3);
+    assert(flash[0x105u] == 0 && flash[0x108u] == 0);
+    assert(!memcmp(flash + 0x106u, library + 1u, 2u));
+    assert(!memcmp(flash + 0x109u, library + 4u, sizeof library - 4u));
+    assert(!hpclang_rpl_flash_recover_tails(io) && writes == 3);
     init();
     uint32_t attempted = UINT32_MAX;
     struct hpclang_rpl_flash_replacement transaction = {0};

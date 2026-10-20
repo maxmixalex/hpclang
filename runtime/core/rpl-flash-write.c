@@ -629,9 +629,24 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
             at += extent + 2u;
             continue;
         }
-        if (status && !(status & 1u) && !(header >> 20u)) {
+        int unpublished = status != 0x53u && (status & 0x53u) == 0x53u;
+        if (status && (!(status & 1u) || unpublished) && !(header >> 20u)) {
+            if (unpublished) {
+                /* Only library cancellation creates an odd zero-metadata
+                 * marker. Do not broaden backup corruption recovery. */
+                struct recovery_status view = {&reader, at, 0x53u};
+                const struct hpclang_rpl_reader committed = {committed_status_nibble, &view};
+                struct hpclang_rpl_port_cursor cursor = {at, 0x40000u, 0};
+                struct hpclang_rpl_port_entry entry;
+                result = hpclang_rpl_flash_next(&committed, &cursor, &entry);
+                if (result != 1 || entry.prologue != 0x02b40u)
+                    return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                                  : HPCLANG_RPL_FLASH_DIRTY;
+            }
             /* Tail cleanup verifies zero metadata and the extent before
-             * clearing bit zero. Every subsequent status remains even.
+             * clearing bit zero. A cancelled library first clears metadata
+             * while its status is still an unpublished superset of 53.
+             * Every subsequent status remains even.
              * Require a bounded allocation covering the discard plan and an
              * erased remainder; a failed append may have reserved more space
              * than its partial body needs. Do not
@@ -663,7 +678,9 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
                 return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
                                                               : HPCLANG_RPL_FLASH_DIRTY;
             if (partial) {
-                if (entry.prologue != 0x02b62u || (header >> 20u) != 1u ||
+                int library = entry.prologue == 0x02b40u;
+                if ((entry.prologue != 0x02b62u && !(library && unpublished)) ||
+                    (header >> 20u) != 1u ||
                     (((entry.span + 15u) & ~7u) != extent + 2u &&
                      ((entry.span + 11u) & ~3u) != extent + 2u))
                     return HPCLANG_RPL_FLASH_DIRTY;
@@ -673,6 +690,22 @@ static int recover_bank(const struct hpclang_rpl_flash_io *io, uint32_t bank, in
                     if (result)
                         return result;
                     if (value != 15u)
+                        return HPCLANG_RPL_FLASH_DIRTY;
+                }
+                if (library) {
+                    /* Only abandon an unpublished final allocation. Never
+                     * complete it or treat a partially removed live library
+                     * as fresh installation. Zero metadata before changing
+                     * status so every interrupted cleanup is recognizable by
+                     * the bounded discard path above. Preserve the payload. */
+                    struct hpclang_rpl_flash_space tail;
+                    uint32_t next = at + extent + 2u;
+                    result = hpclang_rpl_flash_tail(&reader, next, 0x40000u, &tail);
+                    if (result || tail.address != next)
+                        return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                                      : HPCLANG_RPL_FLASH_DIRTY;
+                    const uint8_t metadata = (uint8_t)((header >> 16u) & 15u);
+                    if (apply && !write_bytes(io, bank + at / 2u + 3u, &metadata, 1u))
                         return HPCLANG_RPL_FLASH_DIRTY;
                 }
                 if (apply && !discard_status(io, bank + at / 2u))

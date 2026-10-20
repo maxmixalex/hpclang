@@ -58,6 +58,12 @@ int hpclang_rpl_flash_recover_tail(const struct hpclang_rpl_flash_io *io, uint32
  * FF tails are discarded. Backups with any hidden non-FF status value
  * are tombstoned only after validating their complete CRC, extent, metadata and
  * padding. Their bodies remain unchanged and never become visible.
+ * A CRC-valid library at the final allocation may likewise be abandoned only
+ * when its hidden status is a strict NOR predecessor of live 53. First clear
+ * metadata, then a required live bit, then the remaining status bits; retry
+ * recognizes the zero-metadata bounded tail. Preserve its payload and never
+ * publish it. Live libraries, partially removed libraries, malformed bodies
+ * and hidden libraries followed by another allocation are not discarded.
  * Zero metadata with an even hidden status identifies an interrupted discard
  * at the bank tail, accepted only with a bounded halfword allocation covering
  * the revalidated discard plan and an erased remainder.

@@ -5,6 +5,9 @@
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_CLEANUP
+int hpclang_installation_cleanup(const struct hpclang_rpl_flash_io *io);
+#endif
 #ifdef HPCLANG_INSTALLATION_STARTUP
 #include "rpl-recovery-installation.h"
 #include "rpl-stock-memory.h"
@@ -159,6 +162,8 @@ int hpclang_recovery_predicate(const uint32_t *map)
     int result = hpclang_installation_publish(map, &io, &catalog, &slot);
 #elif defined(HPCLANG_INSTALLATION_CANCELLATION)
     int result = hpclang_installation_cancel(map, &io, &catalog, &slot);
+#elif defined(HPCLANG_INSTALLATION_CLEANUP)
+    int result = hpclang_installation_cleanup(&io);
 #elif defined(HPCLANG_INSTALLATION_STORE)
     int result = (int)preparation_result[0];
     if (!result) {

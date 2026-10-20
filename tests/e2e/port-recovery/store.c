@@ -57,3 +57,21 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *source, const 
             __asm__ volatile("nop"); /* Retain ownership of an unverified tail. */
     return result;
 }
+
+int hpclang_installation_cleanup(const struct hpclang_rpl_flash_io *source)
+{
+    uint64_t now;
+    if (hpclang_time_read_us(&now))
+        for (;;)
+            __asm__ volatile("nop");
+    owned_first = source->first;
+    owned_end = source->end;
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_owned;
+    int result = hpclang_rpl_flash_recover_tails(&io);
+    storage_result[0] = (uint32_t)result;
+    if (result)
+        for (;;)
+            __asm__ volatile("nop");
+    return result;
+}

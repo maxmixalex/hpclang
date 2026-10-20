@@ -68,6 +68,58 @@ def run_storage(args, clean, root, *, transfer, emulator, completed, verify_busy
     print(
         "Native prepared library stored at selected slot and discovered after restart", flush=True
     )
+    cut = root / "interrupted-storage"
+    transfer(
+        args,
+        cut,
+        clean,
+        args.build,
+        "STORECUT",
+        power_cut=(operations, 1, 0x0400),
+        package_name="installation-store.hp",
+    )
+    interrupted = (cut / "state/flash").read_bytes()
+    complete = (stored / "state/flash").read_bytes()
+    require(
+        interrupted[slot] == 0xFB
+        and interrupted[:slot] == complete[:slot]
+        and interrupted[slot + 1 :] == complete[slot + 1 :],
+        "Final library commit cut did not isolate the unpublished status",
+    )
+    reset = root / "interrupted-storage-restart"
+    reset.mkdir()
+    shutil.copytree(cut / "state", reset / "state")
+    with emulator(args, reset, "10000 capture home\n12000 finish-install\n", ["--reset"]) as child:
+        completed(child, 90)
+    require_stock_pc(reset / "state")
+    require(
+        (reset / "state/flash").read_bytes() == interrupted,
+        "Stock restart changed the interrupted library",
+    )
+    read, original = reader(reset / "state"), reader(clean)
+    count = original(0x8611D, 3)
+    require(
+        read(0x8611D, 3) == count
+        and all(read(0x86120 + 16 * i, 16) == original(0x86120 + 16 * i, 16) for i in range(count)),
+        "Stock restart registered an unpublished library",
+    )
+    cleanup = root / "interrupted-storage-cleanup"
+    transfer(
+        args,
+        cleanup,
+        reset / "state",
+        args.build,
+        "CLEANLIB",
+        package_name="installation-cleanup.hp",
+    )
+    cleaned = verify_cleanup(reset / "state", cleanup / "state", args.build, args.nm, slot)
+    require(
+        cleaned == 3 and verify_busy_reads(args, cleanup) == cleaned,
+        "Interrupted library cleanup bypassed expected Flash polling",
+    )
+    print(
+        "Interrupted library commit abandoned without changing other Flash or catalog", flush=True
+    )
 
 
 def restart_storage(args, stored, restart, library, slot, *, emulator, completed):
@@ -87,3 +139,33 @@ def restart_storage(args, stored, restart, library, slot, *, emulator, completed
         (state / "flash").read_bytes(), library, LIBRARY_ID, TARGET, read=reader(state)
     )
     require(found == slot, "Stock restart did not discover the exact stored library")
+
+
+def verify_cleanup(before, after, build, nm, slot):
+    prior = (before / "flash").read_bytes()
+    status, metadata = prior[slot], prior[slot + 3]
+    require(status != 0x53, "Cleanup fixture must never abandon a live library")
+    expected = bytearray(prior)
+    expected[slot] = 0
+    expected[slot + 3] &= 15
+    base = verify_probe(
+        before,
+        after,
+        build,
+        nm,
+        0,
+        0xFFFFFFFF,
+        image="installation-cleanup",
+        expected_flash=expected,
+    )
+    symbols = symbol_offsets(build / "installation-cleanup.elf", nm)
+    result, operations = struct.unpack_from(
+        "<2I", (after / "sram").read_bytes(), base + symbols["storage_result"]
+    )
+    needed = (
+        int(bool(metadata & 0xF0)) + int(status != 0 and status & 0x53 == 0x53) + int(status != 0)
+    )
+    require(
+        result == 0 and operations == needed, "Cleanup did not follow bounded header transition"
+    )
+    return operations

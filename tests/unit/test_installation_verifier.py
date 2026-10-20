@@ -234,6 +234,43 @@ class StorageTests(unittest.TestCase):
                     storage.verify_storage(before, after, root, "unused")
 
 
+class CleanupTests(unittest.TestCase):
+    def test_abandoned_header_transitions_and_operation_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            with (
+                patch.object(storage, "verify_probe", return_value=0) as probe,
+                patch.object(storage, "symbol_offsets", return_value={"storage_result": 0}),
+            ):
+                for status, metadata, count in (
+                    (0xFB, 0x10, 3),
+                    (0xFB, 0, 2),
+                    (0xFA, 0, 1),
+                    (0, 0, 0),
+                ):
+                    prior = bytes([status, 0x36, 0, metadata, 0x40, 0x2B])
+                    (before / "flash").write_bytes(prior)
+                    (after / "sram").write_bytes(struct.pack("<2I", 0, count))
+                    self.assertEqual(
+                        storage.verify_cleanup(before, after, root, "unused", 0), count
+                    )
+                    self.assertEqual(
+                        probe.call_args.kwargs["expected_flash"],
+                        bytes([0, 0x36, 0, 0, 0x40, 0x2B]),
+                    )
+                    self.assertEqual(probe.call_args.kwargs["image"], "installation-cleanup")
+                    for result, operations in ((1, count), (0, count + 1)):
+                        (after / "sram").write_bytes(struct.pack("<2I", result, operations))
+                        with self.assertRaises(ValueError):
+                            storage.verify_cleanup(before, after, root, "unused", 0)
+                (before / "flash").write_bytes(bytes([0x53, 0x36, 0, 0x10]))
+                with self.assertRaises(ValueError):
+                    storage.verify_cleanup(before, after, root, "unused", 0)
+
+
 class StartupInventoryTests(unittest.TestCase):
     def test_independent_layout_and_diagnostic_checks(self):
         flash = bytearray(0x200000)

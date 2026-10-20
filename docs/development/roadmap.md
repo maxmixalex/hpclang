@@ -427,13 +427,36 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Abandoned-library cleanup implementation (local, not submitted):** tail
+  recovery now accepts a complete CRC-checked unpublished library only as the
+  final allocation, clears its metadata before status, and preserves its
+  payload. Live libraries and partial removal states are not adopted. Host
+  installation tests pass with 126 interruption combinations across fourteen
+  unpublished statuses and all three cleanup writes, including retry and
+  unchanged payload checks. Both HP49g+/HP50g clean the saved `0xFB` native
+  interruption in three SST operations, with exact other Flash bytes, original
+  catalog, owning CODE and stack guards preserved. Nine Python verifier tests
+  pass. Both models additionally restart and finish cleanup after cuts at the
+  metadata and live-status writes, requiring only the remaining two or one
+  operations. The maintained storage suite now includes final-commit
+  interruption, Stock restart and cleanup; its integrated HP50g run passes.
+  These are local results, not CI acceptance or M8.0 closure.
+  Broader regression exposed an overly permissive zero-metadata path for
+  backups; the implementation now restricts odd unpublished cancellation
+  markers to parsed libraries. The existing damaged-backup rejection test is
+  retained unchanged. The narrowed implementation passes the installation
+  ASan/UBSan suite and ARM static analysis. Both native models also pass the
+  narrowed zero-metadata retry, with exactly two remaining writes and preserved
+  Flash/catalog/guards. Broader Flash regressions are still running.
+
 - **Interrupted fresh-library commit gap (local):** on both HP49g+/HP50g,
   cutting the final status program at SST operation 286, busy read 1, mask
   `0x0400` leaves status `0xFB` at slot `0x157e75`. All other Flash bytes match
   the successful stored draft. Stock restarts normally, preserves that Flash
   and keeps the original 61-library catalog without registering ID 1703.
-  Current C tail recovery against both saved native states returns DIRTY with
-  zero writes: hidden-library cleanup is not covered by the backup-only path.
+  Before the local cleanup change, C tail recovery against both saved native
+  states returned DIRTY with zero writes: hidden-library cleanup was not covered
+  by the backup-only path.
   Next: establish a bounded abandoned-install cleanup transition, including
   interruption of cleanup itself; do not infer permission to complete a live
   installation from matching payload bytes. These results do not establish
@@ -443,8 +466,10 @@ Current delivery checkpoints:
   space planning, runtime sealing, draft preparation and selected-slot storage
   work is submitted together after local validation. The native preparation
   checks reuse existing E2E launches; storage adds one write and one restart
-  phase per installation model. CI acceptance is pending and will not be
-  polled immediately. This does not close M8.0.
+  phase per installation model. A later check of submitted `7c958c30` finds
+  Quality successful (39471377075), Core running (39471377029), and Objects
+  (39471377195) / Runtime (39471377067) queued. CI acceptance remains pending;
+  no repeated polling or M8.0 closure.
 
 - **Local selected-slot library storage:** an internal storage primitive now
   revalidates all six banks, library-ID absence and the exact selected tail before

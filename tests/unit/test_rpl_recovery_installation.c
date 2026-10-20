@@ -13,14 +13,19 @@ static uint8_t flash[END - FIRST], before[END - FIRST], catalog_data[160];
 static uint32_t fail_address;
 static const uint8_t *fail_after_staging;
 static unsigned programs, fail_program;
+static uint16_t partial_program_mask;
 static int program_flash(void *context, uint32_t at, uint16_t value)
 {
     assert(context == flash && !(at & 1) && at >= FIRST && at + 1 < END);
-    if (++programs == fail_program)
-        return 0;
     unsigned offset = at - FIRST;
     uint16_t old = flash[offset] | (uint16_t)flash[offset + 1] << 8;
     assert((old & value) == value);
+    if (++programs == fail_program) {
+        uint16_t partial = old & (value | (uint16_t)~partial_program_mask);
+        flash[offset] = partial;
+        flash[offset + 1] = partial >> 8;
+        return 0;
+    }
     flash[offset] = value;
     flash[offset + 1] = value >> 8;
     return 1;
@@ -449,6 +454,64 @@ static void selected_creation_tests(const struct hpclang_rpl_flash_io *source)
     fail_program = 0;
 }
 
+static void interrupted_library_tests(const struct hpclang_rpl_flash_io *source)
+{
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_flash;
+    const unsigned slot = 0x105;
+    for (unsigned status = 1; status < 255; ++status) {
+        if (status == 0x53 || (status & 0x53) != 0x53)
+            continue;
+        const uint16_t masks[] = {0, 0xaaaa, 0xffff};
+        for (unsigned cut = 1; cut <= 3; ++cut)
+            for (unsigned mask = 0; mask < 3; ++mask) {
+                install(0, 0);
+                memcpy(flash + slot, binding_original, sizeof binding_original);
+                flash[slot] = status;
+                memcpy(before, flash, sizeof flash);
+                programs = 0;
+                fail_program = cut;
+                partial_program_mask = masks[mask];
+                assert(hpclang_rpl_flash_recover_tails(&io) == HPCLANG_RPL_FLASH_DIRTY);
+                assert(programs == cut && flash[slot] != 0x53);
+                fail_program = 0;
+                partial_program_mask = 0;
+                assert(!hpclang_rpl_flash_recover_tails(&io));
+                assert(flash[slot] == 0 && flash[slot + 3] == (before[slot + 3] & 15));
+                before[slot] = 0;
+                before[slot + 3] &= 15;
+                assert(!memcmp(before, flash, sizeof flash));
+                unsigned completed = programs;
+                assert(!hpclang_rpl_flash_recover_tails(&io) && programs == completed);
+            }
+    }
+    for (unsigned fault = 0; fault < 7; ++fault) {
+        install(0, 0);
+        memcpy(flash + slot, binding_original, sizeof binding_original);
+        flash[slot] = 0xfb;
+        if (fault == 0)
+            flash[slot] = 0x52; /* Partial removal of a live library is not fresh creation. */
+        if (fault == 1)
+            flash[slot + 30] ^= 1;
+        if (fault == 2)
+            memcpy(flash + slot + sizeof binding_original, binding_original,
+                   sizeof binding_original);
+        if (fault == 3)
+            flash[sizeof flash - 1] = 0;
+        if (fault == 4)
+            fail_address = END - 2;
+        if (fault == 5)
+            flash[slot + 3] |= 0x20;
+        if (fault == 6)
+            flash[slot + sizeof binding_original - 1] = 0; /* Non-erased padding. */
+        memcpy(before, flash, sizeof flash);
+        programs = 0;
+        int result = hpclang_rpl_flash_recover_tails(&io);
+        assert(result == (fault == 4 ? HPCLANG_RPL_FLASH_FAILED : HPCLANG_RPL_FLASH_DIRTY));
+        assert(!programs && !memcmp(before, flash, sizeof flash));
+    }
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read_flash, NULL, FIRST, END};
@@ -458,6 +521,7 @@ int main(void)
     space_tests(&io);
     preparation_tests(&io, &catalog);
     selected_creation_tests(&io);
+    interrupted_library_tests(&io);
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v)
         for (unsigned bank = 0; bank < 6; ++bank) {
             install(v, bank);
