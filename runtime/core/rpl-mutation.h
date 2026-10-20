@@ -64,7 +64,7 @@ extern "C"
         HPCLANG_RPL_MUTATION_NOT_DIRECTORY = -11,
         HPCLANG_RPL_MUTATION_NOT_EMPTY = -12,
         HPCLANG_RPL_MUTATION_NOMEM = -13,
-        /* Catalog commit started and did not finish. Native/ARM state may be
+        /* A guarded commit started and did not finish. Native/ARM state may be
          * partially changed; retain ownership, never resume Stock or retry. */
         HPCLANG_RPL_MUTATION_INCOMPLETE = -14
     };

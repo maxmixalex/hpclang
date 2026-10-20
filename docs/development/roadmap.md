@@ -427,6 +427,23 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local reservation creation follow-up:** a shared internal creation step
+  replaces the fixture's direct allocator call. It rejects existing names,
+  resolves HOME again after movement and verifies the complete stored string
+  before exposing its address/capacity for subsequent binding. Every lost-write-
+  acknowledgement cut, silent payload corruption and failed readback produce
+  INCOMPLETE without publishing a resource result; malformed/preflight failures
+  do not write. The integrated mutation tests, ASan/UBSan and ARM analysis pass.
+  Initial native runs correctly rejected a lower-stack-guard overwrite.
+  Creation and readback now have separate frames (120 and 312 bytes), keeping
+  the directory-entry buffer out of the allocator's deeper call chain.
+  Both native models now pass normal creation/publication and retained-
+  failure checks with the existing 4 KiB stack, exact code/owning CODE and
+  intact guards. The result describes
+  current-invocation ownership only; durable
+  installation/transaction identity, restart/orphan handling and startup order
+  remain open. This follow-up is local, after submitted `96bcf1f5`.
+
 - **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
   pending; Objects passes, Quality fails because the identity-vector header
   was generated only at build time, and Core/Runtime are still running/queued
@@ -443,7 +460,8 @@ Current delivery checkpoints:
   normal publication, warm restart, zero-write closed repeat and both
   unpublished cancellation cases now also pass on both models from the saved
   clean installed baseline. All 82 related Python tests, ARM analysis, formatting
-  and strict docs pass. The follow-up through `a30ae484` is ready for batched CI.
+  and strict docs pass. The follow-up through `a30ae484` was submitted as `96bcf1f5`;
+  new CI is pending and will not be polled.
   Next: durable reservation
   ownership/lifetime and global startup order. No M8 acceptance gate is removed.
   The detailed evidence below includes earlier intermediate states.

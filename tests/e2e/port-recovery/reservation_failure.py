@@ -24,7 +24,7 @@ def verify_failure(before, after, build, nm):
     while (start := ram.find(initialized, start)) >= 0:
         if start + symbols["__image_end"] <= len(ram):
             result = struct.unpack_from("<2I", ram, start + symbols["reservation_result"])
-            if result == (0xFFFFFFFB, 1):
+            if result == (0xFFFFFFF2, 1):
                 matches.append(start)
         start += 1
     require(len(matches) == 1, "Missing or ambiguous first-write failure image")

@@ -5,6 +5,7 @@
 
 #include "object-snapshot.h"
 #include "rpl-mutation.h"
+#include "rpl-recovery-reservation.h"
 #include "rpl-reference.h"
 #include "rpl-object-store.h"
 #include "rpl-port-mutation.h"
@@ -665,6 +666,85 @@ static void test_named_remove_missing_is_non_mutating(void)
            HPCLANG_RPL_MUTATION_NOT_FOUND);
     assert(get_word(DSKTOP, 5u) == old_dstk);
     assert(get_word(USEROB, 5u) == old_home);
+}
+
+struct reservation_fault
+{
+    unsigned calls, cut, mode, address;
+};
+
+static int reservation_write(void *context, uint32_t address, uint8_t value)
+{
+    struct reservation_fault *fault = context;
+    int result = write_nibble(NULL, address, value);
+    if (++fault->calls == fault->cut) {
+        if (!fault->mode)
+            return 0; /* Lost acknowledgement after the actual write. */
+        if (fault->mode == 1)
+            memory[fault->address] ^= 1u;
+        else
+            rejected_read = fault->address;
+    }
+    return result;
+}
+
+static void test_recovery_reservation_create(void)
+{
+    struct hpclang_rpl_mutation_io io = setup(1u);
+    struct named_pair pair = prepare_two_named_chars();
+    struct hpclang_object *snapshot = make_string1('R');
+    const struct hpclang_rpl_recovery_reservation sentinel = {123u, 456u};
+    struct hpclang_rpl_recovery_reservation created = sentinel;
+    struct reservation_fault fault = {0};
+    io.context = &fault;
+    io.write_nibble = reservation_write;
+    assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                   &created) == HPCLANG_RPL_MUTATION_OK);
+    unsigned count = fault.calls, object = created.object;
+    assert(count > 0 && created.capacity == 1u && get_word(object + 10u, 2) == 'R');
+    assert(get_word(USEROB, 5) < pair.home);
+    /* Both same-content and different-type existing objects remain conflicts. */
+    created = sentinel;
+    assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                   &created) == HPCLANG_RPL_MUTATION_EXISTS);
+    assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"B", 1, snapshot,
+                                                   &created) == HPCLANG_RPL_MUTATION_EXISTS);
+    assert(fault.calls == count && !memcmp(&created, &sentinel, sizeof created));
+    for (unsigned cut = 1; cut <= count; ++cut) {
+        io = setup(1u);
+        prepare_two_named_chars();
+        fault = (struct reservation_fault){.cut = cut};
+        io.context = &fault;
+        io.write_nibble = reservation_write;
+        assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                       &created) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(fault.calls == cut && !memcmp(&created, &sentinel, sizeof created));
+    }
+    /* Success acknowledgements cannot hide a bad payload or failed readback. */
+    for (unsigned mode = 1; mode <= 2; ++mode) {
+        io = setup(1u);
+        prepare_two_named_chars();
+        fault = (struct reservation_fault){.cut = count, .mode = mode, .address = object + 10u};
+        io.context = &fault;
+        io.write_nibble = reservation_write;
+        assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                       &created) ==
+               HPCLANG_RPL_MUTATION_INCOMPLETE);
+        assert(fault.calls == count && !memcmp(&created, &sentinel, sizeof created));
+    }
+    io = setup(1u);
+    prepare_two_named_chars();
+    rejected_read = USEROB;
+    assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                   &created) == HPCLANG_RPL_MUTATION_IO);
+    assert(writes == 0 && !memcmp(&created, &sentinel, sizeof created));
+    rejected_read = UINT32_MAX;
+    snapshot->data[2] ^= 0x10u; /* The native length must agree with the snapshot. */
+    assert(hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                   &created) == HPCLANG_RPL_MUTATION_MALFORMED);
+    assert(writes == 0 && !memcmp(&created, &sentinel, sizeof created));
+    hpclang_object_release(snapshot);
 }
 
 static void test_named_create(void)
@@ -2574,6 +2654,7 @@ int main(void)
     test_named_same_size_replace();
     test_named_reference_preservation_nospace_is_non_mutating();
     test_named_create();
+    test_recovery_reservation_create();
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();
     test_named_remove_newest();

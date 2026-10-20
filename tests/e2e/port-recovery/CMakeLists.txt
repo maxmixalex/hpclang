@@ -146,7 +146,7 @@ foreach(witness IN ITEMS installation installation-transaction installation-publ
     elseif(witness STREQUAL "installation-publication" OR
             witness STREQUAL "installation-reservation-failure")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
-        foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot
+        foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot rpl-recovery-reservation
                 time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()

@@ -366,6 +366,16 @@ injects a lost acknowledgement after the first actual RAM write. Its verifier
 requires exact execution code and its owning CODE object, intact stack guards,
 the owned failure PC, and zero Flash operations. This is failure containment,
 not rollback or recovery after a restart.
+The internal `hpclang_rpl_recovery_reservation_create` step now owns this
+create-and-check boundary: it accepts a validated string snapshot, observes
+native write attempts, resolves HOME again after creation moves it, and checks
+every stored nibble before returning the new object's address and capacity.
+Preflight errors leave the output unchanged; a failure after any write attempt,
+including a failed or mismatched readback, returns `MUTATION_INCOMPLETE`.
+The caller must retain execution and IRQ ownership in that case. The returned
+address is useful only within the current exclusive invocation. It must not be
+saved as a persistent identity across native allocation, garbage collection or
+restart; durable installation/transaction binding remains required.
 
 An internal sealed-admission path addresses the circularity of an executing
 library needing to recognize its own complete content. The packager locates an

@@ -3,7 +3,7 @@
  * It exercises driver-level partial programming, not a power loss. */
 #include "rpl-flash-replay.h"
 #include "rpl-stock-memory.h"
-#include "rpl-object-store.h"
+#include "rpl-recovery-reservation.h"
 #include "sst-flash.h"
 #include "expected-library.h"
 #include <hpclang/time.h>
@@ -37,6 +37,7 @@ static struct
     uint32_t kind, nibble_count, native_prologue;
     uint8_t data[CAPACITY + 5];
 } reservation;
+static struct hpclang_rpl_recovery_reservation created_reservation;
 volatile uint32_t reservation_result[2];
 static unsigned reservation_writes;
 __attribute__((noinline, noreturn)) static void reservation_failed(void)
@@ -81,10 +82,6 @@ static int create_reservation(const uint32_t *map)
                                          .temp_limit = 0x100000,
                                          .user_limit = 0x80000,
                                          .library_table = 0x8611d};
-    const struct hpclang_rpl_reader reader = {stock_read, &memory};
-    uint32_t home;
-    if (hpclang_rpl_store_home_object(&reader, &home))
-        return -101;
     reservation.kind = HPCLANG_OBJECT_STRING;
     reservation.native_prologue = 0x2a2c;
     reservation.nibble_count = 10 + 2 * CAPACITY;
@@ -92,8 +89,9 @@ static int create_reservation(const uint32_t *map)
     set_word(5, 5 + 2 * CAPACITY, 5);
     for (unsigned i = 0; i < CAPACITY; ++i)
         reservation.data[5 + i] = (uint8_t)(i * 37 + 11);
-    return hpclang_rpl_mutation_store_create(&io, home, (const uint8_t *)"HPCLEASE", 8,
-                                             (const struct hpclang_object *)&reservation);
+    return hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"HPCLEASE", 8,
+                                                   (const struct hpclang_object *)&reservation,
+                                                   &created_reservation);
 }
 
 volatile uint32_t publication_result[12];
@@ -210,7 +208,7 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
         return result;
     result = create_reservation(map);
     reservation_result[0] = (uint32_t)result;
-    if (result && reservation_writes) {
+    if (result == HPCLANG_RPL_MUTATION_INCOMPLETE) {
         /* The directory/arena may already have changed. Do not publish Flash
          * or resume Stock on an ordinary negative predicate result. This is
          * retention of the failed invocation, not rollback or restart recovery. */
