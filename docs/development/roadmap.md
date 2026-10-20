@@ -438,8 +438,15 @@ Current delivery checkpoints:
   block/padding boundaries; every input-read failure and every content-nibble
   mutation with a repaired native CRC is rejected. CMake/CTest, ASan/UBSan,
   ARMv4T build/analysis and the related Python tests pass. ARM frame reports are
-  192 bytes for the matcher and 168 for its hashing helper. Native admission
-  integration and full installed allocation/catalog binding remain next.
+  192 bytes for the matcher and 168 for its hashing helper. A subsequent
+  read-only installed-content matcher now resolves a unique live library and
+  its catalog/bank switch before streaming the identity check. It reuses the
+  complete six-bank allocation/tail scanner and shared catalog validation.
+  All 20 vectors pass in all six banks; deleted/duplicate roots, wrong or
+  ambiguous mappings, changed descriptors, read failure, dirty tails and a
+  different valid library with the same ID reject without changing output or
+  Flash. The new matcher, existing creation/authority regressions, ASan/UBSan
+  and ARM analysis pass. Native admission integration remains next.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
 - **Current cancellation batch (2026-10-20):** implementation and maintained

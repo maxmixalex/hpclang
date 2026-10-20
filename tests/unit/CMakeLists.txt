@@ -76,6 +76,17 @@ hpclang_unit(rpl_recovery_identity test_rpl_recovery_identity.c
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-identity.c")
 target_include_directories(test_rpl_recovery_identity PRIVATE
     "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}")
+hpclang_unit(rpl_recovery_installation test_rpl_recovery_installation.c
+    "${CMAKE_CURRENT_BINARY_DIR}/recovery-identity-vectors.h"
+    "${HPCLANG_ROOT}/runtime/core/rpl-recovery-installation.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-recovery-identity.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-flash-record.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-backup.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-port.c"
+    "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
+target_include_directories(test_rpl_recovery_installation PRIVATE
+    "${HPCLANG_ROOT}/runtime/core" "${CMAKE_CURRENT_BINARY_DIR}")
 
 hpclang_unit(rpl_flash_write test_rpl_flash_write.c
     "${HPCLANG_ROOT}/runtime/core/rpl-flash-write.c"
