@@ -34,11 +34,59 @@ static void repair_crc(void)
     for (unsigned i = 0; i < 4; ++i)
         put(span - 4 + i, (crc >> (4 * i)) & 15);
 }
+
+static void seal_tests(unsigned v)
+{
+    const uint8_t *descriptor = vectors[v].descriptor;
+    uint32_t at = descriptor[12] | (uint32_t)descriptor[13] << 8 | (uint32_t)descriptor[14] << 16 |
+                  (uint32_t)descriptor[15] << 24;
+    memcpy(data, vectors[v].data, sizeof data);
+    if (span & 1)
+        data[span / 2] |= 0xf0;
+    uint8_t expected[sizeof data], untouched[sizeof data];
+    memcpy(expected, data, sizeof data);
+    for (unsigned i = 16; i < 96; ++i)
+        put(at + i, 0);
+    /* Existing native CRC bytes must not enter the canonical hash. */
+    for (unsigned i = span - 4; i < span; ++i)
+        put(i, 15);
+    memcpy(untouched, data, sizeof data);
+    assert(hpclang_rpl_recovery_identity_seal(data, sizeof data, at) == 1);
+    assert(!memcmp(data, expected, sizeof data));
+    assert(!hpclang_rpl_recovery_identity_seal(data, sizeof data, at));
+    assert(!memcmp(data, expected, sizeof data));
+    for (unsigned fault = 0; fault < 8; ++fault) {
+        memcpy(data, untouched, sizeof data);
+        uint32_t offset = at, capacity = sizeof data;
+        if (fault == 0)
+            put(0, 1);
+        if (fault == 1)
+            put(at, 0);
+        if (fault == 2)
+            put(at + 95, 1);
+        if (fault == 3)
+            offset = UINT32_MAX;
+        if (fault == 4)
+            offset = 9;
+        if (fault == 5)
+            capacity = (span + 1) / 2 - 1;
+        if (fault == 6)
+            capacity = 4;
+        if (fault == 7)
+            offset = span - 99;
+        memcpy(expected, data, sizeof data);
+        assert(!hpclang_rpl_recovery_identity_seal(data, capacity, offset));
+        assert(!memcmp(data, expected, sizeof data));
+    }
+    assert(!hpclang_rpl_recovery_identity_seal(NULL, sizeof data, at));
+}
+
 int main(void)
 {
     const struct hpclang_rpl_reader reader = {read_nibble, data};
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v) {
         span = vectors[v].span;
+        seal_tests(v);
         memcpy(data, vectors[v].data, sizeof data);
         reads = fail_read = invalid_read = 0;
         assert(hpclang_rpl_recovery_identity_match(&reader, 123, vectors[v].descriptor) == 1);

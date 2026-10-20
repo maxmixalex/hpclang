@@ -427,6 +427,17 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local runtime identity sealing:** an owned packed-library template can now
+  receive its HPCROOT1 span/offset/digest and native CRC in RAM, matching the host
+  packager. All twenty independent hashlib/native-CRC vectors match byte for
+  byte across descriptor/object nibble alignment and SHA padding boundaries.
+  Invalid bounds, damaged/nonempty placeholders and insufficient capacity leave
+  the input unchanged; allocation padding is preserved. Identity ASan/UBSan and
+  ARM build/static analysis pass. This is not native execution acceptance or
+  permission to authenticate arbitrary code: trusted template/layout provenance
+  remains required. Rebinding both owned command descriptors, rechecking final
+  placement and the installation publication/lifetime gates remain open.
+
 - **Local fresh-installation space planning:** installation preflight can now
   place the library, journal and authority together after namespace exclusion.
   It validates all bank tails and searches bank combinations, consumes tails
