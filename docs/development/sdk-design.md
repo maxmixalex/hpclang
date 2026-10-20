@@ -355,6 +355,34 @@ configuration invocation; ordering against earlier system callbacks remains a
 separate unresolved requirement. Capacity validation alone is not a guarantee
 of all startup allocation requirements.
 
+An internal sealed-admission path addresses the circularity of an executing
+library needing to recognize its own complete content. The packager locates an
+owned `hpclang_recovery_identity` ELF symbol and fills its 48-byte `HPCROOT1`
+descriptor: magic, native object span, descriptor nibble coordinate and SHA-256.
+The digest covers canonical packed object nibbles with only its own digest and
+the native CRC cleared; packaging then regenerates the native CRC. Descriptor
+coordinates exclude the allocation envelope. No signature search is involved.
+
+`hpclang_rpl_recovery_installation_stream()` validates a unique live library,
+native catalog/bank switch, complete sealed content, exact journal/authority
+membership and all native bank allocation tails. Pending transactions supply
+the restored sector view; closing/retiring transactions require actual target
+equality, while closed transactions use current Flash. The recovery allocation
+must lie wholly outside the target. It streams the journal instead of retaining
+a sector-sized scratch buffer. The descriptor, transaction coordinates, catalog
+and Flash mapping must come from one trusted, stable, exclusively held view.
+Outputs change only on success; the operation neither writes Flash nor releases
+RAM. Content identity is not authentication, installation provenance, a fresh
+transaction claim or permission to release a matching HOME object.
+
+The Runtime `identity` suite invokes the sealed admission command through its
+installed native library and checks complete initialized code, fresh CODE
+ownership, stack guards, mappings, catalog/Flash preservation and native return.
+It also covers changed library content with a valid native CRC and constrained
+memory with preserved user data. Tests that append a configuration completion
+marker reseal the resulting library at the owned descriptor coordinate, so an
+invalid digest cannot masquerade as correct rejection of another condition.
+
 The standalone `tests/e2e/port-recovery` witness builds its ARM entry, guarded
 stack/TLS layout and actual shared sector-replay implementation entirely from
 repository sources. With ATfE's `bin` on PATH:

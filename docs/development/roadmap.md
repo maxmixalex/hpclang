@@ -507,7 +507,11 @@ Current delivery checkpoints:
   The maintained copied admission program is 17,114 bytes; the measured free
   gap is 20,860 bytes. The corrected standalone clean-boot suite is running.
   A separate local prototype is testing sealed admission before automatic
-  reservation release/recovery; it does not establish reservation ownership.
+  reservation release/recovery. Its initial 2 KiB startup stack corrupted the
+  lower guard and adjacent code on both models; a 4 KiB variant, matching the
+  verified internal-command fixture, is running. Completion-marker libraries
+  now reseal their owned identity after configuration changes; independent
+  digest/native-CRC tests pass. These changes do not establish RAM ownership.
   This streaming path is not yet submitted.
   This content check does not establish installation provenance, fresh
   transaction ownership or RAM release permission.
