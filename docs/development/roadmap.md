@@ -427,6 +427,18 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local native startup inventory:** the existing installation witness now
+  captures the actual ROM size directory and emulator bank bases, validates
+  their geometry and resolves each catalog configuration entry on ARM. An
+  independent host oracle compares every ID/header/bank/target row. Both models
+  pass the original clean catalog (61 libraries / 16 callbacks) and the installed
+  recovery fixture (62 / 17), preserving initialized code, owning CODE, stack
+  guards, mappings, catalog and Flash. The existing missing/matched invocations
+  carry this gate without additional emulator launches. Verifier corruption
+  tests, ARM build/analysis and formatting pass. This is fixture-profile capture,
+  not production firmware discovery or authorization of earlier callback behavior.
+  No further M8 stage is complete.
+
 - **Local ROM-layout validation:** the shared parser now derives bank extents
   from the captured KiB-size directory and compares every native base, including
   unused cells. It checks complete Flash coverage, window sizes, alignment and
@@ -472,7 +484,9 @@ Current delivery checkpoints:
   All 83 related Python tests and ARM analysis pass. Durable ownership proof,
   installation/restart/orphan handling and global startup ordering remain open.
   Submitted at `26f312e5` (implementation `542d832d`, synchronized with main).
-  CI results have not been polled; this is not a completed M8 stage.
+  CI inspected once on 2026-10-21: Quality `39450806498` passes; Core
+  `39450806503`, Runtime `39450806511` and Objects `39450806502` are queued.
+  This is not a completed M8 stage.
 
 - **Accepted delivery:** all four workflows at `96bcf1f5` pass: Quality
   (`39442340894`), Core (`39442341248`), Runtime (`39442340864`) and Objects

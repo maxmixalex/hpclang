@@ -603,6 +603,17 @@ capture stable inputs; plausible bytes or a successful parse do not identify a R
 or authorize recovery. Both native saved-state inventories use this parser and
 the first bank's actual 96 KiB bound when resolving configuration entries.
 
+The maintained installation witness exercises this capture on ARM, using the
+supported Stock 2.15 fixture's verified initializer literal-pool addresses and
+state layout. Its existing missing-library and matched-installation invocations
+emit every catalog ID, library header, selected bank and resolved configuration
+entry. The host reconstructs each row independently from the ROM directory and
+saved catalog, while the installation verifier checks owned execution memory,
+stack guards, restored mappings and unchanged Flash/catalog. An absent callback
+is recorded only after successful header validation; an unsupported mapping or
+failed inventory is rejected by the verifier. This gate does not certify callback
+behavior or make fixture addresses a production firmware-discovery mechanism.
+
 Journal integrity is separate from transaction authority. A host regression
 keeps a valid ready journal and adds a valid backup inside its target sector.
 Whole-port overlay preflight still accepts the old image, because that image

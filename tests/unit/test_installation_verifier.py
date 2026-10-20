@@ -2,7 +2,9 @@ import importlib.util
 from pathlib import Path
 import struct
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SOURCE = Path(__file__).resolve().parents[1] / "e2e/port-recovery"
@@ -10,6 +12,7 @@ sys.path.insert(0, str(SOURCE))
 SPEC = importlib.util.spec_from_file_location("installation_verify", SOURCE / "installation.py")
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
+startup = importlib.import_module("startup")
 
 
 class InstallationExecutionTests(unittest.TestCase):
@@ -88,6 +91,57 @@ class InstallationExecutionTests(unittest.TestCase):
 
 class FreshInstallationExecutionTests(InstallationExecutionTests):
     fresh_copy = True
+
+
+class StartupInventoryTests(unittest.TestCase):
+    def test_independent_layout_and_diagnostic_checks(self):
+        flash = bytearray(0x200000)
+        struct.pack_into("<II", flash, 0x248A0, 0x47FF1, 0x47FF2)
+        flash[0x47FF1:0x48000] = bytes([14, 96] + [128] * 13)
+        header, target = 0x40020, 0x40080
+
+        def write_word(at, value, count):
+            for j in range(count):
+                byte, shift = (at + j) // 2, 4 * ((at + j) & 1)
+                flash[byte] = (flash[byte] & ~(15 << shift)) | ((value >> (4 * j) & 15) << shift)
+
+        physical_header = 0x48000 * 2 + header - 0x40000
+        write_word(physical_header, 221, 3)
+        write_word(physical_header + 18, target - header - 18, 5)
+        words = {0x8611D: 1, 0x86120: 221, 0x86123: header, 0x86128: 0x12345}
+        words.update({0x26BBB + 7 * i: 0x12345 + i for i in range(16)})
+        ram = bytearray(64)
+        struct.pack_into("<3I", ram, 0, 0, 1, 14)
+        struct.pack_into("<4I", ram, 16, 221, header, 0, target)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "flash").write_bytes(flash)
+            (root / "sram").write_bytes(ram)
+            with (
+                patch.object(startup, "native_words", return_value=lambda at, n=5: words[at]),
+                patch.object(
+                    startup,
+                    "symbol_offsets",
+                    return_value={"startup_result": 0, "startup_entries": 16},
+                ),
+            ):
+                self.assertEqual(
+                    startup.verify_startup(root, root, root, "unused", 0),
+                    {"libraries": 1, "callbacks": 1},
+                )
+                for offset in (0, 4, 8, 16, 20, 24, 28):
+                    changed = bytearray(ram)
+                    changed[offset] ^= 1
+                    (root / "sram").write_bytes(changed)
+                    with self.subTest(diagnostic=offset), self.assertRaises(ValueError):
+                        startup.verify_startup(root, root, root, "unused", 0)
+                (root / "sram").write_bytes(ram)
+                for offset in (0x47FF1, 0x47FF2, 0x47FFF, physical_header // 2):
+                    changed = bytearray(flash)
+                    changed[offset] ^= 1
+                    (root / "flash").write_bytes(changed)
+                    with self.subTest(rom=offset), self.assertRaises(ValueError):
+                        startup.verify_startup(root, root, root, "unused", 0)
 
 
 if __name__ == "__main__":

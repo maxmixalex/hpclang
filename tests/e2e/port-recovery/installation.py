@@ -205,13 +205,16 @@ def verify_probe(
 
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
+    from startup import verify_startup
+
     root = args.output / "installation"
     root.mkdir()
     build = args.build
     setup = SimpleNamespace(**(vars(args) | {"flash_busy_reads": 0}))
     missing = root / "missing"
     transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
-    verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
+    verify_startup(clean, missing / "state", build, args.nm, base)
     require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
     print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
@@ -243,7 +246,8 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     )
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
-    verify_probe(before, matched / "state", build, args.nm, 0, slot)
+    base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
+    verify_startup(before, matched / "state", build, args.nm, base)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     transactions = []
     for label, status in (

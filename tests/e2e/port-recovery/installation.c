@@ -5,6 +5,9 @@
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_STARTUP
+void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_reader *reader);
+#endif
 #ifdef HPCLANG_INSTALLATION_IDENTITY
 #include "rpl-recovery-installation.h"
 #define HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT EXPECTED_JOURNAL_SLOT
@@ -63,6 +66,9 @@ int hpclang_recovery_predicate(const uint32_t *map)
     unsigned descriptors[2] = {(l1[0] & ~0xcu) | 0xc00u, (l1[1] & ~0xcu) | 0xc00u};
     hpclang_flash_mapping_swap(descriptors);
     const struct hpclang_rpl_reader reader = {mapped_nibble, (void *)map};
+#ifdef HPCLANG_INSTALLATION_STARTUP
+    hpclang_startup_inventory(map, &reader);
+#endif
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
     const struct hpclang_rpl_flash_io io = {descriptors, read_flash, NULL, 0x140000, 0x200000};
     uint32_t slot = UINT32_MAX;

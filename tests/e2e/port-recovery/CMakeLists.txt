@@ -136,7 +136,10 @@ foreach(witness IN ITEMS installation installation-transaction installation-publ
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
-    if(witness STREQUAL "installation-identity")
+    if(witness STREQUAL "installation")
+        target_sources(${witness} PRIVATE startup.c)
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_STARTUP)
+    elseif(witness STREQUAL "installation-identity")
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
             "${CORE}/rpl-recovery-installation.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_IDENTITY)
