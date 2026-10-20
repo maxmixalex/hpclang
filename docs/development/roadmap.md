@@ -427,6 +427,19 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Local cross-port installation preflight:** the recovery installation planner
+  combines read-only Flash selection with complete caller-supplied Port 0/1
+  chains and a strictly ordered native catalog. Live unregistered RAM libraries
+  conflict too; malformed later RAM records/catalog entries and unreadable views
+  reject without publishing an address. Empty ports require readable terminators.
+  Twelve host scenarios cover success, each RAM port, catalog and Flash conflicts,
+  read failures, malformed chains/catalogs and missing views; all preserve Flash,
+  RAM and catalog bytes. The installation suite passes ASan/UBSan and ARM static
+  analysis passes. Native mapping integration and execution remain unverified
+  for this composite planner. Stable complete mappings, storage reservation,
+  registration, early startup and durable ownership remain caller/installer
+  obligations; ordinary storage APIs retain per-port semantics.
+
 - **Local installation placement planning:** a read-only library planner now
   validates all six Port 2 banks and selects the same erased allocation as
   creation under a stable view, with no programming callback required. Creation

@@ -5,6 +5,27 @@
 #include "rpl-recovery-identity.h"
 #include "rpl-flash-replay.h"
 
+struct hpclang_rpl_recovery_port_view
+{
+    const struct hpclang_rpl_reader *reader;
+    uint32_t first, end;
+};
+
+/* Plan a fresh recovery library's Flash location only after excluding its ID
+ * from both complete RAM-port chains and the strictly ordered native catalog.
+ * The caller supplies actual Port 0/1 mappings, including readable terminators,
+ * and keeps every view stable through use of the result. Empty ports still
+ * require a valid terminated view; NULL does not mean absent.
+ * No writes or heap allocation. Output changes only on success (0); errors use
+ * flash_result. Malformed/unreadable later records are not hidden by a match.
+ * This does not reserve space, discover mappings, choose an early startup ID,
+ * register the library or grant durable installation/publication authority. */
+int hpclang_rpl_recovery_installation_plan(const struct hpclang_rpl_flash_io *io,
+                                           const uint8_t *record, uint32_t bytes,
+                                           const struct hpclang_rpl_recovery_port_view ports[2],
+                                           const struct hpclang_rpl_flash_catalog *catalog,
+                                           uint32_t *slot);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use

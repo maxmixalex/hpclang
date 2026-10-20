@@ -1,5 +1,52 @@
 #include "rpl-recovery-installation.h"
+#include "rpl-port.h"
 #include <stddef.h>
+
+static int installation_span_result(int result)
+{
+    return result == HPCLANG_RPL_SPAN_UNAVAILABLE ? HPCLANG_RPL_FLASH_FAILED
+                                                  : HPCLANG_RPL_FLASH_DIRTY;
+}
+
+int hpclang_rpl_recovery_installation_plan(const struct hpclang_rpl_flash_io *io,
+                                           const uint8_t *record, uint32_t bytes,
+                                           const struct hpclang_rpl_recovery_port_view ports[2],
+                                           const struct hpclang_rpl_flash_catalog *catalog,
+                                           uint32_t *slot)
+{
+    if (!slot || !ports || !catalog || !catalog->reader || !catalog->reader->read_nibble)
+        return HPCLANG_RPL_FLASH_INVALID;
+    for (unsigned port = 0; port < 2; ++port)
+        if (!ports[port].reader || !ports[port].reader->read_nibble)
+            return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t selected;
+    int result = hpclang_rpl_flash_plan_library(io, record, bytes, &selected);
+    if (result)
+        return result;
+    /* plan_library validated the complete native envelope, title and CRC.
+     * Library ID follows the byte title and its repeated length. */
+    uint32_t at = 11u + record[9];
+    uint32_t number = record[at] | (uint32_t)(record[at + 1] & 15u) << 8;
+    int found = 0;
+    for (unsigned port = 0; port < 2; ++port) {
+        struct hpclang_rpl_port_cursor cursor = {ports[port].first, ports[port].end, 0};
+        struct hpclang_rpl_port_entry entry;
+        while ((result = hpclang_rpl_port_next(ports[port].reader, &cursor, &entry)) > 0)
+            if (entry.prologue == 0x02b40u && entry.library_number == number)
+                found = 1;
+        if (result)
+            return installation_span_result(result);
+    }
+    struct hpclang_rpl_catalog_insertion insertion;
+    result = hpclang_rpl_catalog_plan_insert(catalog->reader, catalog->address, catalog->nibbles,
+                                             number, &insertion);
+    if (result < 0)
+        return installation_span_result(result);
+    if (!result || found)
+        return HPCLANG_RPL_FLASH_EXISTS;
+    *slot = selected;
+    return 0;
+}
 
 struct object_reader
 {

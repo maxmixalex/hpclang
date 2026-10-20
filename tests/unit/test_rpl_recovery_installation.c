@@ -140,11 +140,95 @@ static void transaction_tests(const struct hpclang_rpl_flash_io *io,
     }
 }
 
+struct ram_port
+{
+    uint8_t data[4096];
+    uint32_t fail;
+};
+
+static int read_port(void *context, uint32_t at, uint8_t *value)
+{
+    const struct ram_port *port = context;
+    if (at >= sizeof port->data || at == port->fail)
+        return 0;
+    *value = port->data[at];
+    return 1;
+}
+
+static void placement_tests(const struct hpclang_rpl_flash_io *io,
+                            const struct hpclang_rpl_flash_catalog *catalog)
+{
+    static struct ram_port ram[2], original[2];
+    uint8_t record[4096], old_catalog[sizeof catalog_data];
+    unsigned bytes = ((vectors[0].span + 15) & ~7u) / 2;
+    assert(bytes <= sizeof record && vectors[0].span + 5 < sizeof ram[0].data);
+    install(0, 0);
+    memcpy(record, flash + 0x105, bytes);
+    if (vectors[0].span & 1u)
+        record[4 + vectors[0].span / 2] |= 0xf0;
+    for (unsigned scenario = 0; scenario < 12; ++scenario) {
+        install(0, 0);
+        memset(flash + 0x105, 255, bytes);
+        word(120, 0, 3);
+        memset(ram, 0, sizeof ram);
+        ram[0].fail = ram[1].fail = UINT32_MAX;
+        struct hpclang_rpl_reader readers[2] = {{read_port, &ram[0]}, {read_port, &ram[1]}};
+        struct hpclang_rpl_recovery_port_view ports[2] = {{&readers[0], 0, sizeof ram[0].data},
+                                                          {&readers[1], 0, sizeof ram[1].data}};
+        if (scenario == 1 || scenario == 2 || scenario == 7) {
+            unsigned port = scenario == 2;
+            for (unsigned i = 0; i < vectors[0].span; ++i)
+                ram[port].data[i] = (vectors[0].data[i / 2] >> (4 * (i & 1))) & 15;
+            if (scenario == 7)
+                ram[port].data[vectors[0].span] = 1; /* Bad record after a match. */
+        }
+        if (scenario == 3) {
+            word(120, 1, 3);
+            word(123, 1701, 3);
+        }
+        if (scenario == 4 || scenario == 5)
+            ram[scenario - 4].fail = 2;
+        if (scenario == 6) {
+            word(120, 2, 3);
+            word(123, 1701, 3);
+            word(139, 1701, 3); /* Duplicate native catalog IDs are malformed. */
+        }
+        if (scenario == 8)
+            ports[0].end = 4; /* Missing complete terminator. */
+        if (scenario == 9)
+            ports[1].reader = NULL;
+        if (scenario == 10)
+            memcpy(flash + 0x105, record, bytes);
+        if (scenario == 11)
+            fail_address = END - 2;
+        memcpy(before, flash, sizeof flash);
+        memcpy(original, ram, sizeof ram);
+        memcpy(old_catalog, catalog_data, sizeof catalog_data);
+        uint32_t slot = UINT32_MAX;
+        int result =
+            hpclang_rpl_recovery_installation_plan(io, record, bytes, ports, catalog, &slot);
+        if (!scenario) {
+            assert(!result && slot == FIRST + 0x105);
+        } else {
+            int expected = scenario <= 3 || scenario == 10 ? HPCLANG_RPL_FLASH_EXISTS
+                           : scenario == 4 || scenario == 5 || scenario == 11
+                               ? HPCLANG_RPL_FLASH_FAILED
+                           : scenario == 9 ? HPCLANG_RPL_FLASH_INVALID
+                                           : HPCLANG_RPL_FLASH_DIRTY;
+            assert(result == expected && slot == UINT32_MAX);
+        }
+        assert(!memcmp(before, flash, sizeof flash));
+        assert(!memcmp(original, ram, sizeof ram));
+        assert(!memcmp(old_catalog, catalog_data, sizeof catalog_data));
+    }
+}
+
 int main(void)
 {
     const struct hpclang_rpl_flash_io io = {flash, read_flash, NULL, FIRST, END};
     const struct hpclang_rpl_reader reader = {read_catalog, catalog_data};
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 35, 0};
+    placement_tests(&io, &catalog);
     for (unsigned v = 0; v < sizeof vectors / sizeof vectors[0]; ++v)
         for (unsigned bank = 0; bank < 6; ++bank) {
             install(v, bank);
