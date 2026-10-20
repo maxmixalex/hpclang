@@ -85,6 +85,38 @@ def generate_fixture(output):
     )
 
 
+def verify_placement(before, after, build, nm, base, *, existing):
+    """Check selection independently from native allocation headers."""
+    _, record, _ = fixture()
+    flash = (before / "flash").read_bytes()
+    if existing:
+        expected = (0xFFFFFFFA, 0xFFFFFFFF)  # EXISTS, unchanged output
+    else:
+        candidates = []
+        for bank in range(0x140000, 0x200000, 0x20000):
+            at, end = bank + 0x105, bank + 0x20000
+            while at < end and flash[at] != 255:
+                require(flash[at] in (0, 0x53), "Unexpected native allocation")
+                extent = (int.from_bytes(flash[at + 1 : at + 4], "little") & 0xFFFFF) + 2
+                require(
+                    extent >= 8 and extent % 4 == 0 and at + extent // 2 < end,
+                    "Invalid native allocation extent",
+                )
+                at += extent // 2
+            require(flash[at:end] == b"\xff" * (end - at), "Non-erased native free tail")
+            if end - at > len(record):
+                candidates.append(at)
+        require(candidates, "Fixture has no room for planned library")
+        expected = (0, candidates[0])
+    symbols = symbol_offsets(build / "installation.elf", nm)
+    ram = (after / "sram").read_bytes()
+    require(
+        struct.unpack_from("<2I", ram, base + symbols["placement_result"]) == expected,
+        "Native cross-port installation plan differs",
+    )
+    require((after / "flash").read_bytes() == flash, "Placement planning changed Flash")
+
+
 def verify_execution(ram, initialized, symbols, package, result, slot, *, fresh_copy=False):
     require(len(ram) == 0x80000, "Expected complete hp4950 SRAM")
     matches = []
@@ -215,6 +247,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     transfer(args, missing, clean, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(clean, missing / "state", build, args.nm, -8, 0xFFFFFFFF)
     startup_missing = verify_startup(clean, missing / "state", build, args.nm, base)
+    verify_placement(clean, missing / "state", build, args.nm, base, existing=False)
     require(verify_busy_reads(args, missing) == 0, "Missing-library lookup wrote Flash")
     print("Native installation lookup rejected the absent library", flush=True)
     installed = root / "installed"
@@ -248,6 +281,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     base = verify_probe(before, matched / "state", build, args.nm, 0, slot)
     startup_matched = verify_startup(before, matched / "state", build, args.nm, base)
+    verify_placement(before, matched / "state", build, args.nm, base, existing=True)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
     transactions = []
     for label, status in (

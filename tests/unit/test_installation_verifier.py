@@ -93,6 +93,44 @@ class FreshInstallationExecutionTests(InstallationExecutionTests):
     fresh_copy = True
 
 
+class PlacementTests(unittest.TestCase):
+    def test_selection_conflict_and_immutable_flash(self):
+        flash = bytearray(b"\xff" * 0x200000)
+        # A deleted eight-byte allocation must still occupy space.
+        flash[0x140105:0x14010D] = bytes.fromhex("000e0000ffffffff")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            (before / "flash").write_bytes(flash)
+            with patch.object(VERIFY, "symbol_offsets", return_value={"placement_result": 0}):
+                for existing, words in (
+                    (False, (0, 0x14010D)),
+                    (True, (0xFFFFFFFA, 0xFFFFFFFF)),
+                ):
+                    (after / "flash").write_bytes(flash)
+                    (after / "sram").write_bytes(struct.pack("<2I", *words))
+                    VERIFY.verify_placement(before, after, root, "unused", 0, existing=existing)
+                    for index in (0, 1):
+                        changed = list(words)
+                        changed[index] ^= 1
+                        (after / "sram").write_bytes(struct.pack("<2I", *changed))
+                        with (
+                            self.subTest(existing=existing, word=index),
+                            self.assertRaises(ValueError),
+                        ):
+                            VERIFY.verify_placement(
+                                before, after, root, "unused", 0, existing=existing
+                            )
+                    (after / "sram").write_bytes(struct.pack("<2I", *words))
+                    changed = bytearray(flash)
+                    changed[0x140109] ^= 1
+                    (after / "flash").write_bytes(changed)
+                    with self.assertRaises(ValueError):
+                        VERIFY.verify_placement(before, after, root, "unused", 0, existing=existing)
+
+
 class StartupInventoryTests(unittest.TestCase):
     def test_independent_layout_and_diagnostic_checks(self):
         flash = bytearray(0x200000)

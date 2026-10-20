@@ -435,8 +435,21 @@ Current delivery checkpoints:
   Twelve host scenarios cover success, each RAM port, catalog and Flash conflicts,
   read failures, malformed chains/catalogs and missing views; all preserve Flash,
   RAM and catalog bytes. The installation suite passes ASan/UBSan and ARM static
-  analysis passes. Native mapping integration and execution remain unverified
-  for this composite planner. Stable complete mappings, storage reservation,
+  analysis passes. The maintained installation witness now captures Port 0 from
+  the native start pointer and Port 1 through the validated RAM mapping. Both
+  HP49g+/HP50g pass absent-ID selection and existing Flash-library rejection:
+  an independent allocation walk checks the chosen address, exact Flash remains
+  unchanged, and the existing owning-CODE, guards, catalog and startup-inventory
+  checks pass. These checks reuse the existing missing/matched E2E launches.
+  Six verifier tests pass, including wrong-result/address and changed-Flash
+  rejection. Unregistered RAM conflicts have host coverage only: native
+  preparation showed that ordinary Port 0/1 STO already registers the library
+  on both models, so those fixtures cannot prove an unregistered conflict.
+  Separate native probes reject each RAM-port conflict on both models with
+  exact library content/terminator preserved, unchanged catalog and zero Flash
+  writes. Port 1's ERAM callback inventory is outside the original startup
+  inventory fixture; its conflict result is not an inventory acceptance claim.
+  Stable complete mappings, storage reservation,
   registration, early startup and durable ownership remain caller/installer
   obligations; ordinary storage APIs retain per-port semantics.
 

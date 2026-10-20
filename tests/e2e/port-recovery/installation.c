@@ -6,7 +6,35 @@
 
 volatile unsigned installation_result[8];
 #ifdef HPCLANG_INSTALLATION_STARTUP
+#include "rpl-recovery-installation.h"
+#include "rpl-stock-memory.h"
+volatile uint32_t placement_result[2];
 void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_reader *reader);
+
+static void plan_placement(const struct hpclang_rpl_flash_io *io,
+                           const struct hpclang_rpl_flash_catalog *catalog)
+{
+    placement_result[0] = (uint32_t)HPCLANG_RPL_FLASH_INVALID;
+    placement_result[1] = UINT32_MAX;
+    uint32_t first = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        uint8_t nibble;
+        if (!catalog->reader->read_nibble(catalog->reader->context, 0x80716u + i, &nibble))
+            return;
+        first |= (uint32_t)nibble << (4 * i);
+    }
+    const volatile uint32_t *l1 = (void *)0x07f00000u;
+    struct hpclang_rpl_reader port1;
+    if (first < 0x80000u || first > 0xffffbu ||
+        !hpclang_rpl_stock_port1_capture(&port1, (void *)0x08020000u, l1[0x80]))
+        return;
+    const struct hpclang_rpl_recovery_port_view ports[2] = {{catalog->reader, first, 0x100000u},
+                                                            {&port1, 0, HPCLANG_RPL_PORT1_NIBBLES}};
+    uint32_t slot = UINT32_MAX;
+    placement_result[0] = (uint32_t)hpclang_rpl_recovery_installation_plan(
+        io, expected_library, sizeof expected_library, ports, catalog, &slot);
+    placement_result[1] = slot;
+}
 #endif
 #ifdef HPCLANG_INSTALLATION_IDENTITY
 #include "rpl-recovery-installation.h"
@@ -71,6 +99,9 @@ int hpclang_recovery_predicate(const uint32_t *map)
 #endif
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
     const struct hpclang_rpl_flash_io io = {descriptors, read_flash, NULL, 0x140000, 0x200000};
+#ifdef HPCLANG_INSTALLATION_STARTUP
+    plan_placement(&io, &catalog);
+#endif
     uint32_t slot = UINT32_MAX;
 #if defined(HPCLANG_INSTALLATION_IDENTITY)
     uint8_t identity[48];
