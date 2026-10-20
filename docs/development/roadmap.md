@@ -427,6 +427,11 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Current submission batch:** real-template build/native coverage
+  (`192310b5`) and unarmed staging/preflight (`1f51170d`) are submitted together.
+  Local verification is recorded below; CI acceptance remains pending and new
+  runs are not polled. M8.0 is not closed.
+
 - **Real recovery template integration (local, open):** packaging the actual
   guarded recovery/admission ELF images produces a 49,588-byte native record.
   Embedding that record in the installation witness exceeds the recovery CODE
