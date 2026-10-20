@@ -72,11 +72,16 @@ hpclang_unit(rpl_flash_authority test_rpl_flash_authority.c
     "${HPCLANG_ROOT}/runtime/core/rpl-object-span.c")
 target_include_directories(test_rpl_flash_authority PRIVATE "${HPCLANG_ROOT}/runtime/core")
 
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/recovery-identity-vectors.h"
+# Static analysis consumes the compilation database without building targets.
+# Keep generated inputs available at configuration time, including regeneration
+# when either the reference generator or its packager changes.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/recovery_identity_vectors.py"
+    "${HPCLANG_ROOT}/tools/package-recovery.py")
+execute_process(
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/recovery_identity_vectors.py"
         "${CMAKE_CURRENT_BINARY_DIR}/recovery-identity-vectors.h"
-    DEPENDS recovery_identity_vectors.py "${HPCLANG_ROOT}/tools/package-recovery.py"
-    VERBATIM)
+    COMMAND_ERROR_IS_FATAL ANY)
 hpclang_unit(rpl_recovery_identity test_rpl_recovery_identity.c
     "${CMAKE_CURRENT_BINARY_DIR}/recovery-identity-vectors.h"
     "${HPCLANG_ROOT}/runtime/core/rpl-recovery-identity.c")

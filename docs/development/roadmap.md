@@ -428,13 +428,20 @@ post-M8 deferral. Only M8.1 is accepted complete.
 Current delivery checkpoints:
 
 - **Latest status (2026-10-20):** `5aad911e` is submitted, with CI acceptance
-  pending; `8fc3fcd4` is accepted and merged into main as `ff35ffe9`.
+  pending; Objects passes, Quality fails because the identity-vector header
+  was generated only at build time, and Core/Runtime are still running/queued
+  at the latest inspection. A local CMake fix generates the header during
+  configuration and tracks its inputs for regeneration. Both affected sources
+  pass pinned Clang analysis in a fresh, configure-only build directory, and
+  their two CTests pass. `8fc3fcd4` is accepted and merged into main as `ff35ffe9`.
   Local follow-up through `c15a9231` integrates automatic sealed admission
   and checks create-only reservation collisions. Both native models pass
   recovery/restart, all maintained automatic rejection cases and both
   existing-content collision cases. A lost-RAM-write-acknowledgement prototype
-  also passes on both models; maintained integration and normal-path regression
-  are running. Next: complete this regression, then durable reservation
+  also passes on both models. Maintained failure integration at `2952a44b`
+  now passes both models, including both existing-content collision cases;
+  normal publication/restart/cancellation regression remains running.
+  Next: complete this regression, then durable reservation
   ownership/lifetime and global startup order. No M8 acceptance gate is removed.
   The detailed evidence below includes earlier intermediate states.
 
