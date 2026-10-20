@@ -7,18 +7,37 @@ import shutil
 import struct
 from types import SimpleNamespace
 
+from prepare import prepare
 from reservation import packager, reader
 from verify import installed_recovery, nibbles, require, require_stock_pc, symbol_offsets
 
 
 LIBRARY_ID = 1703
+JOURNAL_SLOT = 0x160105
+AUTHORITY_SLOT = JOURNAL_SLOT + 4124
+TARGET = 0x140000
 
 
 def fixture():
     pack = packager()
     # Empty configuration: installable through Stock without an application callback.
-    library = pack._configuration_library(
-        pack.immediate(0x2D9D) + pack.immediate(0x312B), LIBRARY_ID
+    # Two owned PIC stubs (BX LR), never invoked by the empty configuration.
+    # Their descriptors exercise the same command-layout path as real recovery.
+    image = pack.bind_image(
+        bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8),
+        16,
+        JOURNAL_SLOT,
+        AUTHORITY_SLOT,
+    )
+    program = pack._recovery_program(pack.package(image, len(image), model="hp50g"))
+    empty = pack.immediate(0x2D9D) + pack.immediate(0x312B)
+    library = pack._configuration_library(empty, LIBRARY_ID, (program,) + (empty,) * 5 + (program,))
+    layout = pack.recovery_layout(
+        library,
+        (
+            ("recovery", 0, image, 16, False),
+            ("admission", 6, image, 16, False),
+        ),
     )
     obj = nibbles(library[8:])
     span = 5 + int(obj[5:10][::-1], 16)
@@ -26,18 +45,20 @@ def fixture():
     body = obj[:span] + "f" * (allocated - span - 8)
     record = b"\x53" + ((allocated - 2) | 0x100000).to_bytes(3, "little")
     record += bytes(int(body[i], 16) | int(body[i + 1], 16) << 4 for i in range(0, len(body), 2))
-    return library, record
+    return library, record, layout
 
 
 def generate_fixture(output):
     output.mkdir(parents=True, exist_ok=True)
-    library, record = fixture()
+    library, record, layout = fixture()
     (output / "expected-library.hp").write_bytes(library)
     (output / "expected-library.h").write_text(
         "/* Generated native fixture; not a production installation root. */\n"
         "static const unsigned char expected_library[] = {\n    "
         + ", ".join(str(byte) for byte in record)
         + "\n};\n"
+        + f"#define EXPECTED_RECOVERY_BINDING {layout['recovery_binding_nibble']}u\n"
+        + f"#define EXPECTED_ADMISSION_BINDING {layout['admission_binding_nibble']}u\n"
     )
 
 
@@ -79,9 +100,10 @@ def verify_execution(ram, initialized, symbols, package, result, slot):
         and (base + symbols["__image_end"]) * 2 <= i + end
     ]
     require(len(owners) == 1, "Installation execution is not inside one owning CODE object")
+    return base
 
 
-def verify_probe(before, after, build, nm, result, slot):
+def verify_probe(before, after, build, nm, result, slot, *, image="installation"):
     require_stock_pc(after)
     require(
         (before / "flash").read_bytes() == (after / "flash").read_bytes(),
@@ -92,7 +114,7 @@ def verify_probe(before, after, build, nm, result, slot):
     require(read(0x806FD) - read(0x806F8) == 10, "Expected exactly one predicate result")
     pointer = read(read(0x806F8))
     require(
-        read(pointer) == 0x2933 and pointer == (0x2F94C if result == 0 else 0x2F937),
+        read(pointer) == 0x2933 and pointer == (0x2F94C if result >= 0 else 0x2F937),
         "Installation predicate returned the wrong real-valued result",
     )
     count = read(0x8611D, 3)
@@ -101,14 +123,22 @@ def verify_probe(before, after, build, nm, result, slot):
         all(read(0x86120 + i * 16, 16) == original(0x86120 + i * 16, 16) for i in range(count)),
         "Read-only installation witness changed the catalog",
     )
-    verify_execution(
-        (after / "sram").read_bytes(),
-        (build / "installation.bin").read_bytes(),
-        symbol_offsets(build / "installation.elf", nm),
-        (build / "installation.hp").read_bytes(),
+    ram = (after / "sram").read_bytes()
+    symbols = symbol_offsets(build / (image + ".elf"), nm)
+    base = verify_execution(
+        ram,
+        (build / (image + ".bin")).read_bytes(),
+        symbols,
+        (build / (image + ".hp")).read_bytes(),
         result,
         slot,
     )
+    if image == "installation-transaction":
+        require(
+            struct.unpack_from("<3I", ram, base + symbols["transaction_pair"])
+            == ((JOURNAL_SLOT, AUTHORITY_SLOT, TARGET) if result >= 0 else (0, 0, 0)),
+            "Installed transaction coordinates differ from the owned fixture",
+        )
 
 
 def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_reads):
@@ -145,23 +175,70 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
         (before / "flash").read_bytes(),
         (build / "expected-library.hp").read_bytes(),
         LIBRARY_ID,
-        None,
+        TARGET,
         read=reader(before),
     )
     matched = root / "matched"
     transfer(args, matched, before, build, "INSTEST", package_name="installation.hp")
     verify_probe(before, matched / "state", build, args.nm, 0, slot)
     require(verify_busy_reads(args, matched) == 0, "Installed-library lookup wrote Flash")
+    transactions = []
+    for label, status in (
+        ("armed", 1),
+        ("damaged", 1),
+        ("retiring", 2),
+        ("closed", 0),
+        ("unpublished", -4),
+    ):
+        source = root / (label + "-input")
+        prepare(before, source, JOURNAL_SLOT, TARGET, bound=True)
+        flash = bytearray((source / "flash").read_bytes())
+        if label != "damaged":
+            flash[TARGET : TARGET + 4096] = (before / "flash").read_bytes()[TARGET : TARGET + 4096]
+        if label == "retiring":
+            flash[JOURNAL_SLOT] = 0x7C
+        elif label == "closed":
+            flash[JOURNAL_SLOT] = flash[AUTHORITY_SLOT] = 0
+        elif label == "unpublished":
+            flash[AUTHORITY_SLOT] = 0xFF
+        (source / "flash").write_bytes(flash)
+        phase = root / label
+        transfer(
+            args,
+            phase,
+            source,
+            build,
+            "INSTEST",
+            package_name="installation-transaction.hp",
+            consume=True,
+        )
+        verify_probe(
+            source,
+            phase / "state",
+            build,
+            args.nm,
+            status,
+            slot if status >= 0 else 0xFFFFFFFF,
+            image="installation-transaction",
+        )
+        require(verify_busy_reads(args, phase) == 0, "Installed transaction preflight wrote Flash")
+        transactions.append(label)
+        print(f"Installed transaction preflight verified: {label}", flush=True)
     (args.output / "result.json").write_text(
         json.dumps(
-            dict(status="pass", model=args.model, suite="installation", slot=slot, bytes=size),
+            dict(
+                status="pass",
+                model=args.model,
+                suite="installation",
+                slot=slot,
+                bytes=size,
+                transactions=transactions,
+            ),
             indent=2,
         )
         + "\n"
     )
-    print(
-        "PASS: native installation content/catalog/bank matching without Flash writes", flush=True
-    )
+    print("PASS: native installation and transaction preflight without Flash writes", flush=True)
 
 
 if __name__ == "__main__":

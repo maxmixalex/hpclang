@@ -1,10 +1,17 @@
 /* Read-only installation witness for the supported hp4950 Stock 2.15 fixture.
  * ROM/catalog addresses are fixture inputs, not production profile discovery. */
-#include "rpl-flash-write.h"
+#include "rpl-flash-replay.h"
 #include "expected-library.h"
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_TRANSACTION
+static uint8_t transaction_scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+volatile unsigned transaction_pair[3];
+/* A runtime size keeps the compiler from emitting an absolute-pointer constant
+ * aggregate for the position-independent witness. */
+static volatile unsigned expected_bytes = sizeof expected_library;
+#endif
 void hpclang_flash_mapping_swap(unsigned descriptors[2]);
 
 static int read_flash(void *context, uint32_t address, uint16_t *value)
@@ -42,13 +49,27 @@ int hpclang_recovery_predicate(const uint32_t *map)
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 0x8611d, 3 + 128 * 16, 0x26bbb};
     const struct hpclang_rpl_flash_io io = {descriptors, read_flash, NULL, 0x140000, 0x200000};
     uint32_t slot = UINT32_MAX;
+#ifdef HPCLANG_INSTALLATION_TRANSACTION
+    const struct hpclang_rpl_flash_recovery_layout layout = {
+        expected_library, expected_bytes, EXPECTED_RECOVERY_BINDING, EXPECTED_ADMISSION_BINDING};
+    struct hpclang_rpl_flash_installed_recovery installed;
+    int result = hpclang_rpl_flash_preflight_installed(&io, &layout, &catalog, transaction_scratch,
+                                                       sizeof transaction_scratch, &installed);
+    if (result >= 0) {
+        slot = installed.library_slot;
+        transaction_pair[0] = installed.journal_slot;
+        transaction_pair[1] = installed.authority_slot;
+        transaction_pair[2] = installed.target;
+    }
+#else
     int result = hpclang_rpl_flash_match_installation(&io, expected_library,
                                                       sizeof expected_library, &catalog, &slot);
+#endif
     hpclang_flash_mapping_swap(descriptors);
     installation_result[0] = 0x48504944;
     installation_result[1] = (unsigned)result;
     installation_result[2] = slot;
     installation_result[5] = l1[0];
     installation_result[6] = l1[1];
-    return result == 0;
+    return result >= 0;
 }
