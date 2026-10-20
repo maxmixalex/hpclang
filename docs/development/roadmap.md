@@ -427,7 +427,13 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
-- **Port 1 startup inventory extension (local):** the read-only native witness
+- **Cleanup/inventory CI submission:** the locally validated cleanup
+  (`0dbd6429`) and Port 1 inventory (`444bbe8f`) changes are submitted together
+  with their maintained E2E paths. CI acceptance is pending; new runs are not
+  polled. Startup entry selection, durable installation authority and resource
+  reclamation remain M8.0 requirements.
+
+- **Port 1 startup inventory extension:** the read-only native witness
   now resolves ERAM catalog bindings through the existing validated Port 1
   mapping, keeping its Saturn-window bounds separate from Flash geometry.
   The independent oracle reads the corresponding saved SRAM bytes and rejects
@@ -440,7 +446,7 @@ Current delivery checkpoints:
   ownership. The proposed internal use of research ID 4 is awaiting
   maintainer confirmation; the public recovery packager's ID policy is unchanged.
 
-- **Abandoned-library cleanup implementation (local, not submitted):** tail
+- **Abandoned-library cleanup implementation:** tail
   recovery now accepts a complete CRC-checked unpublished library only as the
   final allocation, clears its metadata before status, and preserves its
   payload. Live libraries and partial removal states are not adopted. Host
@@ -462,8 +468,8 @@ Current delivery checkpoints:
   narrowed zero-metadata retry, with exactly two remaining writes and preserved
   Flash/catalog/guards. The complete Flash creation/write ASan/UBSan regressions
   finish successfully, as does a focused run of the unchanged partial-backup
-  recovery/corruption-rejection tests. Implementation is local at `0dbd6429`;
-  no additional CI submission.
+  recovery/corruption-rejection tests. Implementation at `0dbd6429` is included
+  in the accumulated submission above.
 
 - **Interrupted fresh-library commit gap (local):** on both HP49g+/HP50g,
   cutting the final status program at SST operation 286, busy read 1, mask
@@ -473,12 +479,12 @@ Current delivery checkpoints:
   Before the local cleanup change, C tail recovery against both saved native
   states returned DIRTY with zero writes: hidden-library cleanup was not covered
   by the backup-only path.
-  Next: establish a bounded abandoned-install cleanup transition, including
-  interruption of cleanup itself; do not infer permission to complete a live
-  installation from matching payload bytes. These results do not establish
+  The cleanup implementation above addresses this bounded interruption case;
+  matching payload bytes still do not authorize completing a live installation.
+  These results do not establish
   arbitrary torn-state boot safety or durable installation ownership.
 
-- **New CI submission:** the accumulated placement, namespace exclusion, grouped
+- **Previous placement/storage CI submission:** the accumulated placement, namespace exclusion, grouped
   space planning, runtime sealing, draft preparation and selected-slot storage
   work is submitted together after local validation. The native preparation
   checks reuse existing E2E launches; storage adds one write and one restart
