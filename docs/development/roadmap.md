@@ -427,7 +427,7 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
-- **Fresh reservation cancellation cleanup (local):** an internal discard
+- **Fresh reservation cancellation cleanup (submitted, CI pending):** an internal discard
   operation checks the original name, creation receipt address/capacity and
   complete untouched snapshot before removing a reservation. Success consumes
   the receipt; pre-write rejection preserves RAM, while any failure after a
@@ -439,9 +439,9 @@ Current delivery checkpoints:
   separate directory-check frames keep removal within its 4 KiB stack.
   ARM analysis and Python checks pass. This is same-invocation cancellation
   cleanup, not ownership reconstruction after reset, active workspace release
-  or Flash reclamation. It has not been submitted for CI.
+  or Flash reclamation. Commit `4ac72852` is included in the current submission.
 
-- **Installed transaction recovery (local, open):** the real planner places
+- **Installed transaction recovery (submitted, CI pending):** the real planner places
   the library in the second user bank and the journal/authority in the first
   bank's free tail. Injecting damage into that first bank's header after a
   real installation leaves both native models unrepaired. A new host regression
@@ -454,15 +454,16 @@ Current delivery checkpoints:
   unfinished retirement and competing journals. Both native models pass fresh
   real-template installation, recovery/retirement with 1,923 SST operations,
   exact remaining Flash/catalog/source preservation and a second boot with zero
-  writes. This path is connected to maintained installation E2E; it is local,
-  not yet submitted or CI-accepted. Fault preparation validates tails and sector overlap
+  writes. This path is connected to maintained installation E2E; commit `a9b720f4`
+  is included in the current submission, with CI acceptance pending. Fault preparation validates tails and sector overlap
   instead of requiring a separate empty bank. This injected transaction does
   not prove production activation authority or safe reclamation.
 
-- **Current submission batch:** real-template build/native coverage
-  (`192310b5`) and unarmed staging/preflight (`1f51170d`) are submitted together.
-  Local verification is recorded below; CI acceptance remains pending and new
-  runs are not polled. M8.0 is not closed.
+- **Current submission batch:** damaged-bank bound recovery (`a9b720f4`)
+  and fresh reservation cancellation cleanup (`4ac72852`) follow the previous
+  real-template/staging submission (`1deb8872`). Both models pass the maintained
+  native paths described above; final complete ARM build and strict docs pass.
+  CI acceptance is pending; new runs are not polled. M8.0 is not closed.
 
 - **Real recovery template integration (local, open):** packaging the actual
   guarded recovery/admission ELF images produces a 49,588-byte native record.
