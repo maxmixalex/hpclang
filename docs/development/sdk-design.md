@@ -427,6 +427,13 @@ CREATED; it clears the single phase bit and verifies readback. A repeated CREATE
 acknowledgement makes no writes. No RAM bytes or receipt fields change. All views
 must remain exclusively owned in the same invocation; neither entry supplies
 name-absence-before-intent ordering, restart provenance or startup safety.
+The maintained `installation-creation` native witness exercises name-absence
+checking, an exact fresh fixture tail, a driver-level partial INTENT write and
+retry, native RAM creation, then receipt-gated CREATED and an idempotent repeat.
+Its verifier independently constructs the complete expected Flash and checks
+reservation contents, unrelated HOME data, native catalog, owning CODE, guards
+and Flash busy accounting. The fixture's claim address is explicit and checked;
+it is not yet a production claim-bound root installation or a power-loss test.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

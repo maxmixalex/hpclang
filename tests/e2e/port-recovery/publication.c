@@ -4,6 +4,7 @@
 #include "rpl-flash-replay.h"
 #include "rpl-stock-memory.h"
 #include "rpl-recovery-reservation.h"
+#include "rpl-object-store.h"
 #include "sst-flash.h"
 #include "expected-library.h"
 #include <hpclang/time.h>
@@ -117,6 +118,11 @@ __attribute__((noinline)) static int check_reservation(const uint32_t *map)
 }
 
 static unsigned publication_calls, cut_at;
+#ifdef HPCLANG_INSTALLATION_CREATION
+#define CREATION_SLOT 0x1e0105u /* Verified first erased allocation of the fixture's last bank. */
+static uint8_t creation_intent[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
+volatile uint32_t creation_result[5];
+#endif
 unsigned short hpclang_flash_read16(void *, unsigned);
 void hpclang_flash_write16(void *, unsigned, unsigned short);
 static unsigned short bus_read(void *c, unsigned a)
@@ -137,7 +143,12 @@ static int program_publication(void *c, uint32_t a, uint16_t value)
     if ((a < (EXPECTED_JOURNAL_SLOT & ~1u) ||
          a >= EXPECTED_JOURNAL_SLOT + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES) &&
         (a < (EXPECTED_AUTHORITY_SLOT & ~1u) ||
-         a >= EXPECTED_AUTHORITY_SLOT + HPCLANG_RPL_FLASH_AUTHORITY_BYTES))
+         a >= EXPECTED_AUTHORITY_SLOT + HPCLANG_RPL_FLASH_AUTHORITY_BYTES)
+#ifdef HPCLANG_INSTALLATION_CREATION
+        &&
+        (a < (CREATION_SLOT & ~1u) || a >= CREATION_SLOT + HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES)
+#endif
+    )
         return 0;
     unsigned cut = ++publication_calls == cut_at;
     uint16_t actual = cut ? (uint16_t)(value | 0xaaaau) : value;
@@ -151,6 +162,83 @@ static int program_publication(void *c, uint32_t a, uint16_t value)
         ++publication_result[11];
     return !cut && status == HPCLANG_SST_OK && observed == value;
 }
+#ifdef HPCLANG_INSTALLATION_CREATION
+__attribute__((noinline)) static int creation_name_absent(const uint32_t *map)
+{
+    struct hpclang_rpl_stock_memory memory;
+    const volatile unsigned *l1 = (void *)0x07f00000;
+    if (!hpclang_rpl_stock_memory_capture(&memory, map, l1[0x80]))
+        return HPCLANG_RPL_MUTATION_IO;
+    const struct hpclang_rpl_reader reader = {stock_read, &memory};
+    uint32_t home;
+    struct hpclang_rpl_directory_entry_view entry;
+    if (hpclang_rpl_store_home_object(&reader, &home))
+        return HPCLANG_RPL_MUTATION_IO;
+    int result = hpclang_rpl_directory_find(&reader, home, (const uint8_t *)"HPCLEASE", 8, &entry);
+    return result == HPCLANG_RPL_STORE_NOT_FOUND ? 0
+           : result                              ? HPCLANG_RPL_MUTATION_IO
+                                                 : HPCLANG_RPL_MUTATION_EXISTS;
+}
+
+static int begin_creation(const uint32_t *map, const struct hpclang_rpl_flash_io *source,
+                          const struct hpclang_rpl_flash_installed_recovery *planned)
+{
+    int result = creation_name_absent(map);
+    if (result)
+        return result;
+    /* plan_installed already validated all native banks. Requiring the first
+     * allocation marker erased establishes this fixture's exact fresh tail. */
+    uint16_t marker;
+    if (!source->read16(source->context, CREATION_SLOT & ~1u, &marker) || (marker >> 8) != 255)
+        return HPCLANG_RPL_FLASH_OCCUPIED;
+    uint8_t header[80];
+    uint32_t crc = 0;
+    for (unsigned i = 0; i < 4; ++i)
+        crc |= (uint32_t)planned_journal[sizeof planned_journal - 4 + i] << (8 * i);
+    if (!hpclang_rpl_recovery_reservation_header(expected_identity, planned, crc, CAPACITY,
+                                                 header) ||
+        hpclang_rpl_flash_creation_encode(source->first, source->end, CREATION_SLOT, header,
+                                          (const uint8_t *)"HPCLEASE", 8, creation_intent,
+                                          sizeof creation_intent))
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint64_t now;
+    if (hpclang_time_read_us(&now))
+        return HPCLANG_RPL_FLASH_FAILED;
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_publication;
+    cut_at = 3;
+    creation_result[0] = hpclang_rpl_flash_publish_creation_intent(
+        &io, CREATION_SLOT, creation_intent, sizeof creation_intent);
+    creation_result[1] = hpclang_rpl_flash_finish_creation_intent(
+        &io, CREATION_SLOT, creation_intent, sizeof creation_intent);
+    if (creation_result[0] != (uint32_t)HPCLANG_RPL_FLASH_DIRTY || creation_result[1])
+        reservation_failed();
+    return 0;
+}
+
+__attribute__((noinline)) static void complete_creation(const uint32_t *map,
+                                                        const struct hpclang_rpl_flash_io *source)
+{
+    struct hpclang_rpl_stock_memory memory;
+    const volatile unsigned *l1 = (void *)0x07f00000;
+    if (!hpclang_rpl_stock_memory_capture(&memory, map, l1[0x80]))
+        reservation_failed();
+    const struct hpclang_rpl_reader reader = {stock_read, &memory};
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_publication;
+    creation_result[2] = hpclang_rpl_recovery_reservation_complete_creation(
+        &io, CREATION_SLOT, creation_intent, sizeof creation_intent, &reader,
+        (const struct hpclang_object *)&reservation, &created_reservation);
+    unsigned count = publication_calls;
+    creation_result[3] = hpclang_rpl_recovery_reservation_complete_creation(
+        &io, CREATION_SLOT, creation_intent, sizeof creation_intent, &reader,
+        (const struct hpclang_object *)&reservation, &created_reservation);
+    creation_result[4] = publication_calls;
+    if (creation_result[2] || creation_result[3] || count != publication_calls)
+        reservation_failed();
+}
+#endif
+
 static void publish_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *reader,
                           const struct hpclang_rpl_flash_recovery_layout *layout,
                           const struct hpclang_rpl_flash_catalog *catalog)
@@ -338,6 +426,11 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
     *slot = planned.library_slot;
     return 0;
 #endif
+#ifdef HPCLANG_INSTALLATION_CREATION
+    result = begin_creation(map, io, &planned);
+    if (result)
+        return result;
+#endif
     result = create_reservation(map, &planned);
     reservation_result[0] = (uint32_t)result;
     if (result == HPCLANG_RPL_MUTATION_INCOMPLETE) {
@@ -347,7 +440,16 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
         reservation_failed();
     }
     if (result)
+#ifdef HPCLANG_INSTALLATION_CREATION
+        reservation_failed(); /* Durable intent exists; retain even pre-write RAM errors. */
+#else
         return result;
+#endif
+#ifdef HPCLANG_INSTALLATION_CREATION
+    complete_creation(map, io);
+    *slot = planned.library_slot;
+    return 0;
+#endif
 #ifdef HPCLANG_INSTALLATION_ABORT
     abort_owned(map, io, &layout, catalog);
 #else

@@ -1,4 +1,4 @@
-"""Offline creation-claim allocation fixtures; not publication or ownership proof."""
+"""Creation-claim native fixtures; production restart ownership remains separate."""
 
 import shutil
 import struct
@@ -7,7 +7,7 @@ import zlib
 from prepare import free_tail
 from publication import reservation_value
 from reservation import reader
-from verify import require, require_stock_pc
+from verify import home_string, require, require_stock_pc, symbol_offsets
 
 
 def creation_record(binding, name, slot, phase):
@@ -24,6 +24,52 @@ def creation_record(binding, name, slot, phase):
     data[100 : 100 + len(name)] = name
     struct.pack_into("<I", data, 236, zlib.crc32(data[:16] + data[17:236]))
     return data
+
+
+def run_creation_publication(args, before, root, slot, *, transfer, verify_busy_reads):
+    from installation import verify_probe
+
+    claim_slot = 0x1E0105
+    expected = bytearray((before / "flash").read_bytes())
+    require(free_tail(expected, 0x1E0000) == claim_slot, "Creation fixture tail is occupied")
+    reservation = reservation_value(expected, slot)
+    expected[claim_slot : claim_slot + 240] = creation_record(
+        reservation[:80], b"HPCLEASE", claim_slot, 0x7E
+    )
+    phase = root / "creation-published"
+    image = "installation-creation"
+    transfer(
+        args,
+        phase,
+        before,
+        args.build,
+        "CREATE",
+        package_name=image + ".hp",
+        remote_commands=[
+            "-95 CF HOME CLEAR \"unrelated data\" 'HPCKEEP' STO 'CREATE' RCL 'CREATE' PURGE"
+        ],
+    )
+    after = phase / "state"
+    base = verify_probe(
+        before, after, args.build, args.nm, 0, slot, image=image, expected_flash=expected
+    )
+    symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
+    ram = (after / "sram").read_bytes()
+    result = struct.unpack_from("<5I", ram, base + symbols["creation_result"])
+    require(result[:4] == (0xFFFFFFFC, 0, 0, 0), "Creation intent/receipt commit failed")
+    require(
+        result[4] > 0 and verify_busy_reads(args, phase) == result[4],
+        "Creation Flash operations or busy-read budget differ",
+    )
+    require(
+        home_string(reader(after), b"HPCLEASE") == reservation,
+        "Created reservation differs from its bound snapshot",
+    )
+    require(
+        home_string(reader(after), b"HPCKEEP") == b"unrelated data",
+        "Creation publication changed unrelated HOME data",
+    )
+    print("Native intent retry, fresh RAM creation and receipt-gated CREATED verified", flush=True)
 
 
 def run_creation_visibility(args, before, root, slot, *, emulator, completed, verify_busy_reads):

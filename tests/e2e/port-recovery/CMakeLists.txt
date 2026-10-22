@@ -131,7 +131,7 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/insta
 set(installation_witnesses installation installation-transaction installation-publication
         installation-cancellation installation-identity installation-reservation-failure
         installation-store installation-cleanup installation-staging installation-abort
-        installation-activation-reject)
+        installation-activation-reject installation-creation)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
@@ -198,14 +198,17 @@ foreach(witness IN LISTS installation_witnesses)
     elseif(witness STREQUAL "installation-publication" OR
             witness STREQUAL "installation-reservation-failure" OR
             witness STREQUAL "installation-staging" OR witness STREQUAL "installation-abort" OR
-            witness STREQUAL "installation-activation-reject")
+            witness STREQUAL "installation-activation-reject" OR
+            witness STREQUAL "installation-creation")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot rpl-recovery-reservation
                 time time-math rtc rtc-decode datetime sst-flash)
             target_sources(${witness} PRIVATE "${CORE}/${module}.c")
         endforeach()
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_PUBLICATION)
-        if(witness STREQUAL "installation-activation-reject")
+        if(witness STREQUAL "installation-creation")
+            target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_CREATION)
+        elseif(witness STREQUAL "installation-activation-reject")
             target_compile_definitions(${witness} PRIVATE HPCLANG_ACTIVATION_REJECT)
         elseif(witness STREQUAL "installation-reservation-failure")
             target_compile_definitions(${witness} PRIVATE HPCLANG_RESERVATION_FAIL_WRITE=1)

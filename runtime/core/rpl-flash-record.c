@@ -88,6 +88,13 @@ static uint32_t creation_crc(const uint8_t *data)
     return ~crc;
 }
 
+/* Keep repeated copies behind a local call: Thumb size optimization otherwise
+ * caches external memcpy's address through a GOT, unavailable in relocated roots. */
+__attribute__((noinline)) static void creation_copy(void *out, const void *in, uint32_t bytes)
+{
+    memcpy(out, in, bytes);
+}
+
 int hpclang_rpl_flash_creation_encode(uint32_t first, uint32_t end, uint32_t slot,
                                       const uint8_t binding[80], const uint8_t *name,
                                       uint32_t name_length, uint8_t *data, uint32_t capacity)
@@ -97,14 +104,14 @@ int hpclang_rpl_flash_creation_encode(uint32_t first, uint32_t end, uint32_t slo
         return HPCLANG_RPL_SPAN_MALFORMED;
     uint8_t record[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES] = {0};
     write_le32(record, (2u * sizeof record - 2u) << 8u);
-    memcpy(record + 4, "HPCOWN1", 8);
+    creation_copy(record + 4, "HPCOWN1", 8);
     write_le32(record + 12, slot);
     record[16] = 0x7f;
     record[17] = (uint8_t)name_length;
-    memcpy(record + 20, binding, 80);
-    memcpy(record + 100, name, name_length);
+    creation_copy(record + 20, binding, 80);
+    creation_copy(record + 100, name, name_length);
     write_le32(record + sizeof record - 4u, creation_crc(record));
-    memcpy(data, record, sizeof record);
+    creation_copy(data, record, sizeof record);
     return HPCLANG_RPL_SPAN_OK;
 }
 

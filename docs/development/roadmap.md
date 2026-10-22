@@ -426,6 +426,19 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Native creation publication (local, not submitted):** a maintained
+  witness checks name absence and the fixture's exact erased tail, publishes
+  INTENT with a driver-level partial write/retry, creates the RAM reservation,
+  and commits CREATED through the receipt gate; repeating completion must make
+  no writes. The independent verifier checks exact full Flash, RAM binding,
+  unrelated HOME data, owning CODE, stack guards and Flash busy accounting.
+  Both initial runs passed publication/receipt/Flash checks but failed the
+  unrelated-variable check because the fixture had not created that variable.
+  Setup now creates it before execution; both corrected runs pass in full.
+  The full ARM build, ARM analysis, Ruff and Flash-record ASan/UBSan pass. Native compilation exposed a GOT-based external memcpy reference in the
+  creation encoder; a local noinline copy helper restores relocatable calls,
+  with the strict relocation gate unchanged. This fixture is not the production
+  claim-bound root installer, restart ownership, cancellation or reclamation.
 - **Receipt-gated CREATED transition (local, not submitted):** the RAM
   wrapper rechecks the original receipt, full snapshot and claim binding/name
   before the Flash primitive verifies all immutable bytes and changes only the
