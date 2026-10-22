@@ -102,6 +102,20 @@ static int create_reservation(const uint32_t *map,
 }
 
 volatile uint32_t publication_result[12];
+volatile uint32_t activation_result[3];
+
+__attribute__((noinline)) static int check_reservation(const uint32_t *map)
+{
+    struct hpclang_rpl_stock_memory memory;
+    const volatile unsigned *l1 = (void *)0x07f00000;
+    if (!hpclang_rpl_stock_memory_capture(&memory, map, l1[0x80]))
+        return HPCLANG_RPL_MUTATION_IO;
+    const struct hpclang_rpl_reader reader = {stock_read, &memory};
+    return hpclang_rpl_recovery_reservation_check_created(
+        &reader, (const uint8_t *)"HPCLEASE", 8, (const struct hpclang_object *)&reservation,
+        &created_reservation);
+}
+
 static unsigned publication_calls, cut_at;
 unsigned short hpclang_flash_read16(void *, unsigned);
 void hpclang_flash_write16(void *, unsigned, unsigned short);
@@ -137,7 +151,7 @@ static int program_publication(void *c, uint32_t a, uint16_t value)
         ++publication_result[11];
     return !cut && status == HPCLANG_SST_OK && observed == value;
 }
-static void publish_owned(const struct hpclang_rpl_flash_io *reader,
+static void publish_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *reader,
                           const struct hpclang_rpl_flash_recovery_layout *layout,
                           const struct hpclang_rpl_flash_catalog *catalog)
 {
@@ -159,8 +173,23 @@ static void publish_owned(const struct hpclang_rpl_flash_io *reader,
     publication_result[2] = publication_calls - count;
     cut_at = publication_calls + 3;
     publication_result[3] =
-        hpclang_rpl_flash_publish_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
-                                            planned_journal, sizeof planned_journal);
+        hpclang_rpl_flash_stage_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
+                                          planned_journal, sizeof planned_journal);
+    activation_result[0] = hpclang_rpl_flash_finish_staged_authority(
+        &io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT, planned_journal,
+        sizeof planned_journal);
+    activation_result[1] = hpclang_rpl_flash_preflight_staged_installed(
+        &io, layout, catalog, checked_transaction, sizeof checked_transaction, &installed);
+#ifdef HPCLANG_ACTIVATION_REJECT
+    /* A valid staged Flash transaction must not hide a lost creation receipt. */
+    ++created_reservation.capacity;
+#endif
+    activation_result[2] = check_reservation(map);
+    /* Staging is still unarmed. Only this invocation's unchanged fresh receipt,
+     * together with the exact installed staged transaction, permits activation.
+     * This witness does not reconstruct that receipt after a restart. */
+    if (activation_result[0] || activation_result[1] || activation_result[2])
+        reservation_failed();
     publication_result[4] =
         hpclang_rpl_flash_finish_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
                                            planned_journal, sizeof planned_journal);
@@ -322,7 +351,7 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
 #ifdef HPCLANG_INSTALLATION_ABORT
     abort_owned(map, io, &layout, catalog);
 #else
-    publish_owned(io, &layout, catalog);
+    publish_owned(map, io, &layout, catalog);
 #endif
     *slot = planned.library_slot;
     return 0;

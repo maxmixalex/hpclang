@@ -843,6 +843,12 @@ static void test_recovery_reservation_discard_created(void)
     static uint8_t original[NIBBLES];
     memcpy(original, memory, sizeof memory);
     unsigned before = writes;
+    const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+    const struct hpclang_rpl_recovery_reservation initial = created;
+    assert(hpclang_rpl_recovery_reservation_check_created(
+               &reader, (const uint8_t *)"C", 1, snapshot, &created) == HPCLANG_RPL_MUTATION_OK);
+    assert(!memcmp(&created, &initial, sizeof created));
+    assert(writes == before && !memcmp(original, memory, sizeof memory));
     for (unsigned fault = 0; fault < 6; ++fault) {
         struct hpclang_rpl_recovery_reservation receipt = created;
         const uint8_t *name = (const uint8_t *)"C";
@@ -863,6 +869,10 @@ static void test_recovery_reservation_discard_created(void)
             expected = HPCLANG_RPL_MUTATION_NOT_FOUND;
         }
         const struct hpclang_rpl_recovery_reservation sentinel = receipt;
+        assert(hpclang_rpl_recovery_reservation_check_created(&reader, name, 1, snapshot,
+                                                              &receipt) == expected);
+        assert(!memcmp(&receipt, &sentinel, sizeof receipt));
+        assert(writes == before && !memcmp(original, memory, sizeof memory));
         assert(hpclang_rpl_recovery_reservation_discard_created(&io, name, 1, snapshot, &receipt) ==
                expected);
         assert(!memcmp(&receipt, &sentinel, sizeof receipt));
@@ -877,6 +887,9 @@ static void test_recovery_reservation_discard_created(void)
     assert(hpclang_rpl_recovery_reservation_discard_created(&io, (const uint8_t *)"C", 1, snapshot,
                                                             &created) == HPCLANG_RPL_MUTATION_OK);
     assert(!created.object && !created.capacity);
+    assert(hpclang_rpl_recovery_reservation_check_created(&reader, (const uint8_t *)"C", 1,
+                                                          snapshot, &created) ==
+           HPCLANG_RPL_MUTATION_UNAVAILABLE);
     assert(get_word(USEROB, 5) == pair.home);
     unsigned count = fault.calls;
     assert(count > 0);

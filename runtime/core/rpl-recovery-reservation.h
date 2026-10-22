@@ -55,6 +55,18 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
                                             const struct hpclang_object *snapshot,
                                             struct hpclang_rpl_recovery_reservation *created);
 
+/* Recheck the original creation receipt and complete untouched snapshot before
+ * advancing transaction publication. Same exclusive invocation as create: no
+ * native return, intervening RAM relocation, writer or address reuse. Resolves
+ * HOME again and validates the hidden directory, exact address/capacity and all
+ * snapshot nibbles. No writes; neither snapshot nor receipt is modified.
+ * Returns mutation results. A match does not reconstruct ownership after reset
+ * or authorize activation without the installed Flash transaction checks.
+ */
+int hpclang_rpl_recovery_reservation_check_created(
+    const struct hpclang_rpl_reader *reader, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, const struct hpclang_rpl_recovery_reservation *created);
+
 /* Discard an untouched reservation created by this same exclusive invocation,
  * after cancelling any associated unpublished Flash transaction. The original
  * snapshot, name and creation receipt must remain stable; no native return,

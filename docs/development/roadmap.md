@@ -426,6 +426,20 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+
+- **Fresh receipt activation gate (local, not submitted):** publication now
+  stages/retries an unarmed authority, validates the exact staged installation
+  and rechecks its original creation receipt and entire reservation snapshot
+  before activation. The shared read-only checker rejects wrong address,
+  capacity, name, content, missing objects and read errors without writes or
+  receipt changes. Both native models pass normal publication (1,958 Flash
+  operations) and a maintained rejection witness with a mismatched receipt
+  after successful staging. Rejection preserves exact unarmed Flash, reservation,
+  unrelated HOME data, catalog, CODE/guards and retained IRQ ownership. Full
+  mutation ASan/UBSan, ARM analysis, 66 recovery Python tests and Ruff pass.
+  This is an invocation-scoped activation prerequisite; durable creation proof,
+  interruption/restart ownership, startup ordering and reclamation remain open.
+
 - **Same-bank admission parity (local, not submitted):** the installation suite
   now checks both buffered and low-memory streaming admission against a journal
   and adjacent authority behind the target bank header. Six cases cover READY

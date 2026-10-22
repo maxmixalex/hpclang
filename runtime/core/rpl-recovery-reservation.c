@@ -210,7 +210,7 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
 
 /* Do not retain directory buffers across the deeper native removal call. */
 __attribute__((noinline)) static int
-discard_preflight(const struct hpclang_rpl_reader *reader, const uint8_t *name,
+created_preflight(const struct hpclang_rpl_reader *reader, const uint8_t *name,
                   uint32_t name_length, const struct hpclang_object *snapshot,
                   const struct hpclang_rpl_recovery_reservation *created, uint32_t *home)
 {
@@ -237,6 +237,19 @@ discard_preflight(const struct hpclang_rpl_reader *reader, const uint8_t *name,
             return HPCLANG_RPL_MUTATION_EXISTS;
     }
     return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_recovery_reservation_check_created(
+    const struct hpclang_rpl_reader *reader, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, const struct hpclang_rpl_recovery_reservation *created)
+{
+    if (!reader || !reader->read_nibble || !created || !created->object || !name || !name_length ||
+        name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (!valid_string(snapshot))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    uint32_t home;
+    return created_preflight(reader, name, name_length, snapshot, created, &home);
 }
 
 __attribute__((noinline)) static int verify_discarded(const struct hpclang_rpl_reader *reader,
@@ -267,7 +280,7 @@ int hpclang_rpl_recovery_reservation_discard_created(
     observed.write_nibble = write_nibble;
     const struct hpclang_rpl_reader reader = {read_nibble, &operation};
     uint32_t home;
-    int result = discard_preflight(&reader, name, name_length, snapshot, created, &home);
+    int result = created_preflight(&reader, name, name_length, snapshot, created, &home);
     if (result)
         return result;
     result = hpclang_rpl_mutation_store_remove(&observed, home, name, name_length);

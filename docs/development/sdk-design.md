@@ -377,6 +377,17 @@ address is useful only within the current exclusive invocation. It must not be
 saved as a persistent identity across native allocation, garbage collection or
 restart; durable installation/transaction binding remains required.
 
+`hpclang_rpl_recovery_reservation_check_created` revalidates that original
+receipt against HOME, the required hidden directory, exact address/capacity and
+the complete untouched snapshot without changing RAM or consuming the receipt.
+The installation publication witness now stages/retries an unarmed authority,
+validates the installed staged transaction and rechecks the fresh receipt before
+activating it. A separate negative witness changes the receipt capacity after
+staging: it must retain execution with interrupts disabled and the authority
+unarmed, preserving the reservation, unrelated HOME data, catalog, CODE and stack
+guards. The receipt remains an exclusive-invocation capability; this sequence
+does not reconstruct creation provenance after reset or authorize later reuse.
+
 The internal 80-byte `HPCMEM2` payload header records the full sealed
 `HPCROOT1` identity, physical library/journal/authority coordinates, target,
 status-independent journal CRC and exact RAM capacity. It contains no RAM

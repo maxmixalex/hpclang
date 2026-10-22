@@ -38,21 +38,26 @@ def verify_failure(before, after, build, nm):
         struct.unpack_from("<I", ram, base + symbols["installation_result"])[0] == 0,
         "Failed reservation creation returned a normal predicate result",
     )
+    verify_retained_execution(after, build, nm, IMAGE, base)
+
+
+def verify_retained_execution(after, build, nm, image, base):
+    """Require the owned failure loop with interrupts retained and no exception."""
     state = configparser.ConfigParser()
     state.read(after / "state")
     cpu = state["s3c2410-arm"]
     pc, cpsr = int(cpu["reg-15"], 0), int(cpu["cpsr"], 0)
     require(
         cpsr & 0xC0 == 0xC0 and cpsr & 31 not in (0x17, 0x1B),
-        "Failed reservation creation lost IRQ ownership or entered an exception",
+        "Retained invocation lost IRQ ownership or entered an exception",
     )
-    listing = subprocess.check_output([nm, "-S", build / (IMAGE + ".elf")], text=True)
+    listing = subprocess.check_output([nm, "-S", build / (image + ".elf")], text=True)
     spans = [line.split() for line in listing.splitlines() if line.endswith(" reservation_failed")]
     require(len(spans) == 1 and len(spans[0]) == 4, "Missing owned failure loop")
     address, size = int(spans[0][0], 16), int(spans[0][1], 16)
     require(
         0 <= pc - 0x08000000 - base - address < size + 4,
-        "Reservation failure did not remain in the owned failure loop",
+        "Rejected invocation did not remain in the owned failure loop",
     )
 
 
