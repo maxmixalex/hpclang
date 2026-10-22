@@ -407,6 +407,17 @@ never authorize adoption, activation or RAM release, and its storage must not be
 erased/reused while a bound root or transaction can survive. These remain open
 integration requirements, including interrupted native RAM creation.
 
+The internal `hpclang_rpl_flash_publish_creation_intent` primitive now writes a
+validated claim into a caller-owned erased allocation. It verifies the immutable
+body, publishes the native deleted envelope, and commits phase `7F` last.
+`hpclang_rpl_flash_finish_creation_intent` retries that same owned attempt: phase
+`FF` permits compatible partial writes; phase `7F` requires exact complete bytes
+and performs no writes. Other phases and an occupied following end marker reject.
+Neither entry establishes allocation ownership or reservation-name absence;
+the installer must prove both and retain exclusion. A partial write retains
+ownership and prohibits returning to Stock or starting RAM creation. Native
+producer integration, phase CREATED publication, cancellation and restart
+ownership remain required.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

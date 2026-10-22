@@ -426,6 +426,16 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Creation-intent publication primitive (local, not submitted):** writes
+  immutable bytes, then the deleted envelope, then INTENT last. Same-attempt
+  retry accepts compatible incomplete bytes or an exact published INTENT, never
+  later phases or occupied following storage. Tests exercise every programming
+  boundary with four partial-write masks, all 256 phases, binding corruption,
+  occupied end markers, read failure and occupied fresh publication. Complete
+  ARM build, full host ASan/UBSan, all 15 ARM analysis contexts and strict docs
+  pass. Native producer
+  integration must still establish name absence and owned allocation before
+  publication; CREATED transition, cancellation and restart ownership remain open.
 - **Claim-aware installation drafts (local, not submitted):** preparation
   preserves cross-port/catalog namespace checks, plans four extents, rebinds the
   trusted layout's claim field before identity sealing, and revalidates placement

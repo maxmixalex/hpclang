@@ -288,6 +288,26 @@ int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint
 int hpclang_rpl_flash_finish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                     const uint8_t *record, uint32_t bytes);
 
+/* Publish a codec-valid INTENT creation record at a caller-owned erased tail.
+ * The installer must establish the exact allocation, sealed root binding,
+ * reservation-name absence and exclusion BEFORE calling, and retain exclusion
+ * through RAM creation. This primitive does not establish those prerequisites.
+ * Verify immutable body, publish the deleted envelope, then phase 7F last.
+ * The following end marker must be erased. FAILED/OCCUPIED occur before writes;
+ * DIRTY retains exclusive ownership and prohibits native return/RAM creation.
+ * No erase, RAM allocation, CREATED activation or lifecycle permission. */
+int hpclang_rpl_flash_publish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              const uint8_t *record, uint32_t bytes);
+
+/* Retry the SAME owned attempt with its original exact expected INTENT bytes.
+ * Phase FF permits NOR-compatible partial body/envelope; phase 7F requires the
+ * complete record and is idempotent. Reject every later/unknown phase and any
+ * occupied following end marker without writes. DIRTY retains ownership.
+ * Compatible bytes are not provenance: no discovery/adoption or reconstructed
+ * cross-reset ownership is provided. Use before publishing an adjacent object. */
+int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                             const uint8_t *record, uint32_t bytes);
+
 /* Bind one caller-reserved erased authority allocation to an already durable
  * ready journal. Verify the complete journal, then publish/verify the binding
  * body before its ARMED status. Neither journal nor target is modified.

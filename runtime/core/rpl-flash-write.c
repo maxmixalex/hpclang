@@ -84,6 +84,57 @@ static int publish_erased(const struct hpclang_rpl_flash_io *io, uint32_t slot,
     return HPCLANG_RPL_FLASH_WRITTEN;
 }
 
+static int creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                           const uint8_t *record, uint32_t bytes, int retry)
+{
+    enum hpclang_rpl_flash_creation_phase phase;
+    if (!io || !io->read16 || !io->program16 || !record ||
+        bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        hpclang_rpl_flash_creation_inspect(io->first, io->end, slot, record, bytes, record + 20,
+                                           record + 100, record[17], &phase) ||
+        phase != HPCLANG_RPL_FLASH_CREATION_INTENT)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint16_t word;
+    if (!io->read16(io->context, (slot + 16u) & ~1u, &word))
+        return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_FAILED;
+    uint8_t current = (uint8_t)(word >> (8u * ((slot + 16u) & 1u)));
+    if (retry && current != 0xffu && current != 0x7fu)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    for (uint32_t i = 0; i <= bytes; ++i) {
+        uint32_t at = slot + i;
+        if (!io->read16(io->context, at & ~1u, &word))
+            return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_FAILED;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        int matches = !retry || i == bytes ? value == 0xffu
+                      : i == 16            ? value == current
+                      : current == 0xffu   ? (value & record[i]) == record[i]
+                                           : value == record[i];
+        if (!matches)
+            return retry ? HPCLANG_RPL_FLASH_DIRTY : HPCLANG_RPL_FLASH_OCCUPIED;
+    }
+    if (current == 0x7fu)
+        return 0;
+    /* Publish the native deleted envelope only after its immutable body, then
+     * publish intent last. No partial result may return to Stock or create RAM. */
+    if (!write_bytes(io, slot + 1u, record + 1u, 15u) ||
+        !write_bytes(io, slot + 17u, record + 17u, bytes - 17u) ||
+        !write_bytes(io, slot, record, 1u) || !write_bytes(io, slot + 16u, record + 16u, 1u))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return 0;
+}
+
+int hpclang_rpl_flash_publish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                              const uint8_t *record, uint32_t bytes)
+{
+    return creation_intent(io, slot, record, bytes, 0);
+}
+
+int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                             const uint8_t *record, uint32_t bytes)
+{
+    return creation_intent(io, slot, record, bytes, 1);
+}
+
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes)
 {

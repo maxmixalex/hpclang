@@ -667,6 +667,80 @@ static void claim_binding_word(uint8_t *binding, unsigned at, uint32_t value)
         binding[at + i] = (uint8_t)(value >> (8 * i));
 }
 
+static void creation_publication_tests(const struct hpclang_rpl_flash_io *source)
+{
+    const uint32_t slot = FIRST + 0xa0105;
+    uint8_t record[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES], binding[80] = {0};
+    memcpy(binding, "HPCMEM2", 8);
+    memcpy(binding + 8, vectors[0].descriptor, 48);
+    claim_binding_word(binding, 56, FIRST + 0x60105);
+    claim_binding_word(binding, 60, FIRST + 0x20105);
+    claim_binding_word(binding, 64, FIRST + 0x20105 + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES);
+    claim_binding_word(binding, 68, FIRST);
+    claim_binding_word(binding, 76, 32768);
+    assert(!hpclang_rpl_flash_creation_encode(
+        FIRST, END, slot, binding, (const uint8_t *)"HPCLEASE", 8, record, sizeof record));
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_flash;
+    install(0, 3);
+    programs = fail_program = 0;
+    assert(!hpclang_rpl_flash_publish_creation_intent(&io, slot, record, sizeof record));
+    unsigned writes = programs;
+    assert(writes && !memcmp(flash + slot - FIRST, record, sizeof record));
+    const uint16_t masks[] = {0, 0x5555, 0xaaaa, 0xffff};
+    for (unsigned mask = 0; mask < sizeof masks / sizeof masks[0]; ++mask)
+        for (unsigned cut = 1; cut <= writes; ++cut) {
+            install(0, 3);
+            memcpy(before, flash, sizeof flash);
+            programs = 0;
+            fail_program = cut;
+            partial_program_mask = masks[mask];
+            assert(hpclang_rpl_flash_publish_creation_intent(&io, slot, record, sizeof record) ==
+                   HPCLANG_RPL_FLASH_DIRTY);
+            assert(!memcmp(before, flash, slot - FIRST));
+            assert(!memcmp(before + slot - FIRST + sizeof record,
+                           flash + slot - FIRST + sizeof record, END - slot - sizeof record));
+            fail_program = programs = 0;
+            assert(!hpclang_rpl_flash_finish_creation_intent(&io, slot, record, sizeof record));
+            assert(!memcmp(flash + slot - FIRST, record, sizeof record));
+            assert(!memcmp(before, flash, slot - FIRST));
+            assert(!memcmp(before + slot - FIRST + sizeof record,
+                           flash + slot - FIRST + sizeof record, END - slot - sizeof record));
+            programs = 0;
+            assert(!hpclang_rpl_flash_finish_creation_intent(&io, slot, record, sizeof record));
+            assert(!programs);
+        }
+    for (unsigned phase = 0; phase < 256; ++phase) {
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, sizeof record);
+        flash[slot - FIRST + 16] = phase;
+        memcpy(before, flash, sizeof flash);
+        programs = fail_program = 0;
+        int result = hpclang_rpl_flash_finish_creation_intent(&io, slot, record, sizeof record);
+        if (phase == 0xff || phase == 0x7f)
+            assert(!result && !memcmp(flash + slot - FIRST, record, sizeof record));
+        else
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs &&
+                   !memcmp(before, flash, sizeof flash));
+    }
+    for (unsigned fault = 0; fault < 4; ++fault) {
+        install(0, 3);
+        memcpy(flash + slot - FIRST, record, sizeof record);
+        if (fault == 0)
+            flash[slot - FIRST + 24] ^= 1;
+        if (fault == 1)
+            flash[slot - FIRST + sizeof record] = 0;
+        if (fault == 2)
+            fail_address = (slot + 22) & ~1u;
+        memcpy(before, flash, sizeof flash);
+        programs = fail_program = 0;
+        int result =
+            fault == 3 ? hpclang_rpl_flash_publish_creation_intent(&io, slot, record, sizeof record)
+                       : hpclang_rpl_flash_finish_creation_intent(&io, slot, record, sizeof record);
+        assert(result < 0 && !programs && !memcmp(before, flash, sizeof flash));
+    }
+}
+
 static void creation_claim_tests(const struct hpclang_rpl_flash_io *io,
                                  const struct hpclang_rpl_flash_catalog *catalog)
 {
@@ -768,6 +842,7 @@ int main(void)
     const struct hpclang_rpl_reader reader = {read_catalog, catalog_data};
     const struct hpclang_rpl_flash_catalog catalog = {&reader, 120, 35, 0};
     creation_claim_tests(&io, &catalog);
+    creation_publication_tests(&io);
     creation_preparation_tests(&io, &catalog);
     placement_tests(&io, &catalog);
     space_tests(&io);
