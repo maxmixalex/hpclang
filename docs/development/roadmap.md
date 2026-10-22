@@ -426,6 +426,18 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Previous submission CI (`1deb8872`):** Runtime (39483875385) and Objects
+  (39483875257) passed. Quality (39483875241) rejected two formatting lines
+  in bound replay; the current file passes clang-format 18. Core (39483875319)
+  failed both real-template storage paths at the busy-state verifier. The HP50g
+  artifact stops in ARM code with operation 23,813 still busy (1,524,028 of
+  1,524,032 status reads), under the fixed 17-second execution sequence. The
+  local harness now exposes an execution budget; real-template storage uses
+  60 seconds while retaining full Flash, catalog, CODE and busy-state checks.
+  Both models now pass complete storage with 24,569 programming operations,
+  exact busy-read totals, full Flash/catalog/CODE and source preservation.
+  All 66 recovery Python tests, Ruff and strict docs pass. This harness
+  follow-up is submitted with CI acceptance pending.
 
 - **Fresh reservation cancellation cleanup (submitted, CI pending):** an internal discard
   operation checks the original name, creation receipt address/capacity and

@@ -186,7 +186,15 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
 
     stored = root / "stored"
     transfer(
-        args, stored, before, build, "REALSTORE", package_name="installation-template-store.hp"
+        args,
+        stored,
+        before,
+        build,
+        "REALSTORE",
+        package_name="installation-template-store.hp",
+        # A real library programs tens of thousands of words with simulated
+        # busy polling; the small-witness budget can terminate it mid-write.
+        execution_ms=60000,
     )
     slot, rebound, operations = verify_storage(
         before,

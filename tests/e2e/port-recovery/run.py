@@ -124,7 +124,10 @@ def transfer(
     remote_commands=None,
     package_name="recovery.hp",
     consume=False,
+    execution_ms=17000,
 ):
+    if execution_ms < 2000:
+        raise ValueError("Execution budget must allow the final checkpoint")
     if consume and (not execute or remote_commands is not None):
         raise ValueError("Consuming a fixture requires its default execution command")
     recovery.mkdir()
@@ -154,7 +157,7 @@ def transfer(
         "\n".join(prefix)
         + "\n500 capture deposited\n"
         + ("1000 tap eval\n" if execute else "")
-        + "15000 capture checkpoint\n17000 finish-install\n"
+        + f"{execution_ms - 2000} capture checkpoint\n{execution_ms} finish-install\n"
     )
     xtty, ktty = recovery / "x50-tty", recovery / "kermit-tty"
     with process(
