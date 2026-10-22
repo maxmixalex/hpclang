@@ -426,6 +426,39 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Claim-aware installation drafts (local, not submitted):** preparation
+  preserves cross-port/catalog namespace checks, plans four extents, rebinds the
+  trusted layout's claim field before identity sealing, and revalidates placement
+  before publishing output coordinates. Nine host scenarios compare the entire
+  draft to independently packaged bytes and reject invalid/overlapping claim
+  fields, missing output and read failures without publishing coordinates. ARM
+  build/static analysis, Ruff, strict docs and the complete host ASan/UBSan
+  suite pass.
+  Native preparation/publication, interruption and reclamation remain open.
+
+- **Creation-claim space planning (local, not submitted):** the shared
+  erased-tail planner now supports library, journal, authority and creation-claim
+  extents together, retrying bank combinations if the claim cannot fit. Existing
+  three-extent callers retain their selection order. Eight new host scenarios
+  cover split/same-bank placement, backtracking, insufficient space, target
+  exclusion, read/dirty failures and unchanged outputs/Flash. The complete host
+  installation suite passes ASan/UBSan, and all 15 ARM static-analysis contexts
+  pass. Claim-aware draft integration is described below; durable publication
+  remains open.
+
+- **Creation-claim runtime admission (local, not submitted):** the reader
+  revalidates the installed transaction, exact binding and journal CRC, then
+  requires the claim to occupy a complete native deleted allocation rather than
+  an interior payload. Admission roots with a sealed claim slot require the
+  CREATED phase. The complete ARM build, Ruff and full installation host
+  ASan/UBSan suite pass, as do ARM static analysis, 66 recovery Python tests
+  and strict docs. Both HP49g+/HP50g pass guarded low-memory recovery and
+  repeated restart and RAM-loss recovery. Both also reject missing, intent-only
+  and mismatched-binding claims without RAM deletion or Flash operations.
+  Both maintained native suites now pass in full, including resource-guard
+  regression cases. These are local results, not CI acceptance.
+  The native fixture constructs claims offline, so this is not evidence of a
+  production publisher, restart ownership, startup ordering or reclamation.
 
 - **Sealed creation-slot packaging (local, not submitted):** optional
   `--creation-claim-slot` binds only an owned aligned initialized ELF placeholder
@@ -436,8 +469,9 @@ Current delivery checkpoints:
   identical unsymbolized word. All 21 packager and 66 recovery Python tests pass;
   the full ARM build passes. Packaging the same real recovery/admission ELFs with
   the previous/current tools produces byte-identical default libraries and equal
-  layouts. This is packaging support: runtime claim admission, claim-aware
-  placement, durable creation publication and lifetime/reclamation remain open.
+  layouts. Runtime claim admission and claim-aware placement/draft follow-ups
+  are recorded above; durable creation publication and lifetime/reclamation
+  remain open.
 
 - **Persistent creation-claim format (local, not submitted):** an internal
   `HPCOWN1` codec stores the exact reservation name and complete installation/

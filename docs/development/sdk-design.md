@@ -398,9 +398,9 @@ separation, name limits and exact expected binding. It stores no RAM address.
 Offline native fixtures cover incomplete, intent, created, closing and closed
 payloads; they are invisible to Stock and preserve Flash/catalog across restart.
 
-This format is not yet connected to a publisher or startup admission. Next,
-the sealed executing root must bind the claim's allocation; the exclusive
-producer must verify name absence before publishing intent, and revalidate the
+The optional sealed admission root now binds the claim allocation and checks
+the runtime record as described below. A production publisher remains open:
+the exclusive producer must verify name absence before publishing intent and revalidate the
 fresh creation receipt before publishing created. Cuts during either publication
 need explicit retry/cancellation handling. A matching decoded record alone must
 never authorize adoption, activation or RAM release, and its storage must not be
@@ -416,9 +416,36 @@ allocation envelope, like the other binding coordinates. The slot is patched
 before sealing, so changing it changes the root digest; an identical placeholder
 without that symbol is left untouched. Missing symbols/identity and invalid
 geometry leave existing output files unchanged. This provides packaging support,
-not native allocation ownership or runtime claim admission. Existing images
-without the option retain byte-identical output; live root/target overlap checks,
-claim-aware placement and the runtime reader remain integration requirements.
+not native allocation ownership. Packaging the same existing images without
+the option retains byte-identical output. Claim-aware placement and draft
+preparation are described below.
+
+The internal `hpclang_rpl_flash_plan_creation_space` planner searches erased
+native tails for the library, journal, authority and 240-byte claim together.
+If a three-extent placement leaves no room for the claim, it tries other bank
+combinations. All extents exclude the target sector and do not overlap; outputs
+change only on success. The original three-extent planner uses the same logic
+without allocating a claim and preserves its selection order. Neither planner
+reserves Flash.
+
+`hpclang_rpl_recovery_installation_prepare_creation` applies that planning after
+the existing cross-port/catalog namespace check. The caller supplies the trusted
+layout's `admission_creation_nibble`, including the allocation envelope; the
+field must not overlap identity or transaction descriptors. Preparation updates
+the claim address before resealing, then revalidates all four placements. Source
+and output coordinates remain unchanged on failure; staging is disposable.
+This prepares bytes in RAM and does not publish a claim or establish ownership.
+The internal `hpclang_rpl_recovery_installation_creation` reader revalidates
+the installed transaction and journal CRC against the caller's trusted binding.
+It requires the record to occupy an exact native deleted allocation boundary,
+not an interior payload, and validates its full binding, name and phase. Pending
+transactions use the validated restored view for allocation membership; closed
+transactions use actual Flash. Outputs change only on success. Admission with
+a sealed claim slot additionally requires CREATED before checking the RAM
+reservation. An unbound placeholder preserves the existing admission path.
+This is a read-only gate, not creation provenance or permission to release RAM.
+Native tests build the claims offline; the production publisher, interrupted
+creation and lifetime/reclamation integration remain required.
 
 The internal 80-byte `HPCMEM2` payload header records the full sealed
 `HPCROOT1` identity, physical library/journal/authority coordinates, target,

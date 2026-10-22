@@ -47,7 +47,7 @@ Path(sys.argv[1]).write_text(
 )
 
 
-def bound_record(journal, authority):
+def bound_record(journal, authority, claim=None):
     image = pack.bind_image(
         bytes.fromhex("1eff2fe1") + bytes(12) + b"HPCBIND1" + bytes(8) + placeholder,
         16,
@@ -55,11 +55,18 @@ def bound_record(journal, authority):
         authority,
     )
     program = pack._recovery_program(pack.package(image, len(image), model="hp50g"))
-    library = pack._configuration_library(empty, 1701, (program,) + (empty,) * 5 + (program,))
+    admission = image if claim is None else image + claim.to_bytes(4, "little")
+    admission_program = pack._recovery_program(
+        pack.package(admission, (len(admission) + 7) & ~7, model="hp50g")
+    )
+    library = pack._configuration_library(
+        empty, 1701, (program,) + (empty,) * 5 + (admission_program,)
+    )
     layout = pack.recovery_layout(
         library,
-        (("recovery", 0, image, 16, False), ("admission", 6, image, 16, False)),
+        (("recovery", 0, image, 16, False), ("admission", 6, admission, 16, False)),
         identity_offset=32,
+        **({"creation_offset": len(image)} if claim is not None else {}),
     )
     library = pack.seal_recovery_identity(library, layout["identity_object_nibble"])
     data = "".join(f"{byte & 15:x}{byte >> 4:x}" for byte in library[8:])
@@ -83,4 +90,25 @@ with Path(sys.argv[1]).open("a") as output:
         )
     for name in ("recovery_binding_nibble", "admission_binding_nibble", "identity_object_nibble"):
         output.write(f"static const unsigned {name} = {layout[name]};\n")
+    output.write("#endif\n")
+
+original, layout = bound_record(0x180105, 0x1A0105, 0x1E0105)
+journal = 0x160105 + len(original)
+authority = journal + 4124
+claim = authority + 32
+rebound, updated = bound_record(journal, authority, claim)
+assert layout == updated and len(original) == len(rebound)
+with Path(sys.argv[1]).open("a") as output:
+    output.write("#ifdef HPCLANG_RECOVERY_BINDING_VECTORS\n")
+    for name, data in (("creation_original", original), ("creation_expected", rebound)):
+        output.write(
+            f"static const unsigned char {name}[] = {{" + ",".join(map(str, data)) + "};\n"
+        )
+    for name in (
+        "recovery_binding_nibble",
+        "admission_binding_nibble",
+        "identity_object_nibble",
+        "admission_creation_nibble",
+    ):
+        output.write(f"static const unsigned creation_{name} = {layout[name]};\n")
     output.write("#endif\n")

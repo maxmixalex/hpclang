@@ -96,11 +96,28 @@ static void template_put(uint8_t *record, uint32_t at, uint32_t value, unsigned 
     }
 }
 
-int hpclang_rpl_recovery_installation_prepare(
-    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
-    uint32_t identity_nibble, const struct hpclang_rpl_recovery_port_view ports[2],
-    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
-    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space)
+static int prepare_space(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                         uint32_t bytes, const struct hpclang_rpl_recovery_port_view ports[2],
+                         const struct hpclang_rpl_flash_catalog *catalog, uint32_t target,
+                         struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim)
+{
+    if (!claim)
+        return hpclang_rpl_recovery_installation_plan_space(io, record, bytes, ports, catalog,
+                                                            target, space);
+    uint32_t unused;
+    int result = hpclang_rpl_recovery_installation_plan(io, record, bytes, ports, catalog, &unused);
+    return result ? result
+                  : hpclang_rpl_flash_plan_creation_space(io, record, bytes, target, space, claim);
+}
+
+static int prepare_installation(const struct hpclang_rpl_flash_io *io,
+                                const struct hpclang_rpl_flash_recovery_layout *layout,
+                                uint32_t identity_nibble,
+                                const struct hpclang_rpl_recovery_port_view ports[2],
+                                const struct hpclang_rpl_flash_catalog *catalog, uint32_t target,
+                                uint8_t *staging, uint32_t capacity,
+                                struct hpclang_rpl_flash_recovery_space *space,
+                                uint32_t claim_nibble, uint32_t *claim_slot)
 {
     if (!layout || !layout->record || !space || !staging || capacity < layout->bytes)
         return HPCLANG_RPL_FLASH_INVALID;
@@ -109,8 +126,9 @@ int hpclang_rpl_recovery_installation_prepare(
                                       : source_address - destination < layout->bytes)
         return HPCLANG_RPL_FLASH_INVALID;
     struct hpclang_rpl_flash_recovery_space planned;
-    int result = hpclang_rpl_recovery_installation_plan_space(io, layout->record, layout->bytes,
-                                                              ports, catalog, target, &planned);
+    uint32_t planned_claim;
+    int result = prepare_space(io, layout->record, layout->bytes, ports, catalog, target, &planned,
+                               claim_slot ? &planned_claim : NULL);
     if (result)
         return result;
     uint32_t end = 13u + template_word(layout->record, 13u, 5);
@@ -140,6 +158,11 @@ int hpclang_rpl_recovery_installation_prepare(
         template_word(layout->record, offsets[0] + 24, 8) !=
             template_word(layout->record, offsets[1] + 24, 8))
         return HPCLANG_RPL_FLASH_INVALID;
+    if (claim_slot && (claim_nibble < 18 || claim_nibble > end - 12 ||
+                       (claim_nibble < identity + 96 && identity < claim_nibble + 8) ||
+                       (claim_nibble < offsets[0] + 32 && offsets[0] < claim_nibble + 8) ||
+                       (claim_nibble < offsets[1] + 32 && offsets[1] < claim_nibble + 8)))
+        return HPCLANG_RPL_FLASH_INVALID;
     memcpy(staging, layout->record, layout->bytes);
     for (unsigned i = 0; i < 2; ++i) {
         template_put(staging, offsets[i] + 16, planned.journal_slot, 8);
@@ -147,19 +170,48 @@ int hpclang_rpl_recovery_installation_prepare(
     }
     for (unsigned i = 16; i < 96; ++i)
         template_put(staging, identity + i, 0, 1);
+    if (claim_slot)
+        template_put(staging, claim_nibble, planned_claim, 8);
     if (!hpclang_rpl_recovery_identity_seal(staging + 4, layout->bytes - 4, identity_nibble))
         return HPCLANG_RPL_FLASH_INVALID;
     struct hpclang_rpl_flash_recovery_space checked;
-    result = hpclang_rpl_recovery_installation_plan_space(io, staging, layout->bytes, ports,
-                                                          catalog, target, &checked);
+    uint32_t checked_claim;
+    result = prepare_space(io, staging, layout->bytes, ports, catalog, target, &checked,
+                           claim_slot ? &checked_claim : NULL);
     if (result)
         return result;
     if (checked.library_slot != planned.library_slot ||
         checked.journal_slot != planned.journal_slot ||
-        checked.authority_slot != planned.authority_slot)
+        checked.authority_slot != planned.authority_slot ||
+        (claim_slot && checked_claim != planned_claim))
         return HPCLANG_RPL_FLASH_DIRTY;
     *space = checked;
+    if (claim_slot)
+        *claim_slot = checked_claim;
     return 0;
+}
+
+int hpclang_rpl_recovery_installation_prepare(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space)
+{
+    return prepare_installation(io, layout, identity_nibble, ports, catalog, target, staging,
+                                capacity, space, 0, NULL);
+}
+
+int hpclang_rpl_recovery_installation_prepare_creation(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, uint32_t claim_nibble,
+    const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot)
+{
+    if (!claim_slot)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return prepare_installation(io, layout, identity_nibble, ports, catalog, target, staging,
+                                capacity, space, claim_nibble, claim_slot);
 }
 
 struct object_reader
@@ -374,4 +426,67 @@ int hpclang_rpl_recovery_installation_stream(const struct hpclang_rpl_flash_io *
     }
     return finish_preflight(&restored, library_number, catalog, expected, authority, journal,
                             descriptor.target, phase, installed);
+}
+
+static uint32_t binding_word(const uint8_t *data)
+{
+    return data[0] | (uint32_t)data[1] << 8 | (uint32_t)data[2] << 16 | (uint32_t)data[3] << 24;
+}
+
+int hpclang_rpl_recovery_installation_creation(const struct hpclang_rpl_flash_io *io,
+                                               uint32_t library_number,
+                                               const struct hpclang_rpl_flash_catalog *catalog,
+                                               const uint8_t expected_binding[80],
+                                               uint32_t claim_slot, const uint8_t *name,
+                                               uint32_t name_length,
+                                               enum hpclang_rpl_flash_creation_phase *phase)
+{
+    if (!io || !io->read16 || !expected_binding || !name || !phase ||
+        memcmp(expected_binding, "HPCMEM2", 8) || claim_slot < io->first || claim_slot >= io->end ||
+        HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES > io->end - claim_slot)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint32_t journal = binding_word(expected_binding + 60);
+    uint32_t authority = binding_word(expected_binding + 64);
+    struct hpclang_rpl_flash_installed_recovery installed;
+    int transaction = hpclang_rpl_recovery_installation_stream(
+        io, library_number, catalog, expected_binding + 8, authority, journal, &installed);
+    if (transaction < 0)
+        return transaction;
+    if (installed.library_slot != binding_word(expected_binding + 56) ||
+        installed.target != binding_word(expected_binding + 68))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct object_reader source = {io, journal + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4u};
+    for (unsigned i = 0; i < 8; ++i) {
+        uint8_t value;
+        if (!read_nibble(&source, i, &value))
+            return HPCLANG_RPL_FLASH_FAILED;
+        if (value != ((expected_binding[72 + i / 2] >> (4 * (i & 1))) & 15))
+            return HPCLANG_RPL_FLASH_DIRTY;
+    }
+    uint8_t record[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
+    source.first = claim_slot;
+    for (unsigned i = 0; i < sizeof record; ++i) {
+        uint8_t low, high;
+        if (!read_nibble(&source, 2 * i, &low) || !read_nibble(&source, 2 * i + 1, &high))
+            return HPCLANG_RPL_FLASH_FAILED;
+        record[i] = low | high << 4;
+    }
+    enum hpclang_rpl_flash_creation_phase candidate;
+    if (hpclang_rpl_flash_creation_inspect(io->first, io->end, claim_slot, record, sizeof record,
+                                           expected_binding, name, name_length, &candidate))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    struct streamed_view view = {io, installed.target, journal, authority, transaction != 0};
+    const struct hpclang_rpl_flash_io restored = {&view, streamed_read, NULL, io->first, io->end};
+    struct object_reader mapped = {&restored, claim_slot & ~0x1ffffu};
+    const struct hpclang_rpl_reader bank = {read_nibble, &mapped};
+    uint32_t address = 2u * (claim_slot - mapped.first);
+    struct hpclang_rpl_flash_allocation allocation;
+    int result = hpclang_rpl_flash_allocation_find(&bank, 0x20au, 0x40000u, address, &allocation);
+    if (result < 0)
+        return installation_span_result(result);
+    if (result != 1 || allocation.address != address || !allocation.deleted ||
+        allocation.nibbles != 2u * sizeof record)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    *phase = candidate;
+    return 0;
 }

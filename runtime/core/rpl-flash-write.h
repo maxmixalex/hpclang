@@ -159,6 +159,15 @@ int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
                                           const uint8_t *record, uint32_t bytes, uint32_t target,
                                           struct hpclang_rpl_flash_recovery_space *space);
 
+/* Same complete-bank planning, including a separate 240-byte creation claim.
+ * Search alternate placements when the first three extents leave no claim tail.
+ * Both disjoint outputs change only on success. No storage is reserved and no
+ * publication, cross-port exclusion or creation provenance is established. */
+int hpclang_rpl_flash_plan_creation_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space,
+                                          uint32_t *claim_slot);
+
 /* Resolve one installed library against the complete expected native record.
  * Validate all six bank identities, live records and erased tails, then require
  * a unique matching library ID, exact allocation length/header and complete

@@ -51,6 +51,20 @@ int hpclang_rpl_recovery_installation_prepare(
     const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
     uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space);
 
+/* Prepare the same owned draft with all four extents. claim_nibble is the
+ * immutable trusted layout's admission_creation_nibble, including the native
+ * allocation envelope. It must name the admission ELF's owned field; it is not
+ * discovered by scanning. Rebind that field before resealing, then revalidate
+ * all four placements. Outputs must be disjoint and change only on success;
+ * staging is disposable on failure. The prepare ownership/exclusion contract
+ * above applies. This publishes no creation record or installation authority. */
+int hpclang_rpl_recovery_installation_prepare_creation(
+    const struct hpclang_rpl_flash_io *io, const struct hpclang_rpl_flash_recovery_layout *layout,
+    uint32_t identity_nibble, uint32_t claim_nibble,
+    const struct hpclang_rpl_recovery_port_view ports[2],
+    const struct hpclang_rpl_flash_catalog *catalog, uint32_t target, uint8_t *staging,
+    uint32_t capacity, struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot);
+
 /* Resolve a unique live library/catalog binding and compare its complete
  * content with the descriptor in the trusted executing admission image.
  * Read-only; no heap; output changes only on success (0). Other results use
@@ -84,5 +98,24 @@ int hpclang_rpl_recovery_installation_stream(
     const struct hpclang_rpl_flash_io *io, uint32_t library_number,
     const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected[48], uint32_t authority,
     uint32_t journal, struct hpclang_rpl_flash_installed_recovery *installed);
+
+/* Classify a creation claim at the coordinate supplied by the SAME sealed
+ * executing root. expected_binding is its exact HPCMEM2 installation/transaction
+ * binding, constructed from trusted inputs, not copied from the claim being
+ * checked. Revalidate the installed transaction and CRC, compare the complete
+ * claim, then require its exact deleted allocation boundary in the validated
+ * restored view (or actual Flash for a closed transaction). No signature scan,
+ * heap or writes. Return flash results; phase changes only on success (0).
+ * INTENT/CREATED/CLOSING/CLOSED are classifications, not release permission.
+ * Stable exclusive views, producer provenance, startup ordering and one-use
+ * lifetime remain caller obligations. This does not admit unpublished journals.
+ */
+int hpclang_rpl_recovery_installation_creation(const struct hpclang_rpl_flash_io *io,
+                                               uint32_t library_number,
+                                               const struct hpclang_rpl_flash_catalog *catalog,
+                                               const uint8_t expected_binding[80],
+                                               uint32_t claim_slot, const uint8_t *name,
+                                               uint32_t name_length,
+                                               enum hpclang_rpl_flash_creation_phase *phase);
 
 #endif

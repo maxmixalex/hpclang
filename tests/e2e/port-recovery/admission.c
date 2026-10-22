@@ -10,6 +10,7 @@ const volatile struct hpclang_recovery_binding hpclang_recovery_binding =
     HPCLANG_RECOVERY_BINDING_INITIALIZER;
 const volatile unsigned char hpclang_recovery_identity[48] = "HPCROOT1";
 const volatile uint32_t hpclang_recovery_library_id = UINT32_MAX;
+const volatile uint32_t hpclang_recovery_creation_slot = UINT32_MAX;
 const volatile struct hpclang_recovery_reservation_binding hpclang_recovery_reservation =
     HPCLANG_RECOVERY_RESERVATION_INITIALIZER;
 
@@ -34,11 +35,27 @@ static int mapped_nibble(void *context, uint32_t address, uint8_t *value)
         (*(volatile uint8_t *)(page + ((address & 4095u) >> 1)) >> (4u * (address & 1u))) & 15u;
     return 1;
 }
-/* Keep directory buffers out of the streaming preflight's call chain. */
+/* Keep directory buffers out of both streaming preflight call chains. */
+__attribute__((noinline)) static int
+reservation_object_matches(const struct hpclang_rpl_reader *reader, const uint8_t *name,
+                           uint32_t length, const uint8_t header[80])
+{
+    uint32_t home;
+    struct hpclang_rpl_directory_entry_view entry;
+    if (hpclang_rpl_store_home_object(reader, &home))
+        return 0;
+    int found = hpclang_rpl_directory_find(reader, home, name, length, &entry);
+    if (found == HPCLANG_RPL_STORE_NOT_FOUND)
+        return 1; /* No RAM object will be released; retain the RAM-loss path. */
+    return !found &&
+           hpclang_rpl_recovery_reservation_match(reader, entry.object_address, header) == 1;
+}
+
 __attribute__((noinline)) static int
 reservation_matches(const struct hpclang_rpl_reader *reader,
                     const struct hpclang_rpl_flash_installed_recovery *installed,
-                    const uint8_t identity[48])
+                    const uint8_t identity[48], const struct hpclang_rpl_flash_io *io,
+                    const struct hpclang_rpl_flash_catalog *catalog)
 {
     uint32_t length = hpclang_recovery_reservation.name_length;
     uint32_t capacity = hpclang_recovery_reservation.capacity;
@@ -53,15 +70,6 @@ reservation_matches(const struct hpclang_rpl_reader *reader,
         if (name[i] < 33 || name[i] > 126)
             return 0;
     }
-    uint32_t home;
-    struct hpclang_rpl_directory_entry_view entry;
-    if (hpclang_rpl_store_home_object(reader, &home))
-        return 0;
-    int found = hpclang_rpl_directory_find(reader, home, name, length, &entry);
-    if (found == HPCLANG_RPL_STORE_NOT_FOUND)
-        return 1; /* No RAM object will be released; retain the RAM-loss path. */
-    if (found)
-        return 0;
     uint32_t crc = 0;
     for (unsigned i = 0; i < 4; ++i) {
         uint32_t at = installed->journal_slot + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4u + i;
@@ -70,8 +78,17 @@ reservation_matches(const struct hpclang_rpl_reader *reader,
             return 0;
         crc |= (uint32_t)(uint8_t)(word >> (8u * (at & 1u))) << (8u * i);
     }
-    return hpclang_rpl_recovery_reservation_header(identity, installed, crc, capacity, header) &&
-           hpclang_rpl_recovery_reservation_match(reader, entry.object_address, header) == 1;
+    if (!hpclang_rpl_recovery_reservation_header(identity, installed, crc, capacity, header))
+        return 0;
+    uint32_t claim_slot = hpclang_recovery_creation_slot;
+    if (claim_slot != UINT32_MAX) {
+        enum hpclang_rpl_flash_creation_phase phase;
+        if (hpclang_rpl_recovery_installation_creation(io, hpclang_recovery_library_id, catalog,
+                                                       header, claim_slot, name, length, &phase) ||
+            phase != HPCLANG_RPL_FLASH_CREATION_CREATED)
+            return 0;
+    }
+    return reservation_object_matches(reader, name, length, header);
 }
 
 int hpclang_recovery_predicate(const uint32_t *map)
@@ -96,7 +113,7 @@ int hpclang_recovery_predicate(const uint32_t *map)
     struct hpclang_rpl_flash_installed_recovery installed;
     int phase = hpclang_rpl_recovery_installation_stream(&io, hpclang_recovery_library_id, &catalog,
                                                          identity, a, j, &installed);
-    int admitted = phase > 0 && reservation_matches(&reader, &installed, identity);
+    int admitted = phase > 0 && reservation_matches(&reader, &installed, identity, &io, &catalog);
     hpclang_flash_mapping_swap(descriptors);
     return admitted;
 }

@@ -1072,9 +1072,9 @@ static int take_recovery_tail(struct erased_tail *tail, uint32_t bytes, uint32_t
     return 1;
 }
 
-int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
-                                          const uint8_t *record, uint32_t bytes, uint32_t target,
-                                          struct hpclang_rpl_flash_recovery_space *space)
+static int plan_recovery_space(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
+                               uint32_t bytes, uint32_t target,
+                               struct hpclang_rpl_flash_recovery_space *space, uint32_t *claim_slot)
 {
     if (!space || !io || (io->first & 0x1ffffu) || io->first > io->end ||
         io->end - io->first != 6u * 0x20000u || target < io->first ||
@@ -1098,11 +1098,40 @@ int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
                                        target, &selected.journal_slot) &&
                     take_recovery_tail(&available[authority], HPCLANG_RPL_FLASH_AUTHORITY_BYTES,
                                        target, &selected.authority_slot)) {
-                    *space = selected;
-                    return 0;
+                    if (!claim_slot) {
+                        *space = selected;
+                        return 0;
+                    }
+                    for (unsigned claim = 0; claim < 6; ++claim) {
+                        uint32_t slot;
+                        if (take_recovery_tail(&available[claim],
+                                               HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES, target,
+                                               &slot)) {
+                            *space = selected;
+                            *claim_slot = slot;
+                            return 0;
+                        }
+                    }
                 }
             }
     return HPCLANG_RPL_FLASH_NOSPACE;
+}
+
+int hpclang_rpl_flash_plan_recovery_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space)
+{
+    return plan_recovery_space(io, record, bytes, target, space, NULL);
+}
+
+int hpclang_rpl_flash_plan_creation_space(const struct hpclang_rpl_flash_io *io,
+                                          const uint8_t *record, uint32_t bytes, uint32_t target,
+                                          struct hpclang_rpl_flash_recovery_space *space,
+                                          uint32_t *claim_slot)
+{
+    if (!claim_slot)
+        return HPCLANG_RPL_FLASH_INVALID;
+    return plan_recovery_space(io, record, bytes, target, space, claim_slot);
 }
 
 static int create_record(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
