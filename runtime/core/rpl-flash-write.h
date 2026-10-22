@@ -308,6 +308,17 @@ int hpclang_rpl_flash_publish_creation_intent(const struct hpclang_rpl_flash_io 
 int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                              const uint8_t *record, uint32_t bytes);
 
+/* Commit CREATED only after the installer revalidates its original fresh RAM
+ * receipt, entire snapshot, exact claim binding/name and exclusive invocation.
+ * The expected record is the original INTENT. Compare all immutable bytes and
+ * require actual INTENT or CREATED (lost-ack retry), then clear only phase bit 0.
+ * All other phases, partial envelopes and changed bodies reject without writes.
+ * DIRTY retains ownership and forbids transaction activation/native return.
+ * This primitive does not verify RAM or reconstruct ownership after restart;
+ * a matching Flash record alone never authorizes this transition. */
+int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        const uint8_t *intent, uint32_t bytes);
+
 /* Bind one caller-reserved erased authority allocation to an already durable
  * ready journal. Verify the complete journal, then publish/verify the binding
  * body before its ARMED status. Neither journal nor target is modified.

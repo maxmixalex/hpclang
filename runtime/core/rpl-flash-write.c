@@ -135,6 +135,36 @@ int hpclang_rpl_flash_finish_creation_intent(const struct hpclang_rpl_flash_io *
     return creation_intent(io, slot, record, bytes, 1);
 }
 
+int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, uint32_t slot,
+                                        const uint8_t *intent, uint32_t bytes)
+{
+    enum hpclang_rpl_flash_creation_phase expected_phase;
+    if (!io || !io->read16 || !io->program16 || !intent ||
+        bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        hpclang_rpl_flash_creation_inspect(io->first, io->end, slot, intent, bytes, intent + 20,
+                                           intent + 100, intent[17], &expected_phase) ||
+        expected_phase != HPCLANG_RPL_FLASH_CREATION_INTENT)
+        return HPCLANG_RPL_FLASH_INVALID;
+    uint8_t phase = 0xff;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        uint32_t at = slot + i;
+        uint16_t word;
+        if (!io->read16(io->context, at & ~1u, &word))
+            return HPCLANG_RPL_FLASH_DIRTY;
+        uint8_t value = (uint8_t)(word >> (8u * (at & 1u)));
+        if (i == 16) {
+            if (value != 0x7fu && value != 0x7eu)
+                return HPCLANG_RPL_FLASH_DIRTY;
+            phase = value;
+        } else if (value != intent[i]) {
+            return HPCLANG_RPL_FLASH_DIRTY;
+        }
+    }
+    const uint8_t created = 0x7e;
+    return phase == created || write_bytes(io, slot + 16u, &created, 1u) ? HPCLANG_RPL_FLASH_WRITTEN
+                                                                         : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 int hpclang_rpl_flash_publish_sector(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                      const uint8_t *record, uint32_t bytes)
 {

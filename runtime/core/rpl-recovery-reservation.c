@@ -252,6 +252,24 @@ int hpclang_rpl_recovery_reservation_check_created(
     return created_preflight(reader, name, name_length, snapshot, created, &home);
 }
 
+int hpclang_rpl_recovery_reservation_complete_creation(
+    const struct hpclang_rpl_flash_io *flash, uint32_t slot, const uint8_t *intent, uint32_t bytes,
+    const struct hpclang_rpl_reader *reader, const struct hpclang_object *snapshot,
+    const struct hpclang_rpl_recovery_reservation *created)
+{
+    enum hpclang_rpl_flash_creation_phase phase;
+    if (!flash || !intent || bytes != HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES ||
+        hpclang_rpl_flash_creation_inspect(flash->first, flash->end, slot, intent, bytes,
+                                           intent + 20, intent + 100, intent[17], &phase) ||
+        phase != HPCLANG_RPL_FLASH_CREATION_INTENT)
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (hpclang_rpl_recovery_reservation_check_created(reader, intent + 100, intent[17], snapshot,
+                                                       created) ||
+        hpclang_rpl_recovery_reservation_match(reader, created->object, intent + 20) != 1)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    return hpclang_rpl_flash_complete_creation(flash, slot, intent, bytes);
+}
+
 __attribute__((noinline)) static int verify_discarded(const struct hpclang_rpl_reader *reader,
                                                       const uint8_t *name, uint32_t name_length)
 {

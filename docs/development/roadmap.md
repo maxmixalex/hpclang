@@ -426,6 +426,15 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Receipt-gated CREATED transition (local, not submitted):** the RAM
+  wrapper rechecks the original receipt, full snapshot and claim binding/name
+  before the Flash primitive verifies all immutable bytes and changes only the
+  INTENT-to-CREATED phase bit. CREATED is idempotent for the same owned attempt;
+  all other phases reject. Tests cover 256 phases plus receipt/content/name/
+  binding mismatches, read failure and both failed/lost-ack writes, preserving
+  unrelated Flash, RAM and receipts. Complete ARM build, mutation and
+  installation ASan/UBSan suites, ARM analysis and strict docs pass. Native producer
+  integration and restart ownership remain open.
 - **Creation-intent publication primitive (local, not submitted):** writes
   immutable bytes, then the deleted envelope, then INTENT last. Same-attempt
   retry accepts compatible incomplete bytes or an exact published INTENT, never
@@ -435,7 +444,7 @@ Current delivery checkpoints:
   ARM build, full host ASan/UBSan, all 15 ARM analysis contexts and strict docs
   pass. Native producer
   integration must still establish name absence and owned allocation before
-  publication; CREATED transition, cancellation and restart ownership remain open.
+  publication; native integration, cancellation and restart ownership remain open.
 - **Claim-aware installation drafts (local, not submitted):** preparation
   preserves cross-port/catalog namespace checks, plans four extents, rebinds the
   trusted layout's claim field before identity sealing, and revalidates placement

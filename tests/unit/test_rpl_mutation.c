@@ -926,6 +926,102 @@ static void test_recovery_reservation_discard_created(void)
     hpclang_object_release(snapshot);
 }
 
+static uint8_t creation_flash[244];
+static unsigned creation_programs, creation_failure;
+static int creation_read(void *context, uint32_t at, uint16_t *value)
+{
+    assert(context == creation_flash && at >= 0x1e0104 &&
+           at + 1 < 0x1e0104 + sizeof creation_flash);
+    if (creation_failure == 1)
+        return 0;
+    unsigned offset = at - 0x1e0104;
+    *value = creation_flash[offset] | (uint16_t)creation_flash[offset + 1] << 8;
+    return 1;
+}
+static int creation_program(void *context, uint32_t at, uint16_t value)
+{
+    assert(context == creation_flash && at == 0x1e0114);
+    ++creation_programs;
+    if (creation_failure != 2) {
+        creation_flash[at - 0x1e0104] &= value;
+        creation_flash[at - 0x1e0104 + 1] &= value >> 8;
+    }
+    return creation_failure != 2 && creation_failure != 3;
+}
+
+static void test_recovery_creation_commit(void)
+{
+    uint8_t identity[48] = "HPCROOT1", header[80], intent[240], saved_flash[244];
+    identity[9] = 2;
+    identity[12] = 16;
+    for (unsigned i = 16; i < sizeof identity; ++i)
+        identity[i] = (uint8_t)(i * 3);
+    const struct hpclang_rpl_flash_installed_recovery installed = {0x180105, 0x160105, 0x161121,
+                                                                   0x140000};
+    const struct hpclang_rpl_flash_io flash = {creation_flash, creation_read, creation_program,
+                                               0x140000, 0x200000};
+    static uint8_t saved_ram[NIBBLES];
+    for (unsigned fault = 0; fault < 10; ++fault) {
+        struct hpclang_rpl_mutation_io io = setup(1);
+        prepare_reservation_home();
+        assert(
+            hpclang_rpl_recovery_reservation_header(identity, &installed, 0x12345678, 80, header));
+        struct hpclang_object *snapshot = malloc(sizeof(*snapshot) + 85);
+        assert(snapshot);
+        snapshot->kind = HPCLANG_OBJECT_STRING;
+        snapshot->native_prologue = 0x2a2c;
+        snapshot->nibble_count = 170;
+        memset(snapshot->data, 0, 85);
+        for (unsigned i = 0; i < 10; ++i) {
+            uint32_t value = i < 5 ? 0x2a2c : 165;
+            snapshot->data[i / 2] |= ((value >> (4 * (i % 5))) & 15) << (4 * (i & 1));
+        }
+        memcpy(snapshot->data + 5, header, sizeof header);
+        struct hpclang_rpl_recovery_reservation receipt;
+        assert(!hpclang_rpl_recovery_reservation_create(&io, (const uint8_t *)"C", 1, snapshot,
+                                                        &receipt));
+        const uint8_t *name = (const uint8_t *)(fault == 3 ? "D" : "C");
+        if (fault == 4)
+            header[24] ^= 1;
+        assert(!hpclang_rpl_flash_creation_encode(0x140000, 0x200000, 0x1e0105, header, name, 1,
+                                                  intent, sizeof intent));
+        memset(creation_flash, 255, sizeof creation_flash);
+        memcpy(creation_flash + 1, intent, sizeof intent);
+        if (fault == 1)
+            ++receipt.capacity;
+        if (fault == 2)
+            snapshot->data[84] ^= 1;
+        if (fault == 5)
+            creation_flash[24] ^= 1;
+        if (fault == 9)
+            creation_flash[17] = 0x7e;
+        creation_failure = fault >= 6 && fault <= 8 ? fault - 5 : 0;
+        creation_programs = 0;
+        memcpy(saved_flash, creation_flash, sizeof saved_flash);
+        memcpy(saved_ram, memory, sizeof memory);
+        const struct hpclang_rpl_recovery_reservation saved_receipt = receipt;
+        const struct hpclang_rpl_reader reader = {io.read_nibble, io.context};
+        int result = hpclang_rpl_recovery_reservation_complete_creation(
+            &flash, 0x1e0105, intent, sizeof intent, &reader, snapshot, &receipt);
+        assert(result == (!fault || fault == 9 ? 0 : HPCLANG_RPL_FLASH_DIRTY));
+        assert(!memcmp(saved_ram, memory, sizeof memory));
+        assert(!memcmp(&saved_receipt, &receipt, sizeof receipt));
+        if (!fault || fault >= 7) {
+            assert(creation_programs == (fault == 9 ? 0 : 1));
+            creation_failure = creation_programs = 0;
+            assert(!hpclang_rpl_recovery_reservation_complete_creation(
+                &flash, 0x1e0105, intent, sizeof intent, &reader, snapshot, &receipt));
+            assert(creation_programs == (fault == 7 ? 1 : 0));
+            assert(creation_flash[17] == 0x7e);
+            saved_flash[17] = 0x7e;
+        } else {
+            assert(!creation_programs);
+        }
+        assert(!memcmp(saved_flash, creation_flash, sizeof saved_flash));
+        hpclang_object_release(snapshot);
+    }
+}
+
 static void test_recovery_reservation_hidden_preflight(void)
 {
     struct hpclang_object *snapshot = make_string1('R');
@@ -2884,6 +2980,7 @@ int main(void)
     test_recovery_reservation_create();
     test_recovery_reservation_discard_created();
     test_recovery_reservation_hidden_preflight();
+    test_recovery_creation_commit();
     test_recovery_reservation_binding();
     test_named_create_nospace_is_non_mutating();
     test_named_remove_oldest_preserves_reference();

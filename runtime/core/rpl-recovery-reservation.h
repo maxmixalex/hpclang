@@ -67,6 +67,18 @@ int hpclang_rpl_recovery_reservation_check_created(
     const struct hpclang_rpl_reader *reader, const uint8_t *name, uint32_t name_length,
     const struct hpclang_object *snapshot, const struct hpclang_rpl_recovery_reservation *created);
 
+/* Commit a durable claim's CREATED phase after checking this invocation's
+ * original receipt and entire untouched snapshot, then its exact binding header.
+ * The name comes from the trusted original INTENT record. Keep RAM/Flash views,
+ * snapshot and receipt stable and exclusively owned; no native return or reuse
+ * since create. Returns Flash results; DIRTY retains ownership and prohibits
+ * activation/native return. No RAM writes or receipt changes. Does not prove
+ * the initial name absence/intent ordering or reconstruct provenance after reset. */
+int hpclang_rpl_recovery_reservation_complete_creation(
+    const struct hpclang_rpl_flash_io *flash, uint32_t slot, const uint8_t *intent, uint32_t bytes,
+    const struct hpclang_rpl_reader *reader, const struct hpclang_object *snapshot,
+    const struct hpclang_rpl_recovery_reservation *created);
+
 /* Discard an untouched reservation created by this same exclusive invocation,
  * after cancelling any associated unpublished Flash transaction. The original
  * snapshot, name and creation receipt must remain stable; no native return,

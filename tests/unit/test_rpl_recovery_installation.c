@@ -722,6 +722,16 @@ static void creation_publication_tests(const struct hpclang_rpl_flash_io *source
         else
             assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs &&
                    !memcmp(before, flash, sizeof flash));
+        memcpy(flash, before, sizeof flash);
+        programs = 0;
+        result = hpclang_rpl_flash_complete_creation(&io, slot, record, sizeof record);
+        if (phase == 0x7f || phase == 0x7e) {
+            assert(!result && flash[slot - FIRST + 16] == 0x7e);
+            before[slot - FIRST + 16] = 0x7e;
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        }
+        assert(!memcmp(before, flash, sizeof flash));
     }
     for (unsigned fault = 0; fault < 4; ++fault) {
         install(0, 3);

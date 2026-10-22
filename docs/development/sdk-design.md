@@ -416,8 +416,17 @@ and performs no writes. Other phases and an occupied following end marker reject
 Neither entry establishes allocation ownership or reservation-name absence;
 the installer must prove both and retain exclusion. A partial write retains
 ownership and prohibits returning to Stock or starting RAM creation. Native
-producer integration, phase CREATED publication, cancellation and restart
-ownership remain required.
+producer integration, cancellation and restart ownership remain required;
+the receipt-gated CREATED transition is described below.
+`hpclang_rpl_recovery_reservation_complete_creation` connects the original
+creation receipt and untouched snapshot check to the durable CREATED transition.
+It takes the name and binding from the trusted original INTENT, checks the full
+RAM object and its header, then calls `hpclang_rpl_flash_complete_creation`.
+The Flash primitive compares every immutable byte and permits only INTENT or
+CREATED; it clears the single phase bit and verifies readback. A repeated CREATED
+acknowledgement makes no writes. No RAM bytes or receipt fields change. All views
+must remain exclusively owned in the same invocation; neither entry supplies
+name-absence-before-intent ordering, restart provenance or startup safety.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and
