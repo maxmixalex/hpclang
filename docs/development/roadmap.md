@@ -427,6 +427,18 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Sealed creation-slot packaging (local, not submitted):** optional
+  `--creation-claim-slot` binds only an owned aligned initialized ELF placeholder
+  and records its generated admission-command coordinate before identity sealing.
+  Missing slot/identity, wrong placeholders and header/end/transaction overlap
+  reject without replacing outputs. Tests independently recompute the complete
+  identity digest, show that changing the slot invalidates it, and preserve an
+  identical unsymbolized word. All 21 packager and 66 recovery Python tests pass;
+  the full ARM build passes. Packaging the same real recovery/admission ELFs with
+  the previous/current tools produces byte-identical default libraries and equal
+  layouts. This is packaging support: runtime claim admission, claim-aware
+  placement, durable creation publication and lifetime/reclamation remain open.
+
 - **Persistent creation-claim format (local, not submitted):** an internal
   `HPCOWN1` codec stores the exact reservation name and complete installation/
   transaction binding in a 240-byte native deleted allocation. A separate

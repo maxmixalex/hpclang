@@ -407,6 +407,19 @@ never authorize adoption, activation or RAM release, and its storage must not be
 erased/reused while a bound root or transaction can survive. These remain open
 integration requirements, including interrupted native RAM creation.
 
+The internal packager accepts optional `--creation-claim-slot` for a guarded
+admission ELF with a sealed identity. It patches only the aligned initialized
+`hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and
+rejects bank-header/end-marker overlap or overlap with journal/authority storage.
+The optional layout field `admission_creation_nibble` includes the native
+allocation envelope, like the other binding coordinates. The slot is patched
+before sealing, so changing it changes the root digest; an identical placeholder
+without that symbol is left untouched. Missing symbols/identity and invalid
+geometry leave existing output files unchanged. This provides packaging support,
+not native allocation ownership or runtime claim admission. Existing images
+without the option retain byte-identical output; live root/target overlap checks,
+claim-aware placement and the runtime reader remain integration requirements.
+
 The internal 80-byte `HPCMEM2` payload header records the full sealed
 `HPCROOT1` identity, physical library/journal/authority coordinates, target,
 status-independent journal CRC and exact RAM capacity. It contains no RAM
