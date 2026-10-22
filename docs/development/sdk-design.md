@@ -462,6 +462,12 @@ field must not overlap identity or transaction descriptors. Preparation updates
 the claim address before resealing, then revalidates all four placements. Source
 and output coordinates remain unchanged on failure; staging is disposable.
 This prepares bytes in RAM and does not publish a claim or establish ownership.
+The maintained `installation-template-creation` witness uses the actual sealed
+recovery/admission template and checks its entire rebound draft against the
+independent packager. Both native models verify four erased-tail extents, source
+and catalog preservation, CODE/stack guards and zero Flash writes. Ordinary and
+claim-bound variants share the same build generator. Integrated root storage and
+publication remain separate requirements.
 The internal `hpclang_rpl_recovery_installation_creation` reader revalidates
 the installed transaction and journal CRC against the caller's trusted binding.
 It requires the record to occupy an exact native deleted allocation boundary,

@@ -426,6 +426,16 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Real claim-bound template preparation (local, not submitted):** normal
+  and claim-bound templates share the build generator. A maintained native
+  witness loads the actual sealed recovery/admission library, plans four extents,
+  patches its owned claim coordinate and reseals it in RAM. The independent
+  verifier checks complete draft bytes, all four erased-tail boundaries, source,
+  catalog, CODE/guards and zero Flash writes. ARM build/static analysis, Ruff and
+  66 Python tests pass. Both native executions completed; their initial verifier
+  failed on an incorrectly wired argument. After correcting it, both saved
+  captures pass the maintained full verifier without repeating execution. Storage/publication of this integrated root and
+  restart ownership remain open.
 - **Native creation publication (local, not submitted):** a maintained
   witness checks name absence and the fixture's exact erased tail, publishes
   INTENT with a driver-level partial write/retry, creates the RAM reservation,

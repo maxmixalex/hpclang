@@ -10,7 +10,7 @@ from reservation import packager, reader
 from verify import home_object, nibbles, require, symbol_offsets
 
 
-def fixture(library, layout, *, journal_slot=None, authority_slot=None):
+def fixture(library, layout, *, journal_slot=None, authority_slot=None, claim_slot=None):
     """Rebind through the host packager, independently of the ARM implementation."""
     data = list(nibbles(library[8:]))
     span = 5 + int("".join(data[5:10])[::-1], 16)
@@ -19,11 +19,14 @@ def fixture(library, layout, *, journal_slot=None, authority_slot=None):
         data[at : at + len(value) * 2] = nibbles(value)
 
     require((journal_slot is None) == (authority_slot is None), "Incomplete binding")
+    require(claim_slot is None or journal_slot is not None, "Claim requires transaction binding")
     if journal_slot is not None:
         for name in ("recovery_binding_nibble", "admission_binding_nibble"):
             at = layout[name] - 8
             put(at + 16, journal_slot.to_bytes(4, "little"))
             put(at + 24, authority_slot.to_bytes(4, "little"))
+        if claim_slot is not None:
+            put(layout["admission_creation_nibble"] - 8, claim_slot.to_bytes(4, "little"))
         put(layout["identity_object_nibble"], b"HPCROOT1" + bytes(40))
         crc = 0
         for nibble in data[5 : span - 4]:
@@ -60,6 +63,7 @@ def generate(library_path, layout_path, output):
         + f"const uint32_t template_recovery_binding = {layout['recovery_binding_nibble']}u;\n"
         + f"const uint32_t template_admission_binding = {layout['admission_binding_nibble']}u;\n"
         + f"const uint32_t template_identity = {at}u;\n"
+        + f"const uint32_t template_creation = {layout.get('admission_creation_nibble', 0xFFFFFFFF)}u;\n"
     )
 
 
@@ -140,10 +144,68 @@ def run_installed_recovery(
     return {"journal": journal, "authority": authority, "operations": operations}
 
 
+def run_creation_template(args, clean, root, *, transfer, verify_busy_reads):
+    root = root / "creation-template"
+    root.mkdir()
+    build = args.build
+    library = (build / "template-creation.hp").read_bytes()
+    layout = json.loads((build / "template-creation-layout.json").read_text())
+    deposited = root / "source"
+    transfer(
+        args,
+        deposited,
+        clean,
+        build,
+        "HPCTEMPLATE",
+        execute=False,
+        package_name="template-creation.hp",
+        remote_commands=["-95 CF HOME CLEAR"],
+    )
+    before = deposited / "state"
+    verify_source(before, library)
+    prepared = root / "prepared"
+    image = "installation-template-creation"
+    transfer(args, prepared, before, build, "CLAIMPREP", package_name=image + ".hp")
+    verify_creation_template(
+        args, before, prepared, library, layout, verify_busy_reads=verify_busy_reads
+    )
+
+
+def verify_creation_template(args, before, prepared, library, layout, *, verify_busy_reads):
+    from installation import verify_placement, verify_preparation, verify_probe
+    from startup import verify_startup
+
+    build = args.build
+    image = "installation-template-creation"
+    make_fixture = partial(fixture, library, layout)
+    after = prepared / "state"
+    base = verify_probe(before, after, build, args.nm, -8, 0xFFFFFFFF, image=image)
+    verify_startup(before, after, build, args.nm, base, image=image)
+    verify_placement(
+        before, after, build, args.nm, base, existing=False, make_fixture=make_fixture, image=image
+    )
+    verify_preparation(
+        before,
+        after,
+        build,
+        args.nm,
+        base,
+        existing=False,
+        make_fixture=make_fixture,
+        image=image,
+        creation=True,
+    )
+    verify_source(after, library)
+    require(verify_busy_reads(args, prepared) == 0, "Claim-aware draft wrote Flash")
+    print("Real claim-bound template matches independent four-extent draft", flush=True)
+
+
 def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     from installation import verify_placement, verify_preparation, verify_probe
     from startup import verify_startup
     from store import restart_storage, verify_storage
+
+    run_creation_template(args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
 
     root = root / "real-template"
     root.mkdir()

@@ -87,7 +87,15 @@ def generate_fixture(output):
 
 
 def verify_placement(
-    before, after, build, nm, base, *, existing, make_fixture=fixture, image="installation"
+    before,
+    after,
+    build,
+    nm,
+    base,
+    *,
+    existing,
+    make_fixture=fixture,
+    image="installation",
 ):
     """Check selection independently from native allocation headers."""
     _, record, _ = make_fixture()
@@ -121,7 +129,16 @@ def verify_placement(
 
 
 def verify_preparation(
-    before, after, build, nm, base, *, existing, make_fixture=fixture, image="installation"
+    before,
+    after,
+    build,
+    nm,
+    base,
+    *,
+    existing,
+    make_fixture=fixture,
+    image="installation",
+    creation=False,
 ):
     symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
@@ -139,9 +156,20 @@ def verify_preparation(
             "Conflicting draft published installation coordinates",
         )
         require(actual == b"\xa5" * len(original), "Conflicting draft changed staging")
+        if creation:
+            require(
+                struct.unpack_from("<I", ram, base + symbols["preparation_creation_slot"])[0]
+                == 0xFFFFFFFF,
+                "Conflicting draft published a claim coordinate",
+            )
         return
     require(result == 0, "Native draft preparation failed")
-    _, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority)
+    extra = {}
+    if creation:
+        extra["claim_slot"] = struct.unpack_from(
+            "<I", ram, base + symbols["preparation_creation_slot"]
+        )[0]
+    _, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority, **extra)
     require(actual == expected, "Native draft differs from independently rebound package")
     tails = {}
     for bank in range(0x140000, 0x200000, 0x20000):
@@ -153,7 +181,10 @@ def verify_preparation(
             pos += extent // 2
         require(flash[pos:end] == b"\xff" * (end - pos), "Draft tail is not erased")
         tails[bank] = pos
-    for pos, size in ((library, len(expected)), (journal, 4124), (authority, 32)):
+    extents = [(library, len(expected)), (journal, 4124), (authority, 32)]
+    if creation:
+        extents.append((extra["claim_slot"], 240))
+    for pos, size in extents:
         bank = pos & ~0x1FFFF
         require(bank in tails and pos == tails[bank], "Draft allocation leaves a hole or overlaps")
         require(pos % 4 == 1 and pos + size < bank + 0x20000, "Draft allocation leaves bank")

@@ -134,29 +134,37 @@ set(installation_witnesses installation installation-transaction installation-pu
         installation-activation-reject installation-creation)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
-    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
-            "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
-            "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
-        COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
-            --elf --model hp50g --flash-copy --library-id 1701
-            --journal-slot "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT}"
-            --authority-slot "${TEMPLATE_AUTHORITY}"
-            --reservation-name HPCRES --reservation-bytes 32768 --reservation-prefix HPCMEM2
-            --admission-elf "$<TARGET_FILE:admission>"
-            --layout-output "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
-            --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
-            "$<TARGET_FILE:recovery>" "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/template.py"
-            "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
-            "${CMAKE_CURRENT_BINARY_DIR}/template-layout.json"
-            "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
-        DEPENDS recovery admission "${HPCLANG_ROOT}/tools/package-recovery.py"
-            "${CMAKE_CURRENT_LIST_DIR}/template.py"
-            "${CMAKE_CURRENT_LIST_DIR}/reservation.py" "${CMAKE_CURRENT_LIST_DIR}/verify.py"
-        VERBATIM)
-    add_custom_target(recovery-template-data
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/template-data.c")
-    list(APPEND installation_witnesses installation-template installation-template-store)
+    foreach(template IN ITEMS template template-creation)
+        set(creation_arguments)
+        if(template STREQUAL "template-creation")
+            list(APPEND creation_arguments --creation-claim-slot 0x1e0105)
+        endif()
+        add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${template}.hp"
+                "${CMAKE_CURRENT_BINARY_DIR}/${template}-layout.json"
+                "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"
+            COMMAND "${Python3_EXECUTABLE}" "${HPCLANG_ROOT}/tools/package-recovery.py"
+                --elf --model hp50g --flash-copy --library-id 1701
+                --journal-slot "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT}"
+                --authority-slot "${TEMPLATE_AUTHORITY}"
+                --reservation-name HPCRES --reservation-bytes 32768 --reservation-prefix HPCMEM2
+                --admission-elf "$<TARGET_FILE:admission>"
+                ${creation_arguments}
+                --layout-output "${CMAKE_CURRENT_BINARY_DIR}/${template}-layout.json"
+                --nm "${LLVM_NM}" --readelf "${LLVM_READELF}" --objcopy "${LLVM_OBJCOPY}"
+                "$<TARGET_FILE:recovery>" "${CMAKE_CURRENT_BINARY_DIR}/${template}.hp"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/template.py"
+                "${CMAKE_CURRENT_BINARY_DIR}/${template}.hp"
+                "${CMAKE_CURRENT_BINARY_DIR}/${template}-layout.json"
+                "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"
+            DEPENDS recovery admission "${HPCLANG_ROOT}/tools/package-recovery.py"
+                "${CMAKE_CURRENT_LIST_DIR}/template.py"
+                "${CMAKE_CURRENT_LIST_DIR}/reservation.py" "${CMAKE_CURRENT_LIST_DIR}/verify.py"
+            VERBATIM)
+        add_custom_target(recovery-${template}-data
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c")
+    endforeach()
+    list(APPEND installation_witnesses installation-template installation-template-store
+        installation-template-creation)
 endif()
 foreach(witness IN LISTS installation_witnesses)
     add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
@@ -166,8 +174,13 @@ foreach(witness IN LISTS installation_witnesses)
         target_sources(${witness} PRIVATE "${CORE}/${module}.c")
     endforeach()
     if(witness MATCHES "^installation-template")
-        add_dependencies(${witness} recovery-template-data)
-        target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/template-data.c"
+        set(template template)
+        if(witness STREQUAL "installation-template-creation")
+            set(template template-creation)
+            target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE_CREATION)
+        endif()
+        add_dependencies(${witness} recovery-${template}-data)
+        target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"
             "${CORE}/rpl-object-store.c")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE)
     endif()
