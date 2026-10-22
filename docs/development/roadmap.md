@@ -426,6 +426,15 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Same-bank admission parity (local, not submitted):** the installation suite
+  now checks both buffered and low-memory streaming admission against a journal
+  and adjacent authority behind the target bank header. Six cases cover READY
+  recovery, valid retirement, retirement before repair, closed records against
+  new damage, a competing journal and an authority read failure. Successful
+  paths agree on phase and exact installed coordinates; rejection leaves output
+  and all Flash unchanged. The full installation suite passes ASan/UBSan and
+  clang-format 18. This strengthens admission coverage; durable creation proof,
+  interrupted RAM creation, startup ordering and reclamation remain open.
 - **Previous submission CI (`1deb8872`):** Runtime (39483875385) and Objects
   (39483875257) passed. Quality (39483875241) rejected two formatting lines
   in bound replay; the current file passes clang-format 18. Core (39483875319)

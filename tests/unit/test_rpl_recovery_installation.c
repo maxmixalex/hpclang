@@ -79,19 +79,25 @@ static void install(unsigned v, unsigned bank)
 static void transaction_tests(const struct hpclang_rpl_flash_io *io,
                               const struct hpclang_rpl_flash_catalog *catalog)
 {
-    enum
-    {
-        JOURNAL = 0x160105,
-        AUTHORITY = 0x180105
-    };
     uint8_t image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
     uint8_t journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
     uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
     uint8_t scratch[2 * HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
     const struct hpclang_rpl_flash_installed_recovery sentinel = {1, 2, 3, 4};
-    for (unsigned scenario = 0; scenario < 14; ++scenario) {
+    for (unsigned scenario = 0; scenario < 20; ++scenario) {
+        const uint32_t JOURNAL = scenario < 14 ? 0x160105 : FIRST + 0x2005;
+        const uint32_t AUTHORITY = scenario < 14 ? 0x180105 : JOURNAL + sizeof journal;
         unsigned bank = scenario == 5 ? 0 : 3;
         install(0, bank);
+        if (scenario >= 14) {
+            /* Real placement may put the pair behind the target bank header.
+             * Preserve a complete deleted allocation up to that free tail. */
+            uint32_t extent = 2 * (JOURNAL - FIRST - 0x105) - 2;
+            flash[0x105] = 0;
+            flash[0x106] = extent;
+            flash[0x107] = extent >> 8;
+            flash[0x108] = extent >> 16;
+        }
         memcpy(image, flash, sizeof image);
         assert(!hpclang_rpl_flash_sector_encode(FIRST, END, JOURNAL, FIRST, image, journal,
                                                 sizeof journal));
@@ -103,8 +109,10 @@ static void transaction_tests(const struct hpclang_rpl_flash_io *io,
             journal[0] = authority[0] = 0;
         if (scenario == 3)
             authority[0] = 0xff;
-        if (scenario == 10)
+        if (scenario == 10 || scenario == 15 || scenario == 16)
             journal[0] = 0x7c;
+        if (scenario == 17)
+            journal[0] = authority[0] = 0;
         if (scenario == 11) {
             journal[0] = 0;
             authority[0] = 0x7c;
@@ -113,7 +121,8 @@ static void transaction_tests(const struct hpclang_rpl_flash_io *io,
             authority[0] = 0;
         memcpy(flash + JOURNAL - FIRST, journal, sizeof journal);
         memcpy(flash + AUTHORITY - FIRST, authority, sizeof authority);
-        if (scenario == 0 || scenario == 5)
+        if (scenario == 0 || scenario == 5 || scenario == 14 || scenario == 16 || scenario == 17 ||
+            scenario == 18 || scenario == 19)
             memset(flash, 255, sizeof image);
         if (scenario == 4)
             flash[AUTHORITY - FIRST + 12] ^= 1;
@@ -125,7 +134,9 @@ static void transaction_tests(const struct hpclang_rpl_flash_io *io,
             fail_address = END - 2;
         if (scenario == 10)
             flash[123] ^= 1;
-        if (scenario == 13) {
+        if (scenario == 19)
+            fail_address = AUTHORITY & ~1u;
+        if (scenario == 13 || scenario == 18) {
             uint8_t other[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
             assert(!hpclang_rpl_flash_sector_encode(FIRST, END, 0x1e0105, FIRST, image, other,
                                                     sizeof other));
@@ -145,9 +156,13 @@ static void transaction_tests(const struct hpclang_rpl_flash_io *io,
         struct hpclang_rpl_flash_installed_recovery streamed = sentinel;
         int streamed_phase = hpclang_rpl_recovery_installation_stream(
             io, 1701, catalog, vectors[0].descriptor, AUTHORITY, JOURNAL, &streamed);
-        if (scenario < 3 || scenario == 9 || scenario == 11) {
+        if (scenario < 3 || scenario == 9 || scenario == 11 || scenario == 14 || scenario == 15) {
             const int expected[] = {1, 2, 0};
-            assert(phase == (scenario == 11 ? 2 : scenario == 9 ? 0 : expected[scenario]));
+            int wanted = scenario == 14                     ? 1
+                         : scenario == 15 || scenario == 11 ? 2
+                         : scenario == 9                    ? 0
+                                                            : expected[scenario];
+            assert(phase == wanted);
             assert(streamed_phase == phase && !memcmp(&streamed, &result, sizeof result));
             assert(result.library_slot == FIRST + bank * 0x20000 + 0x105);
             assert(result.journal_slot == JOURNAL && result.authority_slot == AUTHORITY &&
