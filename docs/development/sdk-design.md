@@ -388,6 +388,25 @@ unarmed, preserving the reservation, unrelated HOME data, catalog, CODE and stac
 guards. The receipt remains an exclusive-invocation capability; this sequence
 does not reconstruct creation provenance after reset or authorize later reuse.
 
+An internal draft `HPCOWN1` creation claim reserves 240 bytes as a native deleted
+allocation (status and metadata zero), so Stock skips its payload. A separate
+phase byte records intent (`7F`), verified creation (`7E`) and closure (`00`);
+other subsets of `7E` are closing, and `FF` is incomplete. The immutable CRC
+covers its physical slot, complete `HPCMEM2` binding, exact printable name and
+canonical padding. The codec checks record/target/library/journal/authority
+separation, name limits and exact expected binding. It stores no RAM address.
+Offline native fixtures cover incomplete, intent, created, closing and closed
+payloads; they are invisible to Stock and preserve Flash/catalog across restart.
+
+This format is not yet connected to a publisher or startup admission. Next,
+the sealed executing root must bind the claim's allocation; the exclusive
+producer must verify name absence before publishing intent, and revalidate the
+fresh creation receipt before publishing created. Cuts during either publication
+need explicit retry/cancellation handling. A matching decoded record alone must
+never authorize adoption, activation or RAM release, and its storage must not be
+erased/reused while a bound root or transaction can survive. These remain open
+integration requirements, including interrupted native RAM creation.
+
 The internal 80-byte `HPCMEM2` payload header records the full sealed
 `HPCROOT1` identity, physical library/journal/authority coordinates, target,
 status-independent journal CRC and exact RAM capacity. It contains no RAM

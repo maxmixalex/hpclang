@@ -284,6 +284,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     from startup import run_port1_inventory, verify_startup
     from staging import run_staging
     from abort import run_abort
+    from creation import run_creation_visibility
 
     root = args.output / "installation"
     root.mkdir()
@@ -346,6 +347,15 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
     )
     transactions = []
     run_abort(args, before, root, slot, transfer=transfer, verify_busy_reads=verify_busy_reads)
+    run_creation_visibility(
+        args,
+        before,
+        root,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
     for label, status in (
         ("armed", 1),
         ("damaged", 1),
@@ -443,6 +453,7 @@ def run_installation(args, clean, *, transfer, emulator, completed, verify_busy_
                 selected_storage=True,
                 unarmed_staging=True,
                 reservation_abort=True,
+                creation_claim_visibility=True,
                 real_template=real_template,
             ),
             indent=2,

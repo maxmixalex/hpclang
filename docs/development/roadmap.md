@@ -427,6 +427,19 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Persistent creation-claim format (local, not submitted):** an internal
+  `HPCOWN1` codec stores the exact reservation name and complete installation/
+  transaction binding in a 240-byte native deleted allocation. A separate
+  monotonic phase distinguishes intent, verified creation and closure; CRC
+  excludes only that mutable phase. Tests cover all 256 phase bytes, each
+  immutable-byte fault, each binding-byte mismatch, truncation, overlap/bounds,
+  name/capacity errors and unchanged outputs, with an independent CRC oracle.
+  The full Flash-record ASan/UBSan suite and ARM analysis pass. Both models pass
+  the maintained offline five-phase Stock restart probe with exact Flash/catalog
+  and zero Flash operations. This validates the codec and native visibility only:
+  sealed-root allocation binding, publication before RAM creation, interrupted
+  creation/retry, admission and reclamation are not implemented by this codec.
+
 - **CI tool parity correction (local, not submitted):** `22103fb5` Quality
   (39825721704) still rejects two cast/unary-operator spaces in bound replay.
   Previous local checks used system clang-format 18, while Quality selects the
