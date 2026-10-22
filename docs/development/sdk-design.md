@@ -434,6 +434,17 @@ Its verifier independently constructs the complete expected Flash and checks
 reservation contents, unrelated HOME data, native catalog, owning CODE, guards
 and Flash busy accounting. The fixture's claim address is explicit and checked;
 it is not yet a production claim-bound root installation or a power-loss test.
+`hpclang_rpl_recovery_installation_staged` validates an exact unarmed authority
+and READY journal without a sector scratch buffer. It checks native allocation
+boundaries and root/catalog identity in both current and proposed Flash views;
+staging never justifies damage to current Flash. The companion
+`hpclang_rpl_recovery_installation_creation_staged` additionally requires the
+exact CREATED claim, complete binding/journal CRC and its deleted allocation
+boundary in both views. Both are read-only; original ownership, fresh receipt
+validation and startup ordering remain separate activation prerequisites.
+The native fixture stages its pair after creation, then invokes a separate small
+admission program to reject a wrong transaction binding and accept the exact one.
+Neither program activates the authority or erases target data.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

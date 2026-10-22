@@ -82,6 +82,7 @@ def generate_fixture(output):
         + f"#define EXPECTED_JOURNAL_SLOT {JOURNAL_SLOT}u\n"
         + f"#define EXPECTED_AUTHORITY_SLOT {AUTHORITY_SLOT}u\n"
         + f"#define EXPECTED_TARGET {TARGET}u\n"
+        + f"#define EXPECTED_LIBRARY_ID {LIBRARY_ID}u\n"
         + f"#define EXPECTED_IDENTITY_LIBRARY {IDENTITY_LIBRARY_ID}u\n"
     )
 
@@ -267,6 +268,7 @@ def verify_probe(
     image="installation",
     expected_flash=None,
     fresh_copy=False,
+    baseline_results=0,
 ):
     require_stock_pc(after)
     require(
@@ -275,7 +277,10 @@ def verify_probe(
         "Installation witness changed unexpected Flash bytes",
     )
     read, original = reader(after), reader(before)
-    require(original(0x806FD) - original(0x806F8) == 5, "Expected an empty baseline stack")
+    require(
+        original(0x806FD) - original(0x806F8) == 5 * (baseline_results + 1),
+        "Unexpected baseline stack depth",
+    )
     require(read(0x806FD) - read(0x806F8) == 10, "Expected exactly one predicate result")
     pointer = read(read(0x806F8))
     require(

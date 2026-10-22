@@ -131,7 +131,7 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/insta
 set(installation_witnesses installation installation-transaction installation-publication
         installation-cancellation installation-identity installation-reservation-failure
         installation-store installation-cleanup installation-staging installation-abort
-        installation-activation-reject installation-creation)
+        installation-activation-reject installation-creation installation-creation-admission)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
     foreach(template IN ITEMS template template-creation)
@@ -201,6 +201,10 @@ foreach(witness IN LISTS installation_witnesses)
         endif()
     elseif(witness STREQUAL "installation-cleanup")
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_CLEANUP)
+    elseif(witness STREQUAL "installation-creation-admission")
+        target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-installation.c"
+            "${CORE}/rpl-recovery-identity.c" "${CORE}/rpl-recovery-reservation.c")
+        target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_CREATION_ADMISSION)
     elseif(witness STREQUAL "installation-identity")
         target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-identity.c"
             "${CORE}/rpl-recovery-installation.c")

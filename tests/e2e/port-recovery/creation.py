@@ -27,7 +27,8 @@ def creation_record(binding, name, slot, phase):
 
 
 def run_creation_publication(args, before, root, slot, *, transfer, verify_busy_reads):
-    from installation import verify_probe
+    from installation import AUTHORITY_SLOT, JOURNAL_SLOT, TARGET, verify_probe
+    from prepare import prepare
 
     claim_slot = 0x1E0105
     expected = bytearray((before / "flash").read_bytes())
@@ -36,6 +37,12 @@ def run_creation_publication(args, before, root, slot, *, transfer, verify_busy_
     expected[claim_slot : claim_slot + 240] = creation_record(
         reservation[:80], b"HPCLEASE", claim_slot, 0x7E
     )
+    pair = root / "creation-expected-pair"
+    prepare(before, pair, JOURNAL_SLOT, TARGET, bound=True)
+    records = (pair / "flash").read_bytes()
+    for address, size in ((JOURNAL_SLOT, 4124), (AUTHORITY_SLOT, 32)):
+        expected[address : address + size] = records[address : address + size]
+    expected[AUTHORITY_SLOT] = 0x7F
     phase = root / "creation-published"
     image = "installation-creation"
     transfer(
@@ -56,6 +63,11 @@ def run_creation_publication(args, before, root, slot, *, transfer, verify_busy_
     symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
     ram = (after / "sram").read_bytes()
     result = struct.unpack_from("<5I", ram, base + symbols["creation_result"])
+    staging = struct.unpack_from("<2I", ram, base + symbols["creation_stage_result"])
+    require(
+        staging == (0, 0),
+        "Creation witness did not stage its transaction",
+    )
     require(result[:4] == (0xFFFFFFFC, 0, 0, 0), "Creation intent/receipt commit failed")
     require(
         result[4] > 0 and verify_busy_reads(args, phase) == result[4],
@@ -69,7 +81,38 @@ def run_creation_publication(args, before, root, slot, *, transfer, verify_busy_
         home_string(reader(after), b"HPCKEEP") == b"unrelated data",
         "Creation publication changed unrelated HOME data",
     )
-    print("Native intent retry, fresh RAM creation and receipt-gated CREATED verified", flush=True)
+    checked = root / "creation-admission"
+    checker = "installation-creation-admission"
+    transfer(
+        args,
+        checked,
+        after,
+        args.build,
+        "CHECKCREATE",
+        package_name=checker + ".hp",
+        remote_commands=["-95 CF HOME CLEAR 'CHECKCREATE' RCL 'CHECKCREATE' PURGE"],
+    )
+    state = checked / "state"
+    # Publication leaves its checked predicate on the stack; CHECKCREATE's
+    # command clears it before executing the independent admission program.
+    base = verify_probe(
+        after, state, args.build, args.nm, 0, slot, image=checker, baseline_results=1
+    )
+    symbols = symbol_offsets(args.build / (checker + ".elf"), args.nm)
+    values = struct.unpack_from(
+        "<3I", (state / "sram").read_bytes(), base + symbols["staged_creation_result"]
+    )
+    require(values == (0, 0xFFFFFFFC, 0), "Staged gate failed correct/wrong binding checks")
+    require(verify_busy_reads(args, checked) == 0, "Staged gate wrote Flash")
+    require(
+        home_string(reader(state), b"HPCLEASE") == reservation,
+        "Staged gate changed the reservation",
+    )
+    require(
+        home_string(reader(state), b"HPCKEEP") == b"unrelated data",
+        "Staged gate changed unrelated HOME data",
+    )
+    print("Native creation, staging and read-only admission verified", flush=True)
 
 
 def run_creation_visibility(args, before, root, slot, *, emulator, completed, verify_busy_reads):

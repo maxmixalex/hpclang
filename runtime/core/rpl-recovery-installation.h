@@ -118,4 +118,25 @@ int hpclang_rpl_recovery_installation_creation(const struct hpclang_rpl_flash_io
                                                uint32_t name_length,
                                                enum hpclang_rpl_flash_creation_phase *phase);
 
+/* Streaming staged-transaction validation. Require exact authority 7F and READY
+ * journal, then validate both intact current and proposed views, including root
+ * identity/catalog and native pair boundaries. No heap or writes. Return 0 and
+ * update installed only on success. This grants no activation/ownership. */
+int hpclang_rpl_recovery_installation_staged(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected[48], uint32_t authority,
+    uint32_t journal, struct hpclang_rpl_flash_installed_recovery *installed);
+
+/* Read-only pre-activation gate under the same trusted binding/claim contract.
+ * Require exact staged authority 7F, a READY journal and a CREATED claim. Validate
+ * root/catalog and all three allocation boundaries against BOTH intact current
+ * Flash and the proposed target image. Staging cannot justify current damage.
+ * No scratch sector, heap, writes or release permission. Caller must separately
+ * retain original installation ownership and revalidate the fresh RAM receipt;
+ * this proves consistent state, not provenance or safe startup ordering. */
+int hpclang_rpl_recovery_installation_creation_staged(
+    const struct hpclang_rpl_flash_io *io, uint32_t library_number,
+    const struct hpclang_rpl_flash_catalog *catalog, const uint8_t expected_binding[80],
+    uint32_t claim_slot, const uint8_t *name, uint32_t name_length);
+
 #endif

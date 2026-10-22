@@ -122,6 +122,7 @@ static unsigned publication_calls, cut_at;
 #define CREATION_SLOT 0x1e0105u /* Verified first erased allocation of the fixture's last bank. */
 static uint8_t creation_intent[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
 volatile uint32_t creation_result[5];
+volatile uint32_t creation_stage_result[2];
 #endif
 unsigned short hpclang_flash_read16(void *, unsigned);
 void hpclang_flash_write16(void *, unsigned, unsigned short);
@@ -235,6 +236,20 @@ __attribute__((noinline)) static void complete_creation(const uint32_t *map,
         (const struct hpclang_object *)&reservation, &created_reservation);
     creation_result[4] = publication_calls;
     if (creation_result[2] || creation_result[3] || count != publication_calls)
+        reservation_failed();
+}
+
+static void stage_created_transaction(const struct hpclang_rpl_flash_io *source)
+{
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_publication;
+    creation_stage_result[0] = hpclang_rpl_flash_publish_sector(
+        &io, EXPECTED_JOURNAL_SLOT, planned_journal, sizeof planned_journal);
+    creation_stage_result[1] =
+        hpclang_rpl_flash_stage_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
+                                          planned_journal, sizeof planned_journal);
+    creation_result[4] = publication_calls;
+    if (creation_stage_result[0] || creation_stage_result[1])
         reservation_failed();
 }
 #endif
@@ -447,6 +462,7 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
 #endif
 #ifdef HPCLANG_INSTALLATION_CREATION
     complete_creation(map, io);
+    stage_created_transaction(io);
     *slot = planned.library_slot;
     return 0;
 #endif

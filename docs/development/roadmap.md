@@ -426,8 +426,20 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Staged creation admission (locally verified; not yet submitted):** the
+  streaming gate requires exact unarmed authority 7F, READY journal and CREATED
+  claim, checking root/catalog and native boundaries in both current and proposed
+  Flash views. Current damage cannot be excused by the recovery image. Host
+  ASan/UBSan coverage passes all 256 authority and claim values, including direct
+  staged output checks. ARM build/static analysis, 66 Python tests, strict docs
+  and pinned formatting pass. HP49g+/HP50g both pass complete creation, staging
+  and read-only admission sequences, rejecting a wrong binding while preserving
+  Flash, catalog, reservation and unrelated HOME data. Publication leaves one
+  checked stack result; the next command clears it, and exact input/output depths
+  are verified. Separate native programs stay within the loader's 32 KiB limit.
+  Ownership, safe startup, activation and cancellation remain separate requirements.
 
-The accumulated creation-claim batch is submitted for CI: admission, four-extent
+Batch `50eadbea` is submitted for CI: admission, four-extent
 planning/drafts, intent publication, receipt-gated completion and native real-root
 storage/restart. All 452 native and 84 Python files pass the pinned CI formatters.
 CI acceptance remains pending; M8.0 is not closed.

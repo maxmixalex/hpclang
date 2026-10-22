@@ -10,6 +10,11 @@
 #include <stddef.h>
 
 volatile unsigned installation_result[8];
+#ifdef HPCLANG_INSTALLATION_CREATION_ADMISSION
+#include "rpl-recovery-installation.h"
+#include "rpl-recovery-reservation.h"
+volatile uint32_t staged_creation_result[3];
+#endif
 #ifdef HPCLANG_INSTALLATION_CLEANUP
 int hpclang_installation_cleanup(const struct hpclang_rpl_flash_io *io);
 #endif
@@ -188,6 +193,41 @@ int hpclang_recovery_predicate(const uint32_t *map)
         transaction_pair[0] = installed.journal_slot;
         transaction_pair[1] = installed.authority_slot;
         transaction_pair[2] = installed.target;
+    }
+#elif defined(HPCLANG_INSTALLATION_CREATION_ADMISSION)
+    struct hpclang_rpl_flash_installed_recovery installed;
+    int result = hpclang_rpl_recovery_installation_staged(
+        &io, EXPECTED_LIBRARY_ID, &catalog, expected_identity, EXPECTED_AUTHORITY_SLOT,
+        EXPECTED_JOURNAL_SLOT, &installed);
+    staged_creation_result[0] = result;
+    if (!result) {
+        uint32_t crc = 0;
+        for (unsigned i = 0; i < 4; ++i) {
+            uint32_t at = EXPECTED_JOURNAL_SLOT + HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES - 4 + i;
+            uint16_t word;
+            if (!io.read16(io.context, at & ~1u, &word)) {
+                result = HPCLANG_RPL_FLASH_FAILED;
+                break;
+            }
+            crc |= (uint32_t)(uint8_t)(word >> (8 * (at & 1))) << (8 * i);
+        }
+        uint8_t header[80];
+        if (!result && hpclang_rpl_recovery_reservation_header(expected_identity, &installed, crc,
+                                                               32768, header)) {
+            header[72] ^= 1;
+            staged_creation_result[1] = hpclang_rpl_recovery_installation_creation_staged(
+                &io, EXPECTED_LIBRARY_ID, &catalog, header, 0x1e0105, (const uint8_t *)"HPCLEASE",
+                8);
+            header[72] ^= 1;
+            result = hpclang_rpl_recovery_installation_creation_staged(
+                &io, EXPECTED_LIBRARY_ID, &catalog, header, 0x1e0105, (const uint8_t *)"HPCLEASE",
+                8);
+            staged_creation_result[2] = result;
+            if (!result)
+                slot = installed.library_slot;
+        } else if (!result) {
+            result = HPCLANG_RPL_FLASH_INVALID;
+        }
     }
 #elif defined(HPCLANG_INSTALLATION_PUBLICATION)
     int result = hpclang_installation_publish(map, &io, &catalog, &slot);

@@ -843,6 +843,52 @@ static void creation_claim_tests(const struct hpclang_rpl_flash_io *io,
             assert(result < 0 && phase == 99);
         }
         assert(!memcmp(before, flash, sizeof flash));
+        if (!scenario) {
+            /* Activation must validate intact actual Flash as well as its
+             * proposed image; a recovery-only restored view is insufficient. */
+            memcpy(flash, image, sizeof image);
+            flash[claim_slot - FIRST + 16] = 0x7e;
+            for (unsigned status = 0; status < 256; ++status) {
+                flash[AUTHORITY - FIRST] = status;
+                memcpy(before, flash, sizeof flash);
+                result = hpclang_rpl_recovery_installation_creation_staged(
+                    io, 1701, catalog, binding, claim_slot, name, 8);
+                assert(status == 0x7f ? result == 0 : result < 0);
+                const struct hpclang_rpl_flash_installed_recovery sentinel = {1, 2, 3, 4};
+                struct hpclang_rpl_flash_installed_recovery staged = sentinel;
+                result = hpclang_rpl_recovery_installation_staged(io, 1701, catalog, binding + 8,
+                                                                  AUTHORITY, JOURNAL, &staged);
+                if (status == 0x7f) {
+                    assert(!result && staged.library_slot == FIRST + 0x60105 &&
+                           staged.journal_slot == JOURNAL && staged.authority_slot == AUTHORITY &&
+                           staged.target == FIRST);
+                } else {
+                    assert(result < 0 && !memcmp(&staged, &sentinel, sizeof staged));
+                }
+                assert(!memcmp(before, flash, sizeof flash));
+            }
+            flash[AUTHORITY - FIRST] = 0x7f;
+            for (unsigned status = 0; status < 256; ++status) {
+                flash[claim_slot - FIRST + 16] = status;
+                memcpy(before, flash, sizeof flash);
+                result = hpclang_rpl_recovery_installation_creation_staged(
+                    io, 1701, catalog, binding, claim_slot, name, 8);
+                assert(status == 0x7e ? result == 0 : result < 0);
+                assert(!memcmp(before, flash, sizeof flash));
+            }
+            flash[claim_slot - FIRST + 16] = 0x7e;
+            flash[0x100] ^= 1;
+            memcpy(before, flash, sizeof flash);
+            assert(hpclang_rpl_recovery_installation_creation_staged(io, 1701, catalog, binding,
+                                                                     claim_slot, name, 8) < 0);
+            assert(!memcmp(before, flash, sizeof flash));
+            flash[0x100] ^= 1;
+            fail_address = (claim_slot + 20) & ~1u;
+            memcpy(before, flash, sizeof flash);
+            assert(hpclang_rpl_recovery_installation_creation_staged(io, 1701, catalog, binding,
+                                                                     claim_slot, name, 8) < 0);
+            assert(!memcmp(before, flash, sizeof flash));
+        }
     }
 }
 
