@@ -426,7 +426,21 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
-- **Real claim-bound template preparation (local, not submitted):** normal
+
+The accumulated creation-claim batch is submitted for CI: admission, four-extent
+planning/drafts, intent publication, receipt-gated completion and native real-root
+storage/restart. All 452 native and 84 Python files pass the pinned CI formatters.
+CI acceptance remains pending; M8.0 is not closed.
+- **Claim-bound real library storage (locally verified; CI pending):** the existing
+  selected-slot writer now has a maintained claim-bound template variant using
+  the same preparation and storage code. Independent verification reconstructs
+  the exact library from all three bound addresses, checks the four extents and
+  original erased contents, and compares the complete resulting Flash. Restart
+  must discover the same library without changes. Complete ARM build, Ruff and
+  66 Python tests pass. Both native storage/restart runs pass with 25,329 Flash
+  programming operations each; all unrelated Flash and source data remain intact. Journal,
+  authority and claim publication/activation remain separate open work.
+- **Real claim-bound template preparation (locally verified; CI pending):** normal
   and claim-bound templates share the build generator. A maintained native
   witness loads the actual sealed recovery/admission library, plans four extents,
   patches its owned claim coordinate and reseals it in RAM. The independent
@@ -436,7 +450,7 @@ Current delivery checkpoints:
   failed on an incorrectly wired argument. After correcting it, both saved
   captures pass the maintained full verifier without repeating execution. Storage/publication of this integrated root and
   restart ownership remain open.
-- **Native creation publication (local, not submitted):** a maintained
+- **Native creation publication (locally verified; CI pending):** a maintained
   witness checks name absence and the fixture's exact erased tail, publishes
   INTENT with a driver-level partial write/retry, creates the RAM reservation,
   and commits CREATED through the receipt gate; repeating completion must make
@@ -449,7 +463,7 @@ Current delivery checkpoints:
   creation encoder; a local noinline copy helper restores relocatable calls,
   with the strict relocation gate unchanged. This fixture is not the production
   claim-bound root installer, restart ownership, cancellation or reclamation.
-- **Receipt-gated CREATED transition (local, not submitted):** the RAM
+- **Receipt-gated CREATED transition (locally verified; CI pending):** the RAM
   wrapper rechecks the original receipt, full snapshot and claim binding/name
   before the Flash primitive verifies all immutable bytes and changes only the
   INTENT-to-CREATED phase bit. CREATED is idempotent for the same owned attempt;
@@ -458,7 +472,7 @@ Current delivery checkpoints:
   unrelated Flash, RAM and receipts. Complete ARM build, mutation and
   installation ASan/UBSan suites, ARM analysis and strict docs pass. Native producer
   integration and restart ownership remain open.
-- **Creation-intent publication primitive (local, not submitted):** writes
+- **Creation-intent publication primitive (locally verified; CI pending):** writes
   immutable bytes, then the deleted envelope, then INTENT last. Same-attempt
   retry accepts compatible incomplete bytes or an exact published INTENT, never
   later phases or occupied following storage. Tests exercise every programming
@@ -468,7 +482,7 @@ Current delivery checkpoints:
   pass. Native producer
   integration must still establish name absence and owned allocation before
   publication; native integration, cancellation and restart ownership remain open.
-- **Claim-aware installation drafts (local, not submitted):** preparation
+- **Claim-aware installation drafts (locally verified; CI pending):** preparation
   preserves cross-port/catalog namespace checks, plans four extents, rebinds the
   trusted layout's claim field before identity sealing, and revalidates placement
   before publishing output coordinates. Nine host scenarios compare the entire
@@ -478,7 +492,7 @@ Current delivery checkpoints:
   suite pass.
   Native preparation/publication, interruption and reclamation remain open.
 
-- **Creation-claim space planning (local, not submitted):** the shared
+- **Creation-claim space planning (locally verified; CI pending):** the shared
   erased-tail planner now supports library, journal, authority and creation-claim
   extents together, retrying bank combinations if the claim cannot fit. Existing
   three-extent callers retain their selection order. Eight new host scenarios
@@ -488,7 +502,7 @@ Current delivery checkpoints:
   pass. Claim-aware draft integration is described below; durable publication
   remains open.
 
-- **Creation-claim runtime admission (local, not submitted):** the reader
+- **Creation-claim runtime admission (locally verified; CI pending):** the reader
   revalidates the installed transaction, exact binding and journal CRC, then
   requires the claim to occupy a complete native deleted allocation rather than
   an interior payload. Admission roots with a sealed claim slot require the
@@ -502,7 +516,7 @@ Current delivery checkpoints:
   The native fixture constructs claims offline, so this is not evidence of a
   production publisher, restart ownership, startup ordering or reclamation.
 
-- **Sealed creation-slot packaging (local, not submitted):** optional
+- **Sealed creation-slot packaging (locally verified; CI pending):** optional
   `--creation-claim-slot` binds only an owned aligned initialized ELF placeholder
   and records its generated admission-command coordinate before identity sealing.
   Missing slot/identity, wrong placeholders and header/end/transaction overlap
@@ -515,7 +529,7 @@ Current delivery checkpoints:
   are recorded above; durable creation publication and lifetime/reclamation
   remain open.
 
-- **Persistent creation-claim format (local, not submitted):** an internal
+- **Persistent creation-claim format (locally verified; CI pending):** an internal
   `HPCOWN1` codec stores the exact reservation name and complete installation/
   transaction binding in a 240-byte native deleted allocation. A separate
   monotonic phase distinguishes intent, verified creation and closure; CRC
@@ -528,7 +542,7 @@ Current delivery checkpoints:
   sealed-root allocation binding, publication before RAM creation, interrupted
   creation/retry, admission and reclamation are not implemented by this codec.
 
-- **CI tool parity correction (local, not submitted):** `22103fb5` Quality
+- **CI tool parity correction (locally verified; CI pending):** `22103fb5` Quality
   (39825721704) still rejects two cast/unary-operator spaces in bound replay.
   Previous local checks used system clang-format 18, while Quality selects the
   pinned ATfE 22.1.0 formatter. Passing the former did not fix or validate the
@@ -538,7 +552,7 @@ Current delivery checkpoints:
   (39825721928) passed; Core (39825722002) is running and Runtime (39825721891)
   is queued at this check. No repeated polling or CI acceptance is claimed.
 
-- **Fresh receipt activation gate (local, not submitted):** publication now
+- **Fresh receipt activation gate (locally verified; CI pending):** publication now
   stages/retries an unarmed authority, validates the exact staged installation
   and rechecks its original creation receipt and entire reservation snapshot
   before activation. The shared read-only checker rejects wrong address,
@@ -551,7 +565,7 @@ Current delivery checkpoints:
   This is an invocation-scoped activation prerequisite; durable creation proof,
   interruption/restart ownership, startup ordering and reclamation remain open.
 
-- **Same-bank admission parity (local, not submitted):** the installation suite
+- **Same-bank admission parity (locally verified; CI pending):** the installation suite
   now checks both buffered and low-memory streaming admission against a journal
   and adjacent authority behind the target bank header. Six cases cover READY
   recovery, valid retirement, retirement before repair, closed records against

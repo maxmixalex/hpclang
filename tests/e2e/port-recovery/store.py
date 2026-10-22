@@ -34,7 +34,10 @@ def verify_storage(before, after, build, nm, *, make_fixture=fixture, image="ins
 
     journal = word(layout["recovery_binding_nibble"] + 16)
     authority = word(layout["recovery_binding_nibble"] + 24)
-    library, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority)
+    extra = {}
+    if "admission_creation_nibble" in layout:
+        extra["claim_slot"] = word(layout["admission_creation_nibble"])
+    library, expected, _ = make_fixture(journal_slot=journal, authority_slot=authority, **extra)
     require(record == expected, "Stored record differs from independently rebound library")
     require(prior[slot : slot + len(record)] == b"\xff" * len(record), "Storage overwrote data")
     expected_flash = bytearray(prior)
@@ -49,6 +52,34 @@ def verify_storage(before, after, build, nm, *, make_fixture=fixture, image="ins
         == (0, slot, journal, authority),
         "Storage departed from prepared coordinates",
     )
+    if extra:
+        claim = extra["claim_slot"]
+        require(
+            struct.unpack_from("<I", ram, base + symbols["preparation_creation_slot"])[0] == claim,
+            "Stored claim coordinate differs from preparation",
+        )
+        extents = [(slot, len(record)), (journal, 4124), (authority, 32), (claim, 240)]
+        for index, (address, size) in enumerate(extents):
+            require(
+                0x140105 <= address < 0x200000
+                and address % 4 == 1
+                and address % 0x20000 >= 0x105
+                and address + size < (address & ~0x1FFFF) + 0x20000,
+                "Stored binding extent leaves native allocation space",
+            )
+            require(
+                address + size <= TARGET or address >= TARGET + 4096,
+                "Stored binding extent overlaps target",
+            )
+            require(
+                prior[address : address + size] == b"\xff" * size,
+                "Stored binding extent was not erased",
+            )
+            for other, length in extents[:index]:
+                require(
+                    address + size <= other or other + length <= address,
+                    "Stored binding extents overlap",
+                )
     at = base + symbols["prepared_library"]
     require(ram[at : at + len(record)] == record, "Stored and prepared records differ")
     result, operations = struct.unpack_from("<2I", ram, base + symbols["storage_result"])

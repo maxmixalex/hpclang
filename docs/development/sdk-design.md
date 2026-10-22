@@ -468,6 +468,11 @@ independent packager. Both native models verify four erased-tail extents, source
 and catalog preservation, CODE/stack guards and zero Flash writes. Ordinary and
 claim-bound variants share the same build generator. Integrated root storage and
 publication remain separate requirements.
+The `installation-template-creation-store` variant uses the same selected-slot
+writer. Its verifier decodes the stored claim coordinate, independently rebuilds
+the library, checks all four extents and preserves every byte outside the library.
+A subsequent Stock restart must discover the exact stored library. This stores
+the root only; it does not publish the journal, authority or creation claim.
 The internal `hpclang_rpl_recovery_installation_creation` reader revalidates
 the installed transaction and journal CRC against the caller's trusted binding.
 It requires the record to occupy an exact native deleted allocation boundary,

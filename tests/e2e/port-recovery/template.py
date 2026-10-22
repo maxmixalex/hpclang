@@ -169,6 +169,7 @@ def run_creation_template(args, clean, root, *, transfer, verify_busy_reads):
     verify_creation_template(
         args, before, prepared, library, layout, verify_busy_reads=verify_busy_reads
     )
+    return before, library, layout
 
 
 def verify_creation_template(args, before, prepared, library, layout, *, verify_busy_reads):
@@ -200,12 +201,72 @@ def verify_creation_template(args, before, prepared, library, layout, *, verify_
     print("Real claim-bound template matches independent four-extent draft", flush=True)
 
 
+def run_creation_storage(
+    args, before, root, library, layout, *, transfer, emulator, completed, verify_busy_reads
+):
+    from store import restart_storage, verify_storage
+
+    root = root / "creation-storage"
+    root.mkdir()
+    stored = root / "stored"
+    image = "installation-template-creation-store"
+    transfer(
+        args,
+        stored,
+        before,
+        args.build,
+        "CLAIMSTORE",
+        package_name=image + ".hp",
+        execution_ms=60000,
+    )
+    slot, rebound, operations = verify_storage(
+        before,
+        stored / "state",
+        args.build,
+        args.nm,
+        make_fixture=partial(fixture, library, layout),
+        image=image,
+    )
+    verify_source(stored / "state", library)
+    require(
+        verify_busy_reads(args, stored) == operations,
+        "Claim-bound storage bypassed expected Flash polling",
+    )
+    restart = root / "restart"
+    restart_storage(
+        args,
+        stored,
+        restart,
+        rebound,
+        slot,
+        emulator=emulator,
+        completed=completed,
+        library_id=layout["library_id"],
+    )
+    verify_source(restart / "state", library)
+    print("Claim-bound real library stored and discovered unchanged after restart", flush=True)
+    return {"slot": slot, "operations": operations}
+
+
 def run_template(args, clean, root, *, transfer, emulator, completed, verify_busy_reads):
     from installation import verify_placement, verify_preparation, verify_probe
     from startup import verify_startup
     from store import restart_storage, verify_storage
 
-    run_creation_template(args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads)
+    claim_before, claim_library, claim_layout = run_creation_template(
+        args, clean, root, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
+    claim_storage = run_creation_storage(
+        args,
+        claim_before,
+        root,
+        claim_library,
+        claim_layout,
+        transfer=transfer,
+        emulator=emulator,
+        completed=completed,
+        verify_busy_reads=verify_busy_reads,
+    )
 
     root = root / "real-template"
     root.mkdir()
@@ -320,6 +381,7 @@ def run_template(args, clean, root, *, transfer, emulator, completed, verify_bus
     )
     return {
         "bytes": layout["record_bytes"],
+        "creation_storage": claim_storage,
         "slot": slot,
         "operations": operations,
         "recovery": recovery,
