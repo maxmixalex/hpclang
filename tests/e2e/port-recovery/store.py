@@ -65,8 +65,18 @@ def verify_storage(
     expected_flash = bytearray(prior)
     expected_flash[slot : slot + len(record)] = record
     if staged:
-        for address, data in staged_records(prior, journal, authority).items():
+        from creation import creation_record
+
+        records = staged_records(prior, journal, authority)
+        for address, data in records.items():
             expected_flash[address : address + len(data)] = data
+        identity_at = 8 + layout["identity_object_nibble"]
+        identity = b"".join(word(identity_at + 8 * i).to_bytes(4, "little") for i in range(12))
+        crc = int.from_bytes(records[journal][-4:], "little")
+        binding = b"HPCMEM2\0" + identity
+        binding += struct.pack("<6I", slot, journal, authority, TARGET, crc, 32768)
+        claim = extra["claim_slot"]
+        expected_flash[claim : claim + 240] = creation_record(binding, b"HPCLEASE", claim, 0x7F)
     base = verify_probe(
         before, after, build, nm, 0, slot, image=image, expected_flash=expected_flash
     )
@@ -74,8 +84,8 @@ def verify_storage(
     ram = (after / "sram").read_bytes()
     if staged:
         require(
-            struct.unpack_from("<2I", ram, base + symbols["storage_stage_result"]) == (0, 0),
-            "Real root storage did not stage its transaction",
+            struct.unpack_from("<3I", ram, base + symbols["storage_stage_result"]) == (0, 0, 0),
+            "Real root storage did not stage its transaction and creation intent",
         )
     require(
         struct.unpack_from("<4I", ram, base + symbols["preparation_result"])

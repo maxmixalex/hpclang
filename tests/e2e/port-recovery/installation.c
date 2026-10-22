@@ -38,9 +38,10 @@ static int stored_result;
 int hpclang_installation_store(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                uint32_t bytes, uint32_t slot);
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+#include "rpl-object-store.h"
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *io,
                                const struct hpclang_rpl_flash_recovery_space *space,
-                               uint32_t target);
+                               uint32_t target, uint32_t claim, const uint8_t identity[48]);
 #endif
 #endif
 
@@ -87,12 +88,36 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
     preparation_result[2] = space.journal_slot;
     preparation_result[3] = space.authority_slot;
 #ifdef HPCLANG_INSTALLATION_STORE
+#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+    if (!preparation_result[0]) {
+        uint32_t home;
+        struct hpclang_rpl_directory_entry_view entry;
+        stored_result = hpclang_rpl_store_home_object(catalog->reader, &home);
+        if (!stored_result) {
+            int found = hpclang_rpl_directory_find(catalog->reader, home,
+                                                   (const uint8_t *)"HPCLEASE", 8, &entry);
+            stored_result = found == HPCLANG_RPL_STORE_NOT_FOUND ? 0
+                            : found                              ? found
+                                                                 : HPCLANG_RPL_FLASH_EXISTS;
+        }
+        if (stored_result)
+            return;
+    }
+#endif
     if (!preparation_result[0])
         stored_result = hpclang_installation_store(io, prepared_library, EXPECTED_LIBRARY_BYTES,
                                                    space.library_slot);
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
-    if (!preparation_result[0] && !stored_result)
-        stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET);
+    if (!preparation_result[0] && !stored_result) {
+        uint8_t identity[48];
+        for (unsigned i = 0; i < sizeof identity; ++i) {
+            uint32_t at = 8 + EXPECTED_IDENTITY_NIBBLE + 2 * i;
+            identity[i] = (prepared_library[at / 2] >> (4 * (at & 1))) & 15;
+            ++at;
+            identity[i] |= ((prepared_library[at / 2] >> (4 * (at & 1))) & 15) << 4;
+        }
+        stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET, claim, identity);
+    }
 #endif
 #endif
 }

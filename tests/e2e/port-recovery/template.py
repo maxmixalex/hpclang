@@ -7,7 +7,7 @@ from pathlib import Path
 import struct
 
 from reservation import packager, reader
-from verify import home_object, nibbles, require, symbol_offsets
+from verify import home_object, home_string, nibbles, require, symbol_offsets
 
 
 def fixture(library, layout, *, journal_slot=None, authority_slot=None, claim_slot=None):
@@ -201,12 +201,67 @@ def verify_creation_template(args, before, prepared, library, layout, *, verify_
     print("Real claim-bound template matches independent four-extent draft", flush=True)
 
 
+def run_creation_name_collision(args, before, root, library, *, transfer, verify_busy_reads):
+    phase = root / "creation-name-collision"
+    image = "installation-template-creation-store"
+    transfer(
+        args,
+        phase,
+        before,
+        args.build,
+        "CLAIMCOLLIDE",
+        package_name=image + ".hp",
+        remote_commands=[
+            "-95 CF HOME CLEAR \"existing user data\" 'HPCLEASE' STO",
+            "'CLAIMCOLLIDE' RCL 'CLAIMCOLLIDE' PURGE",
+        ],
+    )
+    verify_creation_name_collision(
+        args, before, phase, library, verify_busy_reads=verify_busy_reads
+    )
+
+
+def verify_creation_name_collision(args, before, phase, library, *, verify_busy_reads):
+    from installation import verify_probe
+    from prepare import free_tail
+
+    image = "installation-template-creation-store"
+    state = phase / "state"
+    # Preparation precedes the name check, so diagnostics retain its planned
+    # root location even though the rejection must leave all Flash unchanged.
+    span = 5 + int(nibbles(library[8:])[5:10][::-1], 16)
+    size = ((span + 15) & ~7) // 2
+    flash = (before / "flash").read_bytes()
+    candidates = [free_tail(flash, bank) for bank in range(0x140000, 0x200000, 0x20000)]
+    candidates = [
+        at for at in candidates if at >= 0x141000 and at + size < (at & ~0x1FFFF) + 0x20000
+    ]
+    require(candidates, "Collision fixture has no root capacity")
+    base = verify_probe(before, state, args.build, args.nm, -6, candidates[0], image=image)
+    symbols = symbol_offsets(args.build / (image + ".elf"), args.nm)
+    require(
+        struct.unpack_from("<2I", (state / "sram").read_bytes(), base + symbols["storage_result"])
+        == (0, 0),
+        "Name collision attempted root storage",
+    )
+    require(verify_busy_reads(args, phase) == 0, "Name collision wrote Flash")
+    require(
+        home_string(reader(state), b"HPCLEASE") == b"existing user data",
+        "Name collision changed the user's variable",
+    )
+    verify_source(state, library)
+    print("Real installation rejects a pre-existing resource name before Flash writes", flush=True)
+
+
 def run_creation_storage(
     args, before, root, library, layout, *, transfer, emulator, completed, verify_busy_reads
 ):
     from store import restart_storage, verify_storage
 
     verify_source(before, library)
+    run_creation_name_collision(
+        args, before, root, library, transfer=transfer, verify_busy_reads=verify_busy_reads
+    )
     root = root / "creation-storage"
     root.mkdir()
     stored = root / "stored"

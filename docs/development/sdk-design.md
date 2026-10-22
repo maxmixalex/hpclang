@@ -453,6 +453,14 @@ remains erased and target data is unchanged. Its independent verifier reconstruc
 all records at the planned coordinates and checks complete Flash before and after
 Stock restart. This is unarmed installation staging, not resource creation,
 activation, recovery ownership reconstruction or startup-order acceptance.
+The subsequent creation-intent extension resolves HOME and checks name absence
+before the first root write. After root and pair publication, it encodes HPCOWN1
+at the fourth planned extent using the resealed identity and exact transaction
+CRC. It stops at INTENT without creating RAM or arming the authority. The name
+check and Flash publication share one exclusive invocation; returning or resetting
+does not turn the claim into permission to adopt a later same-name object. The
+maintained negative case supplies an existing string and requires rejection before
+Flash programming, preserving that string and the input template.
 `hpclang_rpl_flash_activate_staged_authority` handles the later phase transition
 without treating the record as an unfinished tail. It requires the exact READY
 journal, complete authority body and phase 7F (or 7E for a lost acknowledgement),

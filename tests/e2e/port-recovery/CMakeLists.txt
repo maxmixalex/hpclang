@@ -178,6 +178,7 @@ foreach(witness IN LISTS installation_witnesses)
         if(witness MATCHES "^installation-template-creation")
             set(template template-creation)
             target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TEMPLATE_CREATION)
+            target_sources(${witness} PRIVATE "${CORE}/rpl-recovery-reservation.c")
         endif()
         add_dependencies(${witness} recovery-${template}-data)
         target_sources(${witness} PRIVATE template.c "${CMAKE_CURRENT_BINARY_DIR}/${template}-data.c"

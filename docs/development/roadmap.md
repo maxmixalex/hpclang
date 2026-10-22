@@ -426,6 +426,18 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Real-root creation intent (locally verified; not yet submitted):** before any root write,
+  the native witness resolves HOME and rejects an existing HPCLEASE name. After
+  staging the real root's pair, it publishes INTENT at the fourth planned extent,
+  binding the resealed root identity, all coordinates, journal CRC, name and RAM
+  capacity. No RAM resource is created yet; this does not reconstruct ownership
+  after a return/reset. Independent full-Flash verification includes the claim.
+  ARM build/package and 66 Python tests pass. Both native storage/restart cases
+  pass with 27,500 operations each. Existing-name cases initially hit Stock's
+  remote-command limit; setup/execution are now separate short commands. Both
+  saved rejection captures pass after correcting the verifier to expect the
+  prepared (unwritten) slot in diagnostics: zero Flash operations, original string
+  and template preserved. Strict docs and pinned formatting pass.
 - **Real-root transaction staging (locally verified; not yet submitted):** the maintained
   claim-bound storage witness now writes its real recovery library, READY journal
   and unarmed authority in the same exclusive invocation, using the four-extent

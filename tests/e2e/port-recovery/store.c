@@ -8,9 +8,11 @@
 __thread int errno;
 volatile uint32_t storage_result[2];
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+#include "rpl-recovery-reservation.h"
 static uint8_t staged_image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
 static uint8_t staged_journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
-volatile uint32_t storage_stage_result[2];
+static uint8_t staged_claim[HPCLANG_RPL_FLASH_CREATION_CLAIM_BYTES];
+volatile uint32_t storage_stage_result[3];
 #endif
 static uint32_t owned_first, owned_end;
 unsigned short hpclang_flash_read16(void *, unsigned);
@@ -67,10 +69,11 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *source, const 
 #ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
 /* Same invocation and four-extent reservation as the successful root store.
  * Publish in planner order so a later allocation never hides behind an erased
- * marker. This stages only; no claim, RAM resource or activation is implied. */
+ * marker. Name absence was checked before root storage. The durable intent
+ * precedes any RAM creation; no RAM resource or activation is implied here. */
 int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
                                const struct hpclang_rpl_flash_recovery_space *space,
-                               uint32_t target)
+                               uint32_t target, uint32_t claim, const uint8_t identity[48])
 {
     for (uint32_t i = 0; i < sizeof staged_image; i += 2) {
         uint16_t word;
@@ -84,6 +87,17 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
                                         staged_image, staged_journal, sizeof staged_journal);
     if (result)
         return result;
+    uint32_t crc = 0;
+    for (unsigned i = 0; i < 4; ++i)
+        crc |= (uint32_t)staged_journal[sizeof staged_journal - 4 + i] << (8 * i);
+    const struct hpclang_rpl_flash_installed_recovery installed = {
+        space->library_slot, space->journal_slot, space->authority_slot, target};
+    uint8_t header[80];
+    if (!hpclang_rpl_recovery_reservation_header(identity, &installed, crc, 32768, header) ||
+        hpclang_rpl_flash_creation_encode(source->first, source->end, claim, header,
+                                          (const uint8_t *)"HPCLEASE", 8, staged_claim,
+                                          sizeof staged_claim))
+        return HPCLANG_RPL_FLASH_INVALID;
     struct hpclang_rpl_flash_io io = *source;
     io.program16 = program_owned;
     owned_first = space->journal_slot;
@@ -97,6 +111,13 @@ int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
         result = hpclang_rpl_flash_stage_authority(&io, owned_first, space->journal_slot,
                                                    staged_journal, sizeof staged_journal);
         storage_stage_result[1] = result;
+    }
+    if (!result) {
+        owned_first = claim;
+        owned_end = claim + sizeof staged_claim;
+        result = hpclang_rpl_flash_publish_creation_intent(&io, claim, staged_claim,
+                                                           sizeof staged_claim);
+        storage_stage_result[2] = result;
     }
     if (result)
         for (;;)
