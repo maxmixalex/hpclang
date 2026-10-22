@@ -427,6 +427,20 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **Fresh reservation cancellation cleanup (local):** an internal discard
+  operation checks the original name, creation receipt address/capacity and
+  complete untouched snapshot before removing a reservation. Success consumes
+  the receipt; pre-write rejection preserves RAM, while any failure after a
+  write attempt retains the invocation as INCOMPLETE. The mutation ASan/UBSan
+  suite covers mismatches, every lost-write acknowledgement and failed final
+  readback. Both HP49g+/HP50g pass the maintained create/stage/cancel/discard
+  path with unrelated HOME data, exact Flash/catalog and CODE/guards preserved.
+  The witness executes from Stock-preserved TEMPOB, avoiding movable USEROB;
+  separate directory-check frames keep removal within its 4 KiB stack.
+  ARM analysis and Python checks pass. This is same-invocation cancellation
+  cleanup, not ownership reconstruction after reset, active workspace release
+  or Flash reclamation. It has not been submitted for CI.
+
 - **Installed transaction recovery (local, open):** the real planner places
   the library in the second user bank and the journal/authority in the first
   bank's free tail. Injecting damage into that first bank's header after a

@@ -130,7 +130,7 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/insta
     "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_ERROR_IS_FATAL ANY)
 set(installation_witnesses installation installation-transaction installation-publication
         installation-cancellation installation-identity installation-reservation-failure
-        installation-store installation-cleanup installation-staging)
+        installation-store installation-cleanup installation-staging installation-abort)
 if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
     math(EXPR TEMPLATE_AUTHORITY "${HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT} + 4124")
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/template.hp"
@@ -196,7 +196,7 @@ foreach(witness IN LISTS installation_witnesses)
         target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_TRANSACTION)
     elseif(witness STREQUAL "installation-publication" OR
             witness STREQUAL "installation-reservation-failure" OR
-            witness STREQUAL "installation-staging")
+            witness STREQUAL "installation-staging" OR witness STREQUAL "installation-abort")
         target_sources(${witness} PRIVATE publication.c predicate-tls.S)
         foreach(module IN ITEMS rpl-flash-replay rpl-object-store object-snapshot rpl-recovery-reservation
                 time time-math rtc rtc-decode datetime sst-flash)
@@ -207,6 +207,8 @@ foreach(witness IN LISTS installation_witnesses)
             target_compile_definitions(${witness} PRIVATE HPCLANG_RESERVATION_FAIL_WRITE=1)
         elseif(witness STREQUAL "installation-staging")
             target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_STAGING)
+        elseif(witness STREQUAL "installation-abort")
+            target_compile_definitions(${witness} PRIVATE HPCLANG_INSTALLATION_ABORT)
         endif()
     elseif(witness STREQUAL "installation-cancellation")
         target_sources(${witness} PRIVATE cancellation.c predicate-tls.S)

@@ -55,4 +55,22 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
                                             const struct hpclang_object *snapshot,
                                             struct hpclang_rpl_recovery_reservation *created);
 
+/* Discard an untouched reservation created by this same exclusive invocation,
+ * after cancelling any associated unpublished Flash transaction. The original
+ * snapshot, name and creation receipt must remain stable; no native return,
+ * other writer, relocation or reuse may intervene. Resolve HOME again and
+ * require the exact receipt address, capacity and full original string before
+ * removal. Matching bytes alone are not a receipt and never authorize adoption.
+ * This is cancellation cleanup, not active-recovery workspace release or
+ * reconstruction of ownership after reset. It does not inspect Flash phases.
+ *
+ * Success consumes the receipt (both fields zero). Pre-write errors leave it
+ * and native memory unchanged. Any error after a write attempt is INCOMPLETE:
+ * retain the invocation, never resume Stock or retry with the stale receipt.
+ * Existing native references are preserved by normal directory removal.
+ */
+int hpclang_rpl_recovery_reservation_discard_created(
+    const struct hpclang_rpl_mutation_io *io, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, struct hpclang_rpl_recovery_reservation *created);
+
 #endif

@@ -207,3 +207,75 @@ int hpclang_rpl_recovery_reservation_create(const struct hpclang_rpl_mutation_io
         return creation.attempted ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
     return verify_created(&reader, name, name_length, snapshot, created);
 }
+
+/* Do not retain directory buffers across the deeper native removal call. */
+__attribute__((noinline)) static int
+discard_preflight(const struct hpclang_rpl_reader *reader, const uint8_t *name,
+                  uint32_t name_length, const struct hpclang_object *snapshot,
+                  const struct hpclang_rpl_recovery_reservation *created, uint32_t *home)
+{
+    if (hpclang_rpl_store_home_object(reader, home))
+        return HPCLANG_RPL_MUTATION_IO;
+    int result = hidden_directory_ready(reader, *home);
+    if (result)
+        return result;
+    struct hpclang_rpl_directory_entry_view entry;
+    result = hpclang_rpl_directory_find(reader, *home, name, name_length, &entry);
+    if (result)
+        return result == HPCLANG_RPL_STORE_NOT_FOUND ? HPCLANG_RPL_MUTATION_NOT_FOUND
+                                                     : HPCLANG_RPL_MUTATION_IO;
+    if (entry.object_address != created->object || entry.prologue != 0x2a2cu ||
+        created->capacity != (snapshot->nibble_count - 10u) / 2u || created->object >= 0x100000u ||
+        snapshot->nibble_count > 0x100000u - created->object)
+        return HPCLANG_RPL_MUTATION_EXISTS;
+    for (uint32_t i = 0; i < snapshot->nibble_count; ++i) {
+        uint8_t actual, expected;
+        if (!reader->read_nibble(reader->context, created->object + i, &actual) ||
+            !hpclang_object_snapshot_read_nibble(snapshot, i, &expected))
+            return HPCLANG_RPL_MUTATION_IO;
+        if (actual != expected)
+            return HPCLANG_RPL_MUTATION_EXISTS;
+    }
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+__attribute__((noinline)) static int verify_discarded(const struct hpclang_rpl_reader *reader,
+                                                      const uint8_t *name, uint32_t name_length)
+{
+    uint32_t home;
+    struct hpclang_rpl_directory_entry_view entry;
+    if (hpclang_rpl_store_home_object(reader, &home) || hidden_directory_ready(reader, home) ||
+        hpclang_rpl_directory_find(reader, home, name, name_length, &entry) !=
+            HPCLANG_RPL_STORE_NOT_FOUND)
+        return HPCLANG_RPL_MUTATION_INCOMPLETE;
+    return HPCLANG_RPL_MUTATION_OK;
+}
+
+int hpclang_rpl_recovery_reservation_discard_created(
+    const struct hpclang_rpl_mutation_io *io, const uint8_t *name, uint32_t name_length,
+    const struct hpclang_object *snapshot, struct hpclang_rpl_recovery_reservation *created)
+{
+    if (!io || !io->read_nibble || !io->write_nibble || !created || !created->object || !name ||
+        !name_length || name_length >= HPCLANG_RPL_STORE_NAME_CAPACITY)
+        return HPCLANG_RPL_MUTATION_UNAVAILABLE;
+    if (!valid_string(snapshot))
+        return HPCLANG_RPL_MUTATION_MALFORMED;
+    struct creation operation = {io, 0};
+    struct hpclang_rpl_mutation_io observed = *io;
+    observed.context = &operation;
+    observed.read_nibble = read_nibble;
+    observed.write_nibble = write_nibble;
+    const struct hpclang_rpl_reader reader = {read_nibble, &operation};
+    uint32_t home;
+    int result = discard_preflight(&reader, name, name_length, snapshot, created, &home);
+    if (result)
+        return result;
+    result = hpclang_rpl_mutation_store_remove(&observed, home, name, name_length);
+    if (result)
+        return operation.attempted ? HPCLANG_RPL_MUTATION_INCOMPLETE : result;
+    result = verify_discarded(&reader, name, name_length);
+    if (result)
+        return result;
+    *created = (struct hpclang_rpl_recovery_reservation){0};
+    return HPCLANG_RPL_MUTATION_OK;
+}

@@ -227,6 +227,52 @@ static void stage_owned(const struct hpclang_rpl_flash_io *reader,
 }
 #endif
 
+#ifdef HPCLANG_INSTALLATION_ABORT
+static int discard_reservation(const uint32_t *map)
+{
+    struct hpclang_rpl_stock_memory memory;
+    const volatile unsigned *l1 = (void *)0x07f00000;
+    if (!hpclang_rpl_stock_memory_capture(&memory, map, l1[0x80]))
+        return HPCLANG_RPL_MUTATION_IO;
+    struct hpclang_rpl_mutation_io io = {.read_nibble = stock_read,
+                                         .write_nibble = stock_write,
+                                         .context = &memory,
+                                         .temp_limit = 0x100000,
+                                         .user_limit = 0x80000,
+                                         .library_table = 0x8611d};
+    return hpclang_rpl_recovery_reservation_discard_created(
+        &io, (const uint8_t *)"HPCLEASE", 8, (const struct hpclang_object *)&reservation,
+        &created_reservation);
+}
+
+static void abort_owned(const uint32_t *map, const struct hpclang_rpl_flash_io *reader,
+                        const struct hpclang_rpl_flash_recovery_layout *layout,
+                        const struct hpclang_rpl_flash_catalog *catalog)
+{
+    uint64_t now;
+    if (hpclang_time_read_us(&now))
+        reservation_failed();
+    struct hpclang_rpl_flash_io io = *reader;
+    io.program16 = program_publication;
+    publication_result[0] = hpclang_rpl_flash_publish_sector(
+        &io, EXPECTED_JOURNAL_SLOT, planned_journal, sizeof planned_journal);
+    publication_result[1] =
+        hpclang_rpl_flash_stage_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
+                                          planned_journal, sizeof planned_journal);
+    if (publication_result[0] || publication_result[1])
+        reservation_failed();
+    publication_result[2] = hpclang_rpl_flash_cancel_installed(&io, layout, catalog);
+    if (publication_result[2])
+        reservation_failed();
+    publication_result[3] = discard_reservation(map);
+    if (publication_result[3])
+        reservation_failed();
+    publication_result[4] = publication_calls;
+    publication_result[5] = created_reservation.object;
+    publication_result[6] = created_reservation.capacity;
+}
+#endif
+
 int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_flash_io *io,
                                  const struct hpclang_rpl_flash_catalog *catalog, uint32_t *slot)
 {
@@ -273,7 +319,11 @@ int hpclang_installation_publish(const uint32_t *map, const struct hpclang_rpl_f
     }
     if (result)
         return result;
+#ifdef HPCLANG_INSTALLATION_ABORT
+    abort_owned(map, io, &layout, catalog);
+#else
     publish_owned(io, &layout, catalog);
+#endif
     *slot = planned.library_slot;
     return 0;
 }
