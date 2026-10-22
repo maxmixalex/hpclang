@@ -427,6 +427,16 @@ post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
 
+- **CI tool parity correction (local, not submitted):** `22103fb5` Quality
+  (39825721704) still rejects two cast/unary-operator spaces in bound replay.
+  Previous local checks used system clang-format 18, while Quality selects the
+  pinned ATfE 22.1.0 formatter. Passing the former did not fix or validate the
+  CI failure. The two lines are now formatted with ATfE; all 452 tracked native
+  sources pass that formatter, and all 83 tracked Python sources pass pinned
+  Ruff after normalizing only checkout line endings to Git's LF form. Objects
+  (39825721928) passed; Core (39825722002) is running and Runtime (39825721891)
+  is queued at this check. No repeated polling or CI acceptance is claimed.
+
 - **Fresh receipt activation gate (local, not submitted):** publication now
   stages/retries an unarmed authority, validates the exact staged installation
   and rechecks its original creation receipt and entire reservation snapshot
@@ -451,7 +461,8 @@ Current delivery checkpoints:
   interrupted RAM creation, startup ordering and reclamation remain open.
 - **Previous submission CI (`1deb8872`):** Runtime (39483875385) and Objects
   (39483875257) passed. Quality (39483875241) rejected two formatting lines
-  in bound replay; the current file passes clang-format 18. Core (39483875319)
+  in bound replay; the earlier local clang-format 18 check did not match CI's
+  pinned ATfE formatter (see correction above). Core (39483875319)
   failed both real-template storage paths at the busy-state verifier. The HP50g
   artifact stops in ARM code with operation 23,813 still busy (1,524,028 of
   1,524,032 status reads), under the fixed 17-second execution sequence. The

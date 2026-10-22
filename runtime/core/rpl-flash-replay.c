@@ -111,9 +111,9 @@ static int bound_read(void *context, uint32_t address, uint16_t *value)
     else if (!view->io->read16(view->io->context, address, value))
         return 0;
     if (address == (view->authority & ~1u))
-        *value &= (uint16_t) ~(255u << (8u * (view->authority & 1u)));
+        *value &= (uint16_t)~(255u << (8u * (view->authority & 1u)));
     if (view->hide_journal && address == (view->journal & ~1u))
-        *value &= (uint16_t) ~(255u << (8u * (view->journal & 1u)));
+        *value &= (uint16_t)~(255u << (8u * (view->journal & 1u)));
     return 1;
 }
 
