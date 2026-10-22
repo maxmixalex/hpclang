@@ -37,6 +37,11 @@ void hpclang_startup_inventory(const uint32_t *map, const struct hpclang_rpl_rea
 static int stored_result;
 int hpclang_installation_store(const struct hpclang_rpl_flash_io *io, const uint8_t *record,
                                uint32_t bytes, uint32_t slot);
+#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+int hpclang_installation_stage(const struct hpclang_rpl_flash_io *io,
+                               const struct hpclang_rpl_flash_recovery_space *space,
+                               uint32_t target);
+#endif
 #endif
 
 static void plan_placement(const struct hpclang_rpl_flash_io *io,
@@ -85,6 +90,10 @@ static void plan_placement(const struct hpclang_rpl_flash_io *io,
     if (!preparation_result[0])
         stored_result = hpclang_installation_store(io, prepared_library, EXPECTED_LIBRARY_BYTES,
                                                    space.library_slot);
+#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+    if (!preparation_result[0] && !stored_result)
+        stored_result = hpclang_installation_stage(io, &space, EXPECTED_TARGET);
+#endif
 #endif
 }
 #endif

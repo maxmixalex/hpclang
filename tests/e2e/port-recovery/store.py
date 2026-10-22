@@ -2,19 +2,41 @@
 
 import shutil
 import struct
+import zlib
 
 from installation import LIBRARY_ID, TARGET, fixture, verify_probe
 from reservation import reader
 from verify import installed_recovery, require, require_stock_pc, symbol_offsets
 
 
-def verify_storage(before, after, build, nm, *, make_fixture=fixture, image="installation-store"):
+def staged_records(flash, journal, authority):
+    capsule = bytearray.fromhex("7e362030") + b"HPCSECT1"
+    capsule += struct.pack("<3I", journal, TARGET, 4096)
+    capsule += flash[TARGET : TARGET + 4096]
+    crc = zlib.crc32(capsule[1:])
+    capsule += struct.pack("<I", crc)
+    permission = bytearray.fromhex("7f3e0040") + b"HPCAUTH1"
+    permission += struct.pack("<4I", authority, journal, TARGET, crc)
+    permission += struct.pack("<I", zlib.crc32(permission[1:]))
+    return {journal: capsule, authority: permission}
+
+
+def verify_storage(
+    before, after, build, nm, *, make_fixture=fixture, image="installation-store", staged=False
+):
     prior = (before / "flash").read_bytes()
     actual = (after / "flash").read_bytes()
     changed = [i for i, (a, b) in enumerate(zip(prior, actual, strict=True)) if a != b]
     require(changed, "Selected-slot witness did not store a library")
     slot = changed[0]
     _, original, layout = make_fixture()
+    if staged:
+        from prepare import free_tail
+
+        candidates = [free_tail(prior, bank) for bank in range(0x140000, 0x200000, 0x20000)]
+        candidates = [at for at in candidates if actual[at : at + 32] == original[:32]]
+        require(len(candidates) == 1, "Expected exactly one new recovery root at a native tail")
+        slot = candidates[0]
     require(
         0x140105 <= slot < 0x200000
         and slot % 4 == 1
@@ -42,11 +64,19 @@ def verify_storage(before, after, build, nm, *, make_fixture=fixture, image="ins
     require(prior[slot : slot + len(record)] == b"\xff" * len(record), "Storage overwrote data")
     expected_flash = bytearray(prior)
     expected_flash[slot : slot + len(record)] = record
+    if staged:
+        for address, data in staged_records(prior, journal, authority).items():
+            expected_flash[address : address + len(data)] = data
     base = verify_probe(
         before, after, build, nm, 0, slot, image=image, expected_flash=expected_flash
     )
     symbols = symbol_offsets(build / (image + ".elf"), nm)
     ram = (after / "sram").read_bytes()
+    if staged:
+        require(
+            struct.unpack_from("<2I", ram, base + symbols["storage_stage_result"]) == (0, 0),
+            "Real root storage did not stage its transaction",
+        )
     require(
         struct.unpack_from("<4I", ram, base + symbols["preparation_result"])
         == (0, slot, journal, authority),
@@ -154,7 +184,16 @@ def run_storage(args, clean, root, *, transfer, emulator, completed, verify_busy
 
 
 def restart_storage(
-    args, stored, restart, library, slot, *, emulator, completed, library_id=LIBRARY_ID
+    args,
+    stored,
+    restart,
+    library,
+    slot,
+    *,
+    emulator,
+    completed,
+    library_id=LIBRARY_ID,
+    staged_pair=None,
 ):
     restart.mkdir()
     shutil.copytree(stored / "state", restart / "state")
@@ -163,14 +202,34 @@ def restart_storage(
     ) as child:
         completed(child, 90)
     state = restart / "state"
+    verify_storage_restart(stored / "state", state, library, slot, library_id, staged_pair)
+
+
+def verify_storage_restart(before, state, library, slot, library_id, staged_pair=None):
     require_stock_pc(state)
+    flash = (state / "flash").read_bytes()
     require(
-        (state / "flash").read_bytes() == (stored / "state/flash").read_bytes(),
+        flash == (before / "flash").read_bytes(),
         "Stock restart changed the stored library",
     )
-    found, _ = installed_recovery(
-        (state / "flash").read_bytes(), library, library_id, TARGET, read=reader(state)
-    )
+    if staged_pair is not None:
+        # Only the two exact, independently reconstructed unarmed records may
+        # appear as native tombstones to the allocation/catalog verifier.
+        visible = bytearray(flash)
+        for address, data in staged_records(flash, *staged_pair).items():
+            require(flash[address : address + len(data)] == data, "Staged record changed")
+            cursor = (address & ~0x1FFFF) + 0x105
+            while cursor < address:
+                extent = (int.from_bytes(flash[cursor + 1 : cursor + 4], "little") & 0xFFFFF) + 2
+                require(
+                    extent >= 8 and extent % 8 == 0 and cursor + extent // 2 <= address,
+                    "Staged record is not at a native allocation boundary",
+                )
+                cursor += extent // 2
+            require(cursor == address, "Staged record precedes native allocation space")
+            visible[address] = 0
+        flash = bytes(visible)
+    found, _ = installed_recovery(flash, library, library_id, TARGET, read=reader(state))
     require(found == slot, "Stock restart did not discover the exact stored library")
 
 

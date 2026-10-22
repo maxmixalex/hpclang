@@ -426,6 +426,24 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Real-root transaction staging (locally verified; not yet submitted):** the maintained
+  claim-bound storage witness now writes its real recovery library, READY journal
+  and unarmed authority in the same exclusive invocation, using the four-extent
+  plan rather than fixture addresses. Each write callback is confined to its owned
+  allocation. Failed pair publication retains the invocation. The creation claim
+  stays erased; no RAM ownership or activation is implied. The independent oracle
+  reconstructs all records and compares complete Flash, allowing planned records
+  in different banks. ARM build/package, analysis and 66 Python tests pass;
+  Initial saved inputs contained an older template; both programs rejected it
+  without changing Flash. The runner now checks source-template equality before
+  execution. Both current-template writes and restarts completed. Initial restart
+  verification rejected known staged records; the corrected verifier requires their
+  exact independent bytes and native allocation boundaries before interpreting only
+  their statuses as tombstones. Both saved captures pass the complete verifier:
+  27,378 operations each, root 0x160105, journal 0x157e75, authority 0x158e91.
+  Physical Flash, source template and native root registration survive restart.
+  CI artifact review also found the creation-template layout JSON missing from
+  the upload list; it is now included and the workflow parses successfully.
 - **Adjacent-allocation activation (locally verified; not yet submitted):** integration
   review found that publication retry requires an erased successor, whereas a
   completed staged authority may precede an already-published creation claim.

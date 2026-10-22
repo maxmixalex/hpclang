@@ -206,6 +206,7 @@ def run_creation_storage(
 ):
     from store import restart_storage, verify_storage
 
+    verify_source(before, library)
     root = root / "creation-storage"
     root.mkdir()
     stored = root / "stored"
@@ -226,6 +227,7 @@ def run_creation_storage(
         args.nm,
         make_fixture=partial(fixture, library, layout),
         image=image,
+        staged=True,
     )
     verify_source(stored / "state", library)
     require(
@@ -233,6 +235,9 @@ def run_creation_storage(
         "Claim-bound storage bypassed expected Flash polling",
     )
     restart = root / "restart"
+    body = nibbles(rebound[8:])
+    binding = layout["recovery_binding_nibble"] - 8
+    pair = tuple(int(body[at : at + 8][::-1], 16) for at in (binding + 16, binding + 24))
     restart_storage(
         args,
         stored,
@@ -242,9 +247,10 @@ def run_creation_storage(
         emulator=emulator,
         completed=completed,
         library_id=layout["library_id"],
+        staged_pair=pair,
     )
     verify_source(restart / "state", library)
-    print("Claim-bound real library stored and discovered unchanged after restart", flush=True)
+    print("Claim-bound root and staged transaction survive Stock restart unchanged", flush=True)
     return {"slot": slot, "operations": operations}
 
 

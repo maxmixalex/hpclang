@@ -1,11 +1,17 @@
 /* Fresh library storage witness. The predicate owns RAM execution, mappings
- * and interrupts. This does not publish a recovery transaction or register it. */
+ * and interrupts. The creation variant also stages its planned transaction;
+ * neither variant activates it or registers the root in the native catalog. */
 #include "rpl-flash-write.h"
 #include "sst-flash.h"
 #include <hpclang/time.h>
 
 __thread int errno;
 volatile uint32_t storage_result[2];
+#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+static uint8_t staged_image[HPCLANG_RPL_FLASH_SECTOR_BYTES];
+static uint8_t staged_journal[HPCLANG_RPL_FLASH_SECTOR_RECORD_BYTES];
+volatile uint32_t storage_stage_result[2];
+#endif
 static uint32_t owned_first, owned_end;
 unsigned short hpclang_flash_read16(void *, unsigned);
 void hpclang_flash_write16(void *, unsigned, unsigned short);
@@ -57,6 +63,47 @@ int hpclang_installation_store(const struct hpclang_rpl_flash_io *source, const 
             __asm__ volatile("nop"); /* Retain ownership of an unverified tail. */
     return result;
 }
+
+#ifdef HPCLANG_INSTALLATION_TEMPLATE_CREATION
+/* Same invocation and four-extent reservation as the successful root store.
+ * Publish in planner order so a later allocation never hides behind an erased
+ * marker. This stages only; no claim, RAM resource or activation is implied. */
+int hpclang_installation_stage(const struct hpclang_rpl_flash_io *source,
+                               const struct hpclang_rpl_flash_recovery_space *space,
+                               uint32_t target)
+{
+    for (uint32_t i = 0; i < sizeof staged_image; i += 2) {
+        uint16_t word;
+        if (!source->read16(source->context, target + i, &word))
+            return HPCLANG_RPL_FLASH_FAILED;
+        staged_image[i] = word;
+        staged_image[i + 1] = word >> 8;
+    }
+    int result =
+        hpclang_rpl_flash_sector_encode(source->first, source->end, space->journal_slot, target,
+                                        staged_image, staged_journal, sizeof staged_journal);
+    if (result)
+        return result;
+    struct hpclang_rpl_flash_io io = *source;
+    io.program16 = program_owned;
+    owned_first = space->journal_slot;
+    owned_end = owned_first + sizeof staged_journal;
+    result =
+        hpclang_rpl_flash_publish_sector(&io, owned_first, staged_journal, sizeof staged_journal);
+    storage_stage_result[0] = result;
+    if (!result) {
+        owned_first = space->authority_slot;
+        owned_end = owned_first + HPCLANG_RPL_FLASH_AUTHORITY_BYTES;
+        result = hpclang_rpl_flash_stage_authority(&io, owned_first, space->journal_slot,
+                                                   staged_journal, sizeof staged_journal);
+        storage_stage_result[1] = result;
+    }
+    if (result)
+        for (;;)
+            __asm__ volatile("nop"); /* Retain this partially published installation. */
+    return result;
+}
+#endif
 
 int hpclang_installation_cleanup(const struct hpclang_rpl_flash_io *source)
 {

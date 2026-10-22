@@ -445,6 +445,14 @@ validation and startup ordering remain separate activation prerequisites.
 The native fixture stages its pair after creation, then invokes a separate small
 admission program to reject a wrong transaction binding and accept the exact one.
 Neither program activates the authority or erases target data.
+The claim-bound real-template storage witness additionally publishes its READY
+journal and staged authority after the root, following the four-extent plan in
+one exclusive invocation. Every driver callback is bounded to the current owned
+allocation; a publication failure retains the invocation. The claim allocation
+remains erased and target data is unchanged. Its independent verifier reconstructs
+all records at the planned coordinates and checks complete Flash before and after
+Stock restart. This is unarmed installation staging, not resource creation,
+activation, recovery ownership reconstruction or startup-order acceptance.
 `hpclang_rpl_flash_activate_staged_authority` handles the later phase transition
 without treating the record as an unfinished tail. It requires the exact READY
 journal, complete authority body and phase 7F (or 7E for a lost acknowledgement),

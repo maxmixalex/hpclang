@@ -154,6 +154,7 @@ jobs:
             build/port-recovery/*/*.bin
             build/port-recovery/*/*.hp
             build/port-recovery/*/template-layout.json
+            build/port-recovery/*/template-creation-layout.json
           if-no-files-found: error
 
       - name: Restore prepared HPGCC39 cache

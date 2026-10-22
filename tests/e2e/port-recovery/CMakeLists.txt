@@ -167,7 +167,7 @@ if(NOT HPCLANG_RECOVERY_BOUND_JOURNAL_SLOT STREQUAL "")
         installation-template-creation installation-template-creation-store)
 endif()
 foreach(witness IN LISTS installation_witnesses)
-    add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c
+    add_executable(${witness} EXCLUDE_FROM_ALL admission-entry.S installation.c predicate.c memory.c
         "${CORE}/flash-mapping.S" "${HPCLANG_ROOT}/runtime/bootstrap/sync.S")
     foreach(module IN ITEMS rpl-stock-memory rpl-mutation rpl-stack-view rpl-flash-record
             rpl-flash-write rpl-port rpl-backup rpl-object-span)
