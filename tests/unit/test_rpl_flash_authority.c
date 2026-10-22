@@ -303,6 +303,74 @@ static void staging_tests(void)
     }
 }
 
+static void activation_fixture(unsigned phase)
+{
+    prepare(0);
+    memcpy(flash + ROOT - FIRST, authority, sizeof authority);
+    flash[ROOT - FIRST] = phase;
+    /* A published successor must survive activation unchanged. */
+    memset(flash + ROOT - FIRST + sizeof authority, 0x53, 240);
+}
+
+static int activate(void)
+{
+    return hpclang_rpl_flash_activate_staged_authority(&io, ROOT, JOURNAL, journal, sizeof journal);
+}
+
+static void activation_tests(void)
+{
+    static uint8_t expected[sizeof flash];
+    for (unsigned phase = 0; phase < 256; ++phase) {
+        activation_fixture(phase);
+        memcpy(expected, flash, sizeof flash);
+        int result = activate();
+        if (phase == 0x7f || phase == 0x7e) {
+            assert(!result && programs == (unsigned)(phase == 0x7f));
+            expected[ROOT - FIRST] = 0x7e;
+        } else {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        }
+        assert(!memcmp(flash, expected, sizeof flash) && !erases);
+    }
+    activation_fixture(0x7f);
+    assert(!activate());
+    unsigned read_count = reads;
+    for (unsigned cut = 1; cut <= read_count; ++cut) {
+        activation_fixture(0x7f);
+        fail_read = cut;
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+        fail_read = 0;
+        assert(!activate());
+        assert(programs == 1 && flash[ROOT - FIRST] == 0x7e);
+    }
+    for (unsigned mask = 0; mask < 2; ++mask) {
+        activation_fixture(0x7f);
+        fail_program = 1;
+        program_mask = mask ? 0xffff : 0;
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+        assert(flash[ROOT - FIRST] == (mask ? 0x7e : 0x7f));
+        fail_program = 0;
+        assert(!activate());
+        assert(programs == (mask ? 1u : 2u));
+    }
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        activation_fixture(0x7f);
+        if (fault == 0)
+            flash[ROOT - FIRST + 8] ^= 1;
+        else if (fault == 1)
+            flash[JOURNAL - FIRST + 100] ^= 1;
+        else
+            flash[JOURNAL - FIRST] = 0;
+        memcpy(expected, flash, sizeof flash);
+        assert(activate() == HPCLANG_RPL_FLASH_DIRTY && !programs);
+        assert(!memcmp(flash, expected, sizeof flash));
+    }
+    activation_fixture(0x7f);
+    silent = 1;
+    assert(activate() == HPCLANG_RPL_FLASH_DIRTY);
+    assert(flash[ROOT - FIRST] == 0x7f);
+}
+
 static void closure_tests(void)
 {
     prepare(1);
@@ -1015,6 +1083,7 @@ int main(void)
     publication_tests();
     resumption_tests();
     staging_tests();
+    activation_tests();
     closure_tests();
     bound_replay_tests();
     transaction_test();

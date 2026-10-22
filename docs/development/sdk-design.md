@@ -445,6 +445,13 @@ validation and startup ordering remain separate activation prerequisites.
 The native fixture stages its pair after creation, then invokes a separate small
 admission program to reject a wrong transaction binding and accept the exact one.
 Neither program activates the authority or erases target data.
+`hpclang_rpl_flash_activate_staged_authority` handles the later phase transition
+without treating the record as an unfinished tail. It requires the exact READY
+journal, complete authority body and phase 7F (or 7E for a lost acknowledgement),
+and changes only the authority phase byte. An occupied successor is preserved.
+The existing publication-retry interfaces still require an erased end marker.
+This primitive does not replace installation admission, fresh receipt validation,
+original ownership or safe startup checks; callers must establish those first.
 The internal packager accepts optional `--creation-claim-slot` for a guarded
 admission ELF with a sealed identity. It patches only the aligned initialized
 `hpclang_recovery_creation_slot` symbol, which must contain `UINT32_MAX`, and

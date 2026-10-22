@@ -293,9 +293,9 @@ static void publish_owned(const uint32_t *map, const struct hpclang_rpl_flash_io
      * This witness does not reconstruct that receipt after a restart. */
     if (activation_result[0] || activation_result[1] || activation_result[2])
         reservation_failed();
-    publication_result[4] =
-        hpclang_rpl_flash_finish_authority(&io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT,
-                                           planned_journal, sizeof planned_journal);
+    publication_result[4] = hpclang_rpl_flash_activate_staged_authority(
+        &io, EXPECTED_AUTHORITY_SLOT, EXPECTED_JOURNAL_SLOT, planned_journal,
+        sizeof planned_journal);
     publication_result[5] = hpclang_rpl_flash_preflight_installed(
         &io, layout, catalog, checked_transaction, sizeof checked_transaction, &installed);
     publication_result[6] = hpclang_rpl_flash_retire_sector(

@@ -295,6 +295,31 @@ int hpclang_rpl_flash_finish_staged_authority(const struct hpclang_rpl_flash_io 
     return finish_authority_status(io, slot, journal_slot, journal, journal_bytes, 0x7fu);
 }
 
+int hpclang_rpl_flash_activate_staged_authority(const struct hpclang_rpl_flash_io *io,
+                                                uint32_t slot, uint32_t journal_slot,
+                                                const uint8_t *journal, uint32_t journal_bytes)
+{
+    uint8_t authority[HPCLANG_RPL_FLASH_AUTHORITY_BYTES];
+    if (!io || !io->read16 || !io->program16 ||
+        hpclang_rpl_flash_authority_encode(io->first, io->end, slot, journal_slot, journal,
+                                           journal_bytes, authority, sizeof authority))
+        return HPCLANG_RPL_FLASH_INVALID;
+    if (matching_record(io, journal_slot, journal, journal_bytes, 0, 0x7e) !=
+        HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint16_t word;
+    if (!io->read16(io->context, slot & ~1u, &word))
+        return HPCLANG_RPL_FLASH_DIRTY;
+    uint8_t phase = (uint8_t)(word >> (8u * (slot & 1u)));
+    if ((phase != 0x7f && phase != 0x7e) || matching_record(io, slot, authority, sizeof authority,
+                                                            0, phase) != HPCLANG_RPL_FLASH_WRITTEN)
+        return HPCLANG_RPL_FLASH_DIRTY;
+    /* The allocation was already published. Its successor may now be occupied;
+     * activate only its phase byte, never resume body or tail publication. */
+    return write_bytes(io, slot, authority, 1) ? HPCLANG_RPL_FLASH_WRITTEN
+                                               : HPCLANG_RPL_FLASH_DIRTY;
+}
+
 int hpclang_rpl_flash_close_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                       uint32_t journal_slot, const uint8_t *journal,
                                       uint32_t journal_bytes)

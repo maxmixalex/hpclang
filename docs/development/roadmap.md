@@ -426,6 +426,18 @@ ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
 Current delivery checkpoints:
+- **Adjacent-allocation activation (locally verified; not yet submitted):** integration
+  review found that publication retry requires an erased successor, whereas a
+  completed staged authority may precede an already-published creation claim.
+  A separate activation primitive accepts only exact 7F/7E and complete READY
+  journal/binding, changing only its phase byte and preserving the successor.
+  Partial-publication retry keeps its erased-tail requirement. ARM build and
+  static analysis and full host sanitizer tests pass (all 256 phases, every read
+  failure, failed/silent writes and lost acknowledgements). The existing native
+  publication witness now uses this primitive after staged admission and fresh
+  receipt validation; HP49g+/HP50g both pass activation and transaction closure
+  with 1,958 Flash operations each. Strict docs and pinned formatting pass. Complete
+  installer integration, fresh receipt checks and safe startup remain required.
 - **Staged creation admission (locally verified; not yet submitted):** the
   streaming gate requires exact unarmed authority 7F, READY journal and CREATED
   claim, checking root/catalog and native boundaries in both current and proposed

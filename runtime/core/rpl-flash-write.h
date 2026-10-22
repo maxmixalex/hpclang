@@ -336,7 +336,7 @@ int hpclang_rpl_flash_publish_authority(const struct hpclang_rpl_flash_io *io, u
  * Requires the same owned erased allocation and exact READY journal as publish.
  * Target and journal remain unchanged; replay/preflight must still reject this
  * phase. Use finish_staged_authority for a cut during staging, then explicitly
- * finish_authority only after the installer's resource/ownership prerequisites.
+ * activate_staged_authority after the installer's resource/ownership prerequisites.
  * A complete 7F record is not itself durable installation provenance or RAM
  * ownership: an interrupted older direct publication can have the same bytes. */
 int hpclang_rpl_flash_stage_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
@@ -352,6 +352,18 @@ int hpclang_rpl_flash_stage_authority(const struct hpclang_rpl_flash_io *io, uin
 int hpclang_rpl_flash_finish_staged_authority(const struct hpclang_rpl_flash_io *io, uint32_t slot,
                                               uint32_t journal_slot, const uint8_t *journal,
                                               uint32_t journal_bytes);
+
+/* Activate a complete, owned staged allocation after installation/resource and
+ * startup-safety checks. Require the exact READY journal and complete authority
+ * body; accept only 7F or already-ARMED 7E (lost acknowledgement). Change only the
+ * phase byte. Unlike publication retry, the successor need not be erased: a
+ * later allocation may already exist. Caller proves native allocation boundaries,
+ * trusted root, creation ownership, fresh RAM receipt and exclusive stable views.
+ * This primitive does not establish those prerequisites or adopt an old record.
+ * DIRTY retains ownership; no target write may start until success. */
+int hpclang_rpl_flash_activate_staged_authority(const struct hpclang_rpl_flash_io *io,
+                                                uint32_t slot, uint32_t journal_slot,
+                                                const uint8_t *journal, uint32_t journal_bytes);
 
 /* Resume this SAME reserved transaction after a publication cut, including a
  * lost acknowledgement of ARMED. Requires the exact durable READY journal and
