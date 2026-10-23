@@ -1145,6 +1145,82 @@ static void creation_publication_tests(const struct hpclang_rpl_flash_io *source
     }
 }
 
+static uint8_t retirement_ram[0x100000], retirement_ram_before[0x100000];
+static uint32_t retirement_ram_failure;
+
+static void retirement_word(uint32_t address, uint32_t value, unsigned count)
+{
+    for (unsigned i = 0; i < count; ++i)
+        retirement_ram[address + i] = (value >> (4 * i)) & 15;
+}
+
+static int retirement_read(void *context, uint32_t address, uint8_t *value)
+{
+    (void)context;
+    if (address >= sizeof retirement_ram || address == retirement_ram_failure)
+        return 0;
+    *value = retirement_ram[address];
+    return 1;
+}
+
+static void retired_closure_tests(const struct hpclang_rpl_flash_io *source,
+                                  const struct hpclang_rpl_flash_catalog *catalog,
+                                  const uint8_t binding[80], uint32_t claim, uint32_t authority)
+{
+    const uint8_t name[] = "HPCLEASE";
+    const struct hpclang_rpl_reader ram = {retirement_read, NULL};
+    for (unsigned scenario = 0; scenario < 11; ++scenario) {
+        memcpy(flash, before, sizeof flash);
+        flash[claim - FIRST + 16] = scenario == 6   ? 0x7f
+                                    : scenario == 7 ? 0x7c
+                                    : scenario == 8 ? 0
+                                                    : 0x7e;
+        memset(retirement_ram, 0, sizeof retirement_ram);
+        retirement_word(0x80711, 0x82000, 5);
+        retirement_word(0x82000, scenario == 3 ? 0x29bf : 0x2a96, 5);
+        if (scenario == 1 || scenario == 2) {
+            retirement_word(0x82008, 0x82100 - 0x82008, 5);
+            retirement_word(0x82100, 8, 2);
+            for (unsigned i = 0; i < 8; ++i)
+                retirement_word(0x82102 + 2 * i, scenario == 1 ? name[i] : "OTHERONE"[i], 2);
+            retirement_word(0x82112, 8, 2);
+            retirement_word(0x82114, 0x29bf, 5);
+        }
+        retirement_ram_failure = scenario == 4 ? 0x80711 : UINT32_MAX;
+        if (scenario == 5)
+            flash[authority - FIRST] = 0x7e;
+        memcpy(retirement_ram_before, retirement_ram, sizeof retirement_ram);
+        struct hpclang_rpl_flash_io io = *source;
+        io.program16 = scenario == 10 ? NULL : program_flash;
+        programs = 0;
+        fail_program = scenario == 9 ? 1 : 0;
+        partial_program_mask = 0xaaaa;
+        int result = hpclang_rpl_recovery_installation_close_retired_creation(
+            &io, 1701, catalog, binding, claim, name, 8, &ram);
+        if (scenario == 0 || scenario == 2 || scenario == 7 || scenario == 8) {
+            assert(!result && flash[claim - FIRST + 16] == 0);
+            assert(programs == (scenario == 8 ? 0 : 1));
+            assert(!hpclang_rpl_recovery_installation_close_retired_creation(
+                &io, 1701, catalog, binding, claim, name, 8, &ram));
+            assert(programs == (scenario == 8 ? 0 : 1));
+        } else if (scenario == 9) {
+            assert(result == HPCLANG_RPL_FLASH_DIRTY && programs == 1);
+            fail_program = 0;
+            assert(!hpclang_rpl_recovery_installation_close_retired_creation(
+                &io, 1701, catalog, binding, claim, name, 8, &ram));
+            assert(flash[claim - FIRST + 16] == 0);
+        } else {
+            assert(result < 0 && !programs);
+        }
+        flash[claim - FIRST + 16] = 0;
+        flash[authority - FIRST] = 0;
+        assert(!memcmp(before, flash, sizeof flash));
+        assert(!memcmp(retirement_ram_before, retirement_ram, sizeof retirement_ram));
+    }
+    programs = fail_program = partial_program_mask = 0;
+    retirement_ram_failure = UINT32_MAX;
+}
+
 static void creation_claim_tests(const struct hpclang_rpl_flash_io *io,
                                  const struct hpclang_rpl_flash_catalog *catalog)
 {
@@ -1237,6 +1313,50 @@ static void creation_claim_tests(const struct hpclang_rpl_flash_io *io,
             assert(result < 0 && phase == 99);
         }
         assert(!memcmp(before, flash, sizeof flash));
+        phase = 99;
+        result = hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                    claim_slot, name, 8, &phase);
+        if (scenario == 4)
+            assert(!result && phase == HPCLANG_RPL_FLASH_CREATION_CLOSED);
+        else
+            assert(result < 0 && phase == 99);
+        assert(!memcmp(before, flash, sizeof flash));
+        if (scenario == 4) {
+            /* A closed pair alone must not authorize an unpublished claim;
+             * nor may a retired claim hide an active/partly retired pair. */
+            const uint8_t states[] = {0xff, 0x7f, 0x7e, 0x7c, 0x40, 0x02, 0, 0x80};
+            for (unsigned field = 0; field < 3; ++field)
+                for (unsigned i = 0; i < sizeof states; ++i) {
+                    uint32_t at = field == 0 ? CLAIM + 16 : field == 1 ? JOURNAL : AUTHORITY;
+                    uint8_t saved = flash[at - FIRST];
+                    flash[at - FIRST] = states[i];
+                    phase = 99;
+                    result = hpclang_rpl_recovery_installation_creation_retired(
+                        io, 1701, catalog, binding, CLAIM, name, 8, &phase);
+                    int accepted = field ? states[i] == 0 : (states[i] & ~0x7e) == 0;
+                    assert(accepted ? result == 0 && phase != 99 : result < 0 && phase == 99);
+                    assert(flash[at - FIRST] == states[i]);
+                    flash[at - FIRST] = saved;
+                    assert(!memcmp(before, flash, sizeof flash));
+                }
+            /* Closed transactions inspect actual media, not the old capsule's
+             * intact bank header. Read failures must also preserve output. */
+            flash[0x100] ^= 1;
+            phase = 99;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, &phase) < 0 &&
+                   phase == 99);
+            flash[0x100] ^= 1;
+            fail_address = CLAIM & ~1u;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, &phase) < 0 &&
+                   phase == 99);
+            fail_address = UINT32_MAX;
+            assert(hpclang_rpl_recovery_installation_creation_retired(io, 1701, catalog, binding,
+                                                                      CLAIM, name, 8, NULL) < 0);
+            assert(!memcmp(before, flash, sizeof flash));
+            retired_closure_tests(io, catalog, binding, CLAIM, AUTHORITY);
+        }
         if (!scenario) {
             /* Activation must validate intact actual Flash as well as its
              * proposed image; a recovery-only restored view is insufficient. */

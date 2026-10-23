@@ -2651,6 +2651,37 @@ static void test_jump_return_relocation(void)
     }
 }
 
+static void test_call_return_relocation(void)
+{
+    const struct hpclang_stage_stack_io stage = {NULL, stage_read_word, NULL};
+    for (unsigned kind = 0; kind < 3; ++kind)
+        for (unsigned cursor = 0; cursor < 8; ++cursor) {
+            struct hpclang_rpl_mutation_io io = setup_catalog_growth();
+            uint32_t pc = 0x82400, stack[8], *roots[9] = {&pc};
+            for (unsigned i = 0; i < 8; ++i)
+                stack[i] = 0x82600;
+            unsigned prefix = kind ? 2 : 1;
+            unsigned width = kind == 0 ? 3 : kind == 1 ? 4 : 5;
+            put_word(pc, prefix, kind == 0 ? 7 : kind == 1 ? 0xe8 : 0xf8);
+            put_word(pc + prefix, width, kind == 2 ? 0x82500 : 0x100 - prefix - width);
+            put_word(pc + prefix + width, 2, 0x10);
+            put_word(0x82500, 2, 0x10);
+            put_word(0x82600, 2, 0xab);
+            assert(hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1) == 1);
+            assert(roots[1] == stack + ((cursor + 7) & 7));
+            io.native_roots = roots;
+            io.native_root_count = 2;
+            const struct hpclang_rpl_reference_edit edit = {1, pc + prefix, 0x82500, 0x82510, 5};
+            const struct hpclang_rpl_catalog_repairs repairs = {1, &edit, kind == 2, NULL, 0};
+            assert(!hpclang_rpl_mutation_catalog_grow_repaired(&io, 0x82013, &repairs));
+            assert(pc == 0x82410);
+            for (unsigned i = 0; i < 8; ++i)
+                assert(stack[i] == (i == ((cursor + 7) & 7) ? 0x82610 : 0x82600));
+            assert(get_word(pc + prefix, width) == (kind == 2 ? 0x82510 : 0x100 - prefix - width));
+            assert(hpclang_stage_return_roots(&stage, pc, stack, cursor, roots + 1) == 1);
+        }
+}
+
 static void test_catalog_merged_repairs(void)
 {
     for (unsigned width = 1; width <= 5; ++width) {
@@ -2942,6 +2973,7 @@ int main(void)
 {
     test_boolean_return_formats();
     test_jump_return_relocation();
+    test_call_return_relocation();
     test_catalog_commit_failures();
 #ifdef HPCLANG_TEST_WRAP_ALLOC
     test_catalog_allocation_lifetime();

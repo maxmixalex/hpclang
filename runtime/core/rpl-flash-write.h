@@ -321,8 +321,10 @@ int hpclang_rpl_flash_complete_creation(const struct hpclang_rpl_flash_io *io, u
 
 /* Close an owned CREATED claim only AFTER its transaction has been closed and
  * its resource safely released. The caller must establish those prerequisites
- * under uninterrupted ownership; this primitive never discovers/adopts RAM or
- * authorizes release. Compare the original INTENT's entire immutable record,
+ * under uninterrupted ownership, or through trusted durable installation
+ * retirement and verified resource absence. This primitive never establishes
+ * those prerequisites or authorizes RAM release. Compare the expected INTENT's
+ * entire immutable record (original, or rebuilt from that trusted binding),
  * then clear only the phase byte. Accept CREATED, NOR-compatible partial CLOSING
  * and CLOSED (lost acknowledgement); reject INTENT and every other phase.
  * An occupied following allocation is allowed and preserved. No erase or RAM

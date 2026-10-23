@@ -425,6 +425,64 @@ results or scope facts change. M8.0 remains the primary track. Port 2 recovery
 ownership, startup ordering and reclamation are required deliverables, not a
 post-M8 deferral. Only M8.1 is accepted complete.
 
+Maintainer direction (2026-10-23): prioritize a useful bounded Port 2 delivery
+and accept explicit compromises rather than pursuing exhaustive perfection.
+Unknown execution-reference contexts may reject mutation; universal relocation,
+automatic reclamation and exhaustive fault-pattern coverage must not silently
+become prerequisites for every other M8 deliverable. Concrete changes to milestone
+acceptance still need a specific scope decision; this direction does not itself
+mark any retained requirement complete or authorize unsafe writes. Prefer a
+small documented supported operating envelope with verified failure behavior.
+The observed pre-recovery traversal into SRAM remains a known limitation to
+resolve or exclude from that envelope, not a reason to collect unlimited
+additional successful corruption samples.
+
+The direct-call root-discovery follow-up and maintained native code-relocation
+acceptance are submitted together after local verification. Both models pass
+fresh standard Stock startup, all 88 existing native cases and three new direct
+call cases. Host sanitizers, ARM compilation/analysis, pinned formatting and
+strict docs pass. CI acceptance for this new batch remains pending; newly
+triggered workflows are not polled. This is not M8.0 completion.
+
+The completed `3d1a665e` CI results are Quality 39916501552, Objects 39916501560,
+Storage 39916501477, Font Gallery 39916501572 and Runtime 39916501501 successful.
+Core 39916501547 fails only the HP49g+/HP50g recovery jobs; its other fourteen
+Stock jobs, runtime/unit tests and HP39 packaging pass. Both failures occur at
+guarded low-memory recovery with a nonempty native stack. The downloaded CI
+snapshots retain 20,902 bytes of free gap before the fault, while the admission
+runtime alone occupies 20,888 bytes before its native program envelope. Replaying
+the HP50g CI fault locally reproduces failure with zero Flash operations.
+Safe identical-code folding now reduces the admission runtime to 20,720 bytes,
+preserving its 4 KiB stack and passing the existing strict relocation/package
+gate. Both complete guarded-recovery suites have now terminated with PASS;
+logs and reservation/result.json were inspected on 2026-10-23. Each model
+retains a 20,902-byte initial gap, preserves 24,000 user elements, performs
+1,923 recovery operations and passes thirteen admission rejections,
+three resource guards, absent-reservation recovery and repeated restart.
+A separate supplement executes the newly added size calculation and both gap
+checks against the saved native states on both models: the packaged copy is
+20,802 bytes against 20,902-byte gaps; exact-fit and smaller gaps reject.
+The original full-run results remain unchanged. All 93 recovery-related Python
+tests, recovery-directory Ruff and formatting checks pass. This is local
+acceptance of the repair, not CI acceptance or milestone completion. Startup
+confinement and the other retained M8.0 requirements remain open.
+
+The older `a728192f` Objects run
+39911770970 also succeeded, while its Core/Runtime runs ended cancelled;
+those cancellations are not acceptance evidence.
+Submitted `02e81749` passes Quality (39903692796), Core runtime (39903692792,
+including all fourteen Stock port jobs), Objects (39903692845), Runtime
+(39903692814), Storage (39903692791) and Font Gallery (39903692794).
+PR #6 merges the registered native installation/activation, interruption and
+complete RAM-loss batch into main as `261dba7c`. Both full local registration
+suites also pass. The local retirement/claim-closure follow-up is excluded from
+that merge. Its fresh retirement suites and same-name replacement supplements
+now pass on both models. This retirement/claim-closure batch is submitted for
+CI. A later one-time check finds Quality 39911770977 successful; Core
+39911770972, Objects 39911770970 and Runtime 39911770971 are queued.
+CI acceptance remains pending; those queued runs are not repeatedly polled.
+Earlier checkpoint wording describes its state at that checkpoint.
+
 Current batch through `92acb946` includes retryable claim closure, native combined
 cancellation, unregistered-root pair cancellation, complete real-root cleanup,
 RAM-bounded CODE packaging, independent acceptance suites and one-shot installer
@@ -466,6 +524,130 @@ Both template suites take about 8 minutes. All 88 recovery Python tests,
 pinned formatting (453 native / 84 Python files) and strict docs pass.
 
 Current delivery checkpoints:
+- **Direct-call execution roots (locally verified, submitted; CI pending):** stage root
+  discovery now follows GOSUB/GOSUBL/GOSBVL as well as the existing direct jumps
+  and unconditional returns. A private eight-cell circular stack tracks generated
+  return addresses and overwritten original cells; only original values actually
+  consumed by a return are reported, once each. The native stack is unchanged.
+  The existing 64-instruction/eight-root bound remains; conditional, computed
+  and unclassified paths still stop discovery. ASan/UBSan tests cover all stack
+  cursors, nested calls through circular overwrite, signed displacement limits
+  and instruction read failures. Sanitized catalog-movement integration verifies
+  consumed-root updates, unchanged unconsumed values and separate absolute-call
+  operand repair. ARMv4T compilation, ARM static analysis and pinned formatting
+  pass. All six launchers rebuild. HP49g+/HP50g baseline catalog-growth and
+  independent post-call-marker regressions pass with unchanged Flash. Controlled
+  native GOSUB fixtures also pass on both models: a caller-provided rooted string
+  holds the short call/return path, selected by a private test stage, and the
+  original interpreter reaches the post-call marker after catalog growth. The
+  original RTNCC continuation is preserved; the first fixture incorrectly required
+  RTN and failed before the marker. Exact payload and Flash checks pass after that
+  fixture correction. An old-selector control on each model refuses before moving
+  the catalog, returns normally and leaves library 123 unregistered. This isolates
+  the new discovery behavior. Additional controlled GOSUBL and GOSBVL fixtures
+  pass on both models with the same native marker, catalog and Flash checks.
+  The absolute-call oracle also checks the encoded target against the actual
+  retained fixture object and preserves the original return opcode. This gives
+  controlled native evidence for all three direct-call forms; it does not prove
+  arbitrary code provenance or hidden-address safety. These cases are now part
+  of the maintained code-relocation verifier: the ordinary launcher starts a
+  test application that explicitly binds its own controlled continuation,
+  discovers its original return roots, creates the minimal Port 0 library through
+  the public API and grows the catalog using validated fixture reference repairs.
+  No patched platform copy or research snapshot is required. Each case starts
+  from the standard Stock suite's baseline and checks the independent RPL marker,
+  exact payload/absolute target, unchanged complete Flash and preservation of all
+  prior catalog IDs with exactly one new library 123 entry. Both fresh standard
+  Stock launches pass, followed by all 88 existing native cases and all three new
+  call cases on each model. ARM analysis and pinned C/Python formatting pass.
+  Opaque execution remains explicitly outside this controlled fixture's proof;
+  complete execution coverage and general relocation/reclamation remain gated.
+- **Post-recovery resource replacement (locally verified, submitted; CI pending):**
+  after actual native recovery, Stock STO creates a new user string under the
+  former reservation name. The native closure API rejects it before programming;
+  both HP49g+ and HP50g preserve the exact user payload and complete Flash/catalog,
+  with zero SST operations and normal guarded return. The maintained retirement
+  suite now includes this case. Isolated acceptance and supplements using both
+  successful fresh retirement runs pass. Each supplement executes the maintained
+  final case against that run's actual recovered state and bound native package;
+  original suite results are preserved separately from supplement results.
+  This verifies replacement rejection, not ownership reconstruction or orphan release.
+- **Claim closure interruption (locally verified, submitted; CI pending):**
+  the maintained test cuts the actual phase-word program before any bit lands,
+  after a partial clear and after complete closure. Exact emulator event fields
+  and full Flash comparisons must match; reset must preserve the interrupted
+  claim without writes, retry must close it, and two further resets must remain
+  unchanged. HP49g+ and HP50g both pass: unwritten/partial/complete cases retry
+  with one/one/zero SST operations respectively. Each first reset and both
+  post-retry resets perform zero writes; exact cut events and complete Flash
+  images match. Retirement/closure acceptance now
+  has its own fresh-boot suite, sharing native installation setup while retaining
+  all registration/activation/RAM-loss checks in the registration suite. The
+  two-model CI matrix adds retirement with the existing 30-minute job limit.
+  Pre-submit review corrected the new matrix entry indentation (`bf11d170`);
+  YAML parsing verifies all sixteen jobs and the unchanged timeout, and
+  actionlint passes the runtime workflow.
+  A separate clean ARM build and both full registration regressions pass
+  (HP50g 948.8 seconds; HP49g+ 965.3 seconds), including creation/cancellation,
+  activation cuts and complete RAM-loss recovery. Both fresh retirement suites exposed a caller
+  format mismatch: the integration passed the packaged library where the
+  retirement oracle requires its Flash allocation record. The caller now passes
+  the actual installed record, which must still match independent reconstruction
+  byte for byte. Five template unit tests and Ruff checks pass. Both failed runs
+  exited; corrected fresh suites pass with the same clean ARM build
+  (HP50g 1299.9 seconds; HP49g+ 1308.2 seconds). Both successful result files
+  record closure-cut retry writes of one/one/zero for unwritten/partial/complete
+  cases. Supplemental replacement checks against those fresh states also pass.
+  All workflow actionlint checks, recovery-directory Ruff checks and 71 related
+  Python tests pass. CI acceptance for this follow-up remains pending.
+- **Retired claim closure (locally verified, submitted; CI pending):** a new
+  internal operation revalidates the trusted installed transaction's retirement
+  and requires the resource name to be absent from valid Stock HOME before
+  clearing only its claim phase. Existing same-name objects, active transactions
+  and invalid/unreadable RAM reject without writes. Trusted durable producer
+  provenance, exclusive views and no allocation reuse remain caller obligations;
+  the operation does not discover authority from a surviving claim. ARM analysis
+  and the complete installation ASan/UBSan suite pass, including absence/presence,
+  malformed RAM, active/intent rejection, partial-write retry and idempotent
+  closure cases. A native SST witness restricts programming to the bound claim
+  phase word and repeats closure to verify zero additional writes. Its maintained
+  retirement checks compare all Flash bytes and preserve RAM resources; both
+  model runs initially reject the active transaction with zero Flash changes,
+  but fail the low stack guard before Stock return. The closure frame reserves
+  568 bytes across deep validation. Moving directory/encoding buffers into a
+  separate non-inlined phase reduces that frame to 56 bytes without increasing
+  the 4 KiB witness stack. ARM packaging/analysis and the complete installation
+  sanitizer rerun pass. Both native models now reject active transactions without
+  writes, close the actually recovered claim with exactly one SST operation, and
+  repeat closure with zero further writes. Full Flash comparison changes only
+  the claim phase byte; resources, catalog, mappings and stack guards remain
+  intact. Two subsequent resets per model preserve the complete Flash image and
+  catalog with zero writes and no resource revival. These targeted native runs
+  reuse the accepted installation snapshots; the expanded fresh registration
+  suites are running. Native closure-interruption coverage passes as recorded`n  above; Flash reclamation remains open.
+- **Post-recovery retirement prerequisite (locally verified, not submitted):**
+  a read-only installation gate requires both the authority and journal to be
+  fully retired before accepting a CREATED/CLOSING/CLOSED claim. It validates
+  the trusted binding, installed root/catalog and exact claim allocation against
+  actual Flash; the historical capsule cannot hide current damage. ARM static
+  analysis and pinned formatting pass. After correcting the bank-damage fixture
+  to target the actual native header, the complete installation ASan/UBSan suite
+  passes, including partial phases, uncommitted claims, bank damage, read failure
+  and unchanged outputs/storage. A native retirement witness now binds its
+  expected fields from the independently reconstructed installation. The
+  retirement suite checks rejection of the real active transaction and
+  acceptance after actual recovery, preserving Flash, catalog, mappings and
+  owning CODE/stack guards. ARM packaging, formatting and Ruff pass. Initial
+  native probes stop during USB reception: Stock reports insufficient memory
+  before the probe executes. The fixture now consumes its completed original
+  HPCTEMPLATE copy through Stock commands in a separate snapshot before upload,
+  checks unchanged Flash and active reservation bytes (or continued absence after
+  recovery), then runs the read-only probe. Both HP49g+ and HP50g retests pass:
+  active transactions reject with unchanged output, and recovered transactions
+  accept the still-CREATED claim; complete Flash, catalog, mappings and execution
+  guards remain unchanged. Both process exits are zero. This fixture preparation
+  does not establish low-memory admission. The gate does not prove RAM ownership
+  or permit release, claim mutation or Flash reclamation.
 - **Native-created transaction with complete RAM loss (locally verified):**
   added a registration-path check that clears SRAM before resetting the actual
   installed/armed transaction, then declines Stock memory recovery. Initially both
@@ -1219,7 +1401,92 @@ fix is not submitted yet, so CI acceptance and M8.0 completion remain open.
   other metadata/object tears, earlier callback access and installation lifetime
   remain open. Local verification is not CI or M8 acceptance.
 
-- **Local pre-callback Flash access:** native read watchpoints on both models
+- **Local retained-identity allocation tears (2026-10-23):** six offline
+  interrupted-erase fixtures pass automatic recovery on HP49g+/HP50g. The bank
+  identity remains intact while the first allocation's three-byte length field
+  is ORed with `0x000001`, `0x000800` or `0x0fffff`, modelling selected erase
+  transitions from zero to one. Each starts from the same clean retained-RAM
+  fixture with its bound journal/authority, and retains the other target-sector
+  bytes. Both models restore exact whole-Flash contents except the authorized
+  journal/authority retirement, reconstruct the original catalog and empty
+  stack, preserve 24,000 user-array elements and release the matching reservation.
+  Busy-read evidence confirms recovery writes occurred. This is research-only
+  local evidence using the existing experimental recovery installation, not a
+  maintained CI case, actual mid-pulse interruption, second-reset check or
+  approval of internal ID 4. Other allocation fields, arbitrary erase patterns,
+  earlier callbacks and general startup safety remain open.
+
+- **Early ARM scan classification (2026-10-23):** inspection of both Stock 2.15
+  ROMs identifies the routine called at `0x2ed40` as a bank-type-dependent
+  checksum pass, rather than allocation/library traversal. Its instructions
+  at `0x272e0` dispatch types `0x0f`, `0x18`, `0x32` and `0x86`; every value
+  `F0` through `FF` instead branches to the next-bank step at `0x27428`, without
+  checksumming that bank's payload. Exact instruction/call-target checks pass
+  for both ROMs, whose complete inspected routine bytes agree. Thus the earlier
+  read watchpoint proves metadata access, but does not prove this ARM routine
+  follows torn Port 2 allocation lengths. The later Saturn metadata reads remain
+  a separate startup-safety requirement. This narrows the interpretation of the
+  historical watchpoint below; it does not establish complete startup safety.
+
+- **Saturn allocation traversal (locally observed, 2026-10-23):** independent
+  warm-start read watchpoints on both models observe the first allocation status
+  at Saturn address `0x4020a` with continuation `0x23956`, and its length at
+  `0x4020c` with continuation `0x239ee`. The relevant ROM instruction bytes
+  agree across models. Disassembly identifies status/library-prologue handling
+  before the length read; the subsequent traversal exits on zero length or
+  address-addition carry. This locates the actual allocation traversal separately
+  from the earlier ARM checksum pass; it is not proof that every malformed
+  library header is harmless. Three further offline erase fixtures per model
+  OR the first library's title-length byte with `0x04`, `0x80` or `0xec`, leaving
+  the bank identity, allocation length and remaining sector contents intact.
+  All six recover exact authorized Flash/catalog/empty-stack state, preserve
+  24,000 user-array elements and release the matching reservation. These remain
+  research-only local fixtures using the experimental recovery installation;
+  arbitrary library-header tears and supported early installation remain open.
+
+- **Library checksum rejection observed (local, 2026-10-23):** the scanner calls
+  `0x23a7b` before parsing a library header unless Saturn status bit 10 selects
+  the bypass path. The called routine checks the object prologue/length and
+  uses the Saturn CRC register. Separate clean/torn warm-start observers on both
+  models record the first library at `D0=0x40212` returning to `0x2397c`;
+  only the torn-title fixture proceeds to the rejection path at `0x2397f`.
+  This distinguishes checksum rejection from a merely successful final boot.
+  Both observed damaged runs subsequently restore exact authorized Flash,
+  catalog and empty-stack state, preserve 24,000 user-array elements and release
+  the matching reservation. The observation does not classify all callers of
+  the bypass path, prove that checksum reads stay inside a damaged allocation,
+  or make CRC a sufficient safety proof for arbitrary corruption. These remain
+  startup requirements; experimental ID 4 is not approved for production.
+
+- **Pre-checksum catalog pass observed (local, 2026-10-23):** dual instruction
+  watchpoints on both models show the damaged first library taking
+  `0x23973 -> 0x23983 -> 0x23986` before any observed call at `0x23978` and
+  later checksum rejection at `0x2397f`. Original code at `0x09537` sets status
+  bit 10 for catalog preparation; the bypass branch records library-number
+  presence and counts distinct entries. Code at `0x09764` clears the bit before
+  the subsequent checked pass. Thus checksum rejection does not protect every
+  earlier header read. Both instrumented damaged runs still pass exact recovery,
+  catalog/stack, 24,000-element user-data and reservation-release checks. The
+  next startup obligation is bounding the unchecked header reads and catalog
+  preparation writes under torn metadata; this pass is not library configuration
+  execution. General startup safety and the production entry remain open.
+
+- **Allocation traversal leaves Flash (local counterexample, 2026-10-23):**
+  ORing the first record length with `0x40000` changes one erased bit from zero
+  to one while leaving bank identity intact. Both models then execute the
+  scanner status read at `D0=0x9c34a`, continuation `0x23956`, outside the Flash
+  window. The captured read map resolves it to SRAM `0x0804e1a5`; the observed
+  A-register byte agrees with the captured RAM byte `0x78`. This disproves
+  confinement of the native pre-recovery traversal to its Flash bank. It does
+  not demonstrate a RAM write, user-data corruption or failed recovery: these
+  two observed runs still pass exact final Flash/catalog/stack, user-array and
+  reservation checks. All six ordinary cases with length OR masks `0x20000`,
+  `0x40000` and `0x80000` also recover. Their success cannot prove safety for
+  other RAM contents. Startup design must account for this data-dependent
+  out-of-bank traversal before relying on an early library callback; merely
+  adding more successful corruption samples does not close that requirement.
+
+- **Local pre-callback Flash access (historical watchpoint):** native read watchpoints on both models
   observe the original ARM library scanner reading physical `0x140100`, inside
   the installation fixture's `0x140000` target sector, during warm startup.
   ROM instructions identify the bank-status load in the scanner called at
